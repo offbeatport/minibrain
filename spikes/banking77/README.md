@@ -1,7 +1,13 @@
-# Spike: Banking77, Mac half
+# Spike: Banking77
 
 End-to-end check of the core path on one task, before any platform code: prompt-only version 0 → LoRA training →
 eval on the same examples → serving through an OpenAI-compatible endpoint. See `ROADMAP.md` for the plan this tests.
+
+Two parts, matching the roadmap's two modes:
+
+- **Local** (done): `transformers` backend and a 0.6B model, so it runs on any machine. The code picks CUDA, MPS or
+  CPU on its own.
+- **Production** (next): SGLang on an NVIDIA GPU, the large teacher and a 4B model on full data.
 
 - Task: Classify, 77 banking intents ([PolyAI/banking77](https://huggingface.co/datasets/PolyAI/banking77), CC-BY-4.0,
   pinned commit).
@@ -28,7 +34,7 @@ uv run python -m spikes.banking77.call
 Outputs land in `spikes/banking77/out/` (ignored by git). On the M1 Pro, train with
 `--limit 5000 --batch-size 8 --grad-accum 2 --device cpu` (see Findings).
 
-## Results (2026-10-29, Apple M1 Pro 16 GB)
+## Local results (2026-10-29, Apple M1 Pro 16 GB)
 
 | Version | Golden accuracy | Eval accuracy | Eval macro F1 | Invalid | p50 | p95 | Prompt tokens |
 |---|---|---|---|---|---|---|---|
@@ -57,7 +63,7 @@ Outputs land in `spikes/banking77/out/` (ignored by git). On the M1 Pro, train w
   within 3–8 steps, with SDPA and eager attention, batch 16 and 8. Inference on MPS is fine. CPU training was only
   ~1.8× slower than MPS steps before the hang, so local mode needs an automatic CPU fallback.
 
-## Not covered here (GPU half)
+## Production part (to do)
 
 Teacher as version 0 (Qwen3-32B or similar), the 4B student on full data, SGLang with runtime adapter loading, the
 `<base>:<adapter>` model name, constrained decoding, and cost per 1,000 requests.
