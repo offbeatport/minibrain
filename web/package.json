@@ -1,0 +1,37 @@
+{
+    "name": "minibrain-web",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "packageManager": "pnpm@10.30.3",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc --noEmit && vite build",
+        "typecheck": "tsc --noEmit",
+        "lint": "biome check .",
+        "lint:fix": "biome check --write .",
+        "gen:api": "cd .. && uv run minibrain openapi --output web/openapi.json && cd web && openapi-typescript openapi.json --default-non-nullable false -o src/api/schema.d.ts"
+    },
+    "dependencies": {
+        "@tanstack/react-query": "^5.0.0",
+        "@tanstack/react-router": "^1.168.22",
+        "@tanstack/react-table": "^8.20.0",
+        "lucide-react": "^1.35.0",
+        "obp-ui": "github:offbeatport/obp-ui#main",
+        "openapi-fetch": "^0.13.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^1.9.4",
+        "@tailwindcss/vite": "^4.2.2",
+        "@types/node": "^22.20.5",
+        "@types/react": "^19.0.7",
+        "@types/react-dom": "^19.0.3",
+        "@vitejs/plugin-react": "^4.3.4",
+        "openapi-typescript": "^7.4.0",
+        "tailwindcss": "^4.2.2",
+        "typescript": "^5.7.3",
+        "vite": "^7.3.2"
+    }
+}

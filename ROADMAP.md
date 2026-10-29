@@ -485,7 +485,7 @@ Everything in the v1 scope below, after M1.
 
 ## v1 scope
 
-- [ ] Minibrains: create, list, select, delete
+- [x] Minibrains: create, list, select, delete
 - [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer
 - [ ] Index per minibrain: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations
@@ -501,17 +501,17 @@ Everything in the v1 scope below, after M1.
 - [ ] Sources: Postgres, Parquet, S3, files via DuckDB scanners
 - [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
-- [ ] Preview of 5–10 examples
+- [x] Preview of 5–10 examples
 - [ ] Quality score and PII report
-- [ ] Content-hashed snapshots with train/eval split
-- [ ] Worker (Huey), training subprocess, streamed logs, cancel
+- [x] Content-hashed snapshots with train/eval split
+- [x] Worker (Huey), training subprocess, streamed logs, cancel
 - [ ] Base model registry, default recipe, chat template parity tests
-- [ ] Eval vs base, side-by-side review, promote, rollback
+- [x] Eval vs base, side-by-side review, promote, rollback
 - [ ] SGLang pool with runtime adapter load/unload
-- [ ] `transformers` backend for local mode and tests
+- [x] `transformers` backend for local mode and tests
 - [ ] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, audit log, opt-in request
       logs, retrieval context step
-- [ ] Playground
+- [x] Playground
 - [ ] Harness config export
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers
 - [ ] FIPS-ready crypto rules enforced in CI

@@ -1,0 +1,184 @@
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class MinibrainCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class ColumnInfo(BaseModel):
+    name: str
+    type: str
+
+
+class SourceInfo(BaseModel):
+    file: str
+    columns: list[ColumnInfo]
+    rows: int
+
+
+class MappingInfo(BaseModel):
+    input_column: str | None
+    label_column: str | None
+    sql: str | None
+
+
+class MappingUpdate(BaseModel):
+    input_column: str | None = None
+    label_column: str | None = None
+    sql: str | None = None
+
+
+class SnapshotInfo(BaseModel):
+    hash: str
+    counts: dict[str, int]
+    labels: list[str]
+    created_at: datetime
+
+
+class JobInfo(BaseModel):
+    id: int
+    version: int
+    kind: str
+    status: str
+    progress: float
+    error: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class SplitScore(BaseModel):
+    examples: int
+    accuracy: float
+    macro_f1: float
+    invalid_rate: float
+
+
+class Mistake(BaseModel):
+    input: str
+    gold: str
+    output: str
+
+
+class VersionInfo(BaseModel):
+    number: int
+    kind: str
+    status: str
+    current: bool
+    snapshot_hash: str
+    recipe: dict[str, Any]
+    golden: SplitScore | None
+    held_out: SplitScore | None
+    latency_p50_ms: float | None
+    latency_p95_ms: float | None
+    prompt_tokens: float | None
+    mistakes: list[Mistake]
+    job: JobInfo | None
+    created_at: datetime
+
+
+class MinibrainSummary(BaseModel):
+    slug: str
+    name: str
+    task: str
+    current_version: int | None
+    versions: int
+    active_jobs: int
+
+
+class MinibrainDetail(MinibrainSummary):
+    base_model: str
+    source: SourceInfo | None
+    mapping: MappingInfo
+    snapshot: SnapshotInfo | None
+    models: list[str]
+
+
+class QueryRequest(BaseModel):
+    sql: str = Field(min_length=1)
+
+
+class QueryResponse(BaseModel):
+    columns: list[str]
+    rows: list[list[str | None]]
+
+
+class QualityInfo(BaseModel):
+    rows: int
+    empty: int
+    duplicates: int
+    labels: int
+    smallest_label: int
+    largest_label: int
+    mean_input_chars: float
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class PreviewRow(BaseModel):
+    input: str | None
+    label: str | None
+
+
+class PreviewResponse(BaseModel):
+    rows: list[PreviewRow]
+    quality: QualityInfo
+    labels: list[str]
+    example: list[ChatMessage]
+
+
+class ExampleInfo(BaseModel):
+    input: str
+    label: str
+
+
+class VersionCreate(BaseModel):
+    kind: Literal["prompt", "lora"]
+    max_rows: int | None = Field(default=None, ge=10)
+    epochs: float | None = Field(default=None, gt=0, le=10)
+
+
+class PromoteRequest(BaseModel):
+    override: bool = False
+
+
+class CompleteRequest(BaseModel):
+    text: str = Field(min_length=1)
+    version: int | None = None
+    max_tokens: int = Field(default=24, ge=1, le=512)
+
+
+class CompleteResponse(BaseModel):
+    model: str
+    output: str
+    label: str | None
+    latency_ms: float
+    prompt_tokens: int
+    completion_tokens: int
+
+
+class KeyCreate(BaseModel):
+    name: str = Field(default="default", max_length=60)
+
+
+class KeyInfo(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class KeyCreated(KeyInfo):
+    secret: str
+
+
+class LogChunk(BaseModel):
+    text: str
+    offset: int
