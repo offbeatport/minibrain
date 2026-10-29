@@ -249,8 +249,10 @@ PII counts.
 ## Eval and promote
 
 - Eval first: the golden set (20–50 human-verified examples) is written or picked before any training.
-- Version 0 is prompt-only on the teacher: the task type's prompt plus few-shot examples from the golden set. It is
-  usable minutes after the minibrain is created.
+- Version 0 is prompt-only on the teacher: the task type's prompt plus few-shot examples. It is usable minutes after
+  the minibrain is created.
+- Few-shot examples never come from the golden set, which must stay unseen: they come from other labelled rows, or,
+  when the golden set is all there is, a few of its rows move out of it and stop being scored.
 - If version 0 meets `promote.min_score` and its latency and cost are acceptable, the UI says no training is needed.
   Otherwise the report shows the gap a trained version has to close.
 - Every version runs on the golden set and the held-out split: base, teacher and adapter on the same examples, scored
@@ -258,7 +260,8 @@ PII counts.
 - Reported per model: score, p50 / p95 latency, cost per 1,000 requests (GPU time for local models, list price for API
   teachers). The headline reads like "base 54% → minibrain 91% at 1/20 of the teacher's cost".
 - Side-by-side review screen. The version sits in `approval` until a user promotes it; a version that scores below
-  `current` on the golden set needs an explicit override.
+  `current` on the held-out split needs an explicit override. The golden set alone is too small to decide: in the
+  spike, one of 50 rows moved the score 2 points and golden and held-out scores differed by 8–11 points.
 - Promote moves `current` and loads the adapter into the pool. Rollback moves `current` back.
 
 ### Rebase
@@ -413,6 +416,9 @@ Two modes, same code, same adapter format (PEFT safetensors).
 - SGLang on Windows: WSL2 only. SGLang on macOS (MLX backend, v0.5.10+) is experimental with no confirmed LoRA support,
   so it is not used.
 - MPS gaps fall back to CPU with `PYTORCH_ENABLE_MPS_FALLBACK=1`.
+- Local training falls back to CPU when the Metal GPU hangs. Seen in the spike: LoRA backward on an M1 Pro (macOS
+  27.0.1, torch 2.15) hangs the GPU within 3–8 steps, while inference runs fine. CPU training there was only ~1.8×
+  slower.
 - Tests run on the `transformers` backend with a ~0.5B model; integration tests run on a GPU box.
 - Later, a `llamacpp` backend for faster local serving: Metal, Vulkan (AMD and Intel GPUs on Windows and Linux), CPU.
   Needs PEFT → GGUF conversion; per-request LoRA works, requests with different adapters are not batched together.
@@ -522,5 +528,5 @@ Everything in the v1 scope below, after M1.
   under concurrency.
 - Huey on SQLite with the API and the worker writing at the same time.
 - DuckDB Postgres scanner load on customer databases: read replicas, `LIMIT`, materialize.
-- MPS dtype and op gaps during local training.
+- MPS dtype and op gaps during local training; Metal GPU hangs in LoRA backward (seen on M1 Pro, macOS 27.0.1).
 - Teacher quality on generated Q&A: track the check-pass drop rate per source.
