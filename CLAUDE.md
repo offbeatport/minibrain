@@ -8,6 +8,13 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - This repo is public. Business content (customers, pricing, design partners, investors, license strategy) lives in
   the private repo at `~/Development/private/minibrain_plan.md` and never lands here.
 
+## Code rules
+
+- Hashing and crypto stay FIPS-ready: SHA-256 for content hashes and signatures, never MD5 or SHA-1 (ruff `S324`).
+  Non-security hashes pass `usedforsecurity=False`. All crypto goes through OpenSSL or the `cryptography` library;
+  never hand-rolled.
+- Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
+
 ## Portfolio deviations
 
 - Python backend. The frontend is a Vite SPA served by FastAPI, not TanStack Start.

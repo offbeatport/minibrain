@@ -302,7 +302,9 @@ PII counts.
 - API keys scoped to minibrains. Audit log: who, which minibrain, when.
 - Request logging opt-in per minibrain; it feeds feedback and distillation.
 - A context hook between auth and the model call: empty in v1, RAG in v2.
-- Local accounts in v1; OIDC (Entra, Okta, Keycloak) early in v2.
+- Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
+  reaches Minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
+  client-certificate check. Proxy headers are trusted only from configured proxy addresses.
 - Harness config export: base URL, key and model name for common harnesses.
 
 ## UI
@@ -376,12 +378,18 @@ v1, the evidence regulated buyers ask for first:
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
 - PII and PHI handling as in Data; access to every minibrain is scoped and audited.
+- SSO: OIDC and trusted proxy headers (see API and access).
+- FIPS-ready design, so FIPS mode in v2 is a build setting, not a rewrite:
+  - SHA-256 for every content hash and signature; never MD5 or SHA-1 (ruff `S324` in CI).
+  - Non-security hashing (MinHash) passes `usedforsecurity=False`.
+  - All crypto through OpenSSL or the `cryptography` library; nothing hand-rolled.
+  - Base images that can run in FIPS mode (Red Hat UBI).
 
 v2, for defense and critical infrastructure:
 
-- FIPS 140-3 validated crypto mode.
+- FIPS 140-3 validated crypto mode: FIPS-enabled images, test suite run in FIPS mode.
 - Hardened images: DoD STIG, Iron Bank listing.
-- SAML login, CAC / PIV smart cards, roles by team.
+- Native SAML and CAC / PIV login, if customers' proxies are not enough; roles by team.
 - Control mappings: CMMC / NIST 800-171, NIST 800-53, HIPAA.
 
 ## Platforms
@@ -473,7 +481,8 @@ Everything in the v1 scope below, after M1.
       logs, empty context hook
 - [ ] Playground
 - [ ] Harness config export
-- [ ] Local accounts
+- [ ] Login: local accounts, OIDC, trusted reverse-proxy headers
+- [ ] FIPS-ready crypto rules enforced in CI
 - [ ] Local install via uv on Linux, macOS, Windows; production Docker image (CUDA)
 - [ ] Offline install bundle; air-gap CI test
 - [ ] Signed offline update bundles (app and base models) with rollback
@@ -497,12 +506,12 @@ Everything in the v1 scope below, after M1.
 - Version diff (data and scores)
 - Preset recipes
 - Arbitrary Python transforms (admin-only, sandboxed)
-- Teams, sharing, OIDC
+- Teams, sharing
 - Multi-GPU and multi-node (Ray), serving pools across nodes
 - vLLM backend, AMD ROCm production image, `llamacpp` local backend
 - Dedicated or merged-adapter instances for high-traffic minibrains
 - Optional MLflow
-- FIPS 140-3 mode, STIG / Iron Bank images, SAML + CAC / PIV, control mappings
+- FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
 - Helm chart, OpenShift
 - Preinstalled appliance
 
