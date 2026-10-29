@@ -8,7 +8,8 @@ Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factor
 
 ## Positioning
 
-- A minibrain is a **task model**: it learns a format, a behaviour, a house style. It is not a store of facts.
+- A minibrain learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
+  things relate, rarely changing policy). Exact, changing or citable facts come from retrieval.
 - Facts that change, need citations, or sit behind per-document access rules need retrieval (RAG). Out of v1; works
   from day one outside the platform, because any RAG tool can use a minibrain through the OpenAI API.
 - Train only when it pays off. Every minibrain starts prompt-only on the large local model; the eval shows whether a
