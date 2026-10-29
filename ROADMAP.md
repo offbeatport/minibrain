@@ -102,7 +102,7 @@ One deployable, three process types. Module boundaries are the future service bo
 | data | Sources, staging, transforms, quality, PII, snapshots | data |
 | train | Recipes, training subprocess, eval | train |
 | serve | Pools, engine lifecycle, adapter load/unload | serve |
-| gateway | OpenAI API, auth, name resolution, request logging, context hook | gateway |
+| gateway | OpenAI API, auth, name resolution, request logging, retrieval context step | gateway |
 | ui | SPA | — |
 
 | Process | Runs |
