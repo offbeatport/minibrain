@@ -53,7 +53,7 @@ ignore = ["S311"]
 "minibrain/data/sources.py" = ["S608"]
 
 [tool.pyright]
-include = ["minibrain", "spikes", "tests"]
+include = ["minibrain", "samples", "spikes", "tests"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 venvPath = "."

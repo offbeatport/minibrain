@@ -21,6 +21,9 @@ database live in `~/.minibrain` (set `MINIBRAIN_HOME` to move them).
 
 The first scoring job downloads the base model (Qwen3-0.6B, about 1.5 GB) into the Hugging Face cache.
 
+To try it, upload `samples/travel_intents.jsonl` (quick) or `samples/banking77.csv` (where training pays). See
+[`samples/README.md`](samples/README.md).
+
 ## Use the endpoint
 
 Create a key on a minibrain's Endpoint tab, then:
