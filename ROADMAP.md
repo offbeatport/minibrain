@@ -10,8 +10,8 @@ Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factor
 
 - A minibrain learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
   things relate, rarely changing policy). Exact, changing or citable facts come from retrieval.
-- Facts that change, need citations, or sit behind per-document access rules need retrieval (RAG). Out of v1; works
-  from day one outside the platform, because any RAG tool can use a minibrain through the OpenAI API.
+- Facts that change, need citations, or sit behind per-document access rules come from the minibrain's own index
+  (RAG), built from the same sources as training.
 - Train only when it pays off. Every minibrain starts prompt-only on the large local model; the eval shows whether a
   trained small model beats it on score, latency or cost.
 - Two products on one install: a **private frontier endpoint** (the large open model behind the gateway, offline) and
@@ -31,8 +31,8 @@ Good fit, v1 targets:
 | Financial analysis | Text-to-SQL on the customer's own schema |
 | Distillation | Logged frontier-model calls → small private model at lower cost and latency |
 
-Need retrieval (v2, or external RAG with a minibrain as the model): internal knowledge Q&A, sales enablement, codebase
-assistant, compliance and policy, HR helpdesk, customer success onboarding.
+Need the index (Answer task type): internal knowledge Q&A, sales enablement, codebase assistant, compliance and
+policy, HR helpdesk, customer success onboarding.
 
 ### Why raw documents are not enough
 
@@ -54,6 +54,7 @@ mapping comes down to a few fields.
 | Rewrite | Text → text in house style | LLM judge vs reference | Free text |
 | Text-to-SQL | Question + schema → SQL | Execution match on a read-only DB | SQL |
 | Distill | Any prompt → the teacher's answer | LLM judge or exact match vs teacher | As the teacher |
+| Answer | Question + retrieved chunks → answer | LLM judge vs reference, citation precision | Free text + citations |
 
 - Classify and Extract are served with `response_format: json_schema`; SGLang constrains decoding so the output always
   parses.
@@ -63,7 +64,7 @@ mapping comes down to a few fields.
 
 | Term | Meaning |
 |---|---|
-| Minibrain | Slug, base model (pinned revision), `current` version pointer, system prompt, API keys |
+| Minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
 | Version | Prompt-only (model + system prompt + few-shot examples) or trained (snapshot hash + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
 | Snapshot | Final examples as content-hashed Parquet + JSONL, fixed train/eval split |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
@@ -73,6 +74,7 @@ mapping comes down to a few fields.
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
 | Rebase | Rebuilding a minibrain on a new base model from its snapshot, golden set and config, then comparing it with `current` |
 | Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue |
+| Index | The minibrain's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
 
 ## Flow
 
@@ -86,6 +88,9 @@ teacher and version 0 on the golden set + human review → promote → load adap
 
 Distill shortcut: the gateway forwards calls to the teacher and logs them → the logs are the dataset → train → apps
 change the model name.
+
+Index, alongside: the same sources → chunks → embeddings → index, synced continuously → the gateway retrieves from it
+at answer time.
 
 ## Architecture
 
@@ -119,6 +124,8 @@ lines, so the split needs no rewrite.
 | Staging and transforms | DuckDB, one file per minibrain, disposable |
 | Connectors | DuckDB scanners in v1; dlt from the first API source |
 | PII | Presidio |
+| Embeddings | Local open embedding model, pinned (e.g. Qwen3-Embedding-0.6B, Apache-2.0) |
+| Index | LanceDB, embedded on disk: vector + full-text (hybrid) search. DuckDB `vss` persistence is still experimental |
 | Training | torch + transformers + peft + trl + datasets + accelerate |
 | Serving, production | SGLang; vLLM in v2 |
 | Serving, local and tests | `transformers` backend; `llamacpp` later |
@@ -147,6 +154,10 @@ lines, so the split needs no rewrite.
   state is what v2 "retrain on new data" runs on.
 - The DuckDB file is a cache, rebuildable from the source. The only durable data artifact is the snapshot.
 - Gateway request logs are a source like any other; the Distill task reads them directly.
+- Sources are defined once per minibrain and feed both training (a frozen snapshot) and the index (continuous sync):
+  one connector, one PII policy, one set of access rules, one lineage.
+- Training uses only rows every user of the minibrain may see. Rows with narrower access go to the index only, where
+  retrieval filters them per user.
 
 ### Example format
 
@@ -281,6 +292,17 @@ PII counts.
 3. Accepted rows join the next snapshot; the worst failures can join the golden set.
 4. Each minibrain shows feedback since its last version; retraining is one click.
 
+## Retrieval
+
+- Each minibrain has an index built from its sources: chunks, embeddings, full-text terms, source and access metadata.
+- Sync is incremental: dlt state for API sources, change columns or file hashes otherwise. Rows deleted at the source
+  leave the index.
+- At answer time the gateway's context step retrieves top chunks (hybrid search, filtered by the caller's access),
+  adds them to the prompt and returns citations with the answer.
+- Per minibrain, retrieval is off, on, or required (no answer without supporting chunks).
+- The embedding model and index run on local GPU or CPU; nothing leaves the network.
+- Eval: retrieval hit rate and answer correctness on golden questions with known sources.
+
 ## Serving
 
 - A pool is one SGLang instance started with `--enable-lora`, `--max-lora-rank` and `--lora-target-modules`.
@@ -305,7 +327,8 @@ PII counts.
   `<base>:<adapter>` name.
 - API keys scoped to minibrains. Audit log: who, which minibrain, when.
 - Request logging opt-in per minibrain; it feeds feedback and distillation.
-- A context hook between auth and the model call: empty in v1, RAG in v2.
+- A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
+- Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
   reaches Minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
   client-certificate check. Proxy headers are trusted only from configured proxy addresses.
@@ -463,7 +486,9 @@ Everything in the v1 scope below, after M1.
 ## v1 scope
 
 - [ ] Minibrains: create, list, select, delete
-- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill
+- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer
+- [ ] Index per minibrain: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
+      citations
 - [ ] Golden set authoring; eval-first flow
 - [ ] Prompt-only version 0 on the teacher pool
 - [ ] Teacher pool, permanent or temporary; API teacher opt-in, off by default
@@ -485,7 +510,7 @@ Everything in the v1 scope below, after M1.
 - [ ] SGLang pool with runtime adapter load/unload
 - [ ] `transformers` backend for local mode and tests
 - [ ] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, audit log, opt-in request
-      logs, empty context hook
+      logs, retrieval context step
 - [ ] Playground
 - [ ] Harness config export
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers
@@ -505,8 +530,7 @@ Everything in the v1 scope below, after M1.
 ## v2
 
 - Split into services: data, train, serve, gateway
-- RAG: minibrain = adapter + optional index (DuckDB `fts` + `vss`, or LanceDB); adapters trained to answer from
-  retrieved context with citations
+- Adapters trained to answer from retrieved context and cite it
 - dlt API connectors: Zendesk, Jira, Confluence, Salesforce, HubSpot
 - One-click retrain on new data (dlt incremental)
 - Automatic retrain when feedback since the last version crosses a threshold
