@@ -97,6 +97,7 @@ class Version(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))

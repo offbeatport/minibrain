@@ -68,7 +68,7 @@ def cancel_requested(sessions: sessionmaker[Session], job_id: int) -> bool:
 def run_process(sessions: sessionmaker[Session], job_id: int, command: tuple[list[str], Path]) -> int | None:
     arguments, log_path = command
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("ab") as log:
+    with log_path.open("wb") as log:
         process = subprocess.Popen(
             arguments, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, env=os.environ | QUIET_ENV
         )

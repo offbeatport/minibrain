@@ -73,6 +73,8 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     if any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
         raise ConflictError("cancel the running jobs first")
+    for job in minibrain.jobs:
+        Path(job.log_path).unlink(missing_ok=True)
     session.delete(minibrain)
     session.commit()
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)

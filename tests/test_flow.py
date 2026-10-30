@@ -154,3 +154,14 @@ def test_bad_sql_is_rejected(harness: Harness) -> None:
     create_with_dataset(harness)
     response = harness.client.put(f"/api/minibrains/{SLUG}/mapping", json={"sql": "SELECT nope FROM source"})
     assert response.status_code == 422
+
+
+def test_delete_removes_job_logs(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "prompt")
+    job_id = harness.queued[-1]
+    finish_job(harness, job_id, accuracy=0.4)
+    log = harness.settings.jobs_dir() / f"{job_id}.log"
+    log.write_text("old run")
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert not log.exists()
