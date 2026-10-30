@@ -37,5 +37,3 @@ Repo rules on top of `~/Development/CLAUDE.md`.
   set Inter, Space Grotesk and JetBrains Mono, so `styles.css` imports `obp-ui/fonts-alt.css`.
 - Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
   user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.
-- Buttons carry a top-lit gradient edge (`--button-edge` in `web/src/styles.css`): the user's choice on 2026-10-30,
-  an exception to the portfolio's no-gradients rule.
