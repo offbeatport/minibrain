@@ -6,3 +6,62 @@
 
 @source "./**/*.{tsx,ts}";
 @source "../node_modules/obp-ui/src";
+
+:root {
+    --background: #f4f5f5;
+    --foreground: #202121;
+    --card: #feffff;
+    --card-foreground: #202121;
+    --popover: #feffff;
+    --popover-foreground: #202121;
+    --secondary: #eceded;
+    --secondary-foreground: #202121;
+    --muted: #eceded;
+    --muted-foreground: #535454;
+    --faint: #6b6c6d;
+    --primary: #026ecd;
+    --primary-foreground: #ffffff;
+    --accent: #b8d7f2;
+    --accent-foreground: #015aa7;
+    --border: #d3d4d5;
+    --border-soft: #e4e5e5;
+    --input: #d3d4d5;
+    --ring: #026ecd;
+    --shadow-e1: none;
+    --shadow-e2: 0 1px 2px rgba(38, 39, 39, 0.06), 0 4px 12px rgba(38, 39, 39, 0.08);
+    --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+    --font-display: "Space Grotesk Variable", "Space Grotesk", "Inter Variable", sans-serif;
+    --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+    --font-serif: "Spectral", Georgia, serif;
+    --radius: 0.75rem;
+    --radius-card: 1.125rem;
+    --spacing: 0.25rem;
+}
+
+.dark {
+    --background: #010101;
+    --foreground: #e8e9ea;
+    --card: #060606;
+    --card-foreground: #e8e9ea;
+    --popover: #060606;
+    --popover-foreground: #e8e9ea;
+    --secondary: #010101;
+    --secondary-foreground: #e8e9ea;
+    --muted: #010101;
+    --muted-foreground: #a6a7a8;
+    --faint: #7f8182;
+    --primary: #346bf1;
+    --primary-foreground: #ffffff;
+    --accent: #172b57;
+    --accent-foreground: #ffffff;
+    --border: #272c38;
+    --border-soft: #060606;
+    --input: #272c38;
+    --ring: #346bf1;
+    --success: #009b39;
+    --success-foreground: #ffffff;
+    --destructive: #bc0000;
+    --destructive-foreground: #ffffff;
+    --shadow-e1: none;
+    --shadow-e2: 0 4px 12px rgba(0, 0, 0, 0.5);
+}

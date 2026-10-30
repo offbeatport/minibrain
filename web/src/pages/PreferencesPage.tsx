@@ -24,10 +24,7 @@ export function PreferencesPage() {
     return (
         <Page>
             <PageHeader title="Preferences" caption="Stored in this browser." />
-            <Section
-                title="Appearance"
-                caption="The theme is Paper; pick light, dark or follow the system."
-            >
+            <Section title="Appearance" caption="Pick light, dark or follow the system.">
                 <SegmentedTabs tabs={MODES} active={mode} onSelect={choose} />
             </Section>
         </Page>

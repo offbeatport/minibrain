@@ -30,7 +30,7 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - No outbound telemetry, ever: the product runs air-gapped. obp-base OpenPanel and Sentry stay off by default or point
   at self-hosted instances.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
-- obp-ui theme: the Paper preset (user's choice, 2026-10-30), applied in `web/src/lib/theme.ts` for both modes.
-  Paper sets Inter and Space Grotesk, so `web/src/styles.css` imports `obp-ui/fonts-alt.css`.
+- obp-ui theme: the user's own token overrides (2026-10-30) at the end of `web/src/styles.css`, light and dark. They
+  set Inter, Space Grotesk and JetBrains Mono, so `styles.css` imports `obp-ui/fonts-alt.css`.
 - Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
   user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.
