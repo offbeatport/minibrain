@@ -10,7 +10,7 @@ import { count, dateTime, percent } from "~/lib/format";
 
 const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
-        header: "Minibrain",
+        header: "minibrain",
         id: "minibrain",
         cell: ({ row }) => (
             <Link

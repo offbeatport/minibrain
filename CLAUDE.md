@@ -1,4 +1,4 @@
-# Minibrain
+# minibrain
 
 Repo rules on top of `~/Development/CLAUDE.md`.
 

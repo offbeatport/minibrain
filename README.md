@@ -1,4 +1,4 @@
-# Minibrain
+# minibrain
 
 Private platform for small, task-specific models. Point it at your data, score a prompt-only baseline, train a LoRA,
 compare versions on the same examples, and serve the one you promote on an OpenAI-compatible endpoint. Runs on your own
@@ -8,7 +8,7 @@ Plan: [`ROADMAP.md`](ROADMAP.md).
 
 ## Run it
 
-Minibrain is a Python package with the web UI built in, so running it needs no Node:
+minibrain is a Python package with the web UI built in, so running it needs no Node:
 
 ```sh
 uvx --python 3.12 minibrain serve

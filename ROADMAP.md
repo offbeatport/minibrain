@@ -1,4 +1,4 @@
-# Minibrain roadmap
+# minibrain roadmap
 
 Private platform for small, task-specific models. Point at a data source → build examples → train a LoRA → eval
 against the base → serve an OpenAI-compatible API. Many minibrains per install. On-prem / VPC, fully offline by
@@ -64,7 +64,7 @@ mapping comes down to a few fields.
 
 | Term | Meaning |
 |---|---|
-| Minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
+| minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
 | Version | Prompt-only (model + system prompt + few-shot examples) or trained (snapshot hash + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
 | Snapshot | Final examples as content-hashed Parquet + JSONL, fixed train/eval split |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
@@ -98,7 +98,7 @@ One deployable, three process types. Module boundaries are the future service bo
 
 | Module | Owns | Future service |
 |---|---|---|
-| registry | Minibrains, versions, keys, audit log | api |
+| registry | minibrains, versions, keys, audit log | api |
 | data | Sources, staging, transforms, quality, PII, snapshots | data |
 | train | Recipes, training subprocess, eval | train |
 | serve | Pools, engine lifecycle, adapter load/unload | serve |
@@ -229,7 +229,7 @@ PII counts.
 
 - Custom regex recognizers per minibrain for internal IDs (customer numbers, employee IDs).
 - Consistent fakes, not `<PERSON>` tags, or the model learns to emit the tags.
-- Detection is risk reduction, not a guarantee; the UI says so. Minibrain access control stays the real control.
+- Detection is risk reduction, not a guarantee; the UI says so. minibrain access control stays the real control.
 
 ### Snapshots
 
@@ -330,7 +330,7 @@ PII counts.
 - A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
-  reaches Minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
+  reaches minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
   client-certificate check. Proxy headers are trusted only from configured proxy addresses.
 - Harness config export: base URL, key and model name for common harnesses.
 
@@ -486,7 +486,7 @@ Everything in the v1 scope below, after M1.
 
 ## v1 scope
 
-- [x] Minibrains: create, list, select, delete
+- [x] minibrains: create, list, select, delete
 - [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer
 - [ ] Index per minibrain: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations

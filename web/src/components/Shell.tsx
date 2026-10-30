@@ -120,7 +120,7 @@ export function Shell() {
     });
     const rail = (
         <Rail
-            brand={<span className="text-base font-semibold">Minibrain</span>}
+            brand={<span className="text-base font-semibold">minibrain</span>}
             brandHref="/"
             brandLabel="Home"
             toggleIcon="panel"

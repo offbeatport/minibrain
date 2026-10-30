@@ -44,7 +44,7 @@ function MinibrainPicker({
 }) {
     return (
         <Select value={slug} onValueChange={(next) => onSelect(String(next ?? slug))}>
-            <SelectTrigger className="w-56" aria-label="Minibrain">
+            <SelectTrigger className="w-56" aria-label="minibrain">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>

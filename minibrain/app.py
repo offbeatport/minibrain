@@ -48,7 +48,7 @@ def create_app(
     settings: Settings | None = None, backend: ServingBackend | None = None, enqueue: Enqueue | None = None
 ) -> FastAPI:
     settings = settings or load_settings()
-    app = FastAPI(title="Minibrain", version="0.0.0")
+    app = FastAPI(title="minibrain", version="0.0.0")
     app.state.settings = settings
     app.state.sessions = make_sessions(settings.database_url)
     app.state.backend = backend or TransformersBackend()
