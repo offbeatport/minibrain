@@ -1,9 +1,72 @@
 import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { Button, ThemeToggle, type UILinkProps, UIProvider } from "obp-ui";
-import { AppShell, EntityRow, Rail } from "obp-ui/shell";
+import {
+    Activity,
+    Boxes,
+    Cpu,
+    Database,
+    Gauge,
+    GraduationCap,
+    Home,
+    LogOut,
+    MessageSquare,
+    Rocket,
+    Settings,
+    SlidersHorizontal,
+    ThumbsUp,
+    UserRound,
+    Workflow,
+} from "lucide-react";
+import { type UILinkProps, UIProvider } from "obp-ui";
+import {
+    AccountButton,
+    AccountMenu,
+    type AccountMenuItem,
+    AppShell,
+    type IconComponent,
+    NavItem,
+    Rail,
+    SectionLabel,
+} from "obp-ui/shell";
 import type { MouseEvent } from "react";
-import type { MinibrainSummary } from "~/api/client";
-import { useMinibrains } from "~/api/queries";
+import { readMinibrainParam, rememberedMinibrain } from "~/lib/selection";
+
+type NavEntry = { label: string; path: string; icon: IconComponent; scoped?: boolean };
+
+const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
+    { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
+    {
+        label: "Explore",
+        items: [
+            { label: "Models", path: "/models", icon: Boxes },
+            { label: "Playground", path: "/playground", icon: MessageSquare, scoped: true },
+        ],
+    },
+    {
+        label: "Create",
+        items: [
+            { label: "Data", path: "/data", icon: Database, scoped: true },
+            { label: "Training", path: "/training", icon: GraduationCap, scoped: true },
+            { label: "Evaluations", path: "/evaluations", icon: Gauge, scoped: true },
+            { label: "Feedback", path: "/feedback", icon: ThumbsUp, scoped: true },
+        ],
+    },
+    {
+        label: "Run",
+        items: [
+            { label: "Deployments", path: "/deployments", icon: Rocket, scoped: true },
+            { label: "Pipelines", path: "/pipelines", icon: Workflow },
+            { label: "Compute", path: "/compute", icon: Cpu },
+            { label: "Monitor", path: "/monitor", icon: Activity, scoped: true },
+        ],
+    },
+    { label: null, items: [{ label: "Settings", path: "/settings", icon: Settings }] },
+];
+
+const ACCOUNT_ITEMS: AccountMenuItem[] = [
+    { icon: <UserRound />, label: "Profile", href: "/profile" },
+    { icon: <SlidersHorizontal />, label: "Preferences", href: "/preferences" },
+    { icon: <LogOut />, label: "Sign out", separatorBefore: true, disabled: true },
+];
 
 function KitLink({ href, onClick, ...rest }: UILinkProps) {
     const router = useRouter();
@@ -19,61 +82,53 @@ function KitLink({ href, onClick, ...rest }: UILinkProps) {
     return <a href={href} onClick={follow} {...rest} />;
 }
 
-function Initial({ name, active }: { name: string; active: boolean }) {
-    return (
-        <span className="relative grid size-8 flex-none place-items-center rounded-md border bg-card text-sm font-semibold">
-            {name.slice(0, 1).toUpperCase()}
-            {active && (
-                <span
-                    aria-hidden="true"
-                    className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-info"
-                />
-            )}
-        </span>
-    );
+function hrefFor(entry: NavEntry, minibrain: string | null): string {
+    return entry.scoped && minibrain
+        ? `${entry.path}?minibrain=${encodeURIComponent(minibrain)}`
+        : entry.path;
 }
 
-function meta(item: MinibrainSummary): string {
-    if (item.active_jobs > 0) {
-        return "Job running";
-    }
-    return item.current_version === null ? "No version yet" : `Serving v${item.current_version}`;
-}
-
-function MinibrainList({ pathname }: { pathname: string }) {
-    const { data } = useMinibrains();
+function Navigation({ pathname, minibrain }: { pathname: string; minibrain: string | null }) {
     return (
-        <div className="flex flex-col gap-0.5 px-3">
-            {(data ?? []).map((item) => (
-                <EntityRow
-                    key={item.slug}
-                    name={item.name}
-                    href={`/m/${item.slug}/data`}
-                    avatar={<Initial name={item.name} active={item.active_jobs > 0} />}
-                    metaLabel={meta(item)}
-                    selected={pathname.startsWith(`/m/${item.slug}/`)}
-                />
+        <>
+            {SECTIONS.map((section) => (
+                <div key={section.label ?? section.items[0].path} className="flex flex-col">
+                    {section.label && <SectionLabel>{section.label}</SectionLabel>}
+                    {section.items.map((entry) => (
+                        <NavItem
+                            key={entry.path}
+                            icon={entry.icon}
+                            label={entry.label}
+                            href={hrefFor(entry, minibrain)}
+                            active={pathname === entry.path}
+                        />
+                    ))}
+                </div>
             ))}
-        </div>
+        </>
     );
 }
 
 export function Shell() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const requested = useRouterState({
+        select: (state) => readMinibrainParam(state.location.search),
+    });
     const rail = (
         <Rail
             brand={<span className="text-base font-semibold">Minibrain</span>}
             brandCollapsed={<span className="text-base font-semibold">M</span>}
             brandHref="/"
-            footer={<ThemeToggle />}
+            brandLabel="Home"
+            footer={
+                <AccountMenu
+                    trigger={<AccountButton initial="L" name="Local user" sub="This install" />}
+                    items={ACCOUNT_ITEMS}
+                />
+            }
         >
-            <div className="px-3 pb-2">
-                <Button asChild variant="outline" size="sm" className="w-full">
-                    <KitLink href="/">New minibrain</KitLink>
-                </Button>
-            </div>
-            <MinibrainList pathname={pathname} />
+            <Navigation pathname={pathname} minibrain={requested ?? rememberedMinibrain()} />
         </Rail>
     );
     return (
@@ -81,7 +136,7 @@ export function Shell() {
             Link={KitLink}
             navigate={(href) => router.history.push(href)}
             pathname={pathname}
-            paths={{ home: () => "/" }}
+            paths={{ home: () => "/", settings: () => "/settings" }}
         >
             <AppShell rail={rail}>
                 <Outlet />

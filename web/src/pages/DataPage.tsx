@@ -22,9 +22,9 @@ import {
 } from "~/api/client";
 import { keys, useGolden, useMinibrain, usePreview } from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
-import { ErrorLine, Page, Section, Stat } from "~/components/Section";
+import { ScopedPage } from "~/components/PageHeader";
+import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
-import { useSlug } from "./MinibrainLayout";
 
 type Row = { input: string | null; label: string | null };
 
@@ -378,18 +378,25 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-export function DataPage() {
-    const slug = useSlug();
+function DataSections({ slug }: { slug: string }) {
     const { data } = useMinibrain(slug);
     if (!data) {
         return null;
     }
     return (
-        <Page>
+        <>
             <SourceSection detail={data} />
             <MappingSection detail={data} />
             <PreviewSection detail={data} />
             <DatasetSection detail={data} />
-        </Page>
+        </>
+    );
+}
+
+export function DataPage() {
+    return (
+        <ScopedPage title="Data" caption="Upload a file, map its columns and build the dataset.">
+            {(slug) => <DataSections key={slug} slug={slug} />}
+        </ScopedPage>
     );
 }

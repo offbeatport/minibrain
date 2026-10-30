@@ -165,3 +165,28 @@ def test_delete_removes_job_logs(harness: Harness) -> None:
     log.write_text("old run")
     assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
     assert not log.exists()
+
+
+def test_recent_jobs_span_minibrains(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "prompt")
+    finish_job(harness, harness.queued[-1], accuracy=0.4)
+    harness.client.post("/api/minibrains", json={"name": "Other"})
+    jobs = harness.client.get("/api/jobs?limit=5").json()
+    assert [(job["minibrain"], job["minibrain_name"]) for job in jobs] == [(SLUG, "Support Triage")]
+    summaries = {item["slug"]: item for item in harness.client.get("/api/minibrains").json()}
+    assert summaries[SLUG]["current_accuracy"] == 0.4
+    assert summaries["other"]["current_accuracy"] is None
+    assert summaries["other"]["base_model"] == "qwen3-0.6b"
+
+
+def test_system_and_settings(harness: Harness) -> None:
+    system = harness.client.get("/api/system").json()
+    assert system["device"]["inference"] in {"cuda", "mps", "cpu"}
+    assert system["device"]["cpu_count"] >= 1
+    assert "torch" in system["libraries"]
+    assert system["loaded"] == []
+    settings = harness.client.get("/api/settings").json()
+    assert settings["default_base_model"] == "qwen3-0.6b"
+    assert settings["base_models"][0]["license"] == "Apache-2.0"
+    assert settings["splits"]["golden"] == 50

@@ -13,9 +13,9 @@ import { ChatBubble } from "obp-ui/chat";
 import { type FormEvent, useState } from "react";
 import { type CompleteResponse, api, unwrap } from "~/api/client";
 import { useGolden, useMinibrain, useVersions } from "~/api/queries";
-import { ErrorLine, Page, Section } from "~/components/Section";
+import { ScopedPage } from "~/components/PageHeader";
+import { ErrorLine, Section } from "~/components/Section";
 import { asCode, milliseconds } from "~/lib/format";
-import { useSlug } from "./MinibrainLayout";
 
 const NONE = "none";
 
@@ -68,8 +68,7 @@ function Reply({ reply }: { reply: CompleteResponse }) {
     );
 }
 
-export function PlaygroundPage() {
-    const slug = useSlug();
+function Playground({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const { data: versions } = useVersions(slug);
     const golden = useGolden(slug, Boolean(detail?.snapshot));
@@ -109,16 +108,16 @@ export function PlaygroundPage() {
     };
     if (ready.length === 0) {
         return (
-            <Page>
+            <>
                 <p className="text-sm text-muted-foreground">
-                    No version is ready yet. Score or train one on the Versions tab.
+                    No version is ready yet. Score or train one on the Training page.
                 </p>
-            </Page>
+            </>
         );
     }
     const samples = (golden.data ?? []).slice(0, 4);
     return (
-        <Page>
+        <>
             <Section
                 title="Try it"
                 caption="Each message is classified on its own. Pick a second version to compare answers side by side."
@@ -181,6 +180,17 @@ export function PlaygroundPage() {
                     </div>
                 </div>
             ))}
-        </Page>
+        </>
+    );
+}
+
+export function PlaygroundPage() {
+    return (
+        <ScopedPage
+            title="Playground"
+            caption="Try a version on your own inputs, or compare two side by side."
+        >
+            {(slug) => <Playground key={slug} slug={slug} />}
+        </ScopedPage>
     );
 }

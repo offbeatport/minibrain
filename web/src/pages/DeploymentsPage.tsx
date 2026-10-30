@@ -5,9 +5,9 @@ import { type FormEvent, useState } from "react";
 import { type KeyCreated, type KeyInfo, api, succeed, unwrap } from "~/api/client";
 import { keys, useKeys, useMinibrain } from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
-import { ErrorLine, Page, Section } from "~/components/Section";
-import { dateTime } from "~/lib/format";
-import { useSlug } from "./MinibrainLayout";
+import { ScopedPage } from "~/components/PageHeader";
+import { ErrorLine, Section } from "~/components/Section";
+import { dateTime, percent } from "~/lib/format";
 
 function Code({ children }: { children: string }) {
     return (
@@ -122,8 +122,7 @@ function KeysSection({ slug, onCreated }: { slug: string; onCreated: (key: KeyCr
     );
 }
 
-export function EndpointPage() {
-    const slug = useSlug();
+function Deployment({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const [created, setCreated] = useState<KeyCreated | null>(null);
     if (!detail) {
@@ -133,12 +132,20 @@ export function EndpointPage() {
     const model = detail.models[0] ?? slug;
     const code = snippets(baseUrl, model, created?.secret ?? "YOUR_KEY");
     return (
-        <Page>
+        <>
             <Section
                 title="Endpoint"
                 caption="OpenAI-compatible. Point any OpenAI client at this base URL."
             >
                 <div className="flex flex-col gap-3 text-sm">
+                    <div>
+                        <div className="text-muted-foreground">Serving</div>
+                        <div>
+                            {detail.current_version === null
+                                ? "Nothing yet: promote a version on the Evaluations page."
+                                : `v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`}
+                        </div>
+                    </div>
                     <div>
                         <div className="text-muted-foreground">Base URL</div>
                         <div className="font-mono">{baseUrl}</div>
@@ -177,6 +184,17 @@ export function EndpointPage() {
                     <Code>{code.python}</Code>
                 </div>
             </Section>
-        </Page>
+        </>
+    );
+}
+
+export function DeploymentsPage() {
+    return (
+        <ScopedPage
+            title="Deployments"
+            caption="The endpoint, model names and API keys for a minibrain."
+        >
+            {(slug) => <Deployment key={slug} slug={slug} />}
+        </ScopedPage>
     );
 }

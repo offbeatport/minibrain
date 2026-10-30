@@ -15,7 +15,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.data.sources import describe
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, Job, Minibrain, Snapshot, Version
-from minibrain.registry.service import latest_snapshot
+from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
 
@@ -45,6 +45,8 @@ def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
 def job_info(job: Job) -> JobInfo:
     return JobInfo(
         id=job.id,
+        minibrain=job.minibrain.slug,
+        minibrain_name=job.minibrain.name,
         version=job.version.number,
         kind=job.kind,
         status=job.status,
@@ -88,12 +90,21 @@ def version_info(minibrain: Minibrain, version: Version) -> VersionInfo:
     )
 
 
+def current_accuracy(minibrain: Minibrain) -> float | None:
+    if minibrain.current_version is None:
+        return None
+    version = find_version(minibrain, minibrain.current_version)
+    return held_out_accuracy(version) if version is not None and version.metrics else None
+
+
 def summary(minibrain: Minibrain) -> MinibrainSummary:
     return MinibrainSummary(
         slug=minibrain.slug,
         name=minibrain.name,
         task=minibrain.task,
+        base_model=minibrain.base_model,
         current_version=minibrain.current_version,
+        current_accuracy=current_accuracy(minibrain),
         versions=len(minibrain.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
     )
@@ -105,10 +116,11 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         slug=minibrain.slug,
         name=minibrain.name,
         task=minibrain.task,
+        base_model=minibrain.base_model,
         current_version=minibrain.current_version,
+        current_accuracy=current_accuracy(minibrain),
         versions=len(minibrain.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
-        base_model=minibrain.base_model,
         source=source_info(settings, minibrain),
         mapping=MappingInfo(
             input_column=minibrain.input_column, label_column=minibrain.label_column, sql=minibrain.sql

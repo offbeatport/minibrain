@@ -40,6 +40,8 @@ class SnapshotInfo(BaseModel):
 
 class JobInfo(BaseModel):
     id: int
+    minibrain: str
+    minibrain_name: str
     version: int
     kind: str
     status: str
@@ -84,13 +86,14 @@ class MinibrainSummary(BaseModel):
     slug: str
     name: str
     task: str
+    base_model: str
     current_version: int | None
+    current_accuracy: float | None
     versions: int
     active_jobs: int
 
 
 class MinibrainDetail(MinibrainSummary):
-    base_model: str
     source: SourceInfo | None
     mapping: MappingInfo
     snapshot: SnapshotInfo | None
@@ -182,3 +185,42 @@ class KeyCreated(KeyInfo):
 class LogChunk(BaseModel):
     text: str
     offset: int
+
+
+class DeviceInfo(BaseModel):
+    inference: str
+    training: str
+    accelerator: str | None
+    memory_total_mb: float | None
+    memory_used_mb: float | None
+    cpu_count: int
+
+
+class LoadedModel(BaseModel):
+    base_model: str
+    device: str
+    adapters: list[str]
+
+
+class SystemInfo(BaseModel):
+    device: DeviceInfo
+    libraries: dict[str, str]
+    jobs: dict[str, int]
+    loaded: list[LoadedModel]
+
+
+class BaseModelInfo(BaseModel):
+    key: str
+    repo: str
+    revision: str
+    license: str
+
+
+class InstallSettings(BaseModel):
+    home: str
+    database: str
+    web: str
+    base_models: list[BaseModelInfo]
+    default_base_model: str
+    recipe: dict[str, Any]
+    splits: dict[str, int]

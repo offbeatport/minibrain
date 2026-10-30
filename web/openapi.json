@@ -633,6 +633,53 @@
         }
       }
     },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Recent Jobs",
+        "operationId": "recent_jobs_api_jobs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobInfo"
+                  },
+                  "title": "Response Recent Jobs Api Jobs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/jobs/{job_id}/log": {
       "get": {
         "tags": [
@@ -919,6 +966,48 @@
         }
       }
     },
+    "/api/system": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "System",
+        "operationId": "system_api_system_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Install Settings",
+        "operationId": "install_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallSettings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/models": {
       "get": {
         "tags": [
@@ -984,6 +1073,34 @@
   },
   "components": {
     "schemas": {
+      "BaseModelInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "repo",
+          "revision",
+          "license"
+        ],
+        "title": "BaseModelInfo"
+      },
       "Body_upload_source_api_minibrains__slug__source_post": {
         "properties": {
           "file": {
@@ -1160,6 +1277,65 @@
         ],
         "title": "CompleteResponse"
       },
+      "DeviceInfo": {
+        "properties": {
+          "inference": {
+            "type": "string",
+            "title": "Inference"
+          },
+          "training": {
+            "type": "string",
+            "title": "Training"
+          },
+          "accelerator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accelerator"
+          },
+          "memory_total_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Mb"
+          },
+          "memory_used_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Mb"
+          },
+          "cpu_count": {
+            "type": "integer",
+            "title": "Cpu Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inference",
+          "training",
+          "accelerator",
+          "memory_total_mb",
+          "memory_used_mb",
+          "cpu_count"
+        ],
+        "title": "DeviceInfo"
+      },
       "ExampleInfo": {
         "properties": {
           "input": {
@@ -1191,11 +1367,69 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InstallSettings": {
+        "properties": {
+          "home": {
+            "type": "string",
+            "title": "Home"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "web": {
+            "type": "string",
+            "title": "Web"
+          },
+          "base_models": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelInfo"
+            },
+            "type": "array",
+            "title": "Base Models"
+          },
+          "default_base_model": {
+            "type": "string",
+            "title": "Default Base Model"
+          },
+          "recipe": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Recipe"
+          },
+          "splits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Splits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "home",
+          "database",
+          "web",
+          "base_models",
+          "default_base_model",
+          "recipe",
+          "splits"
+        ],
+        "title": "InstallSettings"
+      },
       "JobInfo": {
         "properties": {
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "minibrain": {
+            "type": "string",
+            "title": "Minibrain"
+          },
+          "minibrain_name": {
+            "type": "string",
+            "title": "Minibrain Name"
           },
           "version": {
             "type": "integer",
@@ -1257,6 +1491,8 @@
         "type": "object",
         "required": [
           "id",
+          "minibrain",
+          "minibrain_name",
           "version",
           "kind",
           "status",
@@ -1368,6 +1604,32 @@
           "last_used_at"
         ],
         "title": "KeyInfo"
+      },
+      "LoadedModel": {
+        "properties": {
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "adapters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Adapters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_model",
+          "device",
+          "adapters"
+        ],
+        "title": "LoadedModel"
       },
       "LogChunk": {
         "properties": {
@@ -1524,6 +1786,10 @@
             "type": "string",
             "title": "Task"
           },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
           "current_version": {
             "anyOf": [
               {
@@ -1535,6 +1801,17 @@
             ],
             "title": "Current Version"
           },
+          "current_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Accuracy"
+          },
           "versions": {
             "type": "integer",
             "title": "Versions"
@@ -1542,10 +1819,6 @@
           "active_jobs": {
             "type": "integer",
             "title": "Active Jobs"
-          },
-          "base_model": {
-            "type": "string",
-            "title": "Base Model"
           },
           "source": {
             "anyOf": [
@@ -1583,10 +1856,11 @@
           "slug",
           "name",
           "task",
+          "base_model",
           "current_version",
+          "current_accuracy",
           "versions",
           "active_jobs",
-          "base_model",
           "source",
           "mapping",
           "snapshot",
@@ -1608,6 +1882,10 @@
             "type": "string",
             "title": "Task"
           },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
           "current_version": {
             "anyOf": [
               {
@@ -1618,6 +1896,17 @@
               }
             ],
             "title": "Current Version"
+          },
+          "current_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Accuracy"
           },
           "versions": {
             "type": "integer",
@@ -1633,7 +1922,9 @@
           "slug",
           "name",
           "task",
+          "base_model",
           "current_version",
+          "current_accuracy",
           "versions",
           "active_jobs"
         ],
@@ -1920,6 +2211,42 @@
           "invalid_rate"
         ],
         "title": "SplitScore"
+      },
+      "SystemInfo": {
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          },
+          "libraries": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Libraries"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Jobs"
+          },
+          "loaded": {
+            "items": {
+              "$ref": "#/components/schemas/LoadedModel"
+            },
+            "type": "array",
+            "title": "Loaded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device",
+          "libraries",
+          "jobs",
+          "loaded"
+        ],
+        "title": "SystemInfo"
       },
       "ValidationError": {
         "properties": {

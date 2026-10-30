@@ -32,3 +32,5 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
 - obp-ui theme: the Paper preset (user's choice, 2026-10-30), applied in `web/src/lib/theme.ts` for both modes.
   Paper sets Inter and Space Grotesk, so `web/src/styles.css` imports `obp-ui/fonts-alt.css`.
+- Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
+  user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.

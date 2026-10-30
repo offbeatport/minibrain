@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from minibrain.api import minibrains, versions
+from minibrain.api import minibrains, system, versions
 from minibrain.api.deps import Enqueue
 from minibrain.data.snapshot import SnapshotError
 from minibrain.data.sources import SourceError
@@ -57,6 +57,7 @@ def create_app(
         app.add_exception_handler(error, domain_error)
     app.include_router(minibrains.router)
     app.include_router(versions.router)
+    app.include_router(system.router)
     app.include_router(gateway.router)
     mount_web(app, settings.web_dist)
     return app

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter
+from sqlalchemy import select
 
 from minibrain.api.deps import BackendDep, EnqueueDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
@@ -71,6 +72,12 @@ def promote_version(
 def list_jobs(slug: str, session: SessionDep) -> list[JobInfo]:
     minibrain = get_minibrain(session, slug)
     return [job_info(job) for job in sorted(minibrain.jobs, key=lambda job: job.id, reverse=True)]
+
+
+@router.get("/jobs")
+def recent_jobs(session: SessionDep, limit: int = 20) -> list[JobInfo]:
+    jobs = session.scalars(select(Job).order_by(Job.id.desc()).limit(max(1, min(limit, 200))))
+    return [job_info(job) for job in jobs]
 
 
 def get_job(session: SessionDep, job_id: int) -> Job:

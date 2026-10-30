@@ -11,20 +11,12 @@ from trl.trainer.sft_trainer import SFTTrainer
 
 from minibrain.data.snapshot import read_split
 from minibrain.ml.context import JobContext, load_context, set_progress, update_version
-from minibrain.ml.runtime import load_base_model, load_tokenizer, training_device
+from minibrain.ml.devices import training_device
+from minibrain.ml.runtime import load_base_model, load_tokenizer
+from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.db import make_sessions
 from minibrain.settings import load_settings
 from minibrain.tasks.classify import trained_messages
-
-DEFAULT_RECIPE: dict[str, Any] = {
-    "max_rows": 3000,
-    "epochs": 1.0,
-    "batch_size": 8,
-    "grad_accum": 2,
-    "rank": 16,
-    "alpha": 32,
-    "learning_rate": 2e-4,
-}
 
 
 class ProgressCallback(TrainerCallback):

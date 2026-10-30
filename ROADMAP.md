@@ -337,12 +337,13 @@ PII counts.
 ## UI
 
 - obp-ui, operator-console style.
-- Per-minibrain tabs: task, golden set, source, mapping / SQL, labelling, preview, quality, train, eval, endpoint,
-  playground.
+- Sidebar: Home · Explore (Models, Playground) · Create (Data, Training, Evaluations, Feedback) · Run (Deployments,
+  Pipelines, Compute, Monitor) · Settings · user menu (Profile, Preferences, Sign out). Pages that work on one
+  minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
 
 | Need | obp-ui |
 |---|---|
-| Minibrain list | `shell`: `AppShell`, `Rail`, `EntityRow` |
+| Sidebar | `shell`: `AppShell`, `Rail`, `NavItem`, `SectionLabel`, `AccountMenu` |
 | Status | `Badge`: queued `neutral`, training `info`, awaiting promote `approval`, current `success`, failed `destructive` |
 | Training logs | `console`: `LogView`, `ConsoleDock` |
 | Preview, playground, side-by-side eval | `chat`: `ChatBubble`, `AssistantTurn`, `ChatComposer` |

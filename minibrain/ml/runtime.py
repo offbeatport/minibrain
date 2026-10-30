@@ -1,4 +1,3 @@
-import os
 import time
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
@@ -17,21 +16,10 @@ from transformers import (
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
+from minibrain.ml.devices import pick_device
 
 STOP_TOKENS = ["<|im_end|>", "<|endoftext|>"]
 Message = dict[str, str]
-
-
-def pick_device() -> str:
-    if torch.cuda.is_available():
-        return "cuda"
-    if torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
-
-
-def training_device() -> str:
-    return os.environ.get("MINIBRAIN_TRAIN_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def pick_dtype(device: str) -> torch.dtype:

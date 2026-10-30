@@ -1,60 +1,89 @@
-import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
+import {
+    type AnyRoute,
+    type RouteComponent,
+    createRootRoute,
+    createRoute,
+    createRouter,
+    redirect,
+} from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
+import { readMinibrainParam } from "./lib/selection";
+import { ComputePage } from "./pages/ComputePage";
 import { DataPage } from "./pages/DataPage";
-import { EndpointPage } from "./pages/EndpointPage";
+import { DeploymentsPage } from "./pages/DeploymentsPage";
+import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
-import { MinibrainLayout } from "./pages/MinibrainLayout";
+import { ModelsPage } from "./pages/ModelsPage";
+import { FeedbackPage, MonitorPage, PipelinesPage, ProfilePage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
-import { VersionsPage } from "./pages/VersionsPage";
+import { PreferencesPage } from "./pages/PreferencesPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { TrainingPage } from "./pages/TrainingPage";
+
+const LEGACY_TABS: Record<string, string> = {
+    data: "/data",
+    versions: "/evaluations",
+    playground: "/playground",
+    endpoint: "/deployments",
+};
 
 const rootRoute = createRootRoute({ component: Shell });
 
-const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: HomePage });
+function validateMinibrain(search: Record<string, unknown>): { minibrain?: string } {
+    const minibrain = readMinibrainParam(search);
+    return minibrain ? { minibrain } : {};
+}
 
-const minibrainRoute = createRoute({
+function globalPage(path: string, component: RouteComponent): AnyRoute {
+    return createRoute({ getParentRoute: () => rootRoute, path, component });
+}
+
+function scopedPage(path: string, component: RouteComponent): AnyRoute {
+    return createRoute({
+        getParentRoute: () => rootRoute,
+        path,
+        component,
+        validateSearch: validateMinibrain,
+    });
+}
+
+function legacyHref(slug: string, tab: string): string {
+    return `${LEGACY_TABS[tab] ?? "/data"}?minibrain=${encodeURIComponent(slug)}`;
+}
+
+const legacyTabRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: "/m/$slug",
-    component: MinibrainLayout,
-});
-
-const minibrainIndexRoute = createRoute({
-    getParentRoute: () => minibrainRoute,
-    path: "/",
+    path: "/m/$slug/$tab",
     beforeLoad: ({ params }) => {
-        throw redirect({ to: "/m/$slug/data", params });
+        throw redirect({ href: legacyHref(params.slug, params.tab) });
     },
 });
 
-const dataRoute = createRoute({
-    getParentRoute: () => minibrainRoute,
-    path: "data",
-    component: DataPage,
-});
-const versionsRoute = createRoute({
-    getParentRoute: () => minibrainRoute,
-    path: "versions",
-    component: VersionsPage,
-});
-const playgroundRoute = createRoute({
-    getParentRoute: () => minibrainRoute,
-    path: "playground",
-    component: PlaygroundPage,
-});
-const endpointRoute = createRoute({
-    getParentRoute: () => minibrainRoute,
-    path: "endpoint",
-    component: EndpointPage,
+const legacyRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/m/$slug",
+    beforeLoad: ({ params }) => {
+        throw redirect({ href: legacyHref(params.slug, "data") });
+    },
 });
 
 const routeTree = rootRoute.addChildren([
-    homeRoute,
-    minibrainRoute.addChildren([
-        minibrainIndexRoute,
-        dataRoute,
-        versionsRoute,
-        playgroundRoute,
-        endpointRoute,
-    ]),
+    globalPage("/", HomePage),
+    globalPage("/models", ModelsPage),
+    scopedPage("/playground", PlaygroundPage),
+    scopedPage("/data", DataPage),
+    scopedPage("/training", TrainingPage),
+    scopedPage("/evaluations", EvaluationsPage),
+    scopedPage("/feedback", FeedbackPage),
+    scopedPage("/deployments", DeploymentsPage),
+    globalPage("/pipelines", PipelinesPage),
+    globalPage("/compute", ComputePage),
+    scopedPage("/monitor", MonitorPage),
+    globalPage("/settings", SettingsPage),
+    globalPage("/profile", ProfilePage),
+    globalPage("/preferences", PreferencesPage),
+    legacyTabRoute,
+    legacyRoute,
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent" });

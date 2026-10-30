@@ -81,3 +81,26 @@ export function useKeys(slug: string) {
         queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/keys", path(slug))),
     });
 }
+
+export function useRecentJobs(limit = 15) {
+    return useQuery({
+        queryKey: ["jobs", limit] as const,
+        queryFn: () => unwrap(api.GET("/api/jobs", { params: { query: { limit } } })),
+        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
+    });
+}
+
+export function useSystem() {
+    return useQuery({
+        queryKey: ["system"] as const,
+        queryFn: () => unwrap(api.GET("/api/system")),
+        refetchInterval: 5000,
+    });
+}
+
+export function useInstallSettings() {
+    return useQuery({
+        queryKey: ["settings"] as const,
+        queryFn: () => unwrap(api.GET("/api/settings")),
+    });
+}

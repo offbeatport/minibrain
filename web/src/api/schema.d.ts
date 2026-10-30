@@ -194,6 +194,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Jobs */
+        get: operations["recent_jobs_api_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/log": {
         parameters: {
             query?: never;
@@ -280,6 +297,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** System */
+        get: operations["system_api_system_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Install Settings */
+        get: operations["install_settings_api_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models": {
         parameters: {
             query?: never;
@@ -318,6 +369,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BaseModelInfo */
+        BaseModelInfo: {
+            /** Key */
+            key: string;
+            /** Repo */
+            repo: string;
+            /** Revision */
+            revision: string;
+            /** License */
+            license: string;
+        };
         /** Body_upload_source_api_minibrains__slug__source_post */
         Body_upload_source_api_minibrains__slug__source_post: {
             /** File */
@@ -382,6 +444,21 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
+        /** DeviceInfo */
+        DeviceInfo: {
+            /** Inference */
+            inference: string;
+            /** Training */
+            training: string;
+            /** Accelerator */
+            accelerator: string | null;
+            /** Memory Total Mb */
+            memory_total_mb: number | null;
+            /** Memory Used Mb */
+            memory_used_mb: number | null;
+            /** Cpu Count */
+            cpu_count: number;
+        };
         /** ExampleInfo */
         ExampleInfo: {
             /** Input */
@@ -394,10 +471,35 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InstallSettings */
+        InstallSettings: {
+            /** Home */
+            home: string;
+            /** Database */
+            database: string;
+            /** Web */
+            web: string;
+            /** Base Models */
+            base_models: components["schemas"]["BaseModelInfo"][];
+            /** Default Base Model */
+            default_base_model: string;
+            /** Recipe */
+            recipe: {
+                [key: string]: unknown;
+            };
+            /** Splits */
+            splits: {
+                [key: string]: number;
+            };
+        };
         /** JobInfo */
         JobInfo: {
             /** Id */
             id: number;
+            /** Minibrain */
+            minibrain: string;
+            /** Minibrain Name */
+            minibrain_name: string;
             /** Version */
             version: number;
             /** Kind */
@@ -460,6 +562,15 @@ export interface components {
             /** Last Used At */
             last_used_at: string | null;
         };
+        /** LoadedModel */
+        LoadedModel: {
+            /** Base Model */
+            base_model: string;
+            /** Device */
+            device: string;
+            /** Adapters */
+            adapters: string[];
+        };
         /** LogChunk */
         LogChunk: {
             /** Text */
@@ -507,14 +618,16 @@ export interface components {
             name: string;
             /** Task */
             task: string;
+            /** Base Model */
+            base_model: string;
             /** Current Version */
             current_version: number | null;
+            /** Current Accuracy */
+            current_accuracy: number | null;
             /** Versions */
             versions: number;
             /** Active Jobs */
             active_jobs: number;
-            /** Base Model */
-            base_model: string;
             source: components["schemas"]["SourceInfo"] | null;
             mapping: components["schemas"]["MappingInfo"];
             snapshot: components["schemas"]["SnapshotInfo"] | null;
@@ -529,8 +642,12 @@ export interface components {
             name: string;
             /** Task */
             task: string;
+            /** Base Model */
+            base_model: string;
             /** Current Version */
             current_version: number | null;
+            /** Current Accuracy */
+            current_accuracy: number | null;
             /** Versions */
             versions: number;
             /** Active Jobs */
@@ -634,6 +751,20 @@ export interface components {
             macro_f1: number;
             /** Invalid Rate */
             invalid_rate: number;
+        };
+        /** SystemInfo */
+        SystemInfo: {
+            device: components["schemas"]["DeviceInfo"];
+            /** Libraries */
+            libraries: {
+                [key: string]: string;
+            };
+            /** Jobs */
+            jobs: {
+                [key: string]: number;
+            };
+            /** Loaded */
+            loaded: components["schemas"]["LoadedModel"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -1146,6 +1277,37 @@ export interface operations {
             };
         };
     };
+    recent_jobs_api_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_log_api_jobs__job_id__log_get: {
         parameters: {
             query?: {
@@ -1337,6 +1499,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    system_api_system_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemInfo"];
+                };
+            };
+        };
+    };
+    install_settings_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallSettings"];
                 };
             };
         };

@@ -1,68 +1,84 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import { Button, Input, Label } from "obp-ui";
-import { type FormEvent, useState } from "react";
-import { api, unwrap } from "~/api/client";
-import { keys, useMinibrains } from "~/api/queries";
-import { ErrorLine, Page, Section } from "~/components/Section";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Link } from "obp-ui";
+import type { JobInfo } from "~/api/client";
+import { useMinibrains, useRecentJobs } from "~/api/queries";
+import { DataTable } from "~/components/DataTable";
+import { PageHeader } from "~/components/PageHeader";
+import { Page, Section, Stat } from "~/components/Section";
+import { JobStatus } from "~/components/StatusBadge";
+import { count, dateTime, percent } from "~/lib/format";
+
+const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
+    {
+        header: "Minibrain",
+        id: "minibrain",
+        cell: ({ row }) => (
+            <Link
+                className="text-primary"
+                href={`/training?minibrain=${encodeURIComponent(row.original.minibrain)}`}
+            >
+                {row.original.minibrain_name}
+            </Link>
+        ),
+    },
+    {
+        header: "Job",
+        id: "job",
+        cell: ({ row }) =>
+            `${row.original.kind === "train" ? "Training" : "Scoring"} v${row.original.version}`,
+    },
+    { header: "Status", id: "status", cell: ({ row }) => <JobStatus job={row.original} /> },
+    { header: "Progress", id: "progress", cell: ({ row }) => percent(row.original.progress) },
+    { header: "Created", id: "created", cell: ({ row }) => dateTime(row.original.created_at) },
+];
+
+function GetStarted() {
+    return (
+        <Section title="Get started" caption="Five minutes with the sample data in this repo.">
+            <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
+                <li>
+                    Create a minibrain on{" "}
+                    <Link className="text-primary" href="/models">
+                        Models
+                    </Link>
+                    .
+                </li>
+                <li>
+                    On Data, upload <span className="font-mono">samples/travel_intents.jsonl</span>{" "}
+                    and build the dataset.
+                </li>
+                <li>On Training, score a prompt-only version, then train one.</li>
+                <li>
+                    Compare them on Evaluations, promote the better one and call it from
+                    Deployments.
+                </li>
+            </ol>
+        </Section>
+    );
+}
 
 export function HomePage() {
-    const router = useRouter();
-    const queryClient = useQueryClient();
-    const { data } = useMinibrains();
-    const [name, setName] = useState("");
-    const create = useMutation({
-        mutationFn: (value: string) =>
-            unwrap(api.POST("/api/minibrains", { body: { name: value } })),
-        onSuccess: async (minibrain) => {
-            await queryClient.invalidateQueries({ queryKey: keys.minibrains });
-            router.history.push(`/m/${minibrain.slug}/data`);
-        },
-    });
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (name.trim()) {
-            create.mutate(name.trim());
-        }
-    };
+    const { data: minibrains } = useMinibrains();
+    const { data: jobs } = useRecentJobs(10);
+    const serving = (minibrains ?? []).filter((item) => item.current_version !== null).length;
+    const running = (minibrains ?? []).reduce((total, item) => total + item.active_jobs, 0);
     return (
         <Page>
-            <div>
-                <h1 className="text-xl font-semibold">Minibrains</h1>
-                <p className="text-sm text-muted-foreground">
-                    Each minibrain is a small model trained on your data and served on an
-                    OpenAI-compatible endpoint. Everything runs on this machine.
-                </p>
-            </div>
-            <Section
-                title="New minibrain"
-                caption="Start with a Classify task: text in, one label out."
-            >
-                <form onSubmit={submit} className="flex max-w-xl flex-wrap items-end gap-2">
-                    <div className="flex min-w-64 flex-1 flex-col gap-1">
-                        <Label htmlFor="minibrain-name">Name</Label>
-                        <Input
-                            id="minibrain-name"
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="Support triage"
-                            autoFocus
-                        />
-                    </div>
-                    <Button type="submit" disabled={!name.trim() || create.isPending}>
-                        Create
-                    </Button>
-                </form>
-                <div className="mt-2">
-                    <ErrorLine error={create.error} />
+            <PageHeader
+                title="Home"
+                caption="Small models trained on your data and served on an OpenAI-compatible endpoint. Everything runs on this machine."
+            />
+            <Section title="Overview">
+                <div className="flex flex-wrap gap-8">
+                    <Stat label="Minibrains" value={count(minibrains?.length)} />
+                    <Stat label="Serving" value={count(serving)} />
+                    <Stat label="Jobs running" value={count(running)} />
                 </div>
             </Section>
-            {data && data.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                    {data.length} minibrain{data.length === 1 ? "" : "s"} on this install. Pick one
-                    on the left.
-                </p>
-            )}
+            {minibrains?.length === 0 && <GetStarted />}
+            <Section title="Recent jobs">
+                <DataTable columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
+            </Section>
         </Page>
     );
 }
