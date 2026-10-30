@@ -3,8 +3,11 @@ import { RouterProvider } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { applyAnimationSettings } from "./lib/animation";
 import { router } from "./router";
 import "./styles.css";
+
+applyAnimationSettings(document.documentElement);
 
 const queryClient = new QueryClient({
     defaultOptions: { queries: { refetchOnWindowFocus: false, staleTime: 1000 } },

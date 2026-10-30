@@ -82,6 +82,15 @@
     }
 }
 
+.no-transitions :where(*, ::before, ::after) {
+    transition: none !important;
+}
+
+html.no-springs::view-transition-old(root),
+html.no-springs::view-transition-new(root) {
+    animation: none !important;
+}
+
 @layer base {
     :where(*, ::before, ::after) {
         border-color: var(--border);

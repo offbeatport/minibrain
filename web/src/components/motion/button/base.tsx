@@ -1,4 +1,5 @@
 "use client";
+import { ANIMATION } from "@/lib/animation";
 import { EASE_OUT, SPRING_PRESS } from "@/lib/ease";
 import { useHoverCapable } from "@/lib/hooks/use-hover-capable";
 import { cn } from "@/lib/utils";
@@ -86,7 +87,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             ref={ref}
             type="button"
             whileTap={reduce ? undefined : { scale: pressScale }}
-            whileHover={reduce || !canHover ? undefined : { scale: 1.02 }}
+            whileHover={reduce || !canHover || !ANIMATION.hoverScale ? undefined : { scale: 1.02 }}
             transition={SPRING_PRESS}
             onPointerDown={handlePointerDown}
             className={cn(
@@ -141,7 +142,7 @@ export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(functio
         <motion.a
             ref={ref}
             whileTap={reduce ? undefined : { scale: pressScale }}
-            whileHover={reduce || !canHover ? undefined : { scale: 1.02 }}
+            whileHover={reduce || !canHover || !ANIMATION.hoverScale ? undefined : { scale: 1.02 }}
             transition={SPRING_PRESS}
             className={cn(
                 "inline-flex items-center justify-center font-medium select-none",
