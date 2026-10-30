@@ -96,7 +96,7 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
             {SECTIONS.map((section) => (
                 <div key={section.label ?? section.items[0].path} className="flex flex-col">
                     {section.label && (
-                        <SectionLabel tone="subtle" className="uppercase tracking-wide">
+                        <SectionLabel tone="subtle" className="text-xs uppercase tracking-wide">
                             {section.label}
                         </SectionLabel>
                     )}
