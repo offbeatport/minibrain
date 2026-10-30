@@ -101,6 +101,7 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
                             label={entry.label}
                             href={hrefFor(entry, minibrain)}
                             active={pathname === entry.path}
+                            iconStyle="plain"
                         />
                     ))}
                 </div>
@@ -125,6 +126,7 @@ export function Shell() {
                 <AccountMenu
                     trigger={<AccountButton initial="L" name="Local user" sub="This install" />}
                     items={ACCOUNT_ITEMS}
+                    spacing="comfortable"
                 />
             }
         >
