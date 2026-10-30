@@ -35,14 +35,14 @@
 }
 
 .dark {
-    --background: #151515;
+    --background: #080808;
     --foreground: #f2f2f2;
-    --card: #1c1c1c;
+    --card: #111111;
     --muted-foreground: #868686;
     --border: #ffffff0d;
     --border-strong: #ffffff1a;
     --accent: #00dadb;
-    --accent-foreground: #151515;
+    --accent-foreground: #080808;
     color-scheme: dark;
 }
 
