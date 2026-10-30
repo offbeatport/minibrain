@@ -12,6 +12,7 @@ import {
     Rocket,
     Settings,
     SlidersHorizontal,
+    SunMoon,
     ThumbsUp,
     UserRound,
     Workflow,
@@ -65,6 +66,7 @@ const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
 const ACCOUNT_ITEMS: AccountMenuItem[] = [
     { icon: <UserRound />, label: "Profile", href: "/profile" },
     { icon: <SlidersHorizontal />, label: "Preferences", href: "/preferences" },
+    { kind: "theme", icon: <SunMoon />, label: "Theme" },
     { icon: <LogOut />, label: "Sign out", separatorBefore: true, disabled: true },
 ];
 
