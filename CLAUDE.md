@@ -30,7 +30,4 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - No outbound telemetry, ever: the product runs air-gapped. obp-base OpenPanel and Sentry stay off by default or point
   at self-hosted instances.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
-- No obp-ui: ejected on 2026-10-30 at the user's request. UI components come from beUI (https://beui.dev), copied
-  into `web/src/components/motion` and `web/src/lib` with comments stripped; Biome lints everything except those
-  vendored files. Theme tokens follow beUI's (`web/src/styles.css`), fonts are Geist via `@fontsource`. Add new beUI
-  components from `https://beui.dev/r/{slug}` the same way.
+- obp-ui theme: own `--primary` or a preset, so the `shell` + `console` archetype does not read as cslopslop.

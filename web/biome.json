@@ -50,20 +50,5 @@
                 }
             }
         }
-    },
-    "overrides": [
-        {
-            "include": [
-                "src/components/motion/**",
-                "src/lib/hooks/**",
-                "src/lib/ease.ts",
-                "src/lib/touch.ts",
-                "src/lib/presence-gate.tsx",
-                "src/lib/utils.ts"
-            ],
-            "linter": {
-                "enabled": false
-            }
-        }
-    ]
+    }
 }

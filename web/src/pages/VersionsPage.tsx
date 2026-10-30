@@ -1,11 +1,12 @@
-import { Button } from "@/components/motion/button";
-import { Input } from "@/components/motion/input";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Button, Input, Label } from "obp-ui";
+import { type LogLineData, LogView } from "obp-ui/console";
 import { useEffect, useState } from "react";
 import { type JobInfo, type VersionInfo, api, readLog, unwrap } from "~/api/client";
 import { isActiveJob, keys, useJobs, useMinibrain, useVersions } from "~/api/queries";
-import { type Column, DataTable, Truncated } from "~/components/DataTable";
-import { ErrorLine, type LogKind, LogPanel, Page, Progress, Section } from "~/components/Section";
+import { DataTable } from "~/components/DataTable";
+import { ErrorLine, Page, Section } from "~/components/Section";
 import { JobStatus, VersionStatus } from "~/components/StatusBadge";
 import { count, errorText, milliseconds, percent } from "~/lib/format";
 import { useSlug } from "./MinibrainLayout";
@@ -22,20 +23,20 @@ function useInvalidate(slug: string) {
         ]);
 }
 
-function describeLine(raw: string): { text: string; kind: LogKind } {
+function describeLine(raw: string): LogLineData {
     try {
         const entry = JSON.parse(raw) as Record<string, unknown>;
         if (typeof entry.step === "number") {
             const loss = typeof entry.loss === "number" ? ` · loss ${entry.loss.toFixed(3)}` : "";
-            return { text: `step ${entry.step}/${entry.steps}${loss}`, kind: "info" };
+            return { msg: `step ${entry.step}/${entry.steps}${loss}`, kind: "info" };
         }
         if (typeof entry.evaluated === "number") {
-            return { text: `scored ${entry.evaluated}/${entry.of}`, kind: "info" };
+            return { msg: `scored ${entry.evaluated}/${entry.of}`, kind: "info" };
         }
-        return { text: raw, kind: "ok" };
+        return { msg: raw, kind: "ok" };
     } catch {
-        const kind = /error|traceback/i.test(raw) ? "error" : /warn/i.test(raw) ? "warn" : "plain";
-        return { text: raw, kind };
+        const kind = /error|traceback/i.test(raw) ? "error" : /warn/i.test(raw) ? "warn" : "msg";
+        return { msg: raw, kind };
     }
 }
 
@@ -76,10 +77,10 @@ function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
     });
     const label = job.kind === "train" ? "Training" : "Scoring";
     return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-3 text-sm">
-                    <span className="font-medium">
+                <div className="flex items-center gap-2 text-sm">
+                    <span className="font-semibold">
                         {label} v{job.version}
                     </span>
                     <JobStatus job={job} />
@@ -93,9 +94,18 @@ function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
                     </Button>
                 )}
             </div>
-            <Progress value={job.progress} />
+            <div className="h-1 overflow-hidden bg-secondary">
+                <div
+                    className="h-full bg-primary"
+                    style={{ width: `${Math.round(job.progress * 100)}%` }}
+                />
+            </div>
             {job.error && <p className="text-sm text-destructive">{job.error}</p>}
-            <LogPanel lines={lines.map(describeLine)} empty="Waiting for output…" />
+            <LogView
+                lines={lines.map(describeLine)}
+                className="max-h-64"
+                empty="Waiting for output…"
+            />
             <ErrorLine error={cancel.error} />
         </div>
     );
@@ -119,25 +129,29 @@ function CreateVersion({ slug }: { slug: string }) {
             title="New version"
             caption="Score the base model with a prompt first. Train when the score shows a gap worth closing."
         >
-            <div className="flex flex-wrap items-end gap-8">
+            <div className="flex flex-wrap items-end gap-6">
                 <Button variant="outline" onClick={() => create.mutate({ kind: "prompt" })}>
                     Score prompt-only version
                 </Button>
-                <div className="flex flex-wrap items-end gap-3">
-                    <div className="w-32">
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex flex-col gap-1">
+                        <Label htmlFor="max-rows">Training rows</Label>
                         <Input
-                            label="Training rows"
+                            id="max-rows"
+                            className="w-28 tabular-nums"
                             inputMode="numeric"
                             value={maxRows}
-                            onChange={setMaxRows}
+                            onChange={(event) => setMaxRows(event.target.value)}
                         />
                     </div>
-                    <div className="w-24">
+                    <div className="flex flex-col gap-1">
+                        <Label htmlFor="epochs">Epochs</Label>
                         <Input
-                            label="Epochs"
+                            id="epochs"
+                            className="w-20 tabular-nums"
                             inputMode="decimal"
                             value={epochs}
-                            onChange={setEpochs}
+                            onChange={(event) => setEpochs(event.target.value)}
                         />
                     </div>
                     <Button onClick={train} disabled={create.isPending}>
@@ -170,114 +184,102 @@ function PromoteButton({ slug, version }: { slug: string; version: VersionInfo }
     if (version.current || version.status !== "ready") {
         return null;
     }
-    if (blocked?.includes("scores below")) {
+    if (blocked) {
         return (
-            <Button
-                variant="outline"
-                size="sm"
-                title={blocked}
-                onClick={() => promote.mutate(true)}
-            >
-                Promote anyway
-            </Button>
+            <div className="flex flex-col items-start gap-1">
+                <span className="max-w-56 text-sm text-warning">{blocked}</span>
+                {blocked.includes("scores below") && (
+                    <Button variant="outline" size="xs" onClick={() => promote.mutate(true)}>
+                        Promote anyway
+                    </Button>
+                )}
+            </div>
         );
     }
     return (
-        <Button size="sm" title={blocked ?? undefined} onClick={() => promote.mutate(false)}>
+        <Button size="xs" onClick={() => promote.mutate(false)}>
             Promote
         </Button>
     );
 }
 
-function versionColumns(slug: string, onSelect: (number: number) => void): Column<VersionInfo>[] {
+function versionColumns(
+    slug: string,
+    onSelect: (number: number) => void,
+): ColumnDef<VersionInfo, unknown>[] {
     return [
         {
-            key: "number",
             header: "Version",
-            width: "90px",
-            cell: (row) => (
+            id: "version",
+            cell: ({ row }) => (
                 <button
                     type="button"
                     className="font-mono text-primary"
-                    onClick={() => onSelect(row.number)}
+                    onClick={() => onSelect(row.original.number)}
                 >
-                    v{row.number}
+                    v{row.original.number}
                 </button>
             ),
         },
         {
-            key: "kind",
             header: "Kind",
-            width: "120px",
-            cell: (row) => (row.kind === "lora" ? "Trained" : "Prompt-only"),
+            id: "kind",
+            cell: ({ row }) => (row.original.kind === "lora" ? "Trained" : "Prompt-only"),
         },
         {
-            key: "status",
             header: "Status",
-            width: "190px",
-            cell: (row) => <VersionStatus version={row} />,
+            id: "status",
+            cell: ({ row }) => <VersionStatus version={row.original} />,
         },
         {
-            key: "golden",
             header: "Test set",
-            align: "right",
-            cell: (row) => percent(row.golden?.accuracy),
+            id: "golden",
+            cell: ({ row }) => percent(row.original.golden?.accuracy),
         },
         {
-            key: "held",
             header: "Held-out",
-            align: "right",
-            cell: (row) => percent(row.held_out?.accuracy),
+            id: "held",
+            cell: ({ row }) => percent(row.original.held_out?.accuracy),
         },
         {
-            key: "f1",
             header: "Macro F1",
-            align: "right",
-            cell: (row) => row.held_out?.macro_f1.toFixed(3) ?? "–",
+            id: "f1",
+            cell: ({ row }) => row.original.held_out?.macro_f1.toFixed(3) ?? "–",
         },
         {
-            key: "invalid",
             header: "Invalid",
-            align: "right",
-            cell: (row) => percent(row.held_out?.invalid_rate),
+            id: "invalid",
+            cell: ({ row }) => percent(row.original.held_out?.invalid_rate),
         },
+        { header: "p50", id: "p50", cell: ({ row }) => milliseconds(row.original.latency_p50_ms) },
         {
-            key: "p50",
-            header: "p50",
-            align: "right",
-            cell: (row) => milliseconds(row.latency_p50_ms),
-        },
-        {
-            key: "tokens",
             header: "Prompt tokens",
-            align: "right",
-            cell: (row) => count(row.prompt_tokens),
+            id: "tokens",
+            cell: ({ row }) => count(row.original.prompt_tokens),
         },
         {
-            key: "promote",
             header: "",
-            width: "150px",
-            align: "right",
-            cell: (row) => <PromoteButton slug={slug} version={row} />,
+            id: "promote",
+            cell: ({ row }) => <PromoteButton slug={slug} version={row.original} />,
         },
     ];
 }
 
 type Mistake = VersionInfo["mistakes"][number];
 
-const MISTAKE_COLUMNS: Column<Mistake>[] = [
-    { key: "input", header: "Input", cell: (row) => <Truncated text={row.input} /> },
+const MISTAKE_COLUMNS: ColumnDef<Mistake, unknown>[] = [
+    { header: "Input", accessorKey: "input" },
     {
-        key: "gold",
         header: "Expected",
-        width: "260px",
-        cell: (row) => <span className="font-mono">{row.gold}</span>,
+        accessorKey: "gold",
+        cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
     {
-        key: "output",
         header: "Got",
-        width: "260px",
-        cell: (row) => <span className="font-mono text-destructive">{row.output}</span>,
+        accessorKey: "output",
+        cell: (info) => (
+            <span className="font-mono text-destructive">{String(info.getValue())}</span>
+        ),
     },
 ];
 
@@ -307,7 +309,7 @@ export function VersionsPage() {
             <CreateVersion slug={slug} />
             {(active.length > 0 || recent.length > 0) && (
                 <Section title="Jobs" caption="One job runs at a time; the rest wait in the queue.">
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-3">
                         {[...active, ...recent].map((job) => (
                             <JobPanel key={job.id} job={job} slug={slug} />
                         ))}
@@ -322,7 +324,6 @@ export function VersionsPage() {
                     columns={versionColumns(slug, setSelected)}
                     rows={versions ?? []}
                     empty="No versions yet."
-                    rowHeight={52}
                 />
             </Section>
             {shown && shown.mistakes.length > 0 && (

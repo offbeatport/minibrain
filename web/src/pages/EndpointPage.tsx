@@ -1,13 +1,21 @@
-import { Button } from "@/components/motion/button";
-import { Input } from "@/components/motion/input";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Button, Input, Label } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import { type KeyCreated, type KeyInfo, api, succeed, unwrap } from "~/api/client";
 import { keys, useKeys, useMinibrain } from "~/api/queries";
-import { type Column, DataTable } from "~/components/DataTable";
-import { CodeBlock, ErrorLine, Page, Section } from "~/components/Section";
+import { DataTable } from "~/components/DataTable";
+import { ErrorLine, Page, Section } from "~/components/Section";
 import { dateTime } from "~/lib/format";
 import { useSlug } from "./MinibrainLayout";
+
+function Code({ children }: { children: string }) {
+    return (
+        <pre className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm">
+            {children}
+        </pre>
+    );
+}
 
 function snippets(baseUrl: string, model: string, secret: string) {
     const curl = [
@@ -57,22 +65,28 @@ function KeysSection({ slug, onCreated }: { slug: string; onCreated: (key: KeyCr
             ),
         onSuccess: refresh,
     });
-    const columns: Column<KeyInfo>[] = [
-        { key: "name", header: "Name" },
+    const columns: ColumnDef<KeyInfo, unknown>[] = [
+        { header: "Name", accessorKey: "name" },
         {
-            key: "prefix",
             header: "Key",
-            cell: (row) => <span className="font-mono">{row.prefix}…</span>,
+            accessorKey: "prefix",
+            cell: (info) => <span className="font-mono">{String(info.getValue())}…</span>,
         },
-        { key: "created_at", header: "Created", cell: (row) => dateTime(row.created_at) },
-        { key: "last_used_at", header: "Last used", cell: (row) => dateTime(row.last_used_at) },
         {
-            key: "revoke",
+            header: "Created",
+            accessorKey: "created_at",
+            cell: (info) => dateTime(String(info.getValue())),
+        },
+        {
+            header: "Last used",
+            accessorKey: "last_used_at",
+            cell: (info) => dateTime(info.getValue() as string | null),
+        },
+        {
             header: "",
-            width: "120px",
-            align: "right",
-            cell: (row) => (
-                <Button variant="ghost" size="sm" onClick={() => remove.mutate(row.id)}>
+            id: "delete",
+            cell: ({ row }) => (
+                <Button variant="ghost" size="xs" onClick={() => remove.mutate(row.original.id)}>
                     Revoke
                 </Button>
             ),
@@ -87,12 +101,14 @@ function KeysSection({ slug, onCreated }: { slug: string; onCreated: (key: KeyCr
             title="API keys"
             caption="A key only reaches this minibrain. The full key is shown once."
         >
-            <form onSubmit={submit} className="mb-4 flex flex-wrap items-end gap-3">
-                <div className="w-64">
+            <form onSubmit={submit} className="mb-3 flex flex-wrap items-end gap-2">
+                <div className="flex flex-col gap-1">
+                    <Label htmlFor="key-name">Name</Label>
                     <Input
-                        label="Name"
+                        id="key-name"
+                        className="w-56"
                         value={name}
-                        onChange={setName}
+                        onChange={(event) => setName(event.target.value)}
                         placeholder="helpdesk-app"
                     />
                 </div>
@@ -122,7 +138,7 @@ export function EndpointPage() {
                 title="Endpoint"
                 caption="OpenAI-compatible. Point any OpenAI client at this base URL."
             >
-                <div className="flex flex-col gap-4 text-sm">
+                <div className="flex flex-col gap-3 text-sm">
                     <div>
                         <div className="text-muted-foreground">Base URL</div>
                         <div className="font-mono">{baseUrl}</div>
@@ -138,7 +154,7 @@ export function EndpointPage() {
                                 ))}
                             </div>
                         )}
-                        <p className="mt-1 text-muted-foreground">
+                        <p className="text-muted-foreground">
                             <span className="font-mono">{slug}</span> follows the current version;{" "}
                             <span className="font-mono">{slug}@N</span> pins one.
                         </p>
@@ -147,8 +163,8 @@ export function EndpointPage() {
             </Section>
             <KeysSection slug={slug} onCreated={setCreated} />
             {created && (
-                <div className="rounded-2xl border border-success/40 bg-success/10 p-5 text-sm">
-                    <div className="font-medium">New key for {created.name}</div>
+                <div className="rounded-lg border border-success/40 bg-success-soft p-4 text-sm">
+                    <div className="font-semibold">New key for {created.name}</div>
                     <div className="mt-1 break-all font-mono">{created.secret}</div>
                     <p className="mt-1 text-muted-foreground">
                         Copy it now; it is not shown again.
@@ -157,8 +173,8 @@ export function EndpointPage() {
             )}
             <Section title="Examples">
                 <div className="flex flex-col gap-3">
-                    <CodeBlock>{code.curl}</CodeBlock>
-                    <CodeBlock>{code.python}</CodeBlock>
+                    <Code>{code.curl}</Code>
+                    <Code>{code.python}</Code>
                 </div>
             </Section>
         </Page>

@@ -131,7 +131,7 @@ lines, so the split needs no rewrite.
 | Serving, local and tests | `transformers` backend; `llamacpp` later |
 | Teacher | A larger local open model (default); the pool's base model when GPUs are small; an API only by opt-in |
 | Object store | fsspec over local FS or S3-compatible storage; no MinIO dependency |
-| Frontend | Vite SPA: TanStack Router + Query, beUI components (Motion), Tailwind v4 |
+| Frontend | Vite SPA: TanStack Router + Query + Table, obp-ui, Tailwind v4 |
 | Packaging | uv; Docker image for production |
 
 ### Why not
@@ -336,23 +336,20 @@ PII counts.
 
 ## UI
 
-- [beUI](https://beui.dev) components (MIT, Motion + Tailwind), copied into `web/src/components/motion` and owned
-  here; Geist fonts, self-hosted.
+- obp-ui, operator-console style.
 - Per-minibrain tabs: task, golden set, source, mapping / SQL, labelling, preview, quality, train, eval, endpoint,
   playground.
 
-| Need | beUI |
+| Need | obp-ui |
 |---|---|
-| Minibrain list | `animated-sidebar`, collapsible to an icon rail |
-| Status | `animated-badge`: queued `neutral`, training `loading`, awaiting promote `info`, current `success`, failed `danger` |
-| Tabs, forms, tables | `tabs`, `input`, `select`, `button`, `table` (virtualized) |
-| Sections, confirmations | `card`, `center-morph-modal` |
-| Theme | `theme-toggle` with `next-themes` |
+| Minibrain list | `shell`: `AppShell`, `Rail`, `EntityRow` |
+| Status | `Badge`: queued `neutral`, training `info`, awaiting promote `approval`, current `success`, failed `destructive` |
+| Training logs | `console`: `LogView`, `ConsoleDock` |
+| Preview, playground, side-by-side eval | `chat`: `ChatBubble`, `AssistantTurn`, `ChatComposer` |
+| Forms, tabs, tables | Primitives |
 
-- Local, token-styled pieces where beUI has none or pulls in too much: label, textarea, log panel, chat bubble, code
-  block. beUI's `code-block`, `message-bubble` and `prompt-input` were skipped for their size and dependencies.
-- SQL editor (CodeMirror 6) still to add.
-- Loss and eval charts: beUI `line-chart` / `bar-chart`.
+- Missing, added to obp-ui as an opt-in entry: SQL editor (CodeMirror 6).
+- App-level: preview grid (TanStack Table over `Table`), loss and eval charts (Recharts).
 - The chat is a playground, not open chat: the minibrain's system prompt, held-out examples as starter inputs, base vs
   adapter side by side.
 - The review queue is built for domain experts (doctors, analysts, lawyers), not ML engineers: plain-language labels,

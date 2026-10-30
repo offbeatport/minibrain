@@ -12,7 +12,7 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "types": ["node", "vite/client"],
-        "paths": { "~/*": ["./src/*"], "@/*": ["./src/*"] }
+        "paths": { "~/*": ["./src/*"] }
     },
     "include": ["src", "vite.config.ts"]
 }

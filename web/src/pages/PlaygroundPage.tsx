@@ -1,17 +1,20 @@
-import { Button } from "@/components/motion/button";
+import { useMutation } from "@tanstack/react-query";
 import {
+    Button,
+    Label,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/motion/select";
-import { useMutation } from "@tanstack/react-query";
+    Textarea,
+} from "obp-ui";
+import { ChatBubble } from "obp-ui/chat";
 import { type FormEvent, useState } from "react";
 import { type CompleteResponse, api, unwrap } from "~/api/client";
 import { useGolden, useMinibrain, useVersions } from "~/api/queries";
-import { Bubble, ErrorLine, Field, Page, Section, Textarea } from "~/components/Section";
-import { milliseconds } from "~/lib/format";
+import { ErrorLine, Page, Section } from "~/components/Section";
+import { asCode, milliseconds } from "~/lib/format";
 import { useSlug } from "./MinibrainLayout";
 
 const NONE = "none";
@@ -19,12 +22,14 @@ const NONE = "none";
 type Exchange = { id: number; text: string; replies: CompleteResponse[] };
 
 function VersionPicker({
+    id,
     label,
     value,
     options,
     onChange,
     allowNone,
 }: {
+    id: string;
     label: string;
     value: string;
     options: number[];
@@ -32,30 +37,29 @@ function VersionPicker({
     allowNone?: boolean;
 }) {
     return (
-        <Field label={label}>
-            <div className="w-40">
-                <Select value={value} onValueChange={onChange}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Pick a version" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {allowNone ? <SelectItem value={NONE}>None</SelectItem> : null}
-                        {options.map((number) => (
-                            <SelectItem key={number} value={String(number)}>
-                                v{number}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-        </Field>
+        <div className="flex flex-col gap-1">
+            <Label htmlFor={id}>{label}</Label>
+            <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
+                <SelectTrigger id={id} className="w-40">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {allowNone && <SelectItem value={NONE}>None</SelectItem>}
+                    {options.map((number) => (
+                        <SelectItem key={number} value={String(number)}>
+                            v{number}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
     );
 }
 
 function Reply({ reply }: { reply: CompleteResponse }) {
     return (
         <div className="flex flex-col gap-1">
-            <Bubble role="assistant">{reply.output || "(empty)"}</Bubble>
+            <ChatBubble role="assistant" text={asCode(reply.output) || "(empty)"} />
             <p className="text-sm text-muted-foreground">
                 <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}{" "}
                 · {reply.label ? "valid label" : "not a known label"}
@@ -72,8 +76,8 @@ export function PlaygroundPage() {
     const ready = (versions ?? [])
         .filter((version) => version.status === "ready")
         .map((v) => v.number);
-    const [primary, setPrimary] = useState("");
-    const [compare, setCompare] = useState(NONE);
+    const [primary, setPrimary] = useState<string>("");
+    const [compare, setCompare] = useState<string>(NONE);
     const [text, setText] = useState("");
     const [history, setHistory] = useState<Exchange[]>([]);
     const chosen = primary || String(detail?.current_version ?? ready[0] ?? "");
@@ -119,15 +123,17 @@ export function PlaygroundPage() {
                 title="Try it"
                 caption="Each message is classified on its own. Pick a second version to compare answers side by side."
             >
-                <form onSubmit={submit} className="flex flex-col gap-4">
-                    <div className="flex flex-wrap gap-4">
+                <form onSubmit={submit} className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-3">
                         <VersionPicker
+                            id="primary"
                             label="Version"
                             value={chosen}
                             options={ready}
                             onChange={setPrimary}
                         />
                         <VersionPicker
+                            id="compare"
                             label="Compare with"
                             value={compare}
                             options={ready}
@@ -152,10 +158,10 @@ export function PlaygroundPage() {
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="max-w-64"
+                                className="max-w-64 truncate"
                                 onClick={() => setText(sample.input)}
                             >
-                                <span className="truncate">{sample.input}</span>
+                                {sample.input}
                             </Button>
                         ))}
                     </div>
@@ -165,10 +171,10 @@ export function PlaygroundPage() {
             {history.map((exchange) => (
                 <div
                     key={exchange.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-border p-5"
+                    className="flex flex-col gap-2 rounded-lg border bg-card p-4"
                 >
-                    <Bubble role="user">{exchange.text}</Bubble>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <ChatBubble role="user" text={exchange.text} />
+                    <div className="grid gap-3 md:grid-cols-2">
                         {exchange.replies.map((reply) => (
                             <Reply key={reply.model} reply={reply} />
                         ))}

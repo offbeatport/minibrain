@@ -14,6 +14,10 @@ export function dateTime(value: string | null | undefined): string {
     return value ? new Date(value).toLocaleString() : "–";
 }
 
+export function asCode(text: string): string {
+    return text ? `\`${text.replaceAll("`", "'")}\`` : "";
+}
+
 export function errorText(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }

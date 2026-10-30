@@ -1,43 +1,33 @@
-import { AnimatedBadge, type AnimatedBadgeStatus } from "@/components/motion/animated-badge";
+import { Badge } from "obp-ui";
 import type { JobInfo, VersionInfo } from "~/api/client";
 
-type BadgeSpec = { status: AnimatedBadgeStatus; label: string };
+type Variant = "success" | "info" | "approval" | "neutral" | "warning" | "destructive";
 
-const VERSION_BADGE: Record<string, BadgeSpec> = {
-    training: { status: "loading", label: "Training" },
-    evaluating: { status: "loading", label: "Scoring" },
-    ready: { status: "info", label: "Awaiting promote" },
-    failed: { status: "danger", label: "Failed" },
+const VERSION_BADGE: Record<string, { variant: Variant; label: string }> = {
+    training: { variant: "info", label: "Training" },
+    evaluating: { variant: "info", label: "Scoring" },
+    ready: { variant: "approval", label: "Awaiting promote" },
+    failed: { variant: "destructive", label: "Failed" },
 };
 
-const JOB_BADGE: Record<string, BadgeSpec> = {
-    queued: { status: "neutral", label: "Queued" },
-    running: { status: "loading", label: "Running" },
-    cancelling: { status: "warning", label: "Cancelling" },
-    done: { status: "success", label: "Done" },
-    failed: { status: "danger", label: "Failed" },
-    cancelled: { status: "neutral", label: "Cancelled" },
+const JOB_BADGE: Record<string, { variant: Variant; label: string }> = {
+    queued: { variant: "neutral", label: "Queued" },
+    running: { variant: "info", label: "Running" },
+    cancelling: { variant: "warning", label: "Cancelling" },
+    done: { variant: "success", label: "Done" },
+    failed: { variant: "destructive", label: "Failed" },
+    cancelled: { variant: "neutral", label: "Cancelled" },
 };
-
-function Badge({ spec }: { spec: BadgeSpec }) {
-    return (
-        <AnimatedBadge status={spec.status} size="sm" contentKey={spec.label}>
-            {spec.label}
-        </AnimatedBadge>
-    );
-}
 
 export function VersionStatus({ version }: { version: VersionInfo }) {
     if (version.current) {
-        return <Badge spec={{ status: "success", label: "Current" }} />;
+        return <Badge variant="success">Current</Badge>;
     }
-    return (
-        <Badge
-            spec={VERSION_BADGE[version.status] ?? { status: "neutral", label: version.status }}
-        />
-    );
+    const badge = VERSION_BADGE[version.status] ?? { variant: "neutral", label: version.status };
+    return <Badge variant={badge.variant}>{badge.label}</Badge>;
 }
 
 export function JobStatus({ job }: { job: JobInfo }) {
-    return <Badge spec={JOB_BADGE[job.status] ?? { status: "neutral", label: job.status }} />;
+    const badge = JOB_BADGE[job.status] ?? { variant: "neutral", label: job.status };
+    return <Badge variant={badge.variant}>{badge.label}</Badge>;
 }
