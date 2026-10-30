@@ -8,7 +8,10 @@ const api = "http://127.0.0.1:8000";
 export default defineConfig({
     resolve: {
         dedupe: ["react", "react-dom"],
-        alias: { "~": fileURLToPath(new URL("./src", import.meta.url)) },
+        alias: {
+            "~": fileURLToPath(new URL("./src", import.meta.url)),
+            "@": fileURLToPath(new URL("./src", import.meta.url)),
+        },
     },
     plugins: [tailwindcss(), react()],
     server: {

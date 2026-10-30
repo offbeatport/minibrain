@@ -1,6 +1,7 @@
+import { Button } from "@/components/motion/button";
+import { Input } from "@/components/motion/input";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Button, Input, Label } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { keys, useMinibrains } from "~/api/queries";
@@ -28,8 +29,8 @@ export function HomePage() {
     return (
         <Page>
             <div>
-                <h1 className="text-xl font-semibold">Minibrains</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-2xl font-semibold tracking-tight">Minibrains</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
                     Each minibrain is a small model trained on your data and served on an
                     OpenAI-compatible endpoint. Everything runs on this machine.
                 </p>
@@ -38,13 +39,12 @@ export function HomePage() {
                 title="New minibrain"
                 caption="Start with a Classify task: text in, one label out."
             >
-                <form onSubmit={submit} className="flex max-w-xl flex-wrap items-end gap-2">
-                    <div className="flex min-w-64 flex-1 flex-col gap-1">
-                        <Label htmlFor="minibrain-name">Name</Label>
+                <form onSubmit={submit} className="flex max-w-xl flex-wrap items-end gap-3">
+                    <div className="min-w-64 flex-1">
                         <Input
-                            id="minibrain-name"
+                            label="Name"
                             value={name}
-                            onChange={(event) => setName(event.target.value)}
+                            onChange={setName}
                             placeholder="Support triage"
                             autoFocus
                         />

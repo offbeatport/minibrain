@@ -1,53 +1,40 @@
-import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "obp-ui";
+import { Table, type TableColumn } from "@/components/motion/table";
+
+export type Column<Row> = TableColumn<Row>;
+
+const HEADER_HEIGHT = 48;
 
 export function DataTable<Row>({
     columns,
     rows,
     empty = "Nothing here yet.",
+    rowHeight = 48,
+    visibleRows = 10,
 }: {
-    columns: ColumnDef<Row, unknown>[];
+    columns: Column<Row>[];
     rows: Row[];
     empty?: string;
+    rowHeight?: number;
+    visibleRows?: number;
 }) {
-    const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
+    const height = Math.max(1, Math.min(rows.length, visibleRows)) * rowHeight + HEADER_HEIGHT;
     return (
-        <div className="overflow-x-auto rounded-md border">
-            <Table>
-                <TableHeader>
-                    {table.getHeaderGroups().map((group) => (
-                        <TableRow key={group.id}>
-                            {group.headers.map((header) => (
-                                <TableHead key={header.id}>
-                                    {flexRender(
-                                        header.column.columnDef.header,
-                                        header.getContext(),
-                                    )}
-                                </TableHead>
-                            ))}
-                        </TableRow>
-                    ))}
-                </TableHeader>
-                <TableBody>
-                    {table.getRowModel().rows.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={columns.length} className="text-muted-foreground">
-                                {empty}
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        table.getRowModel().rows.map((row) => (
-                            <TableRow key={row.id}>
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id} className="align-top">
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))
-                    )}
-                </TableBody>
-            </Table>
-        </div>
+        <Table
+            data={rows}
+            columns={columns}
+            rowHeight={rowHeight}
+            height={height}
+            emptyState={<p className="p-4 text-sm text-muted-foreground">{empty}</p>}
+            className="rounded-xl"
+        />
+    );
+}
+
+export function Truncated({ text }: { text: string | null | undefined }) {
+    const value = text ?? "–";
+    return (
+        <span className="block truncate" title={value}>
+            {value}
+        </span>
     );
 }

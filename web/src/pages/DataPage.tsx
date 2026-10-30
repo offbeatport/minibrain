@@ -1,17 +1,13 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
+import { Button } from "@/components/motion/button";
 import {
-    Button,
-    Label,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Textarea,
-} from "obp-ui";
-import { ChatBubble } from "obp-ui/chat";
-import { type ChangeEvent, useEffect, useState } from "react";
+} from "@/components/motion/select";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
     type ExampleInfo,
     type MinibrainDetail,
@@ -21,25 +17,22 @@ import {
     uploadSource,
 } from "~/api/client";
 import { keys, useGolden, useMinibrain, usePreview } from "~/api/queries";
-import { DataTable } from "~/components/DataTable";
-import { ErrorLine, Page, Section, Stat } from "~/components/Section";
-import { asCode, count, dateTime } from "~/lib/format";
+import { type Column, DataTable, Truncated } from "~/components/DataTable";
+import { Bubble, ErrorLine, Field, Page, Section, Stat, Textarea } from "~/components/Section";
+import { count, dateTime } from "~/lib/format";
 import { useSlug } from "./MinibrainLayout";
 
 type Row = { input: string | null; label: string | null };
 
-const ROW_COLUMNS: ColumnDef<Row, unknown>[] = [
-    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
+const LABELLED_COLUMNS: Column<Row>[] = [
+    { key: "input", header: "Input", cell: (row) => <Truncated text={row.input} /> },
     {
+        key: "label",
         header: "Label",
-        accessorKey: "label",
-        cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
+        width: "280px",
+        cell: (row) => <span className="font-mono">{row.label ?? "–"}</span>,
     },
 ];
-
-function Clamp({ text }: { text: unknown }) {
-    return <span className="line-clamp-2 max-w-xl">{text === null ? "–" : String(text)}</span>;
-}
 
 function useRefresh(slug: string) {
     const queryClient = useQueryClient();
@@ -54,6 +47,7 @@ function useRefresh(slug: string) {
 
 function SourceSection({ detail }: { detail: MinibrainDetail }) {
     const refresh = useRefresh(detail.slug);
+    const input = useRef<HTMLInputElement>(null);
     const upload = useMutation({
         mutationFn: (file: File) => uploadSource(detail.slug, file),
         onSuccess: refresh,
@@ -71,23 +65,29 @@ function SourceSection({ detail }: { detail: MinibrainDetail }) {
             title="Source"
             caption="A CSV, TSV, JSON Lines or Parquet file. It is copied into this install."
             actions={
-                <Button asChild variant={source ? "outline" : "default"} size="sm">
-                    <label className="cursor-pointer">
+                <>
+                    <input
+                        ref={input}
+                        type="file"
+                        className="sr-only"
+                        accept=".csv,.tsv,.json,.jsonl,.ndjson,.parquet"
+                        onChange={choose}
+                        aria-label="Data file"
+                    />
+                    <Button
+                        variant={source ? "outline" : "primary"}
+                        size="sm"
+                        disabled={upload.isPending}
+                        onClick={() => input.current?.click()}
+                    >
                         {upload.isPending ? "Uploading…" : source ? "Replace file" : "Upload file"}
-                        <input
-                            type="file"
-                            className="sr-only"
-                            accept=".csv,.tsv,.json,.jsonl,.ndjson,.parquet"
-                            onChange={choose}
-                            disabled={upload.isPending}
-                        />
-                    </label>
-                </Button>
+                    </Button>
+                </>
             }
         >
             {source ? (
                 <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap gap-6">
+                    <div className="flex flex-wrap gap-8">
                         <Stat
                             label="File"
                             value={<span className="font-mono">{source.file}</span>}
@@ -97,7 +97,7 @@ function SourceSection({ detail }: { detail: MinibrainDetail }) {
                     </div>
                     <p className="text-sm text-muted-foreground">
                         {source.columns.map((column) => (
-                            <span key={column.name} className="mr-3 inline-block">
+                            <span key={column.name} className="mr-4 inline-block">
                                 <span className="font-mono text-foreground">{column.name}</span>{" "}
                                 {column.type.toLowerCase()}
                             </span>
@@ -113,50 +113,43 @@ function SourceSection({ detail }: { detail: MinibrainDetail }) {
 }
 
 function ColumnSelect({
-    id,
     label,
     value,
     columns,
     onChange,
 }: {
-    id: string;
     label: string;
     value: string;
     columns: string[];
     onChange: (value: string) => void;
 }) {
     return (
-        <div className="flex flex-col gap-1">
-            <Label htmlFor={id}>{label}</Label>
-            <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
-                <SelectTrigger id={id} className="w-56">
-                    <SelectValue placeholder="Pick a column" />
-                </SelectTrigger>
-                <SelectContent>
-                    {columns.map((column) => (
-                        <SelectItem key={column} value={column}>
-                            {column}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
+        <Field label={label}>
+            <div className="w-56">
+                <Select value={value} onValueChange={onChange}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Pick a column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {columns.map((column) => (
+                            <SelectItem key={column} value={column}>
+                                {column}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        </Field>
     );
 }
 
 function QueryResult({ result }: { result: QueryResponse }) {
-    const columns: ColumnDef<string[], unknown>[] = result.columns.map((name, index) => ({
-        id: name,
+    const columns: Column<(string | null)[]>[] = result.columns.map((name, index) => ({
+        key: `${index}-${name}`,
         header: name,
-        accessorFn: (row) => row[index],
-        cell: (info) => <Clamp text={info.getValue()} />,
+        cell: (row) => <Truncated text={row[index]} />,
     }));
-    return (
-        <DataTable
-            columns={columns}
-            rows={result.rows.map((row) => row.map((cell) => cell ?? ""))}
-        />
-    );
+    return <DataTable columns={columns} rows={result.rows} />;
 }
 
 function MappingSection({ detail }: { detail: MinibrainDetail }) {
@@ -195,7 +188,7 @@ function MappingSection({ detail }: { detail: MinibrainDetail }) {
             }
         >
             {editing ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                     <Textarea
                         value={sql}
                         onChange={(event) => setSql(event.target.value)}
@@ -222,23 +215,20 @@ function MappingSection({ detail }: { detail: MinibrainDetail }) {
                 </div>
             ) : (
                 <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-wrap items-end gap-4">
                         <ColumnSelect
-                            id="input-column"
                             label="Input"
                             value={input}
                             columns={columns}
                             onChange={setInput}
                         />
                         <ColumnSelect
-                            id="label-column"
                             label="Label"
                             value={label}
                             columns={columns}
                             onChange={setLabel}
                         />
                         <Button
-                            size="default"
                             disabled={!input || !label || save.isPending}
                             onClick={() =>
                                 save.mutate({ input_column: input, label_column: label })
@@ -267,7 +257,7 @@ function PreviewSection({ detail }: { detail: MinibrainDetail }) {
         >
             <ErrorLine error={error} />
             {quality && (
-                <div className="mb-4 flex flex-wrap gap-6">
+                <div className="mb-5 flex flex-wrap gap-8">
                     <Stat label="Rows" value={count(quality.rows)} />
                     <Stat label="Empty" value={count(quality.empty)} />
                     <Stat label="Duplicate inputs" value={count(quality.duplicates)} />
@@ -283,21 +273,21 @@ function PreviewSection({ detail }: { detail: MinibrainDetail }) {
                 </div>
             )}
             {data && (
-                <div className="flex flex-col gap-4">
-                    <DataTable columns={ROW_COLUMNS} rows={data.rows} />
+                <div className="flex flex-col gap-5">
+                    <DataTable columns={LABELLED_COLUMNS} rows={data.rows} />
                     <div className="flex max-w-2xl flex-col gap-2">
-                        <h3 className="text-sm font-semibold">One training example</h3>
+                        <h3 className="text-sm font-medium">One training example</h3>
                         {data.example.map((message) => (
-                            <ChatBubble
+                            <Bubble
                                 key={message.role}
                                 role={message.role === "user" ? "user" : "system"}
-                                text={message.content}
-                            />
+                            >
+                                {message.content}
+                            </Bubble>
                         ))}
-                        <ChatBubble
-                            role="assistant"
-                            text={asCode(data.rows.find((row) => row.label)?.label ?? "")}
-                        />
+                        <Bubble role="assistant">
+                            {data.rows.find((row) => row.label)?.label ?? ""}
+                        </Bubble>
                     </div>
                 </div>
             )}
@@ -305,12 +295,13 @@ function PreviewSection({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
-    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
+const GOLDEN_COLUMNS: Column<ExampleInfo>[] = [
+    { key: "input", header: "Input", cell: (row) => <Truncated text={row.input} /> },
     {
+        key: "label",
         header: "Label",
-        accessorKey: "label",
-        cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
+        width: "280px",
+        cell: (row) => <span className="font-mono">{row.label}</span>,
     },
 ];
 
@@ -343,8 +334,8 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
         >
             <ErrorLine error={build.error} />
             {snapshot ? (
-                <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap gap-6">
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-8">
                         <Stat label="Test set" value={count(snapshot.counts.golden)} />
                         <Stat label="Held-out" value={count(snapshot.counts.eval)} />
                         <Stat label="Few-shot" value={count(snapshot.counts.shots)} />

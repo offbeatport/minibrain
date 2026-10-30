@@ -1,17 +1,96 @@
 @import "tailwindcss" source(none);
-
-@import "obp-ui/fonts.css";
-@import "obp-ui/styles.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @source "./**/*.{tsx,ts}";
-@source "../node_modules/obp-ui/src";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-    --primary: #0f6e5c;
-    --ring: #0f6e5c;
+    --background: #fcfcfc;
+    --foreground: #0b0b0b;
+    --card: #f5f5f5;
+    --card-foreground: var(--foreground);
+    --popover: var(--card);
+    --popover-foreground: var(--foreground);
+    --secondary: var(--card);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--card);
+    --muted-foreground: #636363;
+    --border: #0b0b0b0f;
+    --border-strong: #0b0b0b1f;
+    --ring: var(--border-strong);
+    --primary: #0285f7;
+    --primary-foreground: #ffffff;
+    --accent: #00bebf;
+    --accent-foreground: #0b0b0b;
+    --destructive: #ee343b;
+    --success: #00bd6c;
+    --warning: #f5a500;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    color-scheme: light;
 }
 
 .dark {
-    --primary: #6fd3bd;
-    --ring: #6fd3bd;
+    --background: #151515;
+    --foreground: #f2f2f2;
+    --card: #1c1c1c;
+    --muted-foreground: #868686;
+    --border: #ffffff0d;
+    --border-strong: #ffffff1a;
+    --accent: #00dadb;
+    --accent-foreground: #151515;
+    color-scheme: dark;
+}
+
+@theme inline {
+    --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-ring: var(--ring);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+}
+
+@utility press {
+    transition: transform 0.12s var(--ease-out);
+    &:active {
+        transform: scale(0.97);
+    }
+}
+
+@layer base {
+    :where(*, ::before, ::after) {
+        border-color: var(--border);
+    }
+
+    body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
 }
