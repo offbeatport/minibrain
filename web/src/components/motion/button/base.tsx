@@ -40,9 +40,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
     outline: "border border-border bg-transparent text-foreground hover:bg-muted/60",
 };
 const SIZE_CLASS: Record<ButtonSize, string> = {
-    sm: "h-8 px-3 text-xs gap-1.5 rounded-full",
-    md: "h-10 px-5 text-sm gap-2 rounded-full",
-    lg: "h-12 px-6 text-base gap-2 rounded-full",
+    sm: "h-8 px-3 text-xs gap-1.5 rounded-control",
+    md: "h-10 px-5 text-sm gap-2 rounded-control",
+    lg: "h-12 px-6 text-base gap-2 rounded-control",
     icon: "h-8 w-8 rounded-lg",
 };
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

@@ -261,7 +261,7 @@ export function CenterMorphModalContent({
                                                 : CENTER_UNFOLD_TRANSITION
                                         }
                                         className={cn(
-                                            "pointer-events-auto relative w-full max-w-[26rem] origin-center overflow-hidden rounded-[30px] border border-border bg-background will-change-[clip-path]",
+                                            "pointer-events-auto relative w-full max-w-[26rem] origin-center overflow-hidden rounded-modal border border-border bg-background will-change-[clip-path]",
                                             className,
                                         )}
                                     >
@@ -288,7 +288,7 @@ export function CenterMorphModalContent({
                                                     duration: reduce ? 0.12 : 0.2,
                                                     ease: EASE_OUT,
                                                 }}
-                                                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-control bg-foreground/[0.05] text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             >
                                                 <X className="h-4 w-4" aria-hidden="true" />
                                             </motion.button>

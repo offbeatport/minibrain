@@ -180,7 +180,7 @@ export function Tabs({
     );
 }
 const listClasses: Record<Variant, string> = {
-    pill: "inline-flex items-center gap-1 rounded-full bg-card p-1",
+    pill: "inline-flex items-center gap-1 rounded-control bg-card p-1",
     underline: "inline-flex items-center gap-1 border-b border-border",
     segment: "inline-flex items-center gap-0 rounded-lg bg-card p-0.5",
 };
@@ -410,7 +410,7 @@ export function TabsList({
         "absolute inset-y-0 z-20 inline-flex w-9 items-center justify-center text-foreground transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0";
     const surfaceClass =
         variant === "pill"
-            ? "rounded-full bg-card"
+            ? "rounded-control bg-card"
             : variant === "segment"
               ? "rounded-lg bg-card"
               : "";
@@ -610,7 +610,7 @@ export function TabsTrigger({
             </button>
         );
     }
-    const radius = variant === "pill" ? "rounded-full" : "rounded-md";
+    const radius = variant === "pill" ? "rounded-control" : "rounded-md";
     const tracked = icons === "selected" && placed;
     return (
         <div className={cn("shrink-0", !tracked && "relative")}>
