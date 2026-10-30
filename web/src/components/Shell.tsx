@@ -123,6 +123,7 @@ export function Shell() {
             brandHref="/"
             brandLabel="Home"
             toggleIcon="panel"
+            togglePlacement="header"
             footer={
                 <AccountMenu
                     trigger={<AccountButton initial="L" name="Local user" sub="This install" />}
