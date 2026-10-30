@@ -93,7 +93,7 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
         <>
             {SECTIONS.map((section) => (
                 <div key={section.label ?? section.items[0].path} className="flex flex-col">
-                    {section.label && <SectionLabel>{section.label}</SectionLabel>}
+                    {section.label && <SectionLabel tone="subtle">{section.label}</SectionLabel>}
                     {section.items.map((entry) => (
                         <NavItem
                             key={entry.path}
@@ -122,6 +122,7 @@ export function Shell() {
             brandCollapsed={<span className="text-base font-semibold">M</span>}
             brandHref="/"
             brandLabel="Home"
+            toggleIcon="panel"
             footer={
                 <AccountMenu
                     trigger={<AccountButton initial="L" name="Local user" sub="This install" />}
