@@ -25,8 +25,13 @@ class Settings:
         return self.home / "jobs"
 
 
+def default_web_dist() -> Path:
+    packaged = Path(__file__).resolve().parent / "web"
+    return packaged if (packaged / "index.html").is_file() else REPO_ROOT / "web" / "dist"
+
+
 def load_settings() -> Settings:
     home = Path(os.environ.get("MINIBRAIN_HOME", Path.home() / ".minibrain")).expanduser()
-    web_dist = Path(os.environ.get("MINIBRAIN_WEB_DIST", REPO_ROOT / "web" / "dist"))
+    web_dist = Path(os.environ.get("MINIBRAIN_WEB_DIST", default_web_dist()))
     home.mkdir(parents=True, exist_ok=True)
     return Settings(home=home, web_dist=web_dist)

@@ -6,3 +6,4 @@ spikes/*/out/
 .minibrain/
 web/node_modules/
 web/dist/
+dist/

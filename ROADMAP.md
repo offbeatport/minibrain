@@ -517,6 +517,12 @@ Everything in the v1 scope below, after M1.
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers
 - [ ] FIPS-ready crypto rules enforced in CI
 - [ ] Local install via uv on Linux, macOS, Windows; production Docker image (CUDA)
+- [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
+- [x] Developer tasks in `mise.toml` (setup, dev, check, build)
+- [ ] CI on every push: `mise run check`, then build the UI and the wheel
+- [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
+- [ ] Install docs for `uvx`, `uv tool install`, `pip install` and Docker
+- [ ] Python 3.13: allow it in `requires-python` (uvx already ran the wheel on 3.13)
 - [ ] Offline install bundle; air-gap CI test
 - [ ] Signed offline update bundles (app and base models) with rollback
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys

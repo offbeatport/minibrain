@@ -8,13 +8,15 @@ Plan: [`ROADMAP.md`](ROADMAP.md).
 
 ## Run it
 
-Needs Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node with pnpm.
+Minibrain is a Python package with the web UI built in, so running it needs no Node:
 
 ```sh
-uv sync
-(cd web && pnpm install && pnpm build)
-uv run minibrain serve
+uvx --python 3.12 minibrain serve
 ```
+
+`uv tool install minibrain` or `pip install minibrain`, then `minibrain serve`, work too. There is no published release
+yet; until then build the wheel from this repo (see Develop) and run it with
+`uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`.
 
 Open http://127.0.0.1:8000. `minibrain serve` starts the API, the web UI and one job worker. Data, adapters and the
 database live in `~/.minibrain` (set `MINIBRAIN_HOME` to move them).
@@ -43,13 +45,15 @@ print(reply.choices[0].message.content)
 
 ## Develop
 
+Needs [uv](https://docs.astral.sh/uv/), Node with pnpm, and [mise](https://mise.jdx.dev) for the tasks in
+`mise.toml`. Development data lives in `.minibrain/` in the repo.
+
 ```sh
-uv run minibrain serve           # API + worker on :8000
-(cd web && pnpm dev)             # UI with hot reload on :5173, proxying /api and /v1
-uv run pytest -q                 # backend tests, no model download needed
-uv run ruff check . && uv run pyright
-(cd web && pnpm lint && pnpm typecheck)
-(cd web && pnpm gen:api)         # regenerate the TypeScript client after API changes
+mise run setup       # uv sync + pnpm install
+mise run dev         # API + worker on :8000, UI with hot reload on :5173
+mise run check       # tests, ruff, pyright, biome, tsc
+mise run build       # dist/minibrain-*.whl with the built UI inside
+mise run api-types   # regenerate the TypeScript client after API changes
 ```
 
 Training runs on CUDA when available, otherwise on CPU: the Metal GPU hangs during LoRA training on Apple Silicon (see

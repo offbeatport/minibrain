@@ -1,0 +1,43 @@
+[tasks.setup]
+description = "Install Python and web dependencies"
+run = ["uv sync", "pnpm --dir web install"]
+
+[tasks."dev:api"]
+description = "API and job worker on :8000, data in .minibrain/"
+run = "uv run minibrain serve"
+env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain" }
+
+[tasks."dev:web"]
+description = "Web UI with hot reload on :5173"
+run = "pnpm --dir web dev"
+
+[tasks.dev]
+description = "API, worker and web UI with hot reload"
+depends = ["dev:api", "dev:web"]
+
+[tasks.serve]
+description = "API, worker and the built UI on :8000, data in .minibrain/"
+run = ["pnpm --dir web build", "uv run minibrain serve"]
+env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain" }
+
+[tasks.build]
+description = "Wheel with the built UI inside, in dist/"
+run = "uv build --wheel"
+
+[tasks.api-types]
+description = "Regenerate the TypeScript API client from FastAPI"
+run = "pnpm --dir web gen:api"
+
+[tasks.test]
+description = "Backend tests"
+run = "uv run pytest -q"
+
+[tasks.check]
+description = "Tests, lint and type checks for backend and web"
+run = [
+    "uv run pytest -q",
+    "uv run ruff check .",
+    "uv run pyright",
+    "pnpm --dir web lint",
+    "pnpm --dir web typecheck",
+]
