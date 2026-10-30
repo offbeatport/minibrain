@@ -30,4 +30,5 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - No outbound telemetry, ever: the product runs air-gapped. obp-base OpenPanel and Sentry stay off by default or point
   at self-hosted instances.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
-- obp-ui theme: own `--primary` or a preset, so the `shell` + `console` archetype does not read as cslopslop.
+- obp-ui theme: the Paper preset (user's choice, 2026-10-30), applied in `web/src/lib/theme.ts` for both modes.
+  Paper sets Inter and Space Grotesk, so `web/src/styles.css` imports `obp-ui/fonts-alt.css`.

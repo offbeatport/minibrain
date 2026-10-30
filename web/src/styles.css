@@ -1,17 +1,8 @@
 @import "tailwindcss" source(none);
 
 @import "obp-ui/fonts.css";
+@import "obp-ui/fonts-alt.css";
 @import "obp-ui/styles.css";
 
 @source "./**/*.{tsx,ts}";
 @source "../node_modules/obp-ui/src";
-
-:root {
-    --primary: #0f6e5c;
-    --ring: #0f6e5c;
-}
-
-.dark {
-    --primary: #6fd3bd;
-    --ring: #6fd3bd;
-}
