@@ -57,8 +57,6 @@
     --border: #181b22;
     --border-soft: #060606;
     --input: #1e222c;
-    --tabs-background: var(--background);
-    --tabs-active: var(--secondary);
     --ring: #346bf1;
     --success: #009b39;
     --success-foreground: #ffffff;
