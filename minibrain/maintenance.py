@@ -5,6 +5,7 @@ from datetime import timedelta
 from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.leader import Leader
 from minibrain.policy import load
 from minibrain.registry.compute import forget_stale
 from minibrain.registry.models import RequestLog, now
@@ -23,9 +24,11 @@ def purge_request_logs(session: Session) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
-def purge_forever(sessions: sessionmaker[Session], stop: threading.Event) -> None:
+def purge_forever(sessions: sessionmaker[Session], stop: threading.Event, leader: Leader) -> None:
     while not stop.wait(PURGE_SECONDS):
         try:
+            if not leader.held():
+                continue
             with sessions() as session:
                 purge_request_logs(session)
                 forget_stale(session)

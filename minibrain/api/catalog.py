@@ -1,3 +1,4 @@
+import logging
 import threading
 
 import httpx
@@ -22,6 +23,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import job_info
 from minibrain.jobs.queue import enqueue
+from minibrain.leader import Leader
 from minibrain.models import hub
 from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
 from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
@@ -38,6 +40,8 @@ router = APIRouter(prefix="/api/catalog", tags=["catalog"])
 LOCAL_USER = "Local user"
 SYNC_INTERVAL_SECONDS = 24 * 3600
 SCHEDULE_CHECK_SECONDS = 3600.0
+
+log = logging.getLogger("minibrain.catalog")
 
 
 def pool_hardware(pool: Pool) -> Hardware:
@@ -260,11 +264,15 @@ def sync_due(session: Session) -> bool:
     return last is None or (now() - last.created_at).total_seconds() > SYNC_INTERVAL_SECONDS
 
 
-def schedule_forever(sessions: sessionmaker[Session], stop: threading.Event) -> None:
+def schedule_forever(sessions: sessionmaker[Session], stop: threading.Event, leader: Leader) -> None:
     while True:
-        with sessions() as session:
-            if sync_due(session):
-                enqueue(session, JobKind.CATALOG_SYNC, sync_params(session), idempotency_key="catalog_sync")
-                session.commit()
+        try:
+            if leader.held():
+                with sessions() as session:
+                    if sync_due(session):
+                        enqueue(session, JobKind.CATALOG_SYNC, sync_params(session), idempotency_key="catalog_sync")
+                        session.commit()
+        except Exception:
+            log.exception("catalogue sync scheduling failed")
         if stop.wait(SCHEDULE_CHECK_SECONDS):
             return

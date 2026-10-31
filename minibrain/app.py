@@ -31,6 +31,7 @@ from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogBuffer, database_sink
 from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
+from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever
 from minibrain.models.catalog import seed
 from minibrain.policy import LockedError, PolicyError
@@ -82,10 +83,11 @@ def no_engines(_bases: dict[str, BaseModelSpec], _registered: dict[str, list[dic
     return {}
 
 
-def expire_forever(queue: SqlJobQueue, stop: threading.Event) -> None:
+def expire_forever(queue: SqlJobQueue, stop: threading.Event, leader: Leader) -> None:
     while not stop.wait(EXPIRY_SECONDS):
         try:
-            queue.expire()
+            if leader.held():
+                queue.expire()
         except Exception:
             log.exception("lease expiry failed")
 
@@ -94,18 +96,20 @@ def expire_forever(queue: SqlJobQueue, stop: threading.Event) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     stop = threading.Event()
     if app.state.background:
-        for target, source in (
-            (expire_forever, app.state.queue),
-            (LocalConfig.refresh_forever, app.state.gateway_config),
-            (LogBuffer.flush_forever, app.state.request_logs),
-            (schedule_forever, app.state.sessions),
-            (purge_forever, app.state.sessions),
+        leader = app.state.leader
+        for target, args in (
+            (expire_forever, (app.state.queue, stop, leader)),
+            (schedule_forever, (app.state.sessions, stop, leader)),
+            (purge_forever, (app.state.sessions, stop, leader)),
+            (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
+            (LogBuffer.flush_forever, (app.state.request_logs, stop)),
         ):
-            threading.Thread(target=target, args=(source, stop), daemon=True).start()
+            threading.Thread(target=target, args=args, daemon=True).start()
         if isinstance(app.state.backend, EngineBackend):
             threading.Thread(target=app.state.backend.probe_forever, args=(stop,), daemon=True).start()
     yield
     stop.set()
+    app.state.leader.release()
     app.state.request_logs.flush()
     if app.state.engines is not None:
         app.state.engines.stop()
@@ -126,6 +130,7 @@ def create_app(
     app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.sessions = sessions
+    app.state.leader = leader_for(settings.database_url)
     app.state.store = store_for(settings)
     app.state.queue = SqlJobQueue(sessions, DomainEffects(settings))
     app.state.queue.grace()

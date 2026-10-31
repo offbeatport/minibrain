@@ -13,6 +13,12 @@ type PoolInfo = components["schemas"]["PoolInfo"];
 type NodeInfo = components["schemas"]["NodeInfo"];
 type ReplicaInfo = components["schemas"]["ReplicaInfo"];
 
+const LOOPS: Record<string, string> = {
+    single: "Runs here",
+    leader: "Runs here (leader)",
+    standby: "Standby",
+};
+
 const ENGINE_LABEL: Record<string, string> = {
     sglang: "SGLang",
     mlx: "MLX",
@@ -173,6 +179,7 @@ export function ComputePage() {
                         value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
                     />
                     <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                    <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
                 </div>
             </Section>
             <Section title="Job queue" caption="One worker runs jobs one at a time.">

@@ -6422,6 +6422,15 @@
             },
             "type": "array",
             "title": "Loaded"
+          },
+          "loops": {
+            "type": "string",
+            "enum": [
+              "single",
+              "leader",
+              "standby"
+            ],
+            "title": "Loops"
           }
         },
         "type": "object",
@@ -6429,7 +6438,8 @@
           "device",
           "libraries",
           "jobs",
-          "loaded"
+          "loaded",
+          "loops"
         ],
         "title": "SystemInfo"
       },

@@ -1,7 +1,7 @@
 import os
 from importlib.metadata import PackageNotFoundError, version
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy import func, select
 
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
@@ -56,13 +56,14 @@ def loaded_models(backend: ServingBackend) -> list[LoadedModel]:
 
 
 @router.get("/system")
-def system(session: SessionDep, backend: BackendDep) -> SystemInfo:
+def system(request: Request, session: SessionDep, backend: BackendDep) -> SystemInfo:
     counts = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
     return SystemInfo(
         device=device_info(),
         libraries={name: library_version(name) for name in LIBRARIES},
         jobs={status: count for status, count in counts},
         loaded=loaded_models(backend),
+        loops=request.app.state.leader.describe(),
     )
 
 

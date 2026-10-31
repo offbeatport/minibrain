@@ -2155,6 +2155,11 @@ export interface components {
             };
             /** Loaded */
             loaded: components["schemas"]["LoadedModel"][];
+            /**
+             * Loops
+             * @enum {string}
+             */
+            loops: "single" | "leader" | "standby";
         };
         /** TestRequest */
         TestRequest: {

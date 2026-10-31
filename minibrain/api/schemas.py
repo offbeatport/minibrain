@@ -236,6 +236,7 @@ class SystemInfo(BaseModel):
     libraries: dict[str, str]
     jobs: dict[str, int]
     loaded: list[LoadedModel]
+    loops: Literal["single", "leader", "standby"]
 
 
 class BaseModelInfo(BaseModel):
