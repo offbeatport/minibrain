@@ -95,6 +95,7 @@ at answer time.
 ## Architecture
 
 One install is one supervised process tree: one command starts it, and minibrain starts and restarts the rest.
+main is the control plane; gateways and engines are the data plane.
 
 | Process | Runs |
 |---|---|
@@ -103,6 +104,10 @@ One install is one supervised process tree: one command starts it, and minibrain
 | training | One child per training or eval job; writes checkpoints and results |
 | engine | One model server per pool: SGLang, vLLM, or `transformers` / `llamacpp` on a laptop |
 
+- The data plane keeps serving without main. main publishes a versioned config snapshot (routes, versions, adapters,
+  key hashes, limits); gateways keep the last good copy on disk and serve from it, and buffer request and audit logs
+  until main is back. A main outage or upgrade pauses only the UI and new jobs; rollback republishes a snapshot.
+- Everything long-running is a job on one contract: data preparation, training, eval, batch jobs, pipeline steps.
 - One binary, many roles: `minibrain serve` runs all; `--role api|gateway|worker|engine` runs one. Compose, Helm and
   Kubernetes only start roles separately.
 - The jobs table is the only job state: status, attempt, lease with heartbeat, idempotency key, cancel flag. A job is
@@ -121,10 +126,13 @@ One install is one supervised process tree: one command starts it, and minibrain
   worker or a Kubernetes Job later.
 - Module boundaries (registry, data, train, serve, gateway) are the future service boundaries; no in-memory state
   crosses them.
+- One database code path: SQLAlchemy 2 and Alembic, no raw SQL or dialect branches. `MINIBRAIN_DATABASE_URL` picks
+  SQLite (default) or Postgres; tests run on both. The job claim is one statement (`UPDATE … RETURNING` with
+  `FOR UPDATE SKIP LOCKED`, which SQLite ignores).
 
 | | Local | Deployed |
 |---|---|---|
-| Metadata | SQLite (WAL) | Postgres |
+| Metadata | SQLite (WAL) | SQLite; Postgres for a highly available main |
 | Artifacts | Local folder | S3-compatible store |
 | Workers | Local processes | Local or remote, same contract |
 | Engines | Local children | Local or remote, routed by the gateway |
@@ -139,7 +147,9 @@ One install is one supervised process tree: one command starts it, and minibrain
 - Workers through the API: no database credentials outside the main process and one SQLite writer, for more API
   surface and workers that wait while the main process is down.
 - At-least-once, not exactly-once: simpler, correct while every job is idempotent.
-- SQLite is single-writer and single-box, which is the local target.
+- SQLite is single-writer: one main. With a statically stable data plane that is enough; Postgres buys a main that
+  fails over without downtime.
+- SQLite and Postgres only: other SQLAlchemy dialects may work but are not tested.
 
 ## Stack
 
@@ -147,7 +157,7 @@ One install is one supervised process tree: one command starts it, and minibrain
 |---|---|
 | API | FastAPI + uvicorn |
 | Jobs | Own jobs table with leases; workers claim through the API; Ray for multi-node training in v2 |
-| Metadata | SQLite WAL via SQLAlchemy locally; Postgres when deployed |
+| Metadata | SQLAlchemy 2 + Alembic; SQLite by default, Postgres optional |
 | Staging and transforms | DuckDB, one file per minibrain, disposable |
 | Connectors | DuckDB scanners in v1; dlt from the first API source |
 | PII | Presidio |
