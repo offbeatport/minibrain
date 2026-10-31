@@ -6,6 +6,7 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.policy import load
+from minibrain.registry.compute import forget_stale
 from minibrain.registry.models import RequestLog, now
 
 PURGE_SECONDS = 3600.0
@@ -27,5 +28,7 @@ def purge_forever(sessions: sessionmaker[Session], stop: threading.Event) -> Non
         try:
             with sessions() as session:
                 purge_request_logs(session)
+                forget_stale(session)
+                session.commit()
         except Exception:
             log.exception("request log purge failed")

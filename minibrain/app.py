@@ -8,7 +8,19 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from minibrain.api import catalog, internal, internal_gateway, jobs, minibrains, models, ops, policies, system, versions
+from minibrain.api import (
+    catalog,
+    compute,
+    internal,
+    internal_gateway,
+    jobs,
+    minibrains,
+    models,
+    ops,
+    policies,
+    system,
+    versions,
+)
 from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BaseModelSpec
@@ -132,6 +144,7 @@ def create_app(
         minibrains,
         models,
         catalog,
+        compute,
         policies,
         versions,
         jobs,

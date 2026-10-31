@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.api.deps import SessionDep, SettingsDep
+from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.model_rows import base_availability, model_job
 from minibrain.api.schemas import (
     AddedInfo,
@@ -18,32 +18,37 @@ from minibrain.api.schemas import (
     HardwareInfo,
     JobInfo,
     ModelRow,
+    PoolChoice,
 )
 from minibrain.api.views import job_info
 from minibrain.jobs.queue import enqueue
 from minibrain.models import hub
 from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
-from minibrain.models.hardware import Hardware, detect, fit
+from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
 from minibrain.models.registry import start_download
 from minibrain.policy import load as load_policy
+from minibrain.registry.compute import Pool, find_pool, pools
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
 from minibrain.settings import Settings
 
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
-DETECT_LOCK = threading.Lock()
 LOCAL_USER = "Local user"
 SYNC_INTERVAL_SECONDS = 24 * 3600
 SCHEDULE_CHECK_SECONDS = 3600.0
 
 
-def hardware(request: Request) -> Hardware:
-    with DETECT_LOCK:
-        if getattr(request.app.state, "hardware", None) is None:
-            request.app.state.hardware = detect()
-        return request.app.state.hardware
+def pool_hardware(pool: Pool) -> Hardware:
+    machines = [machine for machine in pool.machines() if machine.known]
+    if not machines:
+        return Hardware(pool.label, "Not reported yet", "unknown", None, None, "memory")
+    return max(machines, key=lambda machine: machine.memory_bytes or 0)
+
+
+def local_machines(session: Session, node: NodeReport) -> list[Hardware]:
+    return find_pool(pools(session, node), LOCAL_POOL).machines()
 
 
 def cached_fully(variant: CatalogVariant) -> bool:
@@ -64,7 +69,7 @@ def added_for(session: Session, settings: Settings, entry: CatalogModel) -> list
     return added
 
 
-def variant_info(variant: CatalogVariant, machine: Hardware) -> CatalogVariantInfo:
+def variant_info(variant: CatalogVariant, machines: list[Hardware]) -> CatalogVariantInfo:
     return CatalogVariantInfo(
         id=variant.id,
         label=variant.label,
@@ -78,11 +83,11 @@ def variant_info(variant: CatalogVariant, machine: Hardware) -> CatalogVariantIn
         files=len(variant.files),
         runtimes=list(variant.runtimes),
         requires=dict(variant.requires),
-        fit=FitInfo(**fit(variant.weights_bytes, variant.requires, machine)),
+        fit=FitInfo(**pool_fit(variant.weights_bytes, variant.requires, machines)),
     )
 
 
-def entry_info(session: Session, settings: Settings, entry: CatalogModel, machine: Hardware) -> CatalogEntry:
+def entry_info(session: Session, settings: Settings, entry: CatalogModel, machines: list[Hardware]) -> CatalogEntry:
     return CatalogEntry(
         id=entry.id,
         name=entry.name,
@@ -108,7 +113,7 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         support=entry.support,
         superseded_by=entry.superseded_by,
         origin=entry.origin,
-        variants=[variant_info(variant, machine) for variant in entry.variants],
+        variants=[variant_info(variant, machines) for variant in entry.variants],
         added=added_for(session, settings, entry),
     )
 
@@ -119,15 +124,21 @@ def latest_sync(session: Session) -> Job | None:
 
 
 @router.get("")
-def catalogue(request: Request, session: SessionDep, settings: SettingsDep) -> CatalogResponse:
-    machine = hardware(request)
+def catalogue(
+    session: SessionDep, settings: SettingsDep, node: LocalNodeDep, pool: str | None = None
+) -> CatalogResponse:
+    found = pools(session, node)
+    chosen = find_pool(found, pool)
+    machines = chosen.machines()
     policy = load_policy(session)
     entries = session.scalars(select(CatalogModel).order_by(CatalogModel.position))
     synced = [entry.synced_at for entry in session.scalars(select(CatalogModel)) if entry.synced_at is not None]
     sync = latest_sync(session)
     return CatalogResponse(
-        entries=[entry_info(session, settings, entry, machine) for entry in entries],
-        hardware=HardwareInfo(**machine.as_dict()),
+        entries=[entry_info(session, settings, entry, machines) for entry in entries],
+        hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
+        pools=[PoolChoice(name=item.name, label=item.label) for item in found],
+        pool=chosen.name,
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         endpoint=hub.endpoint(),
@@ -170,7 +181,7 @@ class HubAddRequest(BaseModel):
 
 
 @router.post("/hub", status_code=201)
-def add_from_hub(body: HubAddRequest, request: Request, session: SessionDep, settings: SettingsDep) -> CatalogEntry:
+def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> CatalogEntry:
     policy = load_policy(session)
     policy.add_from_hub()
     policy.outbound(hub.endpoint())
@@ -180,7 +191,7 @@ def add_from_hub(body: HubAddRequest, request: Request, session: SessionDep, set
         raise ConflictError(str(error)) from error
     existing = session.scalar(select(CatalogModel).where(CatalogModel.repo == repo))
     if existing is not None:
-        return entry_info(session, settings, existing, hardware(request))
+        return entry_info(session, settings, existing, local_machines(session, node))
     try:
         entry = lookup(repo)
     except HubAddError as error:
@@ -194,7 +205,7 @@ def add_from_hub(body: HubAddRequest, request: Request, session: SessionDep, set
         raise NotFoundError(f"{repo} could not be added")
     added.origin = "hub"
     session.commit()
-    return entry_info(session, settings, added, hardware(request))
+    return entry_info(session, settings, added, local_machines(session, node))
 
 
 @router.delete("/{catalog_id}", status_code=204)

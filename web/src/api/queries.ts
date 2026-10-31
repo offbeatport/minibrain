@@ -112,6 +112,14 @@ export function useSystem() {
     });
 }
 
+export function usePools() {
+    return useQuery({
+        queryKey: ["compute", "pools"] as const,
+        queryFn: () => unwrap(api.GET("/api/compute/pools")),
+        refetchInterval: 10000,
+    });
+}
+
 export function useInstallSettings() {
     return useQuery({
         queryKey: ["settings"] as const,
@@ -127,10 +135,10 @@ export function useModels(archived: boolean) {
     });
 }
 
-export function useCatalog() {
+export function useCatalog(pool?: string) {
     return useQuery({
-        queryKey: keys.catalog,
-        queryFn: () => unwrap(api.GET("/api/catalog")),
+        queryKey: [...keys.catalog, pool ?? ""],
+        queryFn: () => unwrap(api.GET("/api/catalog", { params: { query: { pool } } })),
         refetchInterval: (query) => {
             const moving = query.state.data?.entries.some((entry) =>
                 entry.added.some((added) => MOVING_MODEL.has(added.availability.state)),

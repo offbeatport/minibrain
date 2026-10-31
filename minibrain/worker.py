@@ -18,6 +18,7 @@ import httpx
 
 from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.ml.context import FINAL_EXIT
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.models import JobKind
 
 MODULES: dict[str, str] = {
@@ -72,6 +73,8 @@ class WorkerConfig:
     gpus: int = 1
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     host: str = field(default_factory=platform.node)
+    pool: str = LOCAL_POOL
+    hardware: dict[str, Any] = field(default_factory=dict)
 
 
 class MainClient:
@@ -105,7 +108,14 @@ class MainClient:
 
     def worker_body(self) -> dict[str, Any]:
         config = self.config
-        return {"id": config.id, "host": config.host, "kinds": config.kinds, "gpus": config.gpus}
+        return {
+            "id": config.id,
+            "host": config.host,
+            "kinds": config.kinds,
+            "gpus": config.gpus,
+            "pool": config.pool,
+            "hardware": config.hardware,
+        }
 
     def register(self) -> None:
         self.call("POST", "/internal/worker/register", json=self.worker_body())

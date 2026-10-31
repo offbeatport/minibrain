@@ -641,12 +641,44 @@ function FilterSelect({
     );
 }
 
+function PoolSelect({
+    catalog,
+    onPool,
+}: {
+    catalog: CatalogResponse;
+    onPool: (pool: string) => void;
+}) {
+    if (catalog.pools.length < 2) {
+        return null;
+    }
+    return (
+        <Select value={catalog.pool} onValueChange={(next) => onPool(String(next))}>
+            <SelectTrigger aria-label="Compute pool" size="sm" className="w-auto min-w-36">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {catalog.pools.map((pool) => (
+                    <SelectItem key={pool.name} value={pool.name}>
+                        {`Pool: ${pool.label}`}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function poolPhrase(catalog: CatalogResponse): string {
+    return catalog.pool === "local" ? "this machine" : `pool ${catalog.pool}`;
+}
+
 function MachineBar({
     catalog,
     onRequirements,
+    onPool,
 }: {
     catalog: CatalogResponse;
     onRequirements: () => void;
+    onPool: (pool: string) => void;
 }) {
     const refresh = useModelsRefresh();
     const { hardware } = catalog;
@@ -667,6 +699,7 @@ function MachineBar({
     return (
         <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-2 text-sm">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <PoolSelect catalog={catalog} onPool={onPool} />
                 <span className="font-semibold">{hardware.machine}</span>
                 <span className="text-muted-foreground">{hardware.accelerator}</span>
                 {hardware.known ? (
@@ -726,7 +759,7 @@ export function Discover({
 }) {
     const router = useRouter();
     const refresh = useModelsRefresh();
-    const catalog = useCatalog();
+    const catalog = useCatalog(search.pool);
     const [downloading, setDownloading] = useState<CatalogEntry | null>(null);
     const [adding, setAdding] = useState(false);
     const [requirements, setRequirements] = useState<{ entry: CatalogEntry | null } | null>(null);
@@ -799,7 +832,11 @@ export function Discover({
     );
     return (
         <div className="flex flex-col gap-3">
-            <MachineBar catalog={data} onRequirements={() => setRequirements({ entry: null })} />
+            <MachineBar
+                catalog={data}
+                onRequirements={() => setRequirements({ entry: null })}
+                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
+            />
             {data.online === false && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 px-3 py-2 text-sm">
                     <StatusText tone="warning">
@@ -877,14 +914,14 @@ export function Discover({
                                 }
                             />
                             <Label htmlFor="fits" className="text-sm text-muted-foreground">
-                                Fits this machine
+                                {`Fits ${poolPhrase(data)}`}
                             </Label>
                         </span>
                     </TooltipTrigger>
                     <TooltipContent>
                         {data.hardware.known
-                            ? "Estimated from the weights' size against this machine's memory."
-                            : "Compatibility not checked: this machine's memory is unknown."}
+                            ? `Estimated from the weights' size against the memory of ${poolPhrase(data)}.`
+                            : `Compatibility not checked: the memory of ${poolPhrase(data)} is unknown.`}
                     </TooltipContent>
                 </Tooltip>
             </div>

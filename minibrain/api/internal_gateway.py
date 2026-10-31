@@ -1,15 +1,17 @@
 import hmac
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from minibrain.api.deps import StoreDep
+from minibrain.api.deps import SessionDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
+from minibrain.models.hardware import LOCAL_POOL
+from minibrain.registry.compute import EngineReport, record_engine
 
 MAX_WAIT_SECONDS = 30.0
 
@@ -38,6 +40,23 @@ class LogBody(BaseModel):
 
 class LogsBody(BaseModel):
     entries: list[LogBody]
+
+
+class EngineBody(BaseModel):
+    id: str
+    host: str
+    url: str
+    base_model: str
+    engine: str
+    state: str
+    pool: str = LOCAL_POOL
+    hardware: dict[str, Any] = {}
+
+
+@router.post("/engines", status_code=204)
+def register_engine(body: EngineBody, session: SessionDep) -> None:
+    record_engine(session, EngineReport(**body.model_dump()))
+    session.commit()
 
 
 @router.get("/config")

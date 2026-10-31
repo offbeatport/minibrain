@@ -362,3 +362,29 @@ class AuditEvent(Base):
     action: Mapped[str]
     target: Mapped[str]
     detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Node(Base):
+    __tablename__ = "nodes"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    pool: Mapped[str] = mapped_column(index=True)
+    host: Mapped[str]
+    roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    hardware: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class EngineReplica(Base):
+    __tablename__ = "engine_replicas"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    node_id: Mapped[str]
+    pool: Mapped[str]
+    base_model: Mapped[str] = mapped_column(index=True)
+    engine: Mapped[str]
+    url: Mapped[str]
+    state: Mapped[str]
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)

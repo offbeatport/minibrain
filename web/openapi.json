@@ -1004,6 +1004,24 @@
         ],
         "summary": "Catalogue",
         "operationId": "catalogue_api_catalog_get",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pool"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1011,6 +1029,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1220,6 +1248,31 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/pools": {
+      "get": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "List Pools",
+        "operationId": "list_pools_api_compute_pools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PoolInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Pools Api Compute Pools Get"
                 }
               }
             }
@@ -2560,6 +2613,52 @@
         }
       }
     },
+    "/internal/gateway/engines": {
+      "post": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Register Engine",
+        "operationId": "register_engine_internal_gateway_engines_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/gateway/config": {
       "get": {
         "tags": [
@@ -3581,6 +3680,17 @@
           "hardware": {
             "$ref": "#/components/schemas/HardwareInfo"
           },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/PoolChoice"
+            },
+            "type": "array",
+            "title": "Pools"
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
           "online": {
             "anyOf": [
               {
@@ -3642,6 +3752,8 @@
         "required": [
           "entries",
           "hardware",
+          "pools",
+          "pool",
           "online",
           "offline_forced",
           "endpoint",
@@ -4084,6 +4196,55 @@
         ],
         "title": "DownloadRequest"
       },
+      "EngineBody": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool",
+            "default": "local"
+          },
+          "hardware": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Hardware",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "host",
+          "url",
+          "base_model",
+          "engine",
+          "state"
+        ],
+        "title": "EngineBody"
+      },
       "EventBody": {
         "properties": {
           "kind": {
@@ -4227,6 +4388,24 @@
         ],
         "title": "FitInfo"
       },
+      "GpuInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "memory_bytes": {
+            "type": "integer",
+            "title": "Memory Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "memory_bytes"
+        ],
+        "title": "GpuInfo"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4280,6 +4459,10 @@
             "type": "string",
             "title": "Memory Label"
           },
+          "gpus": {
+            "type": "integer",
+            "title": "Gpus"
+          },
           "known": {
             "type": "boolean",
             "title": "Known"
@@ -4293,6 +4476,7 @@
           "memory_bytes",
           "ram_bytes",
           "memory_label",
+          "gpus",
           "known"
         ],
         "title": "HardwareInfo"
@@ -5500,6 +5684,115 @@
         "type": "object",
         "title": "ModelUpdate"
       },
+      "NodeInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "online": {
+            "type": "boolean",
+            "title": "Online"
+          },
+          "seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen At"
+          },
+          "system": {
+            "type": "string",
+            "title": "System"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch"
+          },
+          "cpu_count": {
+            "type": "integer",
+            "title": "Cpu Count"
+          },
+          "ram_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Bytes"
+          },
+          "accelerator": {
+            "type": "string",
+            "title": "Accelerator"
+          },
+          "accelerator_name": {
+            "type": "string",
+            "title": "Accelerator Name"
+          },
+          "usable_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usable Bytes"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuInfo"
+            },
+            "type": "array",
+            "title": "Gpus"
+          },
+          "engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Engines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "host",
+          "roles",
+          "online",
+          "seen_at",
+          "system",
+          "arch",
+          "cpu_count",
+          "ram_bytes",
+          "accelerator",
+          "accelerator_name",
+          "usable_bytes",
+          "gpus",
+          "engines"
+        ],
+        "title": "NodeInfo"
+      },
       "PolicyChoice": {
         "properties": {
           "value": {
@@ -5579,6 +5872,58 @@
           "value"
         ],
         "title": "PolicyUpdate"
+      },
+      "PoolChoice": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label"
+        ],
+        "title": "PoolChoice"
+      },
+      "PoolInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeInfo"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "engines": {
+            "items": {
+              "$ref": "#/components/schemas/ReplicaInfo"
+            },
+            "type": "array",
+            "title": "Engines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "nodes",
+          "engines"
+        ],
+        "title": "PoolInfo"
       },
       "PreviewResponse": {
         "properties": {
@@ -5749,6 +6094,50 @@
           "rows"
         ],
         "title": "QueryResponse"
+      },
+      "ReplicaInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "base_model",
+          "engine",
+          "url",
+          "state",
+          "host",
+          "seen_at"
+        ],
+        "title": "ReplicaInfo"
       },
       "SnapshotInfo": {
         "properties": {
@@ -6185,6 +6574,16 @@
             "type": "integer",
             "title": "Gpus",
             "default": 1
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool",
+            "default": "local"
+          },
+          "hardware": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Hardware"
           }
         },
         "type": "object",

@@ -53,7 +53,7 @@ def terminate_self() -> None:
     os.kill(os.getpid(), signal.SIGTERM)
 
 
-def engine(spec_json: str, port: int, main_url: str, parent: int | None) -> None:
+def engine(spec_json: str, port: int, main_url: str, parent: int | None, pool: str) -> None:
     from minibrain.base_models import BaseModelSpec
     from minibrain.serve.engine import create_engine_app
     from minibrain.settings import load_settings
@@ -61,7 +61,8 @@ def engine(spec_json: str, port: int, main_url: str, parent: int | None) -> None
     settings = load_settings()
     spec = BaseModelSpec.from_dict(json.loads(spec_json))
     token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
-    app = create_engine_app(spec, main_url, token, settings.home / "engines" / spec.key)
+    url = local_url("127.0.0.1", port)
+    app = create_engine_app(spec, main_url, token, settings.home / "engines" / spec.key, url=url, pool=pool)
     threading.Thread(target=watch_parent, args=(parent, threading.Event(), terminate_self), daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
@@ -75,7 +76,8 @@ def gateway(main_url: str, host: str, port: int) -> None:
     uvicorn.run(create_gateway_app(main_url, token, settings.home / "gateway"), host=host, port=port)
 
 
-def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None) -> None:
+def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None, pool: str) -> None:
+    from minibrain.models.hardware import report
     from minibrain.settings import load_settings
     from minibrain.worker import REMOTE_KINDS, Worker, WorkerConfig
 
@@ -87,6 +89,8 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None)
         home=settings.home / "worker",
         kinds=kinds or [str(kind) for kind in REMOTE_KINDS],
         gpus=gpus,
+        pool=pool,
+        hardware=report().as_dict(),
     )
     stop = threading.Event()
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
@@ -114,6 +118,7 @@ def main() -> None:
     worker_command.add_argument("--api-url", default="http://127.0.0.1:8000")
     worker_command.add_argument("--kinds", nargs="*", default=None)
     worker_command.add_argument("--gpus", type=int, default=1)
+    worker_command.add_argument("--pool", default="local", help="compute pool this machine joins")
     worker_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)
     gateway_command = commands.add_parser("gateway", help="run a standalone gateway against a main process")
     gateway_command.add_argument("--main-url", default="http://127.0.0.1:8000")
@@ -124,17 +129,18 @@ def main() -> None:
     engine_command.add_argument("--port", type=int, required=True)
     engine_command.add_argument("--main-url", default="http://127.0.0.1:8000")
     engine_command.add_argument("--parent", type=int, default=None)
+    engine_command.add_argument("--pool", default="local")
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
     if args.command == "serve":
         serve(args.host, args.port, not args.no_worker)
     elif args.command == "worker":
-        worker(args.api_url, args.kinds, args.gpus, args.parent)
+        worker(args.api_url, args.kinds, args.gpus, args.parent, args.pool)
     elif args.command == "gateway":
         gateway(args.main_url, args.host, args.port)
     elif args.command == "engine":
-        engine(args.spec, args.port, args.main_url, args.parent)
+        engine(args.spec, args.port, args.main_url, args.parent, args.pool)
     else:
         openapi(args.output)
 

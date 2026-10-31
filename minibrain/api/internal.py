@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from minibrain.api.deps import QueueDep, SessionDep, StoreDep
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.jobs.queue import EventIn, WorkerInfo
+from minibrain.models.hardware import LOCAL_POOL
+from minibrain.registry.compute import record_node
 from minibrain.registry.files import register
 from minibrain.registry.models import Artifact
 
@@ -32,6 +34,8 @@ class WorkerBody(BaseModel):
     host: str
     kinds: list[str]
     gpus: int = 1
+    pool: str = LOCAL_POOL
+    hardware: dict[str, Any] = Field(default_factory=dict)
 
     def info(self) -> WorkerInfo:
         return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus)
@@ -93,16 +97,23 @@ def require_artifacts(session: SessionDep, ids: list[str | None]) -> None:
         raise HTTPException(status_code=422, detail=f"unknown artifacts: {', '.join(missing)}")
 
 
+def report_worker(session: SessionDep, body: WorkerBody) -> None:
+    record_node(session, body.pool, body.host, "worker", body.hardware)
+    session.commit()
+
+
 @router.post("/register", status_code=204)
-def register_worker(body: WorkerBody, queue: QueueDep) -> None:
+def register_worker(body: WorkerBody, queue: QueueDep, session: SessionDep) -> None:
     queue.register(body.info())
+    report_worker(session, body)
 
 
 @router.post("/claim", response_model=None)
-def claim(body: ClaimRequest, queue: QueueDep) -> ClaimResponse | Response:
+def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep) -> ClaimResponse | Response:
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
     worker = body.worker.info()
     queue.register(worker)
+    report_worker(session, body.worker)
     while True:
         claimed = queue.claim(worker)
         if claimed is not None:

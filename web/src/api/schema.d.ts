@@ -418,6 +418,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/compute/pools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pools */
+        get: operations["list_pools_api_compute_pools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policies": {
         parameters: {
             query?: never;
@@ -846,6 +863,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/gateway/engines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Engine */
+        post: operations["register_engine_internal_gateway_engines_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/gateway/config": {
         parameters: {
             query?: never;
@@ -1183,6 +1217,10 @@ export interface components {
             /** Entries */
             entries: components["schemas"]["CatalogEntry"][];
             hardware: components["schemas"]["HardwareInfo"];
+            /** Pools */
+            pools: components["schemas"]["PoolChoice"][];
+            /** Pool */
+            pool: string;
             /** Online */
             online: boolean | null;
             /** Offline Forced */
@@ -1357,6 +1395,33 @@ export interface components {
              */
             accept_license?: boolean;
         };
+        /** EngineBody */
+        EngineBody: {
+            /** Id */
+            id: string;
+            /** Host */
+            host: string;
+            /** Url */
+            url: string;
+            /** Base Model */
+            base_model: string;
+            /** Engine */
+            engine: string;
+            /** State */
+            state: string;
+            /**
+             * Pool
+             * @default local
+             */
+            pool?: string;
+            /**
+             * Hardware
+             * @default {}
+             */
+            hardware?: {
+                [key: string]: unknown;
+            };
+        };
         /** EventBody */
         EventBody: {
             /** Kind */
@@ -1413,6 +1478,13 @@ export interface components {
             /** Basis */
             basis: string;
         };
+        /** GpuInfo */
+        GpuInfo: {
+            /** Name */
+            name: string;
+            /** Memory Bytes */
+            memory_bytes: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1432,6 +1504,8 @@ export interface components {
             ram_bytes: number | null;
             /** Memory Label */
             memory_label: string;
+            /** Gpus */
+            gpus: number;
             /** Known */
             known: boolean;
         };
@@ -1821,6 +1895,37 @@ export interface components {
             /** Archived */
             archived?: boolean | null;
         };
+        /** NodeInfo */
+        NodeInfo: {
+            /** Id */
+            id: string;
+            /** Host */
+            host: string;
+            /** Roles */
+            roles: string[];
+            /** Online */
+            online: boolean;
+            /** Seen At */
+            seen_at: string | null;
+            /** System */
+            system: string;
+            /** Arch */
+            arch: string;
+            /** Cpu Count */
+            cpu_count: number;
+            /** Ram Bytes */
+            ram_bytes: number | null;
+            /** Accelerator */
+            accelerator: string;
+            /** Accelerator Name */
+            accelerator_name: string;
+            /** Usable Bytes */
+            usable_bytes: number | null;
+            /** Gpus */
+            gpus: components["schemas"]["GpuInfo"][];
+            /** Engines */
+            engines: string[];
+        };
         /** PolicyChoice */
         PolicyChoice: {
             /** Value */
@@ -1851,6 +1956,24 @@ export interface components {
         PolicyUpdate: {
             /** Value */
             value: unknown;
+        };
+        /** PoolChoice */
+        PoolChoice: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+        };
+        /** PoolInfo */
+        PoolInfo: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Nodes */
+            nodes: components["schemas"]["NodeInfo"][];
+            /** Engines */
+            engines: components["schemas"]["ReplicaInfo"][];
         };
         /** PreviewResponse */
         PreviewResponse: {
@@ -1905,6 +2028,26 @@ export interface components {
             columns: string[];
             /** Rows */
             rows: (string | null)[][];
+        };
+        /** ReplicaInfo */
+        ReplicaInfo: {
+            /** Id */
+            id: string;
+            /** Base Model */
+            base_model: string;
+            /** Engine */
+            engine: string;
+            /** Url */
+            url: string;
+            /** State */
+            state: string;
+            /** Host */
+            host: string;
+            /**
+             * Seen At
+             * Format: date-time
+             */
+            seen_at: string;
         };
         /** SnapshotInfo */
         SnapshotInfo: {
@@ -2062,6 +2205,15 @@ export interface components {
              * @default 1
              */
             gpus?: number;
+            /**
+             * Pool
+             * @default local
+             */
+            pool?: string;
+            /** Hardware */
+            hardware?: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
@@ -2789,7 +2941,9 @@ export interface operations {
     };
     catalogue_api_catalog_get: {
         parameters: {
-            query?: never;
+            query?: {
+                pool?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2803,6 +2957,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2973,6 +3136,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pools_api_compute_pools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolInfo"][];
                 };
             };
         };
@@ -3845,6 +4028,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StoredArtifact"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_engine_internal_gateway_engines_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngineBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

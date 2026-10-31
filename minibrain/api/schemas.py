@@ -427,12 +427,20 @@ class HardwareInfo(BaseModel):
     memory_bytes: int | None
     ram_bytes: int | None
     memory_label: str
+    gpus: int
     known: bool
+
+
+class PoolChoice(BaseModel):
+    name: str
+    label: str
 
 
 class CatalogResponse(BaseModel):
     entries: list[CatalogEntry]
     hardware: HardwareInfo
+    pools: list[PoolChoice]
+    pool: str
     online: bool | None
     offline_forced: bool
     endpoint: str
