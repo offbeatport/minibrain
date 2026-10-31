@@ -338,8 +338,8 @@ PII counts.
 
 - obp-ui, operator-console style.
 - Sidebar: Home · Explore (Models, Playground) · Create (Data, Training, Evaluations, Feedback) · Run (Deployments,
-  Pipelines, Batch jobs in v2, Compute, Monitor) · Settings · user menu (Profile, Preferences, Sign out). Pages that work on one
-  minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
+  Pipelines, Batch jobs in v2, Compute, Monitor) · Settings · user menu (Profile, Preferences, Sign out). Pages that
+  work on one minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
 
 | Need | obp-ui |
 |---|---|
