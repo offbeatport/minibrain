@@ -3,10 +3,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, UploadFile
 
-from minibrain.api.deps import SessionDep, SettingsDep
+from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
     ChatMessage,
     ExampleInfo,
+    JobInfo,
     MappingUpdate,
     MinibrainCreate,
     MinibrainDetail,
@@ -16,13 +17,16 @@ from minibrain.api.schemas import (
     QualityInfo,
     QueryRequest,
     QueryResponse,
-    SnapshotInfo,
 )
-from minibrain.api.views import detail, snapshot_info, staging_path, summary
+from minibrain.api.views import detail, job_info, staging_path, summary
+from minibrain.artifacts import Packing
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import quality, snapshot
 from minibrain.data.sources import describe, labelled_rows, mapping_sql, run_query, safe_filename, stage, to_text
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, Minibrain, Snapshot
+from minibrain.jobs.queue import enqueue
+from minibrain.jobs.specs import prepare_params
+from minibrain.registry.files import ArtifactKind, register, snapshot_dir
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, JobKind, Minibrain
 from minibrain.registry.service import ConflictError, create_minibrain, get_minibrain, latest_snapshot, list_minibrains
 from minibrain.settings import Settings
 from minibrain.tasks.classify import trained_messages
@@ -73,25 +77,23 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     if any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
         raise ConflictError("cancel the running jobs first")
-    for job in minibrain.jobs:
-        Path(job.log_path).unlink(missing_ok=True)
     session.delete(minibrain)
     session.commit()
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
 
 
 @router.post("/{slug}/source")
-def upload_source(slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+def upload_source(
+    slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     filename = safe_filename(file.filename or "")
-    source_dir = settings.minibrain_dir(slug) / "source"
-    shutil.rmtree(source_dir, ignore_errors=True)
-    source_dir.mkdir(parents=True)
-    path = source_dir / filename
-    with path.open("wb") as destination:
-        shutil.copyfileobj(file.file, destination)
+    stored = store.put_stream(file.file)
+    artifact = register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
     staging = staging_path(settings, minibrain)
-    stage(path, staging)
+    staging.parent.mkdir(parents=True, exist_ok=True)
+    stage(store.materialize(artifact.id, Packing.FILE, filename), staging)
+    minibrain.source_artifact_id = artifact.id
     columns = [column.name for column in describe(staging)[0]]
     input_column, label_column = guess(columns, INPUT_NAMES), guess(columns, LABEL_NAMES)
     minibrain.source_file = filename
@@ -145,26 +147,21 @@ def preview(slug: str, session: SessionDep, settings: SettingsDep) -> PreviewRes
     )
 
 
-@router.post("/{slug}/snapshots", status_code=201)
-def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> SnapshotInfo:
+@router.post("/{slug}/snapshots", status_code=202)
+def build_snapshot(slug: str, session: SessionDep) -> JobInfo:
     minibrain = get_minibrain(session, slug)
-    rows = labelled_rows(require_source(settings, minibrain), saved_sql(minibrain))
-    files = snapshot.write(snapshot.split(snapshot.clean(rows)), settings.minibrain_dir(slug) / "snapshots")
-    current = latest_snapshot(minibrain)
-    if current is not None and current.hash == files.hash:
-        return snapshot_info(current)
-    record = Snapshot(
-        minibrain=minibrain, hash=files.hash, directory=str(files.directory), counts=files.counts, labels=files.labels
+    params = prepare_params(session, minibrain, saved_sql(minibrain))
+    job = enqueue(
+        session, JobKind.PREPARE, params, minibrain_id=minibrain.id, idempotency_key=f"prepare:{minibrain.id}"
     )
-    session.add(record)
     session.commit()
-    return snapshot_info(record)
+    return job_info(job)
 
 
 @router.get("/{slug}/golden")
-def golden(slug: str, session: SessionDep) -> list[ExampleInfo]:
+def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
     current = latest_snapshot(get_minibrain(session, slug))
     if current is None:
         return []
-    examples = snapshot.read_split(Path(current.directory), "golden")
+    examples = snapshot.read_split(snapshot_dir(session, store, current), "golden")
     return [ExampleInfo(input=example.input, label=example.label) for example in examples]

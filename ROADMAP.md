@@ -544,7 +544,8 @@ Everything in the v1 scope below, after M1.
 - [x] Preview of 5–10 examples
 - [ ] Quality score and PII report
 - [x] Content-hashed snapshots with train/eval split
-- [x] Worker (Huey), training subprocess, streamed logs, cancel
+- [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
+- [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
 - [x] Eval vs base, side-by-side review, promote, rollback
 - [ ] SGLang pool with runtime adapter load/unload

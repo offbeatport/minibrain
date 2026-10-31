@@ -1,10 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { LogLineData } from "obp-ui/console";
 import { useEffect, useState } from "react";
-import { type JobInfo, readLog } from "~/api/client";
-import { isActiveJob, keys } from "~/api/queries";
+import { type JobInfo, jobEventsUrl } from "~/api/client";
+import { keys } from "~/api/queries";
 
-const LOG_POLL_MS = 2000;
 const MAX_LOG_LINES = 300;
 
 export function useInvalidate(slug: string) {
@@ -34,30 +33,28 @@ export function describeLine(raw: string): LogLineData {
     }
 }
 
+type JobEvent = { id: number; kind: string; message: string };
+
+function eventLine(event: JobEvent): string | null {
+    if (event.kind === "log") {
+        return event.message;
+    }
+    return event.kind === "state" ? `· ${event.message}` : null;
+}
+
 export function useJobLog(job: JobInfo): string[] {
     const [lines, setLines] = useState<string[]>([]);
-    const active = isActiveJob(job);
     useEffect(() => {
-        let offset = 0;
-        let pending = "";
-        let stopped = false;
         setLines([]);
-        const pull = async () => {
-            const chunk = await readLog(job.id, offset);
-            if (stopped || chunk.text === "") {
-                return;
+        const source = new EventSource(jobEventsUrl(job.id));
+        source.onmessage = (message) => {
+            const line = eventLine(JSON.parse(message.data) as JobEvent);
+            if (line !== null) {
+                setLines((previous) => [...previous, line].slice(-MAX_LOG_LINES));
             }
-            offset = chunk.offset;
-            const parts = (pending + chunk.text).split("\n");
-            pending = parts.pop() ?? "";
-            setLines((previous) => [...previous, ...parts.filter(Boolean)].slice(-MAX_LOG_LINES));
         };
-        pull();
-        const timer = active ? window.setInterval(pull, LOG_POLL_MS) : undefined;
-        return () => {
-            stopped = true;
-            window.clearInterval(timer);
-        };
-    }, [job.id, active]);
+        source.addEventListener("end", () => source.close());
+        return () => source.close();
+    }, [job.id]);
     return lines;
 }

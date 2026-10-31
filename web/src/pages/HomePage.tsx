@@ -15,7 +15,7 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
         cell: ({ row }) => (
             <Link
                 className="text-primary"
-                href={`/training?minibrain=${encodeURIComponent(row.original.minibrain)}`}
+                href={`/training?minibrain=${encodeURIComponent(row.original.minibrain ?? "")}`}
             >
                 {row.original.minibrain_name}
             </Link>

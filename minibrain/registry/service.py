@@ -8,15 +8,12 @@ from sqlalchemy.orm import Session
 
 from minibrain.registry.models import (
     ApiKey,
-    Job,
-    JobKind,
     Minibrain,
     Snapshot,
     Version,
     VersionKind,
     VersionStatus,
 )
-from minibrain.settings import Settings
 
 KEY_PREFIX = "mb_"
 
@@ -74,35 +71,21 @@ def next_version_number(minibrain: Minibrain) -> int:
     return max((version.number for version in minibrain.versions), default=-1) + 1
 
 
-def create_version(
-    session: Session, settings: Settings, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any]
-) -> Version:
+def create_version(session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any]) -> Version:
     snapshot = latest_snapshot(minibrain)
     if snapshot is None:
         raise ConflictError("build the dataset before creating a version")
-    number = next_version_number(minibrain)
-    adapter_dir = settings.minibrain_dir(minibrain.slug) / "adapters" / f"v{number}"
     version = Version(
         minibrain=minibrain,
         snapshot=snapshot,
-        number=number,
+        number=next_version_number(minibrain),
         kind=kind,
         status=VersionStatus.TRAINING if kind == VersionKind.LORA else VersionStatus.EVALUATING,
-        adapter_dir=str(adapter_dir) if kind == VersionKind.LORA else None,
         recipe=recipe,
     )
     session.add(version)
     session.flush()
     return version
-
-
-def create_job(session: Session, settings: Settings, version: Version, kind: JobKind) -> Job:
-    job = Job(minibrain_id=version.minibrain_id, version=version, kind=kind, log_path="")
-    session.add(job)
-    session.flush()
-    settings.jobs_dir().mkdir(parents=True, exist_ok=True)
-    job.log_path = str(settings.jobs_dir() / f"{job.id}.log")
-    return job
 
 
 def adapter_name(slug: str, number: int) -> str:

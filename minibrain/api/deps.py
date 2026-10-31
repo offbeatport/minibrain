@@ -1,13 +1,13 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
+from minibrain.artifacts import ArtifactStore
+from minibrain.jobs.queue import SqlJobQueue
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
-
-Enqueue = Callable[[int], object]
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -23,11 +23,16 @@ def get_backend(request: Request) -> ServingBackend:
     return request.app.state.backend
 
 
-def get_enqueue(request: Request) -> Enqueue:
-    return request.app.state.enqueue
+def get_queue(request: Request) -> SqlJobQueue:
+    return request.app.state.queue
+
+
+def get_store(request: Request) -> ArtifactStore:
+    return request.app.state.store
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 BackendDep = Annotated[ServingBackend, Depends(get_backend)]
-EnqueueDep = Annotated[Enqueue, Depends(get_enqueue)]
+QueueDep = Annotated[SqlJobQueue, Depends(get_queue)]
+StoreDep = Annotated[ArtifactStore, Depends(get_store)]

@@ -80,9 +80,8 @@ def content_hash(splits: dict[str, list[Example]]) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def write(splits: dict[str, list[Example]], root: Path) -> SnapshotFiles:
+def write(splits: dict[str, list[Example]], directory: Path) -> SnapshotFiles:
     digest = content_hash(splits)
-    directory = root / digest[:16]
     directory.mkdir(parents=True, exist_ok=True)
     for name in SPLITS:
         lines = "".join(json.dumps(asdict(example)) + "\n" for example in splits[name])

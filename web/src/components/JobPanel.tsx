@@ -8,30 +8,49 @@ import { JobStatus } from "~/components/StatusBadge";
 import { percent } from "~/lib/format";
 import { describeLine, useInvalidate, useJobLog } from "~/lib/jobs";
 
+const KIND_TITLES: Record<string, string> = {
+    prepare: "Building dataset",
+    train: "Training",
+    eval: "Scoring",
+};
+
+function jobTitle(job: JobInfo): string {
+    const title = KIND_TITLES[job.kind] ?? job.kind;
+    return job.version === null ? title : `${title} v${job.version}`;
+}
+
 export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
     const lines = useJobLog(job);
     const invalidate = useInvalidate(slug);
+    const target = { params: { path: { job_id: job.id } } };
     const cancel = useMutation({
-        mutationFn: () =>
-            unwrap(api.POST("/api/jobs/{job_id}/cancel", { params: { path: { job_id: job.id } } })),
+        mutationFn: () => unwrap(api.POST("/api/jobs/{job_id}/cancel", target)),
         onSuccess: invalidate,
     });
-    const label = job.kind === "train" ? "Training" : "Scoring";
+    const retry = useMutation({
+        mutationFn: () => unwrap(api.POST("/api/jobs/{job_id}/retry", target)),
+        onSuccess: invalidate,
+    });
+    const retriable = job.status === "failed" || job.status === "cancelled";
     return (
         <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm">
-                    <span className="font-semibold">
-                        {label} v{job.version}
-                    </span>
+                    <span className="font-semibold">{jobTitle(job)}</span>
                     <JobStatus job={job} />
                     <span className="tabular-nums text-muted-foreground">
                         {percent(job.progress)}
+                        {job.attempt > 1 && ` · attempt ${job.attempt} of ${job.max_attempts}`}
                     </span>
                 </div>
-                {isActiveJob(job) && (
+                {isActiveJob(job) && !job.cancel_requested && (
                     <Button variant="outline" size="sm" onClick={() => cancel.mutate()}>
                         Cancel
+                    </Button>
+                )}
+                {retriable && (
+                    <Button variant="outline" size="sm" onClick={() => retry.mutate()}>
+                        Retry
                     </Button>
                 )}
             </div>
@@ -45,9 +64,9 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
             <LogView
                 lines={lines.map(describeLine)}
                 className="max-h-64"
-                empty="Waiting for output…"
+                empty={isActiveJob(job) ? "Waiting for output…" : "No output recorded."}
             />
-            <ErrorLine error={cancel.error} />
+            <ErrorLine error={cancel.error ?? retry.error} />
         </div>
     );
 }

@@ -8,7 +8,7 @@ import { count } from "~/lib/format";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
 
-const JOB_STATES = ["queued", "running", "cancelling", "done", "failed", "cancelled"];
+const JOB_STATES = ["queued", "running", "succeeded", "failed", "cancelled"];
 
 const LOADED_COLUMNS: ColumnDef<LoadedModel, unknown>[] = [
     {

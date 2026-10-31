@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from minibrain.api.deps import BackendDep, SessionDep
+from minibrain.api.deps import BackendDep, SessionDep, StoreDep
 from minibrain.ml.completion import Completion
 from minibrain.registry.models import ApiKey, now
 from minibrain.registry.service import find_key
@@ -102,13 +102,13 @@ def list_models(key: KeyDep) -> dict:
 
 @router.post("/chat/completions", response_model=None)
 def chat_completions(
-    body: ChatCompletionRequest, key: KeyDep, session: SessionDep, backend: BackendDep
+    body: ChatCompletionRequest, key: KeyDep, session: SessionDep, backend: BackendDep, store: StoreDep
 ) -> dict | StreamingResponse:
     target = resolve(session, body.model)
     if target is None or target.minibrain.id != key.minibrain_id:
         raise HTTPException(status_code=404, detail=f"model {body.model} not found")
     max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
-    completion = backend.complete(completion_request(target, last_user_text(body.messages), max_tokens))
+    completion = backend.complete(completion_request(session, store, target, last_user_text(body.messages), max_tokens))
     key.last_used_at = now()
     session.commit()
     identifier = f"chatcmpl-{uuid.uuid4().hex}"

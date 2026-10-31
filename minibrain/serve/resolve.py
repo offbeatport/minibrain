@@ -1,12 +1,13 @@
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import base_model
 from minibrain.data.snapshot import prompt_context
+from minibrain.registry.files import adapter_dir, snapshot_dir
 from minibrain.registry.models import Minibrain, Version, VersionKind, VersionStatus
 from minibrain.registry.service import adapter_name, find_version
 from minibrain.serve.backend import AdapterRef, CompletionRequest
@@ -53,12 +54,15 @@ def model_names(minibrain: Minibrain) -> list[str]:
     return names + [f"{minibrain.slug}@{number}" for number in ready]
 
 
-def completion_request(target: Target, text: str, max_tokens: int) -> CompletionRequest:
+def completion_request(
+    session: Session, store: ArtifactStore, target: Target, text: str, max_tokens: int
+) -> CompletionRequest:
     version = target.version
-    labels, shots = prompt_context(version.snapshot.directory)
+    labels, shots = prompt_context(str(snapshot_dir(session, store, version.snapshot)))
     adapter = None
-    if version.kind == VersionKind.LORA and version.adapter_dir:
-        adapter = AdapterRef(name=adapter_name(target.minibrain.slug, version.number), path=Path(version.adapter_dir))
+    path = adapter_dir(session, store, version) if version.kind == VersionKind.LORA else None
+    if path is not None:
+        adapter = AdapterRef(name=adapter_name(target.minibrain.slug, version.number), path=path)
     return CompletionRequest(
         base=base_model(target.minibrain.base_model),
         messages=build_messages(version.kind, text, labels, shots),

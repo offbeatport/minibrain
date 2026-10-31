@@ -40,16 +40,47 @@ class SnapshotInfo(BaseModel):
 
 class JobInfo(BaseModel):
     id: int
-    minibrain: str
-    minibrain_name: str
-    version: int
+    minibrain: str | None
+    minibrain_name: str | None
+    version: int | None
     kind: str
     status: str
     progress: float
     error: str | None
+    attempt: int
+    max_attempts: int
+    cancel_requested: bool
+    retry_of: int | None
     created_at: datetime
+    run_after: datetime
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class AttemptInfo(BaseModel):
+    number: int
+    worker: str
+    outcome: str
+    error: str | None
+    retryable: bool | None
+    log: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class JobDetail(JobInfo):
+    attempts: list[AttemptInfo]
+    result: dict[str, Any] | None
+    outputs: dict[str, str]
+
+
+class JobEventInfo(BaseModel):
+    id: int
+    attempt: int
+    kind: str
+    message: str
+    data: dict[str, Any] | None
+    at: datetime
 
 
 class SplitScore(BaseModel):
@@ -180,11 +211,6 @@ class KeyInfo(BaseModel):
 
 class KeyCreated(KeyInfo):
     secret: str
-
-
-class LogChunk(BaseModel):
-    text: str
-    offset: int
 
 
 class DeviceInfo(BaseModel):

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type JobInfo, type VersionInfo, api, unwrap } from "./client";
 
-const ACTIVE_JOB = new Set(["queued", "running", "cancelling"]);
+const ACTIVE_JOB = new Set(["queued", "running"]);
 const ACTIVE_VERSION = new Set(["training", "evaluating"]);
 const POLL_MS = 2000;
 
@@ -70,7 +70,7 @@ export function useVersions(slug: string) {
 export function useJobs(slug: string) {
     return useQuery({
         queryKey: keys.jobs(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/jobs", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/jobs", { params: { query: { minibrain: slug } } })),
         refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
     });
 }

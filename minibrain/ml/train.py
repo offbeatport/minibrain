@@ -1,54 +1,47 @@
 import json
-import sys
+from pathlib import Path
 from typing import Any
 
 from datasets import Dataset
 from peft import LoraConfig
-from sqlalchemy.orm import Session, sessionmaker
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 from trl.trainer.sft_config import SFTConfig
 from trl.trainer.sft_trainer import SFTTrainer
 
 from minibrain.data.snapshot import read_split
-from minibrain.ml.context import JobContext, load_context, set_progress, update_version
+from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import training_device
 from minibrain.ml.runtime import load_base_model, load_tokenizer
 from minibrain.recipes import DEFAULT_RECIPE
-from minibrain.registry.db import make_sessions
-from minibrain.settings import load_settings
 from minibrain.tasks.classify import trained_messages
+
+CHECKPOINT_STEPS = 50
 
 
 class ProgressCallback(TrainerCallback):
-    def __init__(self, sessions: sessionmaker[Session], job_id: int) -> None:
-        self.sessions = sessions
-        self.job_id = job_id
-
     def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs: Any) -> None:
         total = state.max_steps or 1
-        set_progress(self.sessions, self.job_id, state.global_step / total)
-        entry = {"step": state.global_step, "steps": total} | (kwargs.get("logs") or {})
-        print(json.dumps(entry), flush=True)
+        report(state.global_step / total, step=state.global_step, steps=total, **(kwargs.get("logs") or {}))
 
 
-def training_row(context: JobContext, text: str, label: str) -> dict[str, Any]:
+def training_row(spec: JobSpec, text: str, label: str) -> dict[str, Any]:
     row: dict[str, Any] = {
         "prompt": trained_messages(text),
         "completion": [{"role": "assistant", "content": label}],
     }
-    if context.spec.template_kwargs:
-        row["chat_template_kwargs"] = dict(context.spec.template_kwargs)
+    if spec.base.template_kwargs:
+        row["chat_template_kwargs"] = dict(spec.base.template_kwargs)
     return row
 
 
-def training_rows(context: JobContext, max_rows: int | None) -> Dataset:
-    examples = read_split(context.snapshot_dir, "train")[:max_rows]
-    return Dataset.from_list([training_row(context, example.input, example.label) for example in examples])
+def training_rows(spec: JobSpec, max_rows: int | None) -> Dataset:
+    examples = read_split(spec.path("snapshot"), "train")[:max_rows]
+    return Dataset.from_list([training_row(spec, example.input, example.label) for example in examples])
 
 
-def sft_config(context: JobContext, recipe: dict[str, Any], device: str) -> SFTConfig:
+def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str) -> SFTConfig:
     return SFTConfig(
-        output_dir=str(context.snapshot_dir.parent.parent / "checkpoints" / f"v{context.number}"),
+        output_dir=str(checkpoints),
         num_train_epochs=float(recipe["epochs"]),
         per_device_train_batch_size=int(recipe["batch_size"]),
         gradient_accumulation_steps=int(recipe["grad_accum"]),
@@ -56,7 +49,9 @@ def sft_config(context: JobContext, recipe: dict[str, Any], device: str) -> SFTC
         lr_scheduler_type="cosine",
         warmup_steps=10,
         logging_steps=5,
-        save_strategy="no",
+        save_strategy="steps",
+        save_steps=CHECKPOINT_STEPS,
+        save_total_limit=1,
         report_to="none",
         disable_tqdm=True,
         max_length=256,
@@ -78,34 +73,32 @@ def lora_config(recipe: dict[str, Any]) -> LoraConfig:
     )
 
 
-def main(job_id: int) -> None:
-    sessions = make_sessions(load_settings().database_url)
-    context = load_context(sessions, job_id)
-    if context.adapter_dir is None:
-        raise ValueError(f"{context.slug}@{context.number} has no adapter directory")
-    recipe = DEFAULT_RECIPE | context.recipe
+def main(spec: JobSpec) -> None:
+    recipe = DEFAULT_RECIPE | spec.raw["recipe"]
     device = training_device()
-    rows = training_rows(context, recipe["max_rows"])
-    print(json.dumps({"device": device, "examples": len(rows), "recipe": recipe}), flush=True)
+    rows = training_rows(spec, recipe["max_rows"])
+    checkpoints = spec.path("checkpoints")
+    resume = checkpoints.is_dir() and any(checkpoints.glob("checkpoint-*"))
+    print(json.dumps({"device": device, "examples": len(rows), "recipe": recipe, "resume": resume}), flush=True)
     trainer = SFTTrainer(
-        model=load_base_model(context.spec, device),
-        args=sft_config(context, recipe, device),
+        model=load_base_model(spec.base, device),
+        args=sft_config(checkpoints, recipe, device),
         train_dataset=rows,
-        processing_class=load_tokenizer(context.spec, padding_side="right"),
+        processing_class=load_tokenizer(spec.base, padding_side="right"),
         peft_config=lora_config(recipe),
-        callbacks=[ProgressCallback(sessions, job_id)],
+        callbacks=[ProgressCallback()],
     )
-    output = trainer.train()
-    trainer.save_model(str(context.adapter_dir))
+    output = trainer.train(resume_from_checkpoint=resume)
+    trainer.save_model(str(spec.path("adapter_out")))
     summary = recipe | {
         "device": device,
         "examples": len(rows),
         "train_seconds": output.metrics.get("train_runtime"),
         "train_loss": output.metrics.get("train_loss"),
     }
-    update_version(sessions, context.version_id, recipe=summary)
-    print(json.dumps(summary), flush=True)
+    write_result(spec, {"summary": summary})
+    report(1.0, **summary)
 
 
 if __name__ == "__main__":
-    main(int(sys.argv[1]))
+    run_child(main)

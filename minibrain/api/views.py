@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from minibrain.api.schemas import (
+    AttemptInfo,
     ColumnInfo,
+    JobDetail,
     JobInfo,
     KeyInfo,
     MappingInfo,
@@ -14,7 +16,7 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.data.sources import describe
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, Job, Minibrain, Snapshot, Version
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, Job, JobAttempt, Minibrain, Snapshot, Version
 from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
@@ -42,19 +44,50 @@ def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
     )
 
 
+def job_fields(job: Job) -> dict:
+    return {
+        "id": job.id,
+        "minibrain": job.minibrain.slug if job.minibrain else None,
+        "minibrain_name": job.minibrain.name if job.minibrain else None,
+        "version": job.version.number if job.version else None,
+        "kind": job.kind,
+        "status": job.status,
+        "progress": job.progress,
+        "error": job.error,
+        "attempt": job.attempt,
+        "max_attempts": job.max_attempts,
+        "cancel_requested": job.cancel_requested,
+        "retry_of": job.retry_of,
+        "created_at": job.created_at,
+        "run_after": job.run_after,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+    }
+
+
 def job_info(job: Job) -> JobInfo:
-    return JobInfo(
-        id=job.id,
-        minibrain=job.minibrain.slug,
-        minibrain_name=job.minibrain.name,
-        version=job.version.number,
-        kind=job.kind,
-        status=job.status,
-        progress=job.progress,
-        error=job.error,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
+    return JobInfo(**job_fields(job))
+
+
+def attempt_info(attempt: JobAttempt) -> AttemptInfo:
+    return AttemptInfo(
+        number=attempt.number,
+        worker=attempt.worker,
+        outcome=attempt.outcome,
+        error=attempt.error,
+        retryable=attempt.retryable,
+        log=attempt.log_artifact_id,
+        started_at=attempt.started_at,
+        finished_at=attempt.finished_at,
+    )
+
+
+def job_detail(job: Job) -> JobDetail:
+    return JobDetail(
+        **job_fields(job),
+        attempts=[attempt_info(attempt) for attempt in job.attempts],
+        result=job.result,
+        outputs=dict(job.outputs or {}),
     )
 
 

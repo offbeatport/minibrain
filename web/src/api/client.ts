@@ -61,13 +61,6 @@ export async function uploadSource(slug: string, file: File): Promise<MinibrainD
     return body as MinibrainDetail;
 }
 
-export async function readLog(
-    jobId: number,
-    offset: number,
-): Promise<{ text: string; offset: number }> {
-    return unwrap(
-        api.GET("/api/jobs/{job_id}/log", {
-            params: { path: { job_id: jobId }, query: { offset } },
-        }),
-    );
+export function jobEventsUrl(jobId: number): string {
+    return `/api/jobs/${jobId}/events`;
 }

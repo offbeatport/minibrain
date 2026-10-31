@@ -11,7 +11,7 @@ import {
     Textarea,
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 import {
     type ExampleInfo,
     type MinibrainDetail,
@@ -20,8 +20,9 @@ import {
     unwrap,
     uploadSource,
 } from "~/api/client";
-import { keys, useGolden, useMinibrain, usePreview } from "~/api/queries";
+import { isActiveJob, keys, useGolden, useJobs, useMinibrain, usePreview } from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
+import { JobPanel } from "~/components/JobPanel";
 import { ScopedPage } from "~/components/PageHeader";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
@@ -43,13 +44,16 @@ function Clamp({ text }: { text: unknown }) {
 
 function useRefresh(slug: string) {
     const queryClient = useQueryClient();
-    return async (detail?: MinibrainDetail) => {
-        if (detail) {
-            queryClient.setQueryData(keys.minibrain(slug), detail);
-        }
-        await queryClient.invalidateQueries({ queryKey: ["minibrain", slug] });
-        await queryClient.invalidateQueries({ queryKey: keys.minibrains });
-    };
+    return useCallback(
+        async (detail?: MinibrainDetail) => {
+            if (detail) {
+                queryClient.setQueryData(keys.minibrain(slug), detail);
+            }
+            await queryClient.invalidateQueries({ queryKey: ["minibrain", slug] });
+            await queryClient.invalidateQueries({ queryKey: keys.minibrains });
+        },
+        [queryClient, slug],
+    );
 }
 
 function SourceSection({ detail }: { detail: MinibrainDetail }) {
@@ -316,6 +320,9 @@ const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
 
 function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     const refresh = useRefresh(detail.slug);
+    const { data: jobs } = useJobs(detail.slug);
+    const latest = (jobs ?? []).find((job) => job.kind === "prepare");
+    const building = latest !== undefined && isActiveJob(latest);
     const build = useMutation({
         mutationFn: () =>
             unwrap(
@@ -325,6 +332,12 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
             ),
         onSuccess: () => refresh(),
     });
+    const finishedId = latest?.status === "succeeded" ? latest.id : null;
+    useEffect(() => {
+        if (finishedId !== null) {
+            refresh();
+        }
+    }, [finishedId, refresh]);
     const golden = useGolden(detail.slug, Boolean(detail.snapshot));
     const [showGolden, setShowGolden] = useState(false);
     if (!detail.mapping.sql) {
@@ -336,12 +349,23 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
             title="Dataset"
             caption="A frozen copy of the cleaned rows, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
-                <Button size="sm" onClick={() => build.mutate()} disabled={build.isPending}>
-                    {build.isPending ? "Building…" : snapshot ? "Rebuild" : "Build dataset"}
+                <Button
+                    size="sm"
+                    onClick={() => build.mutate()}
+                    disabled={build.isPending || building}
+                >
+                    {build.isPending || building
+                        ? "Building…"
+                        : snapshot
+                          ? "Rebuild"
+                          : "Build dataset"}
                 </Button>
             }
         >
             <ErrorLine error={build.error} />
+            {latest && latest.status !== "succeeded" && (
+                <JobPanel job={latest} slug={detail.slug} />
+            )}
             {snapshot ? (
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-6">

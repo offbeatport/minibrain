@@ -76,8 +76,9 @@ function Training({ slug }: { slug: string }) {
             </p>
         );
     }
-    const active = (jobs ?? []).filter(isActiveJob);
-    const finished = (jobs ?? []).filter((job) => !isActiveJob(job)).slice(0, FINISHED_SHOWN);
+    const versionJobs = (jobs ?? []).filter((job) => job.kind !== "prepare");
+    const active = versionJobs.filter(isActiveJob);
+    const finished = versionJobs.filter((job) => !isActiveJob(job)).slice(0, FINISHED_SHOWN);
     return (
         <>
             <CreateVersion slug={slug} />
