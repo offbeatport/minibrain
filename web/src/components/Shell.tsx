@@ -1,14 +1,14 @@
 import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import {
     Activity,
-    Boxes,
+    Box,
     Cpu,
     Database,
     Gauge,
     GraduationCap,
     Home,
     LogOut,
-    MessageSquare,
+    Play,
     Rocket,
     Settings,
     SlidersHorizontal,
@@ -38,8 +38,8 @@ const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     {
         label: "Explore",
         items: [
-            { label: "Models", path: "/models", icon: Boxes },
-            { label: "Playground", path: "/playground", icon: MessageSquare, scoped: true },
+            { label: "Models", path: "/models", icon: Box },
+            { label: "Playground", path: "/playground", icon: Play, scoped: true },
         ],
     },
     {
