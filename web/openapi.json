@@ -3237,6 +3237,49 @@
             "type": "integer",
             "title": "Popularity"
           },
+          "family": {
+            "type": "string",
+            "title": "Family"
+          },
+          "generation": {
+            "type": "string",
+            "title": "Generation"
+          },
+          "architecture": {
+            "type": "string",
+            "title": "Architecture"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "params_b": {
+            "type": "number",
+            "title": "Params B"
+          },
+          "moe": {
+            "type": "boolean",
+            "title": "Moe"
+          },
+          "support": {
+            "type": "string",
+            "title": "Support"
+          },
+          "superseded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
           "variants": {
             "items": {
               "$ref": "#/components/schemas/CatalogVariantInfo"
@@ -3269,6 +3312,15 @@
           "recommendation",
           "trainable",
           "popularity",
+          "family",
+          "generation",
+          "architecture",
+          "tier",
+          "params_b",
+          "moe",
+          "support",
+          "superseded_by",
+          "origin",
           "variants",
           "added"
         ],
@@ -3330,6 +3382,17 @@
                 "type": "null"
               }
             ]
+          },
+          "catalog_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Url"
           }
         },
         "type": "object",
@@ -3341,7 +3404,8 @@
           "endpoint",
           "token_configured",
           "synced_at",
-          "sync_job"
+          "sync_job",
+          "catalog_url"
         ],
         "title": "CatalogResponse"
       },

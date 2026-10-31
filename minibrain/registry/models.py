@@ -275,6 +275,15 @@ class CatalogModel(Base):
     popularity: Mapped[int] = mapped_column(default=0)
     position: Mapped[int] = mapped_column(default=0)
     synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    family: Mapped[str] = mapped_column(default="", server_default="")
+    generation: Mapped[str] = mapped_column(default="", server_default="")
+    architecture: Mapped[str] = mapped_column(default="", server_default="")
+    tier: Mapped[str] = mapped_column(default="S", server_default="S")
+    params_b: Mapped[float] = mapped_column(default=0.0, server_default="0")
+    moe: Mapped[bool] = mapped_column(default=False, server_default=false())
+    support: Mapped[str] = mapped_column(default="supported", server_default="supported")
+    superseded_by: Mapped[str | None] = mapped_column(default=None)
+    origin: Mapped[str] = mapped_column(default="catalogue", server_default="catalogue")
 
     variants: Mapped[list["CatalogVariant"]] = relationship(
         back_populates="model", cascade="all, delete-orphan", order_by="CatalogVariant.position"

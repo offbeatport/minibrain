@@ -1053,6 +1053,24 @@ export interface components {
             trainable: boolean;
             /** Popularity */
             popularity: number;
+            /** Family */
+            family: string;
+            /** Generation */
+            generation: string;
+            /** Architecture */
+            architecture: string;
+            /** Tier */
+            tier: string;
+            /** Params B */
+            params_b: number;
+            /** Moe */
+            moe: boolean;
+            /** Support */
+            support: string;
+            /** Superseded By */
+            superseded_by: string | null;
+            /** Origin */
+            origin: string;
             /** Variants */
             variants: components["schemas"]["CatalogVariantInfo"][];
             /** Added */
@@ -1074,6 +1092,8 @@ export interface components {
             /** Synced At */
             synced_at: string | null;
             sync_job: components["schemas"]["JobInfo"] | null;
+            /** Catalog Url */
+            catalog_url: string | null;
         };
         /** CatalogSettings */
         CatalogSettings: {

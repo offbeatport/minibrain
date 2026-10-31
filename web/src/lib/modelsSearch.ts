@@ -13,6 +13,8 @@ const KEYS = [
     "provider",
     "fits",
     "access",
+    "tier",
+    "pool",
 ] as const;
 
 export type ModelsSearchKey = (typeof KEYS)[number];

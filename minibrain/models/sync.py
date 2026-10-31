@@ -3,43 +3,34 @@ from typing import Any
 import httpx
 
 from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
-from minibrain.models import hub
+
+REQUIRED = ("id", "repo", "variants")
 
 
-def latest(client: httpx.Client, repo: str) -> dict[str, Any]:
-    response = client.get(f"{hub.endpoint()}/api/models/{repo}", params={"blobs": "true"})
-    response.raise_for_status()
-    data = response.json()
-    files = []
-    for sibling in data.get("siblings", []):
-        if hub.needed(sibling["rfilename"]):
-            lfs = sibling.get("lfs") or {}
-            size = sibling.get("size") or lfs.get("size") or 0
-            files.append({"path": sibling["rfilename"], "size": size, "sha256": lfs.get("sha256")})
-    files.sort(key=lambda item: item["path"])
-    weights = sum(item["size"] for item in files if item["path"].endswith(".safetensors"))
-    return {
-        "revision": data["sha"],
-        "files": files,
-        "size_bytes": sum(item["size"] for item in files),
-        "weights_bytes": weights,
-        "downloads": int(data.get("downloads") or 0),
-    }
+def validate(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    entries = snapshot.get("entries")
+    if not isinstance(entries, list) or not snapshot.get("snapshot"):
+        raise FinalError("The catalogue file has no snapshot or entries")
+    for entry in entries:
+        missing = [key for key in REQUIRED if key not in entry]
+        if missing:
+            raise FinalError(f"Catalogue entry {entry.get('id', '?')} lacks {', '.join(missing)}")
+    return entries
 
 
 def main(spec: JobSpec) -> None:
-    if hub.offline():
-        raise FinalError("Offline: the catalogue sync needs a connection; the bundled catalogue stays in use")
-    variants: list[dict[str, str]] = spec.raw["variants"]
-    result: dict[str, Any] = {"variants": {}, "popularity": {}}
-    with httpx.Client(timeout=httpx.Timeout(30.0), headers=hub.headers(), follow_redirects=True) as client:
-        for index, variant in enumerate(variants):
-            found = latest(client, variant["repo"])
-            result["variants"][variant["id"]] = found
-            current = result["popularity"].get(variant["catalog_id"], 0)
-            result["popularity"][variant["catalog_id"]] = max(current, found.pop("downloads"))
-            report((index + 1) / len(variants), step=f"checked {variant['repo']}", revision=found["revision"][:12])
-    write_result(spec, result)
+    url = spec.raw.get("url")
+    if not url:
+        raise FinalError("No catalogue URL configured; the bundled catalogue stays in use")
+    report(0.2, step=f"fetching {url}")
+    with httpx.Client(timeout=httpx.Timeout(30.0), follow_redirects=True) as client:
+        response = client.get(url)
+    if response.status_code >= 400:
+        raise FinalError(f"{url} answered {response.status_code}")
+    snapshot = response.json()
+    entries = validate(snapshot)
+    write_result(spec, {"snapshot": snapshot["snapshot"], "entries": entries})
+    report(1.0, step=f"{len(entries)} entries from snapshot {snapshot['snapshot']}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,14 @@ ENTRY_FIELDS = (
     "stop_tokens",
     "popularity",
     "position",
+    "family",
+    "generation",
+    "architecture",
+    "tier",
+    "params_b",
+    "moe",
+    "support",
+    "superseded_by",
 )
 VARIANT_FIELDS = (
     "label",
@@ -69,7 +78,8 @@ def upsert(session: Session, entry: dict[str, Any]) -> None:
         model = CatalogModel(id=entry["id"])
         session.add(model)
     for key in ENTRY_FIELDS:
-        setattr(model, key, entry[key])
+        if key in entry:
+            setattr(model, key, entry[key])
     known = {variant.id: variant for variant in model.variants}
     for position, data in enumerate(entry["variants"]):
         variant = known.get(data["id"])
@@ -96,22 +106,24 @@ def seed(session: Session) -> bool:
     return True
 
 
+def catalog_url() -> str | None:
+    found = os.environ.get("MINIBRAIN_CATALOG_URL", "").strip()
+    return found or None
+
+
 def apply_sync(session: Session, result: dict[str, Any]) -> None:
     moment = now()
-    for variant_id, latest in result.get("variants", {}).items():
-        variant = session.get(CatalogVariant, variant_id)
-        if variant is not None:
-            refresh_variant(session, variant, latest)
-    for catalog_id, popularity in result.get("popularity", {}).items():
-        entry = session.get(CatalogModel, catalog_id)
-        if entry is not None:
-            entry.popularity = int(popularity)
-            entry.synced_at = moment
+    for entry in result.get("entries", []):
+        upsert(session, entry)
+        found = session.get(CatalogModel, entry["id"])
+        if found is not None:
+            found.synced_at = moment
+    if result.get("snapshot"):
+        write(session, SNAPSHOT_KEY, result["snapshot"])
 
 
-def sync_params(session: Session) -> dict[str, Any]:
-    variants = session.scalars(select(CatalogVariant).order_by(CatalogVariant.catalog_id, CatalogVariant.position))
-    return {"variants": [{"id": v.id, "catalog_id": v.catalog_id, "repo": v.repo} for v in variants]}
+def sync_params(_session: Session) -> dict[str, Any]:
+    return {"url": catalog_url()}
 
 
 def daily_sync(session: Session) -> bool:

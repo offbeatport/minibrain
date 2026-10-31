@@ -441,7 +441,34 @@ function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
     );
 }
 
-function columns(on: Actions): ColumnDef<CatalogEntry, unknown>[] {
+const SUPPORT_LABEL: Record<string, string> = {
+    tested: "Tested by us",
+    supported: "Supported architecture",
+    untested: "Untested",
+};
+
+const TIERS = ["S", "M", "L", "XL"];
+
+function recommendedOrder(entry: CatalogEntry): number[] {
+    const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
+    const support = ["tested", "supported", "untested"].indexOf(entry.support);
+    return [
+        fitRank < 0 ? 9 : fitRank,
+        support < 0 ? 9 : support,
+        entry.recommended ? 0 : 1,
+        entry.superseded_by ? 1 : 0,
+        -entry.popularity,
+    ];
+}
+
+function byRecommended(left: CatalogEntry, right: CatalogEntry): number {
+    const a = recommendedOrder(left);
+    const b = recommendedOrder(right);
+    const index = a.findIndex((value, position) => value !== b[position]);
+    return index < 0 ? 0 : a[index] - b[index];
+}
+
+function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
     return [
         {
             id: "model",
@@ -465,10 +492,22 @@ function columns(on: Actions): ColumnDef<CatalogEntry, unknown>[] {
                     <span className="line-clamp-2 whitespace-normal text-sm text-muted-foreground">
                         {row.original.description}
                     </span>
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                        {`${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
+                            SUPPORT_LABEL[row.original.support] ?? row.original.support
+                        }`}
+                    </span>
+                    {row.original.superseded_by && (
+                        <span className="text-sm text-muted-foreground">
+                            {`Newer version available: ${
+                                names.get(row.original.superseded_by) ?? row.original.superseded_by
+                            }`}
+                        </span>
+                    )}
                 </div>
             ),
         },
-        { id: "provider", header: "Provider", accessorFn: (entry) => entry.provider },
+        { id: "provider", header: "Publisher", accessorFn: (entry) => entry.provider },
         {
             id: "capabilities",
             header: "Capabilities",
@@ -639,7 +678,11 @@ export function Discover({
         }),
         [router, refresh, data?.online, data?.token_configured],
     );
-    const tableColumns = useMemo(() => columns(on), [on]);
+    const names = useMemo(
+        () => new Map((data?.entries ?? []).map((entry) => [entry.id, entry.name])),
+        [data?.entries],
+    );
+    const tableColumns = useMemo(() => columns(on, names), [on, names]);
     if (catalog.isLoading) {
         return <p className="text-sm text-muted-foreground">Loading the catalogue…</p>;
     }
@@ -660,18 +703,22 @@ export function Discover({
         (entry) =>
             entry.gated === needsAccess &&
             (!text ||
-                `${entry.name} ${entry.description} ${entry.provider}`
+                `${entry.name} ${entry.description} ${entry.provider} ${entry.family} ${entry.architecture}`
                     .toLowerCase()
                     .includes(text)) &&
             (!search.task || entry.capabilities.includes(search.task)) &&
+            (!search.tier || entry.tier === search.tier) &&
             (!search.provider || entry.provider === search.provider) &&
             (!fitsOnly ||
                 entry.variants.some((variant) => ["fits", "limited"].includes(variant.fit.level))),
     );
+    visible.sort(byRecommended);
     const tasks = [...new Set(data.entries.flatMap((entry) => entry.capabilities))].sort();
     const providers = [...new Set(data.entries.map((entry) => entry.provider))].sort();
     const gatedCount = data.entries.filter((entry) => entry.gated).length;
-    const filtering = Boolean(search.q || search.task || search.provider || fitsOnly);
+    const filtering = Boolean(
+        search.q || search.task || search.provider || search.tier || fitsOnly,
+    );
     const empty: ReactNode = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No supported models match these filters.</p>
@@ -679,7 +726,7 @@ export function Discover({
                 <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => update({ q: "", task: "", provider: "", fits: "" })}
+                    onClick={() => update({ q: "", task: "", provider: "", tier: "", fits: "" })}
                 >
                     Clear filters
                 </Button>
@@ -721,10 +768,16 @@ export function Discover({
                     onChange={(task) => update({ task })}
                 />
                 <FilterSelect
-                    label="Provider"
+                    label="Publisher"
                     value={search.provider}
                     options={providers}
                     onChange={(provider) => update({ provider })}
+                />
+                <FilterSelect
+                    label="Size"
+                    value={search.tier}
+                    options={TIERS}
+                    onChange={(tier) => update({ tier })}
                 />
                 <Select
                     value={needsAccess ? "needs-access" : "ready"}

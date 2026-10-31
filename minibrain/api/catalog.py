@@ -21,7 +21,7 @@ from minibrain.api.schemas import (
 from minibrain.api.views import job_info
 from minibrain.jobs.queue import enqueue
 from minibrain.models import hub
-from minibrain.models.catalog import DAILY_SYNC_KEY, daily_sync, sync_params
+from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params
 from minibrain.models.hardware import Hardware, detect, fit
 from minibrain.models.registry import start_download
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
@@ -96,6 +96,15 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         recommendation=entry.recommendation,
         trainable=entry.trainable,
         popularity=entry.popularity,
+        family=entry.family,
+        generation=entry.generation,
+        architecture=entry.architecture,
+        tier=entry.tier,
+        params_b=entry.params_b,
+        moe=entry.moe,
+        support=entry.support,
+        superseded_by=entry.superseded_by,
+        origin=entry.origin,
         variants=[variant_info(variant, machine) for variant in entry.variants],
         added=added_for(session, settings, entry),
     )
@@ -121,6 +130,7 @@ def catalogue(request: Request, session: SessionDep, settings: SettingsDep) -> C
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),
         sync_job=job_info(sync) if sync is not None else None,
+        catalog_url=catalog_url(),
     )
 
 
@@ -151,8 +161,10 @@ def download(
 
 @router.post("/sync", status_code=202)
 def sync(session: SessionDep) -> JobInfo:
-    if hub.offline() or hub.CONNECTIVITY.check() is False:
+    if hub.offline():
         raise ConflictError("Offline: the catalogue sync needs a connection; the bundled catalogue stays in use")
+    if catalog_url() is None:
+        raise ConflictError("Set MINIBRAIN_CATALOG_URL to sync the catalogue; the bundled catalogue stays in use")
     job = enqueue(session, JobKind.CATALOG_SYNC, sync_params(session), idempotency_key="catalog_sync")
     session.commit()
     return job_info(job)
@@ -175,7 +187,7 @@ def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettin
 
 
 def sync_due(session: Session) -> bool:
-    if hub.offline() or not daily_sync(session):
+    if hub.offline() or catalog_url() is None or not daily_sync(session):
         return False
     last = latest_sync(session)
     if last is not None and last.status in (JobStatus.QUEUED, JobStatus.RUNNING):

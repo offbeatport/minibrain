@@ -23,7 +23,8 @@ PROBE_TIMEOUT = 3.0
 
 
 def needed(path: str) -> bool:
-    return "/" not in path and (path in KEEP_FILES or path.endswith(".safetensors"))
+    duplicate = path.startswith("consolidated")
+    return "/" not in path and not duplicate and (path in KEEP_FILES or path.endswith(".safetensors"))
 
 
 def endpoint() -> str:

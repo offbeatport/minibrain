@@ -407,6 +407,15 @@ class CatalogEntry(BaseModel):
     recommendation: str | None
     trainable: bool
     popularity: int
+    family: str
+    generation: str
+    architecture: str
+    tier: str
+    params_b: float
+    moe: bool
+    support: str
+    superseded_by: str | None
+    origin: str
     variants: list[CatalogVariantInfo]
     added: list[AddedInfo]
 
@@ -430,6 +439,7 @@ class CatalogResponse(BaseModel):
     token_configured: bool
     synced_at: datetime | None
     sync_job: JobInfo | None
+    catalog_url: str | None
 
 
 class DownloadRequest(BaseModel):

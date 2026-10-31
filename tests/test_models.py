@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import threading
 from collections.abc import Iterator
 from functools import partial
@@ -12,7 +13,7 @@ import pytest
 from minibrain.models.catalog import bundled, seed
 from minibrain.models.hardware import GIB, Hardware, fit
 from minibrain.models.sources import StorageSource, location_url
-from minibrain.registry.models import CatalogModel, CatalogVariant, Job
+from minibrain.registry.models import CatalogModel, CatalogVariant
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 
@@ -221,19 +222,45 @@ def test_storage_sources_read_buckets_and_folders(tmp_path: Path) -> None:
     assert location_url("folder", "~/models") == str(Path("~/models").expanduser())
 
 
-def test_catalogue_sync_marks_updates_without_moving_pins(harness: Harness, hub: Path) -> None:
+def publish_catalogue(hub: Path, monkeypatch: pytest.MonkeyPatch, revision: str) -> None:
+    variant = {
+        "id": "tiny:bf16",
+        "label": "BF16",
+        "format": "safetensors",
+        "precision": "bf16",
+        "repo": REPO,
+        "revision": revision,
+        "files": manifest(),
+        "size_bytes": 1,
+        "weights_bytes": 1,
+        "runtimes": ["transformers"],
+        "requires": {},
+    }
+    snapshot = {
+        "snapshot": "9999-01-01.1",
+        "entries": [{"id": "tiny", "repo": REPO, "popularity": 7, "variants": [variant]}],
+    }
+    (hub / "catalog.json").write_text(json.dumps(snapshot))
+    monkeypatch.setenv("MINIBRAIN_CATALOG_URL", f"{os.environ['MINIBRAIN_HF_ENDPOINT']}/catalog.json")
+
+
+def test_catalogue_sync_reads_our_url_and_keeps_pins(
+    harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     add_tiny(harness)
     download_tiny(harness)
     harness.worker(kinds=["download"]).run_once()
+    monkeypatch.delenv("MINIBRAIN_CATALOG_URL", raising=False)
+    assert harness.client.post("/api/catalog/sync").status_code == 409
+    publish_catalogue(hub, monkeypatch, "b" * 40)
     assert harness.client.post("/api/catalog/sync").status_code == 202
-    with harness.sessions() as session:
-        variants = [{"id": "tiny:bf16", "catalog_id": "tiny", "repo": REPO}]
-        session.query(Job).filter(Job.kind == "catalog_sync").update({"params": {"variants": variants}})
-        session.commit()
     assert harness.worker(kinds=["catalog_sync"]).run_once()
     row = rows(harness)["tiny"]
     assert row["update_available"] is True
     assert harness.client.get("/api/models/base/tiny").json()["revision"] == REVISION
+    with harness.sessions() as session:
+        entry = session.get(CatalogModel, "tiny")
+        assert entry is not None and entry.popularity == 7
     assert harness.client.get("/api/catalog/settings").json() == {"daily_sync": False}
 
 
