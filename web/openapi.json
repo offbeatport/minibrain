@@ -1070,6 +1070,82 @@
         }
       }
     },
+    "/api/catalog/hub": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Add From Hub",
+        "operationId": "add_from_hub_api_catalog_hub_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HubAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/{catalog_id}": {
+      "delete": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Remove From Catalogue",
+        "operationId": "remove_from_catalogue_api_catalog__catalog_id__delete",
+        "parameters": [
+          {
+            "name": "catalog_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalog Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalog/sync": {
       "post": {
         "tags": [
@@ -4071,6 +4147,19 @@
           "lease_expires_at"
         ],
         "title": "HeartbeatResponse"
+      },
+      "HubAddRequest": {
+        "properties": {
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo"
+        ],
+        "title": "HubAddRequest"
       },
       "ImportRequest": {
         "properties": {

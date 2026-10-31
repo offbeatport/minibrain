@@ -1,5 +1,6 @@
 import threading
 
+import httpx
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -21,8 +22,9 @@ from minibrain.api.schemas import (
 from minibrain.api.views import job_info
 from minibrain.jobs.queue import enqueue
 from minibrain.models import hub
-from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params
+from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
 from minibrain.models.hardware import Hardware, detect, fit
+from minibrain.models.hubadd import HubAddError, lookup, parse_repo
 from minibrain.models.registry import start_download
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -157,6 +159,48 @@ def download(
     model = start_download(session, settings, entry, variant, LOCAL_USER)
     session.commit()
     return row_of(session, settings, request, model)
+
+
+class HubAddRequest(BaseModel):
+    repo: str
+
+
+@router.post("/hub", status_code=201)
+def add_from_hub(body: HubAddRequest, request: Request, session: SessionDep, settings: SettingsDep) -> CatalogEntry:
+    try:
+        repo = parse_repo(body.repo)
+    except HubAddError as error:
+        raise ConflictError(str(error)) from error
+    existing = session.scalar(select(CatalogModel).where(CatalogModel.repo == repo))
+    if existing is not None:
+        return entry_info(session, settings, existing, hardware(request))
+    try:
+        entry = lookup(repo)
+    except HubAddError as error:
+        raise ConflictError(str(error)) from error
+    except httpx.HTTPError as error:
+        raise ConflictError(f"Could not reach {hub.endpoint()}: {error}") from error
+    upsert(session, entry)
+    session.flush()
+    added = session.get(CatalogModel, entry["id"])
+    if added is None:
+        raise NotFoundError(f"{repo} could not be added")
+    added.origin = "hub"
+    session.commit()
+    return entry_info(session, settings, added, hardware(request))
+
+
+@router.delete("/{catalog_id}", status_code=204)
+def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
+    entry = session.get(CatalogModel, catalog_id)
+    if entry is None:
+        raise NotFoundError(f"{catalog_id} is not in the catalogue")
+    if entry.origin != "hub":
+        raise ConflictError("Only models added from Hugging Face can be removed from the catalogue")
+    if session.scalar(select(Model.id).where(Model.catalog_id == catalog_id).limit(1)) is not None:
+        raise ConflictError(f"{entry.name} is on this install; archive or remove the model first")
+    session.delete(entry)
+    session.commit()
 
 
 @router.post("/sync", status_code=202)

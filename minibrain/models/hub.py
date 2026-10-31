@@ -4,27 +4,8 @@ import time
 
 import httpx
 
-KEEP_FILES = {
-    "config.json",
-    "generation_config.json",
-    "tokenizer.json",
-    "tokenizer_config.json",
-    "vocab.json",
-    "merges.txt",
-    "special_tokens_map.json",
-    "added_tokens.json",
-    "model.safetensors.index.json",
-    "chat_template.jinja",
-    "LICENSE",
-    "USE_POLICY.md",
-}
 PROBE_SECONDS = 60.0
 PROBE_TIMEOUT = 3.0
-
-
-def needed(path: str) -> bool:
-    duplicate = path.startswith("consolidated")
-    return "/" not in path and not duplicate and (path in KEEP_FILES or path.endswith(".safetensors"))
 
 
 def endpoint() -> str:

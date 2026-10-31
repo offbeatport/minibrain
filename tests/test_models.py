@@ -383,3 +383,31 @@ def test_import_rejects_pickle_and_incomplete_shards(harness: Harness, tmp_path:
     (sharded / "model.safetensors.index.json").write_text(json.dumps(index))
     (sharded / "model-00001-of-00002.safetensors").write_bytes(b"shard")
     assert "missing model-00002-of-00002" in import_folder(harness, "Sharded", sharded)["error"]
+
+
+def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from minibrain.models.hubadd import HubAddError, parse_repo
+
+    assert parse_repo("https://huggingface.co/Qwen/Qwen3-8B/tree/main") == "Qwen/Qwen3-8B"
+    assert parse_repo(" Qwen/Qwen3-8B ") == "Qwen/Qwen3-8B"
+    with pytest.raises(HubAddError):
+        parse_repo("not a repo")
+    api = hub / "api" / "models" / REPO
+    api.write_text(json.dumps(json.loads(api.read_text()) | {"config": {"model_type": "qwen3"}}))
+    response = harness.client.post("/api/catalog/hub", json={"repo": f"{os.environ['MINIBRAIN_HF_ENDPOINT']}/{REPO}"})
+    assert response.status_code == 201
+    entry = response.json()
+    assert (entry["origin"], entry["support"], entry["architecture"]) == ("hub", "supported", "qwen3")
+    assert entry["variants"][0]["revision"] == "b" * 40
+    again = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
+    assert again["id"] == entry["id"]
+    assert harness.client.delete(f"/api/catalog/{entry['id']}").status_code == 204
+    assert harness.client.delete("/api/catalog/qwen3-0.6b").status_code == 409
+    monkeypatch.setenv("MINIBRAIN_OFFLINE", "1")
+    assert harness.client.post("/api/catalog/hub", json={"repo": REPO}).status_code == 409
+
+
+def test_unknown_architecture_is_marked_untested(harness: Harness, hub: Path) -> None:
+    entry = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
+    assert entry["support"] == "untested"
+    assert harness.client.post("/api/catalog/hub", json={"repo": "test/missing"}).status_code == 409

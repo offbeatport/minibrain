@@ -9,6 +9,7 @@ import httpx
 from minibrain.ml.context import FinalError
 from minibrain.models import hub
 from minibrain.models.files import CHUNK, file_chunks
+from minibrain.models.rules import needed
 
 FOLDER = "folder"
 S3 = "s3"
@@ -76,7 +77,7 @@ class StorageSource:
         found = []
         for item in listing:
             name = str(item["name"]).rstrip("/").rsplit("/", 1)[-1]
-            if item.get("type") == "file" and hub.needed(name):
+            if item.get("type") == "file" and needed(name):
                 found.append({"path": name, "size": int(item.get("size") or 0), "sha256": None})
         return sorted(found, key=lambda item: item["path"])
 

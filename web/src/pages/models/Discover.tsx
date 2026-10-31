@@ -27,7 +27,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
     type CatalogEntry,
     type CatalogResponse,
@@ -468,6 +468,69 @@ function byRecommended(left: CatalogEntry, right: CatalogEntry): number {
     return index < 0 ? 0 : a[index] - b[index];
 }
 
+function AddFromHubDialog({
+    open,
+    onOpenChange,
+    onAdded,
+    endpoint,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onAdded: (entry: CatalogEntry) => void;
+    endpoint: string;
+}) {
+    const refresh = useModelsRefresh();
+    const [repo, setRepo] = useState("");
+    const add = useMutation({
+        mutationFn: () => unwrap(api.POST("/api/catalog/hub", { body: { repo: repo.trim() } })),
+        onSuccess: async (entry) => {
+            await refresh();
+            setRepo("");
+            onOpenChange(false);
+            onAdded(entry);
+        },
+    });
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (repo.trim()) {
+            add.mutate();
+        }
+    };
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg">
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <DialogHeader>
+                        <DialogTitle>Add from Hugging Face</DialogTitle>
+                        <DialogDescription>
+                            {`Find any model on ${endpoint}, then paste its link or id. minibrain reads that one model's details now and adds it to Discover as untested unless our engines support its architecture.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="hub-repo">Model link or id</Label>
+                        <Input
+                            id="hub-repo"
+                            value={repo}
+                            onChange={(event) => setRepo(event.target.value)}
+                            placeholder="Qwen/Qwen3-8B"
+                            autoFocus
+                        />
+                    </div>
+                    <ErrorLine error={add.error} />
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={!repo.trim() || add.isPending}>
+                            {add.isPending ? "Checking…" : "Add model"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
     return [
         {
@@ -495,7 +558,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
                     <span className="text-sm tabular-nums text-muted-foreground">
                         {`${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
                             SUPPORT_LABEL[row.original.support] ?? row.original.support
-                        }`}
+                        }${row.original.origin === "hub" ? " · Added from Hugging Face" : ""}`}
                     </span>
                     {row.original.superseded_by && (
                         <span className="text-sm text-muted-foreground">
@@ -665,6 +728,7 @@ export function Discover({
     const refresh = useModelsRefresh();
     const catalog = useCatalog();
     const [downloading, setDownloading] = useState<CatalogEntry | null>(null);
+    const [adding, setAdding] = useState(false);
     const [requirements, setRequirements] = useState<{ entry: CatalogEntry | null } | null>(null);
     const data = catalog.data;
     const on: Actions = useMemo(
@@ -703,7 +767,7 @@ export function Discover({
         (entry) =>
             entry.gated === needsAccess &&
             (!text ||
-                `${entry.name} ${entry.description} ${entry.provider} ${entry.family} ${entry.architecture}`
+                `${entry.name} ${entry.description} ${entry.provider} ${entry.repo} ${entry.family} ${entry.architecture}`
                     .toLowerCase()
                     .includes(text)) &&
             (!search.task || entry.capabilities.includes(search.task)) &&
@@ -793,6 +857,14 @@ export function Discover({
                         <SelectItem value="needs-access">{`Needs access (${gatedCount})`}</SelectItem>
                     </SelectContent>
                 </Select>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAdding(true)}
+                    disabled={data.offline_forced}
+                >
+                    Add from Hugging Face
+                </Button>
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <span className="flex items-center gap-1.5">
@@ -839,6 +911,14 @@ export function Discover({
                 </button>
                 .
             </p>
+            <AddFromHubDialog
+                open={adding}
+                onOpenChange={setAdding}
+                endpoint={data.endpoint}
+                onAdded={(entry) =>
+                    update({ q: entry.repo, access: entry.gated ? "needs-access" : "" })
+                }
+            />
             <DownloadDialog
                 entry={downloading}
                 catalog={data}
