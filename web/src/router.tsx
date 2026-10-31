@@ -13,7 +13,6 @@ import { DataPage } from "./pages/DataPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
-import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
@@ -80,8 +79,6 @@ function movedToSettings(path: string): AnyRoute {
 const routeTree = rootRoute.addChildren([
     globalPage("/", HomePage),
     globalPage("/models", ModelsPage),
-    globalPage("/models/base/$key", BaseModelPage),
-    globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),
     scopedPage("/data", DataPage),
     scopedPage("/training", TrainingPage),
