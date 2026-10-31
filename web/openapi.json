@@ -5265,6 +5265,11 @@
             "type": "integer",
             "title": "Completion Tokens",
             "default": 0
+          },
+          "recorded": {
+            "type": "boolean",
+            "title": "Recorded",
+            "default": true
           }
         },
         "type": "object",

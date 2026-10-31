@@ -39,6 +39,7 @@ class LogBody(BaseModel):
     latency_ms: float
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    recorded: bool = True
 
 
 class LogsBody(BaseModel):

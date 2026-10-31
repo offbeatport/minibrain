@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.api import (
     catalog,
@@ -33,8 +34,10 @@ from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
 from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever
+from minibrain.models import hub
 from minibrain.models.catalog import seed
 from minibrain.policy import LockedError, PolicyError
+from minibrain.policy import load as load_policy
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -77,6 +80,11 @@ def mount_web(app: FastAPI, dist: Path) -> None:
         if path and candidate.is_file() and candidate.is_relative_to(root):
             return FileResponse(candidate)
         return FileResponse(root / "index.html")
+
+
+def hub_allowed(sessions: sessionmaker[Session]) -> bool:
+    with sessions() as session:
+        return load_policy(session).outbound_allowed(hub.endpoint())
 
 
 def no_engines(_bases: dict[str, BaseModelSpec], _registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
@@ -136,7 +144,8 @@ def create_app(
     app.state.queue.grace()
     engines = None
     if backend is None:
-        engines = EngineManager(settings, os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000"))
+        main_url = os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000")
+        engines = EngineManager(settings, main_url, hub_allowed=lambda: hub_allowed(sessions))
         backend = ManagedEngineBackend(engines, lambda: app.state.gateway_config.current().engines)
     app.state.engines = engines
     app.state.backend = backend

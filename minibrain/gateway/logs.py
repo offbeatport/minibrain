@@ -25,6 +25,7 @@ class LogEntry:
     latency_ms: float
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    recorded: bool = True
 
     def as_json(self) -> dict:
         return asdict(self) | {"at": self.at.isoformat()}
@@ -72,7 +73,11 @@ class LogBuffer:
 def database_sink(sessions: sessionmaker[Session]) -> Sink:
     def write(batch: list[LogEntry]) -> None:
         with sessions() as session:
-            session.add_all(RequestLog(**asdict(entry)) for entry in batch)
+            session.add_all(
+                RequestLog(**{key: value for key, value in asdict(entry).items() if key != "recorded"})
+                for entry in batch
+                if entry.recorded
+            )
             last_used: dict[int, datetime] = {}
             for entry in batch:
                 if entry.key_id is not None and entry.status < 400:

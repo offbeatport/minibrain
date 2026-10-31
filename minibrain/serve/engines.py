@@ -33,10 +33,17 @@ def free_port() -> int:
 
 
 class EngineManager:
-    def __init__(self, settings: Settings, main_url: str, idle_seconds: float = IDLE_SECONDS) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        main_url: str,
+        idle_seconds: float = IDLE_SECONDS,
+        hub_allowed: Callable[[], bool] = lambda: True,
+    ) -> None:
         self.settings = settings
         self.main_url = main_url
         self.idle_seconds = idle_seconds
+        self.hub_allowed = hub_allowed
         self.engines: dict[str, tuple[str, Supervisor]] = {}
         self.used: dict[str, float] = {}
         self.lock = threading.Lock()
@@ -58,6 +65,8 @@ class EngineManager:
             str(os.getpid()),
         ]
         env = os.environ | {"MINIBRAIN_GATEWAY_TOKEN": self.settings.secret("gateway_token")}
+        if not self.hub_allowed():
+            env |= {"HF_HUB_OFFLINE": "1"}
         supervisor = Supervisor(f"engine {spec.key}", command, env)
         supervisor.start()
         url = f"http://127.0.0.1:{port}"

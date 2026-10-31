@@ -166,20 +166,20 @@ def chat_completions(
         status = error.status_code
         raise
     finally:
-        if config.request_logs:
-            logs.add(
-                LogEntry(
-                    at=now(),
-                    key_id=grant.key_id,
-                    minibrain_id=grant.minibrain_id,
-                    model=body.model,
-                    version=route.version if route else None,
-                    status=status,
-                    latency_ms=(time.monotonic() - started) * 1000,
-                    prompt_tokens=completion.prompt_tokens if completion else 0,
-                    completion_tokens=completion.completion_tokens if completion else 0,
-                )
+        logs.add(
+            LogEntry(
+                at=now(),
+                key_id=grant.key_id,
+                minibrain_id=grant.minibrain_id,
+                model=body.model,
+                version=route.version if route else None,
+                status=status,
+                latency_ms=(time.monotonic() - started) * 1000,
+                prompt_tokens=completion.prompt_tokens if completion else 0,
+                completion_tokens=completion.completion_tokens if completion else 0,
+                recorded=config.request_logs,
             )
+        )
     if completion is None:
         raise HTTPException(status_code=500, detail="no completion")
     identifier = f"chatcmpl-{uuid.uuid4().hex}"

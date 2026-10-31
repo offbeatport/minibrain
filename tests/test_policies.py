@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from minibrain.app import hub_allowed
 from minibrain.maintenance import purge_request_logs
 from minibrain.registry.models import ApiKey, AuditEvent, RequestLog, now
 from tests.conftest import Harness
@@ -91,8 +92,10 @@ def test_key_expiry_and_request_log_policies(harness: Harness) -> None:
         assert key.expires_at is not None and key.expires_at > now() + timedelta(days=29)
     set_policy(harness, "request_logs", False)
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 200
-    assert harness.flush_logs() == 0
+    harness.flush_logs()
     with harness.sessions() as session:
+        assert session.query(RequestLog).count() == 0
+        assert session.query(ApiKey).one().last_used_at is not None
         session.query(ApiKey).update({"expires_at": now() - timedelta(seconds=1)})
         session.commit()
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 401
@@ -105,3 +108,9 @@ def test_retention_purges_old_request_logs(harness: Harness) -> None:
         session.commit()
         assert purge_request_logs(session) == 1
         assert session.query(RequestLog).count() == 1
+
+
+def test_local_engines_lose_hub_access_with_the_network(harness: Harness) -> None:
+    assert hub_allowed(harness.sessions)
+    set_policy(harness, "network", "offline")
+    assert not hub_allowed(harness.sessions)

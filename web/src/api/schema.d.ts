@@ -1786,6 +1786,11 @@ export interface components {
              * @default 0
              */
             completion_tokens?: number;
+            /**
+             * Recorded
+             * @default true
+             */
+            recorded?: boolean;
         };
         /** LogsBody */
         LogsBody: {
