@@ -95,14 +95,16 @@ at answer time.
 ## Architecture
 
 One install is one supervised process tree: one command starts it, and minibrain starts and restarts the rest.
-main is the control plane; gateways and engines are the data plane.
+main is the control plane; gateways and engines are the data plane. Production runs on GPU racks, rented or on-prem;
+a laptop install is onboarding. A local main can drive remote GPU workers and engines. Details and tradeoffs:
+`docs/architecture.md`.
 
 | Process | Runs |
 |---|---|
 | main | UI and `/api`, management, job submission, deployments, gateway (`/v1`) and routing; supervises the others |
 | worker | Ingestion and data preparation; launches training jobs |
 | training | One child per training or eval job; writes checkpoints and results |
-| engine | One model server per pool: SGLang, vLLM, or `transformers` / `llamacpp` on a laptop |
+| engine | One model (base + many adapters) per process; SGLang, MLX, `transformers` or llama.cpp, chosen per node |
 
 - The data plane keeps serving without main. main publishes a versioned config snapshot (routes, versions, adapters,
   key hashes, limits); gateways keep the last good copy on disk and serve from it, and buffer request and audit logs
@@ -122,6 +124,17 @@ main is the control plane; gateways and engines are the data plane.
 - The gateway is separate from management: routing lives in memory, refreshed on version changes, with no database
   read per request. Engines are children with health checks.
 - The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
+- Compute pools: workers and engines join a named pool and report GPUs, memory, CPU, platform and installed engines.
+  Discover judges fit against the selected pool; the Compute page lists pools, machines and engines.
+- Engines pick their engine at start from the node and the weights: SGLang on Linux with NVIDIA or ROCm, MLX on Apple
+  silicon, llama.cpp for GGUF, `transformers` otherwise. Remote engines (`minibrain engine --model --pool`) pull
+  weights and adapters from main and announce themselves; replicas scale horizontally.
+- Gateways route per model: fewest requests in flight, sticky by adapter or prompt prefix, overflow when busy, health
+  checks and failover. HAProxy, Envoy or a cloud load balancer in front; sgl-router or llm-d under the gateway later.
+- Several mains on Postgres: an advisory lock picks the leader for lease expiry, catalogue sync and log purge. No
+  ZooKeeper; consensus is Postgres HA's or Kubernetes'. SQLite stays a single main.
+- Orchestration: workers and engines started by hand or by the customer's tooling in v1, a Kubernetes launcher in v2,
+  a cloud VM launcher later.
 - Children die with the parent and restart with backoff. A launcher starts work: a local subprocess now, a remote
   worker or a Kubernetes Job later.
 - Module boundaries (registry, data, train, serve, gateway) are the future service boundaries; no in-memory state
@@ -135,7 +148,7 @@ main is the control plane; gateways and engines are the data plane.
 | Metadata | SQLite (WAL) | SQLite; Postgres for a highly available main |
 | Artifacts | Local folder | S3-compatible store |
 | Workers | Local processes | Local or remote, same contract |
-| Engines | Local children | Local or remote, routed by the gateway |
+| Engines | Local children | Local or remote, per pool, routed by gateways across replicas |
 | Roles | One process tree | Separate processes or services |
 
 ### Tradeoffs
@@ -165,7 +178,9 @@ main is the control plane; gateways and engines are the data plane.
 | Index | LanceDB, embedded on disk: vector + full-text (hybrid) search. DuckDB `vss` persistence is still experimental |
 | Training | torch + transformers + peft + trl + datasets + accelerate |
 | Serving, production | SGLang; vLLM in v2 |
-| Serving, local and tests | `transformers` backend; `llamacpp` later |
+| Serving, Apple silicon | MLX (`mlx-lm`), optional extra |
+| Serving, GGUF | llama.cpp (`llama-cpp-python`), optional extra |
+| Serving, fallback and tests | `transformers` backend |
 | Teacher | A larger local open model (default); the pool's base model when GPUs are small; an API only by opt-in |
 | Object store | fsspec over local FS or S3-compatible storage; no MinIO dependency |
 | Frontend | Vite SPA: TanStack Router + Query + Table, obp-ui, Tailwind v4 |
@@ -347,8 +362,9 @@ PII counts.
   restart.
 - Teacher pool: the larger model, with no adapters unless it was trained itself. Permanent when GPUs allow, otherwise
   loaded for labelling jobs and unloaded after. Prompt-only versions are served from it, so they need it permanent.
-- `ServingBackend` interface: `start(pool)`, `load_adapter`, `unload_adapter`, `chat(stream)`. Implementations:
-  `sglang` (production), `transformers` (local and tests), `vllm` (v2), `llamacpp` (later).
+- `ServingBackend` interface: `load(model)`, `complete(request)`, `status()`. Implementations: `sglang`
+  (production), `mlx` (Apple silicon, PEFT LoRA converted on load), `transformers` (fallback and tests), `llamacpp`
+  (GGUF base models), `vllm` (v2).
 - Engines are never exposed; the gateway proxies every call.
 
 ## API and access
@@ -377,8 +393,9 @@ PII counts.
 - Sidebar: Home · Explore (Models, Playground) · Create (Data, Training, Evaluations, Feedback) · Run (Deployments,
   Pipelines, Batch jobs in v2, Compute, Monitor) · user menu (Settings, Theme, Sign out). Pages that work on one
   minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
-- Settings has two parts: You (appearance; profile once accounts exist) and This install (paths, base models,
-  recipe, splits; admin-only once accounts exist).
+- Settings has two tabs. General: You (appearance; profile once accounts exist) and This install (paths, base models,
+  recipe, splits; admin-only once accounts exist). Security: the policies, locked when set by config, and their recent
+  changes.
 
 | Need | obp-ui |
 |---|---|
@@ -475,17 +492,16 @@ Two modes, same code, same adapter format (PEFT safetensors).
 
 - `uv pip install --torch-backend=auto` (or `UV_TORCH_BACKEND=auto`) picks CUDA, ROCm, Intel or CPU wheels. Docker
   builds have no GPU, so they set `UV_CUDA_DRIVER_VERSION` or `UV_AMD_GPU_ARCHITECTURE`, otherwise they get CPU wheels.
-- Backend auto-select: Linux + CUDA or ROCm + the `sglang` extra installed → `sglang`; otherwise `transformers`.
-  Overridable in config.
-- SGLang on Windows: WSL2 only. SGLang on macOS (MLX backend, v0.5.10+) is experimental with no confirmed LoRA support,
-  so it is not used.
+- Engine auto-select, per engine process: Linux + CUDA or ROCm + SGLang → `sglang`; Apple silicon + `mlx-lm` → `mlx`;
+  GGUF weights → `llamacpp`; otherwise `transformers`. `--engine` overrides; a failed automatic choice falls back to
+  `transformers`. SGLang pins its own torch, so it runs from its own environment (`MINIBRAIN_SGLANG_PYTHON`).
+- SGLang on Windows: WSL2 only. SGLang's own MLX backend is not used; minibrain drives `mlx-lm` directly.
 - MPS gaps fall back to CPU with `PYTORCH_ENABLE_MPS_FALLBACK=1`.
 - Local training falls back to CPU when the Metal GPU hangs. Seen in the spike: LoRA backward on an M1 Pro (macOS
   27.0.1, torch 2.15) hangs the GPU within 3–8 steps, while inference runs fine. CPU training there was only ~1.8×
   slower.
 - Tests run on the `transformers` backend with a ~0.5B model; integration tests run on a GPU box.
-- Later, a `llamacpp` backend for faster local serving: Metal, Vulkan (AMD and Intel GPUs on Windows and Linux), CPU.
-  Needs PEFT → GGUF conversion; per-request LoRA works, requests with different adapters are not batched together.
+- `llamacpp` serves GGUF base models (Metal, CUDA, CPU). Adapters on llama.cpp need PEFT → GGUF conversion: later.
 
 ### Non-NVIDIA hardware
 
@@ -548,7 +564,15 @@ Everything in the v1 scope below, after M1.
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
 - [x] Eval vs base, side-by-side review, promote, rollback
-- [ ] SGLang pool with runtime adapter load/unload
+- [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
+- [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
+      calls, optional sync from our catalogue URL; Add from Hugging Face with support badges
+- [x] Security policies under Settings: network, model sources, licences, safetensors only, request logs and retention,
+      key expiry; config-locked values; audited; enforced in the backend
+- [x] Compute pools with hardware reported by workers and engines; fit per pool in Discover
+- [x] Engines chosen per node (SGLang, MLX, `transformers`, llama.cpp); remote engines join pools
+- [x] Gateway routing across replicas: least in-flight, sticky, overflow, health checks
+- [x] Several mains on Postgres with an advisory-lock leader for background loops
 - [x] `transformers` backend for local mode and tests
 - [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
@@ -590,7 +614,9 @@ Everything in the v1 scope below, after M1.
 - Arbitrary Python transforms (admin-only, sandboxed)
 - Teams, sharing
 - Multi-GPU and multi-node (Ray), serving pools across nodes
-- vLLM backend, AMD ROCm production image, `llamacpp` local backend
+- Kubernetes launcher: training as Jobs, engine replicas as autoscaled Deployments; cloud VM launcher later
+- sgl-router per pool under the gateway for many SGLang replicas of one model; llm-d on Kubernetes
+- vLLM backend, AMD ROCm production image, LoRA adapters on llama.cpp
 - Dedicated or merged-adapter instances for high-traffic minibrains
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
