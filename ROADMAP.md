@@ -338,7 +338,7 @@ PII counts.
 
 - obp-ui, operator-console style.
 - Sidebar: Home · Explore (Models, Playground) · Create (Data, Training, Evaluations, Feedback) · Run (Deployments,
-  Pipelines, Compute, Monitor) · Settings · user menu (Profile, Preferences, Sign out). Pages that work on one
+  Pipelines, Batch jobs in v2, Compute, Monitor) · Settings · user menu (Profile, Preferences, Sign out). Pages that work on one
   minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
 
 | Need | obp-ui |
@@ -542,6 +542,9 @@ Everything in the v1 scope below, after M1.
 - One-click retrain on new data (dlt incremental)
 - Automatic retrain when feedback since the last version crosses a threshold
 - Version diff (data and scores)
+- Batch jobs (Run → Batch jobs): run a version over a file, snapshot or SQL query in the background, on the job
+  worker; resumable, with progress; results as CSV or Parquet with inputs, outputs and the version; OpenAI-compatible
+  `/v1/files` and `/v1/batches`
 - Preset recipes
 - Arbitrary Python transforms (admin-only, sandboxed)
 - Teams, sharing
