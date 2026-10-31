@@ -2,51 +2,15 @@ import argparse
 import ipaddress
 import json
 import os
-import subprocess
+import signal
 import sys
 import threading
-import time
+from collections.abc import Callable
 from pathlib import Path
 
 import uvicorn
 
-RESTART_DELAYS = (1.0, 2.0, 5.0, 10.0, 30.0)
-HEALTHY_SECONDS = 60.0
-
-
-class Supervisor:
-    def __init__(self, name: str, command: list[str], env: dict[str, str]) -> None:
-        self.name = name
-        self.command = command
-        self.env = env
-        self.stop = threading.Event()
-        self.process: subprocess.Popen[bytes] | None = None
-        self.thread = threading.Thread(target=self.loop, daemon=True)
-
-    def start(self) -> None:
-        self.thread.start()
-
-    def loop(self) -> None:
-        failures = 0
-        while not self.stop.is_set():
-            started = time.monotonic()
-            self.process = subprocess.Popen(self.command, env=self.env)
-            code = self.process.wait()
-            if self.stop.is_set():
-                return
-            failures = 0 if time.monotonic() - started > HEALTHY_SECONDS else failures + 1
-            delay = RESTART_DELAYS[min(failures, len(RESTART_DELAYS) - 1)]
-            print(f"minibrain: {self.name} exited with {code}; restarting in {delay:.0f}s", file=sys.stderr, flush=True)
-            self.stop.wait(delay)
-
-    def shutdown(self) -> None:
-        self.stop.set()
-        if self.process is not None and self.process.poll() is None:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
+from minibrain.supervise import Supervisor
 
 
 def local_url(host: str, port: int) -> str:
@@ -62,6 +26,7 @@ def serve(host: str, port: int, with_worker: bool) -> None:
 
     settings = load_settings()
     api_url = local_url(host, port)
+    os.environ["MINIBRAIN_MAIN_URL"] = api_url
     env = os.environ | {"MINIBRAIN_WORKER_TOKEN": settings.secret("worker_token")}
     command = [sys.executable, "-m", "minibrain.cli", "worker", "--api-url", api_url, "--parent", str(os.getpid())]
     worker = Supervisor("worker", command, env) if with_worker else None
@@ -74,10 +39,36 @@ def serve(host: str, port: int, with_worker: bool) -> None:
             worker.shutdown()
 
 
-def watch_parent(parent: int | None, stop: threading.Event) -> None:
+def watch_parent(parent: int | None, stop: threading.Event, on_orphan: Callable[[], None] | None = None) -> None:
     while parent is not None and not stop.wait(2.0):
         if os.getppid() != parent:
             stop.set()
+            if on_orphan is not None:
+                on_orphan()
+
+
+def terminate_self() -> None:
+    os.kill(os.getpid(), signal.SIGTERM)
+
+
+def engine(base: str, port: int, main_url: str, parent: int | None) -> None:
+    from minibrain.serve.engine import create_engine_app
+    from minibrain.settings import load_settings
+
+    settings = load_settings()
+    token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
+    app = create_engine_app(base, main_url, token, settings.home / "engines" / base)
+    threading.Thread(target=watch_parent, args=(parent, threading.Event(), terminate_self), daemon=True).start()
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+
+
+def gateway(main_url: str, host: str, port: int) -> None:
+    from minibrain.gateway.standalone import create_gateway_app
+    from minibrain.settings import load_settings
+
+    settings = load_settings()
+    token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
+    uvicorn.run(create_gateway_app(main_url, token, settings.home / "gateway"), host=host, port=port)
 
 
 def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None) -> None:
@@ -97,7 +88,7 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None)
 def openapi(output: Path | None) -> None:
     from minibrain.app import create_app
 
-    schema = json.dumps(create_app(run_expiry=False).openapi(), indent=2)
+    schema = json.dumps(create_app(background=False).openapi(), indent=2)
     if output is None:
         print(schema)
     else:
@@ -116,6 +107,15 @@ def main() -> None:
     worker_command.add_argument("--kinds", nargs="*", default=None)
     worker_command.add_argument("--gpus", type=int, default=1)
     worker_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)
+    gateway_command = commands.add_parser("gateway", help="run a standalone gateway against a main process")
+    gateway_command.add_argument("--main-url", default="http://127.0.0.1:8000")
+    gateway_command.add_argument("--host", default="127.0.0.1")
+    gateway_command.add_argument("--port", type=int, default=8100)
+    engine_command = commands.add_parser("engine", help=argparse.SUPPRESS)
+    engine_command.add_argument("--base", required=True)
+    engine_command.add_argument("--port", type=int, required=True)
+    engine_command.add_argument("--main-url", default="http://127.0.0.1:8000")
+    engine_command.add_argument("--parent", type=int, default=None)
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -123,6 +123,10 @@ def main() -> None:
         serve(args.host, args.port, not args.no_worker)
     elif args.command == "worker":
         worker(args.api_url, args.kinds, args.gpus, args.parent)
+    elif args.command == "gateway":
+        gateway(args.main_url, args.host, args.port)
+    elif args.command == "engine":
+        engine(args.base, args.port, args.main_url, args.parent)
     else:
         openapi(args.output)
 

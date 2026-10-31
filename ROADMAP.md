@@ -550,8 +550,9 @@ Everything in the v1 scope below, after M1.
 - [x] Eval vs base, side-by-side review, promote, rollback
 - [ ] SGLang pool with runtime adapter load/unload
 - [x] `transformers` backend for local mode and tests
-- [ ] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, audit log, opt-in request
-      logs, retrieval context step
+- [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
+      from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
+- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step
 - [x] Playground
 - [ ] Harness config export
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers

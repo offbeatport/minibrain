@@ -10,7 +10,7 @@ from minibrain.base_models import BASE_MODELS, DEFAULT_BASE_MODEL
 from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.models import Job
-from minibrain.serve.backend import ServingBackend, TransformersBackend
+from minibrain.serve.backend import ServingBackend
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -49,11 +49,9 @@ def device_info() -> DeviceInfo:
 
 
 def loaded_models(backend: ServingBackend) -> list[LoadedModel]:
-    if not isinstance(backend, TransformersBackend):
-        return []
     return [
-        LoadedModel(base_model=key, device=runtime.device, adapters=sorted(runtime.adapters))
-        for key, runtime in backend.runtimes.items()
+        LoadedModel(base_model=item["base_model"], device=item.get("device") or "", adapters=item.get("adapters", []))
+        for item in backend.status()
     ]
 
 

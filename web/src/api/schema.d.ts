@@ -519,6 +519,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/gateway/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Config */
+        get: operations["config_internal_gateway_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/gateway/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logs */
+        post: operations["logs_internal_gateway_logs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/gateway/artifacts/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artifact */
+        get: operations["artifact_internal_gateway_artifacts__artifact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -927,6 +978,41 @@ export interface components {
             device: string;
             /** Adapters */
             adapters: string[];
+        };
+        /** LogBody */
+        LogBody: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Key Id */
+            key_id: number | null;
+            /** Minibrain Id */
+            minibrain_id: number | null;
+            /** Model */
+            model: string;
+            /** Version */
+            version: number | null;
+            /** Status */
+            status: number;
+            /** Latency Ms */
+            latency_ms: number;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens?: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens?: number;
+        };
+        /** LogsBody */
+        LogsBody: {
+            /** Entries */
+            entries: components["schemas"]["LogBody"][];
         };
         /** MappingInfo */
         MappingInfo: {
@@ -2301,6 +2387,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoredArtifact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    config_internal_gateway_config_get: {
+        parameters: {
+            query?: {
+                version?: string;
+                wait?: number;
+            };
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logs_internal_gateway_logs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifact_internal_gateway_artifacts__artifact_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

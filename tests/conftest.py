@@ -33,6 +33,9 @@ class FakeBackend:
         self.requests.append(request)
         return Completion(text=self.output, prompt_tokens=12, completion_tokens=2, stopped=True, seconds=0.01)
 
+    def status(self) -> list[dict[str, Any]]:
+        return []
+
 
 @dataclass
 class Harness:
@@ -49,6 +52,13 @@ class Harness:
     @property
     def token(self) -> str:
         return self.settings.secret("worker_token")
+
+    @property
+    def gateway_headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.settings.secret('gateway_token')}"}
+
+    def flush_logs(self) -> int:
+        return self.app.state.request_logs.flush()
 
     def worker_config(self, kinds: list[str] | None = None) -> WorkerConfig:
         config = WorkerConfig(api_url="http://testserver", token=self.token, home=self.settings.home / "worker")
@@ -101,6 +111,6 @@ def settings(tmp_path: Path) -> Settings:
 def harness(settings: Settings) -> Iterator[Harness]:
     settings.home.mkdir(parents=True)
     backend = FakeBackend()
-    app = create_app(settings=settings, backend=backend, run_expiry=False)
+    app = create_app(settings=settings, backend=backend, background=False, config_max_age=0)
     with TestClient(app) as client:
         yield Harness(app=app, client=client, settings=settings, backend=backend, sessions=app.state.sessions)

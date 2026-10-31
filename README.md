@@ -18,8 +18,19 @@ uvx --python 3.12 minibrain serve
 yet; until then build the wheel from this repo (see Develop) and run it with
 `uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`.
 
-Open http://127.0.0.1:8000. `minibrain serve` starts the API, the web UI and one job worker. Data, adapters and the
-database live in `~/.minibrain` (set `MINIBRAIN_HOME` to move them).
+Open http://127.0.0.1:8000. `minibrain serve` starts main (UI, API, gateway) and supervises a job worker and one model
+engine per base model, restarting them if they stop. Data, artifacts and the database live in `~/.minibrain` (set
+`MINIBRAIN_HOME` to move them; `MINIBRAIN_DATABASE_URL` points the metadata at Postgres instead of SQLite).
+
+Other roles, same package:
+
+| Command | Runs |
+|---|---|
+| `minibrain worker --api-url http://main:8000` | A worker on another machine; it pulls jobs from main over HTTP |
+| `minibrain gateway --main-url http://main:8000 --port 8100` | A standalone `/v1` gateway that serves from a cached config and keeps answering while main restarts |
+
+Remote workers and gateways need the tokens in `~/.minibrain/secrets` (or `MINIBRAIN_WORKER_TOKEN` and
+`MINIBRAIN_GATEWAY_TOKEN`).
 
 The first scoring job downloads the base model (Qwen3-0.6B, about 1.5 GB) into the Hugging Face cache.
 

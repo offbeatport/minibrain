@@ -1,6 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
@@ -13,6 +13,7 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.api.views import detail, key_info, version_info
+from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.registry.models import ApiKey, JobKind, VersionKind
@@ -25,7 +26,6 @@ from minibrain.registry.service import (
     get_version,
     promote,
 )
-from minibrain.serve.resolve import completion_request, target_for
 from minibrain.tasks.classify import parse_label
 
 router = APIRouter(prefix="/api", tags=["versions"])
@@ -64,17 +64,18 @@ def promote_version(
 
 @router.post("/minibrains/{slug}/complete")
 def complete(
-    slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, store: StoreDep
+    slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, request: Request
 ) -> CompleteResponse:
     minibrain = get_minibrain(session, slug)
-    target = target_for(minibrain, body.version)
-    if target is None:
+    name = minibrain.slug if body.version is None else f"{minibrain.slug}@{body.version}"
+    route = request.app.state.gateway_config.current().routes.get(name)
+    if route is None:
         raise ConflictError("no ready version to run; score or train one first")
-    completion = backend.complete(completion_request(session, store, target, body.text, body.max_tokens))
+    completion = run(backend, route, body.text, body.max_tokens)
     return CompleteResponse(
-        model=target.name,
+        model=f"{route.slug}@{route.version}",
         output=completion.text,
-        label=parse_label(completion.text, target.version.snapshot.labels),
+        label=parse_label(completion.text, route.labels),
         latency_ms=completion.seconds * 1000,
         prompt_tokens=completion.prompt_tokens,
         completion_tokens=completion.completion_tokens,

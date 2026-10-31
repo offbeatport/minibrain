@@ -109,7 +109,8 @@ def test_gateway_routes_by_name_and_version(harness: Harness) -> None:
     assert reply["choices"][0]["message"]["content"] == "billing"
     trained = harness.backend.requests[-1]
     assert trained.adapter is not None
-    assert (trained.adapter.path / "adapter_config.json").exists()
+    assert trained.adapter.name == f"{SLUG}-v1"
+    assert len(trained.adapter.artifact["id"]) == 64
     assert "billing" not in trained.messages[0]["content"]
     harness.client.post("/v1/chat/completions", headers=headers, json=body | {"model": f"{SLUG}@0"})
     prompt_only = harness.backend.requests[-1]

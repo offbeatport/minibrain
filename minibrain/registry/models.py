@@ -218,3 +218,19 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
     minibrain: Mapped[Minibrain] = relationship(back_populates="keys")
+
+
+class RequestLog(Base):
+    __tablename__ = "request_logs"
+    __table_args__ = (Index("ix_request_logs_minibrain", "minibrain_id", "id"), {"sqlite_autoincrement": True})
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(UtcDateTime)
+    key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"), default=None)
+    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    model: Mapped[str]
+    version: Mapped[int | None] = mapped_column(default=None)
+    status: Mapped[int]
+    latency_ms: Mapped[float]
+    prompt_tokens: Mapped[int] = mapped_column(default=0)
+    completion_tokens: Mapped[int] = mapped_column(default=0)

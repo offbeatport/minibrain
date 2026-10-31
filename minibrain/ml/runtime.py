@@ -86,6 +86,11 @@ class Runtime:
         self.model.eval()
         self.adapters.add(name)
 
+    def drop_adapter(self, name: str) -> None:
+        if name in self.adapters and isinstance(self.model, PeftModelForCausalLM) and len(self.adapters) > 1:
+            self.model.delete_adapter(name)
+            self.adapters.discard(name)
+
     def render(self, messages: list[Message]) -> str:
         return render_prompt(self.tokenizer, self.spec, messages)
 

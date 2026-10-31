@@ -60,6 +60,7 @@ ignore = ["S311"]
 "**/test_*.py" = ["S101"]
 "minibrain/worker.py" = ["S603"]
 "minibrain/cli.py" = ["S603"]
+"minibrain/supervise.py" = ["S603"]
 "minibrain/data/sources.py" = ["S608"]
 "hatch_build.py" = ["S603"]
 

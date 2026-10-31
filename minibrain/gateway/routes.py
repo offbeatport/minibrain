@@ -8,11 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from minibrain.api.deps import BackendDep, SessionDep, StoreDep
+from minibrain.base_models import base_model
+from minibrain.data.snapshot import Example
+from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
+from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.ml.completion import Completion
-from minibrain.registry.models import ApiKey, now
-from minibrain.registry.service import find_key
-from minibrain.serve.resolve import completion_request, model_names, resolve
+from minibrain.registry.models import now
+from minibrain.registry.service import KEY_PREFIX, key_digest
+from minibrain.serve.backend import AdapterRef, CompletionRequest, EngineUnavailableError, ServingBackend
+from minibrain.tasks.classify import build_messages
 
 router = APIRouter(prefix="/v1", tags=["openai"])
 
@@ -36,15 +40,42 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
 
 
-def authorize(request: Request, session: SessionDep) -> ApiKey:
+def gateway_config(request: Request) -> GatewayConfig:
+    source: ConfigSource = request.app.state.gateway_config
+    return source.current()
+
+
+ConfigDep = Annotated[GatewayConfig, Depends(gateway_config)]
+
+
+def authorize(request: Request, config: ConfigDep) -> Grant:
     scheme, _, token = request.headers.get("authorization", "").partition(" ")
-    key = find_key(session, token.strip()) if scheme.lower() == "bearer" else None
-    if key is None:
+    token = token.strip()
+    grant = config.keys.get(key_digest(token)) if scheme.lower() == "bearer" and token.startswith(KEY_PREFIX) else None
+    if grant is None:
         raise HTTPException(status_code=401, detail="invalid API key")
-    return key
+    return grant
 
 
-KeyDep = Annotated[ApiKey, Depends(authorize)]
+GrantDep = Annotated[Grant, Depends(authorize)]
+
+
+def completion_request(route: Route, text: str, max_tokens: int) -> CompletionRequest:
+    shots = [Example(input=shot_input, label=label) for shot_input, label in route.shots]
+    adapter = AdapterRef(route.adapter["name"], route.adapter["artifact"]) if route.adapter else None
+    return CompletionRequest(
+        base=base_model(route.base_model),
+        messages=build_messages(route.kind, text, route.labels, shots),
+        adapter=adapter,
+        max_tokens=max_tokens,
+    )
+
+
+def run(backend: ServingBackend, route: Route, text: str, max_tokens: int) -> Completion:
+    try:
+        return backend.complete(completion_request(route, text, max_tokens))
+    except EngineUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 def last_user_text(messages: list[Message]) -> str:
@@ -94,23 +125,45 @@ def stream_events(identifier: str, model: str, completion: Completion) -> Iterat
 
 
 @router.get("/models")
-def list_models(key: KeyDep) -> dict:
-    names = model_names(key.minibrain)
+def list_models(grant: GrantDep, config: ConfigDep) -> dict:
+    names = config.models.get(grant.minibrain_id, [])
     data = [{"id": name, "object": "model", "created": 0, "owned_by": "minibrain"} for name in names]
     return {"object": "list", "data": data}
 
 
 @router.post("/chat/completions", response_model=None)
 def chat_completions(
-    body: ChatCompletionRequest, key: KeyDep, session: SessionDep, backend: BackendDep, store: StoreDep
+    body: ChatCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
 ) -> dict | StreamingResponse:
-    target = resolve(session, body.model)
-    if target is None or target.minibrain.id != key.minibrain_id:
-        raise HTTPException(status_code=404, detail=f"model {body.model} not found")
-    max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
-    completion = backend.complete(completion_request(session, store, target, last_user_text(body.messages), max_tokens))
-    key.last_used_at = now()
-    session.commit()
+    started = time.monotonic()
+    logs: LogBuffer = request.app.state.request_logs
+    route = config.routes.get(body.model)
+    status = 200
+    completion: Completion | None = None
+    try:
+        if route is None or route.minibrain_id != grant.minibrain_id:
+            raise HTTPException(status_code=404, detail=f"model {body.model} not found")
+        max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
+        completion = run(request.app.state.backend, route, last_user_text(body.messages), max_tokens)
+    except HTTPException as error:
+        status = error.status_code
+        raise
+    finally:
+        logs.add(
+            LogEntry(
+                at=now(),
+                key_id=grant.key_id,
+                minibrain_id=grant.minibrain_id,
+                model=body.model,
+                version=route.version if route else None,
+                status=status,
+                latency_ms=(time.monotonic() - started) * 1000,
+                prompt_tokens=completion.prompt_tokens if completion else 0,
+                completion_tokens=completion.completion_tokens if completion else 0,
+            )
+        )
+    if completion is None:
+        raise HTTPException(status_code=500, detail="no completion")
     identifier = f"chatcmpl-{uuid.uuid4().hex}"
     if body.stream:
         return StreamingResponse(stream_events(identifier, body.model, completion), media_type="text/event-stream")
