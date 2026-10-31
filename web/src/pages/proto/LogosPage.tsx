@@ -1,15 +1,72 @@
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, createContext, useContext, useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 
 const ORIGINAL = "/proto/knot-icon.png";
 
-const BRAND = {
-    from: "#ff3b22",
-    to: "#ffa23f",
-    flat: "#ff5a2a",
-    cream: "#ffeadf",
-};
+type Palette = { id: string; name: string; from: string; to: string; flat: string; glyph: string };
+
+const PALETTES: Palette[] = [
+    {
+        id: "ember",
+        name: "Ember",
+        from: "#ff3b22",
+        to: "#ffa23f",
+        flat: "#ff5a2a",
+        glyph: "#ffeadf",
+    },
+    {
+        id: "amber",
+        name: "Amber",
+        from: "#c2410c",
+        to: "#fbbf24",
+        flat: "#ea7a0c",
+        glyph: "#fff6e5",
+    },
+    {
+        id: "magenta",
+        name: "Magenta",
+        from: "#b0127a",
+        to: "#ff6f91",
+        flat: "#db2777",
+        glyph: "#ffeaf2",
+    },
+    {
+        id: "violet",
+        name: "Violet",
+        from: "#4c1dd8",
+        to: "#a46bff",
+        flat: "#6a3df0",
+        glyph: "#f1ebff",
+    },
+    {
+        id: "cobalt",
+        name: "Cobalt",
+        from: "#024fb0",
+        to: "#3b8cff",
+        flat: "#026ecd",
+        glyph: "#eaf3ff",
+    },
+    { id: "teal", name: "Teal", from: "#06615d", to: "#22c3ae", flat: "#0f8f84", glyph: "#e3fbf7" },
+    {
+        id: "forest",
+        name: "Forest",
+        from: "#0f5132",
+        to: "#3fbf6f",
+        flat: "#16803c",
+        glyph: "#e8f8ee",
+    },
+    {
+        id: "graphite",
+        name: "Graphite",
+        from: "#16171a",
+        to: "#4b4e57",
+        flat: "#2b2d33",
+        glyph: "#f1f2f4",
+    },
+];
+
+const PaletteContext = createContext<Palette>(PALETTES[0]);
 
 function knotPath(): string {
     const points: string[] = [];
@@ -70,28 +127,29 @@ function Glyph({ size, color = "currentColor" }: { size: number; color?: string 
 type TileStyle = "gradient" | "flat" | "cobalt" | "ink" | "paper";
 
 function Tile({ size, style }: { size: number; style: TileStyle }) {
-    const id = `tile-${style}-${size}`;
+    const brand = useContext(PaletteContext);
+    const id = `tile-${brand.id}-${style}-${size}`;
     const fills: Record<TileStyle, string> = {
         gradient: `url(#${id})`,
-        flat: BRAND.flat,
+        flat: brand.flat,
         cobalt: "var(--primary)",
         ink: "var(--foreground)",
         paper: "var(--card)",
     };
     const glyph: Record<TileStyle, string> = {
-        gradient: BRAND.cream,
-        flat: BRAND.cream,
+        gradient: brand.glyph,
+        flat: brand.glyph,
         cobalt: "var(--primary-foreground)",
         ink: "var(--background)",
-        paper: BRAND.flat,
+        paper: brand.flat,
     };
     const inner = size >= 48 ? 0.74 : 0.86;
     return (
         <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
             <defs>
                 <linearGradient id={id} x1="0" y1="1" x2="1" y2="0">
-                    <stop offset="0" stopColor={BRAND.from} />
-                    <stop offset="1" stopColor={BRAND.to} />
+                    <stop offset="0" stopColor={brand.from} />
+                    <stop offset="1" stopColor={brand.to} />
                 </linearGradient>
             </defs>
             <path
@@ -141,12 +199,62 @@ function Cell({
 }
 
 const TILE_STYLES: { style: TileStyle; label: string }[] = [
-    { style: "gradient", label: "Gradient (original colours)" },
-    { style: "flat", label: "Flat orange" },
+    { style: "gradient", label: "Gradient" },
+    { style: "flat", label: "Flat" },
     { style: "cobalt", label: "Cobalt (app primary)" },
     { style: "ink", label: "Ink" },
     { style: "paper", label: "Paper" },
 ];
+
+function Swatch({ label, color }: { label: string; color: string }) {
+    return (
+        <div className="flex items-center gap-2">
+            <span className="size-6 rounded-md border" style={{ background: color }} />
+            <span className="flex flex-col">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <span className="font-mono text-sm">{color}</span>
+            </span>
+        </div>
+    );
+}
+
+function PaletteSection({
+    selected,
+    onSelect,
+}: { selected: Palette; onSelect: (palette: Palette) => void }) {
+    return (
+        <Section title="Palette" caption="Click a palette to recolour every icon and lockup below.">
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2">
+                    {PALETTES.map((palette) => (
+                        <button
+                            key={palette.id}
+                            type="button"
+                            onClick={() => onSelect(palette)}
+                            aria-pressed={palette.id === selected.id}
+                            className={`flex flex-col items-center gap-1.5 rounded-md border px-3 py-2 text-sm ${
+                                palette.id === selected.id
+                                    ? "border-primary bg-accent text-accent-foreground"
+                                    : "bg-background hover:bg-secondary"
+                            }`}
+                        >
+                            <PaletteContext.Provider value={palette}>
+                                <Tile size={40} style="gradient" />
+                            </PaletteContext.Provider>
+                            {palette.name}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex flex-wrap gap-6">
+                    <Swatch label="Gradient start" color={selected.from} />
+                    <Swatch label="Gradient end" color={selected.to} />
+                    <Swatch label="Flat" color={selected.flat} />
+                    <Swatch label="Glyph" color={selected.glyph} />
+                </div>
+            </div>
+        </Section>
+    );
+}
 
 function OriginalSection() {
     return (
@@ -187,6 +295,7 @@ function TilesSection() {
 }
 
 function LockupsSection() {
+    const brand = useContext(PaletteContext);
     return (
         <Section title="Lockups" caption="Icon and wordmark together.">
             <div className="grid gap-3 lg:grid-cols-2">
@@ -198,7 +307,7 @@ function LockupsSection() {
                 </Cell>
                 <Cell label="Horizontal, glyph only">
                     <div className="flex items-center gap-3 text-foreground">
-                        <Glyph size={56} color={BRAND.flat} />
+                        <Glyph size={56} color={brand.flat} />
                         <Wordmark className="text-4xl" />
                     </div>
                 </Cell>
@@ -224,10 +333,10 @@ function LockupsSection() {
                         <Wordmark className="text-3xl" />
                     </div>
                 </Cell>
-                <Cell label="Orange band" className="border-transparent">
+                <Cell label="Colour band" className="border-transparent">
                     <div
                         className="flex w-full items-center gap-3 rounded-md px-4 py-3"
-                        style={{ background: BRAND.flat, color: BRAND.cream }}
+                        style={{ background: brand.flat, color: brand.glyph }}
                     >
                         <Glyph size={40} />
                         <Wordmark className="text-2xl" />
@@ -280,16 +389,20 @@ function ContextSection() {
 }
 
 export function LogosPage() {
+    const [palette, setPalette] = useState<Palette>(PALETTES[0]);
     return (
         <Page>
             <PageHeader
                 title="Logos"
                 caption="Variations on the knot icon. Prototype; not in the sidebar."
             />
+            <PaletteSection selected={palette} onSelect={setPalette} />
+            <PaletteContext.Provider value={palette}>
+                <TilesSection />
+                <LockupsSection />
+                <ContextSection />
+            </PaletteContext.Provider>
             <OriginalSection />
-            <TilesSection />
-            <LockupsSection />
-            <ContextSection />
         </Page>
     );
 }
