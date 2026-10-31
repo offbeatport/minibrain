@@ -1,5 +1,5 @@
 {
- "snapshot": "2026-10-31",
+ "snapshot": "2026-10-31.2",
  "source": "https://huggingface.co",
  "entries": [
   {
@@ -648,6 +648,378 @@
      ],
      "size_bytes": 16069734987,
      "weights_bytes": 16060556376,
+     "runtimes": [
+      "transformers"
+     ],
+     "requires": {}
+    }
+   ]
+  },
+  {
+   "id": "phi-4-mini-instruct",
+   "name": "Phi-4 mini Instruct",
+   "description": "Microsoft's 3.8B instruction model; strong reasoning for its size.",
+   "provider": "Microsoft",
+   "repo": "microsoft/Phi-4-mini-instruct",
+   "capabilities": [
+    "Chat",
+    "Classification",
+    "Extraction"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "trainable": false,
+   "gated": false,
+   "stop_tokens": [
+    "<|end|>",
+    "<|endoftext|>"
+   ],
+   "template_kwargs": {},
+   "popularity": 352426,
+   "position": 6,
+   "license": "mit",
+   "license_name": "MIT",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the copyright notice.",
+   "license_url": "https://opensource.org/license/mit",
+   "variants": [
+    {
+     "id": "phi-4-mini-instruct:bf16",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "microsoft/Phi-4-mini-instruct",
+     "revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 1084,
+       "sha256": null
+      },
+      {
+       "path": "added_tokens.json",
+       "size": 249,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 2504,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 168,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 2418348,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00002.safetensors",
+       "size": 4903637712,
+       "sha256": "bc703090b63eda16f639fa4de7ac54635c23105ab1da2f6ec4d3403151d38ee6"
+      },
+      {
+       "path": "model-00002-of-00002.safetensors",
+       "size": 2768428504,
+       "sha256": "7ff79b9d2d31076bac2663393451f6530f4fc8ca49b09002116c92c373dba983"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 16273,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 587,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 15524095,
+       "sha256": "382cc235b56c725945e149cc25f191da667c836655efd0857b004320e90e91ea"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 2932,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 3910310,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 7693942766,
+     "weights_bytes": 7672066216,
+     "runtimes": [
+      "transformers"
+     ],
+     "requires": {}
+    }
+   ]
+  },
+  {
+   "id": "granite-3.3-2b-instruct",
+   "name": "Granite 3.3 2B Instruct",
+   "description": "IBM's 2B instruction model, built for enterprise text tasks.",
+   "provider": "IBM",
+   "repo": "ibm-granite/granite-3.3-2b-instruct",
+   "capabilities": [
+    "Chat",
+    "Classification",
+    "Extraction"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "trainable": false,
+   "gated": false,
+   "stop_tokens": [
+    "<|end_of_text|>"
+   ],
+   "template_kwargs": {},
+   "popularity": 336877,
+   "position": 7,
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "variants": [
+    {
+     "id": "granite-3.3-2b-instruct:bf16",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "ibm-granite/granite-3.3-2b-instruct",
+     "revision": "707f574c62054322f6b5b04b6d075f0a8f05e0f0",
+     "files": [
+      {
+       "path": "added_tokens.json",
+       "size": 207,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 787,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 132,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 441810,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00002.safetensors",
+       "size": 4999999840,
+       "sha256": "12880d33c0ad4726af5cf8c07406905f9b496253c58ee46f52be8bde8ccf2254"
+      },
+      {
+       "path": "model-00002-of-00002.safetensors",
+       "size": 67121712,
+       "sha256": "a8757c5bf7627933e7fddbd9bab0533491b4dc0962820e0617f356ca1a379ffa"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 29835,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 801,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 3476578,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 9930,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 776995,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 5071858627,
+     "weights_bytes": 5067121552,
+     "runtimes": [
+      "transformers"
+     ],
+     "requires": {}
+    }
+   ]
+  },
+  {
+   "id": "olmo-2-1b-instruct",
+   "name": "OLMo 2 1B Instruct",
+   "description": "AllenAI's fully open 1B model: open weights, data and training code.",
+   "provider": "AllenAI",
+   "repo": "allenai/OLMo-2-0425-1B-Instruct",
+   "capabilities": [
+    "Chat",
+    "Classification",
+    "Extraction"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "trainable": false,
+   "gated": false,
+   "stop_tokens": [
+    "<|endoftext|>"
+   ],
+   "template_kwargs": {},
+   "popularity": 52449,
+   "position": 8,
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "variants": [
+    {
+     "id": "olmo-2-1b-instruct:bf16",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "allenai/OLMo-2-0425-1B-Instruct",
+     "revision": "48d788eca847d4d7548f375ad03d3c9312f6139e",
+     "files": [
+      {
+       "path": "config.json",
+       "size": 625,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 121,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 916646,
+       "sha256": null
+      },
+      {
+       "path": "model.safetensors",
+       "size": 2969854224,
+       "sha256": "36d044c73655bb904f822915e6294ba3dae8e6e1af5e703e9d452f2d6a3a294f"
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 581,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 7137177,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 4884,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 1611056,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 2979525314,
+     "weights_bytes": 2969854224,
+     "runtimes": [
+      "transformers"
+     ],
+     "requires": {}
+    }
+   ]
+  },
+  {
+   "id": "smollm2-1.7b-instruct",
+   "name": "SmolLM2 1.7B Instruct",
+   "description": "Hugging Face's compact 1.7B instruction model.",
+   "provider": "Hugging Face",
+   "repo": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+   "capabilities": [
+    "Chat",
+    "Classification",
+    "Extraction"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "trainable": false,
+   "gated": false,
+   "stop_tokens": [
+    "<|im_end|>"
+   ],
+   "template_kwargs": {},
+   "popularity": 299079,
+   "position": 9,
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "variants": [
+    {
+     "id": "smollm2-1.7b-instruct:bf16",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+     "revision": "31b70e2e869a7173562077fd711b654946d38674",
+     "files": [
+      {
+       "path": "config.json",
+       "size": 908,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 132,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 466391,
+       "sha256": null
+      },
+      {
+       "path": "model.safetensors",
+       "size": 3422777952,
+       "sha256": "f55217be716b6a997b97b9d8d7eb6fad02e00858f5010ec24f64603c3a98a0e8"
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 655,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 2104556,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 3764,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 800662,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 3426155020,
+     "weights_bytes": 3422777952,
      "runtimes": [
       "transformers"
      ],
