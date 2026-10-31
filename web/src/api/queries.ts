@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JobInfo, type VersionInfo, api, unwrap } from "./client";
+import { type JobInfo, type ModelRow, type VersionInfo, api, unwrap } from "./client";
 
 const ACTIVE_JOB = new Set(["queued", "running"]);
 const ACTIVE_VERSION = new Set(["training", "evaluating"]);
@@ -13,7 +13,21 @@ export const keys = {
     versions: (slug: string) => ["minibrain", slug, "versions"] as const,
     jobs: (slug: string) => ["minibrain", slug, "jobs"] as const,
     keys: (slug: string) => ["minibrain", slug, "keys"] as const,
+    models: ["models"] as const,
+    catalog: ["catalog"] as const,
+    baseModel: (key: string) => ["models", "base", key] as const,
 };
+
+const MOVING_MODEL = new Set(["downloading", "importing"]);
+const MOVING_ACTIVITY = new Set(["running", "queued"]);
+
+export function isModelMoving(row: ModelRow): boolean {
+    return (
+        MOVING_MODEL.has(row.availability.state) ||
+        MOVING_ACTIVITY.has(row.activity.state) ||
+        row.deployment.state === "starting"
+    );
+}
 
 const path = (slug: string) => ({ params: { path: { slug } } });
 
@@ -102,5 +116,50 @@ export function useInstallSettings() {
     return useQuery({
         queryKey: ["settings"] as const,
         queryFn: () => unwrap(api.GET("/api/settings")),
+    });
+}
+
+export function useModels(archived: boolean) {
+    return useQuery({
+        queryKey: [...keys.models, { archived }],
+        queryFn: () => unwrap(api.GET("/api/models", { params: { query: { archived } } })),
+        refetchInterval: (query) => (query.state.data?.some(isModelMoving) ? POLL_MS : 15000),
+    });
+}
+
+export function useCatalog() {
+    return useQuery({
+        queryKey: keys.catalog,
+        queryFn: () => unwrap(api.GET("/api/catalog")),
+        refetchInterval: (query) => {
+            const moving = query.state.data?.entries.some((entry) =>
+                entry.added.some((added) => MOVING_MODEL.has(added.availability.state)),
+            );
+            const sync = query.state.data?.sync_job;
+            return moving || (sync && isActiveJob(sync)) ? POLL_MS : 30000;
+        },
+    });
+}
+
+export function useBaseModel(key: string) {
+    return useQuery({
+        queryKey: keys.baseModel(key),
+        queryFn: () => unwrap(api.GET("/api/models/base/{key}", { params: { path: { key } } })),
+        refetchInterval: (query) =>
+            query.state.data && isModelMoving(query.state.data) ? POLL_MS : 15000,
+    });
+}
+
+export function useBases() {
+    return useQuery({
+        queryKey: ["minibrains", "bases"],
+        queryFn: () => unwrap(api.GET("/api/minibrains/bases")),
+    });
+}
+
+export function useModelSources() {
+    return useQuery({
+        queryKey: ["models", "sources"],
+        queryFn: () => unwrap(api.GET("/api/models/sources")),
     });
 }

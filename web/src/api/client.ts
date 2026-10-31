@@ -15,6 +15,13 @@ export type KeyInfo = Schemas["KeyInfo"];
 export type KeyCreated = Schemas["KeyCreated"];
 export type CompleteResponse = Schemas["CompleteResponse"];
 export type SplitScore = Schemas["SplitScore"];
+export type ModelRow = Schemas["ModelRow"];
+export type BaseModelDetail = Schemas["BaseModelDetail"];
+export type CatalogResponse = Schemas["CatalogResponse"];
+export type CatalogEntry = Schemas["CatalogEntry"];
+export type CatalogVariantInfo = Schemas["CatalogVariantInfo"];
+export type HardwareInfo = Schemas["HardwareInfo"];
+export type FitInfo = Schemas["FitInfo"];
 
 export const api = createClient<paths>();
 

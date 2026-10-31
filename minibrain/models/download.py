@@ -5,7 +5,7 @@ import httpx
 
 from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
 from minibrain.models import hub
-from minibrain.models.files import Progress, check, valid, write_stream
+from minibrain.models.files import Progress, check, sha256_of, valid, write_stream
 from minibrain.models.sources import HubSource
 
 TIMEOUT = httpx.Timeout(30.0, read=300.0)
@@ -30,10 +30,12 @@ def main(spec: JobSpec) -> None:
     report(0.0, step="checking existing files")
     with httpx.Client(timeout=TIMEOUT, follow_redirects=True) as client:
         source = HubSource(spec.raw["repo"], spec.raw["revision"], files, client)
+        recorded: list[dict[str, Any]] = []
         for entry in files:
             target = out / entry["path"]
             if valid(target, entry):
                 progress.add(entry["size"], entry["path"])
+                recorded.append(entry | {"sha256": entry.get("sha256") or sha256_of(target)})
                 continue
             if source.cached(entry["path"]) is None:
                 if hub.offline():
@@ -45,9 +47,10 @@ def main(spec: JobSpec) -> None:
             except PermissionError as error:
                 raise FinalError(gated_message(spec)) from error
             check(entry, target, digest, ChecksumError)
-    manifest = {"repo": spec.raw["repo"], "revision": spec.raw["revision"], "files": files}
+            recorded.append(entry | {"sha256": digest})
+    manifest = {"repo": spec.raw["repo"], "revision": spec.raw["revision"], "files": recorded}
     (out / "minibrain-model.json").write_text(json.dumps(manifest, indent=1))
-    write_result(spec, {"files": files, "size_bytes": progress.total, "revision": spec.raw["revision"]})
+    write_result(spec, {"files": recorded, "size_bytes": progress.total, "revision": spec.raw["revision"]})
     report(1.0, step="validated", files=len(files))
 
 
