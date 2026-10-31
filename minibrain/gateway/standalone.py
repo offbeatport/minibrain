@@ -45,13 +45,16 @@ def create_gateway_app(
         if background:
             threading.Thread(target=source.follow, args=(stop,), daemon=True).start()
             threading.Thread(target=logs.flush_forever, args=(stop,), daemon=True).start()
+            if isinstance(serving, EngineBackend):
+                threading.Thread(target=serving.probe_forever, args=(stop,), daemon=True).start()
         yield
         stop.set()
 
     app = FastAPI(title="minibrain gateway", lifespan=lifespan)
     app.state.gateway_config = source
     app.state.request_logs = logs
-    app.state.backend = backend or EngineBackend(lambda base: source.current().engines.get(base, []))
+    serving = backend or EngineBackend(lambda: source.current().engines)
+    app.state.backend = serving
     app.include_router(routes.router)
 
     @app.get("/healthz")

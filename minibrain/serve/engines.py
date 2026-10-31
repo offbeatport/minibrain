@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import socket
 import sys
@@ -10,6 +11,7 @@ from typing import Any
 import httpx
 
 from minibrain.base_models import BaseModelSpec
+from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
@@ -19,6 +21,9 @@ from minibrain.worker import HttpClient
 GENERATE_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 STARTUP_SECONDS = 600.0
 IDLE_SECONDS = 900.0
+PROBE_SECONDS = 5.0
+
+log = logging.getLogger("minibrain.engines")
 
 
 def free_port() -> int:
@@ -109,66 +114,98 @@ class EngineManager:
             supervisor.shutdown()
 
 
-Replicas = Callable[[str], list[dict[str, str]]]
+Engines = Callable[[], dict[str, list[dict[str, str]]]]
 
 
 class EngineBackend:
-    def __init__(self, replicas: Replicas, http: HttpClient | None = None) -> None:
-        self.replicas = replicas
+    def __init__(self, engines: Engines, http: HttpClient | None = None, balancer: Balancer | None = None) -> None:
+        self.engines = engines
         self.http: HttpClient = http or httpx.Client(timeout=GENERATE_TIMEOUT)
+        self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
+        self.balancer = balancer or Balancer()
 
-    def locate(self, base: str) -> str | None:
-        found = self.replicas(base)
-        ready = [entry for entry in found if entry.get("state") == "ready"]
-        return (ready or found)[0]["url"] if found else None
+    def replicas(self, base: str) -> list[dict[str, str]]:
+        return self.engines().get(base, [])
 
     def complete(self, request: CompletionRequest) -> Completion:
-        url = self.locate(request.base.key)
-        if url is None:
-            raise EngineUnavailableError(f"no engine serves {request.base.key}")
+        base = request.base.key
         adapter = {"name": request.adapter.name, "artifact": request.adapter.artifact} if request.adapter else None
         body = {"messages": request.messages, "adapter": adapter, "max_tokens": request.max_tokens}
+        key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)
         deadline = time.monotonic() + STARTUP_SECONDS
+        tried: set[str] = set()
         while True:
+            replicas = self.replicas(base)
+            if not replicas:
+                raise EngineUnavailableError(f"no engine serves {base}")
+            url = self.balancer.choose(replicas, key, tried)
+            if url is None:
+                if time.monotonic() > deadline:
+                    raise EngineUnavailableError(f"no engine for {base} is reachable")
+                time.sleep(1.0)
+                tried.clear()
+                continue
             try:
                 response = self.http.request("POST", f"{url}/generate", json=body)
-            except (httpx.TransportError, OSError) as error:
-                if time.monotonic() > deadline:
-                    raise EngineUnavailableError(f"engine for {request.base.key} is not reachable") from error
-                time.sleep(1.0)
+            except (httpx.TransportError, OSError):
+                self.balancer.mark(url, "down")
+                tried.add(url)
                 continue
-            if response.status_code == 503 and time.monotonic() < deadline:
-                time.sleep(1.0)
+            finally:
+                self.balancer.release(url)
+            if response.status_code == 503:
+                self.balancer.mark(url, "loading")
+                tried.add(url)
                 continue
             response.raise_for_status()
+            self.balancer.mark(url, "ready")
+            if tried:
+                self.balancer.rebind(key, url)
             return Completion(**response.json())
+
+    def check(self, url: str) -> str:
+        try:
+            response = self.probe.request("GET", f"{url}/health")
+        except (httpx.TransportError, OSError):
+            return "down"
+        return "ready" if response.status_code == 200 else "loading" if response.status_code == 503 else "down"
+
+    def check_all(self) -> None:
+        urls = {entry["url"] for entries in self.engines().values() for entry in entries}
+        for url in sorted(urls):
+            self.balancer.mark(url, self.check(url))
+
+    def probe_forever(self, stop: threading.Event) -> None:
+        while not stop.wait(PROBE_SECONDS):
+            try:
+                self.check_all()
+            except Exception:
+                log.exception("engine health check failed")
 
     def status(self) -> list[dict[str, Any]]:
         return []
 
 
 class ManagedEngineBackend(EngineBackend):
-    def __init__(self, manager: EngineManager, registered: Replicas, http: HttpClient | None = None) -> None:
-        super().__init__(self.known, http)
+    def __init__(self, manager: EngineManager, engines: Engines, http: HttpClient | None = None) -> None:
+        super().__init__(engines, http)
         self.manager = manager
-        self.registered = registered
-        self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
 
-    def known(self, base: str) -> list[dict[str, str]]:
-        found = self.registered(base)
+    def replicas(self, base: str) -> list[dict[str, str]]:
+        found = self.engines().get(base, [])
         local = self.manager.url(base)
         if local is not None and all(entry["url"] != local for entry in found):
             found = [{"url": local, "state": "loading"}, *found]
         return found
 
     def complete(self, request: CompletionRequest) -> Completion:
-        if not self.registered(request.base.key):
+        if not self.engines().get(request.base.key):
             self.manager.ensure_one(request.base)
         self.manager.touch(request.base.key)
         return super().complete(request)
 
     def health(self, key: str) -> str | None:
-        if any(entry.get("state") == "ready" for entry in self.registered(key)):
+        if any(self.balancer.state(entry) == "ready" for entry in self.engines().get(key, [])):
             return "running"
         return self.manager.health(key, self.probe)
 

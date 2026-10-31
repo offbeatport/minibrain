@@ -38,7 +38,7 @@ from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
-from minibrain.serve.engines import EngineManager, ManagedEngineBackend
+from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.settings import Settings, load_settings
 
 EXPIRY_SECONDS = 5.0
@@ -102,6 +102,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (purge_forever, app.state.sessions),
         ):
             threading.Thread(target=target, args=(source, stop), daemon=True).start()
+        if isinstance(app.state.backend, EngineBackend):
+            threading.Thread(target=app.state.backend.probe_forever, args=(stop,), daemon=True).start()
     yield
     stop.set()
     app.state.request_logs.flush()
@@ -130,7 +132,7 @@ def create_app(
     engines = None
     if backend is None:
         engines = EngineManager(settings, os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000"))
-        backend = ManagedEngineBackend(engines, lambda base: app.state.gateway_config.current().engines.get(base, []))
+        backend = ManagedEngineBackend(engines, lambda: app.state.gateway_config.current().engines)
     app.state.engines = engines
     app.state.backend = backend
     app.state.gateway_config = LocalConfig(
