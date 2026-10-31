@@ -11,10 +11,8 @@ import {
     Play,
     Rocket,
     Settings,
-    SlidersHorizontal,
     SunMoon,
     ThumbsUp,
-    UserRound,
     Workflow,
 } from "lucide-react";
 import { type UILinkProps, UIProvider } from "obp-ui";
@@ -60,12 +58,10 @@ const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
             { label: "Monitor", path: "/monitor", icon: Activity, scoped: true },
         ],
     },
-    { label: null, items: [{ label: "Settings", path: "/settings", icon: Settings }] },
 ];
 
 const ACCOUNT_ITEMS: AccountMenuItem[] = [
-    { icon: <UserRound />, label: "Profile", href: "/profile" },
-    { icon: <SlidersHorizontal />, label: "Preferences", href: "/preferences" },
+    { icon: <Settings />, label: "Settings", href: "/settings" },
     { kind: "theme", icon: <SunMoon />, label: "Theme" },
     { icon: <LogOut />, label: "Sign out", separatorBefore: true, disabled: true },
 ];

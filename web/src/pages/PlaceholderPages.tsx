@@ -29,13 +29,3 @@ export function MonitorPage() {
         />
     );
 }
-
-export function ProfilePage() {
-    return (
-        <ComingSoon
-            title="Profile"
-            caption="Your account on this install."
-            body="Local accounts and single sign-on (OIDC) come with access control; until then everyone using this install is the local user."
-        />
-    );
-}

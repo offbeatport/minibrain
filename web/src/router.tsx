@@ -14,9 +14,8 @@ import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
 import { ModelsPage } from "./pages/ModelsPage";
-import { FeedbackPage, MonitorPage, PipelinesPage, ProfilePage } from "./pages/PlaceholderPages";
+import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
-import { PreferencesPage } from "./pages/PreferencesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrainingPage } from "./pages/TrainingPage";
 
@@ -67,6 +66,16 @@ const legacyRoute = createRoute({
     },
 });
 
+function movedToSettings(path: string): AnyRoute {
+    return createRoute({
+        getParentRoute: () => rootRoute,
+        path,
+        beforeLoad: () => {
+            throw redirect({ href: "/settings" });
+        },
+    });
+}
+
 const routeTree = rootRoute.addChildren([
     globalPage("/", HomePage),
     globalPage("/models", ModelsPage),
@@ -80,8 +89,8 @@ const routeTree = rootRoute.addChildren([
     globalPage("/compute", ComputePage),
     scopedPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
-    globalPage("/profile", ProfilePage),
-    globalPage("/preferences", PreferencesPage),
+    movedToSettings("/profile"),
+    movedToSettings("/preferences"),
     legacyTabRoute,
     legacyRoute,
 ]);

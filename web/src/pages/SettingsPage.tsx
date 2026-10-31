@@ -1,5 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "obp-ui";
+import { Badge, SegmentedTabs, type ThemePref, getThemePref, setThemePref } from "obp-ui";
+import { type ReactNode, useState } from "react";
 import { useInstallSettings } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
@@ -8,6 +9,16 @@ import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 
 type BaseModelInfo = components["schemas"]["BaseModelInfo"];
+
+const MODES: { key: ThemePref; label: string }[] = [
+    { key: "light", label: "Light" },
+    { key: "dark", label: "Dark" },
+    { key: "system", label: "System" },
+];
+
+function isThemePref(value: string): value is ThemePref {
+    return MODES.some((mode) => mode.key === value);
+}
 
 const SPLIT_LABELS: Record<string, string> = {
     golden: "Test set (max)",
@@ -53,16 +64,43 @@ function Path({ label, value }: { label: string; value: string | undefined }) {
     );
 }
 
+function Group({ title, caption }: { title: string; caption: ReactNode }) {
+    return (
+        <div className="pt-2">
+            <h2 className="text-lg font-semibold">{title}</h2>
+            <p className="text-sm text-muted-foreground">{caption}</p>
+        </div>
+    );
+}
+
+function Appearance() {
+    const [mode, setMode] = useState<ThemePref>(getThemePref());
+    const choose = (key: string) => {
+        if (isThemePref(key)) {
+            setThemePref(key);
+            setMode(key);
+        }
+    };
+    return (
+        <Section title="Appearance" caption="Pick light, dark or follow the system.">
+            <SegmentedTabs tabs={MODES} active={mode} onSelect={choose} />
+        </Section>
+    );
+}
+
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     return (
         <Page>
-            <PageHeader
-                title="Settings"
+            <PageHeader title="Settings" />
+            <Group title="You" caption="Stored in this browser." />
+            <Appearance />
+            <Group
+                title="This install"
                 caption="Read-only for now. Set MINIBRAIN_HOME before starting to move the install."
             />
             <ErrorLine error={error} />
-            <Section title="Install">
+            <Section title="Paths">
                 <div className="flex flex-col gap-3">
                     <Path label="Data, adapters and jobs" value={data?.home} />
                     <Path label="Database" value={data?.database} />
