@@ -105,7 +105,9 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
                             icon={entry.icon}
                             label={entry.label}
                             href={hrefFor(entry, minibrain)}
-                            active={pathname === entry.path}
+                            active={
+                                pathname === entry.path || pathname.startsWith(`${entry.path}/`)
+                            }
                             iconStyle="plain"
                         />
                     ))}

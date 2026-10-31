@@ -17,6 +17,7 @@ import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
+import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrainingPage } from "./pages/TrainingPage";
 import { LogosPage } from "./pages/proto/LogosPage";
@@ -93,6 +94,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/compute", ComputePage),
     scopedPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
+    globalPage("/settings/security", SecurityPage),
     globalPage("/proto/logos", LogosPage),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),

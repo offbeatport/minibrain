@@ -418,6 +418,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Policies */
+        get: operations["policies_api_policies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policies/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Policy */
+        put: operations["change_policy_api_policies__name__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit */
+        get: operations["audit_api_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/versions": {
         parameters: {
             query?: never;
@@ -950,6 +1001,23 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at: string | null;
+        };
+        /** AuditInfo */
+        AuditInfo: {
+            /** Id */
+            id: number;
+            /** At */
+            at: string;
+            /** Actor */
+            actor: string;
+            /** Action */
+            action: string;
+            /** Target */
+            target: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
         };
         /** Availability */
         Availability: {
@@ -1752,6 +1820,37 @@ export interface components {
             tags?: string[] | null;
             /** Archived */
             archived?: boolean | null;
+        };
+        /** PolicyChoice */
+        PolicyChoice: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+        };
+        /** PolicyInfo */
+        PolicyInfo: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Kind */
+            kind: string;
+            /** Choices */
+            choices: components["schemas"]["PolicyChoice"][];
+            /** Value */
+            value: unknown;
+            /** Locked */
+            locked: boolean;
+            /** Source */
+            source: string;
+        };
+        /** PolicyUpdate */
+        PolicyUpdate: {
+            /** Value */
+            value: unknown;
         };
         /** PreviewResponse */
         PreviewResponse: {
@@ -2865,6 +2964,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    policies_api_policies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyInfo"][];
+                };
+            };
+        };
+    };
+    change_policy_api_policies__name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_api_audit_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditInfo"][];
                 };
             };
             /** @description Validation Error */

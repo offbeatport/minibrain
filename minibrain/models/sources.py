@@ -24,6 +24,10 @@ class ModelSource(Protocol):
     def chunks(self, path: str) -> Iterator[bytes]: ...
 
 
+def s3_endpoint() -> str:
+    return os.environ.get("AWS_ENDPOINT_URL_S3") or os.environ.get("AWS_ENDPOINT_URL") or "https://s3.amazonaws.com"
+
+
 def s3_base() -> str | None:
     found = os.environ.get("MINIBRAIN_MODELS_S3_URL", "").strip().rstrip("/")
     return found or None

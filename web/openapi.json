@@ -1227,6 +1227,134 @@
         }
       }
     },
+    "/api/policies": {
+      "get": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Policies",
+        "operationId": "policies_api_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Policies Api Policies Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{name}": {
+      "put": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Change Policy",
+        "operationId": "change_policy_api_policies__name__put",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyInfo"
+                  },
+                  "title": "Response Change Policy Api Policies  Name  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Audit",
+        "operationId": "audit_api_audit_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditInfo"
+                  },
+                  "title": "Response Audit Api Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/versions": {
       "get": {
         "tags": [
@@ -2851,6 +2979,45 @@
           "finished_at"
         ],
         "title": "AttemptInfo"
+      },
+      "AuditInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "action",
+          "target",
+          "detail"
+        ],
+        "title": "AuditInfo"
       },
       "Availability": {
         "properties": {
@@ -5332,6 +5499,86 @@
         },
         "type": "object",
         "title": "ModelUpdate"
+      },
+      "PolicyChoice": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "PolicyChoice"
+      },
+      "PolicyInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyChoice"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "description",
+          "kind",
+          "choices",
+          "value",
+          "locked",
+          "source"
+        ],
+        "title": "PolicyInfo"
+      },
+      "PolicyUpdate": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "PolicyUpdate"
       },
       "PreviewResponse": {
         "properties": {

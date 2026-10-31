@@ -6,6 +6,7 @@ import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section, Stat } from "~/components/Section";
+import { SettingsTabs } from "~/components/SettingsTabs";
 import { count } from "~/lib/format";
 
 type BaseModelInfo = components["schemas"]["BaseModelInfo"];
@@ -93,6 +94,7 @@ export function SettingsPage() {
     return (
         <Page>
             <PageHeader title="Settings" />
+            <SettingsTabs active="/settings" />
             <Group title="You" caption="Stored in this browser." />
             <Appearance />
             <Group

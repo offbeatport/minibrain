@@ -54,6 +54,8 @@ def authorize(request: Request, config: ConfigDep) -> Grant:
     grant = config.keys.get(key_digest(token)) if scheme.lower() == "bearer" and token.startswith(KEY_PREFIX) else None
     if grant is None:
         raise HTTPException(status_code=401, detail="invalid API key")
+    if grant.expired(now()):
+        raise HTTPException(status_code=401, detail="API key expired")
     return grant
 
 
@@ -164,19 +166,20 @@ def chat_completions(
         status = error.status_code
         raise
     finally:
-        logs.add(
-            LogEntry(
-                at=now(),
-                key_id=grant.key_id,
-                minibrain_id=grant.minibrain_id,
-                model=body.model,
-                version=route.version if route else None,
-                status=status,
-                latency_ms=(time.monotonic() - started) * 1000,
-                prompt_tokens=completion.prompt_tokens if completion else 0,
-                completion_tokens=completion.completion_tokens if completion else 0,
+        if config.request_logs:
+            logs.add(
+                LogEntry(
+                    at=now(),
+                    key_id=grant.key_id,
+                    minibrain_id=grant.minibrain_id,
+                    model=body.model,
+                    version=route.version if route else None,
+                    status=status,
+                    latency_ms=(time.monotonic() - started) * 1000,
+                    prompt_tokens=completion.prompt_tokens if completion else 0,
+                    completion_tokens=completion.completion_tokens if completion else 0,
+                )
             )
-        )
     if completion is None:
         raise HTTPException(status_code=500, detail="no completion")
     identifier = f"chatcmpl-{uuid.uuid4().hex}"

@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from minibrain.base_models import BASE_MODELS, QWEN_STOP_TOKENS, BaseModelSpec
 from minibrain.jobs.queue import enqueue
+from minibrain.models import hub
+from minibrain.models.sources import S3, s3_endpoint
+from minibrain.policy import load as load_policy
 from minibrain.registry.models import CatalogModel, CatalogVariant, JobKind, Model, ModelStatus, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
@@ -72,6 +75,7 @@ def download_params(settings: Settings, model: Model, variant: CatalogVariant, g
 def start_download(
     session: Session, settings: Settings, entry: CatalogModel, variant: CatalogVariant, acknowledged_by: str
 ) -> Model:
+    load_policy(session).download(variant.repo, entry.license, entry.origin)
     model_id = model_id_for(variant)
     model = session.get(Model, model_id)
     if model is not None and model.status in (*ACTIVE_STATUSES, ModelStatus.AVAILABLE):
@@ -143,6 +147,8 @@ def start_import(
     tags: list[str],
     variant_id: str | None = None,
 ) -> Model:
+    if source_type == S3:
+        load_policy(session).outbound(s3_endpoint())
     model_id = slugify(name)
     if session.get(Model, model_id) is not None:
         raise ConflictError(f"a model called {model_id} already exists")
@@ -169,6 +175,8 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
     if model.status not in (ModelStatus.FAILED, ModelStatus.CANCELLED):
         raise ConflictError(f"{model.name} is {model.status}; only failed or cancelled transfers can be retried")
     if model.source == "import":
+        if (model.source_path or "").startswith(f"{S3}:"):
+            load_policy(session).outbound(s3_endpoint())
         model.status = ModelStatus.IMPORTING
         params = import_params(session, settings, model)
         enqueue(session, JobKind.IMPORT, params, idempotency_key=f"import:{model.id}", model_id=model.id)
@@ -176,8 +184,11 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
         variant = model.variant
         if variant is None:
             raise ConflictError(f"{model.name} has no catalogue entry to download from")
-        model.status = ModelStatus.DOWNLOADING
         entry = session.get(CatalogModel, variant.catalog_id)
+        policy = load_policy(session)
+        policy.download(variant.repo, entry.license if entry else "unknown", entry.origin if entry else "hub")
+        policy.outbound(hub.endpoint())
+        model.status = ModelStatus.DOWNLOADING
         params = download_params(settings, model, variant, bool(entry and entry.gated))
         enqueue(session, JobKind.DOWNLOAD, params, idempotency_key=f"download:{model.id}", model_id=model.id)
     model.error = None

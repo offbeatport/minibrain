@@ -26,6 +26,7 @@ from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sy
 from minibrain.models.hardware import Hardware, detect, fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
 from minibrain.models.registry import start_download
+from minibrain.policy import load as load_policy
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
@@ -120,14 +121,15 @@ def latest_sync(session: Session) -> Job | None:
 @router.get("")
 def catalogue(request: Request, session: SessionDep, settings: SettingsDep) -> CatalogResponse:
     machine = hardware(request)
+    policy = load_policy(session)
     entries = session.scalars(select(CatalogModel).order_by(CatalogModel.position))
     synced = [entry.synced_at for entry in session.scalars(select(CatalogModel)) if entry.synced_at is not None]
     sync = latest_sync(session)
     return CatalogResponse(
         entries=[entry_info(session, settings, entry, machine) for entry in entries],
         hardware=HardwareInfo(**machine.as_dict()),
-        online=hub.CONNECTIVITY.check(),
-        offline_forced=hub.offline(),
+        online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
+        offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),
@@ -149,6 +151,8 @@ def download(
     if not body.accept_license:
         raise ConflictError(f"Review and accept the {entry.license_name} before downloading {entry.name}")
     local = cached_fully(variant)
+    if not local:
+        load_policy(session).outbound(hub.endpoint())
     if not local and hub.CONNECTIVITY.check() is False:
         raise ConflictError("Offline: downloads need a connection. Import the model files instead.")
     if not local and entry.gated and hub.token() is None:
@@ -167,6 +171,9 @@ class HubAddRequest(BaseModel):
 
 @router.post("/hub", status_code=201)
 def add_from_hub(body: HubAddRequest, request: Request, session: SessionDep, settings: SettingsDep) -> CatalogEntry:
+    policy = load_policy(session)
+    policy.add_from_hub()
+    policy.outbound(hub.endpoint())
     try:
         repo = parse_repo(body.repo)
     except HubAddError as error:
@@ -207,8 +214,10 @@ def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
 def sync(session: SessionDep) -> JobInfo:
     if hub.offline():
         raise ConflictError("Offline: the catalogue sync needs a connection; the bundled catalogue stays in use")
-    if catalog_url() is None:
+    url = catalog_url()
+    if url is None:
         raise ConflictError("Set MINIBRAIN_CATALOG_URL to sync the catalogue; the bundled catalogue stays in use")
+    load_policy(session).outbound(url)
     job = enqueue(session, JobKind.CATALOG_SYNC, sync_params(session), idempotency_key="catalog_sync")
     session.commit()
     return job_info(job)
@@ -231,7 +240,8 @@ def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettin
 
 
 def sync_due(session: Session) -> bool:
-    if hub.offline() or catalog_url() is None or not daily_sync(session):
+    url = catalog_url()
+    if hub.offline() or url is None or not daily_sync(session) or not load_policy(session).outbound_allowed(url):
         return False
     last = latest_sync(session)
     if last is not None and last.status in (JobStatus.QUEUED, JobStatus.RUNNING):

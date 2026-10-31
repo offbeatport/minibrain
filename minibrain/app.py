@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from minibrain.api import catalog, internal, internal_gateway, jobs, minibrains, models, ops, system, versions
+from minibrain.api import catalog, internal, internal_gateway, jobs, minibrains, models, ops, policies, system, versions
 from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BaseModelSpec
@@ -19,7 +19,9 @@ from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogBuffer, database_sink
 from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
+from minibrain.maintenance import purge_forever
 from minibrain.models.catalog import seed
+from minibrain.policy import LockedError, PolicyError
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -40,6 +42,8 @@ ERROR_STATUS: dict[type[Exception], int] = {
     SnapshotError: 422,
     ArtifactError: 422,
     EngineUnavailableError: 503,
+    PolicyError: 403,
+    LockedError: 409,
 }
 
 log = logging.getLogger("minibrain")
@@ -83,6 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (LocalConfig.refresh_forever, app.state.gateway_config),
             (LogBuffer.flush_forever, app.state.request_logs),
             (schedule_forever, app.state.sessions),
+            (purge_forever, app.state.sessions),
         ):
             threading.Thread(target=target, args=(source, stop), daemon=True).start()
     yield
@@ -123,7 +128,19 @@ def create_app(
     app.state.background = background
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
-    for module in (minibrains, models, catalog, versions, jobs, system, gateway, internal, internal_gateway, ops):
+    for module in (
+        minibrains,
+        models,
+        catalog,
+        policies,
+        versions,
+        jobs,
+        system,
+        gateway,
+        internal,
+        internal_gateway,
+        ops,
+    ):
         app.include_router(module.router)
     mount_web(app, settings.web_dist)
     return app

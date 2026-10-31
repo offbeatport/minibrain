@@ -1,6 +1,7 @@
 import hashlib
 import re
 import secrets
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from minibrain.registry.models import (
     Version,
     VersionKind,
     VersionStatus,
+    now,
 )
 
 KEY_PREFIX = "mb_"
@@ -114,9 +116,17 @@ def key_digest(raw: str) -> str:
 def create_key(
     session: Session, name: str, minibrain: Minibrain | None = None, model_id: str | None = None
 ) -> tuple[ApiKey, str]:
+    from minibrain.policy import load
+
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
+    days = int(load(session)["key_expiry_days"])
     key = ApiKey(
-        minibrain=minibrain, model_id=model_id, name=name.strip() or "default", prefix=raw[:10], digest=key_digest(raw)
+        minibrain=minibrain,
+        model_id=model_id,
+        name=name.strip() or "default",
+        prefix=raw[:10],
+        digest=key_digest(raw),
+        expires_at=now() + timedelta(days=days) if days else None,
     )
     session.add(key)
     session.commit()

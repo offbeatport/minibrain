@@ -5,6 +5,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -15,6 +16,7 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
 from minibrain.data.snapshot import prompt_context
 from minibrain.models.registry import resolve_spec
+from minibrain.policy import load as load_policy
 from minibrain.registry.files import ref, snapshot_dir
 from minibrain.registry.models import ApiKey, Minibrain, Model, ModelStatus, VersionKind, VersionStatus
 from minibrain.registry.service import NotFoundError, adapter_name
@@ -43,6 +45,10 @@ class Grant:
     key_id: int
     minibrain_id: int | None
     model_id: str | None
+    expires_at: str | None = None
+
+    def expired(self, moment: datetime) -> bool:
+        return self.expires_at is not None and datetime.fromisoformat(self.expires_at) <= moment
 
     @property
     def owner(self) -> str:
@@ -61,6 +67,7 @@ class GatewayConfig:
     models: dict[str, list[str]] = field(default_factory=dict)
     engines: dict[str, str] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
+    request_logs: bool = True
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -75,6 +82,7 @@ class GatewayConfig:
             models=dict(data["models"]),
             engines=dict(data.get("engines", {})),
             bases=dict(data.get("bases", {})),
+            request_logs=bool(data.get("request_logs", True)),
         )
 
 
@@ -144,10 +152,18 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         models.setdefault(route.owner, []).append(route.name)
     models = {owner: sorted(names, key=lambda name: ("@" in name, name)) for owner, names in models.items()}
     keys = {
-        key.digest: Grant(key_id=key.id, minibrain_id=key.minibrain_id, model_id=key.model_id)
+        key.digest: Grant(
+            key_id=key.id,
+            minibrain_id=key.minibrain_id,
+            model_id=key.model_id,
+            expires_at=key.expires_at.isoformat() if key.expires_at else None,
+        )
         for key in session.scalars(select(ApiKey))
     }
-    config = GatewayConfig(version="", routes=routes, keys=keys, models=models, engines=engines, bases=bases)
+    logging = bool(load_policy(session)["request_logs"])
+    config = GatewayConfig(
+        version="", routes=routes, keys=keys, models=models, engines=engines, bases=bases, request_logs=logging
+    )
     return replace(config, version=hash_of(config.to_json()))
 
 

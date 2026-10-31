@@ -404,7 +404,7 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
     assert harness.client.delete(f"/api/catalog/{entry['id']}").status_code == 204
     assert harness.client.delete("/api/catalog/qwen3-0.6b").status_code == 409
     monkeypatch.setenv("MINIBRAIN_OFFLINE", "1")
-    assert harness.client.post("/api/catalog/hub", json={"repo": REPO}).status_code == 409
+    assert harness.client.post("/api/catalog/hub", json={"repo": REPO}).status_code == 403
 
 
 def test_unknown_architecture_is_marked_untested(harness: Harness, hub: Path) -> None:

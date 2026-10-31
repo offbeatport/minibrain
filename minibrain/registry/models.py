@@ -233,6 +233,7 @@ class ApiKey(Base):
     digest: Mapped[str] = mapped_column(unique=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
     minibrain: Mapped[Minibrain | None] = relationship(back_populates="keys")
 
@@ -349,3 +350,15 @@ class Setting(Base):
     key: Mapped[str] = mapped_column(primary_key=True)
     value: Mapped[Any] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    actor: Mapped[str]
+    action: Mapped[str]
+    target: Mapped[str]
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
