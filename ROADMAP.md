@@ -94,33 +94,60 @@ at answer time.
 
 ## Architecture
 
-One deployable, three process types. Module boundaries are the future service boundaries.
-
-| Module | Owns | Future service |
-|---|---|---|
-| registry | minibrains, versions, keys, audit log | api |
-| data | Sources, staging, transforms, quality, PII, snapshots | data |
-| train | Recipes, training subprocess, eval | train |
-| serve | Pools, engine lifecycle, adapter load/unload | serve |
-| gateway | OpenAI API, auth, name resolution, request logging, retrieval context step | gateway |
-| ui | SPA | — |
+One install is one supervised process tree: one command starts it, and minibrain starts and restarts the rest.
 
 | Process | Runs |
 |---|---|
-| `api` | uvicorn: gateway, registry, data previews, serves the SPA |
-| `worker` | Huey consumer: data builds, training, eval. Every training and eval run is its own subprocess |
-| `engine` | One serving engine per pool, started and stopped by `serve` |
+| main | UI and `/api`, management, job submission, deployments, gateway (`/v1`) and routing; supervises the others |
+| worker | Ingestion and data preparation; launches training jobs |
+| training | One child per training or eval job; writes checkpoints and results |
+| engine | One model server per pool: SGLang, vLLM, or `transformers` / `llamacpp` on a laptop |
 
-Modules talk through the metadata DB and artifacts in the object store, never through in-memory calls across module
-lines, so the split needs no rewrite.
+- One binary, many roles: `minibrain serve` runs all; `--role api|gateway|worker|engine` runs one. Compose, Helm and
+  Kubernetes only start roles separately.
+- The jobs table is the only job state: status, attempt, lease with heartbeat, idempotency key, cancel flag. A job is
+  stored before it runs and the API returns its ID at once.
+- Workers never touch the database. They claim, heartbeat, report and finish through the API, so the main process is
+  the only writer and a remote worker is the same program with a URL and a token.
+- At-least-once execution: jobs write to a temporary location and commit atomically; training resumes from its last
+  checkpoint after a lost lease.
+- Progress is events: workers post them, the UI follows over SSE. Logs are artifacts read by offset.
+- Artifacts are referenced by SHA-256 ID, never by path: sources, snapshots, adapters, checkpoints, eval results, logs,
+  batch outputs. Base model weights are pinned by repo and revision.
+- The gateway is separate from management: routing lives in memory, refreshed on version changes, with no database
+  read per request. Engines are children with health checks.
+- The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
+- Children die with the parent and restart with backoff. A launcher starts work: a local subprocess now, a remote
+  worker or a Kubernetes Job later.
+- Module boundaries (registry, data, train, serve, gateway) are the future service boundaries; no in-memory state
+  crosses them.
+
+| | Local | Deployed |
+|---|---|---|
+| Metadata | SQLite (WAL) | Postgres |
+| Artifacts | Local folder | S3-compatible store |
+| Workers | Local processes | Local or remote, same contract |
+| Engines | Local children | Local or remote, routed by the gateway |
+| Roles | One process tree | Separate processes or services |
+
+### Tradeoffs
+
+- No Compose or Kubernetes locally: Docker on macOS has no GPU, and `uvx minibrain serve` must work air-gapped.
+- Own jobs table: Procrastinate is Postgres-only, Huey keeps a second job record without leases, Celery / RQ /
+  Dramatiq need a broker, Temporal / Hatchet / Prefect are separate servers. DBOS Transact is closest but its workers
+  need database access. Revisit it if pipelines need durable multi-step workflows.
+- Workers through the API: no database credentials outside the main process and one SQLite writer, for more API
+  surface and workers that wait while the main process is down.
+- At-least-once, not exactly-once: simpler, correct while every job is idempotent.
+- SQLite is single-writer and single-box, which is the local target.
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | API | FastAPI + uvicorn |
-| Jobs | Huey with `SqliteHuey`; Procrastinate once on Postgres; Ray for multi-node in v2 |
-| Metadata | SQLite WAL via SQLAlchemy; Postgres when split |
+| Jobs | Own jobs table with leases; workers claim through the API; Ray for multi-node training in v2 |
+| Metadata | SQLite WAL via SQLAlchemy locally; Postgres when deployed |
 | Staging and transforms | DuckDB, one file per minibrain, disposable |
 | Connectors | DuckDB scanners in v1; dlt from the first API source |
 | PII | Presidio |
@@ -563,7 +590,6 @@ Everything in the v1 scope below, after M1.
 - SGLang LoRA on ROCm, MI300X specifically.
 - `transformers` backend throughput with several adapters; serialize requests if PEFT adapter switching is not safe
   under concurrency.
-- Huey on SQLite with the API and the worker writing at the same time.
 - DuckDB Postgres scanner load on customer databases: read replicas, `LIMIT`, materialize.
 - MPS dtype and op gaps during local training; Metal GPU hangs in LoRA backward (seen on M1 Pro, macOS 27.0.1).
 - Teacher quality on generated Q&A: track the check-pass drop rate per source.
