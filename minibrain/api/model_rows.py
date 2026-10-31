@@ -10,6 +10,7 @@ from minibrain.models.hardware import needed_bytes
 from minibrain.models.registry import files_present
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    CatalogVariant,
     Job,
     JobKind,
     JobStatus,
@@ -109,7 +110,9 @@ def latest_moment(*moments: datetime | None) -> datetime:
     return max(moment for moment in moments if moment is not None)
 
 
-def custom_row(minibrain: Minibrain, jobs: list[Job], store: ArtifactStore, health: Health) -> ModelRow:
+def custom_row(
+    minibrain: Minibrain, jobs: list[Job], store: ArtifactStore, health: Health, base_weights: int | None = None
+) -> ModelRow:
     latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
     current = minibrain.current_version
@@ -142,7 +145,7 @@ def custom_row(minibrain: Minibrain, jobs: list[Job], store: ArtifactStore, heal
         update_available=False,
         current_version=current,
         ready_version=ready.number if ready is not None else None,
-        needed_bytes=None,
+        needed_bytes=needed_bytes(base_weights) if base_weights else None,
     )
 
 
@@ -202,10 +205,20 @@ def jobs_by(session: Session) -> tuple[dict[int, list[Job]], dict[str, Job]]:
     return by_minibrain, by_model
 
 
+def base_weights(session: Session) -> dict[str, int]:
+    weights: dict[str, int] = {}
+    for variant in session.scalars(select(CatalogVariant).where(CatalogVariant.position == 0)):
+        weights[variant.catalog_id] = variant.weights_bytes
+    for model in session.scalars(select(Model)):
+        weights[model.id] = sum(entry["size"] for entry in model.files if entry["path"].endswith(".safetensors"))
+    return weights
+
+
 def all_rows(session: Session, settings: Settings, store: ArtifactStore, health: Health) -> list[ModelRow]:
     by_minibrain, by_model = jobs_by(session)
+    weights = base_weights(session)
     rows = [
-        custom_row(minibrain, by_minibrain.get(minibrain.id, []), store, health)
+        custom_row(minibrain, by_minibrain.get(minibrain.id, []), store, health, weights.get(minibrain.base_model))
         for minibrain in session.scalars(select(Minibrain))
     ]
     rows += [base_row(model, by_model.get(model.id), settings, health) for model in session.scalars(select(Model))]

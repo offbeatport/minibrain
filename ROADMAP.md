@@ -596,6 +596,9 @@ Everything in the v1 scope below, after M1.
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
 - Helm chart, OpenShift
 - [ ] OCI / container registry model sources (Harbor, Quay; KitOps ModelKits)
+- [ ] Catalogue export/import and model bundles for air-gapped sites — only if needed
+- [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
+- [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
 - Preinstalled appliance
 
 ## Risks to verify early

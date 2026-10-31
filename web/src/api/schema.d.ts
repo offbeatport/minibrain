@@ -1002,6 +1002,8 @@ export interface components {
             variant_id: string | null;
             /** Deployed */
             deployed: boolean;
+            /** Verified */
+            verified: boolean;
         };
         /** BaseModelInfo */
         BaseModelInfo: {
@@ -1330,6 +1332,8 @@ export interface components {
             source_type?: "folder" | "s3";
             /** Location */
             location: string;
+            /** Variant Id */
+            variant_id?: string | null;
             /**
              * Description
              * @default

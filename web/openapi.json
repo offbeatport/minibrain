@@ -3077,6 +3077,10 @@
           "deployed": {
             "type": "boolean",
             "title": "Deployed"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
           }
         },
         "type": "object",
@@ -3114,7 +3118,8 @@
           "license_ack_at",
           "catalog_id",
           "variant_id",
-          "deployed"
+          "deployed",
+          "verified"
         ],
         "title": "BaseModelDetail"
       },
@@ -4024,6 +4029,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Location"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
           },
           "description": {
             "type": "string",

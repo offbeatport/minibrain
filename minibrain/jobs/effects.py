@@ -3,8 +3,11 @@ from sqlalchemy.orm import Session
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params
 from minibrain.models.catalog import apply_sync
+from minibrain.models.registry import apply_catalogue
 from minibrain.registry.files import MissingArtifactError
 from minibrain.registry.models import (
+    CatalogModel,
+    CatalogVariant,
     Job,
     JobKind,
     JobStatus,
@@ -66,6 +69,12 @@ class DomainEffects:
         result = job.result or {}
         model.files = list(result.get("files", model.files))
         model.size_bytes = int(result.get("size_bytes", model.size_bytes))
+        variant = session.get(CatalogVariant, result["variant_id"]) if result.get("variant_id") else None
+        if job.kind == JobKind.IMPORT and variant is not None:
+            entry = session.get(CatalogModel, variant.catalog_id)
+            if entry is not None:
+                apply_catalogue(model, entry, variant)
+        model.verified = job.kind == JobKind.DOWNLOAD or variant is not None
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()

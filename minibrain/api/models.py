@@ -70,6 +70,7 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         catalog_id=model.catalog_id,
         variant_id=model.variant_id,
         deployed=model.deployed,
+        verified=model.verified,
     )
 
 
@@ -89,7 +90,9 @@ def model_sources() -> list[dict[str, Any]]:
 @router.post("/import", status_code=202)
 def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
     tags = [tag.strip() for tag in body.tags if tag.strip()]
-    model = start_import(session, settings, body.name, body.source_type, body.location.strip(), body.description, tags)
+    model = start_import(
+        session, settings, body.name, body.source_type, body.location.strip(), body.description, tags, body.variant_id
+    )
     session.commit()
     return row_of(session, settings, request, model)
 

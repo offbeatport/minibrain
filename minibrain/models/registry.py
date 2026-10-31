@@ -88,10 +88,7 @@ def start_download(
     model.size_bytes = variant.size_bytes
     model.status = ModelStatus.DOWNLOADING
     model.error = None
-    model.trainable = entry.trainable and variant.runtimes == ["transformers"]
-    model.template_kwargs = dict(entry.template_kwargs)
-    model.stop_tokens = list(entry.stop_tokens)
-    model.license = entry.license
+    apply_catalogue(model, entry, variant)
     model.license_ack_by = acknowledged_by
     model.license_ack_at = now()
     model.updated_at = now()
@@ -106,9 +103,34 @@ def slugify(name: str) -> str:
     return slug[:48].strip("-") or "model"
 
 
-def import_params(settings: Settings, model: Model) -> dict[str, Any]:
+def catalogue_manifests(session: Session) -> list[dict[str, Any]]:
+    return [
+        {"id": variant.id, "repo": variant.repo, "revision": variant.revision, "files": variant.files}
+        for variant in session.scalars(select(CatalogVariant))
+    ]
+
+
+def import_params(session: Session, settings: Settings, model: Model) -> dict[str, Any]:
     kind, _, location = (model.source_path or "").partition(":")
-    return {"model_id": model.id, "source_type": kind, "location": location, "out": str(model_dir(settings, model.id))}
+    return {
+        "model_id": model.id,
+        "source_type": kind,
+        "location": location,
+        "variant_id": model.variant_id,
+        "catalog": catalogue_manifests(session),
+        "out": str(model_dir(settings, model.id)),
+    }
+
+
+def apply_catalogue(model: Model, entry: CatalogModel, variant: CatalogVariant) -> None:
+    model.catalog_id = entry.id
+    model.variant_id = variant.id
+    model.repo = variant.repo
+    model.revision = variant.revision
+    model.trainable = entry.trainable and variant.runtimes == ["transformers"]
+    model.template_kwargs = dict(entry.template_kwargs)
+    model.stop_tokens = list(entry.stop_tokens)
+    model.license = entry.license
 
 
 def start_import(
@@ -119,6 +141,7 @@ def start_import(
     location: str,
     description: str,
     tags: list[str],
+    variant_id: str | None = None,
 ) -> Model:
     model_id = slugify(name)
     if session.get(Model, model_id) is not None:
@@ -130,13 +153,14 @@ def start_import(
         description=description.strip(),
         tags=tags,
         source_path=f"{source_type}:{location}",
+        variant_id=variant_id,
         status=ModelStatus.IMPORTING,
         trainable=False,
         stop_tokens=[],
     )
     session.add(model)
     session.flush()
-    params = import_params(settings, model)
+    params = import_params(session, settings, model)
     enqueue(session, JobKind.IMPORT, params, idempotency_key=f"import:{model.id}", model_id=model.id)
     return model
 
@@ -146,7 +170,7 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
         raise ConflictError(f"{model.name} is {model.status}; only failed or cancelled transfers can be retried")
     if model.source == "import":
         model.status = ModelStatus.IMPORTING
-        params = import_params(settings, model)
+        params = import_params(session, settings, model)
         enqueue(session, JobKind.IMPORT, params, idempotency_key=f"import:{model.id}", model_id=model.id)
     else:
         variant = model.variant

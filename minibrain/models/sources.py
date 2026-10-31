@@ -59,6 +59,13 @@ class StorageSource:
     def describe(self) -> str:
         return self.url
 
+    def names(self) -> set[str]:
+        try:
+            listing = self.fs.ls(self.root, detail=True)
+        except (FileNotFoundError, PermissionError):
+            return set()
+        return {str(item["name"]).rstrip("/").rsplit("/", 1)[-1] for item in listing if item.get("type") == "file"}
+
     def files(self) -> list[dict[str, Any]]:
         try:
             listing = self.fs.ls(self.root, detail=True)

@@ -325,6 +325,7 @@ class BaseModelDetail(ModelRow):
     catalog_id: str | None
     variant_id: str | None
     deployed: bool
+    verified: bool
 
 
 class ModelUpdate(BaseModel):
@@ -338,6 +339,7 @@ class ImportRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     source_type: Literal["folder", "s3"] = "folder"
     location: str = Field(min_length=1)
+    variant_id: str | None = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
 

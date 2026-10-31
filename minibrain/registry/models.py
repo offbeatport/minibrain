@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, ForeignKey, Index, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
@@ -326,6 +326,7 @@ class Model(Base):
     license_ack_by: Mapped[str | None] = mapped_column(default=None)
     license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     deployed: Mapped[bool] = mapped_column(default=False)
+    verified: Mapped[bool] = mapped_column(default=False, server_default=false())
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)

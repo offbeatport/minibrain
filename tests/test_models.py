@@ -309,3 +309,50 @@ def test_base_models_deploy_through_the_gateway(harness: Harness, tmp_path: Path
     tested = harness.client.post("/api/models/base/base-one/test", json={"text": "Hello"}).json()
     assert tested["output"] == "billing"
     assert rows(harness)["base-one"]["deployment"]["label"] == "Running"
+
+
+def hf_folder(root: Path, revision: str | None = REVISION) -> Path:
+    root.mkdir(parents=True)
+    for name, data in FILES.items():
+        (root / name).write_bytes(data)
+    if revision is not None:
+        meta = root / ".cache" / "huggingface" / "download"
+        meta.mkdir(parents=True)
+        (meta / "config.json.metadata").write_text(f"{revision}\netag\n1700000000\n")
+    return root
+
+
+def import_folder(harness: Harness, name: str, folder: Path, **extra: str) -> dict:
+    body = {"name": name, "source_type": "folder", "location": str(folder), **extra}
+    row = harness.client.post("/api/models/import", json=body).json()
+    harness.worker(kinds=["import"]).run_once()
+    return harness.client.get(f"/api/models/base/{row['key']}").json()
+
+
+def test_hf_download_folder_is_verified_against_the_catalogue(harness: Harness, tmp_path: Path) -> None:
+    add_tiny(harness)
+    verified = import_folder(harness, "Tiny Copy", hf_folder(tmp_path / "hf"))
+    assert (verified["verified"], verified["catalog_id"], verified["revision"]) == (True, "tiny", REVISION)
+    assert verified["trainable"] is True and verified["availability"]["state"] == "available"
+    plain = import_folder(harness, "Plain", hf_folder(tmp_path / "plain", revision=None))
+    assert (plain["verified"], plain["catalog_id"]) == (False, None)
+    picked = import_folder(harness, "Picked", hf_folder(tmp_path / "picked", revision=None), variant_id="tiny:bf16")
+    assert picked["verified"] is True
+    tampered = hf_folder(tmp_path / "tampered")
+    (tampered / "model.safetensors").write_bytes(b"other" * 1400)
+    failed = import_folder(harness, "Tampered", tampered)
+    assert "does not match the catalogue checksum" in failed["error"]
+
+
+def test_import_rejects_pickle_and_incomplete_shards(harness: Harness, tmp_path: Path) -> None:
+    pickle = tmp_path / "pickle"
+    pickle.mkdir()
+    (pickle / "config.json").write_text(json.dumps({"architectures": ["LlamaForCausalLM"]}))
+    (pickle / "tokenizer.json").write_text("{}")
+    (pickle / "pytorch_model.bin").write_bytes(b"not loaded")
+    assert "pickle weights can run code" in import_folder(harness, "Pickle", pickle)["error"]
+    sharded = hf_folder(tmp_path / "sharded", revision=None)
+    index = {"weight_map": {"a": "model-00001-of-00002.safetensors", "b": "model-00002-of-00002.safetensors"}}
+    (sharded / "model.safetensors.index.json").write_text(json.dumps(index))
+    (sharded / "model-00001-of-00002.safetensors").write_bytes(b"shard")
+    assert "missing model-00002-of-00002" in import_folder(harness, "Sharded", sharded)["error"]
