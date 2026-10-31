@@ -18,6 +18,7 @@ import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPag
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrainingPage } from "./pages/TrainingPage";
+import { LogosPage } from "./pages/proto/LogosPage";
 
 const LEGACY_TABS: Record<string, string> = {
     data: "/data",
@@ -89,6 +90,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/compute", ComputePage),
     scopedPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
+    globalPage("/proto/logos", LogosPage),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),
     legacyTabRoute,
