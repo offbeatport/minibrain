@@ -1,7 +1,7 @@
 import json
 import re
 import sys
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -475,7 +475,7 @@ def main() -> None:
         entry["position"] = position
     for line in builder.rejected:
         print(f"skip {line}", file=sys.stderr)
-    stamp = f"{date.today().isoformat()}.9"
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M")
     OUT.write_text(json.dumps({"snapshot": stamp, "source": HUB, "entries": entries}, indent=1) + "\n")
     print(f"{len(entries)} entries, {len(builder.rejected)} rejected -> {OUT}", file=sys.stderr)
 

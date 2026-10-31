@@ -91,6 +91,10 @@ def upsert(session: Session, entry: dict[str, Any]) -> None:
             setattr(variant, key, data[key])
         variant.position = position
         refresh_variant(session, variant, data)
+    listed = {data["id"] for data in entry["variants"]}
+    for stale in [variant for variant in model.variants if variant.id not in listed]:
+        if not variant_in_use(session, stale.id):
+            model.variants.remove(stale)
 
 
 def seed(session: Session) -> bool:

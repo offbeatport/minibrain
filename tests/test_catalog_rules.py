@@ -54,3 +54,19 @@ def test_publisher_and_licence_rules_reject_outsiders() -> None:
     assert build.tier(30, True, 60) == "L"
     assert "qwen-research" not in build.LICENCES
     assert "cc-by-nc-4.0" not in build.LICENCES
+
+
+def test_reseeding_drops_variants_that_left_the_snapshot(harness) -> None:
+    from minibrain.models.catalog import upsert
+    from minibrain.registry.models import CatalogModel, CatalogVariant
+
+    entry = bundled()["entries"][0]
+    with harness.sessions() as session:
+        model = session.get(CatalogModel, entry["id"])
+        assert model is not None
+        extra = dict(entry["variants"][0]) | {"id": f"{entry['id']}:old"}
+        model.variants.append(CatalogVariant(**{k: v for k, v in extra.items() if k != "id"}, id=extra["id"]))
+        session.commit()
+        upsert(session, entry)
+        session.commit()
+        assert session.get(CatalogVariant, f"{entry['id']}:old") is None
