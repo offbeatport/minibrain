@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from minibrain.artifacts import ArtifactStore
-from minibrain.base_models import base_model
+from minibrain.base_models import BaseModelSpec
 from minibrain.serve.backend import AdapterRef, CompletionRequest, ServingBackend, TransformersBackend
 from minibrain.worker import HttpClient, StreamReader
 
@@ -46,14 +46,14 @@ def artifact_fetcher(store: ArtifactStore, http: HttpClient, token: str):
 
 
 def create_engine_app(
-    base: str,
+    spec: BaseModelSpec,
     main_url: str,
     token: str,
     home: Path,
     backend: ServingBackend | None = None,
     http: HttpClient | None = None,
 ) -> FastAPI:
-    spec = base_model(base)
+    base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
     client: HttpClient = http or httpx.Client(base_url=main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     serving = backend or TransformersBackend(artifact_fetcher(store, client, token))

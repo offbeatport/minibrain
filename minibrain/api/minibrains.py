@@ -12,6 +12,7 @@ from minibrain.api.schemas import (
     MinibrainCreate,
     MinibrainDetail,
     MinibrainSummary,
+    ModelUpdate,
     PreviewResponse,
     PreviewRow,
     QualityInfo,
@@ -25,8 +26,9 @@ from minibrain.data import quality, snapshot
 from minibrain.data.sources import describe, labelled_rows, mapping_sql, run_query, safe_filename, stage, to_text
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
+from minibrain.models.registry import trainable_bases
 from minibrain.registry.files import ArtifactKind, register, snapshot_dir
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, JobKind, Minibrain
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, JobKind, Minibrain, now
 from minibrain.registry.service import ConflictError, create_minibrain, get_minibrain, latest_snapshot, list_minibrains
 from minibrain.settings import Settings
 from minibrain.tasks.classify import trained_messages
@@ -64,7 +66,35 @@ def list_all(session: SessionDep) -> list[MinibrainSummary]:
 
 @router.post("", status_code=201)
 def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
-    return detail(settings, create_minibrain(session, body.name, "classify", DEFAULT_BASE_MODEL))
+    base = body.base_model or DEFAULT_BASE_MODEL
+    if base not in trainable_bases(session):
+        raise ConflictError(f"{base} is not a trainable base model on this install")
+    minibrain = create_minibrain(session, body.name, "classify", base)
+    minibrain.description = body.description.strip()
+    minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+    session.commit()
+    return detail(settings, minibrain)
+
+
+@router.get("/bases")
+def bases(session: SessionDep) -> list[str]:
+    return trainable_bases(session)
+
+
+@router.patch("/{slug}")
+def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+    minibrain = get_minibrain(session, slug)
+    if body.name is not None:
+        minibrain.name = body.name.strip()
+    if body.description is not None:
+        minibrain.description = body.description.strip()
+    if body.tags is not None:
+        minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+    if body.archived is not None:
+        minibrain.archived_at = now() if body.archived else None
+    minibrain.updated_at = now()
+    session.commit()
+    return detail(settings, minibrain)
 
 
 @router.get("/{slug}")

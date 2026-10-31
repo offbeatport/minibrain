@@ -102,7 +102,9 @@ def test_standalone_gateway_keeps_serving_while_main_is_down(harness: Harness, t
 
 def test_engine_serves_generate_and_health(harness: Harness, tmp_path: Path) -> None:
     fake = FakeBackend(output="bug")
-    app = create_engine_app("qwen3-0.6b", "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client)
+    app = create_engine_app(
+        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client
+    )
     with TestClient(app) as engine:
         assert engine.get("/health").json()["base_model"] == "qwen3-0.6b"
         backend = EngineBackend(lambda _base: "http://testserver", http=engine)

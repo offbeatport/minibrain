@@ -1,5 +1,8 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
+
+QWEN_STOP_TOKENS = ("<|im_end|>", "<|endoftext|>")
 
 
 @dataclass(frozen=True)
@@ -9,6 +12,30 @@ class BaseModelSpec:
     revision: str
     license: str
     template_kwargs: dict[str, Any] = field(default_factory=dict)
+    stop_tokens: tuple[str, ...] = QWEN_STOP_TOKENS
+    path: str | None = None
+    trainable: bool = True
+
+    def source(self) -> tuple[str, str | None]:
+        if self.path and (Path(self.path) / "config.json").is_file():
+            return self.path, None
+        return self.repo, self.revision
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self) | {"stop_tokens": list(self.stop_tokens)}
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "BaseModelSpec":
+        return BaseModelSpec(
+            key=str(data["key"]),
+            repo=str(data["repo"]),
+            revision=str(data["revision"]),
+            license=str(data["license"]),
+            template_kwargs=dict(data.get("template_kwargs") or {}),
+            stop_tokens=tuple(data.get("stop_tokens") or QWEN_STOP_TOKENS),
+            path=data.get("path"),
+            trainable=bool(data.get("trainable", True)),
+        )
 
 
 QWEN3_0_6B = BaseModelSpec(

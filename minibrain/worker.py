@@ -24,7 +24,12 @@ MODULES: dict[str, str] = {
     JobKind.PREPARE: "minibrain.data.prepare",
     JobKind.TRAIN: "minibrain.ml.train",
     JobKind.EVAL: "minibrain.ml.evaluate",
+    JobKind.DOWNLOAD: "minibrain.models.download",
+    JobKind.IMPORT: "minibrain.models.importer",
+    JobKind.CATALOG_SYNC: "minibrain.models.sync",
 }
+REMOTE_KINDS = [JobKind.PREPARE, JobKind.TRAIN, JobKind.EVAL]
+LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
 CLAIM_WAIT_SECONDS = 25.0
@@ -63,7 +68,7 @@ class WorkerConfig:
     api_url: str
     token: str
     home: Path
-    kinds: list[str] = field(default_factory=lambda: list(MODULES))
+    kinds: list[str] = field(default_factory=lambda: [str(kind) for kind in REMOTE_KINDS])
     gpus: int = 1
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     host: str = field(default_factory=platform.node)
@@ -236,10 +241,12 @@ class Worker:
     def spec(self, claim: dict[str, Any], workdir: Path, attempt_dir: Path) -> dict[str, Any]:
         params = claim["params"]
         spec: dict[str, Any] = {"result": str(attempt_dir / "result.json")}
+        if claim["kind"] in (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC):
+            return params | spec
         if claim["kind"] == JobKind.PREPARE:
             spec |= {"source": self.material(params["source"]), "sql": params["sql"], "out": str(attempt_dir / "out")}
         else:
-            spec |= {key: params[key] for key in ("slug", "number", "base_model") if key in params}
+            spec |= {key: params[key] for key in ("slug", "number", "base_model", "base_spec") if key in params}
             spec["snapshot"] = self.material(params["snapshot"])
         if claim["kind"] == JobKind.TRAIN:
             spec |= {

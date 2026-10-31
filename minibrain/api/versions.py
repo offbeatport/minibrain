@@ -39,15 +39,17 @@ def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
 
 
 @router.post("/minibrains/{slug}/versions", status_code=201)
-def add_version(slug: str, body: VersionCreate, session: SessionDep) -> VersionInfo:
+def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: SettingsDep) -> VersionInfo:
     minibrain = get_minibrain(session, slug)
     kind = VersionKind(body.kind)
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
     version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})
     if kind == VersionKind.LORA:
-        enqueue(session, JobKind.TRAIN, train_params(session, version), minibrain.id, version.id, f"train:{version.id}")
+        params = train_params(session, settings, version)
+        enqueue(session, JobKind.TRAIN, params, minibrain.id, version.id, f"train:{version.id}")
     else:
-        enqueue(session, JobKind.EVAL, eval_params(session, version), minibrain.id, version.id, f"eval:{version.id}")
+        params = eval_params(session, settings, version)
+        enqueue(session, JobKind.EVAL, params, minibrain.id, version.id, f"eval:{version.id}")
     session.commit()
     return version_info(minibrain, version)
 
@@ -68,10 +70,11 @@ def complete(
 ) -> CompleteResponse:
     minibrain = get_minibrain(session, slug)
     name = minibrain.slug if body.version is None else f"{minibrain.slug}@{body.version}"
-    route = request.app.state.gateway_config.current().routes.get(name)
+    config = request.app.state.gateway_config.current()
+    route = config.routes.get(name)
     if route is None:
         raise ConflictError("no ready version to run; score or train one first")
-    completion = run(backend, route, body.text, body.max_tokens)
+    completion = run(backend, config, route, [{"role": "user", "content": body.text}], body.max_tokens)
     return CompleteResponse(
         model=f"{route.slug}@{route.version}",
         output=completion.text,
@@ -89,7 +92,7 @@ def list_keys(slug: str, session: SessionDep) -> list[KeyInfo]:
 
 @router.post("/minibrains/{slug}/keys", status_code=201)
 def add_key(slug: str, body: KeyCreate, session: SessionDep) -> KeyCreated:
-    key, secret = create_key(session, get_minibrain(session, slug), body.name)
+    key, secret = create_key(session, body.name, minibrain=get_minibrain(session, slug))
     return KeyCreated(secret=secret, **key_info(key).model_dump())
 
 

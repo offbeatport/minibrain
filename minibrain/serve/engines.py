@@ -1,3 +1,4 @@
+import json
 import os
 import socket
 import sys
@@ -8,6 +9,7 @@ from typing import Any
 
 import httpx
 
+from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
@@ -16,6 +18,7 @@ from minibrain.worker import HttpClient
 
 GENERATE_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 STARTUP_SECONDS = 600.0
+IDLE_SECONDS = 900.0
 
 
 def free_port() -> int:
@@ -25,21 +28,23 @@ def free_port() -> int:
 
 
 class EngineManager:
-    def __init__(self, settings: Settings, main_url: str) -> None:
+    def __init__(self, settings: Settings, main_url: str, idle_seconds: float = IDLE_SECONDS) -> None:
         self.settings = settings
         self.main_url = main_url
+        self.idle_seconds = idle_seconds
         self.engines: dict[str, tuple[str, Supervisor]] = {}
+        self.used: dict[str, float] = {}
         self.lock = threading.Lock()
 
-    def start(self, base: str) -> str:
+    def start(self, spec: BaseModelSpec) -> str:
         port = free_port()
         command = [
             sys.executable,
             "-m",
             "minibrain.cli",
             "engine",
-            "--base",
-            base,
+            "--spec",
+            json.dumps(spec.as_dict()),
             "--port",
             str(port),
             "--main-url",
@@ -48,21 +53,52 @@ class EngineManager:
             str(os.getpid()),
         ]
         env = os.environ | {"MINIBRAIN_GATEWAY_TOKEN": self.settings.secret("gateway_token")}
-        supervisor = Supervisor(f"engine {base}", command, env)
+        supervisor = Supervisor(f"engine {spec.key}", command, env)
         supervisor.start()
         url = f"http://127.0.0.1:{port}"
-        self.engines[base] = (url, supervisor)
+        self.engines[spec.key] = (url, supervisor)
+        self.used[spec.key] = time.monotonic()
         return url
 
-    def ensure(self, bases: set[str]) -> dict[str, str]:
+    def ensure(self, specs: dict[str, BaseModelSpec]) -> dict[str, str]:
         with self.lock:
-            for base in bases - set(self.engines):
-                self.start(base)
-            return {base: url for base, (url, _) in self.engines.items()}
+            for key, spec in specs.items():
+                if key not in self.engines:
+                    self.start(spec)
+            self.reap(set(specs))
+            return {key: url for key, (url, _) in self.engines.items()}
+
+    def reap(self, keep: set[str]) -> None:
+        moment = time.monotonic()
+        for key in [key for key in self.engines if key not in keep]:
+            if moment - self.used.get(key, 0.0) > self.idle_seconds:
+                _, supervisor = self.engines.pop(key)
+                supervisor.shutdown()
+
+    def ensure_one(self, spec: BaseModelSpec) -> str:
+        with self.lock:
+            found = self.engines.get(spec.key)
+            return found[0] if found else self.start(spec)
+
+    def touch(self, key: str) -> None:
+        self.used[key] = time.monotonic()
 
     def url(self, base: str) -> str | None:
         found = self.engines.get(base)
         return found[0] if found else None
+
+    def health(self, key: str, http: HttpClient) -> str | None:
+        found = self.engines.get(key)
+        if found is None:
+            return None
+        url, supervisor = found
+        try:
+            response = http.request("GET", f"{url}/health")
+        except (httpx.TransportError, OSError):
+            response = None
+        if response is not None and response.status_code == 200:
+            return "running"
+        return "unhealthy" if supervisor.restarts > 0 else "starting"
 
     def stop(self) -> None:
         for _, supervisor in self.engines.values():
@@ -101,8 +137,17 @@ class EngineBackend:
 
 class ManagedEngineBackend(EngineBackend):
     def __init__(self, manager: EngineManager, http: HttpClient | None = None) -> None:
-        super().__init__(lambda base: manager.ensure({base})[base], http)
+        super().__init__(manager.url, http)
         self.manager = manager
+        self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
+
+    def complete(self, request: CompletionRequest) -> Completion:
+        self.manager.ensure_one(request.base)
+        self.manager.touch(request.base.key)
+        return super().complete(request)
+
+    def health(self, key: str) -> str | None:
+        return self.manager.health(key, self.probe)
 
     def status(self) -> list[dict[str, Any]]:
         loaded: list[dict[str, Any]] = []

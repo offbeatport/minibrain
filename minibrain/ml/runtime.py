@@ -18,8 +18,16 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.ml.devices import pick_device
 
-STOP_TOKENS = ["<|im_end|>", "<|endoftext|>"]
 Message = dict[str, str]
+
+
+def stop_ids(tokenizer: PreTrainedTokenizerBase, tokens: tuple[str, ...]) -> list[int]:
+    vocabulary = tokenizer.get_vocab()
+    found = [vocabulary[token] for token in tokens if token in vocabulary]
+    eos = tokenizer.eos_token_id
+    if isinstance(eos, int) and eos not in found:
+        found.append(eos)
+    return found
 
 
 def pick_dtype(device: str) -> torch.dtype:
@@ -27,15 +35,15 @@ def pick_dtype(device: str) -> torch.dtype:
 
 
 def load_tokenizer(spec: BaseModelSpec, padding_side: str = "left") -> PreTrainedTokenizerBase:
-    tokenizer = AutoTokenizer.from_pretrained(spec.repo, revision=spec.revision)
+    source, revision = spec.source()
+    tokenizer = AutoTokenizer.from_pretrained(source, revision=revision)
     tokenizer.padding_side = padding_side
     return tokenizer
 
 
 def load_base_model(spec: BaseModelSpec, device: str) -> PreTrainedModel:
-    return AutoModelForCausalLM.from_pretrained(
-        spec.repo, revision=spec.revision, dtype=pick_dtype(device), device_map=device
-    )
+    source, revision = spec.source()
+    return AutoModelForCausalLM.from_pretrained(source, revision=revision, dtype=pick_dtype(device), device_map=device)
 
 
 def as_text(rendered: object) -> str:
@@ -70,8 +78,7 @@ class Runtime:
         self.model: PreTrainedModel | PeftModelForCausalLM = load_base_model(spec, self.device)
         self.model.eval()
         self.adapters: set[str] = set()
-        converted = self.tokenizer.convert_tokens_to_ids(STOP_TOKENS)
-        self.stop_ids = converted if isinstance(converted, list) else [converted]
+        self.stop_ids = stop_ids(self.tokenizer, spec.stop_tokens)
 
     def ensure_adapter(self, name: str, path: Path) -> None:
         if name in self.adapters:

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from minibrain.base_models import base_model
+from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.data.snapshot import Example
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.logs import LogBuffer, LogEntry
@@ -60,29 +60,44 @@ def authorize(request: Request, config: ConfigDep) -> Grant:
 GrantDep = Annotated[Grant, Depends(authorize)]
 
 
-def completion_request(route: Route, text: str, max_tokens: int) -> CompletionRequest:
+def spec_for(config: GatewayConfig, key: str) -> BaseModelSpec:
+    found = config.bases.get(key)
+    return BaseModelSpec.from_dict(found) if found else base_model(key)
+
+
+def route_messages(route: Route, messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    if route.kind == "base":
+        return messages
+    texts = [message["content"] for message in messages if message.get("role") == "user" and message.get("content")]
+    if not texts:
+        raise HTTPException(status_code=400, detail="a user message with text content is required")
     shots = [Example(input=shot_input, label=label) for shot_input, label in route.shots]
+    return build_messages(route.kind, texts[-1], route.labels, shots)
+
+
+def completion_request(
+    config: GatewayConfig, route: Route, messages: list[dict[str, str]], max_tokens: int
+) -> CompletionRequest:
     adapter = AdapterRef(route.adapter["name"], route.adapter["artifact"]) if route.adapter else None
     return CompletionRequest(
-        base=base_model(route.base_model),
-        messages=build_messages(route.kind, text, route.labels, shots),
+        base=spec_for(config, route.base_model),
+        messages=route_messages(route, messages),
         adapter=adapter,
         max_tokens=max_tokens,
     )
 
 
-def run(backend: ServingBackend, route: Route, text: str, max_tokens: int) -> Completion:
+def run(
+    backend: ServingBackend, config: GatewayConfig, route: Route, messages: list[dict[str, str]], max_tokens: int
+) -> Completion:
     try:
-        return backend.complete(completion_request(route, text, max_tokens))
+        return backend.complete(completion_request(config, route, messages, max_tokens))
     except EngineUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
-def last_user_text(messages: list[Message]) -> str:
-    texts = [message.content for message in messages if message.role == "user" and message.content]
-    if not texts:
-        raise HTTPException(status_code=400, detail="a user message with text content is required")
-    return texts[-1]
+def plain(messages: list[Message]) -> list[dict[str, str]]:
+    return [{"role": message.role, "content": message.content or ""} for message in messages]
 
 
 def usage(completion: Completion) -> dict[str, int]:
@@ -126,7 +141,7 @@ def stream_events(identifier: str, model: str, completion: Completion) -> Iterat
 
 @router.get("/models")
 def list_models(grant: GrantDep, config: ConfigDep) -> dict:
-    names = config.models.get(grant.minibrain_id, [])
+    names = config.models.get(grant.owner, [])
     data = [{"id": name, "object": "model", "created": 0, "owned_by": "minibrain"} for name in names]
     return {"object": "list", "data": data}
 
@@ -141,10 +156,10 @@ def chat_completions(
     status = 200
     completion: Completion | None = None
     try:
-        if route is None or route.minibrain_id != grant.minibrain_id:
+        if route is None or route.owner != grant.owner:
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
         max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
-        completion = run(request.app.state.backend, route, last_user_text(body.messages), max_tokens)
+        completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens)
     except HTTPException as error:
         status = error.status_code
         raise

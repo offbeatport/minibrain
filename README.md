@@ -37,6 +37,21 @@ The first scoring job downloads the base model (Qwen3-0.6B, about 1.5 GB) into t
 To try it, upload `samples/travel_intents.jsonl` (quick) or `samples/banking77.csv` (where training pays). See
 [`samples/README.md`](samples/README.md).
 
+## Models
+
+**Models → Discover** lists a small curated catalogue (pinned revisions, sizes, licences, an estimate of fit on this
+machine). Downloads run in the background, are checked against the published SHA-256 sums and land in
+`~/.minibrain/models`; nothing is loaded or deployed until you choose to. Sources:
+
+| Source | Configure |
+|---|---|
+| Hugging Face or a compatible mirror (Artifactory, Nexus) | `MINIBRAIN_HF_ENDPOINT` (default `https://huggingface.co`); `HF_TOKEN` for gated models |
+| S3-compatible bucket (S3, MinIO, others behind an S3 gateway) | `MINIBRAIN_MODELS_S3_URL=s3://bucket/prefix`, plus the standard `AWS_*` variables (`AWS_ENDPOINT_URL` for MinIO) |
+| A folder on the server | Nothing: **Import model** and give the path |
+
+`MINIBRAIN_OFFLINE=1` turns off every outbound call; the bundled catalogue stays browsable and imports keep working.
+Catalogue updates are fetched only when you press **Check for updates**, or daily if you turn that on.
+
 ## Use the endpoint
 
 Create a key on a minibrain's Endpoint tab, then:

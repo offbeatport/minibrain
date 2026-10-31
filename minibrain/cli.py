@@ -23,12 +23,14 @@ def local_url(host: str, port: int) -> str:
 
 def serve(host: str, port: int, with_worker: bool) -> None:
     from minibrain.settings import load_settings
+    from minibrain.worker import LOCAL_KINDS
 
     settings = load_settings()
     api_url = local_url(host, port)
     os.environ["MINIBRAIN_MAIN_URL"] = api_url
     env = os.environ | {"MINIBRAIN_WORKER_TOKEN": settings.secret("worker_token")}
     command = [sys.executable, "-m", "minibrain.cli", "worker", "--api-url", api_url, "--parent", str(os.getpid())]
+    command += ["--kinds", *LOCAL_KINDS]
     worker = Supervisor("worker", command, env) if with_worker else None
     if worker is not None:
         worker.start()
@@ -51,13 +53,15 @@ def terminate_self() -> None:
     os.kill(os.getpid(), signal.SIGTERM)
 
 
-def engine(base: str, port: int, main_url: str, parent: int | None) -> None:
+def engine(spec_json: str, port: int, main_url: str, parent: int | None) -> None:
+    from minibrain.base_models import BaseModelSpec
     from minibrain.serve.engine import create_engine_app
     from minibrain.settings import load_settings
 
     settings = load_settings()
+    spec = BaseModelSpec.from_dict(json.loads(spec_json))
     token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
-    app = create_engine_app(base, main_url, token, settings.home / "engines" / base)
+    app = create_engine_app(spec, main_url, token, settings.home / "engines" / spec.key)
     threading.Thread(target=watch_parent, args=(parent, threading.Event(), terminate_self), daemon=True).start()
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
@@ -73,12 +77,16 @@ def gateway(main_url: str, host: str, port: int) -> None:
 
 def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None) -> None:
     from minibrain.settings import load_settings
-    from minibrain.worker import MODULES, Worker, WorkerConfig
+    from minibrain.worker import REMOTE_KINDS, Worker, WorkerConfig
 
     settings = load_settings()
     token = os.environ.get("MINIBRAIN_WORKER_TOKEN") or settings.secret("worker_token")
     config = WorkerConfig(
-        api_url=api_url, token=token, home=settings.home / "worker", kinds=kinds or list(MODULES), gpus=gpus
+        api_url=api_url,
+        token=token,
+        home=settings.home / "worker",
+        kinds=kinds or [str(kind) for kind in REMOTE_KINDS],
+        gpus=gpus,
     )
     stop = threading.Event()
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
@@ -112,7 +120,7 @@ def main() -> None:
     gateway_command.add_argument("--host", default="127.0.0.1")
     gateway_command.add_argument("--port", type=int, default=8100)
     engine_command = commands.add_parser("engine", help=argparse.SUPPRESS)
-    engine_command.add_argument("--base", required=True)
+    engine_command.add_argument("--spec", required=True)
     engine_command.add_argument("--port", type=int, required=True)
     engine_command.add_argument("--main-url", default="http://127.0.0.1:8000")
     engine_command.add_argument("--parent", type=int, default=None)
@@ -126,7 +134,7 @@ def main() -> None:
     elif args.command == "gateway":
         gateway(args.main_url, args.host, args.port)
     elif args.command == "engine":
-        engine(args.base, args.port, args.main_url, args.parent)
+        engine(args.spec, args.port, args.main_url, args.parent)
     else:
         openapi(args.output)
 

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
@@ -28,6 +28,17 @@ class JobKind(StrEnum):
     PREPARE = "prepare"
     TRAIN = "train"
     EVAL = "eval"
+    DOWNLOAD = "download"
+    IMPORT = "import"
+    CATALOG_SYNC = "catalog_sync"
+
+
+class ModelStatus(StrEnum):
+    DOWNLOADING = "downloading"
+    IMPORTING = "importing"
+    AVAILABLE = "available"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class JobStatus(StrEnum):
@@ -75,6 +86,10 @@ class Minibrain(Base):
     label_column: Mapped[str | None] = mapped_column(default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
     current_version: Mapped[int | None] = mapped_column(default=None)
+    description: Mapped[str] = mapped_column(default="", server_default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
@@ -147,6 +162,7 @@ class Job(Base):
     kind: Mapped[str]
     minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
     version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), default=None)
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     needs_gpu: Mapped[bool] = mapped_column(default=False)
     status: Mapped[str] = mapped_column(default=JobStatus.QUEUED)
@@ -210,14 +226,15 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
+    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
     name: Mapped[str]
     prefix: Mapped[str]
     digest: Mapped[str] = mapped_column(unique=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
-    minibrain: Mapped[Minibrain] = relationship(back_populates="keys")
+    minibrain: Mapped[Minibrain | None] = relationship(back_populates="keys")
 
 
 class RequestLog(Base):
@@ -234,3 +251,91 @@ class RequestLog(Base):
     latency_ms: Mapped[float]
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
+
+
+class CatalogModel(Base):
+    __tablename__ = "catalog_models"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str]
+    provider: Mapped[str]
+    repo: Mapped[str]
+    capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    license: Mapped[str]
+    license_name: Mapped[str]
+    license_summary: Mapped[str]
+    license_url: Mapped[str]
+    gated: Mapped[bool] = mapped_column(default=False)
+    recommended: Mapped[bool] = mapped_column(default=False)
+    recommendation: Mapped[str | None] = mapped_column(default=None)
+    trainable: Mapped[bool] = mapped_column(default=False)
+    template_kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    stop_tokens: Mapped[list[str]] = mapped_column(JSON, default=list)
+    popularity: Mapped[int] = mapped_column(default=0)
+    position: Mapped[int] = mapped_column(default=0)
+    synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+
+    variants: Mapped[list["CatalogVariant"]] = relationship(
+        back_populates="model", cascade="all, delete-orphan", order_by="CatalogVariant.position"
+    )
+
+
+class CatalogVariant(Base):
+    __tablename__ = "catalog_variants"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    catalog_id: Mapped[str] = mapped_column(ForeignKey("catalog_models.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(default=0)
+    label: Mapped[str]
+    format: Mapped[str]
+    precision: Mapped[str]
+    repo: Mapped[str]
+    revision: Mapped[str]
+    files: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    weights_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    runtimes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    requires: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    latest_revision: Mapped[str | None] = mapped_column(default=None)
+
+    model: Mapped[CatalogModel] = relationship(back_populates="variants")
+
+
+class Model(Base):
+    __tablename__ = "models"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    source: Mapped[str]
+    catalog_id: Mapped[str | None] = mapped_column(ForeignKey("catalog_models.id", ondelete="SET NULL"), default=None)
+    variant_id: Mapped[str | None] = mapped_column(ForeignKey("catalog_variants.id", ondelete="SET NULL"), default=None)
+    name: Mapped[str]
+    description: Mapped[str] = mapped_column(default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    repo: Mapped[str | None] = mapped_column(default=None)
+    revision: Mapped[str | None] = mapped_column(default=None)
+    source_path: Mapped[str | None] = mapped_column(default=None)
+    files: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    status: Mapped[str]
+    error: Mapped[str | None] = mapped_column(default=None)
+    trainable: Mapped[bool] = mapped_column(default=False)
+    template_kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    stop_tokens: Mapped[list[str]] = mapped_column(JSON, default=list)
+    license: Mapped[str | None] = mapped_column(default=None)
+    license_ack_by: Mapped[str | None] = mapped_column(default=None)
+    license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    deployed: Mapped[bool] = mapped_column(default=False)
+    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    variant: Mapped[CatalogVariant | None] = relationship()
+
+
+class Setting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[Any] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)

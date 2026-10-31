@@ -83,6 +83,7 @@ def enqueue(
     idempotency_key: str | None = None,
     priority: int = 0,
     retry_of: int | None = None,
+    model_id: str | None = None,
 ) -> Job:
     if idempotency_key is not None:
         existing = session.scalar(
@@ -99,6 +100,7 @@ def enqueue(
         params=params,
         minibrain_id=minibrain_id,
         version_id=version_id,
+        model_id=model_id,
         needs_gpu=rules.needs_gpu,
         max_attempts=rules.max_attempts,
         idempotency_key=idempotency_key,
@@ -335,6 +337,7 @@ class SqlJobQueue:
             version_id=job.version_id,
             priority=job.priority,
             retry_of=job.id,
+            model_id=job.model_id,
         )
         self.effects.on_retry(session, again)
         return again

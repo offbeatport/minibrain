@@ -29,6 +29,8 @@ class JobSpec:
 
     @property
     def base(self) -> BaseModelSpec:
+        if "base_spec" in self.raw:
+            return BaseModelSpec.from_dict(self.raw["base_spec"])
         return base_model(self.raw["base_model"])
 
 

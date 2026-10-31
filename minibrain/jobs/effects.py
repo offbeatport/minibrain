@@ -2,12 +2,29 @@ from sqlalchemy.orm import Session
 
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params
+from minibrain.models.catalog import apply_sync
 from minibrain.registry.files import MissingArtifactError
-from minibrain.registry.models import Job, JobKind, Minibrain, Snapshot, VersionStatus
+from minibrain.registry.models import (
+    Job,
+    JobKind,
+    JobStatus,
+    Minibrain,
+    Model,
+    ModelStatus,
+    Snapshot,
+    VersionStatus,
+    now,
+)
 from minibrain.registry.service import latest_snapshot
+from minibrain.settings import Settings
+
+TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
 
 class DomainEffects:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
     def on_success(self, session: Session, job: Job) -> None:
         if job.kind == JobKind.PREPARE:
             self.snapshot_built(session, job)
@@ -15,18 +32,43 @@ class DomainEffects:
             self.trained(session, job)
         elif job.kind == JobKind.EVAL:
             self.evaluated(job)
+        elif job.kind in TRANSFERS:
+            self.transferred(session, job)
+        elif job.kind == JobKind.CATALOG_SYNC:
+            apply_sync(session, job.result or {})
 
     def on_failure(self, session: Session, job: Job) -> None:
         if job.version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
             job.version.status = VersionStatus.FAILED
+        model = session.get(Model, job.model_id) if job.model_id else None
+        if model is not None and job.kind in TRANSFERS:
+            model.status = ModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else ModelStatus.FAILED
+            model.error = job.error
+            model.updated_at = now()
 
     def on_retry(self, session: Session, job: Job) -> None:
+        model = session.get(Model, job.model_id) if job.model_id else None
+        if model is not None and job.kind in TRANSFERS:
+            model.status = ModelStatus.DOWNLOADING if job.kind == JobKind.DOWNLOAD else ModelStatus.IMPORTING
+            model.error = None
+            model.updated_at = now()
         if job.version is None:
             return
         if job.kind == JobKind.TRAIN:
             job.version.status = VersionStatus.TRAINING
         elif job.kind == JobKind.EVAL:
             job.version.status = VersionStatus.EVALUATING
+
+    def transferred(self, session: Session, job: Job) -> None:
+        model = session.get(Model, job.model_id) if job.model_id else None
+        if model is None:
+            return
+        result = job.result or {}
+        model.files = list(result.get("files", model.files))
+        model.size_bytes = int(result.get("size_bytes", model.size_bytes))
+        model.status = ModelStatus.AVAILABLE
+        model.error = None
+        model.updated_at = now()
 
     def snapshot_built(self, session: Session, job: Job) -> None:
         minibrain = session.get(Minibrain, job.minibrain_id) if job.minibrain_id is not None else None
@@ -59,7 +101,7 @@ class DomainEffects:
         enqueue(
             session,
             JobKind.EVAL,
-            eval_params(session, version),
+            eval_params(session, self.settings, version),
             minibrain_id=version.minibrain_id,
             version_id=version.id,
             idempotency_key=f"eval:{version.id}",

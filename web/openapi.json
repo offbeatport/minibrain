@@ -69,7 +69,82 @@
         }
       }
     },
+    "/api/minibrains/bases": {
+      "get": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Bases",
+        "operationId": "bases_api_minibrains_bases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "title": "Response Bases Api Minibrains Bases Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}": {
+      "patch": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Update",
+        "operationId": "update_api_minibrains__slug__patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "minibrains"
@@ -413,6 +488,652 @@
                     "$ref": "#/components/schemas/ExampleInfo"
                   },
                   "title": "Response Golden Api Minibrains  Slug  Golden Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List Models",
+        "operationId": "list_models_api_models_get",
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelRow"
+                  },
+                  "title": "Response List Models Api Models Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/sources": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Model Sources",
+        "operationId": "model_sources_api_models_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Model Sources Api Models Sources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/import": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Import Model",
+        "operationId": "import_model_api_models_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Read Base",
+        "operationId": "read_base_api_models_base__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Update Base",
+        "operationId": "update_base_api_models_base__key__patch",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/retry": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Retry Base",
+        "operationId": "retry_base_api_models_base__key__retry_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/deploy": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Deploy Base",
+        "operationId": "deploy_base_api_models_base__key__deploy_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/test": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Test Base",
+        "operationId": "test_base_api_models_base__key__test_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/keys": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List Base Keys",
+        "operationId": "list_base_keys_api_models_base__key__keys_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KeyInfo"
+                  },
+                  "title": "Response List Base Keys Api Models Base  Key  Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Add Base Key",
+        "operationId": "add_base_key_api_models_base__key__keys_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Delete Base Key",
+        "operationId": "delete_base_key_api_models_base__key__keys__key_id__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Catalogue",
+        "operationId": "catalogue_api_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/{catalog_id}/download": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Download",
+        "operationId": "download_api_catalog__catalog_id__download_post",
+        "parameters": [
+          {
+            "name": "catalog_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Catalog Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/sync": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_api_catalog_sync_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog/settings": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Read Settings",
+        "operationId": "read_settings_api_catalog_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Update Settings",
+        "operationId": "update_settings_api_catalog_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSettings"
                 }
               }
             }
@@ -1866,6 +2587,117 @@
   },
   "components": {
     "schemas": {
+      "Activity": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "queued",
+              "failed",
+              "ready",
+              "needs_examples",
+              "idle"
+            ],
+            "title": "State"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "label"
+        ],
+        "title": "Activity"
+      },
+      "AddedInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "variant_id",
+          "availability",
+          "error"
+        ],
+        "title": "AddedInfo"
+      },
       "AttemptInfo": {
         "properties": {
           "number": {
@@ -1944,6 +2776,348 @@
         ],
         "title": "AttemptInfo"
       },
+      "Availability": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "downloading",
+              "importing",
+              "missing",
+              "not_downloaded",
+              "none"
+            ],
+            "title": "State"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "Availability"
+      },
+      "BaseModelDetail": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "base",
+              "custom"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          },
+          "base_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/Activity"
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/Deployment"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "trainable": {
+            "type": "boolean",
+            "title": "Trainable"
+          },
+          "can_test": {
+            "type": "boolean",
+            "title": "Can Test"
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "ready_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Version"
+          },
+          "needed_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needed Bytes"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          },
+          "storage_path": {
+            "type": "string",
+            "title": "Storage Path"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ModelFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "license_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Name"
+          },
+          "license_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Url"
+          },
+          "license_ack_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Ack By"
+          },
+          "license_ack_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Ack At"
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "description",
+          "tags",
+          "archived",
+          "base_model",
+          "availability",
+          "activity",
+          "deployment",
+          "updated_at",
+          "trainable",
+          "can_test",
+          "update_available",
+          "current_version",
+          "ready_version",
+          "needed_bytes",
+          "source",
+          "repo",
+          "revision",
+          "latest_revision",
+          "source_path",
+          "storage_path",
+          "files",
+          "size_bytes",
+          "error",
+          "license",
+          "license_name",
+          "license_url",
+          "license_ack_by",
+          "license_ack_at",
+          "catalog_id",
+          "variant_id",
+          "deployed"
+        ],
+        "title": "BaseModelDetail"
+      },
       "BaseModelInfo": {
         "properties": {
           "key": {
@@ -1985,6 +3159,282 @@
           "file"
         ],
         "title": "Body_upload_source_api_minibrains__slug__source_post"
+      },
+      "CatalogEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "license_name": {
+            "type": "string",
+            "title": "License Name"
+          },
+          "license_summary": {
+            "type": "string",
+            "title": "License Summary"
+          },
+          "license_url": {
+            "type": "string",
+            "title": "License Url"
+          },
+          "gated": {
+            "type": "boolean",
+            "title": "Gated"
+          },
+          "recommended": {
+            "type": "boolean",
+            "title": "Recommended"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation"
+          },
+          "trainable": {
+            "type": "boolean",
+            "title": "Trainable"
+          },
+          "popularity": {
+            "type": "integer",
+            "title": "Popularity"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogVariantInfo"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/AddedInfo"
+            },
+            "type": "array",
+            "title": "Added"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "provider",
+          "repo",
+          "capabilities",
+          "license",
+          "license_name",
+          "license_summary",
+          "license_url",
+          "gated",
+          "recommended",
+          "recommendation",
+          "trainable",
+          "popularity",
+          "variants",
+          "added"
+        ],
+        "title": "CatalogEntry"
+      },
+      "CatalogResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/HardwareInfo"
+          },
+          "online": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online"
+          },
+          "offline_forced": {
+            "type": "boolean",
+            "title": "Offline Forced"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "token_configured": {
+            "type": "boolean",
+            "title": "Token Configured"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "sync_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "hardware",
+          "online",
+          "offline_forced",
+          "endpoint",
+          "token_configured",
+          "synced_at",
+          "sync_job"
+        ],
+        "title": "CatalogResponse"
+      },
+      "CatalogSettings": {
+        "properties": {
+          "daily_sync": {
+            "type": "boolean",
+            "title": "Daily Sync"
+          }
+        },
+        "type": "object",
+        "required": [
+          "daily_sync"
+        ],
+        "title": "CatalogSettings"
+      },
+      "CatalogVariantInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "precision": {
+            "type": "string",
+            "title": "Precision"
+          },
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "weights_bytes": {
+            "type": "integer",
+            "title": "Weights Bytes"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "runtimes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Runtimes"
+          },
+          "requires": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Requires"
+          },
+          "fit": {
+            "$ref": "#/components/schemas/FitInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "format",
+          "precision",
+          "repo",
+          "revision",
+          "latest_revision",
+          "size_bytes",
+          "weights_bytes",
+          "files",
+          "runtimes",
+          "requires",
+          "fit"
+        ],
+        "title": "CatalogVariantInfo"
       },
       "ChatCompletionRequest": {
         "properties": {
@@ -2201,6 +3651,50 @@
         ],
         "title": "CompleteResponse"
       },
+      "DeployRequest": {
+        "properties": {
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deployed"
+        ],
+        "title": "DeployRequest"
+      },
+      "Deployment": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "starting",
+              "unhealthy",
+              "not_deployed"
+            ],
+            "title": "State"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "versions": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "label"
+        ],
+        "title": "Deployment"
+      },
       "DeviceInfo": {
         "properties": {
           "inference": {
@@ -2259,6 +3753,24 @@
           "cpu_count"
         ],
         "title": "DeviceInfo"
+      },
+      "DownloadRequest": {
+        "properties": {
+          "variant": {
+            "type": "string",
+            "title": "Variant"
+          },
+          "accept_license": {
+            "type": "boolean",
+            "title": "Accept License",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "variant"
+        ],
+        "title": "DownloadRequest"
       },
       "EventBody": {
         "properties": {
@@ -2362,6 +3874,47 @@
         ],
         "title": "FailBody"
       },
+      "FitInfo": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "fits",
+              "limited",
+              "insufficient",
+              "unknown"
+            ],
+            "title": "Level"
+          },
+          "needed_bytes": {
+            "type": "integer",
+            "title": "Needed Bytes"
+          },
+          "available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Bytes"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "needed_bytes",
+          "available_bytes",
+          "basis"
+        ],
+        "title": "FitInfo"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2374,6 +3927,63 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HardwareInfo": {
+        "properties": {
+          "machine": {
+            "type": "string",
+            "title": "Machine"
+          },
+          "accelerator": {
+            "type": "string",
+            "title": "Accelerator"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Bytes"
+          },
+          "ram_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Bytes"
+          },
+          "memory_label": {
+            "type": "string",
+            "title": "Memory Label"
+          },
+          "known": {
+            "type": "boolean",
+            "title": "Known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "machine",
+          "accelerator",
+          "kind",
+          "memory_bytes",
+          "ram_bytes",
+          "memory_label",
+          "known"
+        ],
+        "title": "HardwareInfo"
       },
       "HeartbeatResponse": {
         "properties": {
@@ -2392,6 +4002,48 @@
           "lease_expires_at"
         ],
         "title": "HeartbeatResponse"
+      },
+      "ImportRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "folder",
+              "s3"
+            ],
+            "title": "Source Type",
+            "default": "folder"
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Location"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "location"
+        ],
+        "title": "ImportRequest"
       },
       "InstallSettings": {
         "properties": {
@@ -3087,6 +4739,30 @@
             "maxLength": 80,
             "minLength": 1,
             "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 280,
+            "title": "Description",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "base_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model"
           }
         },
         "type": "object",
@@ -3275,6 +4951,218 @@
           "output"
         ],
         "title": "Mistake"
+      },
+      "ModelFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256"
+        ],
+        "title": "ModelFile"
+      },
+      "ModelRow": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "base",
+              "custom"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived"
+          },
+          "base_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/Activity"
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/Deployment"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "trainable": {
+            "type": "boolean",
+            "title": "Trainable"
+          },
+          "can_test": {
+            "type": "boolean",
+            "title": "Can Test"
+          },
+          "update_available": {
+            "type": "boolean",
+            "title": "Update Available"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "ready_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Version"
+          },
+          "needed_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needed Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "description",
+          "tags",
+          "archived",
+          "base_model",
+          "availability",
+          "activity",
+          "deployment",
+          "updated_at",
+          "trainable",
+          "can_test",
+          "update_available",
+          "current_version",
+          "ready_version",
+          "needed_bytes"
+        ],
+        "title": "ModelRow"
+      },
+      "ModelUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          }
+        },
+        "type": "object",
+        "title": "ModelUpdate"
       },
       "PreviewResponse": {
         "properties": {
@@ -3588,6 +5476,60 @@
           "loaded"
         ],
         "title": "SystemInfo"
+      },
+      "TestRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "maximum": 1024.0,
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 128
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TestRequest"
+      },
+      "TestResponse": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "output",
+          "latency_ms",
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "title": "TestResponse"
       },
       "TokenBody": {
         "properties": {

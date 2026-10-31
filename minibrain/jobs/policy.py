@@ -21,6 +21,9 @@ POLICIES: dict[str, KindPolicy] = {
     JobKind.PREPARE: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=1), needs_gpu=False),
     JobKind.TRAIN: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=24), needs_gpu=True),
     JobKind.EVAL: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=4), needs_gpu=True),
+    JobKind.DOWNLOAD: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=12), needs_gpu=False),
+    JobKind.IMPORT: KindPolicy(max_attempts=2, max_runtime=timedelta(hours=6), needs_gpu=False),
+    JobKind.CATALOG_SYNC: KindPolicy(max_attempts=2, max_runtime=timedelta(minutes=10), needs_gpu=False),
 }
 
 

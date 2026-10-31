@@ -111,9 +111,13 @@ def key_digest(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def create_key(session: Session, minibrain: Minibrain, name: str) -> tuple[ApiKey, str]:
+def create_key(
+    session: Session, name: str, minibrain: Minibrain | None = None, model_id: str | None = None
+) -> tuple[ApiKey, str]:
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
-    key = ApiKey(minibrain=minibrain, name=name.strip() or "default", prefix=raw[:10], digest=key_digest(raw))
+    key = ApiKey(
+        minibrain=minibrain, model_id=model_id, name=name.strip() or "default", prefix=raw[:10], digest=key_digest(raw)
+    )
     session.add(key)
     session.commit()
     return key, raw

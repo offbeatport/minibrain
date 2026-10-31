@@ -595,6 +595,7 @@ Everything in the v1 scope below, after M1.
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
 - Helm chart, OpenShift
+- [ ] OCI / container registry model sources (Harbor, Quay; KitOps ModelKits)
 - Preinstalled appliance
 
 ## Risks to verify early

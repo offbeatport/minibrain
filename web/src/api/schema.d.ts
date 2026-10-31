@@ -22,6 +22,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bases */
+        get: operations["bases_api_minibrains_bases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}": {
         parameters: {
             query?: never;
@@ -37,7 +54,8 @@ export interface paths {
         delete: operations["delete_api_minibrains__slug__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update */
+        patch: operations["update_api_minibrains__slug__patch"];
         trace?: never;
     };
     "/api/minibrains/{slug}/source": {
@@ -135,6 +153,230 @@ export interface paths {
         /** Golden */
         get: operations["golden_api_minibrains__slug__golden_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Sources */
+        get: operations["model_sources_api_models_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Model */
+        post: operations["import_model_api_models_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Base */
+        get: operations["read_base_api_models_base__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Base */
+        patch: operations["update_base_api_models_base__key__patch"];
+        trace?: never;
+    };
+    "/api/models/base/{key}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Base */
+        post: operations["retry_base_api_models_base__key__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/deploy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deploy Base */
+        post: operations["deploy_base_api_models_base__key__deploy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Base */
+        post: operations["test_base_api_models_base__key__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Base Keys */
+        get: operations["list_base_keys_api_models_base__key__keys_get"];
+        put?: never;
+        /** Add Base Key */
+        post: operations["add_base_key_api_models_base__key__keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Base Key */
+        delete: operations["delete_base_key_api_models_base__key__keys__key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalogue */
+        get: operations["catalogue_api_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/{catalog_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download */
+        post: operations["download_api_catalog__catalog_id__download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync */
+        post: operations["sync_api_catalog_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings_api_catalog_settings_get"];
+        /** Update Settings */
+        put: operations["update_settings_api_catalog_settings_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -625,6 +867,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Activity */
+        Activity: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "queued" | "failed" | "ready" | "needs_examples" | "idle";
+            /** Label */
+            label: string;
+            /** Kind */
+            kind?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Progress */
+            progress?: number | null;
+            /** Job Id */
+            job_id?: number | null;
+        };
+        /** AddedInfo */
+        AddedInfo: {
+            /** Key */
+            key: string;
+            /** Variant Id */
+            variant_id: string | null;
+            availability: components["schemas"]["Availability"];
+            /** Error */
+            error: string | null;
+        };
         /** AttemptInfo */
         AttemptInfo: {
             /** Number */
@@ -647,6 +917,92 @@ export interface components {
             /** Finished At */
             finished_at: string | null;
         };
+        /** Availability */
+        Availability: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "downloading" | "importing" | "missing" | "not_downloaded" | "none";
+            /** Progress */
+            progress?: number | null;
+            /** Job Id */
+            job_id?: number | null;
+        };
+        /** BaseModelDetail */
+        BaseModelDetail: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "base" | "custom";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Tags */
+            tags: string[];
+            /** Archived */
+            archived: boolean;
+            /** Base Model */
+            base_model: string | null;
+            availability: components["schemas"]["Availability"];
+            activity: components["schemas"]["Activity"];
+            deployment: components["schemas"]["Deployment"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Trainable */
+            trainable: boolean;
+            /** Can Test */
+            can_test: boolean;
+            /** Update Available */
+            update_available: boolean;
+            /** Current Version */
+            current_version: number | null;
+            /** Ready Version */
+            ready_version: number | null;
+            /** Needed Bytes */
+            needed_bytes: number | null;
+            /** Source */
+            source: string;
+            /** Repo */
+            repo: string | null;
+            /** Revision */
+            revision: string | null;
+            /** Latest Revision */
+            latest_revision: string | null;
+            /** Source Path */
+            source_path: string | null;
+            /** Storage Path */
+            storage_path: string;
+            /** Files */
+            files: components["schemas"]["ModelFile"][];
+            /** Size Bytes */
+            size_bytes: number;
+            /** Error */
+            error: string | null;
+            /** License */
+            license: string | null;
+            /** License Name */
+            license_name: string | null;
+            /** License Url */
+            license_url: string | null;
+            /** License Ack By */
+            license_ack_by: string | null;
+            /** License Ack At */
+            license_ack_at: string | null;
+            /** Catalog Id */
+            catalog_id: string | null;
+            /** Variant Id */
+            variant_id: string | null;
+            /** Deployed */
+            deployed: boolean;
+        };
         /** BaseModelInfo */
         BaseModelInfo: {
             /** Key */
@@ -662,6 +1018,95 @@ export interface components {
         Body_upload_source_api_minibrains__slug__source_post: {
             /** File */
             file: string;
+        };
+        /** CatalogEntry */
+        CatalogEntry: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Provider */
+            provider: string;
+            /** Repo */
+            repo: string;
+            /** Capabilities */
+            capabilities: string[];
+            /** License */
+            license: string;
+            /** License Name */
+            license_name: string;
+            /** License Summary */
+            license_summary: string;
+            /** License Url */
+            license_url: string;
+            /** Gated */
+            gated: boolean;
+            /** Recommended */
+            recommended: boolean;
+            /** Recommendation */
+            recommendation: string | null;
+            /** Trainable */
+            trainable: boolean;
+            /** Popularity */
+            popularity: number;
+            /** Variants */
+            variants: components["schemas"]["CatalogVariantInfo"][];
+            /** Added */
+            added: components["schemas"]["AddedInfo"][];
+        };
+        /** CatalogResponse */
+        CatalogResponse: {
+            /** Entries */
+            entries: components["schemas"]["CatalogEntry"][];
+            hardware: components["schemas"]["HardwareInfo"];
+            /** Online */
+            online: boolean | null;
+            /** Offline Forced */
+            offline_forced: boolean;
+            /** Endpoint */
+            endpoint: string;
+            /** Token Configured */
+            token_configured: boolean;
+            /** Synced At */
+            synced_at: string | null;
+            sync_job: components["schemas"]["JobInfo"] | null;
+        };
+        /** CatalogSettings */
+        CatalogSettings: {
+            /** Daily Sync */
+            daily_sync: boolean;
+        };
+        /** CatalogVariantInfo */
+        CatalogVariantInfo: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Format */
+            format: string;
+            /** Precision */
+            precision: string;
+            /** Repo */
+            repo: string;
+            /** Revision */
+            revision: string;
+            /** Latest Revision */
+            latest_revision: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Weights Bytes */
+            weights_bytes: number;
+            /** Files */
+            files: number;
+            /** Runtimes */
+            runtimes: string[];
+            /** Requires */
+            requires: {
+                [key: string]: unknown;
+            };
+            fit: components["schemas"]["FitInfo"];
         };
         /** ChatCompletionRequest */
         ChatCompletionRequest: {
@@ -746,6 +1191,23 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
+        /** DeployRequest */
+        DeployRequest: {
+            /** Deployed */
+            deployed: boolean;
+        };
+        /** Deployment */
+        Deployment: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "starting" | "unhealthy" | "not_deployed";
+            /** Label */
+            label: string;
+            /** Versions */
+            versions?: number[];
+        };
         /** DeviceInfo */
         DeviceInfo: {
             /** Inference */
@@ -760,6 +1222,16 @@ export interface components {
             memory_used_mb: number | null;
             /** Cpu Count */
             cpu_count: number;
+        };
+        /** DownloadRequest */
+        DownloadRequest: {
+            /** Variant */
+            variant: string;
+            /**
+             * Accept License
+             * @default false
+             */
+            accept_license?: boolean;
         };
         /** EventBody */
         EventBody: {
@@ -803,10 +1275,41 @@ export interface components {
             /** Log */
             log?: string | null;
         };
+        /** FitInfo */
+        FitInfo: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "fits" | "limited" | "insufficient" | "unknown";
+            /** Needed Bytes */
+            needed_bytes: number;
+            /** Available Bytes */
+            available_bytes: number | null;
+            /** Basis */
+            basis: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HardwareInfo */
+        HardwareInfo: {
+            /** Machine */
+            machine: string;
+            /** Accelerator */
+            accelerator: string;
+            /** Kind */
+            kind: string;
+            /** Memory Bytes */
+            memory_bytes: number | null;
+            /** Ram Bytes */
+            ram_bytes: number | null;
+            /** Memory Label */
+            memory_label: string;
+            /** Known */
+            known: boolean;
         };
         /** HeartbeatResponse */
         HeartbeatResponse: {
@@ -814,6 +1317,26 @@ export interface components {
             cancel: boolean;
             /** Lease Expires At */
             lease_expires_at: string;
+        };
+        /** ImportRequest */
+        ImportRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Source Type
+             * @default folder
+             * @enum {string}
+             */
+            source_type?: "folder" | "s3";
+            /** Location */
+            location: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Tags */
+            tags?: string[];
         };
         /** InstallSettings */
         InstallSettings: {
@@ -1045,6 +1568,15 @@ export interface components {
         MinibrainCreate: {
             /** Name */
             name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Tags */
+            tags?: string[];
+            /** Base Model */
+            base_model?: string | null;
         };
         /** MinibrainDetail */
         MinibrainDetail: {
@@ -1097,6 +1629,66 @@ export interface components {
             gold: string;
             /** Output */
             output: string;
+        };
+        /** ModelFile */
+        ModelFile: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string | null;
+        };
+        /** ModelRow */
+        ModelRow: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "base" | "custom";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Tags */
+            tags: string[];
+            /** Archived */
+            archived: boolean;
+            /** Base Model */
+            base_model: string | null;
+            availability: components["schemas"]["Availability"];
+            activity: components["schemas"]["Activity"];
+            deployment: components["schemas"]["Deployment"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Trainable */
+            trainable: boolean;
+            /** Can Test */
+            can_test: boolean;
+            /** Update Available */
+            update_available: boolean;
+            /** Current Version */
+            current_version: number | null;
+            /** Ready Version */
+            ready_version: number | null;
+            /** Needed Bytes */
+            needed_bytes: number | null;
+        };
+        /** ModelUpdate */
+        ModelUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Archived */
+            archived?: boolean | null;
         };
         /** PreviewResponse */
         PreviewResponse: {
@@ -1208,6 +1800,29 @@ export interface components {
             };
             /** Loaded */
             loaded: components["schemas"]["LoadedModel"][];
+        };
+        /** TestRequest */
+        TestRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Max Tokens
+             * @default 128
+             */
+            max_tokens?: number;
+        };
+        /** TestResponse */
+        TestResponse: {
+            /** Model */
+            model: string;
+            /** Output */
+            output: string;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
         };
         /** TokenBody */
         TokenBody: {
@@ -1348,6 +1963,26 @@ export interface operations {
             };
         };
     };
+    bases_api_minibrains_bases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
     read_api_minibrains__slug__get: {
         parameters: {
             query?: never;
@@ -1396,6 +2031,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_minibrains__slug__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -1593,6 +2263,483 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExampleInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_models_get: {
+        parameters: {
+            query?: {
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_sources_api_models_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    import_model_api_models_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_base_api_models_base__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_base_api_models_base__key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_base_api_models_base__key__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deploy_base_api_models_base__key__deploy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeployRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_base_api_models_base__key__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_base_keys_api_models_base__key__keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_base_key_api_models_base__key__keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_base_key_api_models_base__key__keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue_api_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogResponse"];
+                };
+            };
+        };
+    };
+    download_api_catalog__catalog_id__download_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_api_catalog_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobInfo"];
+                };
+            };
+        };
+    };
+    read_settings_api_catalog_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSettings"];
+                };
+            };
+        };
+    };
+    update_settings_api_catalog_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSettings"];
                 };
             };
             /** @description Validation Error */
