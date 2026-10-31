@@ -78,7 +78,7 @@ def mount_web(app: FastAPI, dist: Path) -> None:
         return FileResponse(root / "index.html")
 
 
-def no_engines(_bases: dict[str, BaseModelSpec]) -> dict[str, str]:
+def no_engines(_bases: dict[str, BaseModelSpec], _registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
     return {}
 
 
@@ -130,7 +130,7 @@ def create_app(
     engines = None
     if backend is None:
         engines = EngineManager(settings, os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000"))
-        backend = ManagedEngineBackend(engines)
+        backend = ManagedEngineBackend(engines, lambda base: app.state.gateway_config.current().engines.get(base, []))
     app.state.engines = engines
     app.state.backend = backend
     app.state.gateway_config = LocalConfig(

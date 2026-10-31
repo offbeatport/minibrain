@@ -1,17 +1,20 @@
 import hmac
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from minibrain.api.deps import SessionDep, StoreDep
+from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.registry import resolve_spec
 from minibrain.registry.compute import EngineReport, record_engine
+from minibrain.serve.weights import local_dir
 
 MAX_WAIT_SECONDS = 30.0
 
@@ -57,6 +60,47 @@ class EngineBody(BaseModel):
 def register_engine(body: EngineBody, session: SessionDep) -> None:
     record_engine(session, EngineReport(**body.model_dump()))
     session.commit()
+
+
+class BaseFile(BaseModel):
+    path: str
+    size: int
+
+
+class BaseWeights(BaseModel):
+    spec: dict[str, Any]
+    files: list[BaseFile]
+
+
+def weights_folder(session: SessionDep, settings: SettingsDep, key: str) -> tuple[dict[str, Any], Path]:
+    spec = resolve_spec(session, settings, key)
+    try:
+        return spec.as_dict(), local_dir(spec, offline=True).resolve()
+    except Exception as error:
+        raise HTTPException(status_code=404, detail=f"weights for {key} are not on main") from error
+
+
+def shareable(folder: Path) -> list[BaseFile]:
+    return [
+        BaseFile(path=path.relative_to(folder).as_posix(), size=path.stat().st_size)
+        for path in sorted(folder.rglob("*"))
+        if path.is_file() and not any(part.startswith(".") for part in path.relative_to(folder).parts)
+    ]
+
+
+@router.get("/bases/{key}")
+def base_weights(key: str, session: SessionDep, settings: SettingsDep) -> BaseWeights:
+    spec, folder = weights_folder(session, settings, key)
+    return BaseWeights(spec=spec | {"path": None}, files=shareable(folder))
+
+
+@router.get("/bases/{key}/files/{path:path}")
+def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -> FileResponse:
+    _, folder = weights_folder(session, settings, key)
+    candidate = (folder / path).resolve()
+    if not candidate.is_file() or path not in {entry.path for entry in shareable(folder)}:
+        raise HTTPException(status_code=404, detail=f"{path} is not part of {key}")
+    return FileResponse(candidate)
 
 
 @router.get("/config")

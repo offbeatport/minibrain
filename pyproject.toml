@@ -28,6 +28,12 @@ minibrain = "minibrain.cli:main"
 postgres = [
     "psycopg[binary]>=3.3.6",
 ]
+mlx = [
+    "mlx-lm>=0.32.2 ; platform_machine == 'arm64' and sys_platform == 'darwin'",
+]
+llamacpp = [
+    "llama-cpp-python>=0.3.36",
+]
 
 [build-system]
 requires = ["hatchling"]

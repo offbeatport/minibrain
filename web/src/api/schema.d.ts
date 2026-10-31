@@ -880,6 +880,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/gateway/bases/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base Weights */
+        get: operations["base_weights_internal_gateway_bases__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/gateway/bases/{key}/files/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base File */
+        get: operations["base_file_internal_gateway_bases__key__files__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/gateway/config": {
         parameters: {
             query?: never;
@@ -1065,6 +1099,13 @@ export interface components {
             /** Job Id */
             job_id?: number | null;
         };
+        /** BaseFile */
+        BaseFile: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+        };
         /** BaseModelDetail */
         BaseModelDetail: {
             /**
@@ -1151,6 +1192,15 @@ export interface components {
             revision: string;
             /** License */
             license: string;
+        };
+        /** BaseWeights */
+        BaseWeights: {
+            /** Spec */
+            spec: {
+                [key: string]: unknown;
+            };
+            /** Files */
+            files: components["schemas"]["BaseFile"][];
         };
         /** Body_upload_source_api_minibrains__slug__source_post */
         Body_upload_source_api_minibrains__slug__source_post: {
@@ -4061,6 +4111,73 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_weights_internal_gateway_bases__key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseWeights"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_file_internal_gateway_bases__key__files__path__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                key: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

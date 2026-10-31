@@ -33,7 +33,12 @@ def files_present(settings: Settings, model: Model) -> bool:
     )
 
 
+def gguf_file(model: Model) -> str | None:
+    return next((str(entry["path"]) for entry in model.files if str(entry["path"]).endswith(".gguf")), None)
+
+
 def spec_for(settings: Settings, model: Model) -> BaseModelSpec:
+    weights_file = gguf_file(model)
     return BaseModelSpec(
         key=model.id,
         repo=model.repo or "",
@@ -43,6 +48,8 @@ def spec_for(settings: Settings, model: Model) -> BaseModelSpec:
         stop_tokens=tuple(model.stop_tokens) or QWEN_STOP_TOKENS,
         path=str(model_dir(settings, model.id)),
         trainable=model.trainable,
+        format="gguf" if weights_file else "safetensors",
+        weights_file=weights_file,
     )
 
 

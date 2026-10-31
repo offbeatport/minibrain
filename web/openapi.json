@@ -2659,6 +2659,117 @@
         }
       }
     },
+    "/internal/gateway/bases/{key}": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Base Weights",
+        "operationId": "base_weights_internal_gateway_bases__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseWeights"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/gateway/bases/{key}/files/{path}": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Base File",
+        "operationId": "base_file_internal_gateway_bases__key__files__path__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/gateway/config": {
       "get": {
         "tags": [
@@ -3161,6 +3272,24 @@
         ],
         "title": "Availability"
       },
+      "BaseFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size"
+        ],
+        "title": "BaseFile"
+      },
       "BaseModelDetail": {
         "properties": {
           "kind": {
@@ -3492,6 +3621,28 @@
           "license"
         ],
         "title": "BaseModelInfo"
+      },
+      "BaseWeights": {
+        "properties": {
+          "spec": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Spec"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/BaseFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spec",
+          "files"
+        ],
+        "title": "BaseWeights"
       },
       "Body_upload_source_api_minibrains__slug__source_post": {
         "properties": {

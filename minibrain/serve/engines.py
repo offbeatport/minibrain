@@ -60,12 +60,16 @@ class EngineManager:
         self.used[spec.key] = time.monotonic()
         return url
 
-    def ensure(self, specs: dict[str, BaseModelSpec]) -> dict[str, str]:
+    def ensure(self, specs: dict[str, BaseModelSpec], registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
         with self.lock:
+            own = {key: url for key, (url, _) in self.engines.items()}
+            elsewhere = {
+                key for key, entries in registered.items() if any(entry["url"] != own.get(key) for entry in entries)
+            }
             for key, spec in specs.items():
-                if key not in self.engines:
+                if key not in self.engines and key not in elsewhere:
                     self.start(spec)
-            self.reap(set(specs))
+            self.reap({key for key in specs if key not in elsewhere})
             return {key: url for key, (url, _) in self.engines.items()}
 
     def reap(self, keep: set[str]) -> None:
@@ -105,10 +109,18 @@ class EngineManager:
             supervisor.shutdown()
 
 
+Replicas = Callable[[str], list[dict[str, str]]]
+
+
 class EngineBackend:
-    def __init__(self, locate: Callable[[str], str | None], http: HttpClient | None = None) -> None:
-        self.locate = locate
+    def __init__(self, replicas: Replicas, http: HttpClient | None = None) -> None:
+        self.replicas = replicas
         self.http: HttpClient = http or httpx.Client(timeout=GENERATE_TIMEOUT)
+
+    def locate(self, base: str) -> str | None:
+        found = self.replicas(base)
+        ready = [entry for entry in found if entry.get("state") == "ready"]
+        return (ready or found)[0]["url"] if found else None
 
     def complete(self, request: CompletionRequest) -> Completion:
         url = self.locate(request.base.key)
@@ -136,17 +148,28 @@ class EngineBackend:
 
 
 class ManagedEngineBackend(EngineBackend):
-    def __init__(self, manager: EngineManager, http: HttpClient | None = None) -> None:
-        super().__init__(manager.url, http)
+    def __init__(self, manager: EngineManager, registered: Replicas, http: HttpClient | None = None) -> None:
+        super().__init__(self.known, http)
         self.manager = manager
+        self.registered = registered
         self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
 
+    def known(self, base: str) -> list[dict[str, str]]:
+        found = self.registered(base)
+        local = self.manager.url(base)
+        if local is not None and all(entry["url"] != local for entry in found):
+            found = [{"url": local, "state": "loading"}, *found]
+        return found
+
     def complete(self, request: CompletionRequest) -> Completion:
-        self.manager.ensure_one(request.base)
+        if not self.registered(request.base.key):
+            self.manager.ensure_one(request.base)
         self.manager.touch(request.base.key)
         return super().complete(request)
 
     def health(self, key: str) -> str | None:
+        if any(entry.get("state") == "ready" for entry in self.registered(key)):
+            return "running"
         return self.manager.health(key, self.probe)
 
     def status(self) -> list[dict[str, Any]]:

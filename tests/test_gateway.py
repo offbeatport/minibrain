@@ -107,7 +107,7 @@ def test_engine_serves_generate_and_health(harness: Harness, tmp_path: Path) -> 
     )
     with TestClient(app) as engine:
         assert engine.get("/health").json()["base_model"] == "qwen3-0.6b"
-        backend = EngineBackend(lambda _base: "http://testserver", http=engine)
+        backend = EngineBackend(lambda _base: [{"url": "http://testserver", "state": "ready"}], http=engine)
         request = CompletionRequest(base_model("qwen3-0.6b"), [{"role": "user", "content": "x"}], None, 8)
         assert backend.complete(request).text == "bug"
         assert fake.requests[-1].max_tokens == 8
@@ -115,5 +115,5 @@ def test_engine_serves_generate_and_health(harness: Harness, tmp_path: Path) -> 
 
 def test_unknown_engine_is_a_503(harness: Harness) -> None:
     headers = servable(harness)
-    harness.app.state.backend = EngineBackend(lambda _base: None)
+    harness.app.state.backend = EngineBackend(lambda _base: [])
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 503

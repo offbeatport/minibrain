@@ -19,6 +19,10 @@ class EngineUnavailableError(Exception):
     pass
 
 
+class AdapterNotSupportedError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class AdapterRef:
     name: str
@@ -39,6 +43,10 @@ class ServingBackend(Protocol):
     def status(self) -> list[dict[str, Any]]: ...
 
 
+class EngineRuntime(ServingBackend, Protocol):
+    def load(self, spec: BaseModelSpec) -> Any: ...
+
+
 class TransformersBackend:
     def __init__(self, materialize: Callable[[dict[str, Any]], Path], max_adapters: int = MAX_ADAPTERS) -> None:
         self.materialize = materialize
@@ -46,6 +54,9 @@ class TransformersBackend:
         self.runtimes: dict[str, Runtime] = {}
         self.recent: OrderedDict[tuple[str, str], None] = OrderedDict()
         self.lock = threading.Lock()
+
+    def load(self, spec: BaseModelSpec) -> None:
+        self.runtime(spec)
 
     def runtime(self, spec: BaseModelSpec) -> "Runtime":
         from minibrain.ml.runtime import Runtime

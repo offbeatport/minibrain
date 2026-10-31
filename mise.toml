@@ -1,6 +1,6 @@
 [tasks.setup]
 description = "Install Python and web dependencies"
-run = ["uv sync", "pnpm --dir web install"]
+run = ["uv sync --all-extras", "pnpm --dir web install"]
 
 [tasks."dev:api"]
 description = "API and job worker on :8000, data in .minibrain/"

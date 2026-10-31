@@ -15,6 +15,8 @@ class BaseModelSpec:
     stop_tokens: tuple[str, ...] = QWEN_STOP_TOKENS
     path: str | None = None
     trainable: bool = True
+    format: str = "safetensors"
+    weights_file: str | None = None
 
     def source(self) -> tuple[str, str | None]:
         if self.path and (Path(self.path) / "config.json").is_file():
@@ -35,6 +37,8 @@ class BaseModelSpec:
             stop_tokens=tuple(data.get("stop_tokens") or QWEN_STOP_TOKENS),
             path=data.get("path"),
             trainable=bool(data.get("trainable", True)),
+            format=str(data.get("format") or "safetensors"),
+            weights_file=data.get("weights_file"),
         )
 
 

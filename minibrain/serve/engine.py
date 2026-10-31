@@ -1,8 +1,9 @@
 import logging
 import threading
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,15 @@ from pydantic import BaseModel
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
-from minibrain.serve.backend import AdapterRef, CompletionRequest, ServingBackend, TransformersBackend
+from minibrain.serve.backend import (
+    AdapterNotSupportedError,
+    AdapterRef,
+    CompletionRequest,
+    EngineRuntime,
+    ServingBackend,
+    TransformersBackend,
+)
+from minibrain.serve.select import choose_engine
 from minibrain.worker import HttpClient, StreamReader
 
 
@@ -55,13 +64,13 @@ log = logging.getLogger("minibrain.engine")
 
 
 class Announcer:
-    def __init__(self, client: HttpClient, token: str, body: dict[str, Any]) -> None:
+    def __init__(self, client: HttpClient, token: str, body: Callable[[], dict[str, Any]]) -> None:
         self.client = client
         self.headers = {"Authorization": f"Bearer {token}"}
         self.body = body
 
     def announce(self, state: str) -> None:
-        body = self.body | {"state": state}
+        body = self.body() | {"state": state}
         self.client.request("POST", "/internal/gateway/engines", json=body, headers=self.headers).raise_for_status()
 
     def forever(self, ready: threading.Event, stop: threading.Event) -> None:
@@ -74,6 +83,58 @@ class Announcer:
                 return
 
 
+def make_backend(engine: str, materialize: Callable[[dict[str, Any]], Path]) -> EngineRuntime:
+    if engine == "mlx":
+        from minibrain.serve.mlx_backend import MlxBackend
+
+        return MlxBackend(materialize)
+    if engine == "llamacpp":
+        from minibrain.serve.llamacpp_backend import LlamaCppBackend
+
+        return LlamaCppBackend()
+    if engine == "sglang":
+        from minibrain.serve.sglang_backend import SglangBackend
+
+        return SglangBackend(materialize)
+    return TransformersBackend(materialize)
+
+
+def load_backend(
+    spec: BaseModelSpec, node: NodeReport, requested: str | None, materialize: Callable[[dict[str, Any]], Path]
+) -> tuple[str, EngineRuntime]:
+    engine = choose_engine(node, spec.format, requested)
+    backend = make_backend(engine, materialize)
+    try:
+        backend.load(spec)
+    except Exception:
+        if requested not in (None, "auto") or engine == "transformers" or spec.format == "gguf":
+            raise
+        log.exception("%s could not load %s; falling back to transformers", engine, spec.key)
+        engine, backend = "transformers", TransformersBackend(materialize)
+        backend.load(spec)
+    return engine, backend
+
+
+def pull_base(client: HttpClient, token: str, key: str, folder: Path) -> BaseModelSpec:
+    headers = {"Authorization": f"Bearer {token}"}
+    response = client.request("GET", f"/internal/gateway/bases/{key}", headers=headers)
+    response.raise_for_status()
+    found = response.json()
+    for entry in found["files"]:
+        target = folder / entry["path"]
+        if target.is_file() and target.stat().st_size == entry["size"]:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        partial = target.with_name(target.name + ".partial")
+        with client.stream("GET", f"/internal/gateway/bases/{key}/files/{entry['path']}", headers=headers) as stream:
+            stream.raise_for_status()
+            with partial.open("wb") as out:
+                for chunk in stream.iter_bytes():
+                    out.write(chunk)
+        partial.replace(target)
+    return replace(BaseModelSpec.from_dict(found["spec"]), path=str(folder))
+
+
 def create_engine_app(
     spec: BaseModelSpec,
     main_url: str,
@@ -84,48 +145,60 @@ def create_engine_app(
     url: str | None = None,
     pool: str = LOCAL_POOL,
     node: NodeReport | None = None,
+    requested: str | None = None,
 ) -> FastAPI:
     base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
     client: HttpClient = http or httpx.Client(base_url=main_url, timeout=httpx.Timeout(120.0, connect=10.0))
-    serving = backend or TransformersBackend(artifact_fetcher(store, client, token))
-    engine = "transformers"
+    materialize = artifact_fetcher(store, client, token)
     ready = threading.Event()
-    state = {"ready": False}
+    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         stop = threading.Event()
+        hardware = node or report()
+        if current["backend"] is None:
+            current["engine"] = choose_engine(hardware, spec.format, requested)
         if url is not None:
-            hardware = node or report()
-            body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base, "engine": engine}
-            announcer = Announcer(client, token, body | {"pool": pool, "hardware": hardware.as_dict()})
+            body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
+            body |= {"pool": pool, "hardware": hardware.as_dict()}
+            announcer = Announcer(client, token, lambda: body | {"engine": current["engine"]})
             threading.Thread(target=announcer.forever, args=(ready, stop), daemon=True).start()
-        if isinstance(serving, TransformersBackend):
-            serving.runtime(spec)
-        state["ready"] = True
+        if current["backend"] is None:
+            current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
         ready.set()
         yield
         stop.set()
+        closing = getattr(current["backend"], "close", None)
+        if closing is not None:
+            closing()
 
     app = FastAPI(title=f"minibrain engine {base}", lifespan=lifespan)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        if not state["ready"]:
+        serving: ServingBackend | None = current["backend"]
+        if not ready.is_set() or serving is None:
             raise HTTPException(status_code=503, detail="loading")
         loaded = next((item for item in serving.status() if item["base_model"] == base), None)
         return {
             "base_model": base,
-            "engine": engine,
+            "engine": current["engine"],
             "adapters": (loaded or {}).get("adapters", []),
             "device": (loaded or {}).get("device"),
         }
 
     @app.post("/generate")
     def generate(body: GenerateBody) -> GenerateResult:
+        serving: ServingBackend | None = current["backend"]
+        if serving is None:
+            raise HTTPException(status_code=503, detail="loading")
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
-        completion = serving.complete(CompletionRequest(spec, body.messages, adapter, body.max_tokens))
+        try:
+            completion = serving.complete(CompletionRequest(spec, body.messages, adapter, body.max_tokens))
+        except AdapterNotSupportedError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
         return GenerateResult(**completion.__dict__)
 
     return app

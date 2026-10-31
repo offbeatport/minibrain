@@ -15,8 +15,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
 from minibrain.data.snapshot import prompt_context
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.registry import resolve_spec
 from minibrain.policy import load as load_policy
+from minibrain.registry.compute import live_engines
 from minibrain.registry.files import ref, snapshot_dir
 from minibrain.registry.models import ApiKey, Minibrain, Model, ModelStatus, VersionKind, VersionStatus
 from minibrain.registry.service import NotFoundError, adapter_name
@@ -65,7 +67,7 @@ class GatewayConfig:
     routes: dict[str, Route] = field(default_factory=dict)
     keys: dict[str, Grant] = field(default_factory=dict)
     models: dict[str, list[str]] = field(default_factory=dict)
-    engines: dict[str, str] = field(default_factory=dict)
+    engines: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
     request_logs: bool = True
 
@@ -80,10 +82,17 @@ class GatewayConfig:
             routes={name: Route(**route) for name, route in data["routes"].items()},
             keys={digest: Grant(**grant) for digest, grant in data["keys"].items()},
             models=dict(data["models"]),
-            engines=dict(data.get("engines", {})),
+            engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
             request_logs=bool(data.get("request_logs", True)),
         )
+
+
+Replicas = dict[str, list[dict[str, str]]]
+
+
+def replicas_of(found: Any) -> list[dict[str, str]]:
+    return [{"url": found}] if isinstance(found, str) else [dict(item) for item in found]
 
 
 EMPTY = GatewayConfig(version="empty")
@@ -135,7 +144,7 @@ def base_route(model: Model) -> Route:
     )
 
 
-def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: dict[str, str]) -> GatewayConfig:
+def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:
     routes: dict[str, Route] = {}
     for minibrain in session.scalars(select(Minibrain).order_by(Minibrain.id)):
         routes |= {route.name: route for route in routes_for(session, store, minibrain)}
@@ -167,6 +176,26 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     return replace(config, version=hash_of(config.to_json()))
 
 
+def registered_replicas(session: Session, specs: dict[str, BaseModelSpec]) -> Replicas:
+    found: Replicas = {}
+    for replica in live_engines(session):
+        if replica.base_model in specs:
+            entry = {"url": replica.url, "engine": replica.engine, "pool": replica.pool, "state": replica.state}
+            found.setdefault(replica.base_model, []).append(entry)
+    return found
+
+
+def merge_replicas(managed: dict[str, str], registered: Replicas) -> Replicas:
+    merged: Replicas = {}
+    for base, url in managed.items():
+        reported = next((entry for entry in registered.get(base, []) if entry["url"] == url), None)
+        merged[base] = [reported or {"url": url, "engine": "", "pool": LOCAL_POOL, "state": "loading"}]
+    for base, entries in registered.items():
+        known = {entry["url"] for entry in merged.get(base, [])}
+        merged.setdefault(base, []).extend(entry for entry in entries if entry["url"] not in known)
+    return merged
+
+
 def hash_of(payload: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
@@ -181,7 +210,7 @@ class LocalConfig:
         sessions: sessionmaker[Session],
         store: ArtifactStore,
         settings: Settings,
-        engines: Callable[[dict[str, BaseModelSpec]], dict[str, str]],
+        engines: Callable[[dict[str, BaseModelSpec], Replicas], dict[str, str]],
         max_age: float = 1.0,
     ) -> None:
         self.sessions = sessions
@@ -198,8 +227,10 @@ class LocalConfig:
         with self.lock, self.sessions() as session:
             draft = build_config(session, self.store, self.settings, {})
             specs = {key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items()}
-            urls = self.engines(specs)
-            config = build_config(session, self.store, self.settings, urls) if urls else draft
+            registered = registered_replicas(session, specs)
+            managed = self.engines(specs, registered)
+            replicas = merge_replicas(managed, registered)
+            config = build_config(session, self.store, self.settings, replicas) if replicas else draft
         self.built_at = time.monotonic()
         if config.version != self.config.version:
             with self.changed:

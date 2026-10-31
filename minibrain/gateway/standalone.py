@@ -51,7 +51,7 @@ def create_gateway_app(
     app = FastAPI(title="minibrain gateway", lifespan=lifespan)
     app.state.gateway_config = source
     app.state.request_logs = logs
-    app.state.backend = backend or EngineBackend(lambda base: source.current().engines.get(base))
+    app.state.backend = backend or EngineBackend(lambda base: source.current().engines.get(base, []))
     app.include_router(routes.router)
 
     @app.get("/healthz")
