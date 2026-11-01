@@ -11,9 +11,12 @@ from minibrain.api.deps import QueueDep, SessionDep, StoreDep
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.jobs.queue import EventIn, WorkerInfo
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.registry import check_job
+from minibrain.policy import PolicyError
 from minibrain.registry.compute import record_node
 from minibrain.registry.files import register
-from minibrain.registry.models import Artifact
+from minibrain.registry.models import Artifact, Job
+from minibrain.registry.service import ConflictError
 
 CLAIM_POLL_SECONDS = 0.5
 MAX_CLAIM_WAIT_SECONDS = 30.0
@@ -97,6 +100,18 @@ def require_artifacts(session: SessionDep, ids: list[str | None]) -> None:
         raise HTTPException(status_code=422, detail=f"unknown artifacts: {', '.join(missing)}")
 
 
+def policy_refusal(session: SessionDep, job_id: int) -> str | None:
+    session.expire_all()
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    try:
+        check_job(session, job)
+    except (PolicyError, ConflictError) as error:
+        return str(error)
+    return None
+
+
 def report_worker(session: SessionDep, body: WorkerBody) -> None:
     record_node(session, body.pool, body.host, "worker", body.hardware)
     session.commit()
@@ -117,7 +132,11 @@ def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep) -> ClaimResp
     while True:
         claimed = queue.claim(worker)
         if claimed is not None:
-            return ClaimResponse(**claimed.__dict__)
+            refusal = policy_refusal(session, claimed.job_id)
+            if refusal is None:
+                return ClaimResponse(**claimed.__dict__)
+            queue.fail(claimed.job_id, claimed.token, refusal, False, None)
+            continue
         if time.monotonic() >= deadline:
             return Response(status_code=204)
         time.sleep(CLAIM_POLL_SECONDS)

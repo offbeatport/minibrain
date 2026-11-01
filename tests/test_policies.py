@@ -114,3 +114,13 @@ def test_local_engines_lose_hub_access_with_the_network(harness: Harness) -> Non
     assert hub_allowed(harness.sessions)
     set_policy(harness, "network", "offline")
     assert not hub_allowed(harness.sessions)
+
+
+def test_queued_downloads_are_refused_when_the_policy_changes(harness: Harness, hub: Path) -> None:  # noqa: F811
+    add_tiny(harness)
+    body = {"variant": "tiny:bf16", "accept_license": True}
+    assert harness.client.post("/api/catalog/tiny/download", json=body).status_code == 202
+    set_policy(harness, "network", "offline")
+    assert harness.worker(kinds=["download"]).run_once() is False
+    detail = harness.client.get("/api/models/base/tiny").json()
+    assert detail["activity"]["state"] == "failed" and "Offline" in (detail["error"] or "")
