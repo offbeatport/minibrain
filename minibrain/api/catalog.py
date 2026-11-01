@@ -141,7 +141,7 @@ def catalogue(
     return CatalogResponse(
         entries=[entry_info(session, settings, entry, machines) for entry in entries],
         hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
-        pools=[PoolChoice(name=item.name, label=item.label) for item in found],
+        pools=[PoolChoice(name=item.name, label=item.label) for item in found if item.machines() or item is chosen],
         pool=chosen.name,
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),

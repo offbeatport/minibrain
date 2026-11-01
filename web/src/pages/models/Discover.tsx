@@ -206,8 +206,7 @@ function DownloadDialog({
                 )}
                 {variant?.fit.level === "insufficient" && (
                     <p className="text-sm text-warning">
-                        This variant is unlikely to run on this machine. You can still download it
-                        for another machine.
+                        {`This variant is unlikely to run on ${poolPhrase(catalog)}. You can still download it for another pool.`}
                     </p>
                 )}
                 <div className="flex flex-col gap-2 rounded-md border p-3">
@@ -270,11 +269,13 @@ function RequirementsDialog({
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
-                        {entry ? `${entry.name} requirements` : "Requirements on this machine"}
+                        {entry
+                            ? `${entry.name} requirements`
+                            : `Requirements on ${poolPhrase(catalog)}`}
                     </DialogTitle>
                     <DialogDescription>
-                        Estimates for serving with the transformers runtime, from the weights' size;
-                        real use also depends on context length and batch size.
+                        Estimates for serving, from the weights' size; real use also depends on
+                        context length and batch size.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="max-h-96 overflow-y-auto">

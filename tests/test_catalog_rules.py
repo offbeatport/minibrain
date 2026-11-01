@@ -70,3 +70,28 @@ def test_reseeding_drops_variants_that_left_the_snapshot(harness) -> None:
         upsert(session, entry)
         session.commit()
         assert session.get(CatalogVariant, f"{entry['id']}:old") is None
+
+
+def test_downloaded_models_follow_a_renamed_variant(harness) -> None:
+    from minibrain.models.catalog import upsert
+    from minibrain.registry.models import CatalogModel, CatalogVariant, Model
+
+    entry = bundled()["entries"][0]
+    current = entry["variants"][0]
+    with harness.sessions() as session:
+        model = session.get(CatalogModel, entry["id"])
+        assert model is not None
+        renamed = f"{entry['id']}:renamed"
+        model.variants.append(CatalogVariant(**{k: v for k, v in current.items() if k != "id"}, id=renamed, position=9))
+        session.flush()
+        session.add(
+            Model(
+                id="pinned", source="catalog", catalog_id=entry["id"], variant_id=renamed, name="x", status="available"
+            )
+        )
+        session.commit()
+        upsert(session, entry)
+        session.commit()
+        assert session.get(CatalogVariant, renamed) is None
+        pinned = session.get(Model, "pinned")
+        assert pinned is not None and pinned.variant_id == current["id"]

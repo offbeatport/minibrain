@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from minibrain.registry.models import CatalogModel, CatalogVariant, Model, now
@@ -92,7 +92,12 @@ def upsert(session: Session, entry: dict[str, Any]) -> None:
         variant.position = position
         refresh_variant(session, variant, data)
     listed = {data["id"] for data in entry["variants"]}
+    same = {(variant.repo, variant.revision): variant for variant in model.variants if variant.id in listed}
     for stale in [variant for variant in model.variants if variant.id not in listed]:
+        renamed = same.get((stale.repo, stale.revision))
+        if renamed is not None:
+            session.flush()
+            session.execute(update(Model).where(Model.variant_id == stale.id).values(variant_id=renamed.id))
         if not variant_in_use(session, stale.id):
             model.variants.remove(stale)
 
