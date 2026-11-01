@@ -47,6 +47,10 @@ class LeaseLostError(Exception):
     pass
 
 
+class WorkerStoppedError(Exception):
+    pass
+
+
 class Response(Protocol):
     status_code: int
     text: str
@@ -82,6 +86,7 @@ class MainClient:
         self.config = config
         self.http: HttpClient = http or httpx.Client(base_url=config.api_url, timeout=httpx.Timeout(60.0, connect=10.0))
         self.headers = {"Authorization": f"Bearer {config.token}"}
+        self.stop = threading.Event()
 
     def call(self, method: str, path: str, opener: Callable[[], Any] | None = None, **kwargs: Any) -> Response:
         delay = 1.0
@@ -102,7 +107,8 @@ class MainClient:
             finally:
                 if body is not None and hasattr(body, "close"):
                     body.close()
-            time.sleep(delay)
+            if self.stop.wait(delay):
+                raise WorkerStoppedError("worker is stopping")
             delay = min(delay * 2, 30.0)
         raise RuntimeError("unreachable")
 
@@ -231,9 +237,13 @@ class Worker:
         self.store = ArtifactStore(config.home / "artifacts", config.home / "cache")
 
     def run_forever(self, stop: threading.Event) -> None:
-        self.client.register()
-        while not stop.is_set():
-            self.run_once(CLAIM_WAIT_SECONDS)
+        self.client.stop = stop
+        try:
+            self.client.register()
+            while not stop.is_set():
+                self.run_once(CLAIM_WAIT_SECONDS)
+        except WorkerStoppedError:
+            return
 
     def run_once(self, wait: float = 0.0) -> bool:
         claim = self.client.claim(wait)

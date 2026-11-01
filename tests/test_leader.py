@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -43,7 +44,10 @@ def run_briefly(leader: Toggle, monkeypatch: pytest.MonkeyPatch) -> int:
     queue, stop = CountingQueue(), threading.Event()
     thread = threading.Thread(target=expire_forever, args=(queue, stop, leader))
     thread.start()
-    threading.Event().wait(0.1)
+    deadline = time.monotonic() + 5
+    while queue.calls == 0 and leader.held() and time.monotonic() < deadline:
+        stop.wait(0.01)
+    stop.wait(0.1)
     stop.set()
     thread.join()
     return queue.calls

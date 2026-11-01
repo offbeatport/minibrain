@@ -1,5 +1,6 @@
 import threading
 import time
+from typing import Any
 
 import pytest
 
@@ -67,3 +68,24 @@ def test_cancel_stops_the_child_process(harness: Harness, monkeypatch: pytest.Mo
     assert time.monotonic() - started < 25
     assert train_job(harness)["status"] == "cancelled"
     assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "failed"
+
+
+class Unreachable:
+    def request(self, method: str, url: str, **kwargs: Any) -> Any:
+        raise worker_module.httpx.ConnectError("main is gone")
+
+    def stream(self, method: str, url: str, **kwargs: Any) -> Any:
+        raise worker_module.httpx.ConnectError("main is gone")
+
+
+def test_orphaned_worker_stops_without_waiting_out_retries(harness: Harness) -> None:
+    config = harness.worker_config()
+    worker = worker_module.Worker(config, client=worker_module.MainClient(config, http=Unreachable()))
+    stop = threading.Event()
+    thread = threading.Thread(target=worker.run_forever, args=(stop,))
+    started = time.monotonic()
+    thread.start()
+    time.sleep(0.2)
+    stop.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive() and time.monotonic() - started < 3
