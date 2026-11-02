@@ -29,7 +29,7 @@ export function ModelsPage() {
                 actions={
                     <>
                         <ImportButton onClick={() => setImporting(true)} />
-                        <Button onClick={() => setCreating(true)}>Create model</Button>
+                        <Button onClick={() => setCreating(true)}>Add model</Button>
                     </>
                 }
             />

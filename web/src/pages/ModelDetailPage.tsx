@@ -17,6 +17,7 @@ import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from
 import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { percent } from "~/lib/format";
 import { modelsHref } from "~/lib/modelsSearch";
@@ -235,6 +236,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
         <>
             <PageHeader
                 title={model.name}
+                icon={<PublisherLogo publisher={model.publisher} name={model.name} />}
                 caption={model.description || model.key}
                 actions={
                     <>
@@ -414,6 +416,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
         <>
             <PageHeader
                 title={row.name}
+                icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
                 caption={row.description || `Custom model on ${row.base_model}`}
                 actions={
                     <>

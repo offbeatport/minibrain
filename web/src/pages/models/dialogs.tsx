@@ -107,7 +107,7 @@ export function CreateModelDialog({
             <DialogContent className="max-w-lg">
                 <form onSubmit={submit} className="flex flex-col gap-4">
                     <DialogHeader>
-                        <DialogTitle>Create model</DialogTitle>
+                        <DialogTitle>Add model</DialogTitle>
                         <DialogDescription>
                             A Classify model: text in, one label out. Next you add examples on the
                             Data page.
@@ -165,7 +165,7 @@ export function CreateModelDialog({
                             Cancel
                         </Button>
                         <Button type="submit" disabled={!name.trim() || create.isPending}>
-                            Create model
+                            Add model
                         </Button>
                     </DialogFooter>
                 </form>

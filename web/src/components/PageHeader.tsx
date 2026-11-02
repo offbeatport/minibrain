@@ -20,17 +20,20 @@ export function PageHeader({
     title,
     caption,
     actions,
+    icon,
 }: {
     title: string;
     caption?: ReactNode;
     actions?: ReactNode;
+    icon?: ReactNode;
 }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const Icon = navEntryFor(pathname)?.icon;
+    const Icon = icon ? undefined : navEntryFor(pathname)?.icon;
     return (
         <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
             <div className="flex min-w-0 flex-col gap-1">
                 <h1 className="flex items-center gap-2.5 text-2xl font-semibold">
+                    {icon}
                     {Icon && (
                         <Icon
                             aria-hidden="true"
@@ -40,7 +43,13 @@ export function PageHeader({
                     {title}
                 </h1>
                 {caption && (
-                    <p className={cn("text-base text-muted-foreground", Icon && "pl-8.5")}>
+                    <p
+                        className={cn(
+                            "text-base text-muted-foreground",
+                            Icon && "pl-8.5",
+                            icon && "pl-10.5",
+                        )}
+                    >
                         {caption}
                     </p>
                 )}

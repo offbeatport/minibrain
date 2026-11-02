@@ -56,7 +56,7 @@ export function GetStarted({
                     {sample.isPending ? "Creating sample…" : "Try it with sample data"}
                 </Button>
                 <Button variant="outline" onClick={onCreate}>
-                    Create model
+                    Add model
                 </Button>
                 <Button variant="ghost" onClick={onDiscover}>
                     Discover base models
