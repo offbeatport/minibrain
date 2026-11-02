@@ -282,6 +282,18 @@ class Deployment(BaseModel):
     versions: list[int] = Field(default_factory=list)
 
 
+class Stage(BaseModel):
+    key: Literal["data", "train", "evaluate", "deploy"]
+    state: Literal["todo", "active", "done", "failed"]
+    label: str
+    progress: float | None = None
+
+
+class Usage(BaseModel):
+    daily: list[int]
+    p50_ms: float | None
+
+
 class ModelRow(BaseModel):
     kind: Literal["base", "custom"]
     key: str
@@ -302,6 +314,9 @@ class ModelRow(BaseModel):
     needed_bytes: int | None
     publisher: str | None = None
     size_bytes: int | None = None
+    stages: list[Stage] = []
+    accuracy: float | None = None
+    usage: Usage | None = None
 
 
 class ModelFile(BaseModel):

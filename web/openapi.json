@@ -271,6 +271,27 @@
         }
       }
     },
+    "/api/minibrains/sample": {
+      "post": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Create Sample",
+        "operationId": "create_sample_api_minibrains_sample_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/mapping": {
       "put": {
         "tags": [
@@ -3448,6 +3469,35 @@
             ],
             "title": "Size Bytes"
           },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "type": "array",
+            "title": "Stages",
+            "default": []
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -5837,6 +5887,35 @@
               }
             ],
             "title": "Size Bytes"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "type": "array",
+            "title": "Stages",
+            "default": []
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6461,6 +6540,52 @@
         ],
         "title": "SplitScore"
       },
+      "Stage": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "data",
+              "train",
+              "evaluate",
+              "deploy"
+            ],
+            "title": "Key"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "todo",
+              "active",
+              "done",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "state",
+          "label"
+        ],
+        "title": "Stage"
+      },
       "StoredArtifact": {
         "properties": {
           "id": {
@@ -6591,6 +6716,34 @@
           "token"
         ],
         "title": "TokenBody"
+      },
+      "Usage": {
+        "properties": {
+          "daily": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "daily",
+          "p50_ms"
+        ],
+        "title": "Usage"
       },
       "ValidationError": {
         "properties": {

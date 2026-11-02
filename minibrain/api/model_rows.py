@@ -1,10 +1,20 @@
+import statistics
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
 
-from minibrain.api.schemas import Activity, Availability, AvailabilityState, Deployment, DeploymentState, ModelRow
+from minibrain.api.schemas import (
+    Activity,
+    Availability,
+    AvailabilityState,
+    Deployment,
+    DeploymentState,
+    ModelRow,
+    Stage,
+    Usage,
+)
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.registry import files_present
@@ -18,10 +28,13 @@ from minibrain.registry.models import (
     Minibrain,
     Model,
     ModelStatus,
+    RequestLog,
     Version,
     VersionKind,
     VersionStatus,
+    now,
 )
+from minibrain.registry.service import held_out_accuracy, latest_snapshot
 from minibrain.settings import Settings
 
 FAILED_LABELS: dict[str, str] = {
@@ -32,6 +45,8 @@ FAILED_LABELS: dict[str, str] = {
     JobKind.IMPORT: "Import failed",
 }
 STATE_LABELS = {"running": "Running", "starting": "Starting", "unhealthy": "Unhealthy"}
+USAGE_DAYS = 7
+LATENCY_SAMPLE = 2000
 
 
 Health = Callable[[str], str | None]
@@ -91,6 +106,122 @@ def custom_activity(minibrain: Minibrain, jobs: list[Job]) -> Activity:
     return Activity(state="idle", label="No active jobs")
 
 
+def data_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
+    job = active.get(JobKind.PREPARE)
+    if job is not None:
+        return Stage(key="data", state="active", label="Building dataset", progress=running_progress(job))
+    snapshot = latest_snapshot(minibrain)
+    if snapshot is not None:
+        return Stage(key="data", state="done", label=f"{sum(snapshot.counts.values()):,} examples")
+    if failed is not None and failed.kind == JobKind.PREPARE:
+        return Stage(key="data", state="failed", label="Dataset build failed")
+    return Stage(key="data", state="todo", label="Add examples")
+
+
+def train_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
+    job = active.get(JobKind.TRAIN)
+    if job is not None:
+        return Stage(key="train", state="active", label=version_label(job), progress=running_progress(job))
+    if failed is not None and failed.kind == JobKind.TRAIN:
+        return Stage(key="train", state="failed", label=FAILED_LABELS[JobKind.TRAIN])
+    built = [v.number for v in minibrain.versions if v.status != VersionStatus.FAILED]
+    if built:
+        return Stage(key="train", state="done", label=f"v{max(built)}")
+    return Stage(key="train", state="todo", label="Train")
+
+
+def scored(minibrain: Minibrain) -> list[Version]:
+    return [v for v in minibrain.versions if v.status == VersionStatus.READY and v.metrics]
+
+
+def evaluate_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
+    job = active.get(JobKind.EVAL)
+    if job is not None:
+        return Stage(key="evaluate", state="active", label=version_label(job), progress=running_progress(job))
+    if failed is not None and failed.kind == JobKind.EVAL:
+        return Stage(key="evaluate", state="failed", label=FAILED_LABELS[JobKind.EVAL])
+    latest = max(scored(minibrain), key=lambda v: v.number, default=None)
+    if latest is not None:
+        return Stage(key="evaluate", state="done", label=f"{held_out_accuracy(latest):.0%} on v{latest.number}")
+    return Stage(key="evaluate", state="todo", label="Score")
+
+
+def deploy_stage(minibrain: Minibrain) -> Stage:
+    if minibrain.current_version is not None:
+        return Stage(key="deploy", state="done", label=f"v{minibrain.current_version} live")
+    return Stage(key="deploy", state="todo", label="Not deployed")
+
+
+def custom_stages(minibrain: Minibrain, jobs: list[Job]) -> list[Stage]:
+    active: dict[str, Job] = {}
+    for job in jobs:
+        if job.status in ACTIVE_JOB_STATUSES:
+            active.setdefault(job.kind, job)
+    failed = jobs[0] if jobs and jobs[0].status == JobStatus.FAILED else None
+    return [
+        data_stage(minibrain, active, failed),
+        train_stage(minibrain, active, failed),
+        evaluate_stage(minibrain, active, failed),
+        deploy_stage(minibrain),
+    ]
+
+
+def shown_accuracy(minibrain: Minibrain) -> float | None:
+    versions = scored(minibrain)
+    current = next((v for v in versions if v.number == minibrain.current_version), None)
+    shown = current or max(versions, key=lambda v: v.number, default=None)
+    return held_out_accuracy(shown) if shown is not None else None
+
+
+def usage_window() -> tuple[datetime, list[str]]:
+    today = now().astimezone(UTC).date()
+    days = [today - timedelta(days=offset) for offset in range(USAGE_DAYS - 1, -1, -1)]
+    return datetime.combine(days[0], time.min, tzinfo=UTC), [day.isoformat() for day in days]
+
+
+def usage_index(session: Session) -> tuple[dict[int, Usage], dict[str, Usage]]:
+    since, days = usage_window()
+    day = func.date(RequestLog.at)
+    recent = RequestLog.at >= since
+    custom: dict[int, dict[str, int]] = {}
+    for target, value, total in session.execute(
+        select(RequestLog.minibrain_id, day, func.count())
+        .where(RequestLog.minibrain_id.is_not(None), recent)
+        .group_by(RequestLog.minibrain_id, day)
+    ):
+        if target is not None:
+            custom.setdefault(target, {})[str(value)[:10]] = total
+    base: dict[str, dict[str, int]] = {}
+    for target, value, total in session.execute(
+        select(RequestLog.model, day, func.count())
+        .where(RequestLog.minibrain_id.is_(None), recent)
+        .group_by(RequestLog.model, day)
+    ):
+        base.setdefault(target, {})[str(value)[:10]] = total
+
+    def summary(counts: dict[str, int], *conditions: ColumnElement[bool]) -> Usage:
+        latencies = list(
+            session.scalars(
+                select(RequestLog.latency_ms)
+                .where(*conditions, recent)
+                .order_by(RequestLog.id.desc())
+                .limit(LATENCY_SAMPLE)
+            )
+        )
+        return Usage(
+            daily=[counts.get(name, 0) for name in days],
+            p50_ms=statistics.median(latencies) if latencies else None,
+        )
+
+    return (
+        {target: summary(counts, RequestLog.minibrain_id == target) for target, counts in custom.items()},
+        {
+            target: summary(counts, RequestLog.minibrain_id.is_(None), RequestLog.model == target)
+            for target, counts in base.items()
+        },
+    )
+
+
 def custom_availability(minibrain: Minibrain, store: ArtifactStore) -> Availability:
     trained = [v for v in minibrain.versions if v.kind == VersionKind.LORA and v.adapter_artifact_id is not None]
     if not trained:
@@ -112,7 +243,12 @@ def latest_moment(*moments: datetime | None) -> datetime:
 
 
 def custom_row(
-    minibrain: Minibrain, jobs: list[Job], store: ArtifactStore, health: Health, base_weights: int | None = None
+    minibrain: Minibrain,
+    jobs: list[Job],
+    store: ArtifactStore,
+    health: Health,
+    base_weights: int | None = None,
+    usage: Usage | None = None,
 ) -> ModelRow:
     latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
@@ -147,6 +283,9 @@ def custom_row(
         current_version=current,
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
+        stages=custom_stages(minibrain, jobs),
+        accuracy=shown_accuracy(minibrain),
+        usage=usage,
     )
 
 
@@ -168,7 +307,7 @@ def base_activity(job: Job | None) -> Activity:
     return Activity(state="idle", label="No active jobs")
 
 
-def base_row(model: Model, job: Job | None, settings: Settings, health: Health) -> ModelRow:
+def base_row(model: Model, job: Job | None, settings: Settings, health: Health, usage: Usage | None = None) -> ModelRow:
     availability = base_availability(model, job, settings)
     variant = model.variant
     latest = variant.latest_revision if variant is not None else None
@@ -194,6 +333,7 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health) 
         needed_bytes=needed_bytes(weights) if weights else None,
         publisher=variant.model.provider if variant is not None else publisher_of(model.repo),
         size_bytes=model.size_bytes or None,
+        usage=usage,
     )
 
 
@@ -220,11 +360,22 @@ def base_weights(session: Session) -> dict[str, int]:
 def all_rows(session: Session, settings: Settings, store: ArtifactStore, health: Health) -> list[ModelRow]:
     by_minibrain, by_model = jobs_by(session)
     weights = base_weights(session)
+    custom_usage, base_usage = usage_index(session)
     rows = [
-        custom_row(minibrain, by_minibrain.get(minibrain.id, []), store, health, weights.get(minibrain.base_model))
+        custom_row(
+            minibrain,
+            by_minibrain.get(minibrain.id, []),
+            store,
+            health,
+            weights.get(minibrain.base_model),
+            custom_usage.get(minibrain.id),
+        )
         for minibrain in session.scalars(select(Minibrain))
     ]
-    rows += [base_row(model, by_model.get(model.id), settings, health) for model in session.scalars(select(Model))]
+    rows += [
+        base_row(model, by_model.get(model.id), settings, health, base_usage.get(model.id))
+        for model in session.scalars(select(Model))
+    ]
     return sorted(rows, key=lambda row: row.updated_at, reverse=True)
 
 

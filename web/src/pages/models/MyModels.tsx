@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Search } from "lucide-react";
+import { Brain, Layers, MoreHorizontal, Search, X } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -11,6 +11,7 @@ import {
     Input,
     Label,
     Link,
+    SegmentedTabs,
     Select,
     SelectContent,
     SelectItem,
@@ -21,15 +22,17 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine } from "~/components/Section";
+import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { Requests, Stages } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { GetStarted } from "./GetStarted";
 import {
     ConfirmAction,
     type Confirmation,
@@ -398,89 +401,146 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
     );
 }
 
-function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
+function ModelName({ row }: { row: ModelRow }) {
+    return (
+        <div className="flex min-w-52 max-w-72 items-start gap-3">
+            <PublisherLogo publisher={row.publisher} name={row.name} />
+            <div className="flex min-w-0 flex-col">
+                <Link
+                    href={detailHref(row)}
+                    className="font-semibold text-foreground hover:underline"
+                >
+                    {row.name}
+                </Link>
+                <span className="truncate text-sm text-muted-foreground">
+                    {row.description ||
+                        (row.kind === "custom" ? `Classify model on ${row.base_model}` : row.key)}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function requestTotal(row: ModelRow): number {
+    return (row.usage?.daily ?? []).reduce((sum, value) => sum + value, 0);
+}
+
+function usageColumn(): ColumnDef<ModelRow, unknown> {
+    return {
+        id: "usage",
+        header: "Usage, 7 days",
+        accessorFn: requestTotal,
+        cell: ({ row }) => <Requests usage={row.original.usage} />,
+    };
+}
+
+function actionsColumn(on: Handlers): ColumnDef<ModelRow, unknown> {
+    return {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        enableSorting: false,
+        cell: ({ row }) => <RowActions row={row.original} on={on} />,
+    };
+}
+
+function customColumns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
     return [
         {
             id: "model",
             header: "Model",
             accessorFn: (row) => row.name.toLowerCase(),
-            cell: ({ row }) => (
-                <div className="flex min-w-64 max-w-88 items-start gap-3">
-                    <PublisherLogo publisher={row.original.publisher} name={row.original.name} />
-                    <div className="flex min-w-0 flex-col">
-                        <Link
-                            href={detailHref(row.original)}
-                            className="font-semibold text-foreground hover:underline"
-                        >
-                            {row.original.name}
-                        </Link>
-                        <span className="truncate text-sm text-muted-foreground">
-                            {row.original.description ||
-                                (row.original.kind === "custom"
-                                    ? `Classify model on ${row.original.base_model}`
-                                    : row.original.key)}
-                        </span>
-                    </div>
-                </div>
-            ),
+            cell: ({ row }) => <ModelName row={row.original} />,
         },
         {
-            id: "type",
-            header: "Type",
-            accessorFn: (row) => row.kind,
-            cell: ({ row }) => (row.original.kind === "base" ? "Base" : "Custom"),
+            id: "progress",
+            header: "Progress",
+            accessorFn: (row) => row.accuracy ?? -1,
+            cell: ({ row }) => <Stages stages={row.original.stages ?? []} />,
+        },
+        usageColumn(),
+        actionsColumn(on),
+    ];
+}
+
+function baseColumns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
+    return [
+        {
+            id: "model",
+            header: "Model",
+            accessorFn: (row) => row.name.toLowerCase(),
+            cell: ({ row }) => <ModelName row={row.original} />,
         },
         {
             id: "availability",
             header: "Availability",
             accessorFn: (row) => STATE_ORDER.indexOf(row.availability.state),
-            cell: ({ row }) => <Availability row={row.original} />,
+            cell: ({ row }) =>
+                row.original.activity.state === "failed" ? (
+                    <Activity row={row.original} />
+                ) : (
+                    <Availability row={row.original} />
+                ),
         },
         {
-            id: "activity",
-            header: "Latest activity",
-            accessorFn: (row) => row.activity.label,
-            cell: ({ row }) => <Activity row={row.original} />,
+            id: "size",
+            header: "Size",
+            accessorFn: (row) => row.size_bytes ?? 0,
+            cell: ({ row }) =>
+                row.original.size_bytes ? (
+                    <span className="tabular-nums">{bytes(row.original.size_bytes)}</span>
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
         },
+        usageColumn(),
         {
             id: "deployment",
             header: "Deployment",
             accessorFn: (row) => row.deployment.state,
             cell: ({ row }) => <Deployment row={row.original} />,
         },
-        {
-            id: "updated",
-            header: "Updated",
-            accessorFn: (row) => row.updated_at,
-            cell: ({ row }) => <Updated value={row.original.updated_at} />,
-        },
-        {
-            id: "actions",
-            header: () => <span className="sr-only">Actions</span>,
-            enableSorting: false,
-            cell: ({ row }) => <RowActions row={row.original} on={on} />,
-        },
+        actionsColumn(on),
     ];
 }
 
-function matches(row: ModelRow, search: ModelsSearch): boolean {
+const ATTENTION_STATES = ["failed", "needs_examples", "ready"];
+
+function needsAttention(row: ModelRow): boolean {
+    return (
+        ATTENTION_STATES.includes(row.activity.state) ||
+        row.availability.state === "missing" ||
+        row.deployment.state === "unhealthy"
+    );
+}
+
+type Facet = "type" | "availability" | "deployment" | "tag" | "attention";
+
+function matches(row: ModelRow, search: ModelsSearch, skip?: Facet): boolean {
     const text = (search.q ?? "").trim().toLowerCase();
-    if (text && !`${row.name} ${row.description}`.toLowerCase().includes(text)) {
+    if (text && !`${row.name} ${row.description} ${row.key}`.toLowerCase().includes(text)) {
         return false;
     }
-    if (search.type && row.kind !== search.type) {
+    if (skip !== "type" && search.type && row.kind !== search.type) {
         return false;
     }
-    if (search.availability && row.availability.state !== search.availability) {
+    if (
+        skip !== "availability" &&
+        search.availability &&
+        row.availability.state !== search.availability
+    ) {
         return false;
     }
-    if (search.deployment === "deployed" && row.deployment.state === "not_deployed") {
+    const deployed = row.deployment.state !== "not_deployed";
+    if (skip !== "deployment" && search.deployment === "deployed" && !deployed) {
         return false;
     }
-    if (search.deployment === "not-deployed" && row.deployment.state !== "not_deployed") {
+    if (skip !== "deployment" && search.deployment === "not-deployed" && deployed) {
         return false;
     }
-    return !search.tag || row.tags.includes(search.tag);
+    if (skip !== "attention" && search.attention === "true" && !needsAttention(row)) {
+        return false;
+    }
+    return skip === "tag" || !search.tag || row.tags.includes(search.tag);
 }
 
 function FilterSelect({
@@ -491,7 +551,7 @@ function FilterSelect({
 }: {
     label: string;
     value: string | undefined;
-    options: [string, string][];
+    options: [string, string, number][];
     onChange: (value: string) => void;
 }) {
     return (
@@ -504,9 +564,9 @@ function FilterSelect({
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value={ANY}>{`${label}: All`}</SelectItem>
-                {options.map(([key, text]) => (
+                {options.map(([key, text, total]) => (
                     <SelectItem key={key} value={key}>
-                        {`${label}: ${text}`}
+                        {`${label}: ${text} (${total})`}
                     </SelectItem>
                 ))}
             </SelectContent>
@@ -514,15 +574,42 @@ function FilterSelect({
     );
 }
 
-function filterContext(search: ModelsSearch): string {
-    const parts = [
-        search.q && `“${search.q}”`,
-        search.type && (search.type === "base" ? "Base" : "Custom"),
-        search.availability && AVAILABILITY_LABELS[search.availability],
-        search.deployment && (search.deployment === "deployed" ? "Deployed" : "Not deployed"),
-        search.tag && `tag ${search.tag}`,
-    ].filter(Boolean);
-    return parts.join(", ");
+const DEPLOYMENT_OPTIONS: [string, string][] = [
+    ["deployed", "Deployed"],
+    ["not-deployed", "Not deployed"],
+];
+
+function chips(search: ModelsSearch): { label: string; clear: ModelsSearch }[] {
+    return [
+        search.q ? { label: `“${search.q}”`, clear: { q: "" } } : null,
+        search.type
+            ? { label: search.type === "base" ? "Base" : "Custom", clear: { type: "" } }
+            : null,
+        search.attention === "true" ? { label: "Needs attention", clear: { attention: "" } } : null,
+        search.availability
+            ? { label: AVAILABILITY_LABELS[search.availability], clear: { availability: "" } }
+            : null,
+        search.deployment
+            ? {
+                  label: search.deployment === "deployed" ? "Deployed" : "Not deployed",
+                  clear: { deployment: "" },
+              }
+            : null,
+        search.tag ? { label: `Tag ${search.tag}`, clear: { tag: "" } } : null,
+    ].filter((chip) => chip !== null);
+}
+
+const CLEARED: ModelsSearch = {
+    q: "",
+    type: "",
+    availability: "",
+    deployment: "",
+    tag: "",
+    attention: "",
+};
+
+function plural(total: number, noun: string): string {
+    return `${total} ${noun}${total === 1 ? "" : "s"}`;
 }
 
 export function MyModels({
@@ -579,44 +666,55 @@ export function MyModels({
         }),
         [router, refresh],
     );
-    const tableColumns = useMemo(() => columns(on), [on]);
+    const customTable = useMemo(() => customColumns(on), [on]);
+    const baseTable = useMemo(() => baseColumns(on), [on]);
     const rows = models.data ?? [];
     const visible = rows.filter((row) => matches(row, search));
+    const custom = visible.filter((row) => row.kind === "custom");
+    const base = visible.filter((row) => row.kind === "base");
+    const facetCount = (facet: Facet, test: (row: ModelRow) => boolean) =>
+        rows.filter((row) => matches(row, search, facet) && test(row)).length;
     const tags = [...new Set(rows.flatMap((row) => row.tags))].sort();
-    const filtering = Boolean(
-        search.q || search.type || search.availability || search.deployment || search.tag,
+    const active = chips(search);
+    const attention = search.attention === "true";
+    const attentionCount = facetCount("attention", needsAttention);
+    const filtering = active.length > 0;
+    const clear = () => update(CLEARED);
+    const showCustom = search.type !== "base";
+    const showBase = search.type !== "custom";
+    const firstRun = !rows.some((row) => row.kind === "custom") && !filtering && !archived;
+    const baseBytes = base.reduce((sum, row) => sum + (row.size_bytes ?? 0), 0);
+    const noMatch = (
+        <div className="flex flex-wrap items-center gap-2">
+            <p className="text-muted-foreground">No models match these filters.</p>
+            {filtering && (
+                <Button variant="outline" size="sm" onClick={clear}>
+                    Clear filters
+                </Button>
+            )}
+        </div>
     );
-    const clear = () => update({ q: "", type: "", availability: "", deployment: "", tag: "" });
-    let empty: ReactNode;
-    if (rows.length === 0 && !filtering && !archived) {
-        empty = (
-            <div className="flex flex-col items-start gap-2">
-                <p>Start with a base model or create a model for your task.</p>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={onDiscover}>
-                        Discover models
-                    </Button>
-                    <Button size="sm" onClick={onCreate}>
-                        Create model
-                    </Button>
-                </div>
-            </div>
-        );
-    } else {
-        empty = (
-            <div className="flex flex-wrap items-center gap-2">
-                <p className="text-muted-foreground">
-                    No models match{" "}
-                    {filterContext(search) || (archived ? "with archived shown" : "")}.
-                </p>
-                {filtering && (
-                    <Button variant="outline" size="sm" onClick={clear}>
-                        Clear filters
-                    </Button>
-                )}
-            </div>
-        );
-    }
+    const noBase = filtering ? (
+        noMatch
+    ) : (
+        <div className="flex flex-wrap items-center gap-2">
+            <p className="text-muted-foreground">
+                No base models downloaded yet; Qwen3 0.6B is still ready for training.
+            </p>
+            <Button variant="outline" size="sm" onClick={onDiscover}>
+                Discover base models
+            </Button>
+        </div>
+    );
+    const typeTabs = [
+        { key: "all", label: "All", badge: facetCount("type", () => true) },
+        {
+            key: "custom",
+            label: "Custom",
+            badge: facetCount("type", (row) => row.kind === "custom"),
+        },
+        { key: "base", label: "Base", badge: facetCount("type", (row) => row.kind === "base") },
+    ];
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -630,42 +728,55 @@ export function MyModels({
                         className="h-8 w-64 pl-8"
                     />
                 </div>
-                <FilterSelect
-                    label="Type"
-                    value={search.type}
-                    options={[
-                        ["base", "Base"],
-                        ["custom", "Custom"],
-                    ]}
-                    onChange={(type) => update({ type })}
+                <SegmentedTabs
+                    tabs={typeTabs}
+                    active={search.type || "all"}
+                    onSelect={(key) => update({ type: key === "all" ? "" : key })}
                 />
+                <Button
+                    variant={attention ? "secondary" : "outline"}
+                    aria-pressed={attention}
+                    disabled={!attention && attentionCount === 0}
+                    onClick={() => update({ attention: attention ? "" : "true" })}
+                >
+                    Needs attention
+                    <span className="tabular-nums text-muted-foreground">{attentionCount}</span>
+                </Button>
                 <FilterSelect
                     label="Availability"
                     value={search.availability}
-                    options={Object.entries(AVAILABILITY_LABELS)}
+                    options={Object.entries(AVAILABILITY_LABELS).map(([key, text]) => [
+                        key,
+                        text,
+                        facetCount("availability", (row) => row.availability.state === key),
+                    ])}
                     onChange={(availability) => update({ availability })}
                 />
                 <FilterSelect
                     label="Deployment"
                     value={search.deployment}
-                    options={[
-                        ["deployed", "Deployed"],
-                        ["not-deployed", "Not deployed"],
-                    ]}
+                    options={DEPLOYMENT_OPTIONS.map(([key, text]) => [
+                        key,
+                        text,
+                        facetCount(
+                            "deployment",
+                            (row) =>
+                                (row.deployment.state !== "not_deployed") === (key === "deployed"),
+                        ),
+                    ])}
                     onChange={(deployment) => update({ deployment })}
                 />
                 {tags.length > 0 && (
                     <FilterSelect
                         label="Tag"
                         value={search.tag}
-                        options={tags.map((tag) => [tag, tag])}
+                        options={tags.map((tag) => [
+                            tag,
+                            tag,
+                            facetCount("tag", (row) => row.tags.includes(tag)),
+                        ])}
                         onChange={(tag) => update({ tag })}
                     />
-                )}
-                {filtering && (
-                    <Button variant="ghost" size="sm" onClick={clear}>
-                        Clear filters
-                    </Button>
                 )}
                 <div className="ml-auto flex items-center gap-2">
                     <Switch
@@ -678,6 +789,25 @@ export function MyModels({
                     </Label>
                 </div>
             </div>
+            {filtering && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {active.map((chip) => (
+                        <Button
+                            key={chip.label}
+                            variant="outline"
+                            size="xs"
+                            aria-label={`Remove filter ${chip.label}`}
+                            onClick={() => update(chip.clear)}
+                        >
+                            {chip.label}
+                            <X />
+                        </Button>
+                    ))}
+                    <Button variant="ghost" size="xs" onClick={clear}>
+                        Clear all
+                    </Button>
+                </div>
+            )}
             {models.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading models…</p>
             ) : models.error ? (
@@ -688,16 +818,55 @@ export function MyModels({
                     </Button>
                 </div>
             ) : (
-                <SortableTable
-                    columns={tableColumns}
-                    rows={visible}
-                    onOpen={(row) => on.open(detailHref(row))}
-                    rowLabel={(row) =>
-                        `${row.name}, ${row.kind === "base" ? "base" : "custom"} model`
-                    }
-                    empty={empty}
-                    initialSort={[{ id: "updated", desc: true }]}
-                />
+                <PanelSections>
+                    {showCustom && (
+                        <PanelSection
+                            icon={Brain}
+                            title="Custom models"
+                            bare
+                            actions={
+                                <span className="text-sm text-muted-foreground tabular-nums">
+                                    {plural(custom.length, "model")}
+                                </span>
+                            }
+                        >
+                            {firstRun ? (
+                                <GetStarted onDiscover={onDiscover} onCreate={onCreate} />
+                            ) : (
+                                <SortableTable
+                                    columns={customTable}
+                                    rows={custom}
+                                    onOpen={(row) => on.open(detailHref(row))}
+                                    rowLabel={(row) => `${row.name}, custom model`}
+                                    empty={noMatch}
+                                    minWidth="min-w-[880px]"
+                                />
+                            )}
+                        </PanelSection>
+                    )}
+                    {showBase && (
+                        <PanelSection
+                            icon={Layers}
+                            title="Base models"
+                            bare
+                            actions={
+                                <span className="text-sm text-muted-foreground tabular-nums">
+                                    {plural(base.length, "model")}
+                                    {baseBytes > 0 ? ` · ${bytes(baseBytes)}` : ""}
+                                </span>
+                            }
+                        >
+                            <SortableTable
+                                columns={baseTable}
+                                rows={base}
+                                onOpen={(row) => on.open(detailHref(row))}
+                                rowLabel={(row) => `${row.name}, base model`}
+                                empty={noBase}
+                                minWidth="min-w-[880px]"
+                            />
+                        </PanelSection>
+                    )}
+                </PanelSections>
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />

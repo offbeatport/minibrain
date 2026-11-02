@@ -1,7 +1,10 @@
 import shutil
 from pathlib import Path
+from typing import BinaryIO
 
 from fastapi import APIRouter, UploadFile
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.policies import LOCAL_USER
@@ -21,7 +24,7 @@ from minibrain.api.schemas import (
     QueryResponse,
 )
 from minibrain.api.views import detail, job_info, staging_path, summary
-from minibrain.artifacts import Packing
+from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import quality, snapshot
 from minibrain.data.sources import describe, labelled_rows, mapping_sql, run_query, safe_filename, stage, to_text
@@ -30,8 +33,15 @@ from minibrain.jobs.specs import prepare_params
 from minibrain.models.registry import trainable_bases
 from minibrain.registry.files import ArtifactKind, register, snapshot_dir
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
-from minibrain.registry.service import ConflictError, create_minibrain, get_minibrain, latest_snapshot, list_minibrains
-from minibrain.settings import Settings
+from minibrain.registry.service import (
+    ConflictError,
+    create_minibrain,
+    get_minibrain,
+    latest_snapshot,
+    list_minibrains,
+    slugify,
+)
+from minibrain.settings import Settings, sample_file
 from minibrain.tasks.classify import trained_messages
 
 router = APIRouter(prefix="/api/minibrains", tags=["minibrains"])
@@ -121,13 +131,15 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
 
 
-@router.post("/{slug}/source")
-def upload_source(
-    slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
-) -> MinibrainDetail:
-    minibrain = get_minibrain(session, slug)
-    filename = safe_filename(file.filename or "")
-    stored = store.put_stream(file.file)
+SAMPLE_NAME = "Travel intents (sample)"
+SAMPLE_FILE = "travel_intents.jsonl"
+SAMPLE_DESCRIPTION = "Sample: sort travel support messages into intents such as lost luggage or refunds."
+
+
+def attach_source(
+    session: Session, settings: Settings, store: ArtifactStore, minibrain: Minibrain, filename: str, stream: BinaryIO
+) -> None:
+    stored = store.put_stream(stream)
     artifact = register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
     staging = staging_path(settings, minibrain)
     staging.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +151,30 @@ def upload_source(
     minibrain.input_column = input_column
     minibrain.label_column = label_column
     minibrain.sql = mapping_sql(input_column, label_column) if input_column and label_column else None
+
+
+@router.post("/{slug}/source")
+def upload_source(
+    slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> MinibrainDetail:
+    minibrain = get_minibrain(session, slug)
+    attach_source(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
+    session.commit()
+    return detail(settings, minibrain)
+
+
+def free_name(session: Session, name: str) -> str:
+    taken = set(session.scalars(select(Minibrain.slug)))
+    candidates = (name if number == 1 else f"{name} {number}" for number in range(1, 1000))
+    return next(candidate for candidate in candidates if slugify(candidate) not in taken)
+
+
+@router.post("/sample", status_code=201)
+def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> MinibrainDetail:
+    minibrain = create_minibrain(session, free_name(session, SAMPLE_NAME), "classify", DEFAULT_BASE_MODEL)
+    minibrain.description = SAMPLE_DESCRIPTION
+    with sample_file(SAMPLE_FILE).open("rb") as stream:
+        attach_source(session, settings, store, minibrain, SAMPLE_FILE, stream)
     session.commit()
     return detail(settings, minibrain)
 

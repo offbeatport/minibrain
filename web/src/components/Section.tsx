@@ -31,12 +31,14 @@ export function PanelSection({
     title,
     description,
     actions,
+    bare = false,
     children,
 }: {
     icon: LucideIcon;
     title: string;
     description?: ReactNode;
     actions?: ReactNode;
+    bare?: boolean;
     children: ReactNode;
 }) {
     return (
@@ -56,7 +58,7 @@ export function PanelSection({
                 </div>
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
             </header>
-            <div className="rounded-lg border bg-card p-4">{children}</div>
+            {bare ? children : <div className="rounded-lg border bg-card p-4">{children}</div>}
         </section>
     );
 }

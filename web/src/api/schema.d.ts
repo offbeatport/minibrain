@@ -75,6 +75,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Sample */
+        post: operations["create_sample_api_minibrains_sample_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/mapping": {
         parameters: {
             query?: never;
@@ -1150,6 +1167,14 @@ export interface components {
             publisher?: string | null;
             /** Size Bytes */
             size_bytes?: number | null;
+            /**
+             * Stages
+             * @default []
+             */
+            stages?: components["schemas"]["Stage"][];
+            /** Accuracy */
+            accuracy?: number | null;
+            usage?: components["schemas"]["Usage"] | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1947,6 +1972,14 @@ export interface components {
             publisher?: string | null;
             /** Size Bytes */
             size_bytes?: number | null;
+            /**
+             * Stages
+             * @default []
+             */
+            stages?: components["schemas"]["Stage"][];
+            /** Accuracy */
+            accuracy?: number | null;
+            usage?: components["schemas"]["Usage"] | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -2149,6 +2182,23 @@ export interface components {
             /** Invalid Rate */
             invalid_rate: number;
         };
+        /** Stage */
+        Stage: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "data" | "train" | "evaluate" | "deploy";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "todo" | "active" | "done" | "failed";
+            /** Label */
+            label: string;
+            /** Progress */
+            progress?: number | null;
+        };
         /** StoredArtifact */
         StoredArtifact: {
             /** Id */
@@ -2202,6 +2252,13 @@ export interface components {
         TokenBody: {
             /** Token */
             token: string;
+        };
+        /** Usage */
+        Usage: {
+            /** Daily */
+            daily: number[];
+            /** P50 Ms */
+            p50_ms: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2492,6 +2549,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_sample_api_minibrains_sample_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
                 };
             };
         };
