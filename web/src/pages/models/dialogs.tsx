@@ -8,6 +8,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Field,
     Input,
     Label,
     Textarea,
@@ -34,21 +35,6 @@ export function splitTags(text: string): string[] {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean);
-}
-
-export function Field({
-    id,
-    label,
-    children,
-    hint,
-}: { id: string; label: string; children: ReactNode; hint?: string }) {
-    return (
-        <div className="flex flex-col gap-1">
-            <Label htmlFor={id}>{label}</Label>
-            {children}
-            {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
-        </div>
-    );
 }
 
 export function EditModelDialog({
@@ -108,7 +94,7 @@ export function EditModelDialog({
                         event.preventDefault();
                         save.mutate();
                     }}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-5"
                 >
                     <DialogHeader>
                         <DialogTitle>Edit {row?.name}</DialogTitle>

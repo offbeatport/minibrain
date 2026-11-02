@@ -16,6 +16,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Field,
     Input,
     Label,
 } from "obp-ui";
@@ -154,7 +155,7 @@ function KeyDialog({
                         event.preventDefault();
                         save.mutate();
                     }}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-5"
                 >
                     <DialogHeader>
                         <DialogTitle>
@@ -167,8 +168,7 @@ function KeyDialog({
                         </DialogDescription>
                     </DialogHeader>
                     {creating && (
-                        <div className="flex flex-col gap-1">
-                            <Label htmlFor="key-name">Name</Label>
+                        <Field id="key-name" label="Name">
                             <Input
                                 id="key-name"
                                 value={name}
@@ -176,7 +176,7 @@ function KeyDialog({
                                 placeholder="helpdesk-app"
                                 maxLength={60}
                             />
-                        </div>
+                        </Field>
                     )}
                     <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium">Models</span>

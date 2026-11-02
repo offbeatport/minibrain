@@ -4,7 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     DataGrid,
-    Label,
+    Field,
     Link,
     Select,
     SelectContent,
@@ -144,8 +144,7 @@ function ColumnSelect({
     onChange: (value: string) => void;
 }) {
     return (
-        <div className="flex flex-col gap-1">
-            <Label htmlFor={id}>{label}</Label>
+        <Field id={id} label={label}>
             <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
                 <SelectTrigger id={id} className="w-56">
                     <SelectValue placeholder="Pick a column" />
@@ -158,7 +157,7 @@ function ColumnSelect({
                     ))}
                 </SelectContent>
             </Select>
-        </div>
+        </Field>
     );
 }
 

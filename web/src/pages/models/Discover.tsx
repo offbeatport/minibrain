@@ -14,6 +14,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Field,
     Input,
     Label,
     Link,
@@ -467,8 +468,7 @@ function AddFromHubDialog({
                             {`Find any model on ${endpoint}, then paste its link or id. minibrain reads that one model's details now and adds it to Discover as untested unless our engines support its architecture.`}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="hub-repo">Model link or id</Label>
+                    <Field id="hub-repo" label="Model link or id">
                         <Input
                             id="hub-repo"
                             value={repo}
@@ -476,7 +476,7 @@ function AddFromHubDialog({
                             placeholder="Qwen/Qwen3-8B"
                             autoFocus
                         />
-                    </div>
+                    </Field>
                     <ErrorLine error={add.error} />
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

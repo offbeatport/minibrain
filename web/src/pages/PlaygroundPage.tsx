@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import {
     Button,
-    Label,
+    Field,
     Select,
     SelectContent,
     SelectItem,
@@ -37,8 +37,7 @@ function VersionPicker({
     allowNone?: boolean;
 }) {
     return (
-        <div className="flex flex-col gap-1">
-            <Label htmlFor={id}>{label}</Label>
+        <Field id={id} label={label}>
             <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
                 <SelectTrigger id={id} className="w-40">
                     <SelectValue />
@@ -52,7 +51,7 @@ function VersionPicker({
                     ))}
                 </SelectContent>
             </Select>
-        </div>
+        </Field>
     );
 }
 

@@ -18,6 +18,8 @@ import {
 import {
     Button,
     Checkbox,
+    Field,
+    FieldGroup,
     Input,
     Label,
     Link,
@@ -45,7 +47,7 @@ import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { DatasetMapping } from "../DataLibrary";
 import { bestFit } from "./DiscoverFilters";
-import { Field, splitTags, useModelsRefresh } from "./dialogs";
+import { splitTags, useModelsRefresh } from "./dialogs";
 
 type BaseSource = "installed" | "import";
 type DataSource = "upload" | "dataset" | "sample";
@@ -314,7 +316,7 @@ function ImportPath({
     loading: boolean;
 }) {
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
             <span className="flex items-center gap-1.5">
                 <label htmlFor="import-location" className="text-sm font-medium">
                     Folder or S3 path
@@ -648,8 +650,8 @@ export function AddModelPage() {
                         </div>
                     </PanelSection>
                     <PanelSection icon={SquarePen} title="Details">
-                        <div className="flex flex-col gap-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
+                        <FieldGroup>
+                            <div className="grid gap-5 sm:grid-cols-2">
                                 <Field id="create-name" label="Name">
                                     <Input
                                         id="create-name"
@@ -676,7 +678,7 @@ export function AddModelPage() {
                                     onChange={(event) => setTags(event.target.value)}
                                 />
                             </Field>
-                        </div>
+                        </FieldGroup>
                     </PanelSection>
                     <PanelSection icon={Database} title="Training data">
                         <div className="flex flex-col gap-3">

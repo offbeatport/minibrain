@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Button, Input, Label } from "obp-ui";
+import { Button, Field, Input } from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { isActiveJob, useJobs, useMinibrain } from "~/api/queries";
@@ -33,8 +33,7 @@ function CreateVersion({ slug }: { slug: string }) {
                     Score prompt-only version
                 </Button>
                 <div className="flex flex-wrap items-end gap-2">
-                    <div className="flex flex-col gap-1">
-                        <Label htmlFor="max-rows">Training rows</Label>
+                    <Field id="max-rows" label="Training rows">
                         <Input
                             id="max-rows"
                             className="w-28 tabular-nums"
@@ -42,9 +41,8 @@ function CreateVersion({ slug }: { slug: string }) {
                             value={maxRows}
                             onChange={(event) => setMaxRows(event.target.value)}
                         />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <Label htmlFor="epochs">Epochs</Label>
+                    </Field>
+                    <Field id="epochs" label="Epochs">
                         <Input
                             id="epochs"
                             className="w-20 tabular-nums"
@@ -52,7 +50,7 @@ function CreateVersion({ slug }: { slug: string }) {
                             value={epochs}
                             onChange={(event) => setEpochs(event.target.value)}
                         />
-                    </div>
+                    </Field>
                     <Button onClick={train} disabled={create.isPending}>
                         Train new version
                     </Button>
