@@ -331,9 +331,8 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
     }
     harness.client.post("/api/minibrains", json={"name": "Draft"})
     assert rows(harness)["draft"]["activity"]["label"] == "Needs examples"
-    harness.client.patch("/api/minibrains/draft", json={"archived": True, "tags": ["x"]})
-    assert "draft" not in rows(harness)
-    assert rows(harness, "?archived=true")["draft"]["archived"] is True
+    harness.client.patch("/api/minibrains/draft", json={"tags": ["x"]})
+    assert rows(harness)["draft"]["tags"] == ["x"]
 
 
 def test_ready_candidate_is_reported(harness: Harness) -> None:

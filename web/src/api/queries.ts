@@ -160,10 +160,10 @@ export function useInstallSettings() {
     });
 }
 
-export function useModels(archived: boolean) {
+export function useModels() {
     return useQuery({
-        queryKey: [...keys.models, { archived }],
-        queryFn: () => unwrap(api.GET("/api/models", { params: { query: { archived } } })),
+        queryKey: keys.models,
+        queryFn: () => unwrap(api.GET("/api/models")),
         refetchInterval: (query) => (query.state.data?.some(isModelMoving) ? POLL_MS : 15000),
     });
 }

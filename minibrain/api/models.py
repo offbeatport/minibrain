@@ -81,11 +81,8 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
 
 
 @router.get("")
-def list_models(
-    request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep, archived: bool = False
-) -> list[ModelRow]:
-    rows = all_rows(session, settings, store, health_for(request))
-    return [row for row in rows if archived or not row.archived]
+def list_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
+    return all_rows(session, settings, store, health_for(request))
 
 
 @router.get("/sources")
@@ -119,8 +116,6 @@ def update_base(
         model.description = body.description.strip()
     if body.tags is not None:
         model.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
-    if body.archived is not None:
-        model.archived_at = now() if body.archived else None
     model.updated_at = now()
     session.commit()
     return detail_of(session, settings, request, model)

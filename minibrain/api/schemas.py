@@ -370,7 +370,6 @@ class ModelRow(BaseModel):
     name: str
     description: str
     tags: list[str]
-    archived: bool
     base_model: str | None
     availability: Availability
     activity: Activity
@@ -421,7 +420,6 @@ class ModelUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=280)
     tags: list[str] | None = None
-    archived: bool | None = None
 
 
 class ImportRequest(BaseModel):

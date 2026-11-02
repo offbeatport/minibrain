@@ -223,7 +223,7 @@ def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
     if entry.origin != "hub":
         raise ConflictError("Only models added from Hugging Face can be removed from the catalogue")
     if session.scalar(select(Model.id).where(Model.catalog_id == catalog_id).limit(1)) is not None:
-        raise ConflictError(f"{entry.name} is on this install; archive or remove the model first")
+        raise ConflictError(f"{entry.name} is on this install; delete the model first")
     session.delete(entry)
     session.commit()
 

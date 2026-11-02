@@ -1329,8 +1329,6 @@ export interface components {
             description: string;
             /** Tags */
             tags: string[];
-            /** Archived */
-            archived: boolean;
             /** Base Model */
             base_model: string | null;
             availability: components["schemas"]["Availability"];
@@ -2236,8 +2234,6 @@ export interface components {
             description: string;
             /** Tags */
             tags: string[];
-            /** Archived */
-            archived: boolean;
             /** Base Model */
             base_model: string | null;
             availability: components["schemas"]["Availability"];
@@ -2295,8 +2291,6 @@ export interface components {
             description?: string | null;
             /** Tags */
             tags?: string[] | null;
-            /** Archived */
-            archived?: boolean | null;
         };
         /** NodeInfo */
         NodeInfo: {
@@ -3550,9 +3544,7 @@ export interface operations {
     };
     list_models_api_models_get: {
         parameters: {
-            query?: {
-                archived?: boolean;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3566,15 +3558,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelRow"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

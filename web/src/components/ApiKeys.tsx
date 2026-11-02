@@ -36,7 +36,7 @@ function refOf(id: string): ModelRef {
 }
 
 function useChoices(): Choice[] {
-    const { data } = useModels(false);
+    const { data } = useModels();
     return useMemo(
         () =>
             (data ?? [])

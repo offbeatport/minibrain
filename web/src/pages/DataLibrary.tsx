@@ -319,7 +319,7 @@ export function DataLibrary() {
 
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const refresh = useDataRefresh();
-    const models = useModels(false);
+    const models = useModels();
     const candidates = (models.data ?? []).filter(
         (row) => row.kind === "custom" && !dataset.models.includes(row.key),
     );

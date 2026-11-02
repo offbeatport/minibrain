@@ -1,8 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
-    Archive,
-    ArchiveRestore,
     CircleX,
     Eye,
     FlaskConical,
@@ -24,7 +22,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
-    Label,
     Link,
     SegmentedTabs,
     Select,
@@ -32,7 +29,6 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -239,15 +235,6 @@ function setDeployed(row: ModelRow, deployed: boolean) {
           );
 }
 
-function setArchived(row: ModelRow, archived: boolean) {
-    const body = { archived };
-    return row.kind === "base"
-        ? unwrap(api.PATCH("/api/models/base/{key}", { params: { path: { key: row.key } }, body }))
-        : unwrap(
-              api.PATCH("/api/minibrains/{slug}", { params: { path: { slug: row.key } }, body }),
-          );
-}
-
 function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () => void } | null {
     const deployed = row.deployment.state === "running";
     if (row.kind === "base") {
@@ -275,27 +262,6 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
         return { label: "Test", run: () => on.test(row) };
     }
     return null;
-}
-
-function archiveConfirmation(row: ModelRow, on: Handlers): Confirmation {
-    const deployed = row.deployment.state !== "not_deployed";
-    return {
-        title: row.archived ? `Restore ${row.name}?` : `Archive ${row.name}?`,
-        description: row.archived ? (
-            <p>It shows in Models again.</p>
-        ) : (
-            <>
-                <p>It is hidden from Models; use Show archived to find it again.</p>
-                <p>
-                    {deployed
-                        ? "Its deployment keeps running and its files stay in storage. Undeploy it separately if needed."
-                        : "Its files stay in storage."}
-                </p>
-            </>
-        ),
-        confirmLabel: row.archived ? "Restore" : "Archive",
-        run: () => setArchived(row, !row.archived).then(on.refresh),
-    };
 }
 
 function deleteModel(row: ModelRow) {
@@ -560,10 +526,6 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => on.confirm(archiveConfirmation(row, on))}>
-                        {row.archived ? <ArchiveRestore /> : <Archive />}
-                        {row.archived ? "Restore" : "Archive"}
-                    </DropdownMenuItem>
                     <DropdownMenuItem
                         variant="destructive"
                         onSelect={() => on.confirm(deleteConfirmation(row, on))}
@@ -826,8 +788,7 @@ export function MyModels({
 }) {
     const router = useRouter();
     const refresh = useModelsRefresh();
-    const archived = search.archived === "true";
-    const models = useModels(archived);
+    const models = useModels();
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -877,7 +838,7 @@ export function MyModels({
     const active = chips(search);
     const filtering = active.length > 0;
     const clear = () => update(CLEARED);
-    const firstRun = !rows.some((row) => row.kind === "custom") && !filtering && !archived;
+    const firstRun = !rows.some((row) => row.kind === "custom") && !filtering;
     const stateTabs = [
         { key: "all", label: "All", badge: facetCount("state", () => true) },
         ...STATE_RANK.map((state) => ({
@@ -944,16 +905,6 @@ export function MyModels({
                         onChange={(tag) => update({ tag })}
                     />
                 )}
-                <div className="ml-auto flex items-center gap-2">
-                    <Switch
-                        id="show-archived"
-                        checked={archived}
-                        onCheckedChange={(checked) => update({ archived: checked ? "true" : "" })}
-                    />
-                    <Label htmlFor="show-archived" className="text-sm text-muted-foreground">
-                        Show archived
-                    </Label>
-                </div>
             </div>
             {filtering && (
                 <div className="flex flex-wrap items-center gap-2">

@@ -222,7 +222,7 @@ const ENDPOINT_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
 
 export function DeploymentsPage() {
     const router = useRouter();
-    const models = useModels(false);
+    const models = useModels();
     const live = (models.data ?? []).filter((row) => row.deployment.state !== "not_deployed");
     return (
         <Page>
@@ -339,7 +339,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
 
 export function EndpointPage() {
     const { slug } = useParams({ strict: false }) as { slug?: string };
-    const models = useModels(true);
+    const models = useModels();
     const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
     return (
         <Page>

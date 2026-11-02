@@ -411,7 +411,7 @@ export function BaseModelPage() {
 
 export function CustomModelPage() {
     const { slug } = useParams({ strict: false }) as { slug?: string };
-    const models = useModels(true);
+    const models = useModels();
     const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
     return (
         <Page>

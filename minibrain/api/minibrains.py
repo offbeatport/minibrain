@@ -76,8 +76,6 @@ def update(slug: str, body: ModelUpdate, session: SessionDep, settings: Settings
         minibrain.description = body.description.strip()
     if body.tags is not None:
         minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
-    if body.archived is not None:
-        minibrain.archived_at = now() if body.archived else None
     minibrain.updated_at = now()
     session.commit()
     return detail(settings, minibrain)

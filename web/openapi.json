@@ -1103,39 +1103,17 @@
         ],
         "summary": "List Models",
         "operationId": "list_models_api_models_get",
-        "parameters": [
-          {
-            "name": "archived",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Archived"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ModelRow"
                   },
+                  "type": "array",
                   "title": "Response List Models Api Models Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -3869,10 +3847,6 @@
             "type": "array",
             "title": "Tags"
           },
-          "archived": {
-            "type": "boolean",
-            "title": "Archived"
-          },
           "base_model": {
             "anyOf": [
               {
@@ -4171,7 +4145,6 @@
           "name",
           "description",
           "tags",
-          "archived",
           "base_model",
           "availability",
           "activity",
@@ -6582,10 +6555,6 @@
             "type": "array",
             "title": "Tags"
           },
-          "archived": {
-            "type": "boolean",
-            "title": "Archived"
-          },
           "base_model": {
             "anyOf": [
               {
@@ -6750,7 +6719,6 @@
           "name",
           "description",
           "tags",
-          "archived",
           "base_model",
           "availability",
           "activity",
@@ -6805,17 +6773,6 @@
               }
             ],
             "title": "Tags"
-          },
-          "archived": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived"
           }
         },
         "type": "object",

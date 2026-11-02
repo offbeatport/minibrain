@@ -116,7 +116,6 @@ class Minibrain(Base):
     last_version: Mapped[int] = mapped_column(default=-1, server_default="-1")
     description: Mapped[str] = mapped_column(default="", server_default="")
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
-    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
@@ -379,7 +378,6 @@ class Model(Base):
     license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     deployed: Mapped[bool] = mapped_column(default=False)
     verified: Mapped[bool] = mapped_column(default=False, server_default=false())
-    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
