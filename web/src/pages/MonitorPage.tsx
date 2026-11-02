@@ -265,6 +265,7 @@ export function MonitorPage() {
                     rows={visible}
                     storageKey="minibrain.jobs.columns"
                     columnPicker
+                    hiddenColumns={["id", "attempt"]}
                     onOpen={(job) => {
                         const href = jobHref(job);
                         if (href) {

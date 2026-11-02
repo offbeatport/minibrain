@@ -47,9 +47,8 @@ function differences(versions: Record<string, string>, main: Record<string, stri
     ).map((name) => `${name} ${versions[name]} (main has ${main[name]})`);
 }
 
-function VersionCell({ node, main }: { node: NodeInfo; main: Record<string, string> }) {
+function VersionCell({ node }: { node: NodeInfo }) {
     const versions = node.versions ?? {};
-    const differs = node.roles.includes("main") ? [] : differences(versions, main);
     const listed = Object.entries(versions)
         .map(([name, value]) => `${name} ${value}`)
         .join(" · ");
@@ -61,43 +60,53 @@ function VersionCell({ node, main }: { node: NodeInfo; main: Record<string, stri
                 </TooltipTrigger>
                 <TooltipContent>{listed || "Not reported"}</TooltipContent>
             </Tooltip>
-            {differs.length > 0 && (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <span className="rounded-sm">
-                            <Badge variant="warning">Differs from main</Badge>
-                        </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{differs.join("; ")}</TooltipContent>
-                </Tooltip>
-            )}
         </span>
+    );
+}
+
+function VersionWarning({ node, main }: { node: NodeInfo; main: Record<string, string> }) {
+    const differs = node.roles.includes("main") ? [] : differences(node.versions ?? {}, main);
+    if (differs.length === 0) {
+        return null;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="rounded-sm">
+                    <Badge variant="warning">Version differs</Badge>
+                </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">
+                {differs.join("; ")}
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
 function nodeColumns(main: Record<string, string>): ColumnDef<NodeInfo, unknown>[] {
     return [
+        {
+            header: "Machine",
+            id: "host",
+            enableHiding: false,
+            cell: ({ row }) => (
+                <span className="flex items-center gap-2">
+                    <span className="font-mono">{row.original.host}</span>
+                    {!row.original.online && <Badge variant="warning">Offline</Badge>}
+                    <VersionWarning node={row.original} main={main} />
+                </span>
+            ),
+        },
         ...NODE_COLUMNS,
         {
             header: "Version",
             id: "version",
-            cell: ({ row }) => <VersionCell node={row.original} main={main} />,
+            cell: ({ row }) => <VersionCell node={row.original} />,
         },
     ];
 }
 
 const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
-    {
-        header: "Machine",
-        id: "host",
-        enableHiding: false,
-        cell: ({ row }) => (
-            <span className="flex items-center gap-2">
-                <span className="font-mono">{row.original.host}</span>
-                {!row.original.online && <Badge variant="warning">Offline</Badge>}
-            </span>
-        ),
-    },
     { header: "Role", id: "roles", cell: ({ row }) => row.original.roles.join(", ") },
     {
         header: "Accelerator",
@@ -171,7 +180,7 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
                     empty="No machines yet."
                     storageKey="minibrain.machines.columns"
                     columnPicker
-                    hiddenColumns={["cpu", "engines"]}
+                    hiddenColumns={["cpu", "engines", "version"]}
                     dropOrder={["engines", "cpu", "seen", "version", "usable", "roles"]}
                 />
                 {pool.engines.length > 0 && (
