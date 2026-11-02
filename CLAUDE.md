@@ -33,8 +33,9 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - No outbound telemetry, ever: the product runs air-gapped. obp-base OpenPanel and Sentry stay off by default or point
   at self-hosted instances.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
-- obp-ui theme: exactly the kit's defaults (tokens, fonts, radius); no preset and no overrides in
-  `web/src/styles.css` (2026-11-02).
+- obp-ui theme: the kit's Cobalt preset, applied from obp-ui in `web/src/lib/theme.ts` (`themePresetStyle`, re-applied
+  when light/dark changes). Never copy or override its tokens in `web/src/styles.css` (2026-11-02). Cobalt's type
+  pairing (Inter, Space Grotesk, JetBrains Mono) needs `obp-ui/fonts-alt.css`.
 - Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
   user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.
 - `PanelSection` (`web/src/components/Section.tsx`) puts an icon before each section title, with the title and
