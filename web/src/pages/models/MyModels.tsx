@@ -111,7 +111,7 @@ export function Availability({ row }: { row: ModelRow }) {
     const label = AVAILABILITY_LABELS[state];
     const moving = state === "downloading" || state === "importing";
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
             <StatusText tone={AVAILABILITY_TONES[state]}>
                 {label}
                 {moving && percent(progress) && (
@@ -147,7 +147,7 @@ export function Activity({ row }: { row: ModelRow }) {
                 ? jobHref(row)
                 : null;
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
             {href ? (
                 <Link href={href} className="hover:underline">
                     {text}
@@ -610,7 +610,7 @@ function StatusCell({ entry }: { entry: Entry }) {
         const verb = version.status === "training" ? "Training" : "Scoring";
         const share = version.progress ? ` · ${Math.round(version.progress * 100)}%` : "";
         return (
-            <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
                 <StatusText tone="info">
                     {verb}
                     <span className="tabular-nums">{share}</span>
@@ -630,52 +630,31 @@ function StatusCell({ entry }: { entry: Entry }) {
 
 function ModelName({ entry }: { entry: Entry }) {
     const { model } = entry;
-    const detail =
-        model.kind === "custom"
-            ? `Custom · on ${model.base_model}`
-            : `Base${model.size_bytes ? ` · ${bytes(model.size_bytes)}` : ""}`;
     return (
-        <div className="flex min-w-52 max-w-72 items-start gap-3">
-            <PublisherLogo publisher={model.publisher} name={model.name} />
-            <div className="flex min-w-0 flex-col">
-                <Link href={detailHref(model)} className="font-semibold text-foreground">
-                    {model.name}
-                </Link>
-                <span className="truncate text-sm text-muted-foreground">{detail}</span>
-            </div>
+        <div className="flex min-w-48 items-center gap-2.5">
+            <PublisherLogo publisher={model.publisher} name={model.name} size="sm" />
+            <Link href={detailHref(model)} className="truncate font-semibold text-foreground">
+                {model.name}
+            </Link>
         </div>
     );
 }
 
-function versionDetail(version: NonNullable<Entry["version"]>): string {
-    const kind = KIND_LABELS[version.kind] ?? version.kind;
-    return version.accuracy === null ? kind : `${kind} · ${Math.round(version.accuracy * 100)}%`;
-}
+const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-function VersionCell({ entry }: { entry: Entry }) {
-    const { model, version } = entry;
-    if (version) {
-        return (
-            <span className="flex flex-col tabular-nums">
-                <span>{`v${version.number}`}</span>
-                <span className="text-sm text-muted-foreground">{versionDetail(version)}</span>
-            </span>
-        );
+function versionLabel(entry: Entry): string {
+    if (entry.version) {
+        return `v${entry.version.number}`;
     }
-    if (model.kind === "base") {
-        return model.revision ? (
-            <span className="font-mono text-muted-foreground" title={model.revision}>
-                {model.revision.slice(0, 7)}
-            </span>
-        ) : (
-            <span className="text-muted-foreground">—</span>
-        );
-    }
-    return <span className="text-muted-foreground">No versions yet</span>;
+    return entry.model.kind === "base" ? (entry.model.revision?.slice(0, 7) ?? "—") : "—";
 }
 
 function requestTotal(entry: Entry): number {
     return (usageOf(entry)?.daily ?? []).reduce((sum, value) => sum + value, 0);
+}
+
+function lastUsed(entry: Entry): string {
+    return usageOf(entry)?.last_at ?? "";
 }
 
 function modelOrder(entry: Entry): string {
@@ -683,19 +662,73 @@ function modelOrder(entry: Entry): string {
     return `${entry.model.name.toLowerCase()} ${number}`;
 }
 
+const HIDDEN_COLUMNS = ["base", "kind", "tags", "updated"];
+
 function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
     return [
         {
             id: "model",
             header: "Model",
+            enableHiding: false,
             accessorFn: modelOrder,
             cell: ({ row }) => <ModelName entry={row.original} />,
+        },
+        {
+            id: "type",
+            header: "Type",
+            accessorFn: (entry) => entry.model.kind,
+            cell: ({ row }) => (row.original.model.kind === "custom" ? "Custom" : "Base"),
+        },
+        {
+            id: "base",
+            header: "Base model",
+            accessorFn: (entry) => entry.model.base_model ?? "",
+            cell: ({ row }) =>
+                row.original.model.base_model ? (
+                    <span className="font-mono">{row.original.model.base_model}</span>
+                ) : (
+                    muted("—")
+                ),
         },
         {
             id: "version",
             header: "Version",
             accessorFn: (entry) => entry.version?.number ?? -1,
-            cell: ({ row }) => <VersionCell entry={row.original} />,
+            cell: ({ row }) =>
+                row.original.version ? (
+                    <span className="tabular-nums">{versionLabel(row.original)}</span>
+                ) : row.original.model.kind === "base" && row.original.model.revision ? (
+                    <span
+                        className="font-mono text-muted-foreground"
+                        title={row.original.model.revision}
+                    >
+                        {versionLabel(row.original)}
+                    </span>
+                ) : (
+                    muted("—")
+                ),
+        },
+        {
+            id: "kind",
+            header: "Kind",
+            accessorFn: (entry) =>
+                entry.version ? (KIND_LABELS[entry.version.kind] ?? entry.version.kind) : "",
+            cell: ({ row }) =>
+                row.original.version
+                    ? (KIND_LABELS[row.original.version.kind] ?? row.original.version.kind)
+                    : muted("—"),
+        },
+        {
+            id: "score",
+            header: "Score",
+            accessorFn: (entry) => entry.version?.accuracy ?? -1,
+            cell: ({ row }) =>
+                row.original.version?.accuracy === null ||
+                row.original.version?.accuracy === undefined ? (
+                    muted("—")
+                ) : (
+                    <span className="tabular-nums">{`${Math.round(row.original.version.accuracy * 100)}%`}</span>
+                ),
         },
         {
             id: "status",
@@ -705,14 +738,58 @@ function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
         },
         {
             id: "requests",
-            header: "Requests, last 7 days",
+            header: "Requests, 7 days",
             accessorFn: requestTotal,
             cell: ({ row }) => <Requests usage={usageOf(row.original)} />,
+        },
+        {
+            id: "used",
+            header: "Last used",
+            accessorFn: lastUsed,
+            cell: ({ row }) => {
+                const at = lastUsed(row.original);
+                return at ? <span title={exactTime(at)}>{relativeTime(at)}</span> : muted("Never");
+            },
+        },
+        {
+            id: "size",
+            header: "Size",
+            accessorFn: (entry) => entry.model.size_bytes ?? 0,
+            cell: ({ row }) =>
+                row.original.model.size_bytes ? (
+                    <span className="tabular-nums">{bytes(row.original.model.size_bytes)}</span>
+                ) : (
+                    muted("—")
+                ),
+        },
+        {
+            id: "tags",
+            header: "Tags",
+            accessorFn: (entry) => entry.model.tags.join(", "),
+            cell: ({ row }) =>
+                row.original.model.tags.length ? (
+                    <span className="block max-w-48 truncate">
+                        {row.original.model.tags.join(", ")}
+                    </span>
+                ) : (
+                    muted("—")
+                ),
+        },
+        {
+            id: "updated",
+            header: "Updated",
+            accessorFn: (entry) => entry.model.updated_at,
+            cell: ({ row }) => (
+                <span title={exactTime(row.original.model.updated_at)}>
+                    {relativeTime(row.original.model.updated_at)}
+                </span>
+            ),
         },
         {
             id: "actions",
             header: () => <span className="sr-only">Actions</span>,
             enableSorting: false,
+            enableHiding: false,
             cell: ({ row }) => <RowActions entry={row.original} on={on} />,
         },
     ];
@@ -871,6 +948,8 @@ export function MyModels({
                     columns={tableColumns}
                     rows={visible}
                     storageKey="minibrain.models.columns"
+                    columnPicker
+                    hiddenColumns={HIDDEN_COLUMNS}
                     onOpen={(entry) => on.open(detailHref(entry.model))}
                     rowLabel={(entry) =>
                         `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`

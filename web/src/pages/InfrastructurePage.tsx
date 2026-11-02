@@ -90,6 +90,7 @@ const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
     {
         header: "Machine",
         id: "host",
+        enableHiding: false,
         cell: ({ row }) => (
             <span className="flex items-center gap-2">
                 <span className="font-mono">{row.original.host}</span>
@@ -99,18 +100,20 @@ const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
     },
     { header: "Role", id: "roles", cell: ({ row }) => row.original.roles.join(", ") },
     {
-        header: "Hardware",
+        header: "Accelerator",
         id: "hardware",
+        cell: ({ row }) => row.original.accelerator_name || row.original.accelerator,
+    },
+    {
+        header: "Memory for models",
+        id: "usable",
+        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.usable_bytes)}</span>,
+    },
+    {
+        header: "CPU and RAM",
+        id: "cpu",
         cell: ({ row }) => (
-            <span className="flex flex-col">
-                <span>
-                    {row.original.accelerator_name || row.original.accelerator}
-                    <span className="tabular-nums">{` · ${bytes(row.original.usable_bytes)} for models`}</span>
-                </span>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {`${row.original.cpu_count} cores · ${bytes(row.original.ram_bytes)} RAM`}
-                </span>
-            </span>
+            <span className="tabular-nums">{`${row.original.cpu_count} cores · ${bytes(row.original.ram_bytes)}`}</span>
         ),
     },
     {
@@ -162,7 +165,14 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
             description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
         >
             <div className="flex flex-col gap-3">
-                <DataGrid columns={nodeColumns(main)} rows={pool.nodes} empty="No machines yet." />
+                <DataGrid
+                    columns={nodeColumns(main)}
+                    rows={pool.nodes}
+                    empty="No machines yet."
+                    storageKey="minibrain.machines.columns"
+                    columnPicker
+                    hiddenColumns={["cpu", "engines"]}
+                />
                 {pool.engines.length > 0 && (
                     <DataGrid columns={REPLICA_COLUMNS} rows={pool.engines} />
                 )}
@@ -289,17 +299,13 @@ const STORE_KIND: Record<StoreInfo["kind"], string> = {
 
 const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
     { header: "Holds", accessorKey: "name" },
+    { header: "Kind", id: "kind", cell: ({ row }) => STORE_KIND[row.original.kind] },
     {
         header: "Where",
         id: "location",
         cell: ({ row }) => (
-            <span className="flex flex-col">
-                <span className="text-sm text-muted-foreground">
-                    {STORE_KIND[row.original.kind]}
-                </span>
-                <span className="font-mono break-all whitespace-normal">
-                    {row.original.location}
-                </span>
+            <span className="block max-w-64 truncate font-mono" title={row.original.location}>
+                {row.original.location}
             </span>
         ),
     },

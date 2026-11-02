@@ -17,7 +17,7 @@ import { ApiKeys } from "~/components/ApiKeys";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
-import { Requests, failingShare } from "~/components/models/ModelMetrics";
+import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
 import { count, percent } from "~/lib/format";
 import { Deployment as DeploymentCell } from "./models/MyModels";
@@ -161,24 +161,29 @@ function DeploymentStatus({ row }: { row: ModelRow }) {
 const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
     {
         id: "model",
-        header: "Model name",
-        accessorFn: (row) => row.key,
+        header: "Model",
+        accessorFn: (row) => row.name.toLowerCase(),
         cell: ({ row }) => (
-            <div className="flex min-w-52 items-start gap-3">
-                <PublisherLogo publisher={row.original.publisher} name={row.original.name} />
-                <div className="flex min-w-0 flex-col">
-                    <Link
-                        href={deploymentHref(row.original)}
-                        className="font-mono font-semibold text-foreground"
-                    >
-                        {row.original.key}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                        {row.original.name}
-                    </span>
-                </div>
+            <div className="flex min-w-44 items-center gap-2.5">
+                <PublisherLogo
+                    publisher={row.original.publisher}
+                    name={row.original.name}
+                    size="sm"
+                />
+                <Link
+                    href={deploymentHref(row.original)}
+                    className="truncate font-semibold text-foreground"
+                >
+                    {row.original.name}
+                </Link>
             </div>
         ),
+    },
+    {
+        id: "name",
+        header: "API model name",
+        accessorFn: (row) => row.key,
+        cell: ({ row }) => <span className="font-mono">{row.original.key}</span>,
     },
     {
         id: "serves",
@@ -194,9 +199,15 @@ const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
     },
     {
         id: "requests",
-        header: "Requests, last 7 days",
+        header: "Requests, 7 days",
         accessorFn: (row) => row.usage?.total ?? 0,
         cell: ({ row }) => <Requests usage={row.original.usage} />,
+    },
+    {
+        id: "used",
+        header: "Last used",
+        accessorFn: (row) => row.usage?.last_at ?? "",
+        cell: ({ row }) => <LastUsed usage={row.original.usage} />,
     },
     {
         id: "keys",
@@ -291,9 +302,14 @@ function VersionHistory({ row }: { row: ModelRow }) {
                 ),
         },
         {
-            header: "Requests, last 7 days",
+            header: "Requests, 7 days",
             id: "requests",
             cell: ({ row: item }) => <Requests usage={item.original.usage} />,
+        },
+        {
+            header: "Last used",
+            id: "used",
+            cell: ({ row: item }) => <LastUsed usage={item.original.usage} />,
         },
         {
             header: () => <span className="sr-only">Actions</span>,

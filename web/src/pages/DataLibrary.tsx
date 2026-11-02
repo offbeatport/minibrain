@@ -99,18 +99,18 @@ function datasetColumns(
             header: "Dataset",
             accessorFn: (dataset) => dataset.name.toLowerCase(),
             cell: ({ row }) => (
-                <span className="flex flex-col">
-                    <Link
-                        href={datasetHref(row.original.slug)}
-                        className="font-semibold text-foreground"
-                    >
-                        {row.original.name}
-                    </Link>
-                    <span className="text-sm text-muted-foreground">
-                        {row.original.source_name}
-                    </span>
-                </span>
+                <Link
+                    href={datasetHref(row.original.slug)}
+                    className="font-semibold text-foreground"
+                >
+                    {row.original.name}
+                </Link>
             ),
+        },
+        {
+            id: "file",
+            header: "File",
+            accessorFn: (dataset) => dataset.source_name,
         },
         {
             id: "rows",

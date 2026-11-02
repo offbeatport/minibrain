@@ -113,7 +113,7 @@ export function Requests({ usage }: { usage: ModelUsage | null | undefined }) {
     const days =
         usage.days?.length === usage.daily.length ? usage.days : recentDays(usage.daily.length);
     return (
-        <span className="flex flex-col">
+        <span className="flex">
             <Tooltip>
                 <TooltipTrigger asChild>
                     <span className="inline-flex w-fit items-baseline gap-2 rounded-sm tabular-nums">
@@ -138,10 +138,16 @@ export function Requests({ usage }: { usage: ModelUsage | null | undefined }) {
                     </span>
                 </TooltipContent>
             </Tooltip>
-            {usage.last_at && (
-                <span className="text-sm text-muted-foreground">{`Last used ${relativeTime(usage.last_at)}`}</span>
-            )}
         </span>
+    );
+}
+
+export function LastUsed({ usage }: { usage: ModelUsage | null | undefined }) {
+    if (!usage?.last_at) {
+        return <span className="text-muted-foreground">Never</span>;
+    }
+    return (
+        <span title={new Date(usage.last_at).toLocaleString()}>{relativeTime(usage.last_at)}</span>
     );
 }
 

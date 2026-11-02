@@ -589,6 +589,7 @@ export function discoverHref(entry: CatalogEntry, pool?: string): string {
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
 const HIDDEN_COLUMNS = [
+    "newer",
     "publisher",
     "tasks",
     "finetune",
@@ -607,22 +608,26 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex w-60 items-center gap-3">
-                    <PublisherLogo publisher={row.original.provider} name={row.original.name} />
-                    <div className="flex min-w-0 flex-col items-start whitespace-normal">
-                        <span className="line-clamp-2 font-semibold">{row.original.name}</span>
-                        {row.original.recommended ? (
-                            <Badge variant="outline">Recommended</Badge>
-                        ) : (
-                            row.original.superseded_by && (
-                                <span className="line-clamp-1 text-sm text-muted-foreground">
-                                    {`Newer: ${names.get(row.original.superseded_by) ?? row.original.superseded_by}`}
-                                </span>
-                            )
-                        )}
-                    </div>
+                <div className="flex w-64 items-center gap-2.5">
+                    <PublisherLogo
+                        publisher={row.original.provider}
+                        name={row.original.name}
+                        size="sm"
+                    />
+                    <span className="truncate font-semibold">{row.original.name}</span>
+                    {row.original.recommended && <Badge variant="outline">Recommended</Badge>}
                 </div>
             ),
+        },
+        {
+            id: "newer",
+            header: "Newer version",
+            accessorFn: (entry) =>
+                entry.superseded_by ? (names.get(entry.superseded_by) ?? entry.superseded_by) : "",
+            cell: ({ row }) =>
+                row.original.superseded_by
+                    ? (names.get(row.original.superseded_by) ?? row.original.superseded_by)
+                    : muted("—"),
         },
         { id: "publisher", header: "Publisher", accessorFn: (entry) => entry.provider },
         {

@@ -88,7 +88,7 @@ function JobStatus({ job }: { job: JobInfo }) {
     }
     if (job.status === "running") {
         return (
-            <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
                 <StatusText tone="info">
                     {label}
                     {job.progress > 0 && (
@@ -152,12 +152,14 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         id: "job",
         header: "Job",
+        accessorFn: (job) => KINDS[job.kind] ?? job.kind,
+    },
+    {
+        id: "id",
+        header: "ID",
         accessorFn: (job) => job.id,
         cell: ({ row }) => (
-            <span className="flex flex-col">
-                <span>{KINDS[row.original.kind] ?? row.original.kind}</span>
-                <span className="font-mono text-sm text-muted-foreground">{`#${row.original.id}`}</span>
-            </span>
+            <span className="font-mono text-muted-foreground">{`#${row.original.id}`}</span>
         ),
     },
     { id: "subject", header: "For", accessorFn: subject },
