@@ -3519,6 +3519,17 @@
               }
             ]
           },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -3533,17 +3544,6 @@
               }
             ],
             "title": "Repo"
-          },
-          "revision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Revision"
           },
           "latest_revision": {
             "anyOf": [
@@ -3697,7 +3697,6 @@
           "needed_bytes",
           "source",
           "repo",
-          "revision",
           "latest_revision",
           "source_path",
           "storage_path",
@@ -5934,6 +5933,17 @@
                 "type": "null"
               }
             ]
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
           }
         },
         "type": "object",
@@ -6801,6 +6811,13 @@
       },
       "Usage": {
         "properties": {
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Days"
+          },
           "daily": {
             "items": {
               "type": "integer"
@@ -6822,6 +6839,7 @@
         },
         "type": "object",
         "required": [
+          "days",
           "daily",
           "p50_ms"
         ],

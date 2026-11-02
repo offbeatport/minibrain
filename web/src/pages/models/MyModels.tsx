@@ -27,7 +27,7 @@ import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { Requests, Stages } from "~/components/models/ModelMetrics";
+import { Latency, Requests } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
@@ -144,8 +144,15 @@ export function Activity({ row }: { row: ModelRow }) {
     );
 }
 
-export function Deployment({ row }: { row: ModelRow }) {
-    const { state, label } = row.deployment;
+const DEPLOYMENT_STATES: Record<string, string> = {
+    running: "Running",
+    starting: "Starting",
+    unhealthy: "Unhealthy",
+};
+
+export function Deployment({ row, short = false }: { row: ModelRow; short?: boolean }) {
+    const { state } = row.deployment;
+    const label = short ? (DEPLOYMENT_STATES[state] ?? row.deployment.label) : row.deployment.label;
     if (state === "not_deployed") {
         return <span className="text-muted-foreground">{label}</span>;
     }
@@ -441,7 +448,7 @@ function stateOf(row: ModelRow): ModelState {
 function StatusCell({ row }: { row: ModelRow }) {
     const state = stateOf(row);
     if (state === "live") {
-        return <Deployment row={row} />;
+        return <Deployment row={row} short />;
     }
     if (state === "progress") {
         return row.kind === "base" ? <Availability row={row} /> : <Activity row={row} />;
@@ -451,7 +458,7 @@ function StatusCell({ row }: { row: ModelRow }) {
             return <Availability row={row} />;
         }
         if (row.deployment.state === "unhealthy") {
-            return <Deployment row={row} />;
+            return <Deployment row={row} short />;
         }
         return <Activity row={row} />;
     }
@@ -482,6 +489,34 @@ function ModelName({ row }: { row: ModelRow }) {
     );
 }
 
+function VersionCell({ row }: { row: ModelRow }) {
+    if (row.kind === "base") {
+        return row.revision ? (
+            <span className="font-mono text-muted-foreground" title={row.revision}>
+                {row.revision.slice(0, 7)}
+            </span>
+        ) : (
+            <span className="text-muted-foreground">—</span>
+        );
+    }
+    const ready = row.ready_version;
+    if (row.current_version === null || row.current_version === undefined) {
+        return ready !== null && ready !== undefined ? (
+            <span className="tabular-nums">{`v${ready} ready`}</span>
+        ) : (
+            <span className="text-muted-foreground">None yet</span>
+        );
+    }
+    return (
+        <span className="flex flex-col tabular-nums">
+            <span>{`v${row.current_version}`}</span>
+            {ready !== null && ready !== undefined && (
+                <span className="text-sm text-muted-foreground">{`v${ready} ready`}</span>
+            )}
+        </span>
+    );
+}
+
 function requestTotal(row: ModelRow): number {
     return (row.usage?.daily ?? []).reduce((sum, value) => sum + value, 0);
 }
@@ -501,23 +536,22 @@ function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
             cell: ({ row }) => <StatusCell row={row.original} />,
         },
         {
-            id: "progress",
-            header: "Progress",
-            accessorFn: (row) => row.accuracy ?? -1,
-            cell: ({ row }) =>
-                row.original.kind === "custom" ? (
-                    <Stages stages={row.original.stages ?? []} />
-                ) : (
-                    <span className="text-sm text-muted-foreground">
-                        {row.original.trainable ? "Can be fine-tuned" : "Serving only"}
-                    </span>
-                ),
+            id: "version",
+            header: "Version",
+            accessorFn: (row) => row.current_version ?? -1,
+            cell: ({ row }) => <VersionCell row={row.original} />,
         },
         {
-            id: "usage",
-            header: "Usage, 7 days",
+            id: "requests",
+            header: "Requests (7 days)",
             accessorFn: requestTotal,
             cell: ({ row }) => <Requests usage={row.original.usage} />,
+        },
+        {
+            id: "latency",
+            header: "Median latency",
+            accessorFn: (row) => row.usage?.p50_ms ?? Number.POSITIVE_INFINITY,
+            cell: ({ row }) => <Latency usage={row.original.usage} />,
         },
         {
             id: "actions",

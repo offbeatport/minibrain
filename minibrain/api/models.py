@@ -68,7 +68,6 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         **row.model_dump(),
         source=model.source,
         repo=model.repo,
-        revision=model.revision,
         latest_revision=model.variant.latest_revision if model.variant else None,
         source_path=model.source_path,
         storage_path=str(model_dir(settings, model.id)),

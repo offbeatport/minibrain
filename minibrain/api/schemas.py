@@ -294,6 +294,7 @@ class Stage(BaseModel):
 
 
 class Usage(BaseModel):
+    days: list[str]
     daily: list[int]
     p50_ms: float | None
 
@@ -321,6 +322,7 @@ class ModelRow(BaseModel):
     stages: list[Stage] = []
     accuracy: float | None = None
     usage: Usage | None = None
+    revision: str | None = None
 
 
 class ModelFile(BaseModel):
@@ -332,7 +334,6 @@ class ModelFile(BaseModel):
 class BaseModelDetail(ModelRow):
     source: str
     repo: str | None
-    revision: str | None
     latest_revision: str | None
     source_path: str | None
     storage_path: str

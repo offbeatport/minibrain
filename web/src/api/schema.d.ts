@@ -1192,12 +1192,12 @@ export interface components {
             /** Accuracy */
             accuracy?: number | null;
             usage?: components["schemas"]["Usage"] | null;
+            /** Revision */
+            revision?: string | null;
             /** Source */
             source: string;
             /** Repo */
             repo: string | null;
-            /** Revision */
-            revision: string | null;
             /** Latest Revision */
             latest_revision: string | null;
             /** Source Path */
@@ -1994,6 +1994,8 @@ export interface components {
             /** Accuracy */
             accuracy?: number | null;
             usage?: components["schemas"]["Usage"] | null;
+            /** Revision */
+            revision?: string | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -2290,6 +2292,8 @@ export interface components {
         };
         /** Usage */
         Usage: {
+            /** Days */
+            days: string[];
             /** Daily */
             daily: number[];
             /** P50 Ms */

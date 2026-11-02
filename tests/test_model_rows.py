@@ -42,6 +42,7 @@ def test_usage_counts_the_last_seven_days_and_the_median_latency(harness: Harnes
     usage = custom_row(harness, SLUG)["usage"]
     assert len(usage["daily"]) == 7 and usage["daily"][-1] == 2 and usage["daily"][-3] == 1 and sum(usage["daily"]) == 3
     assert usage["p50_ms"] == 20.0
+    assert len(usage["days"]) == 7 and usage["days"][-1] == now().date().isoformat()
 
 
 def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness) -> None:

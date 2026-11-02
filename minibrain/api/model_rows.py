@@ -209,6 +209,7 @@ def usage_index(session: Session) -> tuple[dict[int, Usage], dict[str, Usage]]:
             )
         )
         return Usage(
+            days=days,
             daily=[counts.get(name, 0) for name in days],
             p50_ms=statistics.median(latencies) if latencies else None,
         )
@@ -334,6 +335,7 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health, 
         publisher=variant.model.provider if variant is not None else publisher_of(model.repo),
         size_bytes=model.size_bytes or None,
         usage=usage,
+        revision=model.revision,
     )
 
 
