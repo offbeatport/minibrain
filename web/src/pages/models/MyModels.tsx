@@ -102,6 +102,9 @@ export function detailHref(row: ModelRow): string {
 }
 
 function scoped(path: string, row: ModelRow): string {
+    if (path === "/deployments") {
+        return `/deployments/${encodeURIComponent(row.key)}`;
+    }
     return `${path}?minibrain=${encodeURIComponent(row.key)}`;
 }
 

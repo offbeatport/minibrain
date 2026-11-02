@@ -39,7 +39,7 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     {
         label: "Run",
         items: [
-            { label: "Deployments", path: "/deployments", icon: Rocket, scoped: true },
+            { label: "Deployments", path: "/deployments", icon: Rocket },
             { label: "Pipelines", path: "/pipelines", icon: Workflow },
             { label: "Infrastructure", path: "/infrastructure", icon: Server },
             { label: "Monitor", path: "/monitor", icon: Activity, scoped: true },

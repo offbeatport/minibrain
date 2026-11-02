@@ -339,6 +339,7 @@ class ModelRow(BaseModel):
     revision: str | None = None
     error: str | None = None
     versions: list[VersionRow] = []
+    key_count: int = 0
 
 
 class ModelFile(BaseModel):

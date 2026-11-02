@@ -9,7 +9,7 @@ import {
 import { Shell } from "./components/Shell";
 import { readMinibrainParam } from "./lib/selection";
 import { DataPage } from "./pages/DataPage";
-import { DeploymentsPage } from "./pages/DeploymentsPage";
+import { DeploymentsPage, EndpointPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
@@ -102,7 +102,18 @@ const routeTree = rootRoute.addChildren([
     scopedPage("/training", TrainingPage),
     scopedPage("/evaluations", EvaluationsPage),
     scopedPage("/feedback", FeedbackPage),
-    scopedPage("/deployments", DeploymentsPage),
+    createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/deployments",
+        validateSearch: validateMinibrain,
+        beforeLoad: ({ search }) => {
+            if (search.minibrain) {
+                throw redirect({ href: `/deployments/${encodeURIComponent(search.minibrain)}` });
+            }
+        },
+        component: DeploymentsPage,
+    }),
+    globalPage("/deployments/$slug", EndpointPage),
     globalPage("/pipelines", PipelinesPage),
     globalPage("/infrastructure", InfrastructurePage),
     createRoute({

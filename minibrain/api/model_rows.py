@@ -24,6 +24,7 @@ from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    ApiKey,
     CatalogVariant,
     Job,
     JobKind,
@@ -432,6 +433,29 @@ def all_rows(session: Session, settings: Settings, store: ArtifactStore, health:
     rows += [
         base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id))
         for model in session.scalars(select(Model))
+    ]
+    custom_keys = dict(
+        session.execute(
+            select(ApiKey.minibrain_id, func.count())
+            .where(ApiKey.minibrain_id.is_not(None))
+            .group_by(ApiKey.minibrain_id)
+        ).all()
+    )
+    base_keys = dict(
+        session.execute(
+            select(ApiKey.model_id, func.count()).where(ApiKey.model_id.is_not(None)).group_by(ApiKey.model_id)
+        ).all()
+    )
+    slugs = dict(session.execute(select(Minibrain.slug, Minibrain.id)).all())
+    rows = [
+        row.model_copy(
+            update={
+                "key_count": custom_keys.get(slugs.get(row.key), 0)
+                if row.kind == "custom"
+                else base_keys.get(row.key, 0)
+            }
+        )
+        for row in rows
     ]
     return sorted(rows, key=lambda row: row.updated_at, reverse=True)
 

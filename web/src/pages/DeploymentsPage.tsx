@@ -1,20 +1,29 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button, Input, Label } from "obp-ui";
+import { ChevronLeft, History } from "lucide-react";
+import { Badge, Button, Input, Label, Link } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import {
     type KeyCreated,
     type KeyInfo,
     type MinibrainDetail,
+    type ModelRow,
+    type ModelVersionRow,
     api,
     succeed,
     unwrap,
 } from "~/api/client";
-import { keys, useKeys, useMinibrain } from "~/api/queries";
+import { keys, useKeys, useMinibrain, useModels } from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
-import { ScopedPage } from "~/components/PageHeader";
-import { ErrorLine, Section } from "~/components/Section";
-import { dateTime, percent } from "~/lib/format";
+import { PageHeader } from "~/components/PageHeader";
+import { PublisherLogo } from "~/components/PublisherLogo";
+import { ErrorLine, Page, PanelSection, PanelSections, Section } from "~/components/Section";
+import { Requests, failingShare } from "~/components/models/ModelMetrics";
+import { SortableTable } from "~/components/models/SortableTable";
+import { StatusText } from "~/components/models/StatusText";
+import { count, dateTime, percent } from "~/lib/format";
+import { Deployment as DeploymentCell } from "./models/MyModels";
 
 function Code({ children }: { children: string }) {
     return (
@@ -230,13 +239,227 @@ function Deployment({ slug }: { slug: string }) {
     );
 }
 
+const KIND_NAMES: Record<string, string> = { lora: "Trained", prompt: "Prompt-only" };
+
+export function endpointHref(row: ModelRow): string {
+    return row.kind === "custom"
+        ? `/deployments/${encodeURIComponent(row.key)}`
+        : `/models/base/${encodeURIComponent(row.key)}#api`;
+}
+
+function serves(row: ModelRow): string {
+    if (row.kind === "base") {
+        return row.revision ? `Base model · ${row.revision.slice(0, 7)}` : "Base model";
+    }
+    const current = row.versions?.find((version) => version.live);
+    if (!current) {
+        return `Base model ${row.base_model}`;
+    }
+    const kind = KIND_NAMES[current.kind] ?? current.kind;
+    const score = current.accuracy === null ? "" : ` · ${Math.round(current.accuracy * 100)}%`;
+    return `v${current.number} · ${kind}${score}`;
+}
+
+function DeploymentStatus({ row }: { row: ModelRow }) {
+    const share = failingShare(row.usage);
+    if (share >= 0.01) {
+        return (
+            <StatusText tone="destructive">{`${Math.round(share * 100)}% of requests failing`}</StatusText>
+        );
+    }
+    return <DeploymentCell row={row} short />;
+}
+
+const ENDPOINT_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
+    {
+        id: "endpoint",
+        header: "Endpoint",
+        accessorFn: (row) => row.key,
+        cell: ({ row }) => (
+            <div className="flex min-w-52 items-start gap-3">
+                <PublisherLogo publisher={row.original.publisher} name={row.original.name} />
+                <div className="flex min-w-0 flex-col">
+                    <Link
+                        href={endpointHref(row.original)}
+                        className="font-mono font-semibold text-foreground hover:underline"
+                    >
+                        {row.original.key}
+                    </Link>
+                    <span className="truncate text-sm text-muted-foreground">
+                        {row.original.name}
+                    </span>
+                </div>
+            </div>
+        ),
+    },
+    {
+        id: "serves",
+        header: "Serves",
+        accessorFn: serves,
+        cell: ({ row }) => <span className="tabular-nums">{serves(row.original)}</span>,
+    },
+    {
+        id: "status",
+        header: "Status",
+        accessorFn: (row) => row.deployment.state,
+        cell: ({ row }) => <DeploymentStatus row={row.original} />,
+    },
+    {
+        id: "requests",
+        header: "Requests, last 7 days",
+        accessorFn: (row) => row.usage?.total ?? 0,
+        cell: ({ row }) => <Requests usage={row.original.usage} />,
+    },
+    {
+        id: "keys",
+        header: "API keys",
+        accessorFn: (row) => row.key_count ?? 0,
+        cell: ({ row }) => (
+            <span className="tabular-nums">{count(row.original.key_count ?? 0)}</span>
+        ),
+    },
+];
+
 export function DeploymentsPage() {
+    const router = useRouter();
+    const models = useModels(false);
+    const live = (models.data ?? []).filter((row) => row.deployment.state !== "not_deployed");
     return (
-        <ScopedPage
-            title="Deployments"
-            caption="The endpoint, model names and API keys for a minibrain."
-        >
-            {(slug) => <Deployment key={slug} slug={slug} />}
-        </ScopedPage>
+        <Page>
+            <PageHeader
+                title="Deployments"
+                caption="Everything apps can call now, on one OpenAI-compatible endpoint."
+            />
+            <ErrorLine error={models.error} />
+            {models.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : (
+                <SortableTable
+                    columns={ENDPOINT_COLUMNS}
+                    rows={live}
+                    onOpen={(row) => router.history.push(endpointHref(row))}
+                    rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
+                    empty={
+                        <p className="text-muted-foreground">
+                            Nothing is deployed. Deploy a model or one of its versions from Models.
+                        </p>
+                    }
+                    minWidth="min-w-[760px]"
+                />
+            )}
+        </Page>
+    );
+}
+
+function VersionHistory({ row }: { row: ModelRow }) {
+    const client = useQueryClient();
+    const deploy = useMutation({
+        mutationFn: (number: number) =>
+            unwrap(
+                api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
+                    params: { path: { slug: row.key, number } },
+                }),
+            ),
+        onSuccess: () => client.invalidateQueries(),
+    });
+    const versions = row.versions ?? [];
+    const columns: ColumnDef<ModelVersionRow, unknown>[] = [
+        {
+            header: "Version",
+            id: "number",
+            cell: ({ row: item }) => (
+                <span className="flex items-center gap-2 tabular-nums">
+                    {`v${item.original.number}`}
+                    {item.original.live && <Badge variant="success">Live</Badge>}
+                </span>
+            ),
+        },
+        {
+            header: "Kind",
+            id: "kind",
+            cell: ({ row: item }) => KIND_NAMES[item.original.kind] ?? item.original.kind,
+        },
+        {
+            header: "Score",
+            id: "score",
+            cell: ({ row: item }) =>
+                item.original.status === "failed" ? (
+                    <StatusText tone="destructive">Failed</StatusText>
+                ) : ["training", "evaluating"].includes(item.original.status) ? (
+                    <StatusText tone="info">
+                        {item.original.status === "training" ? "Training" : "Scoring"}
+                    </StatusText>
+                ) : item.original.accuracy === null ? (
+                    <span className="text-muted-foreground">Not scored</span>
+                ) : (
+                    <span className="tabular-nums">{`${Math.round(item.original.accuracy * 100)}%`}</span>
+                ),
+        },
+        {
+            header: "Requests, last 7 days",
+            id: "requests",
+            cell: ({ row: item }) => <Requests usage={item.original.usage} />,
+        },
+        {
+            header: () => <span className="sr-only">Actions</span>,
+            id: "actions",
+            cell: ({ row: item }) =>
+                item.original.status === "ready" && !item.original.live ? (
+                    <Button
+                        variant="outline"
+                        size="xs"
+                        disabled={deploy.isPending}
+                        onClick={() => deploy.mutate(item.original.number)}
+                    >
+                        {`Deploy v${item.original.number}`}
+                    </Button>
+                ) : null,
+        },
+    ];
+    return (
+        <PanelSection icon={History} title="Versions">
+            <div className="flex flex-col gap-2">
+                <DataTable
+                    columns={columns}
+                    rows={versions}
+                    empty="No versions yet: it serves its base model."
+                />
+                <ErrorLine error={deploy.error} />
+            </div>
+        </PanelSection>
+    );
+}
+
+export function EndpointPage() {
+    const { slug } = useParams({ strict: false }) as { slug?: string };
+    const models = useModels(true);
+    const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
+    return (
+        <Page>
+            <Link
+                href="/deployments"
+                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+                <ChevronLeft className="size-4" />
+                Deployments
+            </Link>
+            <ErrorLine error={models.error} />
+            {models.data && !row && (
+                <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
+            )}
+            {row && (
+                <>
+                    <PageHeader
+                        title={row.name}
+                        icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
+                        caption={`Apps call it as ${row.key}`}
+                    />
+                    <PanelSections>
+                        <VersionHistory row={row} />
+                        <Deployment slug={row.key} />
+                    </PanelSections>
+                </>
+            )}
+        </Page>
     );
 }

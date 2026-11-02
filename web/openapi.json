@@ -3635,6 +3635,11 @@
             "title": "Versions",
             "default": []
           },
+          "key_count": {
+            "type": "integer",
+            "title": "Key Count",
+            "default": 0
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -6066,6 +6071,11 @@
             "type": "array",
             "title": "Versions",
             "default": []
+          },
+          "key_count": {
+            "type": "integer",
+            "title": "Key Count",
+            "default": 0
           }
         },
         "type": "object",

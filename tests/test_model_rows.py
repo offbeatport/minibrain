@@ -103,3 +103,10 @@ def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Har
     assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
     assert custom_row(harness, SLUG)["versions"] == []
     assert add_version(harness, "prompt")["number"] == 1
+
+
+def test_rows_count_api_keys(harness: Harness) -> None:
+    harness.client.post("/api/minibrains", json={"name": "Support Triage"})
+    harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "app"})
+    harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "batch"})
+    assert custom_row(harness, SLUG)["key_count"] == 2

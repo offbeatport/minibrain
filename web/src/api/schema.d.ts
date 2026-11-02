@@ -1235,6 +1235,11 @@ export interface components {
              * @default []
              */
             versions?: components["schemas"]["VersionRow"][];
+            /**
+             * Key Count
+             * @default 0
+             */
+            key_count?: number;
             /** Source */
             source: string;
             /** Repo */
@@ -2052,6 +2057,11 @@ export interface components {
              * @default []
              */
             versions?: components["schemas"]["VersionRow"][];
+            /**
+             * Key Count
+             * @default 0
+             */
+            key_count?: number;
         };
         /** ModelUpdate */
         ModelUpdate: {
