@@ -35,11 +35,11 @@ import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { AddModelDialog } from "./AddModelDialog";
 import { GetStarted } from "./GetStarted";
 import {
     ConfirmAction,
     type Confirmation,
-    CreateModelDialog,
     EditModelDialog,
     TestBaseDialog,
     cancelJob,
@@ -886,7 +886,7 @@ export function MyModels({
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
-            <CreateModelDialog
+            <AddModelDialog
                 open={createBase !== null}
                 onOpenChange={(open) => !open && setCreateBase(null)}
                 base={createBase ?? undefined}

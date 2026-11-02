@@ -1497,6 +1497,8 @@ export interface components {
             offline_forced: boolean;
             /** Hub Add Allowed */
             hub_add_allowed: boolean;
+            /** Downloads Allowed */
+            downloads_allowed: boolean;
             /** Store Free Bytes */
             store_free_bytes: number | null;
             /** Endpoint */

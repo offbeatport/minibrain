@@ -30,7 +30,8 @@ def test_defaults_and_ui_changes_are_audited(harness: Harness) -> None:
     found = policies(harness)
     assert found["network"]["value"] == "open" and found["network"]["locked"] is False
     assert found["model_sources"]["value"] == "approved"
-    assert harness.client.get("/api/catalog").json()["hub_add_allowed"] is False
+    catalog = harness.client.get("/api/catalog").json()
+    assert (catalog["hub_add_allowed"], catalog["downloads_allowed"]) == (False, True)
     assert found["safetensors_only"] == found["safetensors_only"] | {"value": True, "locked": True}
     assert set_policy(harness, "network", "allowlist") == 200
     assert set_policy(harness, "network", "everywhere") == 403

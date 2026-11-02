@@ -47,7 +47,7 @@ machine). Downloads run in the background, are checked against the published SHA
 |---|---|
 | Hugging Face or a compatible mirror (Artifactory, Nexus) | `MINIBRAIN_HF_ENDPOINT` (default `https://huggingface.co`); `HF_TOKEN` for gated models |
 | S3-compatible bucket (S3, MinIO, others behind an S3 gateway) | `MINIBRAIN_MODELS_S3_URL=s3://bucket/prefix`, plus the standard `AWS_*` variables (`AWS_ENDPOINT_URL` for MinIO) |
-| A folder on the server | Nothing: **Import model** and give the path |
+| A folder on the server | Nothing: **Add model** → Folder, and give the path |
 
 `MINIBRAIN_OFFLINE=1` turns off every outbound call; the bundled catalogue stays browsable and imports keep working.
 Catalogue updates are fetched only when you press **Check for updates**, or daily if you turn that on.

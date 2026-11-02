@@ -531,6 +531,7 @@ class CatalogResponse(BaseModel):
     online: bool | None
     offline_forced: bool
     hub_add_allowed: bool
+    downloads_allowed: bool
     store_free_bytes: int | None
     endpoint: str
     token_configured: bool

@@ -163,7 +163,7 @@ export function DownloadDialog({
     const blocked = entry.gated && !catalog.token_configured;
     return (
         <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Download {entry.name}</DialogTitle>
                     <DialogDescription>
@@ -280,7 +280,7 @@ function RequirementsDialog({
     const entries = entry ? [entry] : catalog.entries;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {entry

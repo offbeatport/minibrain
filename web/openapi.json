@@ -4427,6 +4427,10 @@
             "type": "boolean",
             "title": "Hub Add Allowed"
           },
+          "downloads_allowed": {
+            "type": "boolean",
+            "title": "Downloads Allowed"
+          },
           "store_free_bytes": {
             "anyOf": [
               {
@@ -4489,6 +4493,7 @@
           "online",
           "offline_forced",
           "hub_add_allowed",
+          "downloads_allowed",
           "store_free_bytes",
           "endpoint",
           "token_configured",

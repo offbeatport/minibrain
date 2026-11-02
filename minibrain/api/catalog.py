@@ -147,6 +147,7 @@ def catalogue(
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         hub_add_allowed=policy["model_sources"] == "any",
+        downloads_allowed=policy["model_sources"] != "imports",
         store_free_bytes=free_bytes(models_dir(settings)),
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
