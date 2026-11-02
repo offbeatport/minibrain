@@ -21,11 +21,6 @@ flowchart LR
     main -- "versioned config snapshot" --> g1 & g2
     g1 & g2 -- "batched request logs" --> main
     e1 & e2 -- "announce every 10 s" --> main
-
-    classDef control fill:#e8f1fb,stroke:#026ecd,color:#202121
-    classDef serving fill:#e6f4ed,stroke:#0f7f57,color:#202121
-    class main,db control
-    class lb,g1,g2,e1,e2 serving
 ```
 
 - `main` publishes a versioned config snapshot: routes, current versions, key hashes and expiry, engine replicas per
