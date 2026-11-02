@@ -27,14 +27,26 @@ flowchart TB
     db[("database<br/>SQLite or Postgres")]
     store[("artifacts<br/>folder or S3")]
 
-    main --- db
-    main --- store
-    main -- "config snapshot" --> gateway
-    gateway -- "batched logs" --> main
-    worker -- "claim, heartbeat,<br/>events, complete" --> main
-    engine -- "announce, pull weights<br/>and adapters" --> main
-    gateway -- "chat" --> engine
+    main -- "SQL" --- db
+    main -- "artifacts" --- store
+    main -. "config snapshot · every ~1 s" .-> gateway
+    gateway -. "request logs · batched 2 s" .-> main
+    worker -. "jobs · HTTPS long-poll 25 s" .-> main
+    engine -. "announce every 10 s · pull weights" .-> main
+    gateway == "/generate · sticky by adapter" ==> engine
+
+    classDef control fill:#e8f1fb,stroke:#026ecd,color:#202121
+    classDef serving fill:#e6f4ed,stroke:#0f7f57,color:#202121
+    classDef batch fill:#faefe1,stroke:#a65c0a,color:#202121
+    classDef client fill:#eceded,stroke:#535454,color:#202121
+    class main,db,store control
+    class gateway,engine serving
+    class worker batch
+    class browser,apps client
 ```
+
+Colour is the plane: blue control, green serving, amber batch. Thick arrows carry inference, dotted ones carry config,
+logs, announcements and jobs.
 
 | Role | Local (`minibrain serve`) | Deployed | Scales by | Talks to the database |
 |---|---|---|---|---|
@@ -48,60 +60,28 @@ flowchart TB
 
 ## Deployment shapes
 
-Same roles, same code; only where they run changes.
+Same roles, same code; only where they run changes. The three pictures share one layout: callers on the left, the
+inference path across the top, main and its state in the middle, GPU pools on the right. Labels give the protocol,
+the frequency and, in production, the port. The interactive version adds failure drills.
 
 ### 1. One machine: onboarding and evaluation
 
-```mermaid
-flowchart LR
-    you["Browser, apps"] --> serve
-    subgraph box["One machine"]
-        serve["minibrain serve<br/>main + gateway"]
-        serve --> w["worker"] & e["engines"]
-        serve --- db[("SQLite")]
-        serve --- f[("artifacts folder")]
-    end
-```
+![One machine: minibrain serve runs main, the gateway, a worker and engines with SQLite and a folder](diagrams/one-machine.svg)
 
 ### 2. Local main, remote GPUs
 
-```mermaid
-flowchart LR
-    you["Browser, apps"] --> main
-    subgraph small["Laptop or small VM"]
-        main["minibrain serve --no-worker<br/>main + gateway"] --- db[("SQLite")]
-    end
-    subgraph rack["GPU box: pool rack-a"]
-        w["minibrain worker"]
-        e["minibrain engine"]
-    end
-    w -- "HTTPS: jobs" --> main
-    e -- "HTTPS: announce, weights" --> main
-    main -- "chat" --> e
-```
+![Local main, remote GPUs: main and its gateway on a laptop or small VM, workers and engines on a GPU box](diagrams/local-main-remote-gpus.svg)
 
 ### 3. Production: separate services
 
-```mermaid
-flowchart LR
-    apps["Apps"] --> glb["load balancer"] --> gw["gateway ×N"]
-    users["Browsers"] --> mlb["load balancer"] --> m["main ×2"]
-    m --- pg[("Postgres HA")]
-    m --- s3[("S3")]
-    m -- "config" --> gw
-    gw -- "logs" --> m
-    subgraph pa["GPU pool A: SGLang"]
-        wa["worker ×N"]
-        ea["engine ×N"]
-    end
-    subgraph pb["GPU pool B"]
-        wb["worker ×N"]
-        eb["engine ×N"]
-    end
-    gw --> ea & eb
-    wa & wb -- "jobs" --> m
-    ea & eb -- "announce, weights" --> m
-```
+![Production: load balancers, gateways, two mains, GPU pools, Postgres and S3, in trust zones](diagrams/production.svg)
+
+| Zone | Holds | Accepts connections from | Ports |
+|---|---|---|---|
+| Corporate network | Apps, browsers | | |
+| Edge | Load balancers | The corporate network | 443 |
+| Internal network | Gateways, mains, Postgres, S3 | The edge; GPU pools reach main only | gateway 8100, main 8000, Postgres 5432, S3 443 |
+| GPU network | Workers, engines | Engines: gateways only. Workers: nothing | Outbound HTTPS to main 8000 |
 
 | | One machine | Local main, remote GPUs | Production |
 |---|---|---|---|
@@ -140,6 +120,13 @@ flowchart LR
     main -- "versioned config snapshot" --> g1 & g2
     g1 & g2 -- "batched request logs" --> main
     e1 & e2 -- "announce every 10 s" --> main
+
+    classDef control fill:#e8f1fb,stroke:#026ecd,color:#202121
+    classDef serving fill:#e6f4ed,stroke:#0f7f57,color:#202121
+    classDef batch fill:#faefe1,stroke:#a65c0a,color:#202121
+    classDef client fill:#eceded,stroke:#535454,color:#202121
+    class main,db control
+    class lb,g1,g2,e1,e2 serving
 ```
 
 - `main` publishes a versioned config snapshot: routes, current versions, key hashes and expiry, engine replicas per
@@ -164,6 +151,87 @@ An inference request never touches the database.
 - Scale out: more gateway replicas behind HAProxy, Envoy or a cloud load balancer, then more engines. GPUs are the
   bottleneck long before gateways or the database.
 - Very high log volume moves to ClickHouse or Parquet in object storage, or to sampling.
+
+## Flows
+
+### Inference request
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant LB as Load balancer
+    participant GW as Gateway
+    participant EN as Engine
+    participant MA as main
+    App->>LB: POST /v1/chat/completions (API key)
+    LB->>GW: HTTPS :443 to :8100
+    GW->>GW: Check key hash, pick engine (fewest in flight, sticky by adapter)
+    GW->>EN: POST /generate (model, adapter ID)
+    opt Adapter not loaded yet
+        EN->>MA: Pull adapter by artifact ID
+    end
+    EN-->>GW: Completion
+    GW-->>App: Response or stream
+    GW-)MA: Request logs, batched every 2 s
+```
+
+### Training job
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser
+    participant MA as main
+    participant WK as Worker
+    participant CH as Training child
+    UI->>MA: Train a new version
+    MA->>MA: Store job (queued)
+    WK->>MA: Claim (long-poll up to 25 s)
+    MA-->>WK: Job, lease token (60 s)
+    WK->>MA: Download snapshot by artifact ID
+    WK->>CH: Start child process
+    loop Every 15 s
+        WK->>MA: Heartbeat, progress events
+    end
+    CH-->>WK: Adapter files, result
+    WK->>MA: Upload adapter, complete
+    MA->>MA: Version evaluating, queue eval job
+```
+
+### Deploy a version
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser
+    participant MA as main
+    participant GW as Gateway
+    participant EN as Engine
+    UI->>MA: Promote v2
+    MA->>MA: Set current version
+    MA->>MA: Rebuild config snapshot (about 1 s)
+    GW->>MA: GET /internal/gateway/config (ETag, long-poll)
+    MA-->>GW: New snapshot
+    Note over GW: Next request for the model routes to v2
+    GW->>EN: First request with the v2 adapter
+    EN->>MA: Pull adapter by artifact ID
+```
+
+### An engine joins
+
+```mermaid
+sequenceDiagram
+    participant EN as Engine (GPU box)
+    participant MA as main
+    participant GW as Gateway
+    EN->>MA: Announce pool, hardware, engine kind, models
+    MA->>MA: Record in pool, add to config
+    GW->>MA: Config long-poll
+    MA-->>GW: Snapshot with the new engine
+    EN->>MA: Pull base weights and adapters
+    loop Every 10 s
+        EN->>MA: Announce: alive, loaded adapters, load
+    end
+    Note over MA,GW: No announcement for 30 s: dropped from routing
+```
 
 ## Compute pools
 
