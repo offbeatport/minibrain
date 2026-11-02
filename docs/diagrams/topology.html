@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>minibrain topology</title>
+<style>
+:root {
+    --page: #f4f5f5;
+    --surface: #feffff;
+    --ink: #202121;
+    --muted: #535454;
+    --line: #d3d4d5;
+    --line-soft: #e4e5e5;
+    --accent: #026ecd;
+    --accent-soft: #e3effa;
+    --control: #026ecd;
+    --control-fill: #e8f1fb;
+    --serving: #0f7f57;
+    --serving-fill: #e6f4ed;
+    --batch: #a65c0a;
+    --batch-fill: #faefe1;
+    --client: #535454;
+    --client-fill: #eceded;
+    --down: #b42318;
+    --down-fill: #fbe9e7;
+    --zone: #eceff0;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --step-0: 13px;
+    --step-1: 14px;
+    --step-2: 16px;
+    --step-3: 22px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --page: #010101;
+        --surface: #08090b;
+        --ink: #e8e9ea;
+        --muted: #a6a7a8;
+        --line: #262a33;
+        --line-soft: #15171c;
+        --accent: #6b9bff;
+        --accent-soft: #111a2e;
+        --control: #7aa6ff;
+        --control-fill: #0e1830;
+        --serving: #47d19f;
+        --serving-fill: #072018;
+        --batch: #f1a751;
+        --batch-fill: #261807;
+        --client: #a6a7a8;
+        --client-fill: #15161a;
+        --down: #ff7b6e;
+        --down-fill: #2a0e0b;
+        --zone: #0c0d10;
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #010101;
+    --surface: #08090b;
+    --ink: #e8e9ea;
+    --muted: #a6a7a8;
+    --line: #262a33;
+    --line-soft: #15171c;
+    --accent: #6b9bff;
+    --accent-soft: #111a2e;
+    --control: #7aa6ff;
+    --control-fill: #0e1830;
+    --serving: #47d19f;
+    --serving-fill: #072018;
+    --batch: #f1a751;
+    --batch-fill: #261807;
+    --client: #a6a7a8;
+    --client-fill: #15161a;
+    --down: #ff7b6e;
+    --down-fill: #2a0e0b;
+    --zone: #0c0d10;
+}
+
+body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--step-1);
+    line-height: 1.5;
+}
+
+.wrap {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding-block: 28px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+h1, h2, h3 {
+    font-family: var(--display);
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+}
+
+h1 {
+    font-size: var(--step-3);
+}
+
+h2 {
+    font-size: var(--step-2);
+}
+
+h3 {
+    font-size: var(--step-1);
+}
+
+p {
+    margin: 0;
+}
+
+.lede {
+    color: var(--muted);
+    max-width: 72ch;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    align-items: center;
+}
+
+.group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-label {
+    font-size: var(--step-0);
+    color: var(--muted);
+}
+
+.segments {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--page);
+}
+
+.segments button {
+    font: inherit;
+    font-size: var(--step-0);
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.segments button:hover:not(:disabled) {
+    color: var(--ink);
+    background: var(--line-soft);
+}
+
+.segments button[aria-pressed="true"] {
+    color: var(--ink);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line);
+    font-weight: 500;
+}
+
+.segments button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+button:focus-visible, .node:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: start;
+}
+
+.canvas {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow-x: auto;
+}
+
+.canvas svg {
+    display: block;
+    width: 100%;
+    min-width: 860px;
+    height: auto;
+}
+
+.panel {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.panel .kicker {
+    font-size: var(--step-0);
+    color: var(--muted);
+}
+
+.facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    margin: 0;
+    font-size: var(--step-0);
+}
+
+.facts dt {
+    color: var(--muted);
+}
+
+.facts dd {
+    margin: 0;
+}
+
+.status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--step-0);
+}
+
+.status-list li {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 8px;
+}
+
+.chip {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid currentColor;
+    width: fit-content;
+    height: fit-content;
+    white-space: nowrap;
+}
+
+.chip.ok {
+    color: var(--serving);
+}
+
+.chip.stop {
+    color: var(--down);
+}
+
+.chip.wait {
+    color: var(--batch);
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    font-size: var(--step-0);
+    color: var(--muted);
+}
+
+.legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1.5px solid;
+}
+
+.node {
+    cursor: pointer;
+    outline: none;
+}
+
+.mono {
+    font-family: var(--mono);
+}
+
+@media (max-width: 980px) {
+    .stage {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .fade {
+        transition: opacity 120ms ease;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+    <header>
+        <h1>minibrain topology</h1>
+        <p class="lede">The same four roles in three deployment shapes. Pick a shape, hover a role to see what it talks to, or take a part down to see what keeps working.</p>
+    </header>
+
+    <div class="toolbar">
+        <div class="group">
+            <span class="group-label" id="shape-label">Shape</span>
+            <div class="segments" role="group" aria-labelledby="shape-label" id="shape-buttons"></div>
+        </div>
+        <div class="group">
+            <span class="group-label" id="failure-label">Take down</span>
+            <div class="segments" role="group" aria-labelledby="failure-label" id="failure-buttons"></div>
+        </div>
+    </div>
+
+    <div class="stage">
+        <div class="canvas" id="canvas"></div>
+        <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+
+    <div class="legend" id="legend"></div>
+</div>
+
+<script>
+const SHAPES = [
+    { id: "one", label: "One machine" },
+    { id: "hybrid", label: "Local main, remote GPUs" },
+    { id: "production", label: "Production" },
+];
+
+const FAILURES = [
+    { id: "none", label: "Nothing" },
+    { id: "main", label: "main" },
+    { id: "pool", label: "GPU pool A" },
+    { id: "gateway", label: "One gateway" },
+    { id: "database", label: "Database" },
+];
+
+const W = 170;
+const H = 50;
+
+const NODES = [
+    { id: "apps", plane: "client", x: 90, y: 120, title: "Apps", sub: { all: "OpenAI SDK" } },
+    { id: "browsers", plane: "client", x: 90, y: 420, title: "Browsers", sub: { all: "UI users" } },
+    { id: "lbApps", plane: "serving", x: 265, y: 120, title: "Load balancer", sub: { all: ":443" }, shapes: ["production"] },
+    { id: "lbUi", plane: "control", x: 265, y: 420, title: "Load balancer", sub: { all: ":443" }, shapes: ["production"] },
+    { id: "gateway", plane: "serving", x: 450, y: 120, title: "gateway", sub: { one: "inside main · :8000/v1", hybrid: "inside main · :8000/v1", production: "×N · :8100" } },
+    { id: "main", plane: "control", x: 450, y: 420, title: "main", sub: { one: "minibrain serve · :8000", hybrid: "minibrain serve · :8000", production: "×2 · :8000" } },
+    { id: "db", plane: "control", x: 385, y: 545, w: 130, title: "database", sub: { one: "SQLite", hybrid: "SQLite", production: "Postgres HA · :5432" }, store: true },
+    { id: "store", plane: "control", x: 530, y: 545, w: 130, title: "artifacts", sub: { one: "folder", hybrid: "folder", production: "S3 · :443" }, store: true },
+    { id: "engineA", plane: "serving", x: 800, y: 112, title: "engine", sub: { one: "one per model", hybrid: "minibrain engine", production: "×N · SGLang" } },
+    { id: "workerA", plane: "batch", x: 800, y: 200, title: "worker", sub: { one: "+ job children", hybrid: "minibrain worker", production: "×N + job children" } },
+    { id: "engineB", plane: "serving", x: 800, y: 372, title: "engine", sub: { all: "×N · MLX or SGLang" }, shapes: ["production"] },
+    { id: "workerB", plane: "batch", x: 800, y: 460, title: "worker", sub: { all: "×N + job children" }, shapes: ["production"] },
+];
+
+const EDGES = [
+    { id: "appsGw", from: "apps", to: "gateway", kind: "inference", path: [[175, 120], [365, 120]], label: "HTTPS /v1", at: [270, 110], shapes: ["one", "hybrid"] },
+    { id: "appsLb", from: "apps", to: "lbApps", kind: "inference", path: [[175, 120], [180, 120]], shapes: ["production"] },
+    { id: "lbGw", from: "lbApps", to: "gateway", kind: "inference", path: [[350, 120], [365, 120]], shapes: ["production"] },
+    { id: "uiMain", from: "browsers", to: "main", kind: "ui", path: [[175, 420], [365, 420]], label: "HTTPS /api", at: [270, 410], shapes: ["one", "hybrid"] },
+    { id: "uiLb", from: "browsers", to: "lbUi", kind: "ui", path: [[175, 420], [180, 420]], shapes: ["production"] },
+    { id: "lbMain", from: "lbUi", to: "main", kind: "ui", path: [[350, 420], [365, 420]], shapes: ["production"] },
+    { id: "config", from: "main", to: "gateway", kind: "config", path: [[425, 395], [425, 145]], label: "config · every ~1 s", at: [418, 270], anchor: "end" },
+    { id: "logs", from: "gateway", to: "main", kind: "config", path: [[475, 145], [475, 395]], label: "logs · batched 2 s", at: [482, 270], anchor: "start" },
+    { id: "gwEngA", from: "gateway", to: "engineA", kind: "inference", path: [[535, 112], [715, 112]], label: "/generate · sticky by adapter", at: [625, 102] },
+    { id: "gwEngB", from: "gateway", to: "engineB", kind: "inference", path: [[535, 132], [690, 132], [690, 372], [715, 372]], shapes: ["production"] },
+    { id: "annA", from: "engineA", to: "main", kind: "config", path: [[715, 124], [620, 124], [620, 402], [535, 402]], label: "announce every 10 s · weights", at: [614, 300], anchor: "end" },
+    { id: "annB", from: "engineB", to: "main", kind: "config", path: [[715, 384], [620, 384], [620, 402], [535, 402]], shapes: ["production"] },
+    { id: "jobsA", from: "workerA", to: "main", kind: "jobs", path: [[715, 200], [660, 200], [660, 440], [535, 440]], label: "jobs · long-poll 25 s", at: [666, 300], anchor: "start" },
+    { id: "jobsB", from: "workerB", to: "main", kind: "jobs", path: [[715, 460], [660, 460], [660, 440], [535, 440]], shapes: ["production"] },
+    { id: "mainDb", from: "main", to: "db", kind: "data", path: [[430, 445], [400, 520]], label: "SQL", at: [400, 482], anchor: "end" },
+    { id: "mainStore", from: "main", to: "store", kind: "data", path: [[470, 445], [515, 520]], label: "artifacts", at: [500, 482], anchor: "start" },
+];
+
+const BOUNDARIES = {
+    one: [{ x: 190, y: 40, w: 920, h: 560, label: "One machine · minibrain serve", kind: "machine" }],
+    hybrid: [
+        { x: 300, y: 40, w: 300, h: 560, label: "Laptop or small VM", kind: "machine" },
+        { x: 700, y: 40, w: 410, h: 220, label: "GPU box · pool rack-a", kind: "machine" },
+    ],
+    production: [
+        { x: 182, y: 40, w: 166, h: 560, label: "Edge", kind: "zone" },
+        { x: 356, y: 40, w: 296, h: 560, label: "Internal network", kind: "zone" },
+        { x: 690, y: 40, w: 420, h: 220, label: "GPU pool A", kind: "zone" },
+        { x: 690, y: 300, w: 420, h: 220, label: "GPU pool B", kind: "zone" },
+    ],
+};
+
+const ROLES = {
+    apps: { name: "Apps", runs: "Your services calling the OpenAI-compatible API with an API key.", local: "Anything that can reach the machine", deployed: "Anywhere on the corporate network", scales: "Not minibrain's concern", db: "No" },
+    browsers: { name: "Browsers", runs: "People using the minibrain UI.", local: "localhost:8000", deployed: "Through a load balancer to main", scales: "Not minibrain's concern", db: "No" },
+    lbApps: { name: "Load balancer (apps)", runs: "HAProxy, Envoy or a cloud load balancer in front of the gateways.", local: "Not needed", deployed: "Health-checks gateways, spreads traffic", scales: "Your infrastructure", db: "No" },
+    lbUi: { name: "Load balancer (UI)", runs: "Sends UI and API traffic to the mains.", local: "Not needed", deployed: "Health-checks the mains", scales: "Your infrastructure", db: "No" },
+    gateway: { name: "gateway", runs: "/v1: checks API keys, routes each request to an engine, buffers request logs.", local: "Part of the main process", deployed: "minibrain gateway, one service", scales: "Copies behind a load balancer", db: "No: cached config snapshot" },
+    main: { name: "main", runs: "UI and /api, jobs, policies, deployments, the config snapshot, supervision.", local: "The parent process of minibrain serve", deployed: "Its own service; two or more with Postgres", scales: "Copies for availability, not load", db: "Yes, the only role that does" },
+    db: { name: "database", runs: "Minibrains, versions, jobs, keys, policies, audit log.", local: "A SQLite file", deployed: "Postgres, highly available", scales: "Managed", db: "It is the database" },
+    store: { name: "artifacts", runs: "Sources, snapshots, adapters, logs and model files, by SHA-256 ID.", local: "A folder", deployed: "S3-compatible storage", scales: "Managed", db: "No" },
+    engineA: { name: "engine", runs: "Serves one base model with many adapters. SGLang, MLX, transformers or llama.cpp, chosen from the box's hardware.", local: "A supervised child per model", deployed: "minibrain engine --pool … on each GPU box", scales: "Copies per model, across boxes", db: "No: HTTP to main" },
+    engineB: { name: "engine", runs: "Same role in a second pool. The gateway routes a model to whichever pool serves it.", local: "Not used", deployed: "minibrain engine --pool … on each GPU box", scales: "Copies per model, across boxes", db: "No: HTTP to main" },
+    workerA: { name: "worker", runs: "Claims jobs from main and runs each training or eval job as its own child process.", local: "A supervised child", deployed: "minibrain worker --pool … on each GPU box", scales: "More boxes per pool", db: "No: HTTP to main" },
+    workerB: { name: "worker", runs: "Same role in a second pool. Any worker can take any job its pool can run.", local: "Not used", deployed: "minibrain worker --pool … on each GPU box", scales: "More boxes per pool", db: "No: HTTP to main" },
+};
+
+const SCENARIOS = {
+    one: {
+        main: { down: ["main", "gateway", "engineA", "workerA"], stops: ["Everything: one process tree, one machine"], keeps: [], recovers: ["Restart minibrain serve; queued jobs resume, running jobs retry"] },
+        pool: null,
+        gateway: null,
+        database: { down: ["db"], stops: ["UI, new jobs, key and config changes"], keeps: ["Inference from the last config snapshot"], recovers: ["SQLite is a local file; it fails only with the disk"] },
+    },
+    hybrid: {
+        main: { down: ["main", "gateway"], stops: ["Inference: the gateway runs inside main", "UI and new jobs"], keeps: ["Running jobs on the GPU box keep going and retry their reports"], recovers: ["Restart main; leases are extended so running jobs are not lost"] },
+        pool: { down: ["engineA", "workerA"], stops: ["Models served only from rack-a: 503", "Jobs on rack-a"], keeps: ["UI, job queue, API keys"], recovers: ["Jobs retry after the 60 s lease expires; main can start a local engine"] },
+        gateway: null,
+        database: { down: ["db"], stops: ["UI, new jobs, key and config changes"], keeps: ["Inference from the last config snapshot", "Running jobs"], recovers: ["SQLite is a local file; it fails only with the disk"] },
+    },
+    production: {
+        main: { down: ["main"], stops: ["UI, new jobs, config changes"], keeps: ["Inference: gateways serve from cached config", "Running jobs, which retry their reports", "Request logs, buffered in gateways"], recovers: ["A second main takes the leader lock; leases are extended"] },
+        pool: { down: ["engineA", "workerA"], stops: ["Capacity in pool A"], keeps: ["Models with copies in pool B", "UI and the job queue"], recovers: ["Gateways drop pool A within 30 s; its jobs retry in pool B after the lease expires"] },
+        gateway: { down: [], partial: ["gateway"], stops: ["Nothing visible"], keeps: ["Other gateway copies take the traffic"], recovers: ["The load balancer's health check removes the failed copy"] },
+        database: { down: ["db"], stops: ["UI writes, new jobs, config changes, until failover"], keeps: ["Inference from cached config", "Running jobs"], recovers: ["Postgres fails over to a replica; mains reconnect"] },
+    },
+};
+
+const state = { shape: "production", failure: "none", focus: null };
+
+function token(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function palette() {
+    return {
+        page: token("--page"), surface: token("--surface"), ink: token("--ink"), muted: token("--muted"),
+        line: token("--line"), lineSoft: token("--line-soft"), zone: token("--zone"),
+        control: token("--control"), controlFill: token("--control-fill"),
+        serving: token("--serving"), servingFill: token("--serving-fill"),
+        batch: token("--batch"), batchFill: token("--batch-fill"),
+        client: token("--client"), clientFill: token("--client-fill"),
+        down: token("--down"), downFill: token("--down-fill"),
+        mono: token("--mono"), body: token("--body"),
+    };
+}
+
+function visible(item, shape) {
+    return !item.shapes || item.shapes.includes(shape);
+}
+
+function planeColors(plane, colors) {
+    const map = {
+        control: [colors.control, colors.controlFill],
+        serving: [colors.serving, colors.servingFill],
+        batch: [colors.batch, colors.batchFill],
+        client: [colors.client, colors.clientFill],
+    };
+    return map[plane];
+}
+
+const EDGE_STYLE = {
+    inference: { width: 2.4, dash: "", plane: "serving" },
+    ui: { width: 1.8, dash: "", plane: "control" },
+    config: { width: 1.5, dash: "6 4", plane: "control" },
+    jobs: { width: 1.6, dash: "2 4", plane: "batch" },
+    data: { width: 1.4, dash: "", plane: "control" },
+};
+
+function escapeText(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function render(shape, failure, focus, colors, interactive) {
+    const scenario = failure === "none" ? null : SCENARIOS[shape][failure];
+    const downSet = new Set(scenario ? scenario.down : []);
+    const partialSet = new Set(scenario && scenario.partial ? scenario.partial : []);
+    const nodes = NODES.filter((node) => visible(node, shape));
+    const edges = EDGES.filter((edge) => visible(edge, shape));
+    const linked = new Set();
+    if (focus) {
+        linked.add(focus);
+        for (const edge of edges) {
+            if (edge.from === focus || edge.to === focus) {
+                linked.add(edge.from);
+                linked.add(edge.to);
+            }
+        }
+    }
+    const parts = [];
+    parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1130 620" role="img" aria-label="minibrain roles in the ${escapeText(SHAPES.find((s) => s.id === shape).label)} shape" font-family="${escapeText(colors.body)}">`);
+    parts.push(`<rect width="1130" height="620" fill="${colors.surface}"/>`);
+    parts.push(`<defs>${["inference", "ui", "config", "jobs", "data", "down"].map((kind) => {
+        const color = kind === "down" ? colors.down : planeColors(EDGE_STYLE[kind].plane, colors)[0];
+        return `<marker id="arrow-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="${color}"/></marker>`;
+    }).join("")}</defs>`);
+    for (const box of BOUNDARIES[shape]) {
+        if (box.kind === "zone") {
+            parts.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="10" fill="${colors.zone}" stroke="${colors.lineSoft}"/>`);
+        } else {
+            parts.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="12" fill="none" stroke="${colors.muted}" stroke-width="1.2" stroke-dasharray="7 5"/>`);
+        }
+        parts.push(`<text x="${box.x + 12}" y="${box.y + 20}" font-size="12" font-weight="600" fill="${colors.muted}">${escapeText(box.label)}</text>`);
+    }
+    if (shape === "production") {
+        parts.push(`<text x="20" y="60" font-size="12" font-weight="600" fill="${colors.muted}">Corporate network</text>`);
+    }
+    for (const edge of edges) {
+        const cut = downSet.has(edge.from) || downSet.has(edge.to);
+        const dim = focus && !(edge.from === focus || edge.to === focus);
+        const style = EDGE_STYLE[edge.kind];
+        const color = cut ? colors.down : planeColors(style.plane, colors)[0];
+        const points = edge.path.map(([x, y]) => `${x},${y}`).join(" ");
+        const marker = cut ? "down" : edge.kind;
+        parts.push(`<polyline class="fade" points="${points}" fill="none" stroke="${color}" stroke-width="${style.width}" stroke-dasharray="${cut ? "3 5" : style.dash}" stroke-linejoin="round" marker-end="url(#arrow-${marker})" opacity="${dim ? 0.15 : cut ? 0.7 : 1}"/>`);
+        if (edge.label) {
+            const [lx, ly] = edge.at;
+            parts.push(`<text class="fade" x="${lx}" y="${ly}" font-size="11.5" font-family="${escapeText(colors.mono)}" text-anchor="${edge.anchor || "middle"}" fill="${cut ? colors.down : colors.muted}" opacity="${dim ? 0.2 : 1}">${escapeText(edge.label)}</text>`);
+        }
+    }
+    for (const node of nodes) {
+        const width = node.w || W;
+        const x = node.x - width / 2;
+        const y = node.y - H / 2;
+        const isDown = downSet.has(node.id);
+        const isPartial = partialSet.has(node.id);
+        const [stroke, fill] = planeColors(node.plane, colors);
+        const dim = focus && !linked.has(node.id);
+        const sub = node.sub[shape] || node.sub.all;
+        const strokeColor = isDown || isPartial ? colors.down : stroke;
+        const fillColor = isDown ? colors.downFill : fill;
+        const attrs = interactive ? ` class="node fade" tabindex="0" role="button" data-id="${node.id}" aria-label="${escapeText(node.title)}: ${escapeText(sub)}"` : "";
+        parts.push(`<g${attrs} opacity="${dim ? 0.25 : 1}">`);
+        if (node.store) {
+            parts.push(`<path d="M${x} ${y + 8} Q${x} ${y} ${x + 10} ${y} L${x + width - 10} ${y} Q${x + width} ${y} ${x + width} ${y + 8} L${x + width} ${y + H} L${x} ${y + H} Z" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5"/>`);
+            parts.push(`<path d="M${x} ${y + 8} Q${x + width / 2} ${y + 16} ${x + width} ${y + 8}" fill="none" stroke="${strokeColor}" stroke-width="1.2"/>`);
+        } else {
+            parts.push(`<rect x="${x}" y="${y}" width="${width}" height="${H}" rx="8" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${focus === node.id ? 2.4 : 1.5}" stroke-dasharray="${isPartial ? "5 3" : ""}"/>`);
+        }
+        parts.push(`<text x="${node.x}" y="${node.y - 3 + (node.store ? 4 : 0)}" text-anchor="middle" font-size="14" font-weight="600" fill="${isDown ? colors.down : colors.ink}">${escapeText(node.title)}${isDown ? " · down" : isPartial ? " · one copy down" : ""}</text>`);
+        parts.push(`<text x="${node.x}" y="${node.y + 14 + (node.store ? 4 : 0)}" text-anchor="middle" font-size="11.5" font-family="${escapeText(colors.mono)}" fill="${colors.muted}">${escapeText(sub)}</text>`);
+        parts.push("</g>");
+    }
+    parts.push("</svg>");
+    return parts.join("");
+}
+
+function legendHtml() {
+    const items = [
+        ["control", "Control plane: main, database, artifacts", "swatch"],
+        ["serving", "Serving plane: gateways, engines", "swatch"],
+        ["batch", "Batch plane: workers and job children", "swatch"],
+    ];
+    const lines = [
+        ["Inference", "serving", 2.4, ""],
+        ["UI and API", "control", 1.8, ""],
+        ["Config, logs, announce", "control", 1.5, "6 4"],
+        ["Jobs", "batch", 1.6, "2 4"],
+    ];
+    const swatches = items.map(([plane, text]) => `<span><span class="swatch" style="border-color: var(--${plane}); background: var(--${plane}-fill)"></span>${text}</span>`);
+    const strokes = lines.map(([text, plane, width, dash]) => `<span><svg width="34" height="10" aria-hidden="true"><line x1="1" y1="5" x2="33" y2="5" stroke="var(--${plane})" stroke-width="${width}" stroke-dasharray="${dash}"/></svg>${text}</span>`);
+    return [...swatches, ...strokes].join("");
+}
+
+function factsHtml(role) {
+    return `<dl class="facts">
+        <dt>Locally</dt><dd>${escapeText(role.local)}</dd>
+        <dt>Deployed</dt><dd>${escapeText(role.deployed)}</dd>
+        <dt>Scales by</dt><dd>${escapeText(role.scales)}</dd>
+        <dt>Database</dt><dd>${escapeText(role.db)}</dd>
+    </dl>`;
+}
+
+function panelHtml() {
+    const shapeName = SHAPES.find((shape) => shape.id === state.shape).label;
+    if (state.failure !== "none") {
+        const failure = FAILURES.find((item) => item.id === state.failure);
+        const scenario = SCENARIOS[state.shape][state.failure];
+        const rows = [
+            ...scenario.keeps.map((text) => `<li><span class="chip ok">Keeps going</span><span>${escapeText(text)}</span></li>`),
+            ...scenario.stops.map((text) => `<li><span class="chip stop">Stops</span><span>${escapeText(text)}</span></li>`),
+            ...scenario.recovers.map((text) => `<li><span class="chip wait">Recovery</span><span>${escapeText(text)}</span></li>`),
+        ];
+        return `<span class="kicker">${escapeText(shapeName)} · failure drill</span>
+            <h2>${escapeText(failure.label)} goes down</h2>
+            <ul class="status-list">${rows.join("")}</ul>`;
+    }
+    if (state.focus) {
+        const role = ROLES[state.focus];
+        return `<span class="kicker">${escapeText(shapeName)} · role</span>
+            <h2>${escapeText(role.name)}</h2>
+            <p>${escapeText(role.runs)}</p>
+            ${factsHtml(role)}`;
+    }
+    const summaries = {
+        one: "Everything runs under one command on one machine: main with its gateway, a worker and the engines, SQLite and an artifacts folder. For trying minibrain and for small teams.",
+        hybrid: "main and its gateway stay on a laptop or small VM. Workers and engines run on a GPU box and join over HTTPS with a URL, a token and a pool name.",
+        production: "Each role is its own service. Gateways and mains sit behind load balancers, GPU pools hold workers and engines, and Postgres and S3 hold the state.",
+    };
+    return `<span class="kicker">${escapeText(shapeName)}</span>
+        <h2>How it fits together</h2>
+        <p>${escapeText(summaries[state.shape])}</p>
+        <p class="kicker">Hover or focus a role to see what it talks to.</p>`;
+}
+
+function segmentButtons(container, items, current, onPick, isDisabled) {
+    container.innerHTML = items.map((item) => {
+        const disabled = isDisabled ? isDisabled(item) : false;
+        return `<button type="button" id="pick-${item.id}" data-id="${item.id}" aria-pressed="${item.id === current}" ${disabled ? "disabled" : ""}>${escapeText(item.label)}</button>`;
+    }).join("");
+    container.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => onPick(button.dataset.id));
+    });
+}
+
+function failureDisabled(item) {
+    return item.id !== "none" && SCENARIOS[state.shape][item.id] === null;
+}
+
+function draw() {
+    segmentButtons(document.getElementById("shape-buttons"), SHAPES, state.shape, (id) => {
+        state.shape = id;
+        if (state.failure !== "none" && SCENARIOS[id][state.failure] === null) {
+            state.failure = "none";
+        }
+        draw();
+    });
+    segmentButtons(document.getElementById("failure-buttons"), FAILURES, state.failure, (id) => {
+        state.failure = id;
+        state.focus = null;
+        draw();
+    }, failureDisabled);
+    redrawCanvas();
+}
+
+function redrawCanvas() {
+    const colors = palette();
+    const active = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.id : null;
+    document.getElementById("canvas").innerHTML = render(state.shape, state.failure, state.focus, colors, true);
+    document.getElementById("panel").innerHTML = panelHtml();
+    document.querySelectorAll(".node").forEach((element) => {
+        const pick = () => {
+            if (state.failure !== "none") {
+                return;
+            }
+            if (state.focus !== element.dataset.id) {
+                state.focus = element.dataset.id;
+                redrawCanvas();
+            }
+        };
+        element.addEventListener("mouseenter", pick);
+        element.addEventListener("focus", pick);
+        element.addEventListener("click", pick);
+        if (element.dataset.id === active) {
+            element.focus({ preventScroll: true });
+        }
+    });
+}
+
+document.getElementById("canvas").addEventListener("mouseleave", () => {
+    if (state.focus) {
+        state.focus = null;
+        redrawCanvas();
+    }
+});
+
+document.getElementById("legend").innerHTML = legendHtml();
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+window.minibrainTopology = { render, SHAPES };
+draw();
+</script>
+</body>
+</html>

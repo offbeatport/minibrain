@@ -95,9 +95,9 @@ at answer time.
 ## Architecture
 
 One install is one supervised process tree: one command starts it, and minibrain starts and restarts the rest.
-main is the control plane; gateways and engines are the data plane. Production runs on GPU racks, rented or on-prem;
+main is the control plane; gateways and engines are the serving plane. Production runs on GPU racks, rented or on-prem;
 a laptop install is onboarding. A local main can drive remote GPU workers and engines. Details and tradeoffs:
-`docs/architecture.md`.
+`docs/architecture.md` and the docs it links.
 
 | Process | Runs |
 |---|---|
@@ -106,7 +106,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 | training | One child per training or eval job; writes checkpoints and results |
 | engine | One model (base + many adapters) per process; SGLang, MLX, `transformers` or llama.cpp, chosen per node |
 
-- The data plane keeps serving without main. main publishes a versioned config snapshot (routes, versions, adapters,
+- The serving plane keeps serving without main. main publishes a versioned config snapshot (routes, versions, adapters,
   key hashes, limits); gateways keep the last good copy on disk and serve from it, and buffer request and audit logs
   until main is back. A main outage or upgrade pauses only the UI and new jobs; rollback republishes a snapshot.
 - Everything long-running is a job on one contract: data preparation, training, eval, batch jobs, pipeline steps.
@@ -160,7 +160,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - Workers through the API: no database credentials outside the main process and one SQLite writer, for more API
   surface and workers that wait while the main process is down.
 - At-least-once, not exactly-once: simpler, correct while every job is idempotent.
-- SQLite is single-writer: one main. With a statically stable data plane that is enough; Postgres buys a main that
+- SQLite is single-writer: one main. With a statically stable serving plane that is enough; Postgres buys a main that
   fails over without downtime.
 - SQLite and Postgres only: other SQLAlchemy dialects may work but are not tested.
 
