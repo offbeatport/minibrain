@@ -282,11 +282,12 @@ function Option({
     children: ReactNode;
 }) {
     return (
-        <Label className="flex min-w-0 items-center gap-2 font-normal">
+        <Label className="flex min-w-0 items-start gap-2 font-normal leading-snug">
             <Checkbox
                 checked={checked}
                 disabled={disabled}
                 onCheckedChange={(next) => onChange(next === true)}
+                className="mt-px"
             />
             <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
             {count !== undefined && (
@@ -393,7 +394,7 @@ export function FilterPanel({
                         publisher,
                         <>
                             <PublisherLogo publisher={publisher} name={publisher} size="sm" />
-                            <span className="truncate">{publisher}</span>
+                            <span className="line-clamp-2 break-words">{publisher}</span>
                         </>,
                     ),
                 )}
@@ -402,7 +403,11 @@ export function FilterPanel({
             <Group title="Size">{TIERS.map((tier) => option("tiers", tier.value))}</Group>
             <Group title="Licence">
                 {distinct("licences").map((licence) =>
-                    option("licences", licence, <span className="truncate">{licence}</span>),
+                    option(
+                        "licences",
+                        licence,
+                        <span className="line-clamp-2 break-words">{licence}</span>,
+                    ),
                 )}
             </Group>
         </div>
