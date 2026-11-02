@@ -222,7 +222,8 @@ export interface paths {
         get: operations["read_base_api_models_base__key__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Base */
+        delete: operations["delete_base_api_models_base__key__delete"];
         options?: never;
         head?: never;
         /** Update Base */
@@ -1147,6 +1148,8 @@ export interface components {
             needed_bytes: number | null;
             /** Publisher */
             publisher?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1161,8 +1164,6 @@ export interface components {
             storage_path: string;
             /** Files */
             files: components["schemas"]["ModelFile"][];
-            /** Size Bytes */
-            size_bytes: number;
             /** Error */
             error: string | null;
             /** License */
@@ -1944,6 +1945,8 @@ export interface components {
             needed_bytes: number | null;
             /** Publisher */
             publisher?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -2761,6 +2764,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BaseModelDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_base_api_models_base__key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

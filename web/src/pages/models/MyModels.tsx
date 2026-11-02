@@ -252,6 +252,47 @@ function archiveConfirmation(row: ModelRow, on: Handlers): Confirmation {
     };
 }
 
+function deleteModel(row: ModelRow) {
+    return row.kind === "base"
+        ? unwrap(api.DELETE("/api/models/base/{key}", { params: { path: { key: row.key } } }))
+        : unwrap(api.DELETE("/api/minibrains/{slug}", { params: { path: { slug: row.key } } }));
+}
+
+function deleteConfirmation(row: ModelRow, on: Handlers): Confirmation {
+    const deployed = row.deployment.state !== "not_deployed";
+    return {
+        title: `Delete ${row.name}?`,
+        description:
+            row.kind === "base" ? (
+                <>
+                    <p>
+                        {row.size_bytes
+                            ? `Its weights (${bytes(row.size_bytes)}) are removed from storage, with its API keys.`
+                            : "Its record and API keys are removed."}{" "}
+                        You can download or import it again later.
+                    </p>
+                    {deployed && <p>It is deployed: undeploy it first.</p>}
+                </>
+            ) : (
+                <>
+                    <p>
+                        Its data, versions, evaluation results and API keys are removed. This cannot
+                        be undone.
+                    </p>
+                    {deployed && (
+                        <p>
+                            It is deployed: apps calling{" "}
+                            <span className="font-mono">{row.key}</span> start getting errors.
+                        </p>
+                    )}
+                </>
+            ),
+        confirmLabel: "Delete",
+        destructive: true,
+        run: () => deleteModel(row).then(on.refresh),
+    };
+}
+
 function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
     const primary = primaryAction(row, on);
     const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
@@ -344,6 +385,12 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => on.confirm(archiveConfirmation(row, on))}>
                         {row.archived ? "Restore" : "Archive"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => on.confirm(deleteConfirmation(row, on))}
+                    >
+                        Delete
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

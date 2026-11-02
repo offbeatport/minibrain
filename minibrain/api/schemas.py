@@ -301,6 +301,7 @@ class ModelRow(BaseModel):
     ready_version: int | None
     needed_bytes: int | None
     publisher: str | None = None
+    size_bytes: int | None = None
 
 
 class ModelFile(BaseModel):
@@ -317,7 +318,6 @@ class BaseModelDetail(ModelRow):
     source_path: str | None
     storage_path: str
     files: list[ModelFile]
-    size_bytes: int
     error: str | None
     license: str | None
     license_name: str | None

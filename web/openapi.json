@@ -709,6 +709,39 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Delete Base",
+        "operationId": "delete_base_api_models_base__key__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/models/base/{key}/retry": {
@@ -3404,6 +3437,17 @@
             ],
             "title": "Publisher"
           },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -3462,10 +3506,6 @@
             },
             "type": "array",
             "title": "Files"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "title": "Size Bytes"
           },
           "error": {
             "anyOf": [
@@ -3591,7 +3631,6 @@
           "source_path",
           "storage_path",
           "files",
-          "size_bytes",
           "error",
           "license",
           "license_name",
@@ -5787,6 +5826,17 @@
               }
             ],
             "title": "Publisher"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
           }
         },
         "type": "object",

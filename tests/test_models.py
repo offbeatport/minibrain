@@ -15,7 +15,7 @@ from minibrain.models.hardware import GIB, Hardware, fit
 from minibrain.models.rules import publisher_of
 from minibrain.models.sources import StorageSource, location_url
 from minibrain.policy import PREFIX
-from minibrain.registry.models import CatalogModel, CatalogVariant
+from minibrain.registry.models import AuditEvent, CatalogModel, CatalogVariant
 from minibrain.registry.settings_store import write
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
@@ -170,6 +170,30 @@ def test_download_appears_in_my_models_and_validates(harness: Harness, hub: Path
     assert all(hashlib.sha256((stored / name).read_bytes()).hexdigest() for name in FILES)
     (stored / "model.safetensors").unlink()
     assert rows(harness)["tiny"]["availability"]["state"] == "missing"
+
+
+def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness, hub: Path) -> None:
+    add_tiny(harness)
+    download_tiny(harness)
+    assert harness.client.delete("/api/models/base/tiny").status_code == 409
+    assert harness.worker(kinds=["download"]).run_once()
+    stored = Path(harness.client.get("/api/models/base/tiny").json()["storage_path"])
+    assert rows(harness)["tiny"]["size_bytes"] == sum(len(data) for data in FILES.values())
+    harness.client.post("/api/models/base/tiny/deploy", json={"deployed": True})
+    assert "undeploy it first" in harness.client.delete("/api/models/base/tiny").json()["detail"]
+    harness.client.post("/api/models/base/tiny/deploy", json={"deployed": False})
+    custom = harness.client.post("/api/minibrains", json={"name": "Tickets", "base_model": "tiny"}).json()
+    assert "Tickets is trained on Tiny" in harness.client.delete("/api/models/base/tiny").json()["detail"]
+    assert harness.client.delete(f"/api/minibrains/{custom['slug']}").status_code == 204
+    assert harness.client.delete("/api/models/base/tiny").status_code == 204
+    assert not stored.exists() and "tiny" not in rows(harness)
+    assert harness.client.get("/api/models/base/tiny").status_code == 404
+    with harness.sessions() as session:
+        deleted = session.query(AuditEvent).filter(AuditEvent.action == "model.delete").all()
+        assert sorted((event.target, event.detail["kind"]) for event in deleted) == [
+            (custom["slug"], "custom"),
+            ("tiny", "base"),
+        ]
 
 
 def test_checksum_mismatch_is_retried_not_trusted(harness: Harness, hub: Path) -> None:

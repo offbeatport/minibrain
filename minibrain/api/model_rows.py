@@ -193,6 +193,7 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health) 
         ready_version=None,
         needed_bytes=needed_bytes(weights) if weights else None,
         publisher=variant.model.provider if variant is not None else publisher_of(model.repo),
+        size_bytes=model.size_bytes or None,
     )
 
 

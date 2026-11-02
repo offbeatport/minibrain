@@ -1,11 +1,14 @@
+import shutil
 import time
 from typing import Any
 
 from fastapi import APIRouter, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.model_rows import Health, all_rows, base_row, model_job
+from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
@@ -22,7 +25,17 @@ from minibrain.api.schemas import (
 from minibrain.api.views import key_info
 from minibrain.models.registry import model_dir, resolve_spec, retry, start_import
 from minibrain.models.sources import configured
-from minibrain.registry.models import ApiKey, CatalogModel, Model, ModelStatus, now
+from minibrain.registry.models import (
+    ACTIVE_JOB_STATUSES,
+    ApiKey,
+    AuditEvent,
+    CatalogModel,
+    Job,
+    Minibrain,
+    Model,
+    ModelStatus,
+    now,
+)
 from minibrain.registry.service import ConflictError, NotFoundError, create_key
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
@@ -60,7 +73,6 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         source_path=model.source_path,
         storage_path=str(model_dir(settings, model.id)),
         files=[ModelFile(path=f["path"], size=f["size"], sha256=f.get("sha256")) for f in model.files],
-        size_bytes=model.size_bytes,
         error=model.error,
         license=model.license,
         license_name=entry.license_name if entry else None,
@@ -118,6 +130,31 @@ def update_base(
     model.updated_at = now()
     session.commit()
     return detail_of(session, settings, request, model)
+
+
+@router.delete("/base/{key}", status_code=204)
+def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
+    model = get_model(session, key)
+    if model.deployed:
+        raise ConflictError(f"{model.name} is deployed; undeploy it first")
+    if session.scalar(select(Job.id).where(Job.model_id == model.id, Job.status.in_(ACTIVE_JOB_STATUSES))):
+        raise ConflictError(f"{model.name} has a download or import running; cancel it first")
+    users = session.scalars(select(Minibrain.name).where(Minibrain.base_model == model.id)).all()
+    if users:
+        verb = "is" if len(users) == 1 else "are"
+        raise ConflictError(f"{', '.join(users)} {verb} trained on {model.name}; delete them first")
+    session.query(ApiKey).filter(ApiKey.model_id == model.id).delete()
+    session.add(
+        AuditEvent(
+            actor=LOCAL_USER,
+            action="model.delete",
+            target=model.id,
+            detail={"name": model.name, "kind": "base", "size_bytes": model.size_bytes},
+        )
+    )
+    session.delete(model)
+    session.commit()
+    shutil.rmtree(model_dir(settings, model.id), ignore_errors=True)
 
 
 @router.post("/base/{key}/retry", status_code=202)

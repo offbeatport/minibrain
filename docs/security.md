@@ -28,5 +28,6 @@ log with who, before and after.
 - Workers and engines hold a shared token (`MINIBRAIN_WORKER_TOKEN`, `MINIBRAIN_GATEWAY_TOKEN`), never database
   credentials.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
+- Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install.
 - Content hashes and signatures use SHA-256 through OpenSSL or `cryptography`; never MD5 or SHA-1.

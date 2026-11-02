@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile
 
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     ChatMessage,
     ExampleInfo,
@@ -28,7 +29,7 @@ from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
 from minibrain.models.registry import trainable_bases
 from minibrain.registry.files import ArtifactKind, register, snapshot_dir
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, JobKind, Minibrain, now
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
 from minibrain.registry.service import ConflictError, create_minibrain, get_minibrain, latest_snapshot, list_minibrains
 from minibrain.settings import Settings
 from minibrain.tasks.classify import trained_messages
@@ -107,6 +108,14 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     if any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
         raise ConflictError("cancel the running jobs first")
+    session.add(
+        AuditEvent(
+            actor=LOCAL_USER,
+            action="model.delete",
+            target=minibrain.slug,
+            detail={"name": minibrain.name, "kind": "custom", "versions": len(minibrain.versions)},
+        )
+    )
     session.delete(minibrain)
     session.commit()
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
