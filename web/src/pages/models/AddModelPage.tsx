@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
     BookOpen,
@@ -9,7 +9,6 @@ import {
     Database,
     ExternalLink,
     FlaskConical,
-    Info,
     type LucideIcon,
     PenLine,
     SquarePen,
@@ -30,9 +29,6 @@ import {
     SelectTrigger,
     SelectValue,
     Textarea,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
     cn,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
@@ -46,10 +42,11 @@ import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { DatasetMapping } from "../DataLibrary";
+import { SourceField, type SourceState, useSourcePlan } from "./BaseSource";
 import { bestFit } from "./DiscoverFilters";
 import { splitTags, useModelsRefresh } from "./dialogs";
 
-type BaseSource = "installed" | "import";
+type BaseSource = "installed" | "fetch";
 type DataSource = "upload" | "dataset" | "sample";
 
 const TASKS: { key: string; label: string; hint: string; ready: boolean; icon: LucideIcon }[] = [
@@ -249,105 +246,6 @@ function BaseChooser({ value, onChange }: { value: string; onChange: (key: strin
     );
 }
 
-function useDebounced(value: string, ms: number): string {
-    const [settled, setSettled] = useState(value);
-    useEffect(() => {
-        const timer = window.setTimeout(() => setSettled(value), ms);
-        return () => window.clearTimeout(timer);
-    }, [value, ms]);
-    return settled;
-}
-
-const PATH_HELP =
-    "A Hugging Face format model: config.json, tokenizer files and .safetensors weights (sharded is fine). Use an absolute folder path on the minibrain server, or an s3:// URL read with the server's AWS_* credentials.";
-
-type Inspection = {
-    ok: boolean;
-    problem?: string | null;
-    source_type?: string | null;
-    architecture?: string | null;
-    files?: number;
-    size_bytes?: number;
-    match?: string | null;
-    name?: string | null;
-    variant_id?: string | null;
-};
-
-function PathCheck({
-    path,
-    found,
-    loading,
-}: { path: string; found?: Inspection; loading: boolean }) {
-    if (path.length < 2) {
-        return null;
-    }
-    if (loading || !found) {
-        return <span className="text-sm text-muted-foreground">Checking…</span>;
-    }
-    if (!found.ok) {
-        return (
-            <StatusText tone="destructive">{found.problem ?? "Cannot read this path"}</StatusText>
-        );
-    }
-    const where = found.source_type === "s3" ? "S3" : "Folder";
-    return (
-        <div className="flex flex-col gap-0.5 rounded-md border bg-card px-3 py-2 text-sm">
-            <StatusText tone="success">
-                {`${where} · ${found.architecture || "unknown architecture"} · ${found.files} files · ${bytes(found.size_bytes)}`}
-            </StatusText>
-            <span className="text-muted-foreground">
-                {found.match
-                    ? `Matches ${found.match}; files are checked against its catalogue checksums.`
-                    : "No catalogue match: it imports as not verified."}
-            </span>
-        </div>
-    );
-}
-
-function ImportPath({
-    value,
-    onChange,
-    found,
-    loading,
-}: {
-    value: string;
-    onChange: (value: string) => void;
-    found?: Inspection;
-    loading: boolean;
-}) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <span className="flex items-center gap-1.5">
-                <label htmlFor="import-location" className="text-sm font-medium">
-                    Folder or S3 path
-                </label>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="What can I import?"
-                            className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        >
-                            <Info className="size-4" />
-                        </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-80 whitespace-normal">
-                        {PATH_HELP}
-                    </TooltipContent>
-                </Tooltip>
-            </span>
-            <Input
-                id="import-location"
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder="/srv/models/qwen3-1.7b or s3://bucket/models/qwen3-1.7b"
-                className="font-mono"
-            />
-            <PathCheck path={value.trim()} found={found} loading={loading} />
-        </div>
-    );
-}
-
 function TaskSelect({ value, onChange }: { value: string; onChange: (task: string) => void }) {
     return (
         <Field id="create-task" label="Task">
@@ -503,14 +401,35 @@ export function AddModelPage() {
     const router = useRouter();
     const refresh = useModelsRefresh();
     const params = useRouterState({
-        select: (state) => state.location.search as { base?: string; source?: string },
+        select: (state) =>
+            state.location.search as {
+                base?: string;
+                source?: string;
+                model?: string;
+                variant?: string;
+            },
     });
     const bases = useBases();
+    const models = useModels();
     const [source, setSource] = useState<BaseSource>(
-        params.source === "import" ? "import" : "installed",
+        params.model || params.source === "import" ? "fetch" : "installed",
     );
     const [chosen, setChosen] = useState(params.base ?? "");
-    const [location, setLocation] = useState("");
+    const [sourceState, setSourceState] = useState<SourceState>({
+        text: params.model ?? "",
+        variant: params.variant ?? "",
+        accepted: false,
+    });
+    const plan = useSourcePlan(sourceState);
+    const pickedRepo =
+        plan.target.kind === "catalogue" && sourceState.text === plan.target.entry.id
+            ? plan.target.entry.repo
+            : null;
+    useEffect(() => {
+        if (pickedRepo) {
+            setSourceState((current) => ({ ...current, text: pickedRepo }));
+        }
+    }, [pickedRepo]);
     const [name, setName] = useState("");
     const [task, setTask] = useState("classify");
     const [description, setDescription] = useState("");
@@ -523,35 +442,18 @@ export function AddModelPage() {
         catalog.data?.entries.some((entry) => entry.recommended && entry.id === key),
     );
     const baseKey = chosen || recommended || bases.data?.[0] || "";
-    const path = useDebounced(location.trim(), 400);
-    const check = useQuery({
-        queryKey: ["models", "inspect", path],
-        queryFn: () => unwrap(api.POST("/api/models/inspect", { body: { location: path } })),
-        enabled: source === "import" && path.length > 1,
-        staleTime: 10_000,
-    });
-    const found = path === location.trim() ? check.data : undefined;
+    const installedName =
+        models.data?.find((row) => row.kind === "base" && row.key === baseKey)?.name ??
+        catalog.data?.entries.find((entry) => entry.id === baseKey)?.name ??
+        baseKey;
+    const suggestedName = (source === "installed" ? installedName : plan.name) ?? "";
     const add = useMutation({
         mutationFn: async () => {
-            let baseModel = baseKey;
-            if (source === "import") {
-                const imported = await unwrap(
-                    api.POST("/api/models/import", {
-                        body: {
-                            name: found?.name || name.trim(),
-                            location: location.trim(),
-                            description: "",
-                            tags: [],
-                            variant_id: found?.variant_id ?? null,
-                        },
-                    }),
-                );
-                baseModel = imported.key;
-            }
+            const baseModel = source === "installed" ? baseKey : await plan.run();
             const created = await unwrap(
                 api.POST("/api/minibrains", {
                     body: {
-                        name: name.trim(),
+                        name: name.trim() || suggestedName,
                         description: description.trim(),
                         tags: splitTags(tags),
                         base_model: baseModel || null,
@@ -575,9 +477,9 @@ export function AddModelPage() {
             router.history.push(`/models/custom/${encodeURIComponent(created.slug)}`);
         },
     });
-    const baseReady = source === "installed" ? Boolean(baseKey) : Boolean(found?.ok);
+    const baseReady = source === "installed" ? Boolean(baseKey) : plan.ready;
     const dataReady = !withData || dataSource === "sample" || dataset !== "";
-    const ready = baseReady && dataReady && name.trim().length > 0;
+    const ready = baseReady && dataReady && (name.trim() || suggestedName).length > 0;
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (ready) {
@@ -629,22 +531,23 @@ export function AddModelPage() {
                                 </Choice>
                                 <Choice
                                     name="base-source"
-                                    value="import"
-                                    checked={source === "import"}
-                                    onChange={() => setSource("import")}
+                                    value="fetch"
+                                    checked={source === "fetch"}
+                                    onChange={() => setSource("fetch")}
                                     className="h-9 items-center px-3 pr-9 text-sm"
                                 >
-                                    Import from a folder or S3
+                                    Download or import
                                 </Choice>
                             </fieldset>
                             {source === "installed" ? (
                                 <BaseChooser value={baseKey} onChange={setChosen} />
                             ) : (
-                                <ImportPath
-                                    value={location}
-                                    onChange={setLocation}
-                                    found={found}
-                                    loading={check.isFetching || path !== location.trim()}
+                                <SourceField
+                                    state={sourceState}
+                                    onState={(patch) =>
+                                        setSourceState((current) => ({ ...current, ...patch }))
+                                    }
+                                    plan={plan}
                                 />
                             )}
                         </div>
@@ -657,7 +560,7 @@ export function AddModelPage() {
                                         id="create-name"
                                         value={name}
                                         onChange={(event) => setName(event.target.value)}
-                                        placeholder="IT ticket classifier"
+                                        placeholder={suggestedName || "IT ticket classifier"}
                                     />
                                 </Field>
                                 <TaskSelect value={task} onChange={setTask} />

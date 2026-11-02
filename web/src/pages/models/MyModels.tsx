@@ -21,8 +21,10 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Label,
     Link,
     SearchInput,
+    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -829,15 +831,14 @@ function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
     if (text && !searchable(entry).includes(text)) {
         return false;
     }
-    const types = picked(search.type);
-    if (skip !== "type" && types.length > 0 && !types.includes(entry.model.kind)) {
+    if (skip !== "type" && entry.model.kind === "base" && search.bases !== "yes") {
         return false;
     }
     const states = picked(search.state);
     return skip === "state" || states.length === 0 || states.includes(stateOfEntry(entry));
 }
 
-const CLEARED: ModelsSearch = { q: "", type: "", state: "" };
+const CLEARED: ModelsSearch = { q: "", state: "" };
 
 export function MyModels({
     search,
@@ -898,7 +899,7 @@ export function MyModels({
     const visible = entries.filter((entry) => matches(entry, search)).sort(byState);
     const facetCount = (facet: Facet, test: (entry: Entry) => boolean) =>
         entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
-    const filtering = Boolean(search.q || search.type || search.state);
+    const filtering = Boolean(search.q || search.state);
     const clear = () => update(CLEARED);
     const firstRun = !rows.some((row) => row.kind === "custom") && !filtering;
     const stateOptions = STATE_RANK.map((state) => ({
@@ -906,11 +907,7 @@ export function MyModels({
         label: STATE_LABELS[state],
         count: facetCount("state", (entry) => stateOfEntry(entry) === state),
     }));
-    const typeOptions = (["custom", "base"] as const).map((kind) => ({
-        value: kind,
-        label: kind === "custom" ? "Custom" : "Base",
-        count: facetCount("type", (entry) => entry.model.kind === kind),
-    }));
+    const baseCount = entries.filter((entry) => entry.model.kind === "base").length;
     const noMatch = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No models match these filters.</p>
@@ -941,14 +938,13 @@ export function MyModels({
                         value={picked(search.state)}
                         onValueChange={(states) => update({ state: states.join(",") })}
                     />
-                    <CheckboxSelect
-                        label="Type"
-                        allLabel="All types"
-                        noun="types"
-                        options={typeOptions}
-                        value={picked(search.type)}
-                        onValueChange={(types) => update({ type: types.join(",") })}
-                    />
+                    <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+                        <Switch
+                            checked={search.bases === "yes"}
+                            onCheckedChange={(checked) => update({ bases: checked ? "yes" : "" })}
+                        />
+                        {`Show base models (${baseCount})`}
+                    </Label>
                 </div>
             </div>
             {models.isLoading ? (

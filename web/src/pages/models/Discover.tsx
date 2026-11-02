@@ -1,25 +1,18 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ExternalLink } from "lucide-react";
+import { ArrowUpDown, ExternalLink } from "lucide-react";
 import {
     Badge,
     Button,
-    Checkbox,
     DataGrid,
     DataGridDetail,
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
-    Field,
-    Input,
-    Label,
     Link,
-    RadioGroup,
-    RadioGroupItem,
     SearchInput,
     Select,
     SelectContent,
@@ -31,7 +24,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { type CatalogEntry, type CatalogResponse, type FitInfo, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -51,7 +44,6 @@ import {
 } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
 
-const RESERVE_BYTES = 1024 ** 3;
 const FIT_LABELS: Record<FitInfo["level"], string> = {
     fits: "Estimated fit",
     limited: "Limited headroom",
@@ -115,155 +107,6 @@ export function AccessSteps({
                 )}
             </li>
         </ol>
-    );
-}
-
-export function DownloadDialog({
-    entry,
-    catalog,
-    onOpenChange,
-    preferred,
-}: {
-    entry: CatalogEntry | null;
-    catalog: CatalogResponse;
-    onOpenChange: (open: boolean) => void;
-    preferred?: string;
-}) {
-    const refresh = useModelsRefresh();
-    const [variantId, setVariantId] = useState("");
-    const [accepted, setAccepted] = useState(false);
-    useEffect(() => {
-        if (entry) {
-            setVariantId(preferred ?? bestFit(entry).id);
-            setAccepted(false);
-        }
-    }, [entry, preferred]);
-    const variant = entry?.variants.find((item) => item.id === variantId);
-    const free = catalog.store_free_bytes;
-    const tooBig =
-        variant !== undefined &&
-        free !== null &&
-        free !== undefined &&
-        variant.size_bytes + RESERVE_BYTES > free;
-    const start = useMutation({
-        mutationFn: () =>
-            unwrap(
-                api.POST("/api/catalog/{catalog_id}/download", {
-                    params: { path: { catalog_id: entry?.id ?? "" } },
-                    body: { variant: variantId, accept_license: accepted },
-                }),
-            ),
-        onSuccess: async () => {
-            await refresh();
-            onOpenChange(false);
-        },
-    });
-    if (!entry) {
-        return null;
-    }
-    const blocked = entry.gated && !catalog.token_configured;
-    return (
-        <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>Download {entry.name}</DialogTitle>
-                    <DialogDescription>
-                        Downloads in the background into managed storage and is checked against the
-                        published SHA-256 sums. Nothing is loaded or deployed until you choose to.
-                    </DialogDescription>
-                </DialogHeader>
-                {entry.variants.length > 1 && (
-                    <RadioGroup
-                        value={variantId}
-                        onValueChange={(value) => setVariantId(String(value))}
-                    >
-                        {entry.variants.map((item) => (
-                            <label
-                                key={item.id}
-                                htmlFor={`variant-${item.id}`}
-                                className="flex cursor-pointer items-start gap-3 rounded-md border p-3"
-                            >
-                                <RadioGroupItem
-                                    id={`variant-${item.id}`}
-                                    value={item.id}
-                                    className="mt-0.5"
-                                />
-                                <span className="flex flex-1 flex-col gap-0.5">
-                                    <span className="font-semibold">
-                                        {item.label} · {bytes(item.size_bytes)}
-                                    </span>
-                                    <span className="text-sm text-muted-foreground">
-                                        Runs on {item.runtimes.join(", ")}. {item.fit.basis}
-                                    </span>
-                                    <StatusText tone={FIT_TONES[item.fit.level]}>
-                                        {fitLabel(item.fit)}
-                                    </StatusText>
-                                </span>
-                            </label>
-                        ))}
-                    </RadioGroup>
-                )}
-                {variant && entry.variants.length === 1 && (
-                    <div className="flex flex-col gap-1 rounded-md border p-3 text-sm">
-                        <span className="font-semibold">
-                            {variant.label} · {bytes(variant.size_bytes)} · {variant.files} files
-                        </span>
-                        <span className="text-muted-foreground">{variant.fit.basis}</span>
-                        <StatusText tone={FIT_TONES[variant.fit.level]}>
-                            {fitLabel(variant.fit)}
-                        </StatusText>
-                    </div>
-                )}
-                {variant?.fit.level === "insufficient" && (
-                    <p className="text-sm text-warning">
-                        {`This variant is unlikely to run on ${poolPhrase(catalog)}. You can still download it for another pool.`}
-                    </p>
-                )}
-                <div className="flex flex-col gap-2 rounded-md border p-3">
-                    <p className="text-sm font-semibold">
-                        {entry.license_name}{" "}
-                        <a
-                            href={entry.license_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-normal text-primary hover:underline"
-                        >
-                            Read the licence
-                            <ExternalLink className="ml-0.5 inline size-3.5" />
-                        </a>
-                    </p>
-                    <p className="text-sm text-muted-foreground">{entry.license_summary}</p>
-                    {entry.gated && <AccessSteps entry={entry} catalog={catalog} />}
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="accept-license"
-                            checked={accepted}
-                            onCheckedChange={(checked) => setAccepted(checked === true)}
-                        />
-                        <Label htmlFor="accept-license">
-                            I accept the {entry.license_name} for this install
-                        </Label>
-                    </div>
-                </div>
-                {tooBig && variant && (
-                    <p className="text-sm text-destructive">
-                        {`Needs ${bytes(variant.size_bytes)}; ${bytes(catalog.store_free_bytes)} free on the disk that holds models. Delete unused models or free up space.`}
-                    </p>
-                )}
-                <ErrorLine error={start.error} />
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={() => start.mutate()}
-                        disabled={!accepted || blocked || tooBig || start.isPending}
-                    >
-                        {variant ? `Download ${bytes(variant.size_bytes)}` : "Download"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     );
 }
 
@@ -356,7 +199,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             </div>
         );
     }
-    const label = entry.variants.length > 1 ? "Choose variant" : "Download";
+    const label = "Add model";
     return (
         <div className="flex justify-end gap-1">
             {on.online ? (
@@ -416,79 +259,18 @@ const SORTS: Record<
 function SortSelect({ value, onSort }: { value: string; onSort: (value: string) => void }) {
     return (
         <Select value={value} onValueChange={(next) => onSort(String(next))}>
-            <SelectTrigger aria-label="Sort models" size="sm" className="w-auto min-w-40">
+            <SelectTrigger aria-label="Sort models" className="w-auto min-w-44">
+                <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
                 {Object.entries(SORTS).map(([key, sort]) => (
                     <SelectItem key={key} value={key}>
-                        {`Sort: ${sort.label}`}
+                        {sort.label}
                     </SelectItem>
                 ))}
             </SelectContent>
         </Select>
-    );
-}
-
-function AddFromHubDialog({
-    open,
-    onOpenChange,
-    onAdded,
-    endpoint,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onAdded: (entry: CatalogEntry) => void;
-    endpoint: string;
-}) {
-    const refresh = useModelsRefresh();
-    const [repo, setRepo] = useState("");
-    const add = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/catalog/hub", { body: { repo: repo.trim() } })),
-        onSuccess: async (entry) => {
-            await refresh();
-            setRepo("");
-            onOpenChange(false);
-            onAdded(entry);
-        },
-    });
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (repo.trim()) {
-            add.mutate();
-        }
-    };
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg">
-                <form onSubmit={submit} className="flex flex-col gap-4">
-                    <DialogHeader>
-                        <DialogTitle>Add from Hugging Face</DialogTitle>
-                        <DialogDescription>
-                            {`Find any model on ${endpoint}, then paste its link or id. minibrain reads that one model's details now and adds it to Discover as untested unless our engines support its architecture.`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Field id="hub-repo" label="Model link or id">
-                        <Input
-                            id="hub-repo"
-                            value={repo}
-                            onChange={(event) => setRepo(event.target.value)}
-                            placeholder="Qwen/Qwen3-8B"
-                            autoFocus
-                        />
-                    </Field>
-                    <ErrorLine error={add.error} />
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={!repo.trim() || add.isPending}>
-                            {add.isPending ? "Checking…" : "Add model"}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
     );
 }
 
@@ -503,6 +285,14 @@ const DOWNLOADS = new Intl.NumberFormat(undefined, {
 
 export function parameters(entry: CatalogEntry): string {
     return `${entry.params_b.toFixed(1)}B${entry.moe ? " MoE" : ""}`;
+}
+
+export function addModelHref(entry: CatalogEntry, variant?: string): string {
+    const query = new URLSearchParams({ model: entry.id });
+    if (variant) {
+        query.set("variant", variant);
+    }
+    return `/models/new?${query.toString()}`;
 }
 
 export function discoverHref(entry: CatalogEntry, pool?: string): string {
@@ -721,13 +511,11 @@ export function Discover({
     const router = useRouter();
     const refresh = useModelsRefresh();
     const catalog = useCatalog(search.pool);
-    const [downloading, setDownloading] = useState<CatalogEntry | null>(null);
-    const [adding, setAdding] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const data = catalog.data;
     const on: Actions = useMemo(
         () => ({
-            download: setDownloading,
+            download: (entry) => router.history.push(addModelHref(entry)),
             requirements: (entry) => router.history.push(discoverHref(entry, search.pool)),
             open: (path) => router.history.push(path),
             refresh,
@@ -825,24 +613,17 @@ export function Discover({
                         >
                             {active > 0 ? `Filters (${active})` : "Filters"}
                         </Button>
-                        <SortSelect
-                            value={sort}
-                            onSort={(next) => update({ sort: next === "recommended" ? "" : next })}
-                        />
                         <span className="text-sm text-muted-foreground tabular-nums">
                             {`${visible.length} of ${data.entries.length} models`}
                         </span>
-                        {data.hub_add_allowed && (
-                            <Button
-                                variant="outline"
-                                className="ml-auto"
-                                size="sm"
-                                onClick={() => setAdding(true)}
-                                disabled={data.offline_forced}
-                            >
-                                Add from Hugging Face
-                            </Button>
-                        )}
+                        <div className="ml-auto">
+                            <SortSelect
+                                value={sort}
+                                onSort={(next) =>
+                                    update({ sort: next === "recommended" ? "" : next })
+                                }
+                            />
+                        </div>
                     </div>
                     <FilterChips filters={filters} update={update} />
                     {needsAccess && (
@@ -886,19 +667,6 @@ export function Discover({
                     {panel}
                 </DialogContent>
             </Dialog>
-            <AddFromHubDialog
-                open={adding}
-                onOpenChange={setAdding}
-                endpoint={data.endpoint}
-                onAdded={(entry) =>
-                    update({ q: entry.repo, access: entry.gated ? "needs-access" : "" })
-                }
-            />
-            <DownloadDialog
-                entry={downloading}
-                catalog={data}
-                onOpenChange={(open) => !open && setDownloading(null)}
-            />
             <Link href="/models" className="sr-only">
                 Models
             </Link>

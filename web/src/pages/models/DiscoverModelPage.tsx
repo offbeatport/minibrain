@@ -2,7 +2,7 @@ import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Info, Layers, Scale } from "lucide-react";
 import { Button, DataGrid, Link, Skeleton } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { Facts } from "~/components/Facts";
@@ -15,9 +15,9 @@ import { bytes } from "~/lib/time";
 import {
     AccessSteps,
     type Actions,
-    DownloadDialog,
     EntryAction,
     Fit,
+    addModelHref,
     discoverHref,
     parameters,
     poolPhrase,
@@ -129,7 +129,7 @@ function variantColumns(
                         disabled={!allowed}
                         onClick={() => onDownload(row.original)}
                     >
-                        Download
+                        Add model
                     </Button>
                 </div>
             ),
@@ -157,12 +157,11 @@ export function DiscoverModelPage() {
     const router = useRouter();
     const refresh = useModelsRefresh();
     const catalog = useCatalog(pool);
-    const [downloading, setDownloading] = useState<{ variant?: string } | null>(null);
     const data = catalog.data;
     const entry = data?.entries.find((item) => item.id === id);
     const on: Actions = useMemo(
         () => ({
-            download: () => setDownloading({}),
+            download: (picked) => router.history.push(addModelHref(picked)),
             requirements: () => document.getElementById("access")?.scrollIntoView(),
             open: (path) => router.history.push(path),
             refresh,
@@ -173,8 +172,13 @@ export function DiscoverModelPage() {
     );
     const blocked = !on.online || Boolean(entry?.gated && !on.tokenConfigured);
     const table = useMemo(
-        () => variantColumns(!blocked, (variant) => setDownloading({ variant: variant.id })),
-        [blocked],
+        () =>
+            variantColumns(!blocked, (variant) => {
+                if (entry) {
+                    router.history.push(addModelHref(entry, variant.id));
+                }
+            }),
+        [blocked, entry, router],
     );
     return (
         <Page>
@@ -234,12 +238,6 @@ export function DiscoverModelPage() {
                         </PanelSection>
                         <Licence entry={entry} />
                     </PanelSections>
-                    <DownloadDialog
-                        entry={downloading ? entry : null}
-                        preferred={downloading?.variant}
-                        catalog={data}
-                        onOpenChange={(open) => !open && setDownloading(null)}
-                    />
                 </>
             )}
         </Page>
