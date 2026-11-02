@@ -16,6 +16,9 @@ export type KeyCreated = Schemas["KeyCreated"];
 export type ModelStage = Schemas["Stage"];
 export type ModelUsage = Schemas["Usage"];
 export type ModelVersionRow = Schemas["VersionRow"];
+export type DatasetSummary = Schemas["DatasetSummary"];
+export type SourceSummary = Schemas["SourceSummary"];
+export type MappingInfo = Schemas["MappingInfo"];
 export type CompleteResponse = Schemas["CompleteResponse"];
 export type SplitScore = Schemas["SplitScore"];
 export type ModelRow = Schemas["ModelRow"];
@@ -69,6 +72,17 @@ export async function uploadSource(slug: string, file: File): Promise<MinibrainD
         throw new Error(describeError(body, response.status));
     }
     return body as MinibrainDetail;
+}
+
+export async function uploadFile(file: File): Promise<SourceSummary> {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch("/api/sources", { method: "POST", body: form });
+    const body: unknown = await response.json();
+    if (!response.ok) {
+        throw new Error(describeError(body, response.status));
+    }
+    return body as SourceSummary;
 }
 
 export function jobEventsUrl(jobId: number): string {

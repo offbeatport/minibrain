@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     Label,
+    Link,
     Select,
     SelectContent,
     SelectItem,
@@ -14,18 +16,30 @@ import { ChatBubble } from "obp-ui/chat";
 import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 import {
     type ExampleInfo,
+    type MappingInfo,
     type MinibrainDetail,
+    type PreviewResponse,
     type QueryResponse,
     api,
     unwrap,
     uploadSource,
 } from "~/api/client";
-import { isActiveJob, keys, useGolden, useJobs, useMinibrain, usePreview } from "~/api/queries";
+import {
+    isActiveJob,
+    keys,
+    useDatasets,
+    useGolden,
+    useJobs,
+    useMinibrain,
+    usePreview,
+} from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { ScopedPage } from "~/components/PageHeader";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
+import { readMinibrainParam } from "~/lib/selection";
+import { DataLibrary } from "./DataLibrary";
 
 type Row = { input: string | null; label: string | null };
 
@@ -163,31 +177,30 @@ function QueryResult({ result }: { result: QueryResponse }) {
     );
 }
 
-function MappingSection({ detail }: { detail: MinibrainDetail }) {
-    const refresh = useRefresh(detail.slug);
-    const columns = detail.source?.columns.map((column) => column.name) ?? [];
-    const [input, setInput] = useState(detail.mapping.input_column ?? "");
-    const [label, setLabel] = useState(detail.mapping.label_column ?? "");
-    const [sql, setSql] = useState(detail.mapping.sql ?? "");
+type MappingBody = { input_column?: string; label_column?: string; sql?: string };
+
+export function MappingSection({
+    columns,
+    mapping,
+    onSave,
+    onRun,
+}: {
+    columns: string[];
+    mapping: MappingInfo;
+    onSave: (body: MappingBody) => Promise<unknown>;
+    onRun: (sql: string) => Promise<QueryResponse>;
+}) {
+    const [input, setInput] = useState(mapping.input_column ?? "");
+    const [label, setLabel] = useState(mapping.label_column ?? "");
+    const [sql, setSql] = useState(mapping.sql ?? "");
     const [editing, setEditing] = useState(false);
     useEffect(() => {
-        setInput(detail.mapping.input_column ?? "");
-        setLabel(detail.mapping.label_column ?? "");
-        setSql(detail.mapping.sql ?? "");
-    }, [detail.mapping]);
-    const path = { params: { path: { slug: detail.slug } } };
-    const save = useMutation({
-        mutationFn: (body: { input_column?: string; label_column?: string; sql?: string }) =>
-            unwrap(api.PUT("/api/minibrains/{slug}/mapping", { ...path, body })),
-        onSuccess: refresh,
-    });
-    const run = useMutation({
-        mutationFn: (statement: string) =>
-            unwrap(api.POST("/api/minibrains/{slug}/query", { ...path, body: { sql: statement } })),
-    });
-    if (!detail.source) {
-        return null;
-    }
+        setInput(mapping.input_column ?? "");
+        setLabel(mapping.label_column ?? "");
+        setSql(mapping.sql ?? "");
+    }, [mapping]);
+    const save = useMutation({ mutationFn: onSave });
+    const run = useMutation({ mutationFn: onRun });
     return (
         <Section
             title="Mapping"
@@ -258,11 +271,10 @@ function MappingSection({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-function PreviewSection({ detail }: { detail: MinibrainDetail }) {
-    const { data, error } = usePreview(detail.slug, Boolean(detail.mapping.sql));
-    if (!detail.mapping.sql) {
-        return null;
-    }
+export function PreviewSection({
+    data,
+    error,
+}: { data: PreviewResponse | undefined; error: unknown }) {
     const quality = data?.quality;
     return (
         <Section
@@ -346,7 +358,7 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     const snapshot = detail.snapshot;
     return (
         <Section
-            title="Dataset"
+            title="Snapshot"
             caption="A frozen copy of the cleaned rows, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
                 <Button
@@ -402,25 +414,110 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-function DataSections({ slug }: { slug: string }) {
+function DatasetPicker({ detail }: { detail: MinibrainDetail }) {
+    const refresh = useRefresh(detail.slug);
+    const datasets = useDatasets();
+    const choose = useMutation({
+        mutationFn: (dataset: string) =>
+            unwrap(
+                api.PUT("/api/minibrains/{slug}/dataset", {
+                    params: { path: { slug: detail.slug } },
+                    body: { dataset },
+                }),
+            ),
+        onSuccess: refresh,
+    });
+    const options = datasets.data ?? [];
+    return (
+        <Section
+            title="Dataset"
+            caption="Datasets are shared: several models can train on the same one. Upload a new file below, or pick one."
+            actions={
+                <Link href="/data" className="text-sm text-primary hover:underline">
+                    All datasets
+                </Link>
+            }
+        >
+            <div className="flex flex-wrap items-center gap-3">
+                <Select
+                    value={detail.dataset ?? ""}
+                    onValueChange={(next) => next && choose.mutate(String(next))}
+                    disabled={options.length === 0 || choose.isPending}
+                >
+                    <SelectTrigger aria-label="Dataset" className="w-72">
+                        <SelectValue
+                            placeholder={options.length ? "Pick a dataset" : "No datasets yet"}
+                        />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {options.map((dataset) => (
+                            <SelectItem key={dataset.slug} value={dataset.slug}>
+                                {`${dataset.name} · ${count(dataset.rows)} rows`}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {detail.dataset && (
+                    <Link
+                        href={`/data/datasets/${encodeURIComponent(detail.dataset)}`}
+                        className="text-sm text-primary hover:underline"
+                    >
+                        Open dataset
+                    </Link>
+                )}
+            </div>
+            <ErrorLine error={choose.error} />
+        </Section>
+    );
+}
+
+export function DataSections({ slug }: { slug: string }) {
     const { data } = useMinibrain(slug);
+    const refresh = useRefresh(slug);
+    const mapped = Boolean(data?.mapping.sql);
+    const preview = usePreview(slug, mapped);
     if (!data) {
         return null;
     }
+    const path = { params: { path: { slug } } };
     return (
         <>
+            <DatasetPicker detail={data} />
             <SourceSection detail={data} />
-            <MappingSection detail={data} />
-            <PreviewSection detail={data} />
+            {data.source && (
+                <MappingSection
+                    columns={data.source.columns.map((column) => column.name)}
+                    mapping={data.mapping}
+                    onSave={(body) =>
+                        unwrap(api.PUT("/api/minibrains/{slug}/mapping", { ...path, body })).then(
+                            refresh,
+                        )
+                    }
+                    onRun={(sql) =>
+                        unwrap(api.POST("/api/minibrains/{slug}/query", { ...path, body: { sql } }))
+                    }
+                />
+            )}
+            {mapped && <PreviewSection data={preview.data} error={preview.error} />}
             <DatasetSection detail={data} />
         </>
     );
 }
 
-export function DataPage() {
+function ModelData() {
     return (
-        <ScopedPage title="Data" caption="Upload a file, map its columns and build the dataset.">
+        <ScopedPage
+            title="Data"
+            caption="The dataset this model trains on, its mapping and its snapshot."
+        >
             {(slug) => <DataSections key={slug} slug={slug} />}
         </ScopedPage>
     );
+}
+
+export function DataPage() {
+    const requested = useRouterState({
+        select: (state) => readMinibrainParam(state.location.search),
+    });
+    return requested ? <ModelData /> : <DataLibrary />;
 }

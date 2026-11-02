@@ -16,6 +16,10 @@ export const keys = {
     models: ["models"] as const,
     catalog: ["catalog"] as const,
     baseModel: (key: string) => ["models", "base", key] as const,
+    datasets: ["datasets"] as const,
+    dataset: (slug: string) => ["datasets", slug] as const,
+    datasetPreview: (slug: string) => ["datasets", slug, "preview"] as const,
+    sources: ["sources"] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -60,6 +64,30 @@ export function usePreview(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.preview(slug),
         queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/preview", path(slug))),
+        enabled,
+        retry: false,
+    });
+}
+
+export function useDatasets() {
+    return useQuery({ queryKey: keys.datasets, queryFn: () => unwrap(api.GET("/api/datasets")) });
+}
+
+export function useSources() {
+    return useQuery({ queryKey: keys.sources, queryFn: () => unwrap(api.GET("/api/sources")) });
+}
+
+export function useDataset(slug: string) {
+    return useQuery({
+        queryKey: keys.dataset(slug),
+        queryFn: () => unwrap(api.GET("/api/datasets/{slug}", path(slug))),
+    });
+}
+
+export function useDatasetPreview(slug: string, enabled: boolean) {
+    return useQuery({
+        queryKey: keys.datasetPreview(slug),
+        queryFn: () => unwrap(api.GET("/api/datasets/{slug}/preview", path(slug))),
         enabled,
         retry: false,
     });

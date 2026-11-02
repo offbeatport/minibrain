@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { readMinibrainParam } from "./lib/selection";
+import { DatasetPage } from "./pages/DataLibrary";
 import { DataPage } from "./pages/DataPage";
 import { DeploymentsPage, EndpointPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
@@ -99,7 +100,8 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),
-    scopedPage("/data", DataPage),
+    globalPage("/data", DataPage),
+    globalPage("/data/datasets/$slug", DatasetPage),
     scopedPage("/training", TrainingPage),
     scopedPage("/evaluations", EvaluationsPage),
     scopedPage("/feedback", FeedbackPage),

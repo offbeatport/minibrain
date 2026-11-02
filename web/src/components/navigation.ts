@@ -30,7 +30,7 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     {
         label: "Create",
         items: [
-            { label: "Data", path: "/data", icon: Database, scoped: true },
+            { label: "Data", path: "/data", icon: Database },
             { label: "Training", path: "/training", icon: GraduationCap, scoped: true },
             { label: "Evaluations", path: "/evaluations", icon: Gauge, scoped: true },
             { label: "Feedback", path: "/feedback", icon: ThumbsUp, scoped: true },
