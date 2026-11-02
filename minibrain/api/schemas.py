@@ -45,6 +45,7 @@ class JobInfo(BaseModel):
     id: int
     minibrain: str | None
     minibrain_name: str | None
+    model: str | None = None
     version: int | None
     kind: str
     status: str

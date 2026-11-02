@@ -49,6 +49,7 @@ def job_fields(job: Job) -> dict:
         "id": job.id,
         "minibrain": job.minibrain.slug if job.minibrain else None,
         "minibrain_name": job.minibrain.name if job.minibrain else None,
+        "model": job.model_id,
         "version": job.version.number if job.version else None,
         "kind": job.kind,
         "status": job.status,

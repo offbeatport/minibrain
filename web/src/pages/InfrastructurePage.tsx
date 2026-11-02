@@ -1,11 +1,14 @@
+import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Cpu, HardDrive, ListOrdered, MemoryStick, Network, Server } from "lucide-react";
-import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { Cpu, Gauge, HardDrive, MemoryStick, Network, Server, TriangleAlert } from "lucide-react";
+import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
+import { SideMenuLayout } from "~/components/SideMenu";
+import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
 
@@ -168,8 +171,6 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
         </PanelSection>
     );
 }
-
-const JOB_STATES = ["queued", "running", "succeeded", "failed", "cancelled"];
 
 const LOADED_COLUMNS: ColumnDef<LoadedModel, unknown>[] = [
     {
@@ -345,7 +346,114 @@ function gigabytes(megabytes: number | null | undefined): string {
         : `${(megabytes / 1024).toFixed(1)} GB`;
 }
 
+const SECTIONS = [
+    { label: "Overview", href: "/infrastructure", icon: Gauge },
+    { label: "Machines", href: "/infrastructure/machines", icon: Server },
+    { label: "Storage", href: "/infrastructure/storage", icon: HardDrive },
+];
+
+const LOW_FREE_SHARE = 0.1;
+const LOW_FREE_BYTES = 10 * 1024 ** 3;
+
+type Warning = { text: string; href: string };
+
+function warningsFor(
+    pools: PoolInfo[],
+    main: Record<string, string>,
+    info: InfrastructureInfo | undefined,
+): Warning[] {
+    const nodes = pools.flatMap((pool) => pool.nodes);
+    const offline = nodes.filter((node) => !node.online);
+    const drifting = nodes.filter(
+        (node) => !node.roles.includes("main") && differences(node.versions ?? {}, main).length > 0,
+    );
+    const low = (info?.stores ?? []).filter(
+        (store) =>
+            store.free_bytes !== null &&
+            store.free_bytes !== undefined &&
+            store.total_bytes &&
+            (store.free_bytes < LOW_FREE_BYTES ||
+                store.free_bytes / store.total_bytes < LOW_FREE_SHARE),
+    );
+    return [
+        ...offline.map((node) => ({
+            text: `${node.host} is offline (last seen ${node.seen_at ? relativeTime(node.seen_at) : "never"})`,
+            href: "/infrastructure/machines",
+        })),
+        ...drifting.map((node) => ({
+            text: `${node.host} runs different library versions from main`,
+            href: "/infrastructure/machines",
+        })),
+        ...low.map((store) => ({
+            text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,
+            href: "/infrastructure/storage",
+        })),
+    ];
+}
+
+function Overview({
+    info,
+    pools,
+    loops,
+    main,
+}: {
+    info: InfrastructureInfo | undefined;
+    pools: PoolInfo[];
+    loops: string | undefined;
+    main: Record<string, string>;
+}) {
+    const nodes = pools.flatMap((pool) => pool.nodes);
+    const engines = pools.flatMap((pool) => pool.engines);
+    const models = info?.stores.find((store) => store.name === "Model files");
+    const warnings = warningsFor(pools, main, info);
+    return (
+        <PanelSections>
+            <SetupSection info={info} pools={pools} loops={loops} />
+            <PanelSection icon={Gauge} title="At a glance">
+                <div className="flex flex-wrap gap-8">
+                    <Stat
+                        label="Machines online"
+                        value={`${count(nodes.filter((node) => node.online).length)} of ${count(nodes.length)}`}
+                    />
+                    <Stat label="Engines serving" value={count(engines.length)} />
+                    <Stat label="Pools" value={count(pools.length)} />
+                    <Stat
+                        label="Free for model files"
+                        value={
+                            models?.free_bytes === null || models?.free_bytes === undefined
+                                ? "Managed"
+                                : bytes(models.free_bytes)
+                        }
+                    />
+                </div>
+            </PanelSection>
+            <PanelSection icon={TriangleAlert} title="Needs a look">
+                {warnings.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        Nothing: every machine is online and up to date.
+                    </p>
+                ) : (
+                    <ul className="flex flex-col gap-2">
+                        {warnings.map((warning) => (
+                            <li
+                                key={warning.text}
+                                className="flex flex-wrap items-center gap-2 text-sm"
+                            >
+                                <StatusText tone="warning">{warning.text}</StatusText>
+                                <Link href={warning.href} className="text-primary hover:underline">
+                                    Open
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </PanelSection>
+        </PanelSections>
+    );
+}
+
 export function InfrastructurePage() {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
     const { data, error } = useSystem();
     const pools = usePools();
     const infrastructure = useInfrastructure();
@@ -353,6 +461,7 @@ export function InfrastructurePage() {
     const main =
         (pools.data ?? []).flatMap((pool) => pool.nodes).find((node) => node.roles.includes("main"))
             ?.versions ?? {};
+    const active = SECTIONS.find((item) => item.href === pathname)?.href ?? "/infrastructure";
     return (
         <Page>
             <PageHeader
@@ -360,66 +469,71 @@ export function InfrastructurePage() {
                 caption="Where minibrain runs and where it keeps its data."
             />
             <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
-            <PanelSections>
-                <SetupSection
-                    info={infrastructure.data}
-                    pools={pools.data ?? []}
-                    loops={data?.loops}
-                />
-                {(pools.data ?? []).map((pool) => (
-                    <PoolSection key={pool.name} pool={pool} main={main} />
-                ))}
-                <PanelSection
-                    icon={Cpu}
-                    title="This main process"
-                    description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
-                >
-                    <div className="flex flex-wrap gap-8">
-                        <Stat
-                            label="Inference"
-                            value={<span className="font-mono">{device?.inference ?? "–"}</span>}
-                        />
-                        <Stat
-                            label="Training"
-                            value={<span className="font-mono">{device?.training ?? "–"}</span>}
-                        />
-                        <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
-                        <Stat
-                            label="GPU memory used"
-                            value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
-                        />
-                        <Stat label="CPU cores" value={count(device?.cpu_count)} />
-                        <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
-                    </div>
-                </PanelSection>
-                <StorageSection info={infrastructure.data} />
-                <PanelSection
-                    icon={ListOrdered}
-                    title="Job queue"
-                    description="One worker runs jobs one at a time."
-                >
-                    <div className="flex flex-wrap gap-8">
-                        {JOB_STATES.map((state) => (
-                            <Stat
-                                key={state}
-                                label={state[0].toUpperCase() + state.slice(1)}
-                                value={count(data?.jobs[state] ?? 0)}
-                            />
-                        ))}
-                    </div>
-                </PanelSection>
-                <PanelSection
-                    icon={MemoryStick}
-                    title="Loaded in memory"
-                    description="Base models and adapters the serving process holds right now."
-                >
-                    <DataTable
-                        columns={LOADED_COLUMNS}
-                        rows={data?.loaded ?? []}
-                        empty="Nothing loaded yet; the first request loads the base model."
+            <SideMenuLayout label="Infrastructure pages" items={SECTIONS} active={active}>
+                {active === "/infrastructure" && (
+                    <Overview
+                        info={infrastructure.data}
+                        pools={pools.data ?? []}
+                        loops={data?.loops}
+                        main={main}
                     />
-                </PanelSection>
-            </PanelSections>
+                )}
+                {active === "/infrastructure/machines" && (
+                    <PanelSections>
+                        {(pools.data ?? []).map((pool) => (
+                            <PoolSection key={pool.name} pool={pool} main={main} />
+                        ))}
+                        <PanelSection
+                            icon={Cpu}
+                            title="This main process"
+                            description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
+                        >
+                            <div className="flex flex-wrap gap-8">
+                                <Stat
+                                    label="Inference"
+                                    value={
+                                        <span className="font-mono">
+                                            {device?.inference ?? "–"}
+                                        </span>
+                                    }
+                                />
+                                <Stat
+                                    label="Training"
+                                    value={
+                                        <span className="font-mono">{device?.training ?? "–"}</span>
+                                    }
+                                />
+                                <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
+                                <Stat
+                                    label="GPU memory used"
+                                    value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
+                                />
+                                <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                                <Stat
+                                    label="Background loops"
+                                    value={LOOPS[data?.loops ?? "single"]}
+                                />
+                            </div>
+                        </PanelSection>
+                        <PanelSection
+                            icon={MemoryStick}
+                            title="Loaded in memory"
+                            description="Base models and adapters the serving process holds right now."
+                        >
+                            <DataTable
+                                columns={LOADED_COLUMNS}
+                                rows={data?.loaded ?? []}
+                                empty="Nothing loaded yet; the first request loads the base model."
+                            />
+                        </PanelSection>
+                    </PanelSections>
+                )}
+                {active === "/infrastructure/storage" && (
+                    <PanelSections>
+                        <StorageSection info={infrastructure.data} />
+                    </PanelSections>
+                )}
+            </SideMenuLayout>
         </Page>
     );
 }

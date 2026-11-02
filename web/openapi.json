@@ -5014,6 +5014,17 @@
             ],
             "title": "Minibrain Name"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "version": {
             "anyOf": [
               {
@@ -5183,6 +5194,17 @@
               }
             ],
             "title": "Minibrain Name"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "version": {
             "anyOf": [

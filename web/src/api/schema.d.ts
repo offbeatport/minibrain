@@ -1710,6 +1710,8 @@ export interface components {
             minibrain: string | null;
             /** Minibrain Name */
             minibrain_name: string | null;
+            /** Model */
+            model?: string | null;
             /** Version */
             version: number | null;
             /** Kind */
@@ -1761,6 +1763,8 @@ export interface components {
             minibrain: string | null;
             /** Minibrain Name */
             minibrain_name: string | null;
+            /** Model */
+            model?: string | null;
             /** Version */
             version: number | null;
             /** Kind */

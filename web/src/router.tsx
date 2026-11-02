@@ -15,7 +15,8 @@ import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
 import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
-import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
+import { MonitorPage } from "./pages/MonitorPage";
+import { FeedbackPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -116,6 +117,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/deployments/$slug", EndpointPage),
     globalPage("/pipelines", PipelinesPage),
     globalPage("/infrastructure", InfrastructurePage),
+    globalPage("/infrastructure/$section", InfrastructurePage),
     createRoute({
         getParentRoute: () => rootRoute,
         path: "/compute",
@@ -123,7 +125,7 @@ const routeTree = rootRoute.addChildren([
             throw redirect({ href: "/infrastructure" });
         },
     }),
-    scopedPage("/monitor", MonitorPage),
+    globalPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", SecurityPage),
     globalPage("/proto/logos", LogosPage),

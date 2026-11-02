@@ -19,13 +19,3 @@ export function PipelinesPage() {
         />
     );
 }
-
-export function MonitorPage() {
-    return (
-        <ComingSoon
-            title="Monitor"
-            caption="Requests, latency and errors per minibrain."
-            body="Opt-in request logging will show traffic, p50/p95 latency and invalid outputs for each served version."
-        />
-    );
-}
