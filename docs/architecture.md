@@ -11,51 +11,113 @@ they keep serving while `main` restarts. Workers and engines talk to `main` only
 the same program with a URL, a token and a pool name. A common shape: `main` on a small VM or a laptop, GPU workers and
 engines on racks.
 
-## Deployment shapes
+## Roles
 
-| Shape | main | Workers and engines | Database |
-|---|---|---|---|
-| Onboarding | Laptop, `minibrain serve` | Local children, pool "This machine" | SQLite |
-| Local main, remote GPUs | Laptop or small VM | `minibrain worker` / `minibrain engine --pool rack-a` on GPU boxes | SQLite |
-| Production | Several mains behind a load balancer | GPU racks, one or more pools | Postgres (HA) |
-
-## Processes
+Four roles. Locally they are one process tree; deployed, each is its own service on its own machines.
 
 ```mermaid
 flowchart TB
-    browser["Browser"] -- "/api" --> main
+    browser["Browsers"] -- "/api" --> main
     apps["Apps (OpenAI SDK)"] -- "/v1" --> gateway
 
-    subgraph tree["minibrain serve (one machine)"]
-        main["main<br/>UI + /api, management,<br/>jobs, policies, deployments,<br/>supervisor"]
-        gateway["gateway<br/>keys, routing from cached config"]
-        worker["worker<br/>data preparation,<br/>launches job children"]
-        train["training / eval child<br/>one per job"]
-        engine["engine<br/>one model per process"]
-        db[("database<br/>SQLite or Postgres")]
-        store[("artifacts<br/>folder or S3")]
+    main["main<br/>UI + /api, jobs, policies,<br/>deployments, supervision"]
+    gateway["gateway<br/>keys, routing from cached config"]
+    worker["worker<br/>data preparation,<br/>one child per training or eval job"]
+    engine["engine<br/>one model per process,<br/>many adapters"]
+    db[("database<br/>SQLite or Postgres")]
+    store[("artifacts<br/>folder or S3")]
 
-        main --- db
-        main -- "config snapshot" --> gateway
-        gateway -- "batched logs" --> main
-        worker -- "claim, heartbeat,<br/>events, complete" --> main
-        worker --> train
-        gateway -- "chat" --> engine
-        engine -- "announce, pull weights<br/>and adapters" --> main
-        train -- "by artifact ID" --- store
+    main --- db
+    main --- store
+    main -- "config snapshot" --> gateway
+    gateway -- "batched logs" --> main
+    worker -- "claim, heartbeat,<br/>events, complete" --> main
+    engine -- "announce, pull weights<br/>and adapters" --> main
+    gateway -- "chat" --> engine
+```
+
+| Role | Local (`minibrain serve`) | Deployed | Scales by | Talks to the database |
+|---|---|---|---|---|
+| main | The parent process | Its own service; two or more with Postgres | Copies behind a load balancer, for availability | Yes, the only one |
+| gateway | Inside main | `minibrain gateway` | Copies behind a load balancer | No: cached config snapshot |
+| worker | A supervised child | `minibrain worker --pool …` on each GPU box | More boxes per pool | No: HTTP to main |
+| training / eval | A child of the worker | Same, on the worker's box | One per job | No |
+| engine | A supervised child per model | `minibrain engine --pool …` on each GPU box | Copies per model, across boxes | No: HTTP to main |
+| database | A SQLite file | Postgres, highly available | Managed | |
+| artifacts | A folder | S3-compatible storage | Managed | |
+
+## Deployment shapes
+
+Same roles, same code; only where they run changes.
+
+### 1. One machine: onboarding and evaluation
+
+```mermaid
+flowchart LR
+    you["Browser, apps"] --> serve
+    subgraph box["One machine"]
+        serve["minibrain serve<br/>main + gateway"]
+        serve --> w["worker"] & e["engines"]
+        serve --- db[("SQLite")]
+        serve --- f[("artifacts folder")]
     end
 ```
 
-| Process | Runs | Talks to the database |
-|---|---|---|
-| main | UI and `/api`, management, job submission, policies, deployments, supervision | Yes, the only one |
-| gateway | `/v1`: auth, routing, request logs | No: cached config snapshot |
-| worker | Data preparation; starts one child per training or eval job | No: HTTP to `main` |
-| training / eval | One job each; writes checkpoints and results | No |
-| engine | One model (base + many adapters) per process; SGLang, MLX, `transformers` or llama.cpp | No: HTTP to `main` |
+### 2. Local main, remote GPUs
 
-`minibrain serve` runs main with its gateway, a local worker and local engines. `minibrain worker`, `minibrain gateway`
-and `minibrain engine` run one role each, which is how Compose, Helm or Kubernetes split them in production.
+```mermaid
+flowchart LR
+    you["Browser, apps"] --> main
+    subgraph small["Laptop or small VM"]
+        main["minibrain serve --no-worker<br/>main + gateway"] --- db[("SQLite")]
+    end
+    subgraph rack["GPU box: pool rack-a"]
+        w["minibrain worker"]
+        e["minibrain engine"]
+    end
+    w -- "HTTPS: jobs" --> main
+    e -- "HTTPS: announce, weights" --> main
+    main -- "chat" --> e
+```
+
+### 3. Production: separate services
+
+```mermaid
+flowchart LR
+    apps["Apps"] --> glb["load balancer"] --> gw["gateway ×N"]
+    users["Browsers"] --> mlb["load balancer"] --> m["main ×2"]
+    m --- pg[("Postgres HA")]
+    m --- s3[("S3")]
+    m -- "config" --> gw
+    gw -- "logs" --> m
+    subgraph pa["GPU pool A: SGLang"]
+        wa["worker ×N"]
+        ea["engine ×N"]
+    end
+    subgraph pb["GPU pool B"]
+        wb["worker ×N"]
+        eb["engine ×N"]
+    end
+    gw --> ea & eb
+    wa & wb -- "jobs" --> m
+    ea & eb -- "announce, weights" --> m
+```
+
+| | One machine | Local main, remote GPUs | Production |
+|---|---|---|---|
+| main | `minibrain serve` | `minibrain serve` on a laptop or small VM | Two or more behind a load balancer |
+| Gateways | Inside main | Inside main | `minibrain gateway` ×N behind a load balancer |
+| Workers and engines | Local children, pool "This machine" | On GPU boxes, one pool per rack | GPU racks, several pools |
+| Database | SQLite | SQLite | Postgres, highly available |
+| Artifacts | Folder | Folder | S3-compatible |
+
+### Who starts the processes
+
+| Stage | Who starts workers and engines |
+|---|---|
+| v1 | People or their tooling: `minibrain worker` and `minibrain engine` on each box (systemd, Compose, Slurm) |
+| v2 | A Kubernetes launcher: main creates Jobs for training and Deployments for engine replicas, autoscaled |
+| Later | A cloud VM launcher for rented GPUs |
 
 ## Control plane and data plane
 
@@ -309,36 +371,6 @@ lock and runs the leader-only loops; the others stand by and serve the UI, `/api
 Metadata is small and written at a low rate: jobs, versions, keys, engine announcements, batched logs. Postgres does
 thousands of writes a second; the bottleneck is GPUs. Dremio, by contrast, embeds RocksDB per coordinator and needs
 ZooKeeper to coordinate them; minibrain keeps one external, replicated database and nothing else to operate.
-
-## Deployed
-
-```mermaid
-flowchart LR
-    lb["load balancer"] --> m1["main"] & m2["main"]
-    m1 & m2 --> pg[("Postgres")]
-    m1 & m2 --> s3[("S3 artifacts")]
-    wa["worker, rack A"] -- "HTTPS" --> lb
-    ea["engines, rack A<br/>SGLang"] -- "announce, pull" --> lb
-    eb["engine, Mac<br/>MLX"] -- "announce, pull" --> lb
-    gw["gateways"] --> ea & eb
-    lb -- "config" --> gw
-```
-
-| | Local | Deployed |
-|---|---|---|
-| Metadata | SQLite | SQLite; Postgres for several mains |
-| Artifacts | Folder | S3-compatible |
-| Workers | Local processes | Local or remote, same contract, per pool |
-| Engines | Local children | Local or remote, per pool, routed by gateways |
-| Roles | One process tree | Separate processes or services |
-
-### Orchestration path
-
-| Stage | Who starts workers and engines |
-|---|---|
-| v1 | People or their tooling: `minibrain worker` and `minibrain engine` on each box (systemd, Compose, Slurm) |
-| v2 | A Kubernetes launcher: `main` creates Jobs for training and Deployments for engine replicas, autoscaled |
-| Later | A cloud VM launcher for rented GPUs |
 
 ## Failure modes
 
