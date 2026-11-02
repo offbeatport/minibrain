@@ -656,7 +656,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Licence",
             accessorFn: (entry) => entry.license_name,
             cell: ({ row }) => (
-                <span className="block max-w-36 whitespace-normal">
+                <span className="block max-w-36 truncate" title={row.original.license_name}>
                     {row.original.license_name}
                 </span>
             ),
