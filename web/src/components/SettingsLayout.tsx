@@ -10,14 +10,11 @@ const PAGES = [
     { label: "Security", href: "/settings/security", icon: ShieldCheck },
 ];
 
-export function SettingsLayout({
-    caption,
-    children,
-}: { caption?: ReactNode; children: ReactNode }) {
+export function SettingsLayout({ children }: { children: ReactNode }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     return (
         <Page>
-            <PageHeader title="Settings" caption={caption} />
+            <PageHeader title="Settings" />
             <div className="flex flex-col gap-6 md:flex-row md:items-start">
                 <nav
                     aria-label="Settings pages"
