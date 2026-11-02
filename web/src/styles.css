@@ -54,9 +54,9 @@
     --primary-foreground: #ffffff;
     --accent: #111216;
     --accent-foreground: #ffffff;
-    --border: #131416;
-    --border-soft: #060606;
-    --input: #1e222c;
+    --border: #2e3036;
+    --border-soft: #1a1b1f;
+    --input: #555963;
     --input-background: #0f0f14;
     --tabs-active: var(--secondary);
     --ring: #346bf1;
