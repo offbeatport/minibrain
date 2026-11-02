@@ -38,8 +38,7 @@ const TIERS = [
 ];
 
 const SUPPORT = [
-    { value: "tested", label: "Tested by us" },
-    { value: "supported", label: "Supported architecture" },
+    { value: "supported", label: "Supported" },
     { value: "untested", label: "Untested" },
 ];
 
@@ -215,7 +214,7 @@ type Preset = { label: string; patch: ModelsSearch; needsFit?: boolean };
 const PRESETS: Preset[] = [
     { label: "Fine-tune here", patch: { train: YES, fit: "fits" }, needsFit: true },
     { label: "Small and fast", patch: { tier: "S" } },
-    { label: "Tested by us", patch: { support: "tested" } },
+    { label: "Permissive licence", patch: { licence: "Apache 2.0,MIT" } },
 ];
 
 function presetActive(preset: Preset, search: ModelsSearch): boolean {

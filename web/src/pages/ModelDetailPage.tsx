@@ -3,10 +3,11 @@ import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
 import { Badge, Button, DataGrid, Link } from "obp-ui";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
+import { Facts } from "~/components/Facts";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -32,19 +33,6 @@ function BackLink() {
             <ChevronLeft className="size-4" />
             Models
         </Link>
-    );
-}
-
-function Facts({ items }: { items: [string, ReactNode][] }) {
-    return (
-        <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-6 gap-y-1.5 text-sm">
-            {items.map(([label, value]) => (
-                <div key={label} className="contents">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="min-w-0 break-words">{value}</dd>
-                </div>
-            ))}
-        </dl>
     );
 }
 

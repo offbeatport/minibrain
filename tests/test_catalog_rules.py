@@ -27,7 +27,7 @@ def test_bundled_catalogue_follows_the_rules() -> None:
         assert entry["architecture"] in build.SUPPORTED_ARCHITECTURES
         assert entry["tier"] in {"S", "M", "L", "XL"}
         assert entry["superseded_by"] is None or entry["superseded_by"] in ids
-        assert entry["support"] in {"tested", "supported"}
+        assert entry["support"] == "supported"
         for variant in entry["variants"]:
             assert re.fullmatch(r"[0-9a-f]{40}", variant["revision"])
             assert variant["files"] and all(item["size"] > 0 for item in variant["files"])
@@ -43,7 +43,7 @@ def test_tiers_match_sizes_and_generations_are_kept() -> None:
     assert entries["gpt-oss-120b"]["tier"] == "XL"
     assert entries["gpt-oss-120b"]["variants"][0]["requires"]["gpus"] == "multi"
     assert entries["qwen2.5-7b-instruct"]["superseded_by"] == "qwen3-8b"
-    assert entries["qwen3-0.6b"]["support"] == "tested"
+    assert entries["qwen3-0.6b"]["trainable"] is True
     assert {entries[key]["gated"] for key in ("llama-3.1-8b-instruct", "qwen3-8b")} == {True, False}
 
 

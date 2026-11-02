@@ -70,7 +70,7 @@ function fitLabel(fit: FitInfo): string {
         : FIT_LABELS[fit.level];
 }
 
-function Fit({ fit }: { fit: FitInfo }) {
+export function Fit({ fit }: { fit: FitInfo }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -83,7 +83,10 @@ function Fit({ fit }: { fit: FitInfo }) {
     );
 }
 
-function AccessSteps({ entry, catalog }: { entry?: CatalogEntry; catalog: CatalogResponse }) {
+export function AccessSteps({
+    entry,
+    catalog,
+}: { entry?: CatalogEntry; catalog: CatalogResponse }) {
     const page = entry ? `${catalog.endpoint}/${entry.repo}` : catalog.endpoint;
     return (
         <ol className="list-decimal space-y-1 pl-5 text-sm">
@@ -114,24 +117,26 @@ function AccessSteps({ entry, catalog }: { entry?: CatalogEntry; catalog: Catalo
     );
 }
 
-function DownloadDialog({
+export function DownloadDialog({
     entry,
     catalog,
     onOpenChange,
+    preferred,
 }: {
     entry: CatalogEntry | null;
     catalog: CatalogResponse;
     onOpenChange: (open: boolean) => void;
+    preferred?: string;
 }) {
     const refresh = useModelsRefresh();
     const [variantId, setVariantId] = useState("");
     const [accepted, setAccepted] = useState(false);
     useEffect(() => {
         if (entry) {
-            setVariantId(bestFit(entry).id);
+            setVariantId(preferred ?? bestFit(entry).id);
             setAccepted(false);
         }
-    }, [entry]);
+    }, [entry, preferred]);
     const variant = entry?.variants.find((item) => item.id === variantId);
     const free = catalog.store_free_bytes;
     const tooBig =
@@ -334,7 +339,7 @@ function RequirementsDialog({
     );
 }
 
-type Actions = {
+export type Actions = {
     download: (entry: CatalogEntry) => void;
     requirements: (entry: CatalogEntry) => void;
     open: (path: string) => void;
@@ -343,7 +348,7 @@ type Actions = {
     tokenConfigured: boolean;
 };
 
-function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
+export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
     const available = entry.added.find((added) => added.availability.state === "available");
     const moving = entry.added.find((added) =>
         ["downloading", "importing"].includes(added.availability.state),
@@ -418,7 +423,7 @@ function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
         return (
             <div className="flex justify-end">
                 <Button variant="outline" size="xs" onClick={() => on.requirements(entry)}>
-                    View requirements
+                    How to get access
                 </Button>
             </div>
         );
@@ -444,16 +449,13 @@ function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
                     </TooltipContent>
                 </Tooltip>
             )}
-            <Button variant="ghost" size="xs" onClick={() => on.requirements(entry)}>
-                Requirements
-            </Button>
         </div>
     );
 }
 
 function recommendedOrder(entry: CatalogEntry): number[] {
     const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
-    const support = ["tested", "supported", "untested"].indexOf(entry.support);
+    const support = ["supported", "untested"].indexOf(entry.support);
     return [
         fitRank < 0 ? 9 : fitRank,
         support < 0 ? 9 : support,
@@ -565,67 +567,77 @@ function AddFromHubDialog({
     );
 }
 
+function smallestVariant(entry: CatalogEntry): number {
+    return Math.min(...entry.variants.map((variant) => variant.size_bytes));
+}
+
+const DOWNLOADS = new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+});
+
+export function parameters(entry: CatalogEntry): string {
+    return `${entry.params_b.toFixed(1)}B${entry.moe ? " MoE" : ""}`;
+}
+
+export function discoverHref(entry: CatalogEntry, pool?: string): string {
+    const query = pool ? `?pool=${encodeURIComponent(pool)}` : "";
+    return `/discover/${encodeURIComponent(entry.id)}${query}`;
+}
+
+const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
+
+const HIDDEN_COLUMNS = [
+    "publisher",
+    "tasks",
+    "finetune",
+    "downloads",
+    "architecture",
+    "generation",
+    "support",
+    "repo",
+];
+
 function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
     return [
         {
             id: "model",
             header: "Model",
+            enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex min-w-64 max-w-88 items-start gap-3">
+                <div className="flex w-60 items-center gap-3">
                     <PublisherLogo publisher={row.original.provider} name={row.original.name} />
-                    <div className="flex min-w-0 flex-col">
-                        <span className="flex items-center gap-2">
-                            <span className="font-semibold">{row.original.name}</span>
-                            {row.original.recommended && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <button type="button" className="rounded-sm">
-                                            <Badge variant="outline">Recommended</Badge>
-                                        </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>{row.original.recommendation}</TooltipContent>
-                                </Tooltip>
-                            )}
-                        </span>
-                        <span className="line-clamp-2 whitespace-normal text-sm text-muted-foreground">
-                            {row.original.description}
-                        </span>
-                        <span className="text-sm tabular-nums text-muted-foreground">
-                            {`${row.original.provider} · ${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
-                                SUPPORT_LABEL[row.original.support] ?? row.original.support
-                            }${row.original.origin === "hub" ? " · Added from Hugging Face" : ""}`}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                            {[
-                                ...row.original.capabilities,
-                                ...(row.original.trainable ? ["Fine-tuning"] : []),
-                            ].join(", ")}
-                        </span>
-                        {row.original.superseded_by && (
-                            <span className="text-sm text-muted-foreground">
-                                {`Newer version available: ${
-                                    names.get(row.original.superseded_by) ??
-                                    row.original.superseded_by
-                                }`}
-                            </span>
+                    <div className="flex min-w-0 flex-col items-start whitespace-normal">
+                        <span className="line-clamp-2 font-semibold">{row.original.name}</span>
+                        {row.original.recommended ? (
+                            <Badge variant="outline">Recommended</Badge>
+                        ) : (
+                            row.original.superseded_by && (
+                                <span className="line-clamp-1 text-sm text-muted-foreground">
+                                    {`Newer: ${names.get(row.original.superseded_by) ?? row.original.superseded_by}`}
+                                </span>
+                            )
                         )}
                     </div>
                 </div>
             ),
         },
+        { id: "publisher", header: "Publisher", accessorFn: (entry) => entry.provider },
+        {
+            id: "parameters",
+            header: "Parameters",
+            accessorFn: (entry) => entry.params_b,
+            cell: ({ row }) => parameters(row.original),
+        },
         {
             id: "size",
             header: "Download size",
-            accessorFn: (entry) => entry.variants[0]?.size_bytes ?? 0,
+            accessorFn: smallestVariant,
             cell: ({ row }) =>
-                row.original.variants.length > 1 ? (
-                    <span className="text-muted-foreground">Varies</span>
-                ) : (
-                    <span className="tabular-nums">
-                        {bytes(row.original.variants[0]?.size_bytes)}
-                    </span>
-                ),
+                row.original.variants.length > 1
+                    ? `From ${bytes(smallestVariant(row.original))}`
+                    : bytes(row.original.variants[0]?.size_bytes),
         },
         {
             id: "fit",
@@ -634,9 +646,50 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             cell: ({ row }) => <Fit fit={bestFit(row.original).fit} />,
         },
         {
+            id: "licence",
+            header: "Licence",
+            accessorFn: (entry) => entry.license_name,
+            cell: ({ row }) => (
+                <span className="block max-w-36 whitespace-normal">
+                    {row.original.license_name}
+                </span>
+            ),
+        },
+        {
+            id: "tasks",
+            header: "Tasks",
+            accessorFn: (entry) => entry.capabilities.join(", "),
+        },
+        {
+            id: "finetune",
+            header: "Fine-tuning",
+            accessorFn: (entry) => (entry.trainable ? 0 : 1),
+            cell: ({ row }) => (row.original.trainable ? "Yes" : muted("No")),
+        },
+        {
+            id: "downloads",
+            header: "Downloads",
+            accessorFn: (entry) => entry.popularity,
+            cell: ({ row }) => DOWNLOADS.format(row.original.popularity),
+        },
+        { id: "architecture", header: "Architecture", accessorFn: (entry) => entry.architecture },
+        { id: "generation", header: "Generation", accessorFn: (entry) => entry.generation },
+        {
+            id: "support",
+            header: "Support",
+            accessorFn: (entry) => SUPPORT_LABEL[entry.support] ?? entry.support,
+        },
+        {
+            id: "repo",
+            header: "Repository",
+            accessorFn: (entry) => entry.repo,
+            cell: ({ row }) => <span className="font-mono">{row.original.repo}</span>,
+        },
+        {
             id: "action",
             header: () => <span className="sr-only">Action</span>,
             enableSorting: false,
+            enableHiding: false,
             cell: ({ row }) => <EntryAction entry={row.original} on={on} />,
         },
     ];
@@ -668,7 +721,7 @@ function PoolSelect({
     );
 }
 
-function poolPhrase(catalog: CatalogResponse): string {
+export function poolPhrase(catalog: CatalogResponse): string {
     return catalog.pool === "local" ? "this machine" : `pool ${catalog.pool}`;
 }
 
@@ -772,13 +825,13 @@ export function Discover({
     const on: Actions = useMemo(
         () => ({
             download: setDownloading,
-            requirements: (entry) => setRequirements({ entry }),
+            requirements: (entry) => router.history.push(discoverHref(entry, search.pool)),
             open: (path) => router.history.push(path),
             refresh,
             online: data?.online !== false,
             tokenConfigured: Boolean(data?.token_configured),
         }),
-        [router, refresh, data?.online, data?.token_configured],
+        [router, refresh, data?.online, data?.token_configured, search.pool],
     );
     const names = useMemo(
         () => new Map((data?.entries ?? []).map((entry) => [entry.id, entry.name])),
@@ -899,10 +952,12 @@ export function Discover({
                         columns={tableColumns}
                         rows={visible}
                         storageKey="minibrain.discover.columns"
-                        onOpen={(entry) => setRequirements({ entry })}
+                        onOpen={(entry) => router.history.push(discoverHref(entry, search.pool))}
+                        columnPicker
+                        hiddenColumns={HIDDEN_COLUMNS}
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
                         empty={empty}
-                        minWidth="min-w-[720px]"
+                        minWidth="min-w-[840px]"
                     />
                     <p className="text-sm text-muted-foreground">
                         Models run on your infrastructure. Offline?{" "}

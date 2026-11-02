@@ -86,6 +86,10 @@ export function modelsHref(): string {
     return `/models${remembered("/models")}`;
 }
 
+export function discoverListHref(): string {
+    return `/discover${remembered("/discover")}`;
+}
+
 function remembered(path: ModelsPath): string {
     try {
         const stored = window.sessionStorage.getItem(storageKey(path)) ?? "";

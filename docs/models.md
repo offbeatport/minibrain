@@ -15,13 +15,13 @@
 - Size tiers: S ≤4B, M 7–14B, L 24–35B or a small mixture of experts, XL 70B+ (multi-GPU).
 - Default order: recommended for the selected pool; also by popularity, size or name. Filters: hardware fit levels on
   the selected pool, can fine-tune, latest generation only, download access, support level, publisher, task, size and
-  licence, with presets (Fine-tune here, Small and fast, Tested by us) and removable chips.
+  licence, with presets (Fine-tune here, Small and fast, Permissive licence) and removable chips. Columns can be shown or
+  hidden; a row opens the model's page (`/discover/<id>`): variants with fit, requirements, licence and files.
 
 ## Add from Hugging Face
 
 Paste a link or id; `main` reads that one repository's metadata, on request, from the configured endpoint (Hugging Face
-or a mirror), checks `config.json`'s architecture and badges the entry "Tested by us", "Supported architecture" or
-"Untested". Only when an admin sets the Model sources [policy](security.md#policies) to Any; the default,
+or a mirror), checks `config.json`'s architecture and badges the entry "Supported" or "Untested". Only when an admin sets the Model sources [policy](security.md#policies) to Any; the default,
 Approved publishers, keeps everyone on the curated list.
 
 ## Sources

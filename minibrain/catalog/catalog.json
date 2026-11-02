@@ -1,5 +1,5 @@
 {
- "snapshot": "2026-11-02T11:14",
+ "snapshot": "2026-11-02T18:00",
  "source": "https://huggingface.co",
  "entries": [
   {
@@ -34,7 +34,7 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 0.75,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -158,7 +158,7 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 2.03,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -292,7 +292,7 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 4.02,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -431,7 +431,7 @@
    "architecture": "qwen3",
    "tier": "M",
    "params_b": 8.19,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -651,7 +651,7 @@
    "architecture": "qwen3",
    "tier": "M",
    "params_b": 14.77,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -789,7 +789,7 @@
    "architecture": "qwen3",
    "tier": "L",
    "params_b": 32.76,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -1837,7 +1837,7 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 4.02,
-   "support": "tested",
+   "support": "supported",
    "moe": false,
    "variants": [
     {

@@ -22,6 +22,7 @@ import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrainingPage } from "./pages/TrainingPage";
+import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
 
 const LEGACY_TABS: Record<string, string> = {
@@ -97,6 +98,7 @@ const routeTree = rootRoute.addChildren([
         component: ModelsPage,
     }),
     globalPage("/discover", DiscoverPage),
+    globalPage("/discover/$id", DiscoverModelPage),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),
