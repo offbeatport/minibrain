@@ -22,6 +22,7 @@ import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrainingPage } from "./pages/TrainingPage";
+import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
 
@@ -99,6 +100,7 @@ const routeTree = rootRoute.addChildren([
     }),
     globalPage("/discover", DiscoverPage),
     globalPage("/discover/$id", DiscoverModelPage),
+    globalPage("/models/new", AddModelPage),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),

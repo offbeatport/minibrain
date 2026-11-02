@@ -36,7 +36,6 @@ import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
-import { AddModelDialog } from "./AddModelDialog";
 import { GetStarted } from "./GetStarted";
 import {
     ConfirmAction,
@@ -857,7 +856,6 @@ export function MyModels({
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-    const [createBase, setCreateBase] = useState<string | null>(null);
     const on: Handlers = useMemo(
         () => ({
             open: (path) => router.history.push(path),
@@ -888,7 +886,8 @@ export function MyModels({
             },
             edit: setEditing,
             confirm: setConfirmation,
-            createFrom: setCreateBase,
+            createFrom: (base) =>
+                router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
             refresh,
         }),
         [router, refresh],
@@ -981,11 +980,6 @@ export function MyModels({
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
-            />
-            <AddModelDialog
-                open={createBase !== null}
-                onOpenChange={(open) => !open && setCreateBase(null)}
-                base={createBase ?? undefined}
             />
         </div>
     );

@@ -373,8 +373,7 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     );
 }
 
-export function DatasetPage() {
-    const { slug = "" } = useParams({ strict: false }) as { slug?: string };
+export function DatasetMapping({ slug }: { slug: string }) {
     const dataset = useDataset(slug);
     const client = useQueryClient();
     const mapped = Boolean(dataset.data?.mapping.sql);
@@ -383,7 +382,31 @@ export function DatasetPage() {
     const refresh = async () => {
         await client.invalidateQueries({ queryKey: keys.dataset(slug) });
         await client.invalidateQueries({ queryKey: keys.datasets });
+        await client.invalidateQueries({ queryKey: keys.datasetPreview(slug) });
     };
+    if (!dataset.data) {
+        return <ErrorLine error={dataset.error} />;
+    }
+    return (
+        <>
+            <MappingSection
+                columns={dataset.data.columns.map((column) => column.name)}
+                mapping={dataset.data.mapping}
+                onSave={(body) =>
+                    unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body })).then(refresh)
+                }
+                onRun={(sql) =>
+                    unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
+                }
+            />
+            {mapped && <PreviewSection data={preview.data} error={preview.error} />}
+        </>
+    );
+}
+
+export function DatasetPage() {
+    const { slug = "" } = useParams({ strict: false }) as { slug?: string };
+    const dataset = useDataset(slug);
     return (
         <Page>
             <Link
@@ -402,24 +425,7 @@ export function DatasetPage() {
                     />
                     <PanelSections>
                         <UsedBy dataset={dataset.data} />
-                        <MappingSection
-                            columns={dataset.data.columns.map((column) => column.name)}
-                            mapping={dataset.data.mapping}
-                            onSave={(body) =>
-                                unwrap(
-                                    api.PUT("/api/datasets/{slug}/mapping", { ...path, body }),
-                                ).then(refresh)
-                            }
-                            onRun={(sql) =>
-                                unwrap(
-                                    api.POST("/api/datasets/{slug}/query", {
-                                        ...path,
-                                        body: { sql },
-                                    }),
-                                )
-                            }
-                        />
-                        {mapped && <PreviewSection data={preview.data} error={preview.error} />}
+                        <DatasetMapping slug={slug} />
                     </PanelSections>
                 </>
             )}
