@@ -78,13 +78,16 @@ function dayName(iso: string): string {
 }
 
 export function failingShare(usage: ModelUsage | null | undefined): number {
-    if (!usage || !usage.total) {
+    if (!usage || typeof usage.failed !== "number" || !usage.total) {
         return 0;
     }
     return usage.failed / usage.total;
 }
 
 function Trend({ usage }: { usage: ModelUsage }) {
+    if (typeof usage.previous !== "number" || typeof usage.total !== "number") {
+        return null;
+    }
     if (usage.previous === 0) {
         return usage.total > 0 ? <span className="text-muted-foreground">New</span> : null;
     }
