@@ -169,7 +169,7 @@ const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
                 <div className="flex min-w-0 flex-col">
                     <Link
                         href={deploymentHref(row.original)}
-                        className="font-mono font-semibold text-foreground hover:underline"
+                        className="font-mono font-semibold text-foreground"
                     >
                         {row.original.key}
                     </Link>

@@ -1,4 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
 import { Button } from "obp-ui";
 import { useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
@@ -29,7 +30,10 @@ export function ModelsPage() {
                 actions={
                     <>
                         <ImportButton onClick={() => setImporting(true)} />
-                        <Button onClick={() => setCreating(true)}>Add model</Button>
+                        <Button onClick={() => setCreating(true)}>
+                            <Plus />
+                            Add model
+                        </Button>
                     </>
                 }
             />

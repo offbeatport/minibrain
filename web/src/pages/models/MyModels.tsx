@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
     Button,
+    CheckboxSelect,
     DataGrid,
     DropdownMenu,
     DropdownMenuContent,
@@ -21,11 +22,6 @@ import {
     DropdownMenuTrigger,
     Link,
     SearchInput,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -61,7 +57,6 @@ import {
     usageOf,
 } from "./entries";
 
-const ANY = "all";
 const AVAILABILITY_LABELS: Record<string, string> = {
     available: "Available",
     downloading: "Downloading",
@@ -644,10 +639,7 @@ function ModelName({ entry }: { entry: Entry }) {
         <div className="flex min-w-52 max-w-72 items-start gap-3">
             <PublisherLogo publisher={model.publisher} name={model.name} />
             <div className="flex min-w-0 flex-col">
-                <Link
-                    href={detailHref(model)}
-                    className="font-semibold text-foreground hover:underline"
-                >
+                <Link href={detailHref(model)} className="font-semibold text-foreground">
                     {model.name}
                 </Link>
                 <span className="truncate text-sm text-muted-foreground">{detail}</span>
@@ -735,54 +727,21 @@ function searchable(entry: Entry): string {
     return `${model.name} ${model.description} ${model.key} ${model.tags.join(" ")} ${number}`.toLowerCase();
 }
 
+function picked(value: string | undefined): string[] {
+    return (value ?? "").split(",").filter(Boolean);
+}
+
 function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
     const text = (search.q ?? "").trim().toLowerCase();
     if (text && !searchable(entry).includes(text)) {
         return false;
     }
-    if (skip !== "type" && search.type && entry.model.kind !== search.type) {
+    const types = picked(search.type);
+    if (skip !== "type" && types.length > 0 && !types.includes(entry.model.kind)) {
         return false;
     }
-    return skip === "state" || !search.state || stateOfEntry(entry) === search.state;
-}
-
-function FilterSelect({
-    label,
-    all,
-    value,
-    options,
-    onChange,
-}: {
-    label: string;
-    all: string;
-    value: string | undefined;
-    options: [string, string, number][];
-    onChange: (value: string) => void;
-}) {
-    const items = [
-        { value: ANY, label: all },
-        ...options.map(([key, text]) => ({ value: key, label: text })),
-    ];
-    return (
-        <Select
-            items={items}
-            value={value || ANY}
-            onValueChange={(next) => onChange(next === ANY ? "" : String(next))}
-        >
-            <SelectTrigger aria-label={label} className="w-auto min-w-40">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value={ANY}>{all}</SelectItem>
-                {options.map(([key, text, total]) => (
-                    <SelectItem key={key} value={key}>
-                        <span>{text}</span>
-                        <span className="ml-auto text-muted-foreground tabular-nums">{total}</span>
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
+    const states = picked(search.state);
+    return skip === "state" || states.length === 0 || states.includes(stateOfEntry(entry));
 }
 
 const CLEARED: ModelsSearch = { q: "", type: "", state: "" };
@@ -849,11 +808,16 @@ export function MyModels({
     const filtering = Boolean(search.q || search.type || search.state);
     const clear = () => update(CLEARED);
     const firstRun = !rows.some((row) => row.kind === "custom") && !filtering;
-    const stateOptions: [string, string, number][] = STATE_RANK.map((state) => [
-        state,
-        STATE_LABELS[state],
-        facetCount("state", (entry) => stateOfEntry(entry) === state),
-    ]);
+    const stateOptions = STATE_RANK.map((state) => ({
+        value: state,
+        label: STATE_LABELS[state],
+        count: facetCount("state", (entry) => stateOfEntry(entry) === state),
+    }));
+    const typeOptions = (["custom", "base"] as const).map((kind) => ({
+        value: kind,
+        label: kind === "custom" ? "Custom" : "Base",
+        count: facetCount("type", (entry) => entry.model.kind === kind),
+    }));
     const noMatch = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No models match these filters.</p>
@@ -876,30 +840,21 @@ export function MyModels({
                     className="w-64"
                 />
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                    <FilterSelect
+                    <CheckboxSelect
                         label="Status"
-                        all="All statuses"
-                        value={search.state}
+                        allLabel="All statuses"
+                        noun="statuses"
                         options={stateOptions}
-                        onChange={(state) => update({ state })}
+                        value={picked(search.state)}
+                        onValueChange={(states) => update({ state: states.join(",") })}
                     />
-                    <FilterSelect
+                    <CheckboxSelect
                         label="Type"
-                        all="All types"
-                        value={search.type}
-                        options={[
-                            [
-                                "custom",
-                                "Custom",
-                                facetCount("type", (entry) => entry.model.kind === "custom"),
-                            ],
-                            [
-                                "base",
-                                "Base",
-                                facetCount("type", (entry) => entry.model.kind === "base"),
-                            ],
-                        ]}
-                        onChange={(type) => update({ type })}
+                        allLabel="All types"
+                        noun="types"
+                        options={typeOptions}
+                        value={picked(search.type)}
+                        onValueChange={(types) => update({ type: types.join(",") })}
                     />
                 </div>
             </div>

@@ -103,7 +103,7 @@ function datasetColumns(
                 <span className="flex flex-col">
                     <Link
                         href={datasetHref(row.original.slug)}
-                        className="font-semibold text-foreground hover:underline"
+                        className="font-semibold text-foreground"
                     >
                         {row.original.name}
                     </Link>
