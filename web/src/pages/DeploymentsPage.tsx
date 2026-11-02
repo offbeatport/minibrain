@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, History, Plug, Terminal } from "lucide-react";
+import { ChevronLeft, History, Plug, Radio } from "lucide-react";
 import { Badge, Button, DataGrid, Link } from "obp-ui";
 import { useState } from "react";
 import {
@@ -55,11 +55,11 @@ function serving(detail: MinibrainDetail): string {
         return "Not deployed";
     }
     if (detail.current_version === null || detail.current_version === undefined) {
-        return `Base model ${detail.base_model}, until you deploy a version`;
+        return `Serving base model ${detail.base_model} until you deploy a version`;
     }
     return detail.current_accuracy === null || detail.current_accuracy === undefined
-        ? `v${detail.current_version}`
-        : `v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`;
+        ? `Serving v${detail.current_version}`
+        : `Serving v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`;
 }
 
 function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
@@ -76,7 +76,6 @@ function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
     });
     return (
         <Button
-            size="xs"
             variant={deployed ? "outline" : "default"}
             onClick={() => toggle.mutate()}
             disabled={toggle.isPending}
@@ -86,7 +85,7 @@ function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
     );
 }
 
-function Deployment({ slug }: { slug: string }) {
+function Connect({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const [created, setCreated] = useState<KeyCreated | null>(null);
     if (!detail) {
@@ -97,15 +96,8 @@ function Deployment({ slug }: { slug: string }) {
     const code = snippets(baseUrl, model, created?.secret ?? "YOUR_KEY");
     return (
         <>
-            <PanelSection icon={Plug} title="Endpoint">
-                <div className="flex flex-col gap-3 text-sm">
-                    <div>
-                        <div className="text-muted-foreground">Serving</div>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <span>{serving(detail)}</span>
-                            <DeployToggle slug={slug} deployed={detail.deployed ?? false} />
-                        </div>
-                    </div>
+            <PanelSection icon={Plug} title="Connect">
+                <div className="flex flex-col gap-4 text-sm">
                     <div>
                         <div className="text-muted-foreground">Base URL</div>
                         <div className="font-mono">{baseUrl}</div>
@@ -126,22 +118,18 @@ function Deployment({ slug }: { slug: string }) {
                             <span className="font-mono">{slug}@N</span> pins one.
                         </p>
                     </div>
-                </div>
-            </PanelSection>
-            <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
-            <PanelSection icon={Terminal} title="Examples" bare>
-                <div className="flex flex-col gap-3">
                     <Code>{code.curl}</Code>
                     <Code>{code.python}</Code>
                 </div>
             </PanelSection>
+            <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
         </>
     );
 }
 
 const KIND_NAMES: Record<string, string> = { lora: "Trained", prompt: "Prompt-only" };
 
-export function endpointHref(row: ModelRow): string {
+export function deploymentHref(row: ModelRow): string {
     return row.kind === "custom"
         ? `/deployments/${encodeURIComponent(row.key)}`
         : `/models/base/${encodeURIComponent(row.key)}#api`;
@@ -170,17 +158,17 @@ function DeploymentStatus({ row }: { row: ModelRow }) {
     return <DeploymentCell row={row} short />;
 }
 
-const ENDPOINT_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
+const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
     {
-        id: "endpoint",
-        header: "Endpoint",
+        id: "model",
+        header: "Model name",
         accessorFn: (row) => row.key,
         cell: ({ row }) => (
             <div className="flex min-w-52 items-start gap-3">
                 <PublisherLogo publisher={row.original.publisher} name={row.original.name} />
                 <div className="flex min-w-0 flex-col">
                     <Link
-                        href={endpointHref(row.original)}
+                        href={deploymentHref(row.original)}
                         className="font-mono font-semibold text-foreground hover:underline"
                     >
                         {row.original.key}
@@ -232,15 +220,15 @@ export function DeploymentsPage() {
             />
             <ErrorLine error={models.error} />
             <PanelSections>
-                <PanelSection icon={Plug} title="Endpoints" bare>
+                <PanelSection icon={Radio} title="Live models" bare>
                     {models.isLoading ? (
                         <p className="text-sm text-muted-foreground">Loading…</p>
                     ) : (
                         <DataGrid
-                            columns={ENDPOINT_COLUMNS}
+                            columns={LIVE_COLUMNS}
                             rows={live}
                             storageKey="minibrain.deployments.columns"
-                            onOpen={(row) => router.history.push(endpointHref(row))}
+                            onOpen={(row) => router.history.push(deploymentHref(row))}
                             rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
                             empty={
                                 <p className="text-muted-foreground">
@@ -337,7 +325,20 @@ function VersionHistory({ row }: { row: ModelRow }) {
     );
 }
 
-export function EndpointPage() {
+function DeploymentHeader({ row }: { row: ModelRow }) {
+    const { data: detail } = useMinibrain(row.key);
+    const status = detail ? ` · ${serving(detail)}` : "";
+    return (
+        <PageHeader
+            title={row.name}
+            icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
+            caption={`Apps call it as ${row.key}${status}`}
+            actions={detail && <DeployToggle slug={row.key} deployed={detail.deployed ?? false} />}
+        />
+    );
+}
+
+export function DeploymentPage() {
     const { slug } = useParams({ strict: false }) as { slug?: string };
     const models = useModels();
     const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
@@ -356,14 +357,10 @@ export function EndpointPage() {
             )}
             {row && (
                 <>
-                    <PageHeader
-                        title={row.name}
-                        icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
-                        caption={`Apps call it as ${row.key}`}
-                    />
+                    <DeploymentHeader row={row} />
                     <PanelSections>
                         <VersionHistory row={row} />
-                        <Deployment slug={row.key} />
+                        <Connect slug={row.key} />
                     </PanelSections>
                 </>
             )}

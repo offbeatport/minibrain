@@ -10,7 +10,7 @@ import { Shell } from "./components/Shell";
 import { readMinibrainParam } from "./lib/selection";
 import { DatasetPage } from "./pages/DataLibrary";
 import { DataPage } from "./pages/DataPage";
-import { DeploymentsPage, EndpointPage } from "./pages/DeploymentsPage";
+import { DeploymentPage, DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
@@ -116,7 +116,7 @@ const routeTree = rootRoute.addChildren([
         },
         component: DeploymentsPage,
     }),
-    globalPage("/deployments/$slug", EndpointPage),
+    globalPage("/deployments/$slug", DeploymentPage),
     globalPage("/pipelines", PipelinesPage),
     globalPage("/infrastructure", InfrastructurePage),
     globalPage("/infrastructure/$section", InfrastructurePage),

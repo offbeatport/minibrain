@@ -306,8 +306,6 @@ export function DataLibrary() {
                         )}
                         rows={sources.data ?? []}
                         storageKey="minibrain.files.columns"
-                        onOpen={(source) => createFrom(source)}
-                        rowLabel={(source) => `${source.filename} file`}
                         empty={<p className="text-muted-foreground">No files uploaded yet.</p>}
                         minWidth="min-w-[720px]"
                     />
