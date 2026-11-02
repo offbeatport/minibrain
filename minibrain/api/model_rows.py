@@ -1,5 +1,6 @@
 import statistics
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
@@ -15,6 +16,7 @@ from minibrain.api.schemas import (
     ModelRow,
     Stage,
     Usage,
+    VersionRow,
 )
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
@@ -182,38 +184,37 @@ def usage_window() -> tuple[datetime, list[str]]:
     return datetime.combine(days[0], time.min, tzinfo=UTC), [day.isoformat() for day in days]
 
 
-def usage_for(session: Session, key: InstrumentedAttribute[Any], scope: ColumnElement[bool]) -> dict[Any, Usage]:
+def usage_for(
+    session: Session, keys: Sequence[InstrumentedAttribute[Any]], scope: ColumnElement[bool]
+) -> dict[tuple[Any, ...], Usage]:
     since, days = usage_window()
     before = since - timedelta(days=USAGE_DAYS)
     recent = RequestLog.at >= since
     day = func.date(RequestLog.at)
-    daily: dict[Any, dict[str, int]] = {}
-    for target, value, total in session.execute(select(key, day, func.count()).where(scope, recent).group_by(key, day)):
-        daily.setdefault(target, {})[str(value)[:10]] = total
+    width = len(keys)
+
+    def grouped(*columns: Any, where: Sequence[ColumnElement[bool]]) -> list[Any]:
+        return list(session.execute(select(*keys, *columns).where(scope, *where).group_by(*keys, *columns[:-1])))
+
+    daily: dict[tuple[Any, ...], dict[str, int]] = {}
+    for row in grouped(day, func.count(), where=[recent]):
+        daily.setdefault(tuple(row[:width]), {})[str(row[width])[:10]] = row[width + 1]
     earlier = (RequestLog.at >= before) & (RequestLog.at < since)
-    previous = {
-        target: value
-        for target, value in session.execute(select(key, func.count()).where(scope, earlier).group_by(key))
-    }
+    previous = {tuple(row[:width]): row[width] for row in grouped(func.count(), where=[earlier])}
     failing = RequestLog.status >= FAILED_STATUS
-    failed = {
-        target: value
-        for target, value in session.execute(select(key, func.count()).where(scope, recent, failing).group_by(key))
-    }
-    last = {
-        target: value
-        for target, value in session.execute(select(key, func.max(RequestLog.at)).where(scope).group_by(key))
-    }
-    found: dict[Any, Usage] = {}
+    failed = {tuple(row[:width]): row[width] for row in grouped(func.count(), where=[recent, failing])}
+    last = {tuple(row[:width]): row[width] for row in grouped(func.max(RequestLog.at), where=[])}
+    found: dict[tuple[Any, ...], Usage] = {}
     for target, last_at in last.items():
-        if target is None or last_at is None:
+        if any(part is None for part in target) or last_at is None:
             continue
         counts = daily.get(target, {})
         series = [counts.get(name, 0) for name in days]
+        matching = [key == part for key, part in zip(keys, target, strict=True)]
         latencies = list(
             session.scalars(
                 select(RequestLog.latency_ms)
-                .where(scope, key == target, recent)
+                .where(scope, *matching, recent)
                 .order_by(RequestLog.id.desc())
                 .limit(LATENCY_SAMPLE)
             )
@@ -230,11 +231,46 @@ def usage_for(session: Session, key: InstrumentedAttribute[Any], scope: ColumnEl
     return found
 
 
-def usage_index(session: Session) -> tuple[dict[int, Usage], dict[str, Usage]]:
-    return (
-        usage_for(session, RequestLog.minibrain_id, RequestLog.minibrain_id.is_not(None)),
-        usage_for(session, RequestLog.model, RequestLog.minibrain_id.is_(None)),
+@dataclass(frozen=True)
+class UsageIndex:
+    custom: dict[int, Usage]
+    base: dict[str, Usage]
+    versions: dict[tuple[int, int], Usage]
+
+
+def usage_index(session: Session) -> UsageIndex:
+    custom = usage_for(session, [RequestLog.minibrain_id], RequestLog.minibrain_id.is_not(None))
+    base = usage_for(session, [RequestLog.model], RequestLog.minibrain_id.is_(None))
+    versions = usage_for(session, [RequestLog.minibrain_id, RequestLog.version], RequestLog.minibrain_id.is_not(None))
+    return UsageIndex(
+        custom={target[0]: usage for target, usage in custom.items()},
+        base={target[0]: usage for target, usage in base.items()},
+        versions={(target[0], target[1]): usage for target, usage in versions.items()},
     )
+
+
+def version_rows(
+    minibrain: Minibrain, jobs: list[Job], version_usage: dict[tuple[int, int], Usage]
+) -> list[VersionRow]:
+    rows: list[VersionRow] = []
+    for version in sorted(minibrain.versions, key=lambda item: item.number, reverse=True):
+        job = next((item for item in jobs if item.version_id == version.id), None)
+        active = job is not None and job.status in ACTIVE_JOB_STATUSES
+        rows.append(
+            VersionRow(
+                number=version.number,
+                kind=version.kind,
+                status=version.status,
+                live=minibrain.deployed and minibrain.current_version == version.number,
+                accuracy=held_out_accuracy(version) if version.metrics else None,
+                progress=running_progress(job) if job is not None and active else None,
+                job_id=job.id if job is not None else None,
+                error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
+                usage=version_usage.get((minibrain.id, version.number)),
+                created_at=version.created_at,
+            )
+        )
+    return rows
 
 
 def custom_availability(minibrain: Minibrain, store: ArtifactStore) -> Availability:
@@ -264,6 +300,7 @@ def custom_row(
     health: Health,
     base_weights: int | None = None,
     usage: Usage | None = None,
+    version_usage: dict[tuple[int, int], Usage] | None = None,
 ) -> ModelRow:
     latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
@@ -297,6 +334,7 @@ def custom_row(
         update_available=False,
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
+        versions=version_rows(minibrain, jobs, version_usage or {}),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         stages=custom_stages(minibrain, jobs),
@@ -378,7 +416,7 @@ def base_weights(session: Session) -> dict[str, int]:
 def all_rows(session: Session, settings: Settings, store: ArtifactStore, health: Health) -> list[ModelRow]:
     by_minibrain, by_model = jobs_by(session)
     weights = base_weights(session)
-    custom_usage, base_usage = usage_index(session)
+    usage = usage_index(session)
     rows = [
         custom_row(
             minibrain,
@@ -386,12 +424,13 @@ def all_rows(session: Session, settings: Settings, store: ArtifactStore, health:
             store,
             health,
             weights.get(minibrain.base_model),
-            custom_usage.get(minibrain.id),
+            usage.custom.get(minibrain.id),
+            usage.versions,
         )
         for minibrain in session.scalars(select(Minibrain))
     ]
     rows += [
-        base_row(model, by_model.get(model.id), settings, health, base_usage.get(model.id))
+        base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id))
         for model in session.scalars(select(Model))
     ]
     return sorted(rows, key=lambda row: row.updated_at, reverse=True)

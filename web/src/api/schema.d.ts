@@ -539,6 +539,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/{slug}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Version */
+        delete: operations["delete_version_api_minibrains__slug__versions__number__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/versions/{number}/promote": {
         parameters: {
             query?: never;
@@ -1213,6 +1230,11 @@ export interface components {
             revision?: string | null;
             /** Error */
             error?: string | null;
+            /**
+             * Versions
+             * @default []
+             */
+            versions?: components["schemas"]["VersionRow"][];
             /** Source */
             source: string;
             /** Repo */
@@ -2025,6 +2047,11 @@ export interface components {
             revision?: string | null;
             /** Error */
             error?: string | null;
+            /**
+             * Versions
+             * @default []
+             */
+            versions?: components["schemas"]["VersionRow"][];
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -2383,6 +2410,31 @@ export interface components {
             /** Mistakes */
             mistakes: components["schemas"]["Mistake"][];
             job: components["schemas"]["JobInfo"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** VersionRow */
+        VersionRow: {
+            /** Number */
+            number: number;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Live */
+            live: boolean;
+            /** Accuracy */
+            accuracy: number | null;
+            /** Progress */
+            progress: number | null;
+            /** Job Id */
+            job_id: number | null;
+            /** Error */
+            error: string | null;
+            usage: components["schemas"]["Usage"] | null;
             /**
              * Created At
              * Format: date-time
@@ -3586,6 +3638,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["VersionInfo"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_version_api_minibrains__slug__versions__number__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

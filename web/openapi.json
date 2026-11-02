@@ -1610,6 +1610,50 @@
         }
       }
     },
+    "/api/minibrains/{slug}/versions/{number}": {
+      "delete": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Delete Version",
+        "operationId": "delete_version_api_minibrains__slug__versions__number__delete",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/versions/{number}/promote": {
       "post": {
         "tags": [
@@ -3582,6 +3626,14 @@
               }
             ],
             "title": "Error"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionRow"
+            },
+            "type": "array",
+            "title": "Versions",
+            "default": []
           },
           "source": {
             "type": "string",
@@ -6006,6 +6058,14 @@
               }
             ],
             "title": "Error"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionRow"
+            },
+            "type": "array",
+            "title": "Versions",
+            "default": []
           }
         },
         "type": "object",
@@ -7120,6 +7180,99 @@
           "created_at"
         ],
         "title": "VersionInfo"
+      },
+      "VersionRow": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "status",
+          "live",
+          "accuracy",
+          "progress",
+          "job_id",
+          "error",
+          "usage",
+          "created_at"
+        ],
+        "title": "VersionRow"
       },
       "WorkerBody": {
         "properties": {

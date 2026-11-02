@@ -70,7 +70,9 @@ def get_version(minibrain: Minibrain, number: int) -> Version:
 
 
 def next_version_number(minibrain: Minibrain) -> int:
-    return max((version.number for version in minibrain.versions), default=-1) + 1
+    highest = max((version.number for version in minibrain.versions), default=-1)
+    minibrain.last_version = max(highest, minibrain.last_version) + 1
+    return minibrain.last_version
 
 
 def create_version(session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any]) -> Version:

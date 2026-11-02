@@ -300,6 +300,19 @@ class Usage(BaseModel):
     p50_ms: float | None
 
 
+class VersionRow(BaseModel):
+    number: int
+    kind: str
+    status: str
+    live: bool
+    accuracy: float | None
+    progress: float | None
+    job_id: int | None
+    error: str | None
+    usage: Usage | None
+    created_at: datetime
+
+
 class ModelRow(BaseModel):
     kind: Literal["base", "custom"]
     key: str
@@ -325,6 +338,7 @@ class ModelRow(BaseModel):
     usage: Usage | None = None
     revision: str | None = None
     error: str | None = None
+    versions: list[VersionRow] = []
 
 
 class ModelFile(BaseModel):

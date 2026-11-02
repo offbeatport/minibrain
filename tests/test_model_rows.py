@@ -72,3 +72,34 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness) -> 
     assert (body["mapping"]["input_column"], body["mapping"]["label_column"]) == ("message", "intent")
     assert body["source"]["rows"] > 100
     assert harness.client.post("/api/minibrains/sample").json()["name"] == "Travel intents (sample) 2"
+
+
+def test_each_version_is_reported_with_its_own_status_and_requests(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "prompt")
+    finish(harness, "eval", accuracy=0.8)
+    deploy(harness)
+    add_version(harness, "lora")
+    with harness.sessions() as session:
+        minibrain = session.query(Minibrain).filter_by(slug=SLUG).one()
+        for _ in range(3):
+            session.add(
+                RequestLog(at=now(), minibrain_id=minibrain.id, model=SLUG, version=0, status=200, latency_ms=9.0)
+            )
+        session.commit()
+    versions = {item["number"]: item for item in custom_row(harness, SLUG)["versions"]}
+    assert (versions[0]["live"], versions[0]["accuracy"], versions[0]["usage"]["total"]) == (True, 0.8, 3)
+    assert (versions[1]["live"], versions[1]["status"], versions[1]["usage"]) == (False, "training", None)
+
+
+def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "prompt")
+    finish(harness, "eval", accuracy=0.8)
+    deploy(harness)
+    refused = harness.client.delete(f"/api/minibrains/{SLUG}/versions/0")
+    assert refused.status_code == 409 and "undeploy it first" in refused.json()["detail"]
+    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
+    assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
+    assert custom_row(harness, SLUG)["versions"] == []
+    assert add_version(harness, "prompt")["number"] == 1

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
+from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
@@ -15,7 +16,7 @@ from minibrain.api.views import detail, key_info, version_info
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
-from minibrain.registry.models import ApiKey, JobKind, VersionKind
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, AuditEvent, JobKind, VersionKind
 from minibrain.registry.service import (
     ConflictError,
     NotFoundError,
@@ -51,6 +52,28 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
         enqueue(session, JobKind.EVAL, params, minibrain.id, version.id, f"eval:{version.id}")
     session.commit()
     return version_info(minibrain, version)
+
+
+@router.delete("/minibrains/{slug}/versions/{number}", status_code=204)
+def delete_version(slug: str, number: int, session: SessionDep) -> None:
+    minibrain = get_minibrain(session, slug)
+    version = get_version(minibrain, number)
+    if minibrain.deployed and minibrain.current_version == number:
+        raise ConflictError(f"{slug}@{number} is deployed; undeploy it first")
+    if any(job.version_id == version.id and job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
+        raise ConflictError(f"{slug}@{number} has a job running; cancel it first")
+    if minibrain.current_version == number:
+        minibrain.current_version = None
+    session.add(
+        AuditEvent(
+            actor=LOCAL_USER,
+            action="version.delete",
+            target=f"{slug}@{number}",
+            detail={"name": minibrain.name, "kind": version.kind, "status": version.status},
+        )
+    )
+    session.delete(version)
+    session.commit()
 
 
 @router.post("/minibrains/{slug}/versions/{number}/promote")
