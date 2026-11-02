@@ -538,7 +538,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Model",
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex min-w-64 max-w-112 items-start gap-3">
+                <div className="flex min-w-64 max-w-88 items-start gap-3">
                     <PublisherLogo publisher={row.original.provider} name={row.original.name} />
                     <div className="flex min-w-0 flex-col">
                         <span className="flex items-center gap-2">
@@ -907,7 +907,7 @@ export function Discover({
                 onOpenChange={(open) => !open && setRequirements(null)}
             />
             <Link href="/models" className="sr-only">
-                My models
+                Models
             </Link>
         </div>
     );

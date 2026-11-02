@@ -14,7 +14,7 @@ import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
 import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
-import { ModelsPage } from "./pages/ModelsPage";
+import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
 import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
@@ -81,7 +81,20 @@ function movedToSettings(path: string): AnyRoute {
 
 const routeTree = rootRoute.addChildren([
     globalPage("/", HomePage),
-    globalPage("/models", ModelsPage),
+    createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/models",
+        beforeLoad: ({ location }) => {
+            const params = new URLSearchParams(location.searchStr);
+            if (params.get("tab") === "discover") {
+                params.delete("tab");
+                const rest = params.toString();
+                throw redirect({ href: `/discover${rest ? `?${rest}` : ""}` });
+            }
+        },
+        component: ModelsPage,
+    }),
+    globalPage("/discover", DiscoverPage),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),

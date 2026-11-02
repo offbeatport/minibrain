@@ -2,7 +2,6 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo } from "react";
 
 const KEYS = [
-    "tab",
     "q",
     "type",
     "availability",
@@ -20,7 +19,11 @@ const KEYS = [
 export type ModelsSearchKey = (typeof KEYS)[number];
 export type ModelsSearch = Partial<Record<ModelsSearchKey, string>>;
 
-const STORAGE_KEY = "minibrain.models.search";
+export type ModelsPath = "/models" | "/discover";
+
+function storageKey(path: ModelsPath): string {
+    return `minibrain${path.replace("/", ".")}.search`;
+}
 
 export function readModelsSearch(search: unknown): ModelsSearch {
     const source = (search ?? {}) as Record<string, unknown>;
@@ -46,37 +49,37 @@ export function searchString(search: ModelsSearch): string {
     return text ? `?${text}` : "";
 }
 
-function remember(search: ModelsSearch): void {
+function remember(path: ModelsPath, search: ModelsSearch): void {
     try {
-        window.sessionStorage.setItem(STORAGE_KEY, searchString(search));
+        window.sessionStorage.setItem(storageKey(path), searchString(search));
     } catch {
         return;
     }
 }
 
 export function modelsHref(): string {
-    return `/models${remembered()}`;
+    return `/models${remembered("/models")}`;
 }
 
-function remembered(): string {
+function remembered(path: ModelsPath): string {
     try {
-        return window.sessionStorage.getItem(STORAGE_KEY) ?? "";
+        return window.sessionStorage.getItem(storageKey(path)) ?? "";
     } catch {
         return "";
     }
 }
 
-export function useModelsSearch() {
+export function useModelsSearch(path: ModelsPath) {
     const router = useRouter();
     const raw = useRouterState({
         select: (state) => searchString(readModelsSearch(state.location.search)),
     });
     useEffect(() => {
-        const saved = remembered();
+        const saved = remembered(path);
         if (!raw && saved) {
-            router.history.replace(`/models${saved}`);
+            router.history.replace(`${path}${saved}`);
         }
-    }, [raw, router]);
+    }, [raw, router, path]);
     const search = useMemo(
         () => readModelsSearch(Object.fromEntries(new URLSearchParams(raw))),
         [raw],
@@ -89,10 +92,10 @@ export function useModelsSearch() {
                     delete next[key];
                 }
             }
-            remember(next);
-            router.history.replace(`/models${searchString(next)}`);
+            remember(path, next);
+            router.history.replace(`${path}${searchString(next)}`);
         },
-        [router, search],
+        [router, search, path],
     );
     return { search, update };
 }

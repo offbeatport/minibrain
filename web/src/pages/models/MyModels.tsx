@@ -236,10 +236,10 @@ function archiveConfirmation(row: ModelRow, on: Handlers): Confirmation {
     return {
         title: row.archived ? `Restore ${row.name}?` : `Archive ${row.name}?`,
         description: row.archived ? (
-            <p>It shows in My models again.</p>
+            <p>It shows in Models again.</p>
         ) : (
             <>
-                <p>It is hidden from My models; use Show archived to find it again.</p>
+                <p>It is hidden from Models; use Show archived to find it again.</p>
                 <p>
                     {deployed
                         ? "Its deployment keeps running and its files stay in storage. Undeploy it separately if needed."

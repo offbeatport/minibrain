@@ -2,6 +2,7 @@ import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import {
     Activity,
     Box,
+    Compass,
     Cpu,
     Database,
     Gauge,
@@ -37,6 +38,7 @@ const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
         label: "Explore",
         items: [
             { label: "Models", path: "/models", icon: Box },
+            { label: "Discover", path: "/discover", icon: Compass },
             { label: "Playground", path: "/playground", icon: Play, scoped: true },
         ],
     },
