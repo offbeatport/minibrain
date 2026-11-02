@@ -14,7 +14,7 @@ export function ModelsPage() {
     const { search, update } = useModelsSearch("/models");
     const [creating, setCreating] = useState(false);
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Models"
                 caption="Models added to this installation."
@@ -40,7 +40,7 @@ export function DiscoverPage() {
     const { search, update } = useModelsSearch("/discover");
     const [importing, setImporting] = useState(false);
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Discover"
                 caption="Find supported models to download and run privately."

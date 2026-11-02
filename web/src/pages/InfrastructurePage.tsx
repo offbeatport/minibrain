@@ -172,6 +172,7 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
                     storageKey="minibrain.machines.columns"
                     columnPicker
                     hiddenColumns={["cpu", "engines"]}
+                    dropOrder={["engines", "cpu", "seen", "version", "usable", "roles"]}
                 />
                 {pool.engines.length > 0 && (
                     <DataGrid columns={REPLICA_COLUMNS} rows={pool.engines} />

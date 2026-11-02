@@ -152,6 +152,7 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         id: "job",
         header: "Job",
+        enableHiding: false,
         accessorFn: (job) => KINDS[job.kind] ?? job.kind,
     },
     {
@@ -200,6 +201,7 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
         enableSorting: false,
+        enableHiding: false,
         cell: ({ row }) => <JobActions job={row.original} />,
     },
 ];
@@ -233,7 +235,7 @@ export function MonitorPage() {
                 : ofKind.filter((job) => job.status === item.key).length,
     }));
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Monitor"
                 caption="Background jobs across every model: data builds, training, scoring and downloads."
@@ -262,6 +264,7 @@ export function MonitorPage() {
                     columns={COLUMNS}
                     rows={visible}
                     storageKey="minibrain.jobs.columns"
+                    columnPicker
                     onOpen={(job) => {
                         const href = jobHref(job);
                         if (href) {

@@ -7,6 +7,7 @@ import {
     Button,
     Checkbox,
     DataGrid,
+    DataGridDetail,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -588,7 +589,23 @@ export function discoverHref(entry: CatalogEntry, pool?: string): string {
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
+const DROP_ORDER = [
+    "repo",
+    "support",
+    "generation",
+    "architecture",
+    "downloads",
+    "finetune",
+    "tasks",
+    "publisher",
+    "newer",
+    "size",
+    "licence",
+    "parameters",
+];
+
 const HIDDEN_COLUMNS = [
+    "size",
     "newer",
     "publisher",
     "tasks",
@@ -621,12 +638,12 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
                                 <Badge variant="outline">Recommended</Badge>
                             )}
                         </span>
-                        <span
+                        <DataGridDetail
                             className="line-clamp-2 whitespace-normal text-sm text-muted-foreground"
                             title={row.original.description}
                         >
                             {row.original.description}
-                        </span>
+                        </DataGridDetail>
                     </div>
                 </div>
             ),
@@ -1033,6 +1050,7 @@ export function Discover({
                         onOpen={(entry) => router.history.push(discoverHref(entry, search.pool))}
                         columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
+                        dropOrder={DROP_ORDER}
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
                         empty={empty}
                         minWidth="min-w-[840px]"

@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 
 export function Section({
@@ -87,9 +88,14 @@ export function ErrorLine({ error }: { error: unknown }) {
     );
 }
 
-export function Page({ children }: { children: ReactNode }) {
+export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
     return (
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-8 pb-6">
+        <div
+            className={cn(
+                "mx-auto flex w-full flex-col gap-4 px-6 pt-8 pb-6",
+                wide ? "max-w-[96rem]" : "max-w-6xl",
+            )}
+        >
             {children}
         </div>
     );

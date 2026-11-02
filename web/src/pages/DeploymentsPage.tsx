@@ -224,7 +224,7 @@ export function DeploymentsPage() {
     const models = useModels();
     const live = (models.data ?? []).filter((row) => row.deployment.state !== "not_deployed");
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Deployments"
                 caption="Everything apps can call now, on one OpenAI-compatible endpoint."
@@ -239,6 +239,9 @@ export function DeploymentsPage() {
                             columns={LIVE_COLUMNS}
                             rows={live}
                             storageKey="minibrain.deployments.columns"
+                            columnPicker
+                            hiddenColumns={["used", "keys"]}
+                            dropOrder={["keys", "used", "serves", "name", "requests"]}
                             onOpen={(row) => router.history.push(deploymentHref(row))}
                             rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
                             empty={

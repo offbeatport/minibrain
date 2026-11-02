@@ -259,7 +259,7 @@ export function DataLibrary() {
         event.target.value = "";
     };
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Data"
                 caption="Datasets and the files behind them, shared by every model."
