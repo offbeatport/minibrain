@@ -913,7 +913,7 @@ export function MyModels({
                     placeholder="Search models"
                     value={search.q ?? ""}
                     onValueChange={(q) => update({ q })}
-                    className="w-full max-w-md flex-1"
+                    className="w-full max-w-xs flex-1"
                 />
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                     <CheckboxSelect
