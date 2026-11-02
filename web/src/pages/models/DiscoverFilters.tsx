@@ -86,9 +86,6 @@ function list(value: string | undefined): string[] {
 }
 
 function readAccess(value: string | undefined): string[] {
-    if (!value) {
-        return [READY];
-    }
     return value === ANY ? [] : list(value);
 }
 
@@ -126,19 +123,11 @@ export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): bo
     );
 }
 
-function accessIsDefault(filters: Filters): boolean {
-    return filters.access.join(",") === READY;
-}
-
 type Chip = { facet: Facet; value: string; label: string };
 
 export function chipsOf(filters: Filters): Chip[] {
     const chips: Chip[] = [];
-    if (!accessIsDefault(filters)) {
-        const names = filters.access.map((value) => labelOf("access", value)).join(" or ");
-        chips.push({ facet: "access", value: "", label: `Download: ${names || "any"}` });
-    }
-    for (const facet of FACETS.filter((item) => item !== "access")) {
+    for (const facet of FACETS) {
         for (const value of filters[facet]) {
             chips.push({ facet, value, label: labelOf(facet, value) });
         }
@@ -169,17 +158,10 @@ function encode(facet: Facet, values: string[]): ModelsSearch {
     if (facet === "fit") {
         patch.fits = "";
     }
-    if (facet === "access") {
-        patch.access =
-            values.length === 0 ? ANY : values.join(",") === READY ? "" : values.join(",");
-    }
     return patch;
 }
 
 function removal(chip: Chip, filters: Filters): ModelsSearch {
-    if (chip.facet === "access") {
-        return { access: "" };
-    }
     return encode(
         chip.facet,
         filters[chip.facet].filter((value) => value !== chip.value),
