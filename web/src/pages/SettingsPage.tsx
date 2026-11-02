@@ -74,11 +74,7 @@ function Appearance() {
         }
     };
     return (
-        <PanelSection
-            icon={Palette}
-            title="Appearance"
-            description="Light, dark or follow the system. Stored in this browser."
-        >
+        <PanelSection icon={Palette} title="Appearance">
             <SegmentedTabs tabs={MODES} active={mode} onSelect={choose} />
         </PanelSection>
     );
@@ -91,32 +87,25 @@ export function SettingsPage() {
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />
-                <PanelSection
-                    icon={FolderOpen}
-                    title="Paths"
-                    description="Read-only. Set MINIBRAIN_HOME before starting to move the install."
-                >
+                <PanelSection icon={FolderOpen} title="Paths">
                     <div className="flex flex-col gap-3">
                         <Path label="Data, adapters and jobs" value={data?.home} />
                         <Path label="Database" value={data?.database} />
                         <Path label="Web app" value={data?.web} />
+                        <p className="border-t pt-3 text-sm text-muted-foreground">
+                            To move the install, set{" "}
+                            <span className="font-mono text-foreground">MINIBRAIN_HOME</span> before
+                            starting minibrain.
+                        </p>
                     </div>
                 </PanelSection>
-                <PanelSection
-                    icon={Box}
-                    title="Base models"
-                    description="Pinned to an exact revision; adapters record which one they were trained on."
-                >
+                <PanelSection icon={Box} title="Base models">
                     <DataTable
                         columns={baseModelColumns(data?.default_base_model)}
                         rows={data?.base_models ?? []}
                     />
                 </PanelSection>
-                <PanelSection
-                    icon={GraduationCap}
-                    title="Default training recipe"
-                    description="New trained versions start from these values."
-                >
+                <PanelSection icon={GraduationCap} title="Default training recipe">
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (
                             <Stat

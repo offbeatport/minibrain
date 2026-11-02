@@ -32,21 +32,16 @@ const GROUPS = [
     {
         icon: Globe,
         title: "Network",
-        description:
-            "Downloads, imports from buckets, catalogue sync and Add from Hugging Face all obey this.",
         names: ["network", "allowed_hosts"],
     },
     {
         icon: Box,
         title: "Models",
-        description: "Checked when a model is added or downloaded, and again on retry.",
         names: ["model_sources", "licences", "allow_unreviewed_licences", "safetensors_only"],
     },
     {
         icon: KeyRound,
         title: "Request logs and API keys",
-        description:
-            "Logs never leave this install. Expiry applies to keys created after the change.",
         names: ["request_logs", "log_retention_days", "key_expiry_days"],
     },
 ];
@@ -273,12 +268,7 @@ export function SecurityPage() {
             <PanelSections>
                 {policies.data &&
                     GROUPS.map((group) => (
-                        <PanelSection
-                            key={group.title}
-                            icon={group.icon}
-                            title={group.title}
-                            description={group.description}
-                        >
+                        <PanelSection key={group.title} icon={group.icon} title={group.title}>
                             <div className="divide-y">
                                 {group.names.map((name) => {
                                     const policy = byName.get(name);
@@ -287,11 +277,7 @@ export function SecurityPage() {
                             </div>
                         </PanelSection>
                     ))}
-                <PanelSection
-                    icon={History}
-                    title="Audit log"
-                    description="Who changed a security setting or deleted a model, and when."
-                >
+                <PanelSection icon={History} title="Audit log">
                     <ErrorLine error={audit.error} />
                     <DataTable
                         columns={auditColumns(byName)}

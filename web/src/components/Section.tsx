@@ -43,7 +43,7 @@ export function PanelSection({
         <section className="flex flex-col gap-2">
             <header className="flex flex-wrap items-end justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="flex items-center gap-2 text-base font-semibold">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
                         <Icon
                             aria-hidden="true"
                             className="size-5 shrink-0 text-muted-foreground"
@@ -86,5 +86,9 @@ export function ErrorLine({ error }: { error: unknown }) {
 }
 
 export function Page({ children }: { children: ReactNode }) {
-    return <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-5">{children}</div>;
+    return (
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 pt-8 pb-6">
+            {children}
+        </div>
+    );
 }

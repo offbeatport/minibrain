@@ -23,10 +23,10 @@ export function PageHeader({
     actions?: ReactNode;
 }) {
     return (
-        <header className="flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-0">
-                <h1 className="text-xl font-semibold">{title}</h1>
-                {caption && <p className="text-sm text-muted-foreground">{caption}</p>}
+        <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
+            <div className="flex min-w-0 flex-col gap-1">
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                {caption && <p className="text-base text-muted-foreground">{caption}</p>}
             </div>
             {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
