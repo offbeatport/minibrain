@@ -46,12 +46,12 @@ export function PanelSection({
                     <h2 className="flex items-center gap-2 text-base font-semibold">
                         <Icon
                             aria-hidden="true"
-                            className="size-4 shrink-0 text-muted-foreground"
+                            className="size-5 shrink-0 text-muted-foreground"
                         />
                         {title}
                     </h2>
                     {description && (
-                        <p className="pl-6 text-sm text-muted-foreground">{description}</p>
+                        <p className="pl-7 text-sm text-muted-foreground">{description}</p>
                     )}
                 </div>
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
