@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import {
     Button,
     EmptyState,
@@ -7,10 +8,12 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    cn,
 } from "obp-ui";
 import type { ReactNode } from "react";
 import type { MinibrainSummary } from "~/api/client";
 import { Page } from "~/components/Section";
+import { navEntryFor } from "~/components/navigation";
 import { useSelectedMinibrain } from "~/lib/selection";
 
 export function PageHeader({
@@ -22,11 +25,25 @@ export function PageHeader({
     caption?: ReactNode;
     actions?: ReactNode;
 }) {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const Icon = navEntryFor(pathname)?.icon;
     return (
         <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
             <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="text-2xl font-semibold">{title}</h1>
-                {caption && <p className="text-base text-muted-foreground">{caption}</p>}
+                <h1 className="flex items-center gap-2.5 text-2xl font-semibold">
+                    {Icon && (
+                        <Icon
+                            aria-hidden="true"
+                            className="size-6 shrink-0 text-muted-foreground"
+                        />
+                    )}
+                    {title}
+                </h1>
+                {caption && (
+                    <p className={cn("text-base text-muted-foreground", Icon && "pl-8.5")}>
+                        {caption}
+                    </p>
+                )}
             </div>
             {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>

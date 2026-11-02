@@ -327,6 +327,7 @@ class ModelRow(BaseModel):
     accuracy: float | None = None
     usage: Usage | None = None
     revision: str | None = None
+    error: str | None = None
 
 
 class ModelFile(BaseModel):
@@ -342,7 +343,6 @@ class BaseModelDetail(ModelRow):
     source_path: str | None
     storage_path: str
     files: list[ModelFile]
-    error: str | None
     license: str | None
     license_name: str | None
     license_url: str | None

@@ -1194,6 +1194,8 @@ export interface components {
             usage?: components["schemas"]["Usage"] | null;
             /** Revision */
             revision?: string | null;
+            /** Error */
+            error?: string | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1206,8 +1208,6 @@ export interface components {
             storage_path: string;
             /** Files */
             files: components["schemas"]["ModelFile"][];
-            /** Error */
-            error: string | null;
             /** License */
             license: string | null;
             /** License Name */
@@ -1996,6 +1996,8 @@ export interface components {
             usage?: components["schemas"]["Usage"] | null;
             /** Revision */
             revision?: string | null;
+            /** Error */
+            error?: string | null;
         };
         /** ModelUpdate */
         ModelUpdate: {

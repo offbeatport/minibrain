@@ -158,7 +158,7 @@ export function Activity({ row }: { row: ModelRow }) {
 }
 
 const DEPLOYMENT_STATES: Record<string, string> = {
-    running: "Running",
+    running: "Live",
     starting: "Starting",
     unhealthy: "Unhealthy",
 };
@@ -429,18 +429,16 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
     );
 }
 
-type ModelState = "live" | "attention" | "progress" | "ready";
+type ModelState = "error" | "live" | "progress" | "idle";
 
 const STATE_LABELS: Record<ModelState, string> = {
+    error: "Errors",
     live: "Live",
-    attention: "Needs you",
     progress: "In progress",
-    ready: "Ready",
+    idle: "Not deployed",
 };
 
-const STATE_RANK: ModelState[] = ["live", "attention", "progress", "ready"];
-
-const ATTENTION_STATES = ["failed", "needs_examples", "ready"];
+const STATE_RANK: ModelState[] = ["error", "live", "progress", "idle"];
 
 const FAILING_SHARE = 0.01;
 
@@ -448,10 +446,10 @@ function failing(row: ModelRow): boolean {
     return row.deployment.state !== "not_deployed" && failingShare(row.usage) >= FAILING_SHARE;
 }
 
-function needsAttention(row: ModelRow): boolean {
+function hasError(row: ModelRow): boolean {
     return (
         failing(row) ||
-        ATTENTION_STATES.includes(row.activity.state) ||
+        row.activity.state === "failed" ||
         row.availability.state === "missing" ||
         row.deployment.state === "unhealthy"
     );
@@ -465,43 +463,66 @@ function inProgress(row: ModelRow): boolean {
 }
 
 function stateOf(row: ModelRow): ModelState {
-    if (needsAttention(row)) {
-        return "attention";
+    if (hasError(row)) {
+        return "error";
     }
     if (row.deployment.state !== "not_deployed") {
         return "live";
     }
-    return inProgress(row) ? "progress" : "ready";
+    return inProgress(row) ? "progress" : "idle";
+}
+
+function errorSummary(row: ModelRow): { label: string; detail: string } {
+    if (failing(row)) {
+        const share = Math.round(failingShare(row.usage) * 100);
+        return {
+            label: `${share}% of requests failing`,
+            detail: `${row.usage?.failed ?? 0} of ${row.usage?.total ?? 0} requests in the last 7 days failed.`,
+        };
+    }
+    if (row.deployment.state === "unhealthy") {
+        return {
+            label: "Deployment unhealthy",
+            detail: "The engine serving it does not answer health checks.",
+        };
+    }
+    if (row.availability.state === "missing") {
+        return {
+            label: "Missing files",
+            detail: "Some of its files are gone from storage. Retry the download or delete it.",
+        };
+    }
+    return {
+        label: row.activity.label,
+        detail: row.error || "The last job failed without a message.",
+    };
 }
 
 function StatusCell({ row }: { row: ModelRow }) {
     const state = stateOf(row);
+    if (state === "error") {
+        const { label, detail } = errorSummary(row);
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button type="button" className="rounded-sm text-left">
+                        <StatusText tone="destructive">{label}</StatusText>
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm whitespace-normal">{detail}</TooltipContent>
+            </Tooltip>
+        );
+    }
     if (state === "live") {
         return <Deployment row={row} short />;
     }
     if (state === "progress") {
         return row.kind === "base" ? <Availability row={row} /> : <Activity row={row} />;
     }
-    if (state === "attention") {
-        if (failing(row)) {
-            return (
-                <StatusText tone="warning">
-                    {`Running · ${Math.round(failingShare(row.usage) * 100)}% failing`}
-                </StatusText>
-            );
-        }
-        if (row.availability.state === "missing") {
-            return <Availability row={row} />;
-        }
-        if (row.deployment.state === "unhealthy") {
-            return <Deployment row={row} short />;
-        }
-        return <Activity row={row} />;
-    }
     if (row.kind === "base" && row.availability.state === "not_downloaded") {
         return <Availability row={row} />;
     }
-    return <StatusText tone="neutral">Not deployed</StatusText>;
+    return <span className="text-muted-foreground">Not deployed</span>;
 }
 
 function ModelName({ row }: { row: ModelRow }) {
@@ -525,6 +546,19 @@ function ModelName({ row }: { row: ModelRow }) {
     );
 }
 
+function pendingVersion(row: ModelRow): string | null {
+    const { state, version, progress } = row.activity;
+    if (["running", "queued"].includes(state) && version !== null && version !== undefined) {
+        const verb = row.activity.kind === "eval" ? "scoring" : "training";
+        const share = state === "running" && progress ? ` ${Math.round(progress * 100)}%` : "";
+        return `v${version} ${verb}${share}`;
+    }
+    if (row.ready_version !== null && row.ready_version !== undefined) {
+        return `v${row.ready_version} ready`;
+    }
+    return null;
+}
+
 function VersionCell({ row }: { row: ModelRow }) {
     if (row.kind === "base") {
         return row.revision ? (
@@ -535,20 +569,16 @@ function VersionCell({ row }: { row: ModelRow }) {
             <span className="text-muted-foreground">—</span>
         );
     }
-    const ready = row.ready_version;
-    if (row.current_version === null || row.current_version === undefined) {
-        return ready !== null && ready !== undefined ? (
-            <span className="tabular-nums">{`v${ready} ready`}</span>
-        ) : (
-            <span className="text-muted-foreground">None yet</span>
-        );
-    }
+    const pending = pendingVersion(row);
+    const live = row.current_version;
     return (
         <span className="flex flex-col tabular-nums">
-            <span>{`v${row.current_version}`}</span>
-            {ready !== null && ready !== undefined && (
-                <span className="text-sm text-muted-foreground">{`v${ready} ready`}</span>
+            {live !== null && live !== undefined ? (
+                <span>{`v${live} live`}</span>
+            ) : (
+                !pending && <span className="text-muted-foreground">None yet</span>
             )}
+            {pending && <span className="text-sm text-muted-foreground">{pending}</span>}
         </span>
     );
 }

@@ -1,66 +1,18 @@
 import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import {
-    Activity,
-    Box,
-    Compass,
-    Database,
-    Gauge,
-    GraduationCap,
-    Home,
-    LogOut,
-    Play,
-    Rocket,
-    Server,
-    Settings,
-    SunMoon,
-    ThumbsUp,
-    Workflow,
-} from "lucide-react";
+import { LogOut, Settings, SunMoon } from "lucide-react";
 import { type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
     AccountMenu,
     type AccountMenuItem,
     AppShell,
-    type IconComponent,
     NavItem,
     Rail,
     SectionLabel,
 } from "obp-ui/shell";
 import type { MouseEvent } from "react";
+import { type NavEntry, SECTIONS } from "~/components/navigation";
 import { readMinibrainParam, rememberedMinibrain } from "~/lib/selection";
-
-type NavEntry = { label: string; path: string; icon: IconComponent; scoped?: boolean };
-
-const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
-    { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
-    {
-        label: "Explore",
-        items: [
-            { label: "Models", path: "/models", icon: Box },
-            { label: "Discover", path: "/discover", icon: Compass },
-            { label: "Playground", path: "/playground", icon: Play, scoped: true },
-        ],
-    },
-    {
-        label: "Create",
-        items: [
-            { label: "Data", path: "/data", icon: Database, scoped: true },
-            { label: "Training", path: "/training", icon: GraduationCap, scoped: true },
-            { label: "Evaluations", path: "/evaluations", icon: Gauge, scoped: true },
-            { label: "Feedback", path: "/feedback", icon: ThumbsUp, scoped: true },
-        ],
-    },
-    {
-        label: "Run",
-        items: [
-            { label: "Deployments", path: "/deployments", icon: Rocket, scoped: true },
-            { label: "Pipelines", path: "/pipelines", icon: Workflow },
-            { label: "Infrastructure", path: "/infrastructure", icon: Server },
-            { label: "Monitor", path: "/monitor", icon: Activity, scoped: true },
-        ],
-    },
-];
 
 const ACCOUNT_ITEMS: AccountMenuItem[] = [
     { icon: <Settings />, label: "Settings", href: "/settings" },

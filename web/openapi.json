@@ -3530,6 +3530,17 @@
             ],
             "title": "Revision"
           },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -3577,17 +3588,6 @@
             },
             "type": "array",
             "title": "Files"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
           },
           "license": {
             "anyOf": [
@@ -3701,7 +3701,6 @@
           "source_path",
           "storage_path",
           "files",
-          "error",
           "license",
           "license_name",
           "license_url",
@@ -5944,6 +5943,17 @@
               }
             ],
             "title": "Revision"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           }
         },
         "type": "object",
