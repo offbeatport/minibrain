@@ -400,15 +400,57 @@ PII counts.
   client-certificate check. Proxy headers are trusted only from configured proxy addresses.
 - Harness config export: base URL, key and model name for common harnesses.
 
+### Accounts and roles
+
+Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` stays key-only.
+
+- Sign-in sources, any mix: local accounts, OIDC (authorization code with PKCE; Entra, Okta, ADFS, Keycloak) and
+  trusted proxy headers (user, email and groups headers, honoured only from configured proxy addresses).
+- First run: the first person to open the UI creates the admin account, or `minibrain admin create` does it on the
+  command line. Air-gapped installs need no identity provider.
+- Passwords: PBKDF2-HMAC-SHA256 through `cryptography` (FIPS-approved; not argon2 or scrypt). OIDC through Authlib,
+  which uses `cryptography` for its tokens.
+- Sessions: a server-side row per session holding the SHA-256 of its token; an HttpOnly, Secure, SameSite=Lax
+  cookie; idle and absolute lifetimes as policies; a CSRF token on every state-changing `/api` call. Signing out or
+  disabling an account ends its sessions at once.
+- Single-user mode: with accounts off, minibrain stays today's one local user, and only while it listens on
+  loopback. Listening on any other address requires accounts.
+- Roles are install-wide in v1. Per-model and per-team rights arrive with Teams in v2.
+
+| Can | Viewer | Builder | Admin |
+|---|---|---|---|
+| See models, versions, scores, deployments, Monitor and Infrastructure | Yes | Yes | Yes |
+| Use the Playground | Yes | Yes | Yes |
+| See data rows: previews, golden sets, mistakes | No | Yes | Yes |
+| Upload data, edit mappings, add, train and evaluate models, label | No | Yes | Yes |
+| Deploy, undeploy, roll back; create and revoke API keys | No | Yes | Yes |
+| Download, import and delete base models | No | No | Yes |
+| Security policies, install settings, worker and engine tokens | No | No | Yes |
+| Accounts, role mapping, audit log | No | No | Yes |
+
+- Role mapping: identity-provider groups (the OIDC `groups` claim or the proxy groups header) map to roles in
+  `minibrain.yaml` (`auth.roles: {minibrain-admins: admin, ml-team: builder}`); values set there are locked in the UI,
+  like policies. A person with no mapped group gets the `auth.default_role` policy: none by default, so they see "Ask
+  an admin for access" until an admin assigns a role.
+- Enforcement is in the backend: one dependency per route states the role it needs, and a test lists every `/api`
+  route with its role so a new route cannot ship unguarded. The UI hides what a role cannot do, but never decides.
+- Audit events record the real person and how they signed in (local, OIDC, proxy) instead of the local user. API keys
+  record who created them.
+- UI: a sign-in page; Settings → Accounts for admins (people, role, sign-in source, last sign-in, disable, reset a
+  local password with a one-time link shown once); the user menu shows the person and Sign out.
+- Tables: `users` (email, name, source, subject, role, disabled, password hash for local accounts, last sign-in) and
+  `sessions` (user, token hash, created, last seen, expiry, address, user agent).
+
 ## UI
 
 - obp-ui, operator-console style.
-- Sidebar: Home · Explore (Models, Playground) · Create (Data, Training, Evaluations, Feedback) · Run (Deployments,
-  Pipelines, Batch jobs in v2, Compute, Monitor) · user menu (Settings, Theme, Sign out). Pages that work on one
-  minibrain carry a picker, and the choice lives in the URL (`?minibrain=<slug>`).
-- Settings has two tabs. General: You (appearance; profile once accounts exist) and This install (paths, base models,
-  recipe, splits; admin-only once accounts exist). Security: the policies, locked when set by config, and their recent
-  changes.
+- Sidebar: Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations, Feedback) · Run
+  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, Theme, Sign out). Data,
+  Deployments and Monitor cover every model; Playground, Training, Evaluations and Feedback carry a model picker, and
+  the choice lives in the URL (`?minibrain=<slug>`).
+- Settings has a side menu. General: You (appearance; profile once accounts exist) and This install (paths, base
+  models, recipe, splits; admin-only once accounts exist). Security: the policies, locked when set by config, and their
+  recent changes. Accounts (admin) once accounts exist.
 
 | Need | obp-ui |
 |---|---|
@@ -592,7 +634,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step
 - [x] Playground
 - [ ] Harness config export
-- [ ] Login: local accounts, OIDC, trusted reverse-proxy headers
+- [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
+- [ ] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [ ] FIPS-ready crypto rules enforced in CI
 - [ ] Local install via uv on Linux, macOS, Windows; production Docker image (CUDA)
 - [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
