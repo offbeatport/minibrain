@@ -5,9 +5,8 @@ import { useState } from "react";
 import { useInstallSettings } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
-import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
-import { SettingsTabs } from "~/components/SettingsTabs";
+import { ErrorLine, PanelSection, PanelSections, Stat } from "~/components/Section";
+import { SettingsLayout } from "~/components/SettingsLayout";
 import { count } from "~/lib/format";
 
 type BaseModelInfo = components["schemas"]["BaseModelInfo"];
@@ -88,9 +87,7 @@ function Appearance() {
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     return (
-        <Page>
-            <PageHeader title="Settings" />
-            <SettingsTabs active="/settings" />
+        <SettingsLayout>
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />
@@ -138,6 +135,6 @@ export function SettingsPage() {
                     </div>
                 </PanelSection>
             </PanelSections>
-        </Page>
+        </SettingsLayout>
     );
 }

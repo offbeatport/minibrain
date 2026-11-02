@@ -18,9 +18,8 @@ import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
-import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
-import { SettingsTabs } from "~/components/SettingsTabs";
+import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { SettingsLayout } from "~/components/SettingsLayout";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
@@ -269,12 +268,7 @@ export function SecurityPage() {
     });
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
-        <Page>
-            <PageHeader
-                title="Settings"
-                caption="Values from minibrain.yaml or MINIBRAIN_POLICY_* variables are locked here. Every change is recorded."
-            />
-            <SettingsTabs active="/settings/security" />
+        <SettingsLayout caption="Values from minibrain.yaml or MINIBRAIN_POLICY_* variables are locked here. Every change is recorded.">
             <ErrorLine error={policies.error} />
             <PanelSections>
                 {policies.data &&
@@ -306,6 +300,6 @@ export function SecurityPage() {
                     />
                 </PanelSection>
             </PanelSections>
-        </Page>
+        </SettingsLayout>
     );
 }
