@@ -22,6 +22,9 @@ OUT = Path(__file__).resolve().parent.parent / "minibrain" / "catalog" / "catalo
 
 QWEN3_TOKENS = {"stop_tokens": ["<|im_end|>", "<|endoftext|>"], "template_kwargs": {"enable_thinking": False}}
 CHATML_TOKENS = {"stop_tokens": ["<|im_end|>", "<|endoftext|>"], "template_kwargs": {}}
+GLM_STOPS = ["<|endoftext|>", "<|user|>", "<|observation|>"]
+GLM_TOKENS = {"stop_tokens": GLM_STOPS, "template_kwargs": {}}
+GLM_HYBRID_TOKENS = {"stop_tokens": GLM_STOPS, "template_kwargs": {"enable_thinking": False}}
 
 CANDIDATES: list[dict[str, Any]] = [
     {
@@ -144,6 +147,22 @@ CANDIDATES: list[dict[str, Any]] = [
     {"repo": "HuggingFaceTB/SmolLM2-360M-Instruct", "family": "smollm", "generation": "2"},
     {"repo": "HuggingFaceTB/SmolLM2-1.7B-Instruct", "family": "smollm", "generation": "2"},
     {"repo": "HuggingFaceTB/SmolLM3-3B", "family": "smollm", "generation": "3"},
+    {"repo": "zai-org/GLM-4-9B-0414", "family": "glm", "generation": "4.0414", "tokens": GLM_TOKENS},
+    {"repo": "zai-org/GLM-4-32B-0414", "family": "glm", "generation": "4.0414", "tokens": GLM_TOKENS},
+    {
+        "repo": "zai-org/GLM-4.5-Air",
+        "family": "glm",
+        "generation": "4.5",
+        "tokens": GLM_HYBRID_TOKENS,
+        "extra": ["Reasoning"],
+    },
+    {
+        "repo": "zai-org/GLM-4.6",
+        "family": "glm",
+        "generation": "4.6",
+        "tokens": GLM_HYBRID_TOKENS,
+        "extra": ["Reasoning"],
+    },
 ]
 
 

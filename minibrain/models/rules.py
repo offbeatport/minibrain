@@ -10,6 +10,7 @@ PUBLISHERS = {
     "openai": "OpenAI",
     "allenai": "Allen AI",
     "HuggingFaceTB": "Hugging Face",
+    "zai-org": "Z.ai",
 }
 
 
@@ -88,6 +89,8 @@ SUPPORTED_ARCHITECTURES = {
     "smollm3",
     "deepseek_v3",
     "gpt_oss",
+    "glm4",
+    "glm4_moe",
 }
 
 TESTED_ARCHITECTURES = {"qwen3"}

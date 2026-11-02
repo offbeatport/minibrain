@@ -6,11 +6,16 @@
   minibrain never calls Hugging Face for the catalogue; the optional sync reads only our own catalogue URL
   (`MINIBRAIN_CATALOG_URL`).
 - Rules: approved publishers (Qwen, Google, Meta, Mistral, Microsoft, IBM, NVIDIA, DeepSeek, OpenAI gpt-oss, Allen AI,
-  HuggingFaceTB), instruct or chat variants, reviewed commercial licences, architectures our engines support,
+  HuggingFaceTB, Z.ai GLM), instruct or chat variants, reviewed commercial licences, architectures our engines support,
   safetensors present.
+- GLM: GLM-4-0414 (`glm4`) and GLM-4.5 / 4.6 (`glm4_moe`) run on transformers 5, SGLang, mlx-lm and llama.cpp. GLM-4.5
+  and 4.6 are hybrid reasoning models; minibrain turns thinking off through the chat template. GLM-4.5-Air and 4.6 are
+  XL (mixture of experts, 106B and 355B).
 - Every generation stays; older ones show "Newer version available".
 - Size tiers: S ≤4B, M 7–14B, L 24–35B or a small mixture of experts, XL 70B+ (multi-GPU).
-- Default order: recommended for the selected pool. Filters: size, task, publisher.
+- Default order: recommended for the selected pool; also by popularity, size or name. Filters: hardware fit levels on
+  the selected pool, can fine-tune, latest generation only, download access, support level, publisher, task, size and
+  licence, with presets (Fine-tune here, Small and fast, Tested by us) and removable chips.
 
 ## Add from Hugging Face
 
