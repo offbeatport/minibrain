@@ -2,7 +2,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { Check, ChevronDown, ChevronRight, Info, PackagePlus, Sparkles } from "lucide-react";
 import {
-    Badge,
     Button,
     Dialog,
     DialogContent,
@@ -31,7 +30,6 @@ import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { bytes } from "~/lib/time";
-import { Fit } from "./Discover";
 import { bestFit } from "./DiscoverFilters";
 import { Field, splitTags, useModelsRefresh } from "./dialogs";
 
@@ -110,30 +108,34 @@ const TASKS: { key: string; label: string; hint: string; ready: boolean }[] = [
     { key: "answer", label: "Answer", hint: "Questions over documents", ready: false },
 ];
 
-function TaskPicker({ value, onChange }: { value: string; onChange: (task: string) => void }) {
+const FIT_TEXT: Record<string, string> = {
+    fits: "Fits this machine",
+    limited: "Limited headroom",
+    insufficient: "Won't fit",
+    unknown: "Fit not checked",
+};
+
+function TaskSelect({ value, onChange }: { value: string; onChange: (task: string) => void }) {
     return (
-        <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1.5 text-sm font-medium">Task</legend>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {TASKS.map((task) => (
-                    <RadioCard
-                        key={task.key}
-                        name="task"
-                        value={task.key}
-                        checked={value === task.key}
-                        disabled={!task.ready}
-                        onChange={() => onChange(task.key)}
-                        className="flex-col items-start gap-0.5 px-3 py-2"
-                    >
-                        <span className="flex items-center gap-2 font-semibold">
+        <Field id="create-task" label="Task">
+            <Select value={value} onValueChange={(next) => onChange(String(next ?? "classify"))}>
+                <SelectTrigger id="create-task" className="w-full">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {TASKS.map((task) => (
+                        <SelectItem
+                            key={task.key}
+                            value={task.key}
+                            disabled={!task.ready}
+                            description={task.ready ? task.hint : `${task.hint} · Later`}
+                        >
                             {task.label}
-                            {!task.ready && <Badge variant="outline">Later</Badge>}
-                        </span>
-                        <span className="text-sm text-muted-foreground">{task.hint}</span>
-                    </RadioCard>
-                ))}
-            </div>
-        </fieldset>
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </Field>
     );
 }
 
@@ -163,49 +165,49 @@ function baseChoices(keys: string[], rows: ModelRow[], entries: CatalogEntry[]):
     });
 }
 
-function BasePicker({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+function BaseSelect({ value, onChange }: { value: string; onChange: (key: string) => void }) {
     const bases = useBases();
     const models = useModels();
     const catalog = useCatalog();
     const choices = baseChoices(bases.data ?? [], models.data ?? [], catalog.data?.entries ?? []);
     return (
-        <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1.5 text-sm font-medium">Base model</legend>
-            <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
-                {choices.map((choice) => (
-                    <RadioCard
-                        key={choice.key}
-                        name="base"
-                        value={choice.key}
-                        checked={value === choice.key}
-                        onChange={() => onChange(choice.key)}
-                        className="items-center gap-3 py-2 pr-9 pl-3"
-                    >
-                        <PublisherLogo publisher={choice.publisher} name={choice.name} />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate font-semibold">{choice.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                                {[
-                                    choice.size ? bytes(choice.size) : null,
-                                    choice.onDisk
-                                        ? "On this install"
-                                        : "Downloads on first training",
-                                ]
-                                    .filter(Boolean)
-                                    .join(" · ")}
-                            </span>
-                        </span>
-                        {choice.entry && <Fit fit={bestFit(choice.entry).fit} />}
-                    </RadioCard>
-                ))}
-            </div>
+        <Field id="create-base" label="Base model">
+            <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
+                <SelectTrigger id="create-base" className="w-full">
+                    <SelectValue placeholder="Choose a base model" />
+                </SelectTrigger>
+                <SelectContent>
+                    {choices.map((choice) => (
+                        <SelectItem
+                            key={choice.key}
+                            value={choice.key}
+                            icon={
+                                <PublisherLogo
+                                    publisher={choice.publisher}
+                                    name={choice.name}
+                                    size="sm"
+                                />
+                            }
+                            description={[
+                                choice.size ? bytes(choice.size) : null,
+                                choice.onDisk ? "On this install" : "Downloads on first training",
+                                choice.entry ? FIT_TEXT[bestFit(choice.entry).fit.level] : null,
+                            ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                        >
+                            {choice.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
             <span className="text-sm text-muted-foreground">
                 Need another base?{" "}
                 <Link href="/discover?train=yes" className="text-primary hover:underline">
                     Find models that can be fine-tuned
                 </Link>
             </span>
-        </fieldset>
+        </Field>
     );
 }
 
@@ -393,7 +395,6 @@ function CustomForm({ base, onClose }: { base?: string; onClose: () => void }) {
     };
     return (
         <form onSubmit={submit} className="flex flex-col gap-5">
-            <TaskPicker value={task} onChange={setTask} />
             <Field id="create-name" label="Name">
                 <Input
                     id="create-name"
@@ -403,7 +404,10 @@ function CustomForm({ base, onClose }: { base?: string; onClose: () => void }) {
                     autoFocus
                 />
             </Field>
-            <BasePicker value={baseKey} onChange={setChosen} />
+            <div className="grid gap-4 sm:grid-cols-2">
+                <TaskSelect value={task} onChange={setTask} />
+                <BaseSelect value={baseKey} onChange={setChosen} />
+            </div>
             <DataPicker
                 choice={data}
                 onChoice={setData}
