@@ -28,14 +28,7 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import {
-    type CatalogEntry,
-    type CatalogResponse,
-    type CatalogVariantInfo,
-    type FitInfo,
-    api,
-    unwrap,
-} from "~/api/client";
+import { type CatalogEntry, type CatalogResponse, type FitInfo, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
@@ -43,7 +36,17 @@ import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, relativeTime } from "~/lib/time";
-import { CLEARED, FilterPanel, activeFilters, matches, readFilters } from "./DiscoverFilters";
+import {
+    CLEARED,
+    FIT_ORDER,
+    FilterChips,
+    FilterPanel,
+    SUPPORT_LABEL,
+    activeFilters,
+    bestFit,
+    matches,
+    readFilters,
+} from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
 
 const RESERVE_BYTES = 1024 ** 3;
@@ -59,14 +62,6 @@ const FIT_TONES: Record<FitInfo["level"], Tone> = {
     insufficient: "destructive",
     unknown: "neutral",
 };
-const FIT_ORDER: FitInfo["level"][] = ["fits", "limited", "unknown", "insufficient"];
-
-function bestFit(entry: CatalogEntry): CatalogVariantInfo {
-    return [...entry.variants].sort(
-        (a, b) => FIT_ORDER.indexOf(a.fit.level) - FIT_ORDER.indexOf(b.fit.level),
-    )[0];
-}
-
 function fitLabel(fit: FitInfo): string {
     const enoughMemory = fit.available_bytes !== null && fit.needed_bytes <= fit.available_bytes;
     return fit.level === "insufficient" && enoughMemory
@@ -455,12 +450,6 @@ function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
     );
 }
 
-const SUPPORT_LABEL: Record<string, string> = {
-    tested: "Tested by us",
-    supported: "Supported architecture",
-    untested: "Untested",
-};
-
 function recommendedOrder(entry: CatalogEntry): number[] {
     const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
     const support = ["tested", "supported", "untested"].indexOf(entry.support);
@@ -478,6 +467,38 @@ function byRecommended(left: CatalogEntry, right: CatalogEntry): number {
     const b = recommendedOrder(right);
     const index = a.findIndex((value, position) => value !== b[position]);
     return index < 0 ? 0 : a[index] - b[index];
+}
+
+function smallest(entry: CatalogEntry): number {
+    return Math.min(...entry.variants.map((variant) => variant.size_bytes ?? Number.MAX_VALUE));
+}
+
+const SORTS: Record<
+    string,
+    { label: string; compare: (a: CatalogEntry, b: CatalogEntry) => number }
+> = {
+    recommended: { label: "Recommended", compare: byRecommended },
+    popular: { label: "Most popular", compare: (a, b) => b.popularity - a.popularity },
+    small: { label: "Smallest first", compare: (a, b) => smallest(a) - smallest(b) },
+    large: { label: "Largest first", compare: (a, b) => smallest(b) - smallest(a) },
+    name: { label: "Name", compare: (a, b) => a.name.localeCompare(b.name) },
+};
+
+function SortSelect({ value, onSort }: { value: string; onSort: (value: string) => void }) {
+    return (
+        <Select value={value} onValueChange={(next) => onSort(String(next))}>
+            <SelectTrigger aria-label="Sort models" size="sm" className="w-auto min-w-40">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {Object.entries(SORTS).map(([key, sort]) => (
+                    <SelectItem key={key} value={key}>
+                        {`Sort: ${sort.label}`}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
 }
 
 function AddFromHubDialog({
@@ -632,7 +653,7 @@ function PoolSelect({
     }
     return (
         <Select value={catalog.pool} onValueChange={(next) => onPool(String(next))}>
-            <SelectTrigger aria-label="Compute pool" size="sm" className="w-auto min-w-36">
+            <SelectTrigger aria-label="Compute pool" size="sm" className="w-full">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -653,11 +674,9 @@ function poolPhrase(catalog: CatalogResponse): string {
 function MachineBar({
     catalog,
     onRequirements,
-    onPool,
 }: {
     catalog: CatalogResponse;
     onRequirements: () => void;
-    onPool: (pool: string) => void;
 }) {
     const refresh = useModelsRefresh();
     const { hardware } = catalog;
@@ -678,7 +697,12 @@ function MachineBar({
     return (
         <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-2 text-sm">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <PoolSelect catalog={catalog} onPool={onPool} />
+                {catalog.pools.length > 1 && (
+                    <span className="text-muted-foreground">
+                        {catalog.pools.find((pool) => pool.name === catalog.pool)?.label ??
+                            catalog.pool}
+                    </span>
+                )}
                 <span className="font-semibold">{hardware.machine}</span>
                 <span className="text-muted-foreground">{hardware.accelerator}</span>
                 {hardware.known ? (
@@ -775,20 +799,23 @@ export function Discover({
     }
     const filters = readFilters(search, data.hardware.known);
     const needsAccess = filters.access.includes("needs-access");
+    const sort = SORTS[search.sort ?? ""] ? (search.sort ?? "recommended") : "recommended";
     const visible = data.entries.filter((entry) => matches(entry, filters));
-    visible.sort(byRecommended);
+    visible.sort(SORTS[sort].compare);
     const active = activeFilters(filters);
     const panel = (
         <FilterPanel
             entries={data.entries}
             filters={filters}
+            search={search}
             update={update}
             fitsKnown={data.hardware.known}
-            fitsLabel={poolPhrase(data)}
-            fitsHint={
-                data.hardware.known
-                    ? `Estimated from the weights' size against the memory of ${poolPhrase(data)}.`
-                    : `Compatibility not checked: the memory of ${poolPhrase(data)} is unknown.`
+            fitsHint={`Not checked: the memory of ${poolPhrase(data)} is unknown.`}
+            pool={
+                <PoolSelect
+                    catalog={data}
+                    onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
+                />
             }
         />
     );
@@ -804,11 +831,7 @@ export function Discover({
     );
     return (
         <div className="flex flex-col gap-3">
-            <MachineBar
-                catalog={data}
-                onRequirements={() => setRequirements({ entry: null })}
-                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
-            />
+            <MachineBar catalog={data} onRequirements={() => setRequirements({ entry: null })} />
             {data.online === false && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 px-3 py-2 text-sm">
                     <StatusText tone="warning">
@@ -846,6 +869,10 @@ export function Discover({
                         >
                             {active > 0 ? `Filters (${active})` : "Filters"}
                         </Button>
+                        <SortSelect
+                            value={sort}
+                            onSort={(next) => update({ sort: next === "recommended" ? "" : next })}
+                        />
                         <span className="text-sm text-muted-foreground tabular-nums">
                             {`${visible.length} of ${data.entries.length} models`}
                         </span>
@@ -861,6 +888,7 @@ export function Discover({
                             </Button>
                         )}
                     </div>
+                    <FilterChips filters={filters} update={update} />
                     {needsAccess && (
                         <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
                             <p className="text-sm font-semibold">

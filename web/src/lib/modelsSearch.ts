@@ -16,6 +16,12 @@ const KEYS = [
     "access",
     "tier",
     "pool",
+    "fit",
+    "support",
+    "licence",
+    "train",
+    "latest",
+    "sort",
 ] as const;
 
 export type ModelsSearchKey = (typeof KEYS)[number];
@@ -25,7 +31,21 @@ export type ModelsPath = "/models" | "/discover";
 
 const PAGE_KEYS: Record<ModelsPath, readonly ModelsSearchKey[]> = {
     "/models": ["q", "type", "state", "tag", "archived"],
-    "/discover": ["q", "task", "provider", "fits", "access", "tier", "pool"],
+    "/discover": [
+        "q",
+        "task",
+        "provider",
+        "fits",
+        "fit",
+        "access",
+        "tier",
+        "pool",
+        "support",
+        "licence",
+        "train",
+        "latest",
+        "sort",
+    ],
 };
 
 function storageKey(path: ModelsPath): string {
