@@ -44,9 +44,15 @@ def deploy(harness: Harness, number: int = 0) -> None:
     assert response.status_code == 200, response.text
 
 
-def bearer(harness: Harness) -> dict[str, str]:
-    secret = harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "ci"}).json()["secret"]
-    return {"Authorization": f"Bearer {secret}"}
+def add_key(harness: Harness, *models: tuple[str, str], name: str = "ci") -> dict[str, Any]:
+    body = {"name": name, "models": [{"kind": kind, "key": key} for kind, key in models or [("custom", SLUG)]]}
+    response = harness.client.post("/api/keys", json=body)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def bearer(harness: Harness, *models: tuple[str, str]) -> dict[str, str]:
+    return {"Authorization": f"Bearer {add_key(harness, *models)['secret']}"}
 
 
 def test_upload_guesses_mapping_and_previews(harness: Harness) -> None:

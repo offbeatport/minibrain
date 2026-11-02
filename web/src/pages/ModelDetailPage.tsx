@@ -1,19 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
-import { Badge, Button, Input, Link } from "obp-ui";
+import { Badge, Button, Link } from "obp-ui";
 import { type ReactNode, useState } from "react";
-import {
-    type BaseModelDetail,
-    type KeyCreated,
-    type ModelRow,
-    type VersionInfo,
-    api,
-    succeed,
-    unwrap,
-} from "~/api/client";
+import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
+import { ApiKeys } from "~/components/ApiKeys";
 import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
@@ -94,93 +87,28 @@ function useJob(jobId: number | null | undefined) {
     });
 }
 
-function ApiKeys({ model }: { model: BaseModelDetail }) {
-    const queryClient = useQueryClient();
-    const path = { params: { path: { key: model.key } } };
-    const list = useQuery({
-        queryKey: ["models", "base", model.key, "keys"],
-        queryFn: () => unwrap(api.GET("/api/models/base/{key}/keys", path)),
-    });
-    const [name, setName] = useState("");
-    const [created, setCreated] = useState<KeyCreated | null>(null);
-    const refresh = () =>
-        queryClient.invalidateQueries({ queryKey: ["models", "base", model.key, "keys"] });
-    const create = useMutation({
-        mutationFn: () =>
-            unwrap(api.POST("/api/models/base/{key}/keys", { ...path, body: { name } })),
-        onSuccess: (key) => {
-            setCreated(key);
-            setName("");
-            return refresh();
-        },
-    });
-    const remove = useMutation({
-        mutationFn: (id: number) =>
-            succeed(
-                api.DELETE("/api/models/base/{key}/keys/{key_id}", {
-                    params: { path: { key: model.key, key_id: id } },
-                }),
-            ),
-        onSuccess: refresh,
-    });
+function ApiSection({ model }: { model: BaseModelDetail }) {
     const origin = window.location.origin;
     return (
-        <PanelSection
-            icon={Plug}
-            title="API"
-            description={
-                model.deployed
-                    ? `Call it as ${model.key} on the OpenAI-compatible endpoint.`
-                    : "Deploy it to call it from the API; keys can be created now."
-            }
-        >
-            <div id="api" className="flex flex-col gap-3">
-                <pre className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm">
+        <>
+            <PanelSection
+                icon={Plug}
+                title="API"
+                description={
+                    model.deployed
+                        ? `Call it as ${model.key} on the OpenAI-compatible endpoint.`
+                        : "Deploy it to call it from the API; keys can be created now."
+                }
+            >
+                <pre
+                    id="api"
+                    className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm"
+                >
                     {`curl ${origin}/v1/chat/completions \\\n  -H "Authorization: Bearer $MINIBRAIN_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "${model.key}", "messages": [{"role": "user", "content": "Hello"}]}'`}
                 </pre>
-                {created && (
-                    <p className="text-sm">
-                        New key, shown once:{" "}
-                        <span className="break-all font-mono">{created.secret}</span>
-                    </p>
-                )}
-                <div className="flex flex-col gap-1">
-                    {(list.data ?? []).map((key) => (
-                        <div key={key.id} className="flex items-center gap-3 text-sm">
-                            <span className="font-mono">{key.prefix}…</span>
-                            <span>{key.name}</span>
-                            <span className="text-muted-foreground">
-                                {key.last_used_at
-                                    ? `last used ${exactTime(key.last_used_at)}`
-                                    : "never used"}
-                            </span>
-                            <Button variant="ghost" size="xs" onClick={() => remove.mutate(key.id)}>
-                                Revoke
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-                <form
-                    className="flex items-center gap-2"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        create.mutate();
-                    }}
-                >
-                    <Input
-                        aria-label="Key name"
-                        placeholder="Key name"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        className="h-8 w-56"
-                    />
-                    <Button type="submit" variant="outline" disabled={create.isPending}>
-                        Create key
-                    </Button>
-                </form>
-                <ErrorLine error={create.error ?? remove.error} />
-            </div>
-        </PanelSection>
+            </PanelSection>
+            <ApiKeys scope={{ kind: "base", key: model.key }} />
+        </>
     );
 }
 
@@ -346,7 +274,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 >
                     <DataTable columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
                 </PanelSection>
-                <ApiKeys model={model} />
+                <ApiSection model={model} />
             </PanelSections>
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />

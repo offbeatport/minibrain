@@ -143,7 +143,7 @@ def stream_events(identifier: str, model: str, completion: Completion) -> Iterat
 
 @router.get("/models")
 def list_models(grant: GrantDep, config: ConfigDep) -> dict:
-    names = config.models.get(grant.owner, [])
+    names = [name for owner in grant.owners for name in config.models.get(owner, [])]
     data = [{"id": name, "object": "model", "created": 0, "owned_by": "minibrain"} for name in names]
     return {"object": "list", "data": data}
 
@@ -158,8 +158,10 @@ def chat_completions(
     status = 200
     completion: Completion | None = None
     try:
-        if route is None or route.owner != grant.owner:
+        if route is None:
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
+        if not grant.covers(route):
+            raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
         max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
         completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens)
     except HTTPException as error:
@@ -170,7 +172,7 @@ def chat_completions(
             LogEntry(
                 at=now(),
                 key_id=grant.key_id,
-                minibrain_id=grant.minibrain_id,
+                minibrain_id=route.minibrain_id if route else None,
                 model=body.model,
                 version=route.version if route else None,
                 status=status,

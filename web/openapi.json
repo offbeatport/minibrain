@@ -1481,146 +1481,6 @@
         }
       }
     },
-    "/api/models/base/{key}/keys": {
-      "get": {
-        "tags": [
-          "models"
-        ],
-        "summary": "List Base Keys",
-        "operationId": "list_base_keys_api_models_base__key__keys_get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/KeyInfo"
-                  },
-                  "title": "Response List Base Keys Api Models Base  Key  Keys Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Add Base Key",
-        "operationId": "add_base_key_api_models_base__key__keys_post",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/KeyCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/KeyCreated"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/models/base/{key}/keys/{key_id}": {
-      "delete": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Delete Base Key",
-        "operationId": "delete_base_key_api_models_base__key__keys__key_id__delete",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "key_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Key Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/catalog": {
       "get": {
         "tags": [
@@ -2275,45 +2135,24 @@
         }
       }
     },
-    "/api/minibrains/{slug}/keys": {
+    "/api/keys": {
       "get": {
         "tags": [
-          "versions"
+          "keys"
         ],
         "summary": "List Keys",
-        "operationId": "list_keys_api_minibrains__slug__keys_get",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
+        "operationId": "list_keys_api_keys_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/KeyInfo"
                   },
-                  "title": "Response List Keys Api Minibrains  Slug  Keys Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "array",
+                  "title": "Response List Keys Api Keys Get"
                 }
               }
             }
@@ -2322,30 +2161,19 @@
       },
       "post": {
         "tags": [
-          "versions"
+          "keys"
         ],
         "summary": "Add Key",
-        "operationId": "add_key_api_minibrains__slug__keys_post",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
+        "operationId": "add_key_api_keys_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/KeyCreate"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {
@@ -2371,23 +2199,66 @@
         }
       }
     },
-    "/api/minibrains/{slug}/keys/{key_id}": {
-      "delete": {
+    "/api/keys/{key_id}/models": {
+      "put": {
         "tags": [
-          "versions"
+          "keys"
         ],
-        "summary": "Delete Key",
-        "operationId": "delete_key_api_minibrains__slug__keys__key_id__delete",
+        "summary": "Update Models",
+        "operationId": "update_models_api_keys__key_id__models_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "key_id",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "title": "Slug"
+              "type": "integer",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyScopeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyInfo"
+                }
+              }
             }
           },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{key_id}": {
+      "delete": {
+        "tags": [
+          "keys"
+        ],
+        "summary": "Revoke",
+        "operationId": "revoke_api_keys__key_id__delete",
+        "parameters": [
           {
             "name": "key_id",
             "in": "path",
@@ -5957,9 +5828,20 @@
             "maxLength": 60,
             "title": "Name",
             "default": "default"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRef"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Models"
           }
         },
         "type": "object",
+        "required": [
+          "models"
+        ],
         "title": "KeyCreate"
       },
       "KeyCreated": {
@@ -5993,6 +5875,25 @@
             ],
             "title": "Last Used At"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/KeyModel"
+            },
+            "type": "array",
+            "title": "Models"
+          },
           "secret": {
             "type": "string",
             "title": "Secret"
@@ -6005,6 +5906,8 @@
           "prefix",
           "created_at",
           "last_used_at",
+          "expires_at",
+          "models",
           "secret"
         ],
         "title": "KeyCreated"
@@ -6039,6 +5942,25 @@
               }
             ],
             "title": "Last Used At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/KeyModel"
+            },
+            "type": "array",
+            "title": "Models"
           }
         },
         "type": "object",
@@ -6047,9 +5969,55 @@
           "name",
           "prefix",
           "created_at",
-          "last_used_at"
+          "last_used_at",
+          "expires_at",
+          "models"
         ],
         "title": "KeyInfo"
+      },
+      "KeyModel": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "base"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name"
+        ],
+        "title": "KeyModel"
+      },
+      "KeyScopeUpdate": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRef"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "KeyScopeUpdate"
       },
       "LoadedModel": {
         "properties": {
@@ -6562,6 +6530,28 @@
           "sha256"
         ],
         "title": "ModelFile"
+      },
+      "ModelRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "base"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "ModelRef"
       },
       "ModelRow": {
         "properties": {

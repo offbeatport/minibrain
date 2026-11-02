@@ -13,7 +13,7 @@ log with who, before and after.
 | Licences | Only selected licences (default; a list of reviewed commercial licences) or any licence, including unreviewed ones | Download, retry, Add from Hugging Face |
 | Safetensors only | Always on | Download file filter; pickle weights are never loaded |
 | Request logs | On or off, retention in days | Gateway config; hourly purge on the leader |
-| API keys | Expiry in days for new keys | Gateway rejects expired keys with 401 |
+| API keys | Expiry in days for new keys | Gateway rejects expired keys with 401, and models the key does not cover with 403 |
 
 ## Trust zones and ports
 

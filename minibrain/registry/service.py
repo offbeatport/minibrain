@@ -1,14 +1,16 @@
 import hashlib
 import re
 import secrets
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from minibrain.registry.models import (
     ApiKey,
+    KeyScope,
     Minibrain,
     Snapshot,
     Version,
@@ -111,24 +113,50 @@ def key_digest(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def scopes_of(minibrains: Sequence[Minibrain] = (), model_ids: Sequence[str] = ()) -> list[KeyScope]:
+    return [KeyScope(minibrain=minibrain) for minibrain in minibrains] + [
+        KeyScope(model_id=model_id) for model_id in dict.fromkeys(model_ids)
+    ]
+
+
 def create_key(
-    session: Session, name: str, minibrain: Minibrain | None = None, model_id: str | None = None
+    session: Session, name: str, minibrains: Sequence[Minibrain] = (), model_ids: Sequence[str] = ()
 ) -> tuple[ApiKey, str]:
     from minibrain.policy import load
 
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
     days = int(load(session)["key_expiry_days"])
     key = ApiKey(
-        minibrain=minibrain,
-        model_id=model_id,
         name=name.strip() or "default",
         prefix=raw[:10],
         digest=key_digest(raw),
         expires_at=now() + timedelta(days=days) if days else None,
+        scopes=scopes_of(minibrains, model_ids),
     )
     session.add(key)
     session.commit()
     return key, raw
+
+
+def set_scopes(
+    session: Session, key: ApiKey, minibrains: Sequence[Minibrain] = (), model_ids: Sequence[str] = ()
+) -> None:
+    key.scopes.clear()
+    session.flush()
+    key.scopes.extend(scopes_of(minibrains, model_ids))
+    session.commit()
+
+
+def covers(key: ApiKey, minibrain: Minibrain | None = None, model_id: str | None = None) -> bool:
+    if minibrain is not None:
+        return any(scope.minibrain_id == minibrain.id for scope in key.scopes)
+    return any(scope.model_id == model_id for scope in key.scopes)
+
+
+def drop_orphan_keys(session: Session) -> None:
+    session.flush()
+    session.execute(delete(ApiKey).where(~ApiKey.scopes.any()), execution_options={"synchronize_session": False})
+    session.expire_all()
 
 
 def find_key(session: Session, raw: str) -> ApiKey | None:

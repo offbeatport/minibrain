@@ -45,16 +45,19 @@ class Route:
 @dataclass(frozen=True)
 class Grant:
     key_id: int
-    minibrain_id: int | None
-    model_id: str | None
+    owners: tuple[str, ...]
     expires_at: str | None = None
 
     def expired(self, moment: datetime) -> bool:
         return self.expires_at is not None and datetime.fromisoformat(self.expires_at) <= moment
 
-    @property
-    def owner(self) -> str:
-        return owner_of(self.minibrain_id, self.model_id)
+    def covers(self, route: "Route") -> bool:
+        return route.owner in self.owners
+
+    @staticmethod
+    def from_dict(data: dict[str, Any]) -> "Grant":
+        owners = data.get("owners") or [owner_of(data.get("minibrain_id"), data.get("model_id"))]
+        return Grant(key_id=data["key_id"], owners=tuple(owners), expires_at=data.get("expires_at"))
 
 
 def owner_of(minibrain_id: int | None, model_id: str | None) -> str:
@@ -80,7 +83,7 @@ class GatewayConfig:
         return GatewayConfig(
             version=data["version"],
             routes={name: Route(**route) for name, route in data["routes"].items()},
-            keys={digest: Grant(**grant) for digest, grant in data["keys"].items()},
+            keys={digest: Grant.from_dict(grant) for digest, grant in data["keys"].items()},
             models=dict(data["models"]),
             engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
@@ -178,8 +181,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     keys = {
         key.digest: Grant(
             key_id=key.id,
-            minibrain_id=key.minibrain_id,
-            model_id=key.model_id,
+            owners=tuple(owner_of(scope.minibrain_id, scope.model_id) for scope in key.scopes),
             expires_at=key.expires_at.isoformat() if key.expires_at else None,
         )
         for key in session.scalars(select(ApiKey))

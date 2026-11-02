@@ -1,12 +1,13 @@
 import logging
 import threading
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.registry.models import ApiKey, RequestLog
+from minibrain.registry.models import ApiKey, Minibrain, RequestLog
 
 FLUSH_SECONDS = 2.0
 MAX_BUFFERED = 10_000
@@ -70,16 +71,29 @@ class LogBuffer:
         self.flush()
 
 
+def existing(session: Session, batch: list[LogEntry]) -> Callable[[LogEntry], LogEntry]:
+    def keep(entry: LogEntry) -> LogEntry:
+        key_id = entry.key_id if entry.key_id in keys else None
+        minibrain_id = entry.minibrain_id if entry.minibrain_id in minibrains else None
+        return replace(entry, key_id=key_id, minibrain_id=minibrain_id)
+
+    keys = set(session.scalars(select(ApiKey.id).where(ApiKey.id.in_({e.key_id for e in batch if e.key_id}))))
+    wanted = {entry.minibrain_id for entry in batch if entry.minibrain_id}
+    minibrains = set(session.scalars(select(Minibrain.id).where(Minibrain.id.in_(wanted))))
+    return keep
+
+
 def database_sink(sessions: sessionmaker[Session]) -> Sink:
     def write(batch: list[LogEntry]) -> None:
         with sessions() as session:
+            entries = list(map(existing(session, batch), batch))
             session.add_all(
                 RequestLog(**{key: value for key, value in asdict(entry).items() if key != "recorded"})
-                for entry in batch
+                for entry in entries
                 if entry.recorded
             )
             last_used: dict[int, datetime] = {}
-            for entry in batch:
+            for entry in entries:
                 if entry.key_id is not None and entry.status < 400:
                     last_used[entry.key_id] = max(entry.at, last_used.get(entry.key_id, entry.at))
             for key_id, at in last_used.items():

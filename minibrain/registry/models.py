@@ -124,7 +124,7 @@ class Minibrain(Base):
     snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
-    keys: Mapped[list["ApiKey"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
+    key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
 
 
 class Snapshot(Base):
@@ -255,8 +255,6 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
-    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
     name: Mapped[str]
     prefix: Mapped[str]
     digest: Mapped[str] = mapped_column(unique=True)
@@ -264,7 +262,22 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
-    minibrain: Mapped[Minibrain | None] = relationship(back_populates="keys")
+    scopes: Mapped[list["KeyScope"]] = relationship(
+        back_populates="key", cascade="all, delete-orphan", order_by="KeyScope.id"
+    )
+
+
+class KeyScope(Base):
+    __tablename__ = "api_key_scopes"
+    __table_args__ = (UniqueConstraint("key_id", "minibrain_id", "model_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"))
+    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
+
+    key: Mapped[ApiKey] = relationship(back_populates="scopes")
+    minibrain: Mapped[Minibrain | None] = relationship(back_populates="key_scopes")
 
 
 class RequestLog(Base):

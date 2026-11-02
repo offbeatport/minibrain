@@ -12,7 +12,7 @@ export const keys = {
     golden: (slug: string) => ["minibrain", slug, "golden"] as const,
     versions: (slug: string) => ["minibrain", slug, "versions"] as const,
     jobs: (slug: string) => ["minibrain", slug, "jobs"] as const,
-    keys: (slug: string) => ["minibrain", slug, "keys"] as const,
+    apiKeys: ["keys"] as const,
     models: ["models"] as const,
     catalog: ["catalog"] as const,
     baseModel: (key: string) => ["models", "base", key] as const,
@@ -117,11 +117,8 @@ export function useJobs(slug: string) {
     });
 }
 
-export function useKeys(slug: string) {
-    return useQuery({
-        queryKey: keys.keys(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/keys", path(slug))),
-    });
+export function useKeys() {
+    return useQuery({ queryKey: keys.apiKeys, queryFn: () => unwrap(api.GET("/api/keys")) });
 }
 
 export function useRecentJobs(limit = 15) {

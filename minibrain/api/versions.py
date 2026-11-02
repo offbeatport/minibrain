@@ -5,22 +5,17 @@ from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
-    KeyCreate,
-    KeyCreated,
-    KeyInfo,
     MinibrainDetail,
     VersionCreate,
     VersionInfo,
 )
-from minibrain.api.views import detail, key_info, version_info
+from minibrain.api.views import detail, version_info
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, AuditEvent, JobKind, VersionKind
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, VersionKind
 from minibrain.registry.service import (
     ConflictError,
-    NotFoundError,
-    create_key,
     create_version,
     get_minibrain,
     get_version,
@@ -103,24 +98,3 @@ def complete(
         prompt_tokens=completion.prompt_tokens,
         completion_tokens=completion.completion_tokens,
     )
-
-
-@router.get("/minibrains/{slug}/keys")
-def list_keys(slug: str, session: SessionDep) -> list[KeyInfo]:
-    return [key_info(key) for key in get_minibrain(session, slug).keys]
-
-
-@router.post("/minibrains/{slug}/keys", status_code=201)
-def add_key(slug: str, body: KeyCreate, session: SessionDep) -> KeyCreated:
-    key, secret = create_key(session, body.name, minibrain=get_minibrain(session, slug))
-    return KeyCreated(secret=secret, **key_info(key).model_dump())
-
-
-@router.delete("/minibrains/{slug}/keys/{key_id}", status_code=204)
-def delete_key(slug: str, key_id: int, session: SessionDep) -> None:
-    minibrain = get_minibrain(session, slug)
-    key = session.get(ApiKey, key_id)
-    if key is None or key.minibrain_id != minibrain.id:
-        raise NotFoundError(f"key {key_id} not found")
-    session.delete(key)
-    session.commit()

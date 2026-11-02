@@ -361,8 +361,7 @@ def test_base_models_deploy_through_the_gateway(harness: Harness, tmp_path: Path
     )
     harness.worker(kinds=["import"]).run_once()
     assert harness.client.post("/api/models/base/base-one/deploy", json={"deployed": True}).status_code == 200
-    secret = harness.client.post("/api/models/base/base-one/keys", json={"name": "ci"}).json()["secret"]
-    headers = {"Authorization": f"Bearer {secret}"}
+    headers = bearer(harness, ("base", "base-one"))
     models = harness.client.get("/v1/models", headers=headers).json()
     assert [model["id"] for model in models["data"]] == ["base-one"]
     chat = {
@@ -375,7 +374,7 @@ def test_base_models_deploy_through_the_gateway(harness: Harness, tmp_path: Path
     assert sent.messages == chat["messages"] and sent.base.key == "base-one" and sent.base.path
     create_with_dataset(harness)
     other = bearer(harness)
-    assert harness.client.post("/v1/chat/completions", headers=other, json=chat).status_code == 404
+    assert harness.client.post("/v1/chat/completions", headers=other, json=chat).status_code == 403
     tested = harness.client.post("/api/models/base/base-one/test", json={"text": "Hello"}).json()
     assert tested["output"] == "billing"
     assert rows(harness)["base-one"]["deployment"]["label"] == "Running"

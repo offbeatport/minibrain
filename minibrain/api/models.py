@@ -13,30 +13,26 @@ from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
     ImportRequest,
-    KeyCreate,
-    KeyCreated,
-    KeyInfo,
     ModelFile,
     ModelRow,
     ModelUpdate,
     TestRequest,
     TestResponse,
 )
-from minibrain.api.views import key_info
 from minibrain.models.registry import model_dir, resolve_spec, retry, start_import
 from minibrain.models.sources import configured
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
-    ApiKey,
     AuditEvent,
     CatalogModel,
     Job,
+    KeyScope,
     Minibrain,
     Model,
     ModelStatus,
     now,
 )
-from minibrain.registry.service import ConflictError, NotFoundError, create_key
+from minibrain.registry.service import ConflictError, NotFoundError, drop_orphan_keys
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 
@@ -141,7 +137,8 @@ def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
     if users:
         verb = "is" if len(users) == 1 else "are"
         raise ConflictError(f"{', '.join(users)} {verb} trained on {model.name}; delete them first")
-    session.query(ApiKey).filter(ApiKey.model_id == model.id).delete()
+    session.query(KeyScope).filter(KeyScope.model_id == model.id).delete()
+    drop_orphan_keys(session)
     session.add(
         AuditEvent(
             actor=LOCAL_USER,
@@ -197,25 +194,3 @@ def test_base(
         prompt_tokens=completion.prompt_tokens,
         completion_tokens=completion.completion_tokens,
     )
-
-
-@router.get("/base/{key}/keys")
-def list_base_keys(key: str, session: SessionDep) -> list[KeyInfo]:
-    model = get_model(session, key)
-    return [key_info(item) for item in session.query(ApiKey).filter(ApiKey.model_id == model.id)]
-
-
-@router.post("/base/{key}/keys", status_code=201)
-def add_base_key(key: str, body: KeyCreate, session: SessionDep) -> KeyCreated:
-    created, secret = create_key(session, body.name, model_id=get_model(session, key).id)
-    return KeyCreated(secret=secret, **key_info(created).model_dump())
-
-
-@router.delete("/base/{key}/keys/{key_id}", status_code=204)
-def delete_base_key(key: str, key_id: int, session: SessionDep) -> None:
-    model = get_model(session, key)
-    found = session.get(ApiKey, key_id)
-    if found is None or found.model_id != model.id:
-        raise NotFoundError(f"key {key_id} not found")
-    session.delete(found)
-    session.commit()

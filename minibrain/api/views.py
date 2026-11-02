@@ -1,9 +1,12 @@
+from sqlalchemy.orm import Session
+
 from minibrain.api.schemas import (
     AttemptInfo,
     ColumnInfo,
     JobDetail,
     JobInfo,
     KeyInfo,
+    KeyModel,
     MappingInfo,
     MinibrainDetail,
     MinibrainSummary,
@@ -23,6 +26,7 @@ from minibrain.registry.models import (
     Job,
     JobAttempt,
     Minibrain,
+    Model,
     Snapshot,
     Version,
 )
@@ -177,7 +181,24 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
     )
 
 
-def key_info(key: ApiKey) -> KeyInfo:
+def key_models(session: Session, key: ApiKey) -> list[KeyModel]:
+    found: list[KeyModel] = []
+    for scope in key.scopes:
+        if scope.minibrain is not None:
+            found.append(KeyModel(kind="custom", key=scope.minibrain.slug, name=scope.minibrain.name))
+        elif scope.model_id is not None:
+            model = session.get(Model, scope.model_id)
+            found.append(KeyModel(kind="base", key=scope.model_id, name=model.name if model else scope.model_id))
+    return found
+
+
+def key_info(session: Session, key: ApiKey) -> KeyInfo:
     return KeyInfo(
-        id=key.id, name=key.name, prefix=key.prefix, created_at=key.created_at, last_used_at=key.last_used_at
+        id=key.id,
+        name=key.name,
+        prefix=key.prefix,
+        created_at=key.created_at,
+        last_used_at=key.last_used_at,
+        expires_at=key.expires_at,
+        models=key_models(session, key),
     )

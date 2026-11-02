@@ -1,28 +1,27 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, History } from "lucide-react";
-import { Badge, Button, Input, Label, Link } from "obp-ui";
-import { type FormEvent, useState } from "react";
+import { ChevronLeft, History, Plug, Terminal } from "lucide-react";
+import { Badge, Button, Link } from "obp-ui";
+import { useState } from "react";
 import {
     type KeyCreated,
-    type KeyInfo,
     type MinibrainDetail,
     type ModelRow,
     type ModelVersionRow,
     api,
-    succeed,
     unwrap,
 } from "~/api/client";
-import { keys, useKeys, useMinibrain, useModels } from "~/api/queries";
+import { useMinibrain, useModels } from "~/api/queries";
+import { ApiKeys } from "~/components/ApiKeys";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Page, PanelSection, PanelSections, Section } from "~/components/Section";
+import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { StatusText } from "~/components/models/StatusText";
-import { count, dateTime, percent } from "~/lib/format";
+import { count, percent } from "~/lib/format";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
 function Code({ children }: { children: string }) {
@@ -51,91 +50,6 @@ function snippets(baseUrl: string, model: string, secret: string) {
         "print(reply.choices[0].message.content)",
     ].join("\n");
     return { curl, python };
-}
-
-function KeysSection({ slug, onCreated }: { slug: string; onCreated: (key: KeyCreated) => void }) {
-    const queryClient = useQueryClient();
-    const { data } = useKeys(slug);
-    const [name, setName] = useState("");
-    const refresh = () => queryClient.invalidateQueries({ queryKey: keys.keys(slug) });
-    const create = useMutation({
-        mutationFn: (value: string) =>
-            unwrap(
-                api.POST("/api/minibrains/{slug}/keys", {
-                    params: { path: { slug } },
-                    body: { name: value },
-                }),
-            ),
-        onSuccess: (key) => {
-            onCreated(key);
-            setName("");
-            return refresh();
-        },
-    });
-    const remove = useMutation({
-        mutationFn: (keyId: number) =>
-            succeed(
-                api.DELETE("/api/minibrains/{slug}/keys/{key_id}", {
-                    params: { path: { slug, key_id: keyId } },
-                }),
-            ),
-        onSuccess: refresh,
-    });
-    const columns: ColumnDef<KeyInfo, unknown>[] = [
-        { header: "Name", accessorKey: "name" },
-        {
-            header: "Key",
-            accessorKey: "prefix",
-            cell: (info) => <span className="font-mono">{String(info.getValue())}…</span>,
-        },
-        {
-            header: "Created",
-            accessorKey: "created_at",
-            cell: (info) => dateTime(String(info.getValue())),
-        },
-        {
-            header: "Last used",
-            accessorKey: "last_used_at",
-            cell: (info) => dateTime(info.getValue() as string | null),
-        },
-        {
-            header: "",
-            id: "delete",
-            cell: ({ row }) => (
-                <Button variant="ghost" size="xs" onClick={() => remove.mutate(row.original.id)}>
-                    Revoke
-                </Button>
-            ),
-        },
-    ];
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        create.mutate(name.trim() || "default");
-    };
-    return (
-        <Section
-            title="API keys"
-            caption="A key only reaches this minibrain. The full key is shown once."
-        >
-            <form onSubmit={submit} className="mb-3 flex flex-wrap items-end gap-2">
-                <div className="flex flex-col gap-1">
-                    <Label htmlFor="key-name">Name</Label>
-                    <Input
-                        id="key-name"
-                        className="w-56"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="helpdesk-app"
-                    />
-                </div>
-                <Button type="submit" disabled={create.isPending}>
-                    Create key
-                </Button>
-            </form>
-            <ErrorLine error={create.error ?? remove.error} />
-            <DataTable columns={columns} rows={data ?? []} empty="No keys yet." />
-        </Section>
-    );
 }
 
 function serving(detail: MinibrainDetail): string {
@@ -185,10 +99,7 @@ function Deployment({ slug }: { slug: string }) {
     const code = snippets(baseUrl, model, created?.secret ?? "YOUR_KEY");
     return (
         <>
-            <Section
-                title="Endpoint"
-                caption="OpenAI-compatible. Point any OpenAI client at this base URL."
-            >
+            <PanelSection icon={Plug} title="Endpoint">
                 <div className="flex flex-col gap-3 text-sm">
                     <div>
                         <div className="text-muted-foreground">Serving</div>
@@ -218,23 +129,14 @@ function Deployment({ slug }: { slug: string }) {
                         </p>
                     </div>
                 </div>
-            </Section>
-            <KeysSection slug={slug} onCreated={setCreated} />
-            {created && (
-                <div className="rounded-lg border border-success/40 bg-success-soft p-4 text-sm">
-                    <div className="font-semibold">New key for {created.name}</div>
-                    <div className="mt-1 break-all font-mono">{created.secret}</div>
-                    <p className="mt-1 text-muted-foreground">
-                        Copy it now; it is not shown again.
-                    </p>
-                </div>
-            )}
-            <Section title="Examples">
+            </PanelSection>
+            <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
+            <PanelSection icon={Terminal} title="Examples" bare>
                 <div className="flex flex-col gap-3">
                     <Code>{code.curl}</Code>
                     <Code>{code.python}</Code>
                 </div>
-            </Section>
+            </PanelSection>
         </>
     );
 }
@@ -331,22 +233,28 @@ export function DeploymentsPage() {
                 caption="Everything apps can call now, on one OpenAI-compatible endpoint."
             />
             <ErrorLine error={models.error} />
-            {models.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : (
-                <SortableTable
-                    columns={ENDPOINT_COLUMNS}
-                    rows={live}
-                    onOpen={(row) => router.history.push(endpointHref(row))}
-                    rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
-                    empty={
-                        <p className="text-muted-foreground">
-                            Nothing is deployed. Deploy a model or one of its versions from Models.
-                        </p>
-                    }
-                    minWidth="min-w-[760px]"
-                />
-            )}
+            <PanelSections>
+                <PanelSection icon={Plug} title="Endpoints" bare>
+                    {models.isLoading ? (
+                        <p className="text-sm text-muted-foreground">Loading…</p>
+                    ) : (
+                        <SortableTable
+                            columns={ENDPOINT_COLUMNS}
+                            rows={live}
+                            onOpen={(row) => router.history.push(endpointHref(row))}
+                            rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
+                            empty={
+                                <p className="text-muted-foreground">
+                                    Nothing is deployed. Deploy a model or one of its versions from
+                                    Models.
+                                </p>
+                            }
+                            minWidth="min-w-[760px]"
+                        />
+                    )}
+                </PanelSection>
+                <ApiKeys />
+            </PanelSections>
         </Page>
     );
 }

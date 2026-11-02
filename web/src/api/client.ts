@@ -13,6 +13,7 @@ export type SnapshotInfo = Schemas["SnapshotInfo"];
 export type ExampleInfo = Schemas["ExampleInfo"];
 export type KeyInfo = Schemas["KeyInfo"];
 export type KeyCreated = Schemas["KeyCreated"];
+export type ModelRef = Schemas["ModelRef"];
 export type ModelStage = Schemas["Stage"];
 export type ModelUsage = Schemas["Usage"];
 export type ModelVersionRow = Schemas["VersionRow"];

@@ -390,7 +390,8 @@ PII counts.
 - `POST /v1/feedback` (see Feedback loop).
 - `model: "support-triage"` → current version; `"support-triage@3"` → pinned. The gateway maps it to SGLang's
   `<base>:<adapter>` name.
-- API keys scoped to minibrains. Audit log: who, which minibrain, when.
+- API keys cover one or more models; a call to a model the key does not cover gets 403. Keys are managed on
+  Deployments and on each endpoint. Audit log: who created, changed or revoked which key, when.
 - Request logging opt-in per minibrain; it feeds feedback and distillation.
 - A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.

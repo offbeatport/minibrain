@@ -232,8 +232,22 @@ class CompleteResponse(BaseModel):
     completion_tokens: int
 
 
+class ModelRef(BaseModel):
+    kind: Literal["custom", "base"]
+    key: str
+
+
+class KeyModel(ModelRef):
+    name: str
+
+
 class KeyCreate(BaseModel):
     name: str = Field(default="default", max_length=60)
+    models: list[ModelRef] = Field(min_length=1)
+
+
+class KeyScopeUpdate(BaseModel):
+    models: list[ModelRef] = Field(min_length=1)
 
 
 class KeyInfo(BaseModel):
@@ -242,6 +256,8 @@ class KeyInfo(BaseModel):
     prefix: str
     created_at: datetime
     last_used_at: datetime | None
+    expires_at: datetime | None
+    models: list[KeyModel]
 
 
 class KeyCreated(KeyInfo):

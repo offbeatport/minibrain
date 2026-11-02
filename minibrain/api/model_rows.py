@@ -24,11 +24,11 @@ from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
-    ApiKey,
     CatalogVariant,
     Job,
     JobKind,
     JobStatus,
+    KeyScope,
     Minibrain,
     Model,
     ModelStatus,
@@ -436,14 +436,14 @@ def all_rows(session: Session, settings: Settings, store: ArtifactStore, health:
     ]
     custom_keys = dict(
         session.execute(
-            select(ApiKey.minibrain_id, func.count())
-            .where(ApiKey.minibrain_id.is_not(None))
-            .group_by(ApiKey.minibrain_id)
+            select(KeyScope.minibrain_id, func.count())
+            .where(KeyScope.minibrain_id.is_not(None))
+            .group_by(KeyScope.minibrain_id)
         ).all()
     )
     base_keys = dict(
         session.execute(
-            select(ApiKey.model_id, func.count()).where(ApiKey.model_id.is_not(None)).group_by(ApiKey.model_id)
+            select(KeyScope.model_id, func.count()).where(KeyScope.model_id.is_not(None)).group_by(KeyScope.model_id)
         ).all()
     )
     slugs = dict(session.execute(select(Minibrain.slug, Minibrain.id)).all())

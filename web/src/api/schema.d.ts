@@ -472,41 +472,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Base Keys */
-        get: operations["list_base_keys_api_models_base__key__keys_get"];
-        put?: never;
-        /** Add Base Key */
-        post: operations["add_base_key_api_models_base__key__keys_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/base/{key}/keys/{key_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Base Key */
-        delete: operations["delete_base_key_api_models_base__key__keys__key_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/catalog": {
         parameters: {
             query?: never;
@@ -747,7 +712,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/keys": {
+    "/api/keys": {
         parameters: {
             query?: never;
             header?: never;
@@ -755,17 +720,34 @@ export interface paths {
             cookie?: never;
         };
         /** List Keys */
-        get: operations["list_keys_api_minibrains__slug__keys_get"];
+        get: operations["list_keys_api_keys_get"];
         put?: never;
         /** Add Key */
-        post: operations["add_key_api_minibrains__slug__keys_post"];
+        post: operations["add_key_api_keys_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/keys/{key_id}": {
+    "/api/keys/{key_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Models */
+        put: operations["update_models_api_keys__key_id__models_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/keys/{key_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -775,8 +757,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Key */
-        delete: operations["delete_key_api_minibrains__slug__keys__key_id__delete"];
+        /** Revoke */
+        delete: operations["revoke_api_keys__key_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2002,6 +1984,8 @@ export interface components {
              * @default default
              */
             name?: string;
+            /** Models */
+            models: components["schemas"]["ModelRef"][];
         };
         /** KeyCreated */
         KeyCreated: {
@@ -2018,6 +2002,10 @@ export interface components {
             created_at: string;
             /** Last Used At */
             last_used_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Models */
+            models: components["schemas"]["KeyModel"][];
             /** Secret */
             secret: string;
         };
@@ -2036,6 +2024,27 @@ export interface components {
             created_at: string;
             /** Last Used At */
             last_used_at: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Models */
+            models: components["schemas"]["KeyModel"][];
+        };
+        /** KeyModel */
+        KeyModel: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "custom" | "base";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
+        /** KeyScopeUpdate */
+        KeyScopeUpdate: {
+            /** Models */
+            models: components["schemas"]["ModelRef"][];
         };
         /** LoadedModel */
         LoadedModel: {
@@ -2201,6 +2210,16 @@ export interface components {
             size: number;
             /** Sha256 */
             sha256: string | null;
+        };
+        /** ModelRef */
+        ModelRef: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "custom" | "base";
+            /** Key */
+            key: string;
         };
         /** ModelRow */
         ModelRow: {
@@ -3811,102 +3830,6 @@ export interface operations {
             };
         };
     };
-    list_base_keys_api_models_base__key__keys_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KeyInfo"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_base_key_api_models_base__key__keys_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KeyCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KeyCreated"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_base_key_api_models_base__key__keys__key_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-                key_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     catalogue_api_catalog_get: {
         parameters: {
             query?: {
@@ -4377,13 +4300,11 @@ export interface operations {
             };
         };
     };
-    list_keys_api_minibrains__slug__keys_get: {
+    list_keys_api_keys_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                slug: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4397,24 +4318,13 @@ export interface operations {
                     "application/json": components["schemas"]["KeyInfo"][];
                 };
             };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
         };
     };
-    add_key_api_minibrains__slug__keys_post: {
+    add_key_api_keys_post: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                slug: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
@@ -4443,12 +4353,46 @@ export interface operations {
             };
         };
     };
-    delete_key_api_minibrains__slug__keys__key_id__delete: {
+    update_models_api_keys__key_id__models_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                key_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyScopeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
                 key_id: number;
             };
             cookie?: never;

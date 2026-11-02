@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from minibrain.registry.models import Minibrain, RequestLog, now
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, create_with_dataset, deploy, finish
+from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
 
 
 def custom_row(harness: Harness, slug: str) -> dict:
@@ -107,6 +107,6 @@ def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Har
 
 def test_rows_count_api_keys(harness: Harness) -> None:
     harness.client.post("/api/minibrains", json={"name": "Support Triage"})
-    harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "app"})
-    harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "batch"})
+    add_key(harness, name="app")
+    add_key(harness, name="batch")
     assert custom_row(harness, SLUG)["key_count"] == 2

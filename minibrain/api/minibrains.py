@@ -34,6 +34,7 @@ from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, 
 from minibrain.registry.service import (
     ConflictError,
     create_minibrain,
+    drop_orphan_keys,
     get_minibrain,
     latest_snapshot,
     list_minibrains,
@@ -101,6 +102,7 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
         )
     )
     session.delete(minibrain)
+    drop_orphan_keys(session)
     session.commit()
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
 
