@@ -1,25 +1,15 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Box, FolderOpen, GraduationCap, Palette, Split } from "lucide-react";
-import { Badge, SegmentedTabs, type ThemePref, getThemePref, setThemePref } from "obp-ui";
-import { useState } from "react";
+import { Badge } from "obp-ui";
 import { useInstallSettings } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { ErrorLine, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { ThemeChoice } from "~/components/ThemeChoice";
 import { count } from "~/lib/format";
 
 type BaseModelInfo = components["schemas"]["BaseModelInfo"];
-
-const MODES: { key: ThemePref; label: string }[] = [
-    { key: "light", label: "Light" },
-    { key: "dark", label: "Dark" },
-    { key: "system", label: "System" },
-];
-
-function isThemePref(value: string): value is ThemePref {
-    return MODES.some((mode) => mode.key === value);
-}
 
 const SPLIT_LABELS: Record<string, string> = {
     golden: "Test set (max)",
@@ -66,16 +56,9 @@ function Path({ label, value }: { label: string; value: string | undefined }) {
 }
 
 function Appearance() {
-    const [mode, setMode] = useState<ThemePref>(getThemePref());
-    const choose = (key: string) => {
-        if (isThemePref(key)) {
-            setThemePref(key);
-            setMode(key);
-        }
-    };
     return (
         <PanelSection icon={Palette} title="Appearance">
-            <SegmentedTabs tabs={MODES} active={mode} onSelect={choose} />
+            <ThemeChoice />
         </PanelSection>
     );
 }
