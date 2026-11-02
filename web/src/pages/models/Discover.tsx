@@ -43,9 +43,9 @@ import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, relativeTime } from "~/lib/time";
+import { CLEARED, FilterPanel, activeFilters, matches, readFilters } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
 
-const ANY = "all";
 const FIT_LABELS: Record<FitInfo["level"], string> = {
     fits: "Estimated fit",
     limited: "Limited headroom",
@@ -449,8 +449,6 @@ const SUPPORT_LABEL: Record<string, string> = {
     untested: "Untested",
 };
 
-const TIERS = ["S", "M", "L", "XL"];
-
 function recommendedOrder(entry: CatalogEntry): number[] {
     const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
     const support = ["tested", "supported", "untested"].indexOf(entry.support);
@@ -540,7 +538,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Model",
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex min-w-64 max-w-80 items-start gap-3">
+                <div className="flex min-w-64 max-w-112 items-start gap-3">
                     <PublisherLogo publisher={row.original.provider} name={row.original.name} />
                     <div className="flex min-w-0 flex-col">
                         <span className="flex items-center gap-2">
@@ -560,9 +558,15 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
                             {row.original.description}
                         </span>
                         <span className="text-sm tabular-nums text-muted-foreground">
-                            {`${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
+                            {`${row.original.provider} · ${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
                                 SUPPORT_LABEL[row.original.support] ?? row.original.support
                             }${row.original.origin === "hub" ? " · Added from Hugging Face" : ""}`}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                            {[
+                                ...row.original.capabilities,
+                                ...(row.original.trainable ? ["Fine-tuning"] : []),
+                            ].join(", ")}
                         </span>
                         {row.original.superseded_by && (
                             <span className="text-sm text-muted-foreground">
@@ -574,18 +578,6 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
                         )}
                     </div>
                 </div>
-            ),
-        },
-        { id: "provider", header: "Publisher", accessorFn: (entry) => entry.provider },
-        {
-            id: "capabilities",
-            header: "Capabilities",
-            enableSorting: false,
-            cell: ({ row }) => (
-                <span className="block min-w-40 max-w-56 whitespace-normal text-sm text-muted-foreground">
-                    {row.original.capabilities.join(", ")}
-                    {row.original.trainable ? ", Fine-tuning" : ""}
-                </span>
             ),
         },
         {
@@ -614,37 +606,6 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             cell: ({ row }) => <EntryAction entry={row.original} on={on} />,
         },
     ];
-}
-
-function FilterSelect({
-    label,
-    value,
-    options,
-    onChange,
-}: {
-    label: string;
-    value: string | undefined;
-    options: string[];
-    onChange: (value: string) => void;
-}) {
-    return (
-        <Select
-            value={value ?? ANY}
-            onValueChange={(next) => onChange(next === ANY ? "" : String(next))}
-        >
-            <SelectTrigger aria-label={label} className="w-auto min-w-36">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value={ANY}>{`${label}: All`}</SelectItem>
-                {options.map((option) => (
-                    <SelectItem key={option} value={option}>
-                        {`${label}: ${option}`}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
 }
 
 function PoolSelect({
@@ -768,6 +729,7 @@ export function Discover({
     const catalog = useCatalog(search.pool);
     const [downloading, setDownloading] = useState<CatalogEntry | null>(null);
     const [adding, setAdding] = useState(false);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [requirements, setRequirements] = useState<{ entry: CatalogEntry | null } | null>(null);
     const data = catalog.data;
     const on: Actions = useMemo(
@@ -799,38 +761,30 @@ export function Discover({
             </div>
         );
     }
-    const needsAccess = search.access === "needs-access";
-    const fitsOnly = search.fits === "true" && data.hardware.known;
-    const text = (search.q ?? "").trim().toLowerCase();
-    const visible = data.entries.filter(
-        (entry) =>
-            entry.gated === needsAccess &&
-            (!text ||
-                `${entry.name} ${entry.description} ${entry.provider} ${entry.repo} ${entry.family} ${entry.architecture}`
-                    .toLowerCase()
-                    .includes(text)) &&
-            (!search.task || entry.capabilities.includes(search.task)) &&
-            (!search.tier || entry.tier === search.tier) &&
-            (!search.provider || entry.provider === search.provider) &&
-            (!fitsOnly ||
-                entry.variants.some((variant) => ["fits", "limited"].includes(variant.fit.level))),
-    );
+    const filters = readFilters(search, data.hardware.known);
+    const needsAccess = filters.access.includes("needs-access");
+    const visible = data.entries.filter((entry) => matches(entry, filters));
     visible.sort(byRecommended);
-    const tasks = [...new Set(data.entries.flatMap((entry) => entry.capabilities))].sort();
-    const providers = [...new Set(data.entries.map((entry) => entry.provider))].sort();
-    const gatedCount = data.entries.filter((entry) => entry.gated).length;
-    const filtering = Boolean(
-        search.q || search.task || search.provider || search.tier || fitsOnly,
+    const active = activeFilters(filters);
+    const panel = (
+        <FilterPanel
+            entries={data.entries}
+            filters={filters}
+            update={update}
+            fitsKnown={data.hardware.known}
+            fitsLabel={poolPhrase(data)}
+            fitsHint={
+                data.hardware.known
+                    ? `Estimated from the weights' size against the memory of ${poolPhrase(data)}.`
+                    : `Compatibility not checked: the memory of ${poolPhrase(data)} is unknown.`
+            }
+        />
     );
     const empty: ReactNode = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No supported models match these filters.</p>
-            {filtering && (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => update({ q: "", task: "", provider: "", tier: "", fits: "" })}
-                >
+            {(active > 0 || filters.q) && (
+                <Button variant="outline" size="sm" onClick={() => update(CLEARED)}>
                     Clear filters
                 </Button>
             )}
@@ -857,105 +811,82 @@ export function Discover({
                     </Button>
                 </div>
             )}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        aria-label="Search supported models"
-                        placeholder="Search supported models"
-                        value={search.q ?? ""}
-                        onChange={(event) => update({ q: event.target.value })}
-                        className="h-8 w-64 pl-8"
-                    />
-                </div>
-                <FilterSelect
-                    label="Task"
-                    value={search.task}
-                    options={tasks}
-                    onChange={(task) => update({ task })}
-                />
-                <FilterSelect
-                    label="Publisher"
-                    value={search.provider}
-                    options={providers}
-                    onChange={(provider) => update({ provider })}
-                />
-                <FilterSelect
-                    label="Size"
-                    value={search.tier}
-                    options={TIERS}
-                    onChange={(tier) => update({ tier })}
-                />
-                <Select
-                    value={needsAccess ? "needs-access" : "ready"}
-                    onValueChange={(value) =>
-                        update({ access: value === "needs-access" ? "needs-access" : "" })
-                    }
-                >
-                    <SelectTrigger aria-label="Access" className="w-auto min-w-36">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ready">One-click download</SelectItem>
-                        <SelectItem value="needs-access">{`Needs access (${gatedCount})`}</SelectItem>
-                    </SelectContent>
-                </Select>
-                {data.hub_add_allowed && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAdding(true)}
-                        disabled={data.offline_forced}
-                    >
-                        Add from Hugging Face
-                    </Button>
-                )}
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <span className="flex items-center gap-1.5">
-                            <Switch
-                                id="fits"
-                                checked={fitsOnly}
-                                disabled={!data.hardware.known}
-                                onCheckedChange={(checked) =>
-                                    update({ fits: checked ? "true" : "" })
-                                }
+            <div className="flex items-start gap-4">
+                <aside className="sticky top-4 hidden w-52 shrink-0 min-[1400px]:block">
+                    {panel}
+                </aside>
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                aria-label="Search supported models"
+                                placeholder="Search supported models"
+                                value={search.q ?? ""}
+                                onChange={(event) => update({ q: event.target.value })}
+                                className="h-8 w-64 pl-8"
                             />
-                            <Label htmlFor="fits" className="text-sm text-muted-foreground">
-                                {`Fits ${poolPhrase(data)}`}
-                            </Label>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="min-[1400px]:hidden"
+                            onClick={() => setFiltersOpen(true)}
+                        >
+                            {active > 0 ? `Filters (${active})` : "Filters"}
+                        </Button>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                            {`${visible.length} of ${data.entries.length} models`}
                         </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        {data.hardware.known
-                            ? `Estimated from the weights' size against the memory of ${poolPhrase(data)}.`
-                            : `Compatibility not checked: the memory of ${poolPhrase(data)} is unknown.`}
-                    </TooltipContent>
-                </Tooltip>
-            </div>
-            {needsAccess && (
-                <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-                    <p className="text-sm font-semibold">
-                        These models need access from their publisher first
+                        {data.hub_add_allowed && (
+                            <Button
+                                variant="outline"
+                                className="ml-auto"
+                                size="sm"
+                                onClick={() => setAdding(true)}
+                                disabled={data.offline_forced}
+                            >
+                                Add from Hugging Face
+                            </Button>
+                        )}
+                    </div>
+                    {needsAccess && (
+                        <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
+                            <p className="text-sm font-semibold">
+                                These models need access from their publisher first
+                            </p>
+                            <AccessSteps catalog={data} />
+                        </div>
+                    )}
+                    <SortableTable
+                        columns={tableColumns}
+                        rows={visible}
+                        onOpen={(entry) => setRequirements({ entry })}
+                        rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
+                        empty={empty}
+                        minWidth="min-w-[720px]"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                        Models run on your infrastructure. Offline?{" "}
+                        <button
+                            type="button"
+                            onClick={onImport}
+                            className="text-primary hover:underline"
+                        >
+                            Import model files
+                        </button>
+                        .
                     </p>
-                    <AccessSteps catalog={data} />
                 </div>
-            )}
-            <SortableTable
-                columns={tableColumns}
-                rows={visible}
-                onOpen={(entry) => setRequirements({ entry })}
-                rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
-                empty={empty}
-                minWidth="min-w-[900px]"
-            />
-            <p className="text-sm text-muted-foreground">
-                Models run on your infrastructure. Offline?{" "}
-                <button type="button" onClick={onImport} className="text-primary hover:underline">
-                    Import model files
-                </button>
-                .
-            </p>
+            </div>
+            <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <DialogContent className="max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Filters</DialogTitle>
+                        <DialogDescription>{`${visible.length} of ${data.entries.length} models match.`}</DialogDescription>
+                    </DialogHeader>
+                    {panel}
+                </DialogContent>
+            </Dialog>
             <AddFromHubDialog
                 open={adding}
                 onOpenChange={setAdding}

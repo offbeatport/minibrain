@@ -40,15 +40,29 @@ function monoMask(src: string) {
     };
 }
 
-export function PublisherLogo({ publisher, name }: { publisher?: string | null; name: string }) {
+const SIZES = {
+    sm: { tile: "size-5", logo: "size-3.5" },
+    md: { tile: "size-8", logo: "size-5" },
+};
+
+export function PublisherLogo({
+    publisher,
+    name,
+    size = "md",
+}: {
+    publisher?: string | null;
+    name: string;
+    size?: keyof typeof SIZES;
+}) {
     const logo = publisher ? LOGOS[publisher] : undefined;
+    const { tile, logo: mark } = SIZES[size];
     return (
         <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background"
+            className={`flex ${tile} shrink-0 items-center justify-center rounded-md border bg-background`}
         >
-            {logo?.mono && <span className="size-5 bg-foreground" style={monoMask(logo.src)} />}
-            {logo && !logo.mono && <img src={logo.src} alt="" className="size-5" />}
+            {logo?.mono && <span className={`${mark} bg-foreground`} style={monoMask(logo.src)} />}
+            {logo && !logo.mono && <img src={logo.src} alt="" className={mark} />}
             {!logo && (
                 <span className="text-sm font-semibold text-muted-foreground">
                     {name.trim().charAt(0).toUpperCase()}
