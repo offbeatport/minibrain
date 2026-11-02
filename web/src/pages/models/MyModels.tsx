@@ -9,9 +9,7 @@ import {
     Pencil,
     PowerOff,
     Rocket,
-    Search,
     Trash2,
-    X,
 } from "lucide-react";
 import {
     Button,
@@ -21,9 +19,8 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input,
     Link,
-    SegmentedTabs,
+    SearchInput,
     Select,
     SelectContent,
     SelectItem,
@@ -54,7 +51,6 @@ import {
 } from "./dialogs";
 import {
     type Entry,
-    type EntryState,
     KIND_LABELS,
     STATE_LABELS,
     STATE_RANK,
@@ -731,47 +727,57 @@ function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
     ];
 }
 
-type Facet = "type" | "state" | "tag";
+type Facet = "type" | "state";
+
+function searchable(entry: Entry): string {
+    const { model, version } = entry;
+    const number = version ? `v${version.number}` : "";
+    return `${model.name} ${model.description} ${model.key} ${model.tags.join(" ")} ${number}`.toLowerCase();
+}
 
 function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
-    const { model } = entry;
     const text = (search.q ?? "").trim().toLowerCase();
-    if (text && !`${model.name} ${model.description} ${model.key}`.toLowerCase().includes(text)) {
+    if (text && !searchable(entry).includes(text)) {
         return false;
     }
-    if (skip !== "type" && search.type && model.kind !== search.type) {
+    if (skip !== "type" && search.type && entry.model.kind !== search.type) {
         return false;
     }
-    if (skip !== "state" && search.state && stateOfEntry(entry) !== search.state) {
-        return false;
-    }
-    return skip === "tag" || !search.tag || model.tags.includes(search.tag);
+    return skip === "state" || !search.state || stateOfEntry(entry) === search.state;
 }
 
 function FilterSelect({
     label,
+    all,
     value,
     options,
     onChange,
 }: {
     label: string;
+    all: string;
     value: string | undefined;
     options: [string, string, number][];
     onChange: (value: string) => void;
 }) {
+    const items = [
+        { value: ANY, label: all },
+        ...options.map(([key, text]) => ({ value: key, label: text })),
+    ];
     return (
         <Select
-            value={value ?? ANY}
+            items={items}
+            value={value || ANY}
             onValueChange={(next) => onChange(next === ANY ? "" : String(next))}
         >
-            <SelectTrigger aria-label={label} className="w-auto min-w-36">
+            <SelectTrigger aria-label={label} className="w-auto min-w-40">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value={ANY}>{`${label}: All`}</SelectItem>
+                <SelectItem value={ANY}>{all}</SelectItem>
                 {options.map(([key, text, total]) => (
                     <SelectItem key={key} value={key}>
-                        {`${label}: ${text} (${total})`}
+                        <span>{text}</span>
+                        <span className="ml-auto text-muted-foreground tabular-nums">{total}</span>
                     </SelectItem>
                 ))}
             </SelectContent>
@@ -779,20 +785,7 @@ function FilterSelect({
     );
 }
 
-function chips(search: ModelsSearch): { label: string; clear: ModelsSearch }[] {
-    return [
-        search.q ? { label: `“${search.q}”`, clear: { q: "" } } : null,
-        search.state && search.state in STATE_LABELS
-            ? { label: STATE_LABELS[search.state as EntryState], clear: { state: "" } }
-            : null,
-        search.type
-            ? { label: search.type === "base" ? "Base" : "Custom", clear: { type: "" } }
-            : null,
-        search.tag ? { label: `Tag ${search.tag}`, clear: { tag: "" } } : null,
-    ].filter((chip) => chip !== null);
-}
-
-const CLEARED: ModelsSearch = { q: "", type: "", state: "", tag: "" };
+const CLEARED: ModelsSearch = { q: "", type: "", state: "" };
 
 export function MyModels({
     search,
@@ -853,19 +846,14 @@ export function MyModels({
     const visible = entries.filter((entry) => matches(entry, search)).sort(byState);
     const facetCount = (facet: Facet, test: (entry: Entry) => boolean) =>
         entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
-    const tags = [...new Set(rows.flatMap((row) => row.tags))].sort();
-    const active = chips(search);
-    const filtering = active.length > 0;
+    const filtering = Boolean(search.q || search.type || search.state);
     const clear = () => update(CLEARED);
     const firstRun = !rows.some((row) => row.kind === "custom") && !filtering;
-    const stateTabs = [
-        { key: "all", label: "All", badge: facetCount("state", () => true) },
-        ...STATE_RANK.map((state) => ({
-            key: state,
-            label: STATE_LABELS[state],
-            badge: facetCount("state", (entry) => stateOfEntry(entry) === state),
-        })),
-    ];
+    const stateOptions: [string, string, number][] = STATE_RANK.map((state) => [
+        state,
+        STATE_LABELS[state],
+        facetCount("state", (entry) => stateOfEntry(entry) === state),
+    ]);
     const noMatch = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No models match these filters.</p>
@@ -880,70 +868,41 @@ export function MyModels({
         <div className="flex flex-col gap-3">
             {firstRun && <GetStarted onDiscover={onDiscover} onCreate={onCreate} />}
             <div className="flex flex-wrap items-center gap-2">
-                <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        aria-label="Search models"
-                        placeholder="Search models"
-                        value={search.q ?? ""}
-                        onChange={(event) => update({ q: event.target.value })}
-                        className="h-8 w-64 pl-8"
-                    />
-                </div>
-                <SegmentedTabs
-                    tabs={stateTabs}
-                    active={search.state || "all"}
-                    onSelect={(key) => update({ state: key === "all" ? "" : key })}
+                <SearchInput
+                    aria-label="Search models"
+                    placeholder="Search models"
+                    value={search.q ?? ""}
+                    onValueChange={(q) => update({ q })}
+                    className="w-64"
                 />
-                <FilterSelect
-                    label="Type"
-                    value={search.type}
-                    options={[
-                        [
-                            "custom",
-                            "Custom",
-                            facetCount("type", (entry) => entry.model.kind === "custom"),
-                        ],
-                        [
-                            "base",
-                            "Base",
-                            facetCount("type", (entry) => entry.model.kind === "base"),
-                        ],
-                    ]}
-                    onChange={(type) => update({ type })}
-                />
-                {tags.length > 0 && (
+                <div className="ml-auto flex flex-wrap items-center gap-2">
                     <FilterSelect
-                        label="Tag"
-                        value={search.tag}
-                        options={tags.map((tag) => [
-                            tag,
-                            tag,
-                            facetCount("tag", (entry) => entry.model.tags.includes(tag)),
-                        ])}
-                        onChange={(tag) => update({ tag })}
+                        label="Status"
+                        all="All statuses"
+                        value={search.state}
+                        options={stateOptions}
+                        onChange={(state) => update({ state })}
                     />
-                )}
-            </div>
-            {filtering && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {active.map((chip) => (
-                        <Button
-                            key={chip.label}
-                            variant="outline"
-                            size="xs"
-                            aria-label={`Remove filter ${chip.label}`}
-                            onClick={() => update(chip.clear)}
-                        >
-                            {chip.label}
-                            <X />
-                        </Button>
-                    ))}
-                    <Button variant="ghost" size="xs" onClick={clear}>
-                        Clear all
-                    </Button>
+                    <FilterSelect
+                        label="Type"
+                        all="All types"
+                        value={search.type}
+                        options={[
+                            [
+                                "custom",
+                                "Custom",
+                                facetCount("type", (entry) => entry.model.kind === "custom"),
+                            ],
+                            [
+                                "base",
+                                "Base",
+                                facetCount("type", (entry) => entry.model.kind === "base"),
+                            ],
+                        ]}
+                        onChange={(type) => update({ type })}
+                    />
                 </div>
-            )}
+            </div>
             {models.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading models…</p>
             ) : models.error ? (

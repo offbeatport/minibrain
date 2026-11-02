@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import {
     Badge,
     Button,
@@ -18,6 +18,7 @@ import {
     Link,
     RadioGroup,
     RadioGroupItem,
+    SearchInput,
     Select,
     SelectContent,
     SelectItem,
@@ -852,16 +853,13 @@ export function Discover({
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                aria-label="Search supported models"
-                                placeholder="Search supported models"
-                                value={search.q ?? ""}
-                                onChange={(event) => update({ q: event.target.value })}
-                                className="h-8 w-64 pl-8"
-                            />
-                        </div>
+                        <SearchInput
+                            aria-label="Search supported models"
+                            placeholder="Search supported models"
+                            value={search.q ?? ""}
+                            onValueChange={(q) => update({ q })}
+                            className="w-64"
+                        />
                         <Button
                             variant="outline"
                             className="min-[1400px]:hidden"

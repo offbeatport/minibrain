@@ -6,7 +6,6 @@ const KEYS = [
     "type",
     "availability",
     "deployment",
-    "tag",
     "attention",
     "state",
     "task",
@@ -29,7 +28,7 @@ export type ModelsSearch = Partial<Record<ModelsSearchKey, string>>;
 export type ModelsPath = "/models" | "/discover";
 
 const PAGE_KEYS: Record<ModelsPath, readonly ModelsSearchKey[]> = {
-    "/models": ["q", "type", "state", "tag"],
+    "/models": ["q", "type", "state"],
     "/discover": [
         "q",
         "task",
