@@ -2,7 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button, Input, Label } from "obp-ui";
 import { type FormEvent, useState } from "react";
-import { type KeyCreated, type KeyInfo, api, succeed, unwrap } from "~/api/client";
+import {
+    type KeyCreated,
+    type KeyInfo,
+    type MinibrainDetail,
+    api,
+    succeed,
+    unwrap,
+} from "~/api/client";
 import { keys, useKeys, useMinibrain } from "~/api/queries";
 import { DataTable } from "~/components/DataTable";
 import { ScopedPage } from "~/components/PageHeader";
@@ -122,6 +129,42 @@ function KeysSection({ slug, onCreated }: { slug: string; onCreated: (key: KeyCr
     );
 }
 
+function serving(detail: MinibrainDetail): string {
+    if (!detail.deployed) {
+        return "Not deployed";
+    }
+    if (detail.current_version === null || detail.current_version === undefined) {
+        return `Base model ${detail.base_model}, until you deploy a version`;
+    }
+    return detail.current_accuracy === null || detail.current_accuracy === undefined
+        ? `v${detail.current_version}`
+        : `v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`;
+}
+
+function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
+    const client = useQueryClient();
+    const toggle = useMutation({
+        mutationFn: () =>
+            unwrap(
+                api.POST("/api/minibrains/{slug}/deploy", {
+                    params: { path: { slug } },
+                    body: { deployed: !deployed },
+                }),
+            ),
+        onSuccess: () => client.invalidateQueries(),
+    });
+    return (
+        <Button
+            size="xs"
+            variant={deployed ? "outline" : "default"}
+            onClick={() => toggle.mutate()}
+            disabled={toggle.isPending}
+        >
+            {deployed ? "Undeploy" : "Deploy"}
+        </Button>
+    );
+}
+
 function Deployment({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const [created, setCreated] = useState<KeyCreated | null>(null);
@@ -140,10 +183,9 @@ function Deployment({ slug }: { slug: string }) {
                 <div className="flex flex-col gap-3 text-sm">
                     <div>
                         <div className="text-muted-foreground">Serving</div>
-                        <div>
-                            {detail.current_version === null
-                                ? "Nothing yet: promote a version on the Evaluations page."
-                                : `v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`}
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span>{serving(detail)}</span>
+                            <DeployToggle slug={slug} deployed={detail.deployed ?? false} />
                         </div>
                     </div>
                     <div>

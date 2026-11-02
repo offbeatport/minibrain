@@ -149,8 +149,9 @@ def evaluate_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | N
 
 
 def deploy_stage(minibrain: Minibrain) -> Stage:
-    if minibrain.current_version is not None:
-        return Stage(key="deploy", state="done", label=f"v{minibrain.current_version} live")
+    if minibrain.deployed:
+        live = f"v{minibrain.current_version}" if minibrain.current_version is not None else "Base model"
+        return Stage(key="deploy", state="done", label=f"{live} live")
     return Stage(key="deploy", state="todo", label="Not deployed")
 
 
@@ -285,10 +286,10 @@ def custom_row(
         availability=custom_availability(minibrain, store),
         activity=custom_activity(minibrain, jobs),
         deployment=deployment(
-            f"v{current}" if current is not None else "",
-            current is not None,
-            health(minibrain.base_model) if current is not None else None,
-            [current] if current is not None else [],
+            f"v{current}" if current is not None else "Base model",
+            minibrain.deployed,
+            health(minibrain.base_model) if minibrain.deployed else None,
+            [current] if minibrain.deployed and current is not None else [],
         ),
         updated_at=updated,
         trainable=False,

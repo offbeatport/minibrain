@@ -8,7 +8,6 @@ from minibrain.api.schemas import (
     KeyCreated,
     KeyInfo,
     MinibrainDetail,
-    PromoteRequest,
     VersionCreate,
     VersionInfo,
 )
@@ -55,11 +54,9 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
 
 
 @router.post("/minibrains/{slug}/versions/{number}/promote")
-def promote_version(
-    slug: str, number: int, body: PromoteRequest, session: SessionDep, settings: SettingsDep
-) -> MinibrainDetail:
+def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    promote(minibrain, get_version(minibrain, number), body.override)
+    promote(minibrain, get_version(minibrain, number))
     session.commit()
     return detail(settings, minibrain)
 

@@ -44,5 +44,5 @@ def resolve(session: Session, name: str) -> Target | None:
 
 def model_names(minibrain: Minibrain) -> list[str]:
     ready = sorted(version.number for version in minibrain.versions if version.status == VersionStatus.READY)
-    names = [minibrain.slug] if minibrain.current_version in ready else []
+    names = [minibrain.slug] if minibrain.deployed else []
     return names + [f"{minibrain.slug}@{number}" for number in ready]

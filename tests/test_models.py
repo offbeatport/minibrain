@@ -19,7 +19,7 @@ from minibrain.registry.models import AuditEvent, CatalogModel, CatalogVariant
 from minibrain.registry.settings_store import write
 from minibrain.storage import Space
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
+from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, deploy, finish
 
 REPO = "test/tiny"
 REVISION = "a" * 40
@@ -310,6 +310,7 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     add_version(harness, "lora")
     claim = harness.claim(["train"])
     assert claim is not None

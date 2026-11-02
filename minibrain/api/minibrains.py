@@ -10,6 +10,7 @@ from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     ChatMessage,
+    DeployRequest,
     ExampleInfo,
     JobInfo,
     MappingUpdate,
@@ -151,6 +152,15 @@ def attach_source(
     minibrain.input_column = input_column
     minibrain.label_column = label_column
     minibrain.sql = mapping_sql(input_column, label_column) if input_column and label_column else None
+
+
+@router.post("/{slug}/deploy")
+def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+    minibrain = get_minibrain(session, slug)
+    minibrain.deployed = body.deployed
+    minibrain.updated_at = now()
+    session.commit()
+    return detail(settings, minibrain)
 
 
 @router.post("/{slug}/source")

@@ -70,7 +70,7 @@ mapping comes down to a few fields.
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
 | Task type | Classify, Extract, Rewrite, Text-to-SQL or Distill; sets shape, schema, metric, recipe |
-| Golden set | 20–50 human-verified examples written first; defines the task and gates promotion |
+| Golden set | 20–50 human-verified examples; defines the task and scores every version |
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
 | Rebase | Rebuilding a minibrain on a new base model from its snapshot, golden set and config, then comparing it with `current` |
 | Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue |
@@ -317,16 +317,18 @@ PII counts.
   the minibrain is created.
 - Few-shot examples never come from the golden set, which must stay unseen: they come from other labelled rows, or,
   when the golden set is all there is, a few of its rows move out of it and stop being scored.
-- If version 0 meets `promote.min_score` and its latency and cost are acceptable, the UI says no training is needed.
+- If version 0 meets `target.min_score` and its latency and cost are acceptable, the UI says no training is needed.
   Otherwise the report shows the gap a trained version has to close.
 - Every version runs on the golden set and the held-out split: base, teacher and adapter on the same examples, scored
   with the task type's metric.
 - Reported per model: score, p50 / p95 latency, cost per 1,000 requests (GPU time for local models, list price for API
   teachers). The headline reads like "base 54% → minibrain 91% at 1/20 of the teacher's cost".
-- Side-by-side review screen. The version sits in `approval` until a user promotes it; a version that scores below
-  `current` on the held-out split needs an explicit override. The golden set alone is too small to decide: in the
-  spike, one of 50 rows moved the score 2 points and golden and held-out scores differed by 8–11 points.
-- Promote moves `current` and loads the adapter into the pool. Rollback moves `current` back.
+- Deploy at any step. A custom model can be deployed the moment it exists: with no version yet it serves its base model.
+  Any ready version can then be deployed, scored or not, whatever its score; scores inform the choice and never block
+  it. Training or scoring never changes what is live.
+- Side-by-side review screen. The golden set alone is too small to decide: in the spike, one of 50 rows moved the
+  score 2 points and golden and held-out scores differed by 8–11 points.
+- Deploying a version moves `current` and loads its adapter into the pool. Rollback deploys an earlier version.
 
 ### Rebase
 
@@ -334,7 +336,7 @@ PII counts.
 2. `minibrain rebase --base <model>`, or one button, reruns every minibrain: training from the stored snapshot
    (relabelled first if the teacher changed), then eval on the golden set.
 3. The report compares each rebased version with `current` on score, latency and cost.
-4. Promotion stays per minibrain, through the usual review. Nothing changes until someone promotes.
+4. Deploying stays per minibrain and explicit. Nothing that is live changes until someone deploys.
 
 ### Feedback loop
 
@@ -400,7 +402,7 @@ PII counts.
 | Need | obp-ui |
 |---|---|
 | Sidebar | `shell`: `AppShell`, `Rail`, `NavItem`, `SectionLabel`, `AccountMenu` |
-| Status | `Badge`: queued `neutral`, training `info`, awaiting promote `approval`, current `success`, failed `destructive` |
+| Status | `Badge`: queued `neutral`, training `info`, ready `approval`, live `success`, failed `destructive` |
 | Training logs | `console`: `LogView`, `ConsoleDock` |
 | Preview, playground, side-by-side eval | `chat`: `ChatBubble`, `AssistantTurn`, `ChatComposer` |
 | Forms, tabs, tables | Primitives |
@@ -415,7 +417,7 @@ PII counts.
 
 ## Config as code
 
-One `minibrain.yaml` per minibrain: task type, source, SQL, steps, teacher, recipe, golden set, promotion threshold.
+One `minibrain.yaml` per minibrain: task type, source, SQL, steps, teacher, recipe, golden set, target score.
 The UI reads and writes the same file. `minibrain run <name>` rebuilds, labels, trains and evals from it, so a team
 can keep minibrains in git and rerun them in CI.
 
@@ -431,7 +433,7 @@ steps: [strip_html, pii_scrub]
 teacher: large-local
 golden: golden.jsonl
 recipe: default
-promote:
+target:
   min_score: 0.85
 ```
 
@@ -563,7 +565,7 @@ Everything in the v1 scope below, after M1.
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
-- [x] Eval vs base, side-by-side review, promote, rollback
+- [x] Eval vs base, side-by-side review, deploy any version at any step, rollback
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
       calls, optional sync from our catalogue URL; Add from Hugging Face with support badges

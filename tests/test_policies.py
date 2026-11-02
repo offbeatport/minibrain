@@ -12,7 +12,7 @@ from minibrain.policy import Policy, PolicyError
 from minibrain.registry.db import MIGRATIONS, make_engine
 from minibrain.registry.models import ApiKey, AuditEvent, RequestLog, now
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
+from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, deploy, finish
 from tests.test_models import REPO, add_tiny, hub  # noqa: F401
 
 CHAT = {"model": SLUG, "messages": [{"role": "user", "content": "hello"}]}
@@ -121,6 +121,7 @@ def test_key_expiry_and_request_log_policies(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     set_policy(harness, "key_expiry_days", 30)
     headers = bearer(harness)
     with harness.sessions() as session:

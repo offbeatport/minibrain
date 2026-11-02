@@ -39,6 +39,11 @@ def add_version(harness: Harness, kind: str) -> dict[str, Any]:
     return response.json()
 
 
+def deploy(harness: Harness, number: int = 0) -> None:
+    response = harness.client.post(f"/api/minibrains/{SLUG}/versions/{number}/promote")
+    assert response.status_code == 200, response.text
+
+
 def bearer(harness: Harness) -> dict[str, str]:
     secret = harness.client.post(f"/api/minibrains/{SLUG}/keys", json={"name": "ci"}).json()["secret"]
     return {"Authorization": f"Bearer {secret}"}
@@ -69,28 +74,43 @@ def test_snapshot_is_built_by_a_prepare_job(harness: Harness) -> None:
     assert [job["status"] for job in prepare] == ["succeeded", "succeeded"]
 
 
-def test_prompt_only_version_becomes_current(harness: Harness) -> None:
+def test_scored_versions_go_live_only_when_deployed(harness: Harness) -> None:
     create_with_dataset(harness)
     version = add_version(harness, "prompt")
     assert version["status"] == "evaluating"
     finish(harness, "eval", accuracy=0.4)
     versions = harness.client.get(f"/api/minibrains/{SLUG}/versions").json()
-    assert versions[0]["status"] == "ready"
-    assert versions[0]["current"] is True
+    assert (versions[0]["status"], versions[0]["current"]) == ("ready", False)
+    deploy(harness)
+    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
+    assert (detail["current_version"], detail["deployed"]) == (0, True)
 
 
-def test_training_queues_eval_and_promotion_is_gated(harness: Harness) -> None:
+def test_any_ready_version_can_be_deployed_whatever_its_score(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.8)
+    deploy(harness)
     add_version(harness, "lora")
     finish(harness, "train")
     assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "evaluating"
     finish(harness, "eval", accuracy=0.4)
-    blocked = harness.client.post(f"/api/minibrains/{SLUG}/versions/1/promote", json={"override": False})
-    assert blocked.status_code == 409
-    forced = harness.client.post(f"/api/minibrains/{SLUG}/versions/1/promote", json={"override": True})
-    assert forced.json()["current_version"] == 1
+    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["current_version"] == 0
+    deploy(harness, 1)
+    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["current_version"] == 1
+
+
+def test_a_new_custom_model_can_be_deployed_and_serves_its_base_model(harness: Harness) -> None:
+    harness.client.post("/api/minibrains", json={"name": "Support Triage"})
+    headers = bearer(harness)
+    chat = {"model": SLUG, "messages": [{"role": "user", "content": "hi"}]}
+    assert harness.client.post("/v1/chat/completions", headers=headers, json=chat).status_code == 404
+    response = harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": True})
+    assert response.json()["deployed"] is True
+    served = harness.client.post("/v1/chat/completions", headers=headers, json=chat)
+    assert served.status_code == 200, served.text
+    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
+    assert harness.client.post("/v1/chat/completions", headers=headers, json=chat).status_code == 404
 
 
 def test_gateway_routes_by_name_and_version(harness: Harness) -> None:
@@ -135,6 +155,7 @@ def test_gateway_streams(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     body = {"model": SLUG, "stream": True, "messages": [{"role": "user", "content": "hi"}]}
     response = harness.client.post("/v1/chat/completions", headers=bearer(harness), json=body)
     assert response.headers["content-type"].startswith("text/event-stream")
@@ -147,6 +168,7 @@ def test_playground_parses_label(harness: Harness) -> None:
     add_version(harness, "prompt")
     assert harness.client.post(f"/api/minibrains/{SLUG}/complete", json={"text": "x"}).status_code == 409
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     reply = harness.client.post(f"/api/minibrains/{SLUG}/complete", json={"text": "charged twice"}).json()
     assert reply["label"] == "billing"
     assert reply["model"] == f"{SLUG}@0"
@@ -173,6 +195,7 @@ def test_recent_jobs_span_minibrains(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     harness.client.post("/api/minibrains", json={"name": "Other"})
     jobs = harness.client.get("/api/jobs?limit=5").json()
     assert {(job["minibrain"], job["minibrain_name"]) for job in jobs} == {(SLUG, "Support Triage")}

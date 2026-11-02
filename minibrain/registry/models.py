@@ -86,6 +86,7 @@ class Minibrain(Base):
     label_column: Mapped[str | None] = mapped_column(default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
     current_version: Mapped[int | None] = mapped_column(default=None)
+    deployed: Mapped[bool] = mapped_column(default=False, server_default=false())
     description: Mapped[str] = mapped_column(default="", server_default="")
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)

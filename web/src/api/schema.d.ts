@@ -58,6 +58,23 @@ export interface paths {
         patch: operations["update_api_minibrains__slug__patch"];
         trace?: never;
     };
+    "/api/minibrains/{slug}/deploy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deploy */
+        post: operations["deploy_api_minibrains__slug__deploy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/source": {
         parameters: {
             query?: never;
@@ -1894,6 +1911,11 @@ export interface components {
             base_model: string;
             /** Current Version */
             current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
             /** Current Accuracy */
             current_accuracy: number | null;
             /** Versions */
@@ -1918,6 +1940,11 @@ export interface components {
             base_model: string;
             /** Current Version */
             current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
             /** Current Accuracy */
             current_accuracy: number | null;
             /** Versions */
@@ -2113,14 +2140,6 @@ export interface components {
             input: string | null;
             /** Label */
             label: string | null;
-        };
-        /** PromoteRequest */
-        PromoteRequest: {
-            /**
-             * Override
-             * @default false
-             */
-            override?: boolean;
         };
         /** QualityInfo */
         QualityInfo: {
@@ -2552,6 +2571,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ModelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deploy_api_minibrains__slug__deploy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeployRequest"];
             };
         };
         responses: {
@@ -3554,11 +3608,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PromoteRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

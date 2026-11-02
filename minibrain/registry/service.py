@@ -98,15 +98,11 @@ def held_out_accuracy(version: Version) -> float:
     return float((version.metrics or {}).get("eval", {}).get("accuracy", 0.0))
 
 
-def promote(minibrain: Minibrain, version: Version, override: bool) -> None:
+def promote(minibrain: Minibrain, version: Version) -> None:
     if version.status != VersionStatus.READY:
         raise ConflictError(f"{minibrain.slug}@{version.number} is not ready")
-    current = find_version(minibrain, minibrain.current_version) if minibrain.current_version is not None else None
-    if current is not None and not override and held_out_accuracy(version) < held_out_accuracy(current):
-        raise ConflictError(
-            f"{minibrain.slug}@{version.number} scores below {minibrain.slug}@{current.number} on the held-out split"
-        )
     minibrain.current_version = version.number
+    minibrain.deployed = True
 
 
 def key_digest(raw: str) -> str:

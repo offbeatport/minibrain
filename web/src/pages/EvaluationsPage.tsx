@@ -13,40 +13,29 @@ import { useInvalidate } from "~/lib/jobs";
 
 function PromoteButton({ slug, version }: { slug: string; version: VersionInfo }) {
     const invalidate = useInvalidate(slug);
-    const [blocked, setBlocked] = useState<string | null>(null);
     const promote = useMutation({
-        mutationFn: (override: boolean) =>
+        mutationFn: () =>
             unwrap(
                 api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
                     params: { path: { slug, number: version.number } },
-                    body: { override },
                 }),
             ),
-        onSuccess: () => {
-            setBlocked(null);
-            return invalidate();
-        },
-        onError: (error) => setBlocked(errorText(error)),
+        onSuccess: () => invalidate(),
     });
     if (version.current || version.status !== "ready") {
         return null;
     }
-    if (blocked) {
-        return (
-            <div className="flex flex-col items-start gap-1">
-                <span className="max-w-56 text-sm text-warning">{blocked}</span>
-                {blocked.includes("scores below") && (
-                    <Button variant="outline" size="xs" onClick={() => promote.mutate(true)}>
-                        Promote anyway
-                    </Button>
-                )}
-            </div>
-        );
-    }
     return (
-        <Button size="xs" onClick={() => promote.mutate(false)}>
-            Promote
-        </Button>
+        <div className="flex flex-col items-start gap-1">
+            <Button size="xs" onClick={() => promote.mutate()} disabled={promote.isPending}>
+                Deploy
+            </Button>
+            {promote.error && (
+                <span className="max-w-56 text-sm text-destructive">
+                    {errorText(promote.error)}
+                </span>
+            )}
+        </div>
     );
 }
 

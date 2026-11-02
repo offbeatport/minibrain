@@ -219,6 +219,58 @@
         }
       }
     },
+    "/api/minibrains/{slug}/deploy": {
+      "post": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Deploy",
+        "operationId": "deploy_api_minibrains__slug__deploy_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/source": {
       "post": {
         "tags": [
@@ -1585,16 +1637,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PromoteRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5597,6 +5639,11 @@
             ],
             "title": "Current Version"
           },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
+          },
           "current_accuracy": {
             "anyOf": [
               {
@@ -5692,6 +5739,11 @@
               }
             ],
             "title": "Current Version"
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
           },
           "current_accuracy": {
             "anyOf": [
@@ -6350,17 +6402,6 @@
           "label"
         ],
         "title": "PreviewRow"
-      },
-      "PromoteRequest": {
-        "properties": {
-          "override": {
-            "type": "boolean",
-            "title": "Override",
-            "default": false
-          }
-        },
-        "type": "object",
-        "title": "PromoteRequest"
       },
       "QualityInfo": {
         "properties": {

@@ -122,6 +122,7 @@ class MinibrainSummary(BaseModel):
     task: str
     base_model: str
     current_version: int | None
+    deployed: bool = False
     current_accuracy: float | None
     versions: int
     active_jobs: int
@@ -179,10 +180,6 @@ class VersionCreate(BaseModel):
     kind: Literal["prompt", "lora"]
     max_rows: int | None = Field(default=None, ge=10)
     epochs: float | None = Field(default=None, gt=0, le=10)
-
-
-class PromoteRequest(BaseModel):
-    override: bool = False
 
 
 class CompleteRequest(BaseModel):

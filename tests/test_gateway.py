@@ -12,7 +12,7 @@ from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from tests.conftest import FakeBackend, Harness
-from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
+from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, deploy, finish
 
 CHAT = {"model": SLUG, "messages": [{"role": "user", "content": "I was charged twice"}]}
 
@@ -21,6 +21,7 @@ def servable(harness: Harness) -> dict[str, str]:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
+    deploy(harness)
     return bearer(harness)
 
 
@@ -54,7 +55,7 @@ def test_config_version_changes_when_routes_change(harness: Harness) -> None:
     add_version(harness, "lora")
     finish(harness, "train")
     finish(harness, "eval", accuracy=0.9)
-    harness.client.post(f"/api/minibrains/{SLUG}/versions/1/promote", json={})
+    deploy(harness, 1)
     after = config(harness, f"?version={before}&wait=1").json()
     assert after["version"] != before
     assert after["routes"][SLUG]["version"] == 1

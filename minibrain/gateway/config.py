@@ -123,25 +123,40 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
             adapter=adapter,
         )
         routes.append(route)
-        if version.number == minibrain.current_version:
+        if minibrain.deployed and version.number == minibrain.current_version:
             routes.append(replace(route, name=minibrain.slug))
+    if minibrain.deployed and not any(route.name == minibrain.slug for route in routes):
+        routes.append(
+            replace(
+                base_route_for(minibrain.base_model),
+                name=minibrain.slug,
+                owner=owner_of(minibrain.id, None),
+                minibrain_id=minibrain.id,
+                model_id=None,
+                slug=minibrain.slug,
+            )
+        )
     return routes
 
 
-def base_route(model: Model) -> Route:
+def base_route_for(model_id: str) -> Route:
     return Route(
-        name=model.id,
-        owner=owner_of(None, model.id),
+        name=model_id,
+        owner=owner_of(None, model_id),
         minibrain_id=None,
-        model_id=model.id,
-        slug=model.id,
+        model_id=model_id,
+        slug=model_id,
         version=None,
         kind="base",
-        base_model=model.id,
+        base_model=model_id,
         labels=[],
         shots=[],
         adapter=None,
     )
+
+
+def base_route(model: Model) -> Route:
+    return base_route_for(model.id)
 
 
 def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:

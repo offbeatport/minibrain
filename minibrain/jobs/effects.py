@@ -122,5 +122,3 @@ class DomainEffects:
             return
         version.metrics = dict((job.result or {}).get("metrics", {}))
         version.status = VersionStatus.READY
-        if version.minibrain.current_version is None:
-            version.minibrain.current_version = version.number

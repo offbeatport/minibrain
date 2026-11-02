@@ -35,7 +35,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -207,12 +207,20 @@ function retry(row: ModelRow) {
 }
 
 function setDeployed(row: ModelRow, deployed: boolean) {
-    return unwrap(
-        api.POST("/api/models/base/{key}/deploy", {
-            params: { path: { key: row.key } },
-            body: { deployed },
-        }),
-    );
+    const body = { deployed };
+    return row.kind === "base"
+        ? unwrap(
+              api.POST("/api/models/base/{key}/deploy", {
+                  params: { path: { key: row.key } },
+                  body,
+              }),
+          )
+        : unwrap(
+              api.POST("/api/minibrains/{slug}/deploy", {
+                  params: { path: { slug: row.key } },
+                  body,
+              }),
+          );
 }
 
 function setArchived(row: ModelRow, archived: boolean) {
@@ -363,7 +371,7 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                             {deployed ? "Change deployed version" : "Deploy a version"}
                         </DropdownMenuItem>
                     )}
-                    {row.kind === "base" && row.availability.state === "available" && (
+                    {(row.kind === "custom" || row.availability.state === "available") && (
                         <DropdownMenuItem
                             onSelect={() =>
                                 on.confirm({
@@ -570,14 +578,19 @@ function VersionCell({ row }: { row: ModelRow }) {
         );
     }
     const pending = pendingVersion(row);
+    const deployed = row.deployment.state !== "not_deployed";
     const live = row.current_version;
+    let head: ReactNode = pending ? null : <span className="text-muted-foreground">None yet</span>;
+    if (deployed) {
+        head = (
+            <span>{live !== null && live !== undefined ? `v${live} live` : "Base model live"}</span>
+        );
+    } else if (live !== null && live !== undefined) {
+        head = <span className="text-muted-foreground">{`v${live} chosen`}</span>;
+    }
     return (
         <span className="flex flex-col tabular-nums">
-            {live !== null && live !== undefined ? (
-                <span>{`v${live} live`}</span>
-            ) : (
-                !pending && <span className="text-muted-foreground">None yet</span>
-            )}
+            {head}
             {pending && <span className="text-sm text-muted-foreground">{pending}</span>}
         </span>
     );

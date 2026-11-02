@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from minibrain.registry.models import Minibrain, RequestLog, now
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, create_with_dataset, finish
+from tests.test_flow import SLUG, add_version, create_with_dataset, deploy, finish
 
 
 def custom_row(harness: Harness, slug: str) -> dict:
@@ -21,6 +21,7 @@ def test_stages_follow_the_model_from_data_to_deployment(harness: Harness) -> No
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.8)
+    deploy(harness)
     row = custom_row(harness, SLUG)
     assert [stage["state"] for stage in row["stages"]] == ["done", "done", "done", "done"]
     assert [stage["label"] for stage in row["stages"]][1:] == ["v0", "80% on v0", "v0 live"]
