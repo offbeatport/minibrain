@@ -1,8 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Link } from "obp-ui";
+import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import { useMinibrains, useRecentJobs } from "~/api/queries";
-import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
@@ -77,7 +76,7 @@ export function HomePage() {
             </Section>
             {minibrains?.length === 0 && <GetStarted />}
             <Section title="Recent jobs">
-                <DataTable columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
+                <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
             </Section>
         </Page>
     );

@@ -4,6 +4,7 @@ import { Check, Copy, KeyRound, MoreHorizontal, Pencil, Trash2 } from "lucide-re
 import {
     Button,
     Checkbox,
+    DataGrid,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -21,7 +22,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, succeed, unwrap } from "~/api/client";
 import { keys, useKeys, useModels } from "~/api/queries";
-import { DataTable } from "~/components/DataTable";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
@@ -370,7 +370,7 @@ export function ApiKeys({
             <div className="flex flex-col gap-3">
                 {created && <NewSecret created={created} onDismiss={() => setCreated(null)} />}
                 <ErrorLine error={list.error} />
-                <DataTable columns={table} rows={rows} empty="No keys yet." />
+                <DataGrid columns={table} rows={rows} empty="No keys yet." />
             </div>
             <KeyDialog
                 editing={editing}

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
     Button,
+    DataGrid,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -42,7 +43,6 @@ import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
-import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
@@ -984,9 +984,10 @@ export function MyModels({
                     </Button>
                 </div>
             ) : (
-                <SortableTable
+                <DataGrid
                     columns={tableColumns}
                     rows={visible}
+                    storageKey="minibrain.models.columns"
                     onOpen={(entry) => on.open(detailHref(entry.model))}
                     rowLabel={(entry) =>
                         `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`

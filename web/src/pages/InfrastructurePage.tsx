@@ -1,10 +1,9 @@
 import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Cpu, Gauge, HardDrive, MemoryStick, Network, Server, TriangleAlert } from "lucide-react";
-import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { Badge, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
-import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { SideMenuLayout } from "~/components/SideMenu";
@@ -163,9 +162,9 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
             description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
         >
             <div className="flex flex-col gap-3">
-                <DataTable columns={nodeColumns(main)} rows={pool.nodes} empty="No machines yet." />
+                <DataGrid columns={nodeColumns(main)} rows={pool.nodes} empty="No machines yet." />
                 {pool.engines.length > 0 && (
-                    <DataTable columns={REPLICA_COLUMNS} rows={pool.engines} />
+                    <DataGrid columns={REPLICA_COLUMNS} rows={pool.engines} />
                 )}
             </div>
         </PanelSection>
@@ -327,7 +326,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection icon={HardDrive} title="Storage">
             <div className="flex flex-col gap-3">
-                <DataTable columns={STORE_COLUMNS} rows={info?.stores ?? []} />
+                <DataGrid columns={STORE_COLUMNS} rows={info?.stores ?? []} />
                 <p className="text-sm text-muted-foreground">
                     Everything lives under{" "}
                     <span className="font-mono text-foreground">{info?.home ?? "…"}</span>. To move
@@ -520,7 +519,7 @@ export function InfrastructurePage() {
                             title="Loaded in memory"
                             description="Base models and adapters the serving process holds right now."
                         >
-                            <DataTable
+                            <DataGrid
                                 columns={LOADED_COLUMNS}
                                 rows={data?.loaded ?? []}
                                 empty="Nothing loaded yet; the first request loads the base model."

@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
+    DataGrid,
     SegmentedTabs,
     Select,
     SelectContent,
@@ -18,7 +19,6 @@ import { type JobInfo, api, unwrap } from "~/api/client";
 import { isActiveJob } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
-import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import { exactTime, relativeTime } from "~/lib/time";
 
@@ -256,9 +256,10 @@ export function MonitorPage() {
             {jobs.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading jobs…</p>
             ) : (
-                <SortableTable
+                <DataGrid
                     columns={COLUMNS}
                     rows={visible}
+                    storageKey="minibrain.jobs.columns"
                     onOpen={(job) => {
                         const href = jobHref(job);
                         if (href) {

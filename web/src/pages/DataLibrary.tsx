@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, Database, FileText, Users } from "lucide-react";
 import {
     Button,
+    DataGrid,
     Link,
     Select,
     SelectContent,
@@ -26,7 +27,6 @@ import {
 } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
-import { SortableTable } from "~/components/models/SortableTable";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
@@ -282,11 +282,12 @@ export function DataLibrary() {
             <ErrorLine error={upload.error ?? remove.error ?? datasets.error ?? sources.error} />
             <PanelSections>
                 <PanelSection icon={Database} title="Datasets" bare>
-                    <SortableTable
+                    <DataGrid
                         columns={datasetColumns((dataset) =>
                             remove.mutate({ dataset: dataset.slug }),
                         )}
                         rows={datasets.data ?? []}
+                        storageKey="minibrain.datasets.columns"
                         onOpen={(dataset) => router.history.push(datasetHref(dataset.slug))}
                         rowLabel={(dataset) => `${dataset.name} dataset`}
                         empty={
@@ -299,11 +300,12 @@ export function DataLibrary() {
                     />
                 </PanelSection>
                 <PanelSection icon={FileText} title="Files" bare>
-                    <SortableTable
+                    <DataGrid
                         columns={sourceColumns(createFrom, (source) =>
                             remove.mutate({ source: source.id }),
                         )}
                         rows={sources.data ?? []}
+                        storageKey="minibrain.files.columns"
                         onOpen={(source) => createFrom(source)}
                         rowLabel={(source) => `${source.filename} file`}
                         empty={<p className="text-muted-foreground">No files uploaded yet.</p>}

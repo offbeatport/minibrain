@@ -6,6 +6,7 @@ import {
     Badge,
     Button,
     Checkbox,
+    DataGrid,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -32,7 +33,6 @@ import { type CatalogEntry, type CatalogResponse, type FitInfo, api, unwrap } fr
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, relativeTime } from "~/lib/time";
@@ -897,9 +897,10 @@ export function Discover({
                             <AccessSteps catalog={data} />
                         </div>
                     )}
-                    <SortableTable
+                    <DataGrid
                         columns={tableColumns}
                         rows={visible}
+                        storageKey="minibrain.discover.columns"
                         onOpen={(entry) => setRequirements({ entry })}
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
                         empty={empty}

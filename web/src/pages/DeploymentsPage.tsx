@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, History, Plug, Terminal } from "lucide-react";
-import { Badge, Button, Link } from "obp-ui";
+import { Badge, Button, DataGrid, Link } from "obp-ui";
 import { useState } from "react";
 import {
     type KeyCreated,
@@ -14,12 +14,10 @@ import {
 } from "~/api/client";
 import { useMinibrain, useModels } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
-import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
-import { SortableTable } from "~/components/models/SortableTable";
 import { StatusText } from "~/components/models/StatusText";
 import { count, percent } from "~/lib/format";
 import { Deployment as DeploymentCell } from "./models/MyModels";
@@ -238,9 +236,10 @@ export function DeploymentsPage() {
                     {models.isLoading ? (
                         <p className="text-sm text-muted-foreground">Loading…</p>
                     ) : (
-                        <SortableTable
+                        <DataGrid
                             columns={ENDPOINT_COLUMNS}
                             rows={live}
+                            storageKey="minibrain.deployments.columns"
                             onOpen={(row) => router.history.push(endpointHref(row))}
                             rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
                             empty={
@@ -327,7 +326,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
     return (
         <PanelSection icon={History} title="Versions">
             <div className="flex flex-col gap-2">
-                <DataTable
+                <DataGrid
                     columns={columns}
                     rows={versions}
                     empty="No versions yet: it serves its base model."

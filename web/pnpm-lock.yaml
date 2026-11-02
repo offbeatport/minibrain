@@ -22,7 +22,7 @@ importers:
         version: 1.64.0(@types/react@19.3.0)(react@19.3.1)
       obp-ui:
         specifier: github:offbeatport/obp-ui#main
-        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/dd6cbdb8f05304b417d9b67a774745cfd52296c6(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
+        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/78a7954a9343b8a919f2eecb79fc8446d92baeee(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
       openapi-fetch:
         specifier: ^0.13.0
         version: 0.13.8
@@ -744,6 +744,12 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
+  '@tanstack/react-virtual@3.14.25':
+    resolution: {integrity: sha512-LYNLaogi8NZUqjPgJ0byKQrXprkDJsZLd94u0i1UpYtXz2fgvbP4KrHygM4MSgSAvEaqykQofYdJ1Vuf7XIz/Q==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   '@tanstack/router-core@1.171.39':
     resolution: {integrity: sha512-qUhoJ0meuSUqGYQbHbcJYdASr06YtK+bulbj6vtrhKYFkLgkSsZ6tXmMyym7sFxiSJSPYgasgozrL01LyyR/6A==}
     engines: {node: '>=20.19'}
@@ -754,6 +760,9 @@ packages:
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
+
+  '@tanstack/virtual-core@3.19.10':
+    resolution: {integrity: sha512-/ltpH0qUCs5XQYE7fIhgA+aqgC5NzSfLTDQkC+N1wOOdvIYx1FH/kz2LGfSeanNbekqy3WBu6mNIbqXhxE/pew==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1037,8 +1046,8 @@ packages:
     resolution: {integrity: sha512-5NUN6QCxNFrS9oEA9RPS+d0AP+ooGBzzovY2JhIpDRHacPvOhHjXjUsUMX9qp4nLHZ+5jVgXB2jj/P4arGOE/g==}
     engines: {node: '>=18'}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/dd6cbdb8f05304b417d9b67a774745cfd52296c6:
-    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/dd6cbdb8f05304b417d9b67a774745cfd52296c6}
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/78a7954a9343b8a919f2eecb79fc8446d92baeee:
+    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/78a7954a9343b8a919f2eecb79fc8446d92baeee}
     version: 0.1.0
     peerDependencies:
       '@xyflow/react': ^12
@@ -1734,6 +1743,12 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
+  '@tanstack/react-virtual@3.14.25(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@tanstack/virtual-core': 3.19.10
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+
   '@tanstack/router-core@1.171.39':
     dependencies:
       '@tanstack/history': 1.162.5
@@ -1744,6 +1759,8 @@ snapshots:
   '@tanstack/store@0.11.2': {}
 
   '@tanstack/table-core@8.21.3': {}
+
+  '@tanstack/virtual-core@3.19.10': {}
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -1991,7 +2008,7 @@ snapshots:
 
   node-releases@2.0.61: {}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/dd6cbdb8f05304b417d9b67a774745cfd52296c6(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/78a7954a9343b8a919f2eecb79fc8446d92baeee(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@fontsource-variable/fraunces': 5.3.0
@@ -2005,6 +2022,8 @@ snapshots:
       '@fontsource-variable/space-grotesk': 5.3.0
       '@fontsource/instrument-serif': 5.3.0
       '@fontsource/spectral': 5.3.0
+      '@tanstack/react-table': 8.21.3(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@tanstack/react-virtual': 3.14.25(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
       lucide-react: 1.64.0(@types/react@19.3.0)(react@19.3.1)

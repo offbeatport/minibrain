@@ -3,6 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
+    DataGrid,
     Label,
     Link,
     Select,
@@ -33,7 +34,6 @@ import {
     useMinibrain,
     usePreview,
 } from "~/api/queries";
-import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { ScopedPage } from "~/components/PageHeader";
 import { ErrorLine, Section, Stat } from "~/components/Section";
@@ -170,7 +170,7 @@ function QueryResult({ result }: { result: QueryResponse }) {
         cell: (info) => <Clamp text={info.getValue()} />,
     }));
     return (
-        <DataTable
+        <DataGrid
             columns={columns}
             rows={result.rows.map((row) => row.map((cell) => cell ?? ""))}
         />
@@ -300,7 +300,7 @@ export function PreviewSection({
             )}
             {data && (
                 <div className="flex flex-col gap-4">
-                    <DataTable columns={ROW_COLUMNS} rows={data.rows} />
+                    <DataGrid columns={ROW_COLUMNS} rows={data.rows} />
                     <div className="flex max-w-2xl flex-col gap-2">
                         <h3 className="text-sm font-semibold">One training example</h3>
                         {data.example.map((message) => (
@@ -403,7 +403,7 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
                             {showGolden ? "Hide test set" : "Show test set"}
                         </Button>
                     </div>
-                    {showGolden && <DataTable columns={GOLDEN_COLUMNS} rows={golden.data ?? []} />}
+                    {showGolden && <DataGrid columns={GOLDEN_COLUMNS} rows={golden.data ?? []} />}
                 </div>
             ) : (
                 <p className="text-sm text-muted-foreground">

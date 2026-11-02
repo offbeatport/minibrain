@@ -1,10 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button } from "obp-ui";
+import { Button, DataGrid } from "obp-ui";
 import { useState } from "react";
 import { type VersionInfo, api, unwrap } from "~/api/client";
 import { useVersions } from "~/api/queries";
-import { DataTable } from "~/components/DataTable";
 import { ScopedPage } from "~/components/PageHeader";
 import { Section } from "~/components/Section";
 import { VersionStatus } from "~/components/StatusBadge";
@@ -129,7 +128,7 @@ function Evaluations({ slug }: { slug: string }) {
                 title="Versions"
                 caption="Every version is scored on the same test set and held-out rows. Promotion is blocked when a version scores below the current one on held-out rows."
             >
-                <DataTable
+                <DataGrid
                     columns={versionColumns(slug, setSelected)}
                     rows={versions ?? []}
                     empty="No versions yet. Score or train one on the Training page."
@@ -140,7 +139,7 @@ function Evaluations({ slug }: { slug: string }) {
                     title={`Mistakes in v${shown.number}`}
                     caption="Up to 20 held-out rows it got wrong."
                 >
-                    <DataTable columns={MISTAKE_COLUMNS} rows={shown.mistakes} />
+                    <DataGrid columns={MISTAKE_COLUMNS} rows={shown.mistakes} />
                 </Section>
             )}
         </>

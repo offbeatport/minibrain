@@ -5,6 +5,7 @@ import {
     Badge,
     Button,
     Checkbox,
+    DataGrid,
     Input,
     Label,
     RadioGroup,
@@ -20,7 +21,6 @@ import {
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { DataTable } from "~/components/DataTable";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
@@ -379,7 +379,7 @@ export function SecurityPage() {
                     ))}
                 <PanelSection icon={History} title="Audit log">
                     <ErrorLine error={audit.error} />
-                    <DataTable
+                    <DataGrid
                         columns={auditColumns(byName)}
                         rows={audit.data ?? []}
                         empty="No changes yet."

@@ -2,12 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
-import { Badge, Button, Link } from "obp-ui";
+import { Badge, Button, DataGrid, Link } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
-import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -272,7 +271,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                     title="Files"
                     description="Checked on download or import; each is re-checked by size when listed."
                 >
-                    <DataTable columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
+                    <DataGrid columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
                 </PanelSection>
                 <ApiSection model={model} />
             </PanelSections>
@@ -386,7 +385,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 title="Revisions"
                 description="Each training or scoring run creates a revision; one is deployed at a time."
             >
-                <DataTable
+                <DataGrid
                     columns={VERSION_COLUMNS}
                     rows={versions.data ?? []}
                     empty="No revisions yet: add examples, then train or score a prompt."
