@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Section({
@@ -23,6 +24,45 @@ export function Section({
             <div className="p-4">{children}</div>
         </section>
     );
+}
+
+export function PanelSection({
+    icon: Icon,
+    title,
+    description,
+    actions,
+    children,
+}: {
+    icon: LucideIcon;
+    title: string;
+    description?: ReactNode;
+    actions?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <section className="flex flex-col gap-2">
+            <header className="flex flex-wrap items-end justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="flex items-center gap-2 text-base font-semibold">
+                        <Icon
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-muted-foreground"
+                        />
+                        {title}
+                    </h2>
+                    {description && (
+                        <p className="pl-6 text-sm text-muted-foreground">{description}</p>
+                    )}
+                </div>
+                {actions && <div className="flex items-center gap-2">{actions}</div>}
+            </header>
+            <div className="rounded-lg border bg-card p-4">{children}</div>
+        </section>
+    );
+}
+
+export function PanelSections({ children }: { children: ReactNode }) {
+    return <div className="flex flex-col gap-8 pt-2">{children}</div>;
 }
 
 export function Stat({ label, value }: { label: string; value: ReactNode }) {

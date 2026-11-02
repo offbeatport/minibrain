@@ -1,10 +1,11 @@
 import type { ColumnDef } from "@tanstack/react-table";
+import { Cpu, ListOrdered, MemoryStick, Package, Server } from "lucide-react";
 import { Badge } from "obp-ui";
 import { usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, Section, Stat } from "~/components/Section";
+import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
 
@@ -102,9 +103,10 @@ function plural(value: number, noun: string): string {
 function PoolSection({ pool }: { pool: PoolInfo }) {
     const online = pool.nodes.filter((node) => node.online).length;
     return (
-        <Section
+        <PanelSection
+            icon={Server}
             title={pool.name === "local" ? pool.label : `Pool ${pool.label}`}
-            caption={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
+            description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
         >
             <div className="flex flex-col gap-3">
                 <DataTable columns={NODE_COLUMNS} rows={pool.nodes} empty="No machines yet." />
@@ -112,7 +114,7 @@ function PoolSection({ pool }: { pool: PoolInfo }) {
                     <DataTable columns={REPLICA_COLUMNS} rows={pool.engines} />
                 )}
             </div>
-        </Section>
+        </PanelSection>
     );
 }
 
@@ -157,61 +159,69 @@ export function ComputePage() {
                 caption="Pools of machines that run engines and jobs. Workers and engines join a pool with --pool and report their hardware."
             />
             <ErrorLine error={error ?? pools.error} />
-            {(pools.data ?? []).map((pool) => (
-                <PoolSection key={pool.name} pool={pool} />
-            ))}
-            <Section
-                title="This main process"
-                caption="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
-            >
-                <div className="flex flex-wrap gap-8">
-                    <Stat
-                        label="Inference"
-                        value={<span className="font-mono">{device?.inference ?? "–"}</span>}
-                    />
-                    <Stat
-                        label="Training"
-                        value={<span className="font-mono">{device?.training ?? "–"}</span>}
-                    />
-                    <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
-                    <Stat
-                        label="GPU memory used"
-                        value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
-                    />
-                    <Stat label="CPU cores" value={count(device?.cpu_count)} />
-                    <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
-                </div>
-            </Section>
-            <Section title="Job queue" caption="One worker runs jobs one at a time.">
-                <div className="flex flex-wrap gap-8">
-                    {JOB_STATES.map((state) => (
+            <PanelSections>
+                {(pools.data ?? []).map((pool) => (
+                    <PoolSection key={pool.name} pool={pool} />
+                ))}
+                <PanelSection
+                    icon={Cpu}
+                    title="This main process"
+                    description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
+                >
+                    <div className="flex flex-wrap gap-8">
                         <Stat
-                            key={state}
-                            label={state[0].toUpperCase() + state.slice(1)}
-                            value={count(data?.jobs[state] ?? 0)}
+                            label="Inference"
+                            value={<span className="font-mono">{device?.inference ?? "–"}</span>}
                         />
-                    ))}
-                </div>
-            </Section>
-            <Section
-                title="Loaded in memory"
-                caption="Base models and adapters the serving process holds right now."
-            >
-                <DataTable
-                    columns={LOADED_COLUMNS}
-                    rows={data?.loaded ?? []}
-                    empty="Nothing loaded yet; the first request loads the base model."
-                />
-            </Section>
-            <Section title="Libraries">
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                    {Object.entries(data?.libraries ?? {}).map(([name, version]) => (
-                        <span key={name}>
-                            {name} <span className="font-mono">{version}</span>
-                        </span>
-                    ))}
-                </div>
-            </Section>
+                        <Stat
+                            label="Training"
+                            value={<span className="font-mono">{device?.training ?? "–"}</span>}
+                        />
+                        <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
+                        <Stat
+                            label="GPU memory used"
+                            value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
+                        />
+                        <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                        <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
+                    </div>
+                </PanelSection>
+                <PanelSection
+                    icon={ListOrdered}
+                    title="Job queue"
+                    description="One worker runs jobs one at a time."
+                >
+                    <div className="flex flex-wrap gap-8">
+                        {JOB_STATES.map((state) => (
+                            <Stat
+                                key={state}
+                                label={state[0].toUpperCase() + state.slice(1)}
+                                value={count(data?.jobs[state] ?? 0)}
+                            />
+                        ))}
+                    </div>
+                </PanelSection>
+                <PanelSection
+                    icon={MemoryStick}
+                    title="Loaded in memory"
+                    description="Base models and adapters the serving process holds right now."
+                >
+                    <DataTable
+                        columns={LOADED_COLUMNS}
+                        rows={data?.loaded ?? []}
+                        empty="Nothing loaded yet; the first request loads the base model."
+                    />
+                </PanelSection>
+                <PanelSection icon={Package} title="Libraries">
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                        {Object.entries(data?.libraries ?? {}).map(([name, version]) => (
+                            <span key={name}>
+                                {name} <span className="font-mono">{version}</span>
+                            </span>
+                        ))}
+                    </div>
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }

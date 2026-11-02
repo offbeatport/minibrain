@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Box, Globe, History, KeyRound } from "lucide-react";
 import {
     Badge,
     Button,
@@ -18,7 +19,7 @@ import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, Section } from "~/components/Section";
+import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsTabs } from "~/components/SettingsTabs";
 import { exactTime, relativeTime } from "~/lib/time";
 
@@ -30,19 +31,23 @@ const AUDIT = ["audit"] as const;
 
 const GROUPS = [
     {
+        icon: Globe,
         title: "Network",
-        caption:
+        description:
             "Downloads, imports from buckets, catalogue sync and Add from Hugging Face all obey this.",
         names: ["network", "allowed_hosts"],
     },
     {
+        icon: Box,
         title: "Models",
-        caption: "Checked when a model is added or downloaded, and again on retry.",
+        description: "Checked when a model is added or downloaded, and again on retry.",
         names: ["model_sources", "licences", "allow_unreviewed_licences", "safetensors_only"],
     },
     {
+        icon: KeyRound,
         title: "Request logs and API keys",
-        caption: "Logs never leave this install. Expiry applies to keys created after the change.",
+        description:
+            "Logs never leave this install. Expiry applies to keys created after the change.",
         names: ["request_logs", "log_retention_days", "key_expiry_days"],
     },
 ];
@@ -253,25 +258,32 @@ export function SecurityPage() {
             />
             <SettingsTabs active="/settings/security" />
             <ErrorLine error={policies.error} />
-            {policies.data &&
-                GROUPS.map((group) => (
-                    <Section key={group.title} title={group.title} caption={group.caption}>
-                        <div className="divide-y">
-                            {group.names.map((name) => {
-                                const policy = byName.get(name);
-                                return policy ? <PolicyRow key={name} policy={policy} /> : null;
-                            })}
-                        </div>
-                    </Section>
-                ))}
-            <Section title="Recent changes">
-                <ErrorLine error={audit.error} />
-                <DataTable
-                    columns={auditColumns(byName)}
-                    rows={audit.data ?? []}
-                    empty="No changes yet."
-                />
-            </Section>
+            <PanelSections>
+                {policies.data &&
+                    GROUPS.map((group) => (
+                        <PanelSection
+                            key={group.title}
+                            icon={group.icon}
+                            title={group.title}
+                            description={group.description}
+                        >
+                            <div className="divide-y">
+                                {group.names.map((name) => {
+                                    const policy = byName.get(name);
+                                    return policy ? <PolicyRow key={name} policy={policy} /> : null;
+                                })}
+                            </div>
+                        </PanelSection>
+                    ))}
+                <PanelSection icon={History} title="Recent changes">
+                    <ErrorLine error={audit.error} />
+                    <DataTable
+                        columns={auditColumns(byName)}
+                        rows={audit.data ?? []}
+                        empty="No changes yet."
+                    />
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }

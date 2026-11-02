@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ExternalLink } from "lucide-react";
+import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
 import { Badge, Button, Input, Link } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import {
@@ -17,7 +17,7 @@ import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from
 import { DataTable } from "~/components/DataTable";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, Section } from "~/components/Section";
+import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { percent } from "~/lib/format";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes, exactTime } from "~/lib/time";
@@ -124,9 +124,10 @@ function ApiKeys({ model }: { model: BaseModelDetail }) {
     });
     const origin = window.location.origin;
     return (
-        <Section
+        <PanelSection
+            icon={Plug}
             title="API"
-            caption={
+            description={
                 model.deployed
                     ? `Call it as ${model.key} on the OpenAI-compatible endpoint.`
                     : "Deploy it to call it from the API; keys can be created now."
@@ -178,7 +179,7 @@ function ApiKeys({ model }: { model: BaseModelDetail }) {
                 </form>
                 <ErrorLine error={create.error ?? remove.error} />
             </div>
-        </Section>
+        </PanelSection>
     );
 }
 
@@ -268,80 +269,83 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 }
             />
             <StatusStrip row={model} />
-            <Section title="Overview">
-                <Facts
-                    items={[
-                        [
-                            "Source",
-                            model.source === "download"
-                                ? "Downloaded from the catalogue"
-                                : `Imported from ${model.source_path?.replace(/^\w+:/, "")}`,
-                        ],
-                        ["Repository", repoLink],
-                        [
-                            "Verification",
-                            model.verified ? (
-                                "Every file matches the catalogue checksums"
-                            ) : (
-                                <Badge key="verification" variant="warning">
-                                    Not verified against the catalogue
-                                </Badge>
-                            ),
-                        ],
-                        [
-                            "Update",
-                            model.update_available
-                                ? `A newer revision is published (${(model.latest_revision ?? "").slice(0, 12)}); this pin stays until you choose.`
-                                : "Pinned revision is current",
-                        ],
-                        [
-                            "Licence",
-                            model.license_name ? (
-                                <span key="licence">
-                                    {model.license_url ? (
-                                        <a
-                                            href={model.license_url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-primary hover:underline"
-                                        >
-                                            {model.license_name}
-                                        </a>
-                                    ) : (
-                                        model.license_name
-                                    )}
-                                    {model.license_ack_at &&
-                                        ` · accepted by ${model.license_ack_by} on ${exactTime(model.license_ack_at)}`}
-                                </span>
-                            ) : (
-                                (model.license ?? "—")
-                            ),
-                        ],
-                        ["Size", `${bytes(model.size_bytes)} in ${model.files.length} files`],
-                        [
-                            "Storage",
-                            <span key="storage" className="font-mono">
-                                {model.storage_path}
-                            </span>,
-                        ],
-                        [
-                            "Training",
-                            model.trainable
-                                ? "Can be used as a base for training"
-                                : "Not tested for training",
-                        ],
-                    ]}
-                />
-                {model.error && <p className="mt-2 text-sm text-destructive">{model.error}</p>}
-            </Section>
-            {job.data && <JobPanel job={job.data} slug="" />}
-            <Section
-                title="Files"
-                caption="Checked on download or import; each is re-checked by size when listed."
-            >
-                <DataTable columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
-            </Section>
-            <ApiKeys model={model} />
+            <PanelSections>
+                <PanelSection icon={Info} title="Overview">
+                    <Facts
+                        items={[
+                            [
+                                "Source",
+                                model.source === "download"
+                                    ? "Downloaded from the catalogue"
+                                    : `Imported from ${model.source_path?.replace(/^\w+:/, "")}`,
+                            ],
+                            ["Repository", repoLink],
+                            [
+                                "Verification",
+                                model.verified ? (
+                                    "Every file matches the catalogue checksums"
+                                ) : (
+                                    <Badge key="verification" variant="warning">
+                                        Not verified against the catalogue
+                                    </Badge>
+                                ),
+                            ],
+                            [
+                                "Update",
+                                model.update_available
+                                    ? `A newer revision is published (${(model.latest_revision ?? "").slice(0, 12)}); this pin stays until you choose.`
+                                    : "Pinned revision is current",
+                            ],
+                            [
+                                "Licence",
+                                model.license_name ? (
+                                    <span key="licence">
+                                        {model.license_url ? (
+                                            <a
+                                                href={model.license_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary hover:underline"
+                                            >
+                                                {model.license_name}
+                                            </a>
+                                        ) : (
+                                            model.license_name
+                                        )}
+                                        {model.license_ack_at &&
+                                            ` · accepted by ${model.license_ack_by} on ${exactTime(model.license_ack_at)}`}
+                                    </span>
+                                ) : (
+                                    (model.license ?? "—")
+                                ),
+                            ],
+                            ["Size", `${bytes(model.size_bytes)} in ${model.files.length} files`],
+                            [
+                                "Storage",
+                                <span key="storage" className="font-mono">
+                                    {model.storage_path}
+                                </span>,
+                            ],
+                            [
+                                "Training",
+                                model.trainable
+                                    ? "Can be used as a base for training"
+                                    : "Not tested for training",
+                            ],
+                        ]}
+                    />
+                    {model.error && <p className="mt-2 text-sm text-destructive">{model.error}</p>}
+                </PanelSection>
+                {job.data && <JobPanel job={job.data} slug="" />}
+                <PanelSection
+                    icon={Files}
+                    title="Files"
+                    description="Checked on download or import; each is re-checked by size when listed."
+                >
+                    <DataTable columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
+                </PanelSection>
+                <ApiKeys model={model} />
+            </PanelSections>
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
             <ConfirmAction
@@ -446,16 +450,17 @@ function CustomModelView({ row }: { row: ModelRow }) {
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}
-            <Section
+            <PanelSection
+                icon={History}
                 title="Revisions"
-                caption="Each training or scoring run creates a revision; one is deployed at a time."
+                description="Each training or scoring run creates a revision; one is deployed at a time."
             >
                 <DataTable
                     columns={VERSION_COLUMNS}
                     rows={versions.data ?? []}
                     empty="No revisions yet: add examples, then train or score a prompt."
                 />
-            </Section>
+            </PanelSection>
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
         </>
     );
