@@ -607,6 +607,8 @@ Everything in the v1 scope below, after M1.
 - One-click retrain on new data (dlt incremental)
 - Automatic retrain when feedback since the last version crosses a threshold
 - Version diff (data and scores)
+- Notifications bell in the top bar: failed jobs, results ready to review, models that need examples, missing
+  files
 - Batch jobs (Run → Batch jobs): run a version over a file, snapshot or SQL query in the background, on the job
   worker; resumable, with progress; results as CSV or Parquet with inputs, outputs and the version; OpenAI-compatible
   `/v1/files` and `/v1/batches`
