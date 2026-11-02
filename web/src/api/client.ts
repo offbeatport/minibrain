@@ -15,6 +15,7 @@ export type KeyInfo = Schemas["KeyInfo"];
 export type KeyCreated = Schemas["KeyCreated"];
 export type ModelStage = Schemas["Stage"];
 export type ModelUsage = Schemas["Usage"];
+export type ModelVersionRow = Schemas["VersionRow"];
 export type CompleteResponse = Schemas["CompleteResponse"];
 export type SplitScore = Schemas["SplitScore"];
 export type ModelRow = Schemas["ModelRow"];

@@ -5,6 +5,7 @@ import {
     ArchiveRestore,
     CircleX,
     Eye,
+    FlaskConical,
     GraduationCap,
     MoreHorizontal,
     Pencil,
@@ -35,7 +36,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -55,6 +56,18 @@ import {
     cancelJob,
     useModelsRefresh,
 } from "./dialogs";
+import {
+    type Entry,
+    type EntryState,
+    KIND_LABELS,
+    STATE_LABELS,
+    STATE_RANK,
+    byState,
+    entriesOf,
+    failingEntry,
+    stateOfEntry,
+    usageOf,
+} from "./entries";
 
 const ANY = "all";
 const AVAILABILITY_LABELS: Record<string, string> = {
@@ -323,8 +336,130 @@ function deleteConfirmation(row: ModelRow, on: Handlers): Confirmation {
     };
 }
 
-function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
-    const primary = primaryAction(row, on);
+function promoteVersion(row: ModelRow, number: number) {
+    return unwrap(
+        api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
+            params: { path: { slug: row.key, number } },
+        }),
+    );
+}
+
+function deleteVersion(row: ModelRow, number: number) {
+    return unwrap(
+        api.DELETE("/api/minibrains/{slug}/versions/{number}", {
+            params: { path: { slug: row.key, number } },
+        }),
+    );
+}
+
+function deleteVersionConfirmation(entry: Entry, on: Handlers): Confirmation {
+    const row = entry.model;
+    const number = entry.version?.number ?? 0;
+    if (entry.version?.live) {
+        return {
+            title: `v${number} of ${row.name} is deployed`,
+            description: (
+                <>
+                    <p>Undeploy it first, then delete it.</p>
+                    <p>
+                        Apps calling <span className="font-mono">{row.key}</span> get errors until
+                        you deploy the model again.
+                    </p>
+                </>
+            ),
+            confirmLabel: "Undeploy",
+            destructive: true,
+            run: () => setDeployed(row, false).then(on.refresh),
+        };
+    }
+    return {
+        title: `Delete v${number} of ${row.name}?`,
+        description: (
+            <p>
+                Its adapter, scores and results are removed. This cannot be undone; the number v
+                {number} is not reused.
+            </p>
+        ),
+        confirmLabel: "Delete version",
+        destructive: true,
+        run: () => deleteVersion(row, number).then(on.refresh),
+    };
+}
+
+function versionAction(entry: Entry, on: Handlers): { label: string; run: () => void } | null {
+    const row = entry.model;
+    const version = entry.version;
+    if (!version) {
+        return null;
+    }
+    if (version.live) {
+        return { label: "Use API", run: () => on.open(scoped("/deployments", row)) };
+    }
+    if (version.status === "ready") {
+        return { label: "Deploy", run: () => promoteVersion(row, version.number).then(on.refresh) };
+    }
+    if (version.status === "failed") {
+        return { label: "Details", run: () => on.open(scoped("/training", row)) };
+    }
+    return null;
+}
+
+function VersionMenuItems({ entry, on }: { entry: Entry; on: Handlers }) {
+    const row = entry.model;
+    const version = entry.version;
+    if (!version) {
+        return null;
+    }
+    return (
+        <>
+            {version.status === "ready" && !version.live && (
+                <DropdownMenuItem
+                    onSelect={() => promoteVersion(row, version.number).then(on.refresh)}
+                >
+                    <Rocket />
+                    {`Deploy v${version.number}`}
+                </DropdownMenuItem>
+            )}
+            {version.live && (
+                <DropdownMenuItem
+                    onSelect={() =>
+                        on.confirm({
+                            title: `Undeploy ${row.name}?`,
+                            description: (
+                                <p>Its API stops answering; versions, keys and files stay.</p>
+                            ),
+                            confirmLabel: "Undeploy",
+                            destructive: true,
+                            run: () => setDeployed(row, false).then(on.refresh),
+                        })
+                    }
+                >
+                    <PowerOff />
+                    Undeploy
+                </DropdownMenuItem>
+            )}
+            {version.status === "ready" && (
+                <DropdownMenuItem onSelect={() => on.test(row)}>
+                    <FlaskConical />
+                    {`Test v${version.number}`}
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => on.confirm(deleteVersionConfirmation(entry, on))}
+            >
+                <Trash2 />
+                {`Delete v${version.number}`}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+        </>
+    );
+}
+
+function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
+    const row = entry.model;
+    const version = entry.version;
+    const primary = version ? versionAction(entry, on) : primaryAction(row, on);
     const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
     const deployed = row.deployment.state !== "not_deployed";
     return (
@@ -345,6 +480,7 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
+                    {version && <VersionMenuItems entry={entry} on={on} />}
                     <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
                         <Eye />
                         View details
@@ -365,42 +501,43 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                             Train a model on it
                         </DropdownMenuItem>
                     )}
-                    {row.kind === "custom" && (
+                    {row.kind === "custom" && !version && (
                         <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
                             <Rocket />
                             {deployed ? "Change deployed version" : "Deploy a version"}
                         </DropdownMenuItem>
                     )}
-                    {(row.kind === "custom" || row.availability.state === "available") && (
-                        <DropdownMenuItem
-                            onSelect={() =>
-                                on.confirm({
-                                    title: deployed
-                                        ? `Undeploy ${row.name}?`
-                                        : `Deploy ${row.name}?`,
-                                    description: deployed ? (
-                                        <p>Its API stops answering; keys and files stay.</p>
-                                    ) : (
-                                        <p>
-                                            It becomes callable as{" "}
-                                            <span className="font-mono">{row.key}</span> on the
-                                            OpenAI-compatible API with its own keys
-                                            {row.needed_bytes
-                                                ? `, using about ${bytes(row.needed_bytes)} of memory`
-                                                : ""}
-                                            .
-                                        </p>
-                                    ),
-                                    confirmLabel: deployed ? "Undeploy" : "Deploy",
-                                    destructive: deployed,
-                                    run: () => setDeployed(row, !deployed).then(on.refresh),
-                                })
-                            }
-                        >
-                            {deployed ? <PowerOff /> : <Rocket />}
-                            {deployed ? "Undeploy" : "Deploy"}
-                        </DropdownMenuItem>
-                    )}
+                    {!version &&
+                        (row.kind === "custom" || row.availability.state === "available") && (
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    on.confirm({
+                                        title: deployed
+                                            ? `Undeploy ${row.name}?`
+                                            : `Deploy ${row.name}?`,
+                                        description: deployed ? (
+                                            <p>Its API stops answering; keys and files stay.</p>
+                                        ) : (
+                                            <p>
+                                                It becomes callable as{" "}
+                                                <span className="font-mono">{row.key}</span> on the
+                                                OpenAI-compatible API with its own keys
+                                                {row.needed_bytes
+                                                    ? `, using about ${bytes(row.needed_bytes)} of memory`
+                                                    : ""}
+                                                .
+                                            </p>
+                                        ),
+                                        confirmLabel: deployed ? "Undeploy" : "Deploy",
+                                        destructive: deployed,
+                                        run: () => setDeployed(row, !deployed).then(on.refresh),
+                                    })
+                                }
+                            >
+                                {deployed ? <PowerOff /> : <Rocket />}
+                                {deployed ? "Undeploy" : "Deploy"}
+                            </DropdownMenuItem>
+                        )}
                     {transferring && row.activity.job_id !== null && (
                         <DropdownMenuItem
                             onSelect={() =>
@@ -429,7 +566,7 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                         onSelect={() => on.confirm(deleteConfirmation(row, on))}
                     >
                         <Trash2 />
-                        Delete
+                        {row.kind === "custom" ? "Delete model" : "Delete"}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -437,116 +574,101 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
     );
 }
 
-type ModelState = "error" | "live" | "progress" | "idle";
-
-const STATE_LABELS: Record<ModelState, string> = {
-    error: "Errors",
-    live: "Live",
-    progress: "In progress",
-    idle: "Not deployed",
-};
-
-const STATE_RANK: ModelState[] = ["error", "live", "progress", "idle"];
-
-const FAILING_SHARE = 0.01;
-
-function failing(row: ModelRow): boolean {
-    return row.deployment.state !== "not_deployed" && failingShare(row.usage) >= FAILING_SHARE;
+function failedLabel(entry: Entry): string {
+    const { model, version } = entry;
+    if (version) {
+        return version.kind === "lora" && version.accuracy === null
+            ? "Training failed"
+            : "Scoring failed";
+    }
+    if (model.availability.state === "missing") {
+        return "Missing files";
+    }
+    if (model.deployment.state === "unhealthy") {
+        return "Deployment unhealthy";
+    }
+    return model.activity.label;
 }
 
-function hasError(row: ModelRow): boolean {
+function errorDetail(entry: Entry): string {
+    const usage = usageOf(entry);
+    if (failingEntry(entry)) {
+        return `${usage?.failed ?? 0} of ${usage?.total ?? 0} requests in the last 7 days failed.`;
+    }
+    const { model, version } = entry;
+    if (version) {
+        return version.error || "The job failed without a message.";
+    }
+    if (model.availability.state === "missing") {
+        return "Some of its files are gone from storage. Retry the download or delete it.";
+    }
+    if (model.deployment.state === "unhealthy") {
+        return "The engine serving it does not answer health checks.";
+    }
+    return model.error || "The last job failed without a message.";
+}
+
+function ErrorStatus({ label, detail }: { label: string; detail: string }) {
     return (
-        failing(row) ||
-        row.activity.state === "failed" ||
-        row.availability.state === "missing" ||
-        row.deployment.state === "unhealthy"
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="rounded-sm text-left">
+                    <StatusText tone="destructive">{label}</StatusText>
+                </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">{detail}</TooltipContent>
+        </Tooltip>
     );
 }
 
-function inProgress(row: ModelRow): boolean {
-    return (
-        ["running", "queued"].includes(row.activity.state) ||
-        ["downloading", "importing"].includes(row.availability.state)
-    );
-}
-
-function stateOf(row: ModelRow): ModelState {
-    if (hasError(row)) {
-        return "error";
-    }
-    if (row.deployment.state !== "not_deployed") {
-        return "live";
-    }
-    return inProgress(row) ? "progress" : "idle";
-}
-
-function errorSummary(row: ModelRow): { label: string; detail: string } {
-    if (failing(row)) {
-        const share = Math.round(failingShare(row.usage) * 100);
-        return {
-            label: `${share}% of requests failing`,
-            detail: `${row.usage?.failed ?? 0} of ${row.usage?.total ?? 0} requests in the last 7 days failed.`,
-        };
-    }
-    if (row.deployment.state === "unhealthy") {
-        return {
-            label: "Deployment unhealthy",
-            detail: "The engine serving it does not answer health checks.",
-        };
-    }
-    if (row.availability.state === "missing") {
-        return {
-            label: "Missing files",
-            detail: "Some of its files are gone from storage. Retry the download or delete it.",
-        };
-    }
-    return {
-        label: row.activity.label,
-        detail: row.error || "The last job failed without a message.",
-    };
-}
-
-function StatusCell({ row }: { row: ModelRow }) {
-    const state = stateOf(row);
+function StatusCell({ entry }: { entry: Entry }) {
+    const { model, version } = entry;
+    const state = stateOfEntry(entry);
     if (state === "error") {
-        const { label, detail } = errorSummary(row);
-        return (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <button type="button" className="rounded-sm text-left">
-                        <StatusText tone="destructive">{label}</StatusText>
-                    </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-sm whitespace-normal">{detail}</TooltipContent>
-            </Tooltip>
-        );
+        const share = Math.round(failingShare(usageOf(entry)) * 100);
+        const label = failingEntry(entry) ? `${share}% of requests failing` : failedLabel(entry);
+        return <ErrorStatus label={label} detail={errorDetail(entry)} />;
     }
     if (state === "live") {
-        return <Deployment row={row} short />;
+        return <Deployment row={model} short />;
+    }
+    if (version && state === "progress") {
+        const verb = version.status === "training" ? "Training" : "Scoring";
+        const share = version.progress ? ` · ${Math.round(version.progress * 100)}%` : "";
+        return (
+            <div className="flex flex-col gap-1">
+                <StatusText tone="info">
+                    {verb}
+                    <span className="tabular-nums">{share}</span>
+                </StatusText>
+                <ProgressBar value={version.progress} label={`${model.name} v${version.number}`} />
+            </div>
+        );
     }
     if (state === "progress") {
-        return row.kind === "base" ? <Availability row={row} /> : <Activity row={row} />;
+        return model.kind === "base" ? <Availability row={model} /> : <Activity row={model} />;
     }
-    if (row.kind === "base" && row.availability.state === "not_downloaded") {
-        return <Availability row={row} />;
+    if (model.kind === "base" && model.availability.state === "not_downloaded") {
+        return <Availability row={model} />;
     }
     return <span className="text-muted-foreground">Not deployed</span>;
 }
 
-function ModelName({ row }: { row: ModelRow }) {
+function ModelName({ entry }: { entry: Entry }) {
+    const { model } = entry;
     const detail =
-        row.kind === "custom"
-            ? `Custom · on ${row.base_model}`
-            : `Base${row.size_bytes ? ` · ${bytes(row.size_bytes)}` : ""}`;
+        model.kind === "custom"
+            ? `Custom · on ${model.base_model}`
+            : `Base${model.size_bytes ? ` · ${bytes(model.size_bytes)}` : ""}`;
     return (
         <div className="flex min-w-52 max-w-72 items-start gap-3">
-            <PublisherLogo publisher={row.publisher} name={row.name} />
+            <PublisherLogo publisher={model.publisher} name={model.name} />
             <div className="flex min-w-0 flex-col">
                 <Link
-                    href={detailHref(row)}
+                    href={detailHref(model)}
                     className="font-semibold text-foreground hover:underline"
                 >
-                    {row.name}
+                    {model.name}
                 </Link>
                 <span className="truncate text-sm text-muted-foreground">{detail}</span>
             </div>
@@ -554,106 +676,92 @@ function ModelName({ row }: { row: ModelRow }) {
     );
 }
 
-function pendingVersion(row: ModelRow): string | null {
-    const { state, version, progress } = row.activity;
-    if (["running", "queued"].includes(state) && version !== null && version !== undefined) {
-        const verb = row.activity.kind === "eval" ? "scoring" : "training";
-        const share = state === "running" && progress ? ` ${Math.round(progress * 100)}%` : "";
-        return `v${version} ${verb}${share}`;
-    }
-    if (row.ready_version !== null && row.ready_version !== undefined) {
-        return `v${row.ready_version} ready`;
-    }
-    return null;
+function versionDetail(version: NonNullable<Entry["version"]>): string {
+    const kind = KIND_LABELS[version.kind] ?? version.kind;
+    return version.accuracy === null ? kind : `${kind} · ${Math.round(version.accuracy * 100)}%`;
 }
 
-function VersionCell({ row }: { row: ModelRow }) {
-    if (row.kind === "base") {
-        return row.revision ? (
-            <span className="font-mono text-muted-foreground" title={row.revision}>
-                {row.revision.slice(0, 7)}
+function VersionCell({ entry }: { entry: Entry }) {
+    const { model, version } = entry;
+    if (version) {
+        return (
+            <span className="flex flex-col tabular-nums">
+                <span>{`v${version.number}`}</span>
+                <span className="text-sm text-muted-foreground">{versionDetail(version)}</span>
+            </span>
+        );
+    }
+    if (model.kind === "base") {
+        return model.revision ? (
+            <span className="font-mono text-muted-foreground" title={model.revision}>
+                {model.revision.slice(0, 7)}
             </span>
         ) : (
             <span className="text-muted-foreground">—</span>
         );
     }
-    const pending = pendingVersion(row);
-    const deployed = row.deployment.state !== "not_deployed";
-    const live = row.current_version;
-    let head: ReactNode = pending ? null : <span className="text-muted-foreground">None yet</span>;
-    if (deployed) {
-        head = (
-            <span>{live !== null && live !== undefined ? `v${live} live` : "Base model live"}</span>
-        );
-    } else if (live !== null && live !== undefined) {
-        head = <span className="text-muted-foreground">{`v${live} chosen`}</span>;
-    }
-    return (
-        <span className="flex flex-col tabular-nums">
-            {head}
-            {pending && <span className="text-sm text-muted-foreground">{pending}</span>}
-        </span>
-    );
+    return <span className="text-muted-foreground">No versions yet</span>;
 }
 
-function requestTotal(row: ModelRow): number {
-    return (row.usage?.daily ?? []).reduce((sum, value) => sum + value, 0);
+function requestTotal(entry: Entry): number {
+    return (usageOf(entry)?.daily ?? []).reduce((sum, value) => sum + value, 0);
 }
 
-function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
+function modelOrder(entry: Entry): string {
+    const number = String(1_000_000 - (entry.version?.number ?? 0)).padStart(7, "0");
+    return `${entry.model.name.toLowerCase()} ${number}`;
+}
+
+function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
     return [
         {
             id: "model",
             header: "Model",
-            accessorFn: (row) => row.name.toLowerCase(),
-            cell: ({ row }) => <ModelName row={row.original} />,
-        },
-        {
-            id: "status",
-            header: "Status",
-            accessorFn: (row) => STATE_RANK.indexOf(stateOf(row)),
-            cell: ({ row }) => <StatusCell row={row.original} />,
+            accessorFn: modelOrder,
+            cell: ({ row }) => <ModelName entry={row.original} />,
         },
         {
             id: "version",
             header: "Version",
-            accessorFn: (row) => row.current_version ?? -1,
-            cell: ({ row }) => <VersionCell row={row.original} />,
+            accessorFn: (entry) => entry.version?.number ?? -1,
+            cell: ({ row }) => <VersionCell entry={row.original} />,
+        },
+        {
+            id: "status",
+            header: "Status",
+            accessorFn: (entry) => STATE_RANK.indexOf(stateOfEntry(entry)),
+            cell: ({ row }) => <StatusCell entry={row.original} />,
         },
         {
             id: "requests",
             header: "Requests, last 7 days",
             accessorFn: requestTotal,
-            cell: ({ row }) => <Requests usage={row.original.usage} />,
+            cell: ({ row }) => <Requests usage={usageOf(row.original)} />,
         },
         {
             id: "actions",
             header: () => <span className="sr-only">Actions</span>,
             enableSorting: false,
-            cell: ({ row }) => <RowActions row={row.original} on={on} />,
+            cell: ({ row }) => <RowActions entry={row.original} on={on} />,
         },
     ];
 }
 
 type Facet = "type" | "state" | "tag";
 
-function matches(row: ModelRow, search: ModelsSearch, skip?: Facet): boolean {
+function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
+    const { model } = entry;
     const text = (search.q ?? "").trim().toLowerCase();
-    if (text && !`${row.name} ${row.description} ${row.key}`.toLowerCase().includes(text)) {
+    if (text && !`${model.name} ${model.description} ${model.key}`.toLowerCase().includes(text)) {
         return false;
     }
-    if (skip !== "type" && search.type && row.kind !== search.type) {
+    if (skip !== "type" && search.type && model.kind !== search.type) {
         return false;
     }
-    if (skip !== "state" && search.state && stateOf(row) !== search.state) {
+    if (skip !== "state" && search.state && stateOfEntry(entry) !== search.state) {
         return false;
     }
-    return skip === "tag" || !search.tag || row.tags.includes(search.tag);
-}
-
-function byState(left: ModelRow, right: ModelRow): number {
-    const rank = STATE_RANK.indexOf(stateOf(left)) - STATE_RANK.indexOf(stateOf(right));
-    return rank !== 0 ? rank : right.updated_at.localeCompare(left.updated_at);
+    return skip === "tag" || !search.tag || model.tags.includes(search.tag);
 }
 
 function FilterSelect({
@@ -691,7 +799,7 @@ function chips(search: ModelsSearch): { label: string; clear: ModelsSearch }[] {
     return [
         search.q ? { label: `“${search.q}”`, clear: { q: "" } } : null,
         search.state && search.state in STATE_LABELS
-            ? { label: STATE_LABELS[search.state as ModelState], clear: { state: "" } }
+            ? { label: STATE_LABELS[search.state as EntryState], clear: { state: "" } }
             : null,
         search.type
             ? { label: search.type === "base" ? "Base" : "Custom", clear: { type: "" } }
@@ -758,9 +866,10 @@ export function MyModels({
     );
     const tableColumns = useMemo(() => columns(on), [on]);
     const rows = models.data ?? [];
-    const visible = rows.filter((row) => matches(row, search)).sort(byState);
-    const facetCount = (facet: Facet, test: (row: ModelRow) => boolean) =>
-        rows.filter((row) => matches(row, search, facet) && test(row)).length;
+    const entries = entriesOf(rows);
+    const visible = entries.filter((entry) => matches(entry, search)).sort(byState);
+    const facetCount = (facet: Facet, test: (entry: Entry) => boolean) =>
+        entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
     const tags = [...new Set(rows.flatMap((row) => row.tags))].sort();
     const active = chips(search);
     const filtering = active.length > 0;
@@ -771,7 +880,7 @@ export function MyModels({
         ...STATE_RANK.map((state) => ({
             key: state,
             label: STATE_LABELS[state],
-            badge: facetCount("state", (row) => stateOf(row) === state),
+            badge: facetCount("state", (entry) => stateOfEntry(entry) === state),
         })),
     ];
     const noMatch = (
@@ -807,8 +916,16 @@ export function MyModels({
                     label="Type"
                     value={search.type}
                     options={[
-                        ["custom", "Custom", facetCount("type", (row) => row.kind === "custom")],
-                        ["base", "Base", facetCount("type", (row) => row.kind === "base")],
+                        [
+                            "custom",
+                            "Custom",
+                            facetCount("type", (entry) => entry.model.kind === "custom"),
+                        ],
+                        [
+                            "base",
+                            "Base",
+                            facetCount("type", (entry) => entry.model.kind === "base"),
+                        ],
                     ]}
                     onChange={(type) => update({ type })}
                 />
@@ -819,7 +936,7 @@ export function MyModels({
                         options={tags.map((tag) => [
                             tag,
                             tag,
-                            facetCount("tag", (row) => row.tags.includes(tag)),
+                            facetCount("tag", (entry) => entry.model.tags.includes(tag)),
                         ])}
                         onChange={(tag) => update({ tag })}
                     />
@@ -867,9 +984,9 @@ export function MyModels({
                 <SortableTable
                     columns={tableColumns}
                     rows={visible}
-                    onOpen={(row) => on.open(detailHref(row))}
-                    rowLabel={(row) =>
-                        `${row.name}, ${row.kind} model, ${STATE_LABELS[stateOf(row)]}`
+                    onOpen={(entry) => on.open(detailHref(entry.model))}
+                    rowLabel={(entry) =>
+                        `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`
                     }
                     empty={noMatch}
                     minWidth="min-w-[880px]"
