@@ -89,3 +89,14 @@ def test_multi_gpu_models_need_several_gpus() -> None:
     assert fit(60 * GIB, requires, one)["basis"] == "Needs several datacenter GPUs."
     assert fit(60 * GIB, requires, RACK.hardware())["level"] == "fits"
     assert NodeReport.from_dict(RACK.as_dict()) == RACK
+
+
+def test_infrastructure_reports_the_setup_and_where_data_lives(harness: Harness) -> None:
+    info = harness.client.get("/api/system/infrastructure").json()
+    assert info["setup"] == "one_machine"
+    stores = {store["name"]: store for store in info["stores"]}
+    assert set(stores) == {"Database", "Model files", "Datasets, adapters and results"}
+    assert stores["Database"]["kind"] == "sqlite" and stores["Database"]["location"].endswith("minibrain.db")
+    assert stores["Model files"]["free_bytes"] > 0 and stores["Model files"]["used_bytes"] == 0
+    join_rack(harness)
+    assert harness.client.get("/api/system/infrastructure").json()["setup"] == "remote_gpus"

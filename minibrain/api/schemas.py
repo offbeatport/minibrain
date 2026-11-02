@@ -239,21 +239,26 @@ class SystemInfo(BaseModel):
     loops: Literal["single", "leader", "standby"]
 
 
-class BaseModelInfo(BaseModel):
-    key: str
-    repo: str
-    revision: str
-    license: str
-
-
 class InstallSettings(BaseModel):
-    home: str
-    database: str
-    web: str
-    base_models: list[BaseModelInfo]
-    default_base_model: str
     recipe: dict[str, Any]
     splits: dict[str, int]
+
+
+class StoreInfo(BaseModel):
+    name: str
+    kind: Literal["sqlite", "postgres", "folder"]
+    location: str
+    used_bytes: int | None
+    free_bytes: int | None
+    total_bytes: int | None
+
+
+class InfrastructureInfo(BaseModel):
+    setup: Literal["one_machine", "remote_gpus", "distributed"]
+    host: str
+    home: str
+    web: str
+    stores: list[StoreInfo]
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]
@@ -461,6 +466,7 @@ class CatalogResponse(BaseModel):
     online: bool | None
     offline_forced: bool
     hub_add_allowed: bool
+    store_free_bytes: int | None
     endpoint: str
     token_configured: bool
     synced_at: datetime | None

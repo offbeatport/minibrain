@@ -710,6 +710,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/infrastructure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Infrastructure */
+        get: operations["infrastructure_api_system_infrastructure_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -1210,17 +1227,6 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
-        /** BaseModelInfo */
-        BaseModelInfo: {
-            /** Key */
-            key: string;
-            /** Repo */
-            repo: string;
-            /** Revision */
-            revision: string;
-            /** License */
-            license: string;
-        };
         /** BaseWeights */
         BaseWeights: {
             /** Spec */
@@ -1305,6 +1311,8 @@ export interface components {
             offline_forced: boolean;
             /** Hub Add Allowed */
             hub_add_allowed: boolean;
+            /** Store Free Bytes */
+            store_free_bytes: number | null;
             /** Endpoint */
             endpoint: string;
             /** Token Configured */
@@ -1623,18 +1631,24 @@ export interface components {
             /** Tags */
             tags?: string[];
         };
-        /** InstallSettings */
-        InstallSettings: {
+        /** InfrastructureInfo */
+        InfrastructureInfo: {
+            /**
+             * Setup
+             * @enum {string}
+             */
+            setup: "one_machine" | "remote_gpus" | "distributed";
+            /** Host */
+            host: string;
             /** Home */
             home: string;
-            /** Database */
-            database: string;
             /** Web */
             web: string;
-            /** Base Models */
-            base_models: components["schemas"]["BaseModelInfo"][];
-            /** Default Base Model */
-            default_base_model: string;
+            /** Stores */
+            stores: components["schemas"]["StoreInfo"][];
+        };
+        /** InstallSettings */
+        InstallSettings: {
             /** Recipe */
             recipe: {
                 [key: string]: unknown;
@@ -2198,6 +2212,24 @@ export interface components {
             label: string;
             /** Progress */
             progress?: number | null;
+        };
+        /** StoreInfo */
+        StoreInfo: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sqlite" | "postgres" | "folder";
+            /** Location */
+            location: string;
+            /** Used Bytes */
+            used_bytes: number | null;
+            /** Free Bytes */
+            free_bytes: number | null;
+            /** Total Bytes */
+            total_bytes: number | null;
         };
         /** StoredArtifact */
         StoredArtifact: {
@@ -3857,6 +3889,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemInfo"];
+                };
+            };
+        };
+    };
+    infrastructure_api_system_infrastructure_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfrastructureInfo"];
                 };
             };
         };

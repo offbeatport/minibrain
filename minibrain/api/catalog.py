@@ -28,13 +28,14 @@ from minibrain.models import hub
 from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
 from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
-from minibrain.models.registry import start_download
+from minibrain.models.registry import models_dir, start_download
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import Pool, find_pool, pools
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
 from minibrain.settings import Settings
+from minibrain.storage import free_bytes
 
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
 LOCAL_USER = "Local user"
@@ -146,6 +147,7 @@ def catalogue(
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         hub_add_allowed=policy["model_sources"] == "any",
+        store_free_bytes=free_bytes(models_dir(settings)),
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),

@@ -13,6 +13,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, Model, ModelStatus, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
+from minibrain.storage import missing_room
 
 ACTIVE_STATUSES = (ModelStatus.DOWNLOADING, ModelStatus.IMPORTING)
 
@@ -79,6 +80,12 @@ def download_params(settings: Settings, model: Model, variant: CatalogVariant, g
     }
 
 
+def ensure_room(settings: Settings, model_id: str, files: list[dict[str, Any]], size: int) -> None:
+    problem = missing_room(model_dir(settings, model_id), files, size)
+    if problem is not None:
+        raise ConflictError(problem)
+
+
 def start_download(
     session: Session, settings: Settings, entry: CatalogModel, variant: CatalogVariant, acknowledged_by: str
 ) -> Model:
@@ -87,6 +94,7 @@ def start_download(
     model = session.get(Model, model_id)
     if model is not None and model.status in (*ACTIVE_STATUSES, ModelStatus.AVAILABLE):
         raise ConflictError(f"{model.name} is already {model.status}")
+    ensure_room(settings, model_id, list(variant.files), variant.size_bytes)
     name = entry.name if variant.position == 0 else f"{entry.name} {variant.precision.upper()}"
     if model is None:
         model = Model(id=model_id, source="download", name=name, description=entry.description, status="")
@@ -215,6 +223,7 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
         if variant is None:
             raise ConflictError(f"{model.name} has no catalogue entry to download from")
         entry = session.get(CatalogModel, variant.catalog_id)
+        ensure_room(settings, model.id, list(variant.files), variant.size_bytes)
         model.status = ModelStatus.DOWNLOADING
         params = download_params(settings, model, variant, bool(entry and entry.gated))
         enqueue(session, JobKind.DOWNLOAD, params, idempotency_key=f"download:{model.id}", model_id=model.id)

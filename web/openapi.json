@@ -2133,6 +2133,27 @@
         }
       }
     },
+    "/api/system/infrastructure": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Infrastructure",
+        "operationId": "infrastructure_api_system_infrastructure_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfrastructureInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -3694,34 +3715,6 @@
         ],
         "title": "BaseModelDetail"
       },
-      "BaseModelInfo": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "repo": {
-            "type": "string",
-            "title": "Repo"
-          },
-          "revision": {
-            "type": "string",
-            "title": "Revision"
-          },
-          "license": {
-            "type": "string",
-            "title": "License"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "repo",
-          "revision",
-          "license"
-        ],
-        "title": "BaseModelInfo"
-      },
       "BaseWeights": {
         "properties": {
           "spec": {
@@ -3961,6 +3954,17 @@
             "type": "boolean",
             "title": "Hub Add Allowed"
           },
+          "store_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Store Free Bytes"
+          },
           "endpoint": {
             "type": "string",
             "title": "Endpoint"
@@ -4012,6 +4016,7 @@
           "online",
           "offline_forced",
           "hub_add_allowed",
+          "store_free_bytes",
           "endpoint",
           "token_configured",
           "synced_at",
@@ -4821,31 +4826,49 @@
         ],
         "title": "ImportRequest"
       },
-      "InstallSettings": {
+      "InfrastructureInfo": {
         "properties": {
+          "setup": {
+            "type": "string",
+            "enum": [
+              "one_machine",
+              "remote_gpus",
+              "distributed"
+            ],
+            "title": "Setup"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
           "home": {
             "type": "string",
             "title": "Home"
-          },
-          "database": {
-            "type": "string",
-            "title": "Database"
           },
           "web": {
             "type": "string",
             "title": "Web"
           },
-          "base_models": {
+          "stores": {
             "items": {
-              "$ref": "#/components/schemas/BaseModelInfo"
+              "$ref": "#/components/schemas/StoreInfo"
             },
             "type": "array",
-            "title": "Base Models"
-          },
-          "default_base_model": {
-            "type": "string",
-            "title": "Default Base Model"
-          },
+            "title": "Stores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "setup",
+          "host",
+          "home",
+          "web",
+          "stores"
+        ],
+        "title": "InfrastructureInfo"
+      },
+      "InstallSettings": {
+        "properties": {
           "recipe": {
             "additionalProperties": true,
             "type": "object",
@@ -4861,11 +4884,6 @@
         },
         "type": "object",
         "required": [
-          "home",
-          "database",
-          "web",
-          "base_models",
-          "default_base_model",
           "recipe",
           "splits"
         ],
@@ -6585,6 +6603,70 @@
           "label"
         ],
         "title": "Stage"
+      },
+      "StoreInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sqlite",
+              "postgres",
+              "folder"
+            ],
+            "title": "Kind"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Bytes"
+          },
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "location",
+          "used_bytes",
+          "free_bytes",
+          "total_bytes"
+        ],
+        "title": "StoreInfo"
       },
       "StoredArtifact": {
         "properties": {

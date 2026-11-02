@@ -46,6 +46,7 @@ import { bytes, relativeTime } from "~/lib/time";
 import { CLEARED, FilterPanel, activeFilters, matches, readFilters } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
 
+const RESERVE_BYTES = 1024 ** 3;
 const FIT_LABELS: Record<FitInfo["level"], string> = {
     fits: "Estimated fit",
     limited: "Limited headroom",
@@ -136,6 +137,12 @@ function DownloadDialog({
         }
     }, [entry]);
     const variant = entry?.variants.find((item) => item.id === variantId);
+    const free = catalog.store_free_bytes;
+    const tooBig =
+        variant !== undefined &&
+        free !== null &&
+        free !== undefined &&
+        variant.size_bytes + RESERVE_BYTES > free;
     const start = useMutation({
         mutationFn: () =>
             unwrap(
@@ -236,6 +243,11 @@ function DownloadDialog({
                         </Label>
                     </div>
                 </div>
+                {tooBig && variant && (
+                    <p className="text-sm text-destructive">
+                        {`Needs ${bytes(variant.size_bytes)}; ${bytes(catalog.store_free_bytes)} free on the disk that holds models. Delete unused models or free up space.`}
+                    </p>
+                )}
                 <ErrorLine error={start.error} />
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -243,7 +255,7 @@ function DownloadDialog({
                     </Button>
                     <Button
                         onClick={() => start.mutate()}
-                        disabled={!accepted || blocked || start.isPending}
+                        disabled={!accepted || blocked || tooBig || start.isPending}
                     >
                         {variant ? `Download ${bytes(variant.size_bytes)}` : "Download"}
                     </Button>

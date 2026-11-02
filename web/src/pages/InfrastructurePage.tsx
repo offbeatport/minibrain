@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Cpu, ListOrdered, MemoryStick, Package, Server } from "lucide-react";
+import { Cpu, HardDrive, ListOrdered, MemoryStick, Network, Package, Server } from "lucide-react";
 import { Badge } from "obp-ui";
-import { usePools, useSystem } from "~/api/queries";
+import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
@@ -13,6 +13,8 @@ type LoadedModel = components["schemas"]["LoadedModel"];
 type PoolInfo = components["schemas"]["PoolInfo"];
 type NodeInfo = components["schemas"]["NodeInfo"];
 type ReplicaInfo = components["schemas"]["ReplicaInfo"];
+type StoreInfo = components["schemas"]["StoreInfo"];
+type InfrastructureInfo = components["schemas"]["InfrastructureInfo"];
 
 const LOOPS: Record<string, string> = {
     single: "Runs here",
@@ -142,24 +144,176 @@ const LOADED_COLUMNS: ColumnDef<LoadedModel, unknown>[] = [
     },
 ];
 
+const SETUPS: Record<InfrastructureInfo["setup"], { title: string; body: string }> = {
+    one_machine: {
+        title: "One machine",
+        body: "main, the gateway, the worker and engines all run here, with SQLite and local folders.",
+    },
+    remote_gpus: {
+        title: "Local main, remote GPUs",
+        body: "main and its gateway run here; workers and engines on other machines join pools and pull work from main.",
+    },
+    distributed: {
+        title: "Distributed",
+        body: "Separate services: mains share a Postgres database, and gateways and GPU pools scale on their own.",
+    },
+};
+
+function hostsWith(pools: PoolInfo[], role: string): string[] {
+    const hosts = pools.flatMap((pool) =>
+        pool.nodes
+            .filter((node) => node.online && node.roles.includes(role))
+            .map((node) => node.host),
+    );
+    return [...new Set(hosts)];
+}
+
+function Hosts({ hosts, none }: { hosts: string[]; none: string }) {
+    if (hosts.length === 0) {
+        return <span className="text-muted-foreground">{none}</span>;
+    }
+    return <span className="font-mono">{hosts.join(", ")}</span>;
+}
+
+function SetupSection({
+    info,
+    pools,
+    loops,
+}: {
+    info: InfrastructureInfo | undefined;
+    pools: PoolInfo[];
+    loops: string | undefined;
+}) {
+    const setup = info ? SETUPS[info.setup] : null;
+    const replicas = pools.flatMap((pool) => pool.engines);
+    const engineHosts = [...new Set(replicas.map((replica) => replica.host))];
+    return (
+        <PanelSection icon={Network} title="Setup">
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-base font-semibold">{setup?.title ?? "…"}</span>
+                    <span className="text-sm text-muted-foreground">{setup?.body}</span>
+                </div>
+                <div className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Stat
+                        label="main"
+                        value={
+                            <span className="flex flex-col font-normal">
+                                <span className="font-mono">{info?.host ?? "–"}</span>
+                                <span className="text-sm text-muted-foreground">
+                                    {LOOPS[loops ?? "single"]}
+                                </span>
+                            </span>
+                        }
+                    />
+                    <Stat
+                        label="Gateway"
+                        value={<span className="font-normal">Inside main</span>}
+                    />
+                    <Stat
+                        label="Workers"
+                        value={
+                            <span className="font-normal">
+                                <Hosts hosts={hostsWith(pools, "worker")} none="None online" />
+                            </span>
+                        }
+                    />
+                    <Stat
+                        label={`Engines · ${count(replicas.length)}`}
+                        value={
+                            <span className="font-normal">
+                                <Hosts hosts={engineHosts} none="None running" />
+                            </span>
+                        }
+                    />
+                </div>
+            </div>
+        </PanelSection>
+    );
+}
+
+const STORE_KIND: Record<StoreInfo["kind"], string> = {
+    sqlite: "SQLite file",
+    postgres: "Postgres",
+    folder: "Folder",
+};
+
+const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
+    { header: "Holds", accessorKey: "name" },
+    {
+        header: "Where",
+        id: "location",
+        cell: ({ row }) => (
+            <span className="flex flex-col">
+                <span className="text-sm text-muted-foreground">
+                    {STORE_KIND[row.original.kind]}
+                </span>
+                <span className="font-mono break-all whitespace-normal">
+                    {row.original.location}
+                </span>
+            </span>
+        ),
+    },
+    {
+        header: "Used",
+        id: "used",
+        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.used_bytes)}</span>,
+    },
+    {
+        header: "Free on that disk",
+        id: "free",
+        cell: ({ row }) =>
+            row.original.free_bytes === null || row.original.free_bytes === undefined ? (
+                <span className="text-muted-foreground">Managed</span>
+            ) : (
+                <span className="tabular-nums">
+                    {`${bytes(row.original.free_bytes)} of ${bytes(row.original.total_bytes)}`}
+                </span>
+            ),
+    },
+];
+
+function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
+    return (
+        <PanelSection icon={HardDrive} title="Storage">
+            <div className="flex flex-col gap-3">
+                <DataTable columns={STORE_COLUMNS} rows={info?.stores ?? []} />
+                <p className="text-sm text-muted-foreground">
+                    Everything lives under{" "}
+                    <span className="font-mono text-foreground">{info?.home ?? "…"}</span>. To move
+                    the install, set{" "}
+                    <span className="font-mono text-foreground">MINIBRAIN_HOME</span> before
+                    starting minibrain.
+                </p>
+            </div>
+        </PanelSection>
+    );
+}
+
 function gigabytes(megabytes: number | null | undefined): string {
     return megabytes === null || megabytes === undefined
         ? "–"
         : `${(megabytes / 1024).toFixed(1)} GB`;
 }
 
-export function ComputePage() {
+export function InfrastructurePage() {
     const { data, error } = useSystem();
     const pools = usePools();
+    const infrastructure = useInfrastructure();
     const device = data?.device;
     return (
         <Page>
             <PageHeader
-                title="Compute"
-                caption="Pools of machines that run engines and jobs. Workers and engines join a pool with --pool and report their hardware."
+                title="Infrastructure"
+                caption="Where minibrain runs and where it keeps its data."
             />
-            <ErrorLine error={error ?? pools.error} />
+            <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
             <PanelSections>
+                <SetupSection
+                    info={infrastructure.data}
+                    pools={pools.data ?? []}
+                    loops={data?.loops}
+                />
                 {(pools.data ?? []).map((pool) => (
                     <PoolSection key={pool.name} pool={pool} />
                 ))}
@@ -186,6 +340,7 @@ export function ComputePage() {
                         <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
                     </div>
                 </PanelSection>
+                <StorageSection info={infrastructure.data} />
                 <PanelSection
                     icon={ListOrdered}
                     title="Job queue"
@@ -212,13 +367,21 @@ export function ComputePage() {
                         empty="Nothing loaded yet; the first request loads the base model."
                     />
                 </PanelSection>
-                <PanelSection icon={Package} title="Libraries">
-                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                        {Object.entries(data?.libraries ?? {}).map(([name, version]) => (
-                            <span key={name}>
-                                {name} <span className="font-mono">{version}</span>
+                <PanelSection icon={Package} title="Versions">
+                    <div className="flex flex-col gap-3 text-sm">
+                        <div className="flex flex-wrap gap-x-6 gap-y-1">
+                            {Object.entries(data?.libraries ?? {}).map(([name, version]) => (
+                                <span key={name}>
+                                    {name} <span className="font-mono">{version}</span>
+                                </span>
+                            ))}
+                        </div>
+                        <span className="text-muted-foreground">
+                            Web app served from{" "}
+                            <span className="font-mono text-foreground">
+                                {infrastructure.data?.web ?? "…"}
                             </span>
-                        ))}
+                        </span>
                     </div>
                 </PanelSection>
             </PanelSections>

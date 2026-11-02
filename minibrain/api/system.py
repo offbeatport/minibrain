@@ -1,16 +1,30 @@
 import os
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, make_url, select
+from sqlalchemy.orm import Session
 
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
-from minibrain.api.schemas import BaseModelInfo, DeviceInfo, InstallSettings, LoadedModel, SystemInfo
-from minibrain.base_models import BASE_MODELS, DEFAULT_BASE_MODEL
+from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep
+from minibrain.api.schemas import (
+    DeviceInfo,
+    InfrastructureInfo,
+    InstallSettings,
+    LoadedModel,
+    StoreInfo,
+    SystemInfo,
+)
 from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
+from minibrain.models.hardware import LOCAL_POOL, NodeReport
+from minibrain.models.registry import models_dir
 from minibrain.recipes import DEFAULT_RECIPE
-from minibrain.registry.models import Job
+from minibrain.registry.compute import pools
+from minibrain.registry.models import Artifact, Job, Model, ModelStatus
 from minibrain.serve.backend import ServingBackend
+from minibrain.settings import Settings
+from minibrain.storage import disk_space
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -67,17 +81,65 @@ def system(request: Request, session: SessionDep, backend: BackendDep) -> System
     )
 
 
-@router.get("/settings")
-def install_settings(settings: SettingsDep) -> InstallSettings:
-    return InstallSettings(
+def folder_store(name: str, path: Path, used: int | None) -> StoreInfo:
+    space = disk_space(path)
+    return StoreInfo(
+        name=name,
+        kind="folder",
+        location=str(path),
+        used_bytes=used,
+        free_bytes=space.free if space else None,
+        total_bytes=space.total if space else None,
+    )
+
+
+def database_store(settings: Settings) -> StoreInfo:
+    url = make_url(settings.database_url)
+    if url.get_backend_name() != "sqlite":
+        location = f"{url.host or 'localhost'}:{url.port or 5432}/{url.database or ''}"
+        return StoreInfo(
+            name="Database", kind="postgres", location=location, used_bytes=None, free_bytes=None, total_bytes=None
+        )
+    path = Path(url.database or "")
+    files = [path, path.with_name(f"{path.name}-wal")]
+    used = sum(item.stat().st_size for item in files if item.is_file())
+    return folder_store("Database", path, used).model_copy(update={"kind": "sqlite"})
+
+
+Setup = Literal["one_machine", "remote_gpus", "distributed"]
+
+
+def setup_of(session: Session, node: NodeReport, database: StoreInfo) -> Setup:
+    if database.kind == "postgres":
+        return "distributed"
+    found = pools(session, node)
+    remote = any(pool.name != LOCAL_POOL and pool.nodes for pool in found) or any(
+        item.host != node.host for pool in found for item in pool.nodes
+    )
+    return "remote_gpus" if remote else "one_machine"
+
+
+@router.get("/system/infrastructure")
+def infrastructure(session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> InfrastructureInfo:
+    database = database_store(settings)
+    weights = session.scalar(select(func.sum(Model.size_bytes)).where(Model.status == ModelStatus.AVAILABLE))
+    artifacts = session.scalar(select(func.sum(Artifact.size)))
+    return InfrastructureInfo(
+        setup=setup_of(session, node, database),
+        host=node.host,
         home=str(settings.home),
-        database=str(settings.home / "minibrain.db"),
         web=str(settings.web_dist),
-        base_models=[
-            BaseModelInfo(key=spec.key, repo=spec.repo, revision=spec.revision, license=spec.license)
-            for spec in BASE_MODELS.values()
+        stores=[
+            database,
+            folder_store("Model files", models_dir(settings), int(weights or 0)),
+            folder_store("Datasets, adapters and results", settings.artifacts_dir(), int(artifacts or 0)),
         ],
-        default_base_model=DEFAULT_BASE_MODEL,
+    )
+
+
+@router.get("/settings")
+def install_settings() -> InstallSettings:
+    return InstallSettings(
         recipe=DEFAULT_RECIPE,
         splits={"golden": GOLDEN_MAX, "eval": EVAL_MAX, "shots": SHOTS_MAX, "min_rows": MIN_ROWS},
     )

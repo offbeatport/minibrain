@@ -17,6 +17,7 @@ from minibrain.models.sources import StorageSource, location_url
 from minibrain.policy import PREFIX
 from minibrain.registry.models import AuditEvent, CatalogModel, CatalogVariant
 from minibrain.registry.settings_store import write
+from minibrain.storage import Space
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 
@@ -194,6 +195,16 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
             (custom["slug"], "custom"),
             ("tiny", "base"),
         ]
+
+
+def test_download_is_refused_when_the_model_disk_is_too_full(
+    harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    add_tiny(harness)
+    monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=GIB // 2, total=GIB))
+    response = harness.client.post("/api/catalog/tiny/download", json={"variant": "tiny:bf16", "accept_license": True})
+    assert response.status_code == 409 and response.json()["detail"].startswith("Needs ")
+    assert harness.client.get("/api/catalog").json()["store_free_bytes"] == GIB // 2
 
 
 def test_checksum_mismatch_is_retried_not_trusted(harness: Harness, hub: Path) -> None:

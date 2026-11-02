@@ -1,15 +1,9 @@
-import type { ColumnDef } from "@tanstack/react-table";
-import { Box, FolderOpen, GraduationCap, Palette, Split } from "lucide-react";
-import { Badge } from "obp-ui";
+import { GraduationCap, Palette, Split } from "lucide-react";
 import { useInstallSettings } from "~/api/queries";
-import type { components } from "~/api/schema";
-import { DataTable } from "~/components/DataTable";
 import { ErrorLine, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ThemeChoice } from "~/components/ThemeChoice";
 import { count } from "~/lib/format";
-
-type BaseModelInfo = components["schemas"]["BaseModelInfo"];
 
 const SPLIT_LABELS: Record<string, string> = {
     golden: "Test set (max)",
@@ -17,43 +11,6 @@ const SPLIT_LABELS: Record<string, string> = {
     shots: "Few-shot (max)",
     min_rows: "Minimum rows",
 };
-
-function baseModelColumns(defaultKey: string | undefined): ColumnDef<BaseModelInfo, unknown>[] {
-    return [
-        {
-            header: "Key",
-            id: "key",
-            cell: ({ row }) => (
-                <span className="flex items-center gap-2">
-                    <span className="font-mono">{row.original.key}</span>
-                    {row.original.key === defaultKey && <Badge variant="neutral">Default</Badge>}
-                </span>
-            ),
-        },
-        {
-            header: "Repository",
-            accessorKey: "repo",
-            cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
-        },
-        {
-            header: "Revision",
-            accessorKey: "revision",
-            cell: (info) => (
-                <span className="font-mono">{String(info.getValue()).slice(0, 12)}</span>
-            ),
-        },
-        { header: "License", accessorKey: "license" },
-    ];
-}
-
-function Path({ label, value }: { label: string; value: string | undefined }) {
-    return (
-        <div>
-            <div className="text-sm text-muted-foreground">{label}</div>
-            <div className="break-all font-mono text-sm">{value ?? "–"}</div>
-        </div>
-    );
-}
 
 function Appearance() {
     return (
@@ -70,24 +27,6 @@ export function SettingsPage() {
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />
-                <PanelSection icon={FolderOpen} title="Paths">
-                    <div className="flex flex-col gap-3">
-                        <Path label="Data, adapters and jobs" value={data?.home} />
-                        <Path label="Database" value={data?.database} />
-                        <Path label="Web app" value={data?.web} />
-                        <p className="border-t pt-3 text-sm text-muted-foreground">
-                            To move the install, set{" "}
-                            <span className="font-mono text-foreground">MINIBRAIN_HOME</span> before
-                            starting minibrain.
-                        </p>
-                    </div>
-                </PanelSection>
-                <PanelSection icon={Box} title="Base models">
-                    <DataTable
-                        columns={baseModelColumns(data?.default_base_model)}
-                        rows={data?.base_models ?? []}
-                    />
-                </PanelSection>
                 <PanelSection icon={GraduationCap} title="Default training recipe">
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (

@@ -120,6 +120,14 @@ export function usePools() {
     });
 }
 
+export function useInfrastructure() {
+    return useQuery({
+        queryKey: ["infrastructure"] as const,
+        queryFn: () => unwrap(api.GET("/api/system/infrastructure")),
+        refetchInterval: 30000,
+    });
+}
+
 export function useInstallSettings() {
     return useQuery({
         queryKey: ["settings"] as const,

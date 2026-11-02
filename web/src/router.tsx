@@ -8,11 +8,11 @@ import {
 } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { readMinibrainParam } from "./lib/selection";
-import { ComputePage } from "./pages/ComputePage";
 import { DataPage } from "./pages/DataPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { HomePage } from "./pages/HomePage";
+import { InfrastructurePage } from "./pages/InfrastructurePage";
 import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
 import { FeedbackPage, MonitorPage, PipelinesPage } from "./pages/PlaceholderPages";
@@ -104,7 +104,14 @@ const routeTree = rootRoute.addChildren([
     scopedPage("/feedback", FeedbackPage),
     scopedPage("/deployments", DeploymentsPage),
     globalPage("/pipelines", PipelinesPage),
-    globalPage("/compute", ComputePage),
+    globalPage("/infrastructure", InfrastructurePage),
+    createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/compute",
+        beforeLoad: () => {
+            throw redirect({ href: "/infrastructure" });
+        },
+    }),
     scopedPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", SecurityPage),

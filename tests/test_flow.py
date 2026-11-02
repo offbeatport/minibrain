@@ -189,8 +189,6 @@ def test_system_settings_and_ops(harness: Harness) -> None:
     assert "torch" in system["libraries"]
     assert system["loaded"] == []
     settings = harness.client.get("/api/settings").json()
-    assert settings["default_base_model"] == "qwen3-0.6b"
-    assert settings["base_models"][0]["license"] == "Apache-2.0"
     assert settings["splits"]["golden"] == 50
     assert harness.client.get("/healthz").json() == {"status": "ok"}
     assert harness.client.get("/readyz").json() == {"status": "ready"}
