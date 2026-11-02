@@ -36,15 +36,24 @@ with failure drills.
 
 ### One machine: onboarding and evaluation
 
-![One machine: minibrain serve runs main, the gateway, a worker and engines with SQLite and a folder](diagrams/one-machine.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/one-machine-dark.svg">
+  <img alt="One machine: minibrain serve runs main, the gateway, a worker and engines with SQLite and a folder" src="diagrams/one-machine.svg">
+</picture>
 
 ### Local main, remote GPUs
 
-![Local main, remote GPUs: main and its gateway on a laptop or small VM, workers and engines on a GPU box](diagrams/local-main-remote-gpus.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/local-main-remote-gpus-dark.svg">
+  <img alt="Local main, remote GPUs: main and its gateway on a laptop or small VM, workers and engines on a GPU box" src="diagrams/local-main-remote-gpus.svg">
+</picture>
 
 ### Production: separate services
 
-![Production: load balancers, gateways, two mains, GPU pools, Postgres and S3, in trust zones](diagrams/production.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/production-dark.svg">
+  <img alt="Production: load balancers, gateways, two mains, GPU pools, Postgres and S3, in trust zones" src="diagrams/production.svg">
+</picture>
 
 | | One machine | Local main, remote GPUs | Production |
 |---|---|---|---|
