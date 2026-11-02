@@ -4361,10 +4361,6 @@
             "type": "boolean",
             "title": "Moe"
           },
-          "support": {
-            "type": "string",
-            "title": "Support"
-          },
           "superseded_by": {
             "anyOf": [
               {
@@ -4418,7 +4414,6 @@
           "tier",
           "params_b",
           "moe",
-          "support",
           "superseded_by",
           "origin",
           "variants",

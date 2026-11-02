@@ -1488,8 +1488,6 @@ export interface components {
             params_b: number;
             /** Moe */
             moe: boolean;
-            /** Support */
-            support: string;
             /** Superseded By */
             superseded_by: string | null;
             /** Origin */
