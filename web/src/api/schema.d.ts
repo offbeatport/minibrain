@@ -2036,6 +2036,13 @@ export interface components {
             gpus: components["schemas"]["GpuInfo"][];
             /** Engines */
             engines: string[];
+            /**
+             * Versions
+             * @default {}
+             */
+            versions?: {
+                [key: string]: string;
+            };
         };
         /** PolicyChoice */
         PolicyChoice: {
@@ -2241,10 +2248,6 @@ export interface components {
         /** SystemInfo */
         SystemInfo: {
             device: components["schemas"]["DeviceInfo"];
-            /** Libraries */
-            libraries: {
-                [key: string]: string;
-            };
             /** Jobs */
             jobs: {
                 [key: string]: number;
@@ -2372,6 +2375,11 @@ export interface components {
             hardware?: {
                 [key: string]: unknown;
             };
+            /**
+             * Protocol
+             * @default 1
+             */
+            protocol?: number;
         };
     };
     responses: never;

@@ -186,7 +186,6 @@ def test_system_settings_and_ops(harness: Harness) -> None:
     system = harness.client.get("/api/system").json()
     assert system["device"]["inference"] in {"cuda", "mps", "cpu"}
     assert system["device"]["cpu_count"] >= 1
-    assert "torch" in system["libraries"]
     assert system["loaded"] == []
     settings = harness.client.get("/api/settings").json()
     assert settings["splits"]["golden"] == 50

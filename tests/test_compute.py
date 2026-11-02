@@ -4,6 +4,7 @@ from typing import Any
 
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
 from minibrain.registry.models import EngineReplica, now
+from minibrain.versions import JOB_PROTOCOL
 from tests.conftest import Harness
 
 RACK = NodeReport(
@@ -100,3 +101,20 @@ def test_infrastructure_reports_the_setup_and_where_data_lives(harness: Harness)
     assert stores["Model files"]["free_bytes"] > 0 and stores["Model files"]["used_bytes"] == 0
     join_rack(harness)
     assert harness.client.get("/api/system/infrastructure").json()["setup"] == "remote_gpus"
+
+
+def test_machines_report_versions_and_old_job_formats_are_refused(harness: Harness) -> None:
+    local = by_name(harness)["local"]["nodes"][0]
+    assert local["versions"]["minibrain"]
+    worker = {"id": "w-old", "host": "gpu-09", "kinds": ["train"], "pool": "rack", "protocol": 99}
+    refused = harness.internal("/register", worker)
+    assert refused.status_code == 426
+    assert "gpu-09" in refused.json()["detail"] and "job format 99" in refused.json()["detail"]
+    current = worker | {
+        "id": "w-new",
+        "protocol": JOB_PROTOCOL,
+        "hardware": RACK.as_dict() | {"versions": {"minibrain": "0.0.1"}},
+    }
+    assert harness.internal("/register", current).status_code == 204
+    rack = by_name(harness)["rack"]["nodes"]
+    assert [node["versions"] for node in rack] == [{"minibrain": "0.0.1"}]

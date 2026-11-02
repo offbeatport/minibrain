@@ -6102,6 +6102,14 @@
             },
             "type": "array",
             "title": "Engines"
+          },
+          "versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Versions",
+            "default": {}
           }
         },
         "type": "object",
@@ -6691,13 +6699,6 @@
           "device": {
             "$ref": "#/components/schemas/DeviceInfo"
           },
-          "libraries": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Libraries"
-          },
           "jobs": {
             "additionalProperties": {
               "type": "integer"
@@ -6725,7 +6726,6 @@
         "type": "object",
         "required": [
           "device",
-          "libraries",
           "jobs",
           "loaded",
           "loops"
@@ -7062,6 +7062,11 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Hardware"
+          },
+          "protocol": {
+            "type": "integer",
+            "title": "Protocol",
+            "default": 1
           }
         },
         "type": "object",

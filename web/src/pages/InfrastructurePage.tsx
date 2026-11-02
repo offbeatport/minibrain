@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Cpu, HardDrive, ListOrdered, MemoryStick, Network, Package, Server } from "lucide-react";
-import { Badge } from "obp-ui";
+import { Cpu, HardDrive, ListOrdered, MemoryStick, Network, Server } from "lucide-react";
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { DataTable } from "~/components/DataTable";
@@ -33,6 +33,57 @@ function engineNames(engines: string[]): string {
     return engines.map((engine) => ENGINE_LABEL[engine] ?? engine).join(", ");
 }
 
+const COMPARED = ["minibrain", "torch", "transformers", "peft"];
+
+function release(value: string): string {
+    return value.split("+")[0];
+}
+
+function differences(versions: Record<string, string>, main: Record<string, string>): string[] {
+    return COMPARED.filter(
+        (name) => versions[name] && main[name] && release(versions[name]) !== release(main[name]),
+    ).map((name) => `${name} ${versions[name]} (main has ${main[name]})`);
+}
+
+function VersionCell({ node, main }: { node: NodeInfo; main: Record<string, string> }) {
+    const versions = node.versions ?? {};
+    const differs = node.roles.includes("main") ? [] : differences(versions, main);
+    const listed = Object.entries(versions)
+        .map(([name, value]) => `${name} ${value}`)
+        .join(" · ");
+    return (
+        <span className="flex items-center gap-2">
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="rounded-sm font-mono">{versions.minibrain ?? "–"}</span>
+                </TooltipTrigger>
+                <TooltipContent>{listed || "Not reported"}</TooltipContent>
+            </Tooltip>
+            {differs.length > 0 && (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="rounded-sm">
+                            <Badge variant="warning">Differs from main</Badge>
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{differs.join("; ")}</TooltipContent>
+                </Tooltip>
+            )}
+        </span>
+    );
+}
+
+function nodeColumns(main: Record<string, string>): ColumnDef<NodeInfo, unknown>[] {
+    return [
+        ...NODE_COLUMNS,
+        {
+            header: "Version",
+            id: "version",
+            cell: ({ row }) => <VersionCell node={row.original} main={main} />,
+        },
+    ];
+}
+
 const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
     {
         header: "Machine",
@@ -46,20 +97,18 @@ const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
     },
     { header: "Role", id: "roles", cell: ({ row }) => row.original.roles.join(", ") },
     {
-        header: "Accelerator",
-        id: "accelerator",
-        cell: ({ row }) => row.original.accelerator_name || row.original.accelerator,
-    },
-    {
-        header: "Memory for models",
-        id: "memory",
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.usable_bytes)}</span>,
-    },
-    {
-        header: "CPU",
-        id: "cpu",
+        header: "Hardware",
+        id: "hardware",
         cell: ({ row }) => (
-            <span className="tabular-nums">{`${row.original.cpu_count} cores · ${bytes(row.original.ram_bytes)} RAM`}</span>
+            <span className="flex flex-col">
+                <span>
+                    {row.original.accelerator_name || row.original.accelerator}
+                    <span className="tabular-nums">{` · ${bytes(row.original.usable_bytes)} for models`}</span>
+                </span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                    {`${row.original.cpu_count} cores · ${bytes(row.original.ram_bytes)} RAM`}
+                </span>
+            </span>
         ),
     },
     {
@@ -102,7 +151,7 @@ function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
-function PoolSection({ pool }: { pool: PoolInfo }) {
+function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, string> }) {
     const online = pool.nodes.filter((node) => node.online).length;
     return (
         <PanelSection
@@ -111,7 +160,7 @@ function PoolSection({ pool }: { pool: PoolInfo }) {
             description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
         >
             <div className="flex flex-col gap-3">
-                <DataTable columns={NODE_COLUMNS} rows={pool.nodes} empty="No machines yet." />
+                <DataTable columns={nodeColumns(main)} rows={pool.nodes} empty="No machines yet." />
                 {pool.engines.length > 0 && (
                     <DataTable columns={REPLICA_COLUMNS} rows={pool.engines} />
                 )}
@@ -301,6 +350,9 @@ export function InfrastructurePage() {
     const pools = usePools();
     const infrastructure = useInfrastructure();
     const device = data?.device;
+    const main =
+        (pools.data ?? []).flatMap((pool) => pool.nodes).find((node) => node.roles.includes("main"))
+            ?.versions ?? {};
     return (
         <Page>
             <PageHeader
@@ -315,7 +367,7 @@ export function InfrastructurePage() {
                     loops={data?.loops}
                 />
                 {(pools.data ?? []).map((pool) => (
-                    <PoolSection key={pool.name} pool={pool} />
+                    <PoolSection key={pool.name} pool={pool} main={main} />
                 ))}
                 <PanelSection
                     icon={Cpu}
@@ -366,23 +418,6 @@ export function InfrastructurePage() {
                         rows={data?.loaded ?? []}
                         empty="Nothing loaded yet; the first request loads the base model."
                     />
-                </PanelSection>
-                <PanelSection icon={Package} title="Versions">
-                    <div className="flex flex-col gap-3 text-sm">
-                        <div className="flex flex-wrap gap-x-6 gap-y-1">
-                            {Object.entries(data?.libraries ?? {}).map(([name, version]) => (
-                                <span key={name}>
-                                    {name} <span className="font-mono">{version}</span>
-                                </span>
-                            ))}
-                        </div>
-                        <span className="text-muted-foreground">
-                            Web app served from{" "}
-                            <span className="font-mono text-foreground">
-                                {infrastructure.data?.web ?? "…"}
-                            </span>
-                        </span>
-                    </div>
                 </PanelSection>
             </PanelSections>
         </Page>

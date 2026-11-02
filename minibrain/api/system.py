@@ -1,5 +1,4 @@
 import os
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Literal
 
@@ -28,15 +27,7 @@ from minibrain.storage import disk_space
 
 router = APIRouter(prefix="/api", tags=["system"])
 
-LIBRARIES = ("torch", "transformers", "peft", "trl", "duckdb", "fastapi")
 MEGABYTE = 1024 * 1024
-
-
-def library_version(name: str) -> str:
-    try:
-        return version(name)
-    except PackageNotFoundError:
-        return "not installed"
 
 
 def device_info() -> DeviceInfo:
@@ -74,7 +65,6 @@ def system(request: Request, session: SessionDep, backend: BackendDep) -> System
     counts = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
     return SystemInfo(
         device=device_info(),
-        libraries={name: library_version(name) for name in LIBRARIES},
         jobs={status: count for status, count in counts},
         loaded=loaded_models(backend),
         loops=request.app.state.leader.describe(),

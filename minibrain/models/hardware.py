@@ -50,6 +50,7 @@ class NodeReport:
     usable_bytes: int | None
     gpus: list[Gpu] = field(default_factory=list)
     engines: list[str] = field(default_factory=list)
+    versions: dict[str, str] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,6 +68,7 @@ class NodeReport:
             usable_bytes=data.get("usable_bytes"),
             gpus=[Gpu(str(gpu["name"]), int(gpu["memory_bytes"])) for gpu in data.get("gpus") or []],
             engines=[str(engine) for engine in data.get("engines") or []],
+            versions={str(name): str(value) for name, value in (data.get("versions") or {}).items()},
         )
 
     def hardware(self) -> Hardware:
@@ -104,6 +106,7 @@ def gpu_report() -> tuple[str, str, list[Gpu], int | None]:
 
 def report() -> NodeReport:
     from minibrain.serve.select import installed_engines
+    from minibrain.versions import installed_versions
 
     kind, name, gpus, usable = gpu_report()
     system, arch = sys.platform, platform.machine()
@@ -118,6 +121,7 @@ def report() -> NodeReport:
         usable_bytes=usable,
         gpus=gpus,
         engines=installed_engines(system, arch, kind),
+        versions=installed_versions(),
     )
 
 

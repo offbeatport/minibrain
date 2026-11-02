@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import platform
 import shutil
@@ -20,6 +21,7 @@ from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.models import JobKind
+from minibrain.versions import JOB_PROTOCOL
 
 MODULES: dict[str, str] = {
     JobKind.PREPARE: "minibrain.data.prepare",
@@ -43,7 +45,14 @@ QUIET_ENV = {
 }
 
 
+log = logging.getLogger("minibrain.worker")
+
+
 class LeaseLostError(Exception):
+    pass
+
+
+class IncompatibleWorkerError(Exception):
     pass
 
 
@@ -101,6 +110,8 @@ class MainClient:
             else:
                 if response.status_code == 409:
                     raise LeaseLostError(response.text)
+                if response.status_code == 426:
+                    raise IncompatibleWorkerError(response.json().get("detail", response.text))
                 if response.status_code < 500 or attempt == RETRIES - 1:
                     response.raise_for_status()
                     return response
@@ -121,6 +132,7 @@ class MainClient:
             "gpus": config.gpus,
             "pool": config.pool,
             "hardware": config.hardware,
+            "protocol": JOB_PROTOCOL,
         }
 
     def register(self) -> None:
@@ -244,6 +256,9 @@ class Worker:
                 self.run_once(CLAIM_WAIT_SECONDS)
         except WorkerStoppedError:
             return
+        except IncompatibleWorkerError as error:
+            log.error("%s", error)
+            stop.set()
 
     def run_once(self, wait: float = 0.0) -> bool:
         claim = self.client.claim(wait)

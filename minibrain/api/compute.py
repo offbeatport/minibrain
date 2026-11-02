@@ -29,6 +29,7 @@ class NodeInfo(BaseModel):
     usable_bytes: int | None
     gpus: list[GpuInfo]
     engines: list[str]
+    versions: dict[str, str] = {}
 
 
 class ReplicaInfo(BaseModel):

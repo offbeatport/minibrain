@@ -233,7 +233,6 @@ class LoadedModel(BaseModel):
 
 class SystemInfo(BaseModel):
     device: DeviceInfo
-    libraries: dict[str, str]
     jobs: dict[str, int]
     loaded: list[LoadedModel]
     loops: Literal["single", "leader", "standby"]
