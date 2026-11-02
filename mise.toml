@@ -3,8 +3,8 @@ description = "Install Python and web dependencies"
 run = ["uv sync --all-extras", "pnpm --dir web install"]
 
 [tasks."dev:api"]
-description = "API and job worker on :8000, data in .minibrain/; pages redirect to the web UI on :5173"
-run = "uv run minibrain serve"
+description = "API and job worker on :8000, restarted on Python changes; pages redirect to the web UI on :5173"
+run = "uv run watchfiles --filter python 'minibrain serve' minibrain"
 env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain", MINIBRAIN_UI_URL = "http://localhost:5173" }
 
 [tasks."dev:web"]
