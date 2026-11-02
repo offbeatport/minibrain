@@ -21,7 +21,7 @@ import { DataTable } from "~/components/DataTable";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsTabs } from "~/components/SettingsTabs";
-import { exactTime, relativeTime } from "~/lib/time";
+import { bytes, exactTime, relativeTime } from "~/lib/time";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type AuditInfo = components["schemas"]["AuditInfo"];
@@ -208,6 +208,29 @@ function PolicyRow({ policy }: { policy: PolicyInfo }) {
     );
 }
 
+function describe(event: AuditInfo, byName: Map<string, PolicyInfo>): [string, string] {
+    const detail = event.detail as Record<string, unknown>;
+    if (event.action === "model.delete") {
+        const size =
+            typeof detail.size_bytes === "number" ? ` · freed ${bytes(detail.size_bytes)}` : "";
+        return [`Model ${String(detail.name ?? event.target)}`, `Deleted${size}`];
+    }
+    const policy = byName.get(event.target);
+    const label = policy?.label ?? event.target;
+    if (Array.isArray(detail.from) && Array.isArray(detail.to)) {
+        const before: unknown[] = detail.from;
+        const after: unknown[] = detail.to;
+        const added = after.filter((item) => !before.includes(item));
+        const removed = before.filter((item) => !after.includes(item));
+        const parts = [
+            added.length > 0 ? `Added ${display(policy, added)}` : "",
+            removed.length > 0 ? `Removed ${display(policy, removed)}` : "",
+        ].filter(Boolean);
+        return [label, parts.join("; ") || "No change"];
+    }
+    return [label, `${display(policy, detail.from)} → ${display(policy, detail.to)}`];
+}
+
 function auditColumns(byName: Map<string, PolicyInfo>): ColumnDef<AuditInfo, unknown>[] {
     return [
         {
@@ -221,21 +244,16 @@ function auditColumns(byName: Map<string, PolicyInfo>): ColumnDef<AuditInfo, unk
         },
         { header: "Who", accessorKey: "actor" },
         {
-            header: "Setting",
+            header: "What",
             id: "target",
-            cell: ({ row }) => byName.get(row.original.target)?.label ?? row.original.target,
+            cell: ({ row }) => describe(row.original, byName)[0],
         },
         {
             header: "Change",
             id: "change",
-            cell: ({ row }) => {
-                const policy = byName.get(row.original.target);
-                return (
-                    <span className="whitespace-normal">
-                        {`${display(policy, row.original.detail.from)} → ${display(policy, row.original.detail.to)}`}
-                    </span>
-                );
-            },
+            cell: ({ row }) => (
+                <span className="whitespace-normal">{describe(row.original, byName)[1]}</span>
+            ),
         },
     ];
 }
@@ -275,7 +293,11 @@ export function SecurityPage() {
                             </div>
                         </PanelSection>
                     ))}
-                <PanelSection icon={History} title="Recent changes">
+                <PanelSection
+                    icon={History}
+                    title="Audit log"
+                    description="Who changed a security setting or deleted a model, and when."
+                >
                     <ErrorLine error={audit.error} />
                     <DataTable
                         columns={auditColumns(byName)}
