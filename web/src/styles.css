@@ -1,7 +1,6 @@
 @import "tailwindcss" source(none);
 
 @import "obp-ui/fonts.css";
-@import "obp-ui/fonts-alt.css";
 @import "obp-ui/styles.css";
 
 @source "./**/*.{tsx,ts}";
