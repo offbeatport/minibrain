@@ -635,3 +635,5 @@ Everything in the v1 scope below, after M1.
 - DuckDB Postgres scanner load on customer databases: read replicas, `LIMIT`, materialize.
 - MPS dtype and op gaps during local training; Metal GPU hangs in LoRA backward (seen on M1 Pro, macOS 27.0.1).
 - Teacher quality on generated Q&A: track the check-pass drop rate per source.
+- Banking77 on a GPU (`docs/findings.md` has the laptop run): the teacher as version 0, a 4B student on full data,
+  SGLang with runtime adapters, constrained decoding to zero invalid labels, and cost per 1,000 requests.

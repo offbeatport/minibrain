@@ -83,4 +83,4 @@ mise run api-types   # regenerate the TypeScript client after API changes
 ```
 
 Training runs on CUDA when available, otherwise on CPU: the Metal GPU hangs during LoRA training on Apple Silicon (see
-`spikes/banking77/README.md`). Set `MINIBRAIN_TRAIN_DEVICE` to override.
+`docs/findings.md`). Set `MINIBRAIN_TRAIN_DEVICE` to override.

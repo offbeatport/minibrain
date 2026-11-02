@@ -72,11 +72,11 @@ ignore = ["S311"]
 "hatch_build.py" = ["S603"]
 
 [tool.pyright]
-include = ["minibrain", "samples", "spikes", "tests", "hatch_build.py"]
+include = ["minibrain", "samples", "tests", "hatch_build.py"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "spikes"]
+testpaths = ["tests"]
