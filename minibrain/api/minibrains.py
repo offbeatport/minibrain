@@ -28,7 +28,7 @@ from minibrain.data.shared import attach_upload, dataset_of, dataset_sql, get_da
 from minibrain.data.sources import safe_filename
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
-from minibrain.models.registry import trainable_bases
+from minibrain.models.registry import base_readiness, trainable_bases
 from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
 from minibrain.registry.service import (
@@ -55,8 +55,8 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
     base = body.base_model or DEFAULT_BASE_MODEL
     if body.task != "classify":
         raise ConflictError(f"{body.task} models are not available yet; only Classify is")
-    if base not in trainable_bases(session):
-        raise ConflictError(f"{base} is not a trainable base model on this install")
+    if base_readiness(session, base) == "missing":
+        raise ConflictError(f"{base} is not a base model on this install")
     minibrain = create_minibrain(session, body.name, body.task, base)
     minibrain.description = body.description.strip()
     minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})

@@ -478,3 +478,20 @@ def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Pat
     monkeypatch.setenv("MINIBRAIN_MODELS_S3_URL", "s3://bucket/models")
     bucket = harness.client.post("/api/models/inspect", json={"location": "qwen"}).json()
     assert (bucket["source_type"], bucket["resolved"]) == ("s3", "s3://bucket/models/qwen")
+
+
+def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Harness, tmp_path: Path) -> None:
+    folder = tmp_path / "corp"
+    folder.mkdir()
+    for name, data in FILES.items():
+        (folder / name).write_bytes(data)
+    base = harness.client.post("/api/models/import", json={"name": "Corp base", "location": str(folder)}).json()
+    created = harness.client.post("/api/minibrains", json={"name": "On corp", "base_model": base["key"]})
+    assert created.status_code == 201
+    pending = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "prompt"})
+    assert pending.status_code == 409 and "still being imported" in pending.json()["detail"]
+    harness.worker(kinds=["import"]).run_once()
+    refused = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "lora"})
+    assert refused.status_code == 409 and "can be served but not trained" in refused.json()["detail"]
+    missing = harness.client.post("/api/minibrains", json={"name": "Nowhere", "base_model": "nope"})
+    assert missing.status_code == 409

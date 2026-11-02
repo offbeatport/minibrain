@@ -383,15 +383,50 @@ function versionAction(entry: Entry, on: Handlers): { label: string; run: () => 
     return null;
 }
 
-function VersionMenuItems({ entry, on }: { entry: Entry; on: Handlers }) {
+function undeployConfirmation(row: ModelRow, on: Handlers): Confirmation {
+    return {
+        title: `Undeploy ${row.name}?`,
+        description: <p>Its API stops answering; versions, keys and files stay.</p>,
+        confirmLabel: "Undeploy",
+        destructive: true,
+        run: () => setDeployed(row, false).then(on.refresh),
+    };
+}
+
+function deployConfirmation(row: ModelRow, on: Handlers): Confirmation {
+    return {
+        title: `Deploy ${row.name}?`,
+        description: (
+            <p>
+                It becomes callable as <span className="font-mono">{row.key}</span> on the
+                OpenAI-compatible API with its own keys
+                {row.needed_bytes ? `, using about ${bytes(row.needed_bytes)} of memory` : ""}.
+            </p>
+        ),
+        confirmLabel: "Deploy",
+        run: () => setDeployed(row, true).then(on.refresh),
+    };
+}
+
+function cancelTransferConfirmation(row: ModelRow, on: Handlers): Confirmation {
+    return {
+        title: `Cancel ${row.activity.label.toLowerCase()}?`,
+        description: <p>Files already validated are kept, so a retry resumes.</p>,
+        confirmLabel: "Cancel transfer",
+        destructive: true,
+        run: () => cancelJob(row.activity.job_id ?? 0).then(on.refresh),
+    };
+}
+
+function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
     const version = entry.version;
-    if (!version) {
-        return null;
-    }
+    const deployed = row.deployment.state !== "not_deployed";
+    const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
+    const deployable = row.kind === "custom" || row.availability.state === "available";
     return (
         <>
-            {version.status === "ready" && !version.live && (
+            {version?.status === "ready" && !version.live && (
                 <DropdownMenuItem
                     onSelect={() => promoteVersion(row, version.number).then(on.refresh)}
                 >
@@ -399,48 +434,93 @@ function VersionMenuItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     {`Deploy v${version.number}`}
                 </DropdownMenuItem>
             )}
-            {version.live && (
-                <DropdownMenuItem
-                    onSelect={() =>
-                        on.confirm({
-                            title: `Undeploy ${row.name}?`,
-                            description: (
-                                <p>Its API stops answering; versions, keys and files stay.</p>
-                            ),
-                            confirmLabel: "Undeploy",
-                            destructive: true,
-                            run: () => setDeployed(row, false).then(on.refresh),
-                        })
-                    }
-                >
-                    <PowerOff />
-                    Undeploy
-                </DropdownMenuItem>
-            )}
-            {version.status === "ready" && (
+            {version?.status === "ready" && (
                 <DropdownMenuItem onSelect={() => on.test(row)}>
                     <FlaskConical />
                     {`Test v${version.number}`}
                 </DropdownMenuItem>
             )}
+            <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
+                <Eye />
+                View details
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => on.edit(row)}>
+                <Pencil />
+                Edit name, description and tags
+            </DropdownMenuItem>
+            {row.kind === "custom" && (
+                <DropdownMenuItem onSelect={() => on.open(scoped("/training", row))}>
+                    <GraduationCap />
+                    Train
+                </DropdownMenuItem>
+            )}
+            {row.kind === "base" && row.trainable && (
+                <DropdownMenuItem onSelect={() => on.createFrom(row.key)}>
+                    <GraduationCap />
+                    Train a model on it
+                </DropdownMenuItem>
+            )}
+            {row.kind === "custom" && !version && (
+                <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
+                    <Rocket />
+                    {deployed ? "Change deployed version" : "Deploy a version"}
+                </DropdownMenuItem>
+            )}
+            {!version && deployable && !deployed && (
+                <DropdownMenuItem onSelect={() => on.confirm(deployConfirmation(row, on))}>
+                    <Rocket />
+                    Deploy
+                </DropdownMenuItem>
+            )}
+            {transferring && row.activity.job_id !== null && (
+                <DropdownMenuItem onSelect={() => on.confirm(cancelTransferConfirmation(row, on))}>
+                    <CircleX />
+                    Cancel {row.activity.kind === "import" ? "import" : "download"}
+                </DropdownMenuItem>
+            )}
+        </>
+    );
+}
+
+function StopItems({ entry, on }: { entry: Entry; on: Handlers }) {
+    const row = entry.model;
+    const version = entry.version;
+    const deployed = row.deployment.state !== "not_deployed";
+    const live = version ? version.live : deployed;
+    return (
+        <>
+            {live && (
+                <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => on.confirm(undeployConfirmation(row, on))}
+                >
+                    <PowerOff />
+                    Undeploy
+                </DropdownMenuItem>
+            )}
+            {version && (
+                <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => on.confirm(deleteVersionConfirmation(entry, on))}
+                >
+                    <Trash2 />
+                    {`Delete v${version.number} only`}
+                </DropdownMenuItem>
+            )}
             <DropdownMenuItem
                 variant="destructive"
-                onSelect={() => on.confirm(deleteVersionConfirmation(entry, on))}
+                onSelect={() => on.confirm(deleteConfirmation(row, on))}
             >
                 <Trash2 />
-                {`Delete v${version.number}`}
+                {row.kind === "custom" ? "Delete model and all versions" : "Delete model"}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
         </>
     );
 }
 
 function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
-    const version = entry.version;
-    const primary = version ? versionAction(entry, on) : primaryAction(row, on);
-    const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
-    const deployed = row.deployment.state !== "not_deployed";
+    const primary = entry.version ? versionAction(entry, on) : primaryAction(row, on);
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
@@ -459,90 +539,9 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
-                    {version && <VersionMenuItems entry={entry} on={on} />}
-                    <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
-                        <Eye />
-                        View details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => on.edit(row)}>
-                        <Pencil />
-                        Edit name, description and tags
-                    </DropdownMenuItem>
-                    {row.kind === "custom" && (
-                        <DropdownMenuItem onSelect={() => on.open(scoped("/training", row))}>
-                            <GraduationCap />
-                            Train
-                        </DropdownMenuItem>
-                    )}
-                    {row.kind === "base" && row.trainable && (
-                        <DropdownMenuItem onSelect={() => on.createFrom(row.key)}>
-                            <GraduationCap />
-                            Train a model on it
-                        </DropdownMenuItem>
-                    )}
-                    {row.kind === "custom" && !version && (
-                        <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
-                            <Rocket />
-                            {deployed ? "Change deployed version" : "Deploy a version"}
-                        </DropdownMenuItem>
-                    )}
-                    {!version &&
-                        (row.kind === "custom" || row.availability.state === "available") && (
-                            <DropdownMenuItem
-                                onSelect={() =>
-                                    on.confirm({
-                                        title: deployed
-                                            ? `Undeploy ${row.name}?`
-                                            : `Deploy ${row.name}?`,
-                                        description: deployed ? (
-                                            <p>Its API stops answering; keys and files stay.</p>
-                                        ) : (
-                                            <p>
-                                                It becomes callable as{" "}
-                                                <span className="font-mono">{row.key}</span> on the
-                                                OpenAI-compatible API with its own keys
-                                                {row.needed_bytes
-                                                    ? `, using about ${bytes(row.needed_bytes)} of memory`
-                                                    : ""}
-                                                .
-                                            </p>
-                                        ),
-                                        confirmLabel: deployed ? "Undeploy" : "Deploy",
-                                        destructive: deployed,
-                                        run: () => setDeployed(row, !deployed).then(on.refresh),
-                                    })
-                                }
-                            >
-                                {deployed ? <PowerOff /> : <Rocket />}
-                                {deployed ? "Undeploy" : "Deploy"}
-                            </DropdownMenuItem>
-                        )}
-                    {transferring && row.activity.job_id !== null && (
-                        <DropdownMenuItem
-                            onSelect={() =>
-                                on.confirm({
-                                    title: `Cancel ${row.activity.label.toLowerCase()}?`,
-                                    description: (
-                                        <p>Files already validated are kept, so a retry resumes.</p>
-                                    ),
-                                    confirmLabel: "Cancel transfer",
-                                    destructive: true,
-                                    run: () => cancelJob(row.activity.job_id ?? 0).then(on.refresh),
-                                })
-                            }
-                        >
-                            <CircleX />
-                            Cancel {row.activity.kind === "import" ? "import" : "download"}
-                        </DropdownMenuItem>
-                    )}
+                    <ActionItems entry={entry} on={on} />
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => on.confirm(deleteConfirmation(row, on))}
-                    >
-                        <Trash2 />
-                        {row.kind === "custom" ? "Delete model" : "Delete"}
-                    </DropdownMenuItem>
+                    <StopItems entry={entry} on={on} />
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

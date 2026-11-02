@@ -146,7 +146,7 @@ def apply_catalogue(model: Model, entry: CatalogModel, variant: CatalogVariant) 
     model.variant_id = variant.id
     model.repo = variant.repo
     model.revision = variant.revision
-    model.trainable = entry.trainable and variant.runtimes == ["transformers"]
+    model.trainable = entry.trainable and variant.format == "safetensors"
     model.template_kwargs = dict(entry.template_kwargs)
     model.stop_tokens = list(entry.stop_tokens)
     model.license = entry.license
@@ -235,3 +235,19 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
 def trainable_bases(session: Session) -> list[str]:
     downloaded = session.scalars(select(Model.id).where(Model.status == ModelStatus.AVAILABLE, Model.trainable))
     return sorted(set(BASE_MODELS) | set(downloaded))
+
+
+PENDING = (ModelStatus.IMPORTING, ModelStatus.DOWNLOADING)
+
+
+def base_readiness(session: Session, key: str) -> str:
+    if key in BASE_MODELS:
+        return "ready"
+    model = session.get(Model, key)
+    if model is None:
+        return "missing"
+    if model.status in PENDING:
+        return "pending"
+    if model.status != ModelStatus.AVAILABLE:
+        return "missing"
+    return "ready" if model.trainable else "serve_only"
