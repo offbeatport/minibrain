@@ -30,19 +30,37 @@ def test_stages_follow_the_model_from_data_to_deployment(harness: Harness) -> No
     assert custom_row(harness, SLUG)["stages"][1]["state"] == "active"
 
 
-def test_usage_counts_the_last_seven_days_and_the_median_latency(harness: Harness) -> None:
+def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> None:
     harness.client.post("/api/minibrains", json={"name": "Support Triage"})
     assert custom_row(harness, SLUG)["usage"] is None
     with harness.sessions() as session:
         minibrain = session.query(Minibrain).filter_by(slug=SLUG).one()
-        moments = [now(), now(), now() - timedelta(days=2), now() - timedelta(days=30)]
-        for moment, latency in zip(moments, [10.0, 30.0, 20.0, 999.0], strict=True):
-            session.add(RequestLog(at=moment, minibrain_id=minibrain.id, model=SLUG, status=200, latency_ms=latency))
+        requests = [
+            (now(), 200, 10.0),
+            (now() - timedelta(minutes=5), 500, 30.0),
+            (now() - timedelta(days=2), 200, 20.0),
+            (now() - timedelta(days=10), 200, 50.0),
+            (now() - timedelta(days=30), 200, 999.0),
+        ]
+        for moment, status, latency in requests:
+            session.add(RequestLog(at=moment, minibrain_id=minibrain.id, model=SLUG, status=status, latency_ms=latency))
         session.commit()
     usage = custom_row(harness, SLUG)["usage"]
-    assert len(usage["daily"]) == 7 and usage["daily"][-1] == 2 and usage["daily"][-3] == 1 and sum(usage["daily"]) == 3
+    assert (usage["total"], usage["previous"], usage["failed"]) == (3, 1, 1)
+    assert len(usage["daily"]) == 7 and usage["daily"][-1] == 2 and usage["daily"][-3] == 1
     assert usage["p50_ms"] == 20.0
-    assert len(usage["days"]) == 7 and usage["days"][-1] == now().date().isoformat()
+    assert usage["last_at"].startswith(now().date().isoformat())
+
+
+def test_last_use_is_reported_even_without_recent_requests(harness: Harness) -> None:
+    harness.client.post("/api/minibrains", json={"name": "Support Triage"})
+    with harness.sessions() as session:
+        minibrain = session.query(Minibrain).filter_by(slug=SLUG).one()
+        moment = now() - timedelta(days=12)
+        session.add(RequestLog(at=moment, minibrain_id=minibrain.id, model=SLUG, status=200, latency_ms=5.0))
+        session.commit()
+    usage = custom_row(harness, SLUG)["usage"]
+    assert (usage["total"], usage["previous"], usage["p50_ms"]) == (0, 1, None)
 
 
 def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness) -> None:

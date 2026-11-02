@@ -40,7 +40,7 @@ import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { Requests } from "~/components/models/ModelMetrics";
+import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
@@ -442,8 +442,15 @@ const STATE_RANK: ModelState[] = ["live", "attention", "progress", "ready"];
 
 const ATTENTION_STATES = ["failed", "needs_examples", "ready"];
 
+const FAILING_SHARE = 0.01;
+
+function failing(row: ModelRow): boolean {
+    return row.deployment.state !== "not_deployed" && failingShare(row.usage) >= FAILING_SHARE;
+}
+
 function needsAttention(row: ModelRow): boolean {
     return (
+        failing(row) ||
         ATTENTION_STATES.includes(row.activity.state) ||
         row.availability.state === "missing" ||
         row.deployment.state === "unhealthy"
@@ -458,11 +465,11 @@ function inProgress(row: ModelRow): boolean {
 }
 
 function stateOf(row: ModelRow): ModelState {
-    if (row.deployment.state !== "not_deployed" && row.deployment.state !== "unhealthy") {
-        return "live";
-    }
     if (needsAttention(row)) {
         return "attention";
+    }
+    if (row.deployment.state !== "not_deployed") {
+        return "live";
     }
     return inProgress(row) ? "progress" : "ready";
 }
@@ -476,6 +483,13 @@ function StatusCell({ row }: { row: ModelRow }) {
         return row.kind === "base" ? <Availability row={row} /> : <Activity row={row} />;
     }
     if (state === "attention") {
+        if (failing(row)) {
+            return (
+                <StatusText tone="warning">
+                    {`Running · ${Math.round(failingShare(row.usage) * 100)}% failing`}
+                </StatusText>
+            );
+        }
         if (row.availability.state === "missing") {
             return <Availability row={row} />;
         }
@@ -565,7 +579,7 @@ function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
         },
         {
             id: "requests",
-            header: "Requests (7 days)",
+            header: "Requests, last 7 days",
             accessorFn: requestTotal,
             cell: ({ row }) => <Requests usage={row.original.usage} />,
         },

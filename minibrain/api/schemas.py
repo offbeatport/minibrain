@@ -296,6 +296,10 @@ class Stage(BaseModel):
 class Usage(BaseModel):
     days: list[str]
     daily: list[int]
+    total: int
+    previous: int
+    failed: int
+    last_at: datetime
     p50_ms: float | None
 
 

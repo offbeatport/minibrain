@@ -2296,6 +2296,17 @@ export interface components {
             days: string[];
             /** Daily */
             daily: number[];
+            /** Total */
+            total: number;
+            /** Previous */
+            previous: number;
+            /** Failed */
+            failed: number;
+            /**
+             * Last At
+             * Format: date-time
+             */
+            last_at: string;
             /** P50 Ms */
             p50_ms: number | null;
         };

@@ -1,9 +1,10 @@
 import statistics
 from collections.abc import Callable
 from datetime import UTC, datetime, time, timedelta
+from typing import Any
 
 from sqlalchemy import ColumnElement, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from minibrain.api.schemas import (
     Activity,
@@ -46,6 +47,7 @@ FAILED_LABELS: dict[str, str] = {
 }
 STATE_LABELS = {"running": "Running", "starting": "Starting", "unhealthy": "Unhealthy"}
 USAGE_DAYS = 7
+FAILED_STATUS = 500
 LATENCY_SAMPLE = 2000
 
 
@@ -179,47 +181,58 @@ def usage_window() -> tuple[datetime, list[str]]:
     return datetime.combine(days[0], time.min, tzinfo=UTC), [day.isoformat() for day in days]
 
 
-def usage_index(session: Session) -> tuple[dict[int, Usage], dict[str, Usage]]:
+def usage_for(session: Session, key: InstrumentedAttribute[Any], scope: ColumnElement[bool]) -> dict[Any, Usage]:
     since, days = usage_window()
-    day = func.date(RequestLog.at)
+    before = since - timedelta(days=USAGE_DAYS)
     recent = RequestLog.at >= since
-    custom: dict[int, dict[str, int]] = {}
-    for target, value, total in session.execute(
-        select(RequestLog.minibrain_id, day, func.count())
-        .where(RequestLog.minibrain_id.is_not(None), recent)
-        .group_by(RequestLog.minibrain_id, day)
-    ):
-        if target is not None:
-            custom.setdefault(target, {})[str(value)[:10]] = total
-    base: dict[str, dict[str, int]] = {}
-    for target, value, total in session.execute(
-        select(RequestLog.model, day, func.count())
-        .where(RequestLog.minibrain_id.is_(None), recent)
-        .group_by(RequestLog.model, day)
-    ):
-        base.setdefault(target, {})[str(value)[:10]] = total
-
-    def summary(counts: dict[str, int], *conditions: ColumnElement[bool]) -> Usage:
+    day = func.date(RequestLog.at)
+    daily: dict[Any, dict[str, int]] = {}
+    for target, value, total in session.execute(select(key, day, func.count()).where(scope, recent).group_by(key, day)):
+        daily.setdefault(target, {})[str(value)[:10]] = total
+    earlier = (RequestLog.at >= before) & (RequestLog.at < since)
+    previous = {
+        target: value
+        for target, value in session.execute(select(key, func.count()).where(scope, earlier).group_by(key))
+    }
+    failing = RequestLog.status >= FAILED_STATUS
+    failed = {
+        target: value
+        for target, value in session.execute(select(key, func.count()).where(scope, recent, failing).group_by(key))
+    }
+    last = {
+        target: value
+        for target, value in session.execute(select(key, func.max(RequestLog.at)).where(scope).group_by(key))
+    }
+    found: dict[Any, Usage] = {}
+    for target, last_at in last.items():
+        if target is None or last_at is None:
+            continue
+        counts = daily.get(target, {})
+        series = [counts.get(name, 0) for name in days]
         latencies = list(
             session.scalars(
                 select(RequestLog.latency_ms)
-                .where(*conditions, recent)
+                .where(scope, key == target, recent)
                 .order_by(RequestLog.id.desc())
                 .limit(LATENCY_SAMPLE)
             )
         )
-        return Usage(
+        found[target] = Usage(
             days=days,
-            daily=[counts.get(name, 0) for name in days],
+            daily=series,
+            total=sum(series),
+            previous=previous.get(target, 0),
+            failed=failed.get(target, 0),
+            last_at=last_at if last_at.tzinfo else last_at.replace(tzinfo=UTC),
             p50_ms=statistics.median(latencies) if latencies else None,
         )
+    return found
 
+
+def usage_index(session: Session) -> tuple[dict[int, Usage], dict[str, Usage]]:
     return (
-        {target: summary(counts, RequestLog.minibrain_id == target) for target, counts in custom.items()},
-        {
-            target: summary(counts, RequestLog.minibrain_id.is_(None), RequestLog.model == target)
-            for target, counts in base.items()
-        },
+        usage_for(session, RequestLog.minibrain_id, RequestLog.minibrain_id.is_not(None)),
+        usage_for(session, RequestLog.model, RequestLog.minibrain_id.is_(None)),
     )
 
 
