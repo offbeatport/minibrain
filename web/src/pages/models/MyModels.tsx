@@ -119,7 +119,11 @@ export function Availability({ row }: { row: ModelRow }) {
                 )}
             </StatusText>
             {moving && (
-                <ProgressBar value={progress} label={`${row.name} ${label.toLowerCase()}`} />
+                <ProgressBar
+                    value={progress}
+                    label={`${row.name} ${label.toLowerCase()}`}
+                    className="w-16"
+                />
             )}
         </div>
     );
@@ -155,7 +159,7 @@ export function Activity({ row }: { row: ModelRow }) {
             ) : (
                 text
             )}
-            {state === "running" && <ProgressBar value={progress} label={label} />}
+            {state === "running" && <ProgressBar value={progress} label={label} className="w-16" />}
         </div>
     );
 }
@@ -615,7 +619,11 @@ function StatusCell({ entry }: { entry: Entry }) {
                     {verb}
                     <span className="tabular-nums">{share}</span>
                 </StatusText>
-                <ProgressBar value={version.progress} label={`${model.name} v${version.number}`} />
+                <ProgressBar
+                    value={version.progress}
+                    label={`${model.name} v${version.number}`}
+                    className="w-16"
+                />
             </div>
         );
     }
@@ -631,11 +639,21 @@ function StatusCell({ entry }: { entry: Entry }) {
 function ModelName({ entry }: { entry: Entry }) {
     const { model } = entry;
     return (
-        <div className="flex min-w-48 items-center gap-2.5">
+        <div className="flex w-80 items-center gap-2.5">
             <PublisherLogo publisher={model.publisher} name={model.name} size="sm" />
-            <Link href={detailHref(model)} className="truncate font-semibold text-foreground">
-                {model.name}
-            </Link>
+            <div className="flex min-w-0 flex-col">
+                <Link href={detailHref(model)} className="truncate font-semibold text-foreground">
+                    {model.name}
+                </Link>
+                {model.description && (
+                    <span
+                        className="line-clamp-2 whitespace-normal text-sm text-muted-foreground"
+                        title={model.description}
+                    >
+                        {model.description}
+                    </span>
+                )}
+            </div>
         </div>
     );
 }
@@ -662,7 +680,7 @@ function modelOrder(entry: Entry): string {
     return `${entry.model.name.toLowerCase()} ${number}`;
 }
 
-const HIDDEN_COLUMNS = ["base", "kind", "tags", "updated"];
+const HIDDEN_COLUMNS = ["type", "base", "kind", "used", "size", "tags", "updated"];
 
 function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
     return [

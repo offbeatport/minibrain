@@ -608,14 +608,26 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex w-64 items-center gap-2.5">
+                <div className="flex w-56 items-center gap-2.5">
                     <PublisherLogo
                         publisher={row.original.provider}
                         name={row.original.name}
                         size="sm"
                     />
-                    <span className="truncate font-semibold">{row.original.name}</span>
-                    {row.original.recommended && <Badge variant="outline">Recommended</Badge>}
+                    <div className="flex min-w-0 flex-col">
+                        <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-semibold">{row.original.name}</span>
+                            {row.original.recommended && (
+                                <Badge variant="outline">Recommended</Badge>
+                            )}
+                        </span>
+                        <span
+                            className="line-clamp-2 whitespace-normal text-sm text-muted-foreground"
+                            title={row.original.description}
+                        >
+                            {row.original.description}
+                        </span>
+                    </div>
                 </div>
             ),
         },
@@ -638,7 +650,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
         },
         {
             id: "size",
-            header: "Download size",
+            header: "Download",
             accessorFn: smallestVariant,
             cell: ({ row }) =>
                 row.original.variants.length > 1
@@ -656,7 +668,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Licence",
             accessorFn: (entry) => entry.license_name,
             cell: ({ row }) => (
-                <span className="block max-w-36 truncate" title={row.original.license_name}>
+                <span className="block max-w-28 truncate" title={row.original.license_name}>
                     {row.original.license_name}
                 </span>
             ),

@@ -28,10 +28,17 @@ export function StatusText({
     );
 }
 
-export function ProgressBar({ value, label }: { value: number | null | undefined; label: string }) {
+export function ProgressBar({
+    value,
+    label,
+    className = "w-24",
+}: { value: number | null | undefined; label: string; className?: string }) {
     if (value === null || value === undefined) {
         return (
-            <span aria-hidden className="block h-1 w-24 overflow-hidden rounded-sm bg-secondary">
+            <span
+                aria-hidden
+                className={`block h-1 overflow-hidden rounded-sm bg-secondary ${className}`}
+            >
                 <span className="block h-full w-1/3 animate-pulse bg-primary/70 motion-reduce:animate-none" />
             </span>
         );
@@ -41,7 +48,7 @@ export function ProgressBar({ value, label }: { value: number | null | undefined
             value={Math.round(value * 100)}
             max={100}
             aria-label={label}
-            className="block h-1 w-24 appearance-none overflow-hidden rounded-sm bg-secondary [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary"
+            className={`block h-1 appearance-none overflow-hidden rounded-sm bg-secondary [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-secondary [&::-webkit-progress-value]:bg-primary ${className}`}
         />
     );
 }
