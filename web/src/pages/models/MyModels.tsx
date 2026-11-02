@@ -40,7 +40,7 @@ import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { Latency, Requests } from "~/components/models/ModelMetrics";
+import { Requests } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
@@ -568,12 +568,6 @@ function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
             header: "Requests (7 days)",
             accessorFn: requestTotal,
             cell: ({ row }) => <Requests usage={row.original.usage} />,
-        },
-        {
-            id: "latency",
-            header: "Median latency",
-            accessorFn: (row) => row.usage?.p50_ms ?? Number.POSITIVE_INFINITY,
-            cell: ({ row }) => <Latency usage={row.original.usage} />,
         },
         {
             id: "actions",

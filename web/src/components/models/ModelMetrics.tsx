@@ -59,9 +59,9 @@ export function Stages({ stages }: { stages: ModelStage[] }) {
     );
 }
 
-const BAR_WIDTH = 5;
-const BAR_GAP = 2;
-const CHART_HEIGHT = 18;
+const BAR_WIDTH = 9;
+const BAR_GAP = 3;
+const CHART_HEIGHT = 20;
 
 function recentDays(total: number): string[] {
     const today = new Date();
@@ -98,10 +98,8 @@ export function Requests({ usage }: { usage: ModelUsage | null | undefined }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span className="inline-flex items-end gap-2 rounded-sm">
-                    <span className="min-w-8 text-right font-semibold tabular-nums">
-                        {count(total)}
-                    </span>
+                <span className="inline-flex flex-col gap-1 rounded-sm">
+                    <span className="font-semibold tabular-nums">{count(total)}</span>
                     <svg
                         width={width}
                         height={CHART_HEIGHT}
