@@ -1147,6 +1147,47 @@
         }
       }
     },
+    "/api/models/inspect": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Inspect",
+        "operationId": "inspect_api_models_inspect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/import": {
       "post": {
         "tags": [
@@ -5350,6 +5391,121 @@
         ],
         "title": "HubAddRequest"
       },
+      "ImportCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "folder",
+                  "s3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "resolved": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files",
+            "default": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "default": 0
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "variant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Id"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "ImportCheck"
+      },
       "ImportRequest": {
         "properties": {
           "name": {
@@ -5359,13 +5515,19 @@
             "title": "Name"
           },
           "source_type": {
-            "type": "string",
-            "enum": [
-              "folder",
-              "s3"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "folder",
+                  "s3"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Source Type",
-            "default": "folder"
+            "title": "Source Type"
           },
           "location": {
             "type": "string",
@@ -5443,6 +5605,20 @@
           "stores"
         ],
         "title": "InfrastructureInfo"
+      },
+      "InspectRequest": {
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location"
+        ],
+        "title": "InspectRequest"
       },
       "InstallSettings": {
         "properties": {
@@ -6258,6 +6434,24 @@
               }
             ],
             "title": "Base Model"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "classify",
+              "extract",
+              "rewrite",
+              "sql",
+              "distill",
+              "answer"
+            ],
+            "title": "Task",
+            "default": "classify"
+          },
+          "sample": {
+            "type": "boolean",
+            "title": "Sample",
+            "default": false
           }
         },
         "type": "object",

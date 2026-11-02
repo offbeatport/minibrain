@@ -12,13 +12,17 @@ from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
+    ImportCheck,
     ImportRequest,
+    InspectRequest,
     ModelFile,
     ModelRow,
     ModelUpdate,
     TestRequest,
     TestResponse,
 )
+from minibrain.ml.context import FinalError
+from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import model_dir, resolve_spec, retry, start_import
 from minibrain.models.sources import configured
 from minibrain.registry.models import (
@@ -90,11 +94,20 @@ def model_sources() -> list[dict[str, Any]]:
     return configured()
 
 
+@router.post("/inspect")
+def inspect(body: InspectRequest, session: SessionDep) -> ImportCheck:
+    return ImportCheck(**inspect_location(session, body.location))
+
+
 @router.post("/import", status_code=202)
 def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
     tags = [tag.strip() for tag in body.tags if tag.strip()]
+    try:
+        kind = body.source_type or source_type_of(body.location)
+    except FinalError as error:
+        raise ConflictError(str(error)) from error
     model = start_import(
-        session, settings, body.name, body.source_type, body.location.strip(), body.description, tags, body.variant_id
+        session, settings, body.name, kind, body.location.strip(), body.description, tags, body.variant_id
     )
     session.commit()
     return row_of(session, settings, request, model)

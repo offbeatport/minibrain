@@ -9,6 +9,8 @@ class MinibrainCreate(BaseModel):
     description: str = Field(default="", max_length=280)
     tags: list[str] = Field(default_factory=list)
     base_model: str | None = None
+    task: Literal["classify", "extract", "rewrite", "sql", "distill", "answer"] = "classify"
+    sample: bool = False
 
 
 class ColumnInfo(BaseModel):
@@ -424,11 +426,29 @@ class ModelUpdate(BaseModel):
 
 class ImportRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    source_type: Literal["folder", "s3"] = "folder"
+    source_type: Literal["folder", "s3"] | None = None
     location: str = Field(min_length=1)
     variant_id: str | None = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
+
+
+class InspectRequest(BaseModel):
+    location: str = Field(min_length=1)
+
+
+class ImportCheck(BaseModel):
+    ok: bool
+    problem: str | None = None
+    warning: str | None = None
+    source_type: Literal["folder", "s3"] | None = None
+    resolved: str | None = None
+    architecture: str | None = None
+    files: int = 0
+    size_bytes: int = 0
+    name: str | None = None
+    variant_id: str | None = None
+    match: str | None = None
 
 
 class DeployRequest(BaseModel):

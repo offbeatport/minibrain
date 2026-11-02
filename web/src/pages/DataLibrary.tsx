@@ -28,11 +28,10 @@ import {
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
+import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
 import { MappingSection, PreviewSection } from "./DataPage";
-
-const ACCEPT = ".csv,.tsv,.json,.jsonl,.ndjson,.parquet";
 
 function datasetHref(slug: string): string {
     return `/data/datasets/${encodeURIComponent(slug)}`;
@@ -271,7 +270,7 @@ export function DataLibrary() {
                             <input
                                 type="file"
                                 className="sr-only"
-                                accept={ACCEPT}
+                                accept={DATA_FILE_TYPES}
                                 onChange={choose}
                                 disabled={upload.isPending}
                             />

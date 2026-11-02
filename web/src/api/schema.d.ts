@@ -385,6 +385,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Inspect */
+        post: operations["inspect_api_models_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/import": {
         parameters: {
             query?: never;
@@ -1832,16 +1849,43 @@ export interface components {
             /** Repo */
             repo: string;
         };
+        /** ImportCheck */
+        ImportCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Problem */
+            problem?: string | null;
+            /** Warning */
+            warning?: string | null;
+            /** Source Type */
+            source_type?: ("folder" | "s3") | null;
+            /** Resolved */
+            resolved?: string | null;
+            /** Architecture */
+            architecture?: string | null;
+            /**
+             * Files
+             * @default 0
+             */
+            files?: number;
+            /**
+             * Size Bytes
+             * @default 0
+             */
+            size_bytes?: number;
+            /** Name */
+            name?: string | null;
+            /** Variant Id */
+            variant_id?: string | null;
+            /** Match */
+            match?: string | null;
+        };
         /** ImportRequest */
         ImportRequest: {
             /** Name */
             name: string;
-            /**
-             * Source Type
-             * @default folder
-             * @enum {string}
-             */
-            source_type?: "folder" | "s3";
+            /** Source Type */
+            source_type?: ("folder" | "s3") | null;
             /** Location */
             location: string;
             /** Variant Id */
@@ -1869,6 +1913,11 @@ export interface components {
             web: string;
             /** Stores */
             stores: components["schemas"]["StoreInfo"][];
+        };
+        /** InspectRequest */
+        InspectRequest: {
+            /** Location */
+            location: string;
         };
         /** InstallSettings */
         InstallSettings: {
@@ -2135,6 +2184,17 @@ export interface components {
             tags?: string[];
             /** Base Model */
             base_model?: string | null;
+            /**
+             * Task
+             * @default classify
+             * @enum {string}
+             */
+            task?: "classify" | "extract" | "rewrite" | "sql" | "distill" | "answer";
+            /**
+             * Sample
+             * @default false
+             */
+            sample?: boolean;
         };
         /** MinibrainDetail */
         MinibrainDetail: {
@@ -3582,6 +3642,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    inspect_api_models_inspect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InspectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

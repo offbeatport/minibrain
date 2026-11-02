@@ -46,7 +46,7 @@ export function DiscoverPage() {
                 caption="Find supported models to download and run privately."
             />
             <Discover search={search} update={update} onImport={() => setImporting(true)} />
-            <AddModelDialog open={importing} onOpenChange={setImporting} source="folder" />
+            <AddModelDialog open={importing} onOpenChange={setImporting} source="import" />
         </Page>
     );
 }

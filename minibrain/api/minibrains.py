@@ -51,13 +51,18 @@ def list_all(session: SessionDep) -> list[MinibrainSummary]:
 
 
 @router.post("", status_code=201)
-def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> MinibrainDetail:
     base = body.base_model or DEFAULT_BASE_MODEL
+    if body.task != "classify":
+        raise ConflictError(f"{body.task} models are not available yet; only Classify is")
     if base not in trainable_bases(session):
         raise ConflictError(f"{base} is not a trainable base model on this install")
-    minibrain = create_minibrain(session, body.name, "classify", base)
+    minibrain = create_minibrain(session, body.name, body.task, base)
     minibrain.description = body.description.strip()
     minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+    if body.sample:
+        with sample_file(SAMPLE_FILE).open("rb") as stream:
+            attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
     session.commit()
     return detail(settings, minibrain)
 

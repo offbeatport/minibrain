@@ -246,6 +246,9 @@ def test_import_from_a_folder(harness: Harness, tmp_path: Path) -> None:
     detail = harness.client.get("/api/models/base/corp-llm").json()
     assert detail["availability"]["state"] == "available"
     assert {f["path"]: f["sha256"] for f in detail["files"]}["model.safetensors"] == manifest()[1]["sha256"]
+    inferred = body | {"name": "Corp LLM 2", "source_type": None}
+    assert harness.client.post("/api/models/import", json=inferred).json()["key"] == "corp-llm-2"
+    assert harness.worker(kinds=["import"]).run_once()
     bad = harness.client.post("/api/models/import", json=body | {"name": "Empty", "location": str(tmp_path)}).json()
     harness.worker(kinds=["import"]).run_once()
     assert "config.json" in harness.client.get(f"/api/models/base/{bad['key']}").json()["error"]
@@ -457,3 +460,21 @@ def test_unknown_architecture_is_marked_untested(harness: Harness, hub: Path) ->
     entry = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
     assert entry["support"] == "untested"
     assert harness.client.post("/api/catalog/hub", json={"repo": "test/missing"}).status_code == 409
+
+
+def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Path, monkeypatch) -> None:
+    folder = tmp_path / "corp_model-v2"
+    folder.mkdir()
+    for name, data in FILES.items():
+        (folder / name).write_bytes(data)
+    found = harness.client.post("/api/models/inspect", json={"location": str(folder)}).json()
+    assert (found["ok"], found["source_type"], found["name"], found["files"]) == (True, "folder", "corp model v2", 3)
+    assert "untested" in found["warning"]
+    empty = harness.client.post("/api/models/inspect", json={"location": str(tmp_path)}).json()
+    assert not empty["ok"] and "config.json" in empty["problem"]
+    monkeypatch.delenv("MINIBRAIN_MODELS_S3_URL", raising=False)
+    relative = harness.client.post("/api/models/inspect", json={"location": "models/qwen"}).json()
+    assert "absolute folder path" in relative["problem"]
+    monkeypatch.setenv("MINIBRAIN_MODELS_S3_URL", "s3://bucket/models")
+    bucket = harness.client.post("/api/models/inspect", json={"location": "qwen"}).json()
+    assert (bucket["source_type"], bucket["resolved"]) == ("s3", "s3://bucket/models/qwen")

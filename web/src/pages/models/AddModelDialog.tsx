@@ -1,7 +1,8 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Check, Cloud, FolderOpen, GraduationCap, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Info, PackagePlus, Sparkles } from "lucide-react";
 import {
+    Badge,
     Button,
     Dialog,
     DialogContent,
@@ -10,115 +11,313 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    ProviderLogo,
+    Link,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
     Textarea,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
     cn,
 } from "obp-ui";
-import { type FormEvent, type ReactNode, useState } from "react";
-import { api, unwrap } from "~/api/client";
-import { useBases, useCatalog, useModelSources } from "~/api/queries";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type CatalogEntry, type ModelRow, api, unwrap, uploadSource } from "~/api/client";
+import { useBases, useCatalog, useDatasets, useModels } from "~/api/queries";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
+import { StatusText } from "~/components/models/StatusText";
+import { DATA_FILE_TYPES } from "~/lib/dataFiles";
+import { bytes } from "~/lib/time";
+import { Fit } from "./Discover";
+import { bestFit } from "./DiscoverFilters";
 import { Field, splitTags, useModelsRefresh } from "./dialogs";
 
-export type AddSource = "custom" | "huggingface" | "folder" | "s3";
+export type AddSource = "custom" | "import";
 
-type SourceOption = {
-    key: AddSource;
-    label: string;
-    hint: string;
-    icon: (selected: boolean) => ReactNode;
-};
-
-function lucide(Icon: LucideIcon) {
-    return (selected: boolean) => (
-        <Icon
-            aria-hidden="true"
-            className={cn("size-6", selected ? "text-primary" : "text-muted-foreground")}
-        />
+function RadioCard({
+    name,
+    value,
+    checked,
+    disabled,
+    onChange,
+    children,
+    className,
+}: {
+    name: string;
+    value: string;
+    checked: boolean;
+    disabled?: boolean;
+    onChange: () => void;
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <label
+            className={cn(
+                "relative flex rounded-lg border has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-1 has-focus-visible:ring-offset-background",
+                disabled
+                    ? "cursor-not-allowed bg-background opacity-60"
+                    : checked
+                      ? "cursor-pointer border-primary bg-accent text-accent-foreground"
+                      : "cursor-pointer bg-background hover:bg-secondary",
+                className,
+            )}
+        >
+            <input
+                type="radio"
+                name={name}
+                value={value}
+                checked={checked}
+                disabled={disabled}
+                onChange={onChange}
+                className="sr-only"
+            />
+            {children}
+            {checked && (
+                <Check
+                    aria-hidden="true"
+                    className="absolute top-2.5 right-2.5 size-4 text-primary"
+                />
+            )}
+        </label>
     );
 }
 
-const SOURCES: SourceOption[] = [
+const SOURCES: { key: AddSource; label: string; hint: string; icon: typeof Sparkles }[] = [
     {
         key: "custom",
         label: "Custom model",
-        hint: "Train a base model on your data",
-        icon: lucide(GraduationCap),
+        hint: "Train a base model you have on your data",
+        icon: Sparkles,
     },
     {
-        key: "huggingface",
-        label: "Hugging Face",
-        hint: "Download from the catalogue",
-        icon: () => <ProviderLogo id="huggingface" className="size-6" />,
-    },
-    {
-        key: "folder",
-        label: "Folder",
-        hint: "Import files on the server",
-        icon: lucide(FolderOpen),
-    },
-    {
-        key: "s3",
-        label: "S3 bucket",
-        hint: "Import from object storage",
-        icon: lucide(Cloud),
+        key: "import",
+        label: "Import files",
+        hint: "Bring in a base model from a folder or S3",
+        icon: PackagePlus,
     },
 ];
 
-function SourceCards({
-    value,
-    onChange,
-}: {
-    value: AddSource;
-    onChange: (source: AddSource) => void;
-}) {
+const TASKS: { key: string; label: string; hint: string; ready: boolean }[] = [
+    { key: "classify", label: "Classify", hint: "Text → one label", ready: true },
+    { key: "extract", label: "Extract", hint: "Text → fields", ready: false },
+    { key: "rewrite", label: "Rewrite", hint: "Text → text in your style", ready: false },
+    { key: "sql", label: "Text-to-SQL", hint: "Question → SQL", ready: false },
+    { key: "distill", label: "Distill", hint: "Copy a larger model", ready: false },
+    { key: "answer", label: "Answer", hint: "Questions over documents", ready: false },
+];
+
+function TaskPicker({ value, onChange }: { value: string; onChange: (task: string) => void }) {
     return (
-        <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <legend className="sr-only">What to add</legend>
-            {SOURCES.map((option) => {
-                const selected = option.key === value;
-                return (
-                    <label
-                        key={option.key}
-                        className={cn(
-                            "relative flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-1 has-focus-visible:ring-offset-background",
-                            selected
-                                ? "border-primary bg-accent text-accent-foreground"
-                                : "bg-background hover:bg-secondary",
-                        )}
+        <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-sm font-medium">Task</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {TASKS.map((task) => (
+                    <RadioCard
+                        key={task.key}
+                        name="task"
+                        value={task.key}
+                        checked={value === task.key}
+                        disabled={!task.ready}
+                        onChange={() => onChange(task.key)}
+                        className="flex-col items-start gap-0.5 px-3 py-2"
                     >
-                        <input
-                            type="radio"
-                            name="add-source"
-                            value={option.key}
-                            checked={selected}
-                            onChange={() => onChange(option.key)}
-                            className="sr-only"
-                        />
-                        {option.icon(selected)}
-                        <span className="flex flex-col">
-                            <span className="font-semibold">{option.label}</span>
-                            <span className="text-sm text-muted-foreground">{option.hint}</span>
+                        <span className="flex items-center gap-2 font-semibold">
+                            {task.label}
+                            {!task.ready && <Badge variant="outline">Later</Badge>}
                         </span>
-                        {selected && (
-                            <Check
-                                aria-hidden="true"
-                                className="absolute top-2.5 right-2.5 size-4 text-primary"
-                            />
-                        )}
-                    </label>
-                );
-            })}
+                        <span className="text-sm text-muted-foreground">{task.hint}</span>
+                    </RadioCard>
+                ))}
+            </div>
         </fieldset>
     );
 }
 
-function Footer({
+type BaseChoice = {
+    key: string;
+    name: string;
+    publisher: string | null | undefined;
+    size: number | null | undefined;
+    onDisk: boolean;
+    entry: CatalogEntry | undefined;
+};
+
+function baseChoices(keys: string[], rows: ModelRow[], entries: CatalogEntry[]): BaseChoice[] {
+    return keys.map((key) => {
+        const row = rows.find((item) => item.kind === "base" && item.key === key);
+        const entry =
+            entries.find((item) => item.added.some((added) => added.key === key)) ??
+            entries.find((item) => item.id === key);
+        return {
+            key,
+            name: row?.name ?? entry?.name ?? key,
+            publisher: row?.publisher ?? entry?.provider,
+            size: row?.size_bytes ?? entry?.variants[0]?.size_bytes,
+            onDisk: row?.availability.state === "available",
+            entry,
+        };
+    });
+}
+
+function BasePicker({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+    const bases = useBases();
+    const models = useModels();
+    const catalog = useCatalog();
+    const choices = baseChoices(bases.data ?? [], models.data ?? [], catalog.data?.entries ?? []);
+    return (
+        <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-sm font-medium">Base model</legend>
+            <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+                {choices.map((choice) => (
+                    <RadioCard
+                        key={choice.key}
+                        name="base"
+                        value={choice.key}
+                        checked={value === choice.key}
+                        onChange={() => onChange(choice.key)}
+                        className="items-center gap-3 py-2 pr-9 pl-3"
+                    >
+                        <PublisherLogo publisher={choice.publisher} name={choice.name} />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate font-semibold">{choice.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                                {[
+                                    choice.size ? bytes(choice.size) : null,
+                                    choice.onDisk
+                                        ? "On this install"
+                                        : "Downloads on first training",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                            </span>
+                        </span>
+                        {choice.entry && <Fit fit={bestFit(choice.entry).fit} />}
+                    </RadioCard>
+                ))}
+            </div>
+            <span className="text-sm text-muted-foreground">
+                Need another base?{" "}
+                <Link href="/discover?train=yes" className="text-primary hover:underline">
+                    Find models that can be fine-tuned
+                </Link>
+            </span>
+        </fieldset>
+    );
+}
+
+type DataChoice = "upload" | "dataset" | "sample" | "later";
+
+const DATA_CHOICES: { key: DataChoice; label: string }[] = [
+    { key: "upload", label: "Upload a file" },
+    { key: "dataset", label: "Use a dataset" },
+    { key: "sample", label: "Sample data" },
+    { key: "later", label: "Later" },
+];
+
+function DataPicker({
+    choice,
+    onChoice,
+    file,
+    onFile,
+    dataset,
+    onDataset,
+}: {
+    choice: DataChoice;
+    onChoice: (choice: DataChoice) => void;
+    file: File | null;
+    onFile: (file: File | null) => void;
+    dataset: string;
+    onDataset: (slug: string) => void;
+}) {
+    const datasets = useDatasets();
+    return (
+        <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1.5 text-sm font-medium">Examples</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {DATA_CHOICES.map((item) => (
+                    <RadioCard
+                        key={item.key}
+                        name="data"
+                        value={item.key}
+                        checked={choice === item.key}
+                        disabled={item.key === "dataset" && (datasets.data ?? []).length === 0}
+                        onChange={() => onChoice(item.key)}
+                        className="h-9 items-center px-3 pr-8 text-sm"
+                    >
+                        {item.label}
+                    </RadioCard>
+                ))}
+            </div>
+            {choice === "upload" && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="outline">
+                        <label className="cursor-pointer">
+                            {file ? "Choose another file" : "Choose file"}
+                            <input
+                                type="file"
+                                accept={DATA_FILE_TYPES}
+                                className="sr-only"
+                                onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+                            />
+                        </label>
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                        {file
+                            ? `${file.name} · ${bytes(file.size)}`
+                            : "CSV, TSV, JSON Lines or Parquet"}
+                    </span>
+                </div>
+            )}
+            {choice === "dataset" && (
+                <Select value={dataset} onValueChange={(value) => onDataset(String(value ?? ""))}>
+                    <SelectTrigger aria-label="Dataset" className="w-full">
+                        <SelectValue placeholder="Choose a dataset" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(datasets.data ?? []).map((item) => (
+                            <SelectItem key={item.slug} value={item.slug}>
+                                {item.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+            {choice === "sample" && (
+                <p className="text-sm text-muted-foreground">
+                    Travel support messages labelled with intents such as lost luggage or refunds.
+                </p>
+            )}
+            {choice === "later" && (
+                <p className="text-sm text-muted-foreground">Add examples on the Data page next.</p>
+            )}
+        </fieldset>
+    );
+}
+
+function MoreOptions({ children }: { children: ReactNode }) {
+    const [open, setOpen] = useState(false);
+    const Icon = open ? ChevronDown : ChevronRight;
+    return (
+        <div className="flex flex-col gap-3">
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+                className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+                <Icon className="size-4" />
+                More options
+            </button>
+            {open && children}
+        </div>
+    );
+}
+
+function DialogButtons({
     onCancel,
     submit,
     disabled,
@@ -143,40 +342,58 @@ function CustomForm({ base, onClose }: { base?: string; onClose: () => void }) {
     const router = useRouter();
     const refresh = useModelsRefresh();
     const bases = useBases();
+    const [task, setTask] = useState("classify");
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
     const [chosen, setChosen] = useState(base ?? "");
+    const [data, setData] = useState<DataChoice>("upload");
+    const [file, setFile] = useState<File | null>(null);
+    const [dataset, setDataset] = useState("");
+    const baseKey = chosen || bases.data?.[0] || "";
     const create = useMutation({
-        mutationFn: () =>
-            unwrap(
+        mutationFn: async () => {
+            const created = await unwrap(
                 api.POST("/api/minibrains", {
                     body: {
                         name: name.trim(),
                         description: description.trim(),
                         tags: splitTags(tags),
-                        base_model: chosen || null,
+                        base_model: baseKey || null,
+                        task: "classify",
+                        sample: data === "sample",
                     },
                 }),
-            ),
+            );
+            if (data === "upload" && file) {
+                await uploadSource(created.slug, file);
+            }
+            if (data === "dataset" && dataset) {
+                await unwrap(
+                    api.PUT("/api/minibrains/{slug}/dataset", {
+                        params: { path: { slug: created.slug } },
+                        body: { dataset },
+                    }),
+                );
+            }
+            return created;
+        },
         onSuccess: async (minibrain) => {
             await refresh();
             onClose();
             router.history.push(`/data?minibrain=${encodeURIComponent(minibrain.slug)}`);
         },
     });
+    const missingData = (data === "upload" && !file) || (data === "dataset" && !dataset);
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (name.trim()) {
+        if (name.trim() && !missingData) {
             create.mutate();
         }
     };
-    const options = bases.data ?? [];
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-                A Classify model: text in, one label out. Next you add examples on the Data page.
-            </p>
+        <form onSubmit={submit} className="flex flex-col gap-5">
+            <TaskPicker value={task} onChange={setTask} />
             <Field id="create-name" label="Name">
                 <Input
                     id="create-name"
@@ -186,156 +403,149 @@ function CustomForm({ base, onClose }: { base?: string; onClose: () => void }) {
                     autoFocus
                 />
             </Field>
-            <Field id="create-description" label="Description">
-                <Textarea
-                    id="create-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    rows={2}
-                    placeholder="Routes incoming tickets to the right queue"
-                />
-            </Field>
-            <Field
-                id="create-base"
-                label="Base model"
-                hint="Only base models with a tested chat template can be trained."
-            >
-                <Select
-                    value={chosen || options[0] || ""}
-                    onValueChange={(value) => setChosen(String(value ?? ""))}
-                >
-                    <SelectTrigger id="create-base" className="w-full">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {options.map((option) => (
-                            <SelectItem key={option} value={option}>
-                                {option}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-            <Field id="create-tags" label="Tags" hint="Comma separated.">
-                <Input
-                    id="create-tags"
-                    value={tags}
-                    onChange={(event) => setTags(event.target.value)}
-                />
-            </Field>
+            <BasePicker value={baseKey} onChange={setChosen} />
+            <DataPicker
+                choice={data}
+                onChoice={setData}
+                file={file}
+                onFile={setFile}
+                dataset={dataset}
+                onDataset={setDataset}
+            />
+            <MoreOptions>
+                <Field id="create-description" label="Description">
+                    <Textarea
+                        id="create-description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        rows={2}
+                        placeholder="Routes incoming tickets to the right queue"
+                    />
+                </Field>
+                <Field id="create-tags" label="Tags" hint="Comma separated.">
+                    <Input
+                        id="create-tags"
+                        value={tags}
+                        onChange={(event) => setTags(event.target.value)}
+                    />
+                </Field>
+            </MoreOptions>
             <ErrorLine error={create.error} />
-            <Footer
+            <DialogButtons
                 onCancel={onClose}
-                submit="Add model"
-                disabled={!name.trim() || create.isPending}
+                submit={create.isPending ? "Adding…" : "Add model"}
+                disabled={!name.trim() || missingData || create.isPending}
             />
         </form>
     );
 }
 
-function HubForm({ onClose }: { onClose: () => void }) {
-    const router = useRouter();
-    const refresh = useModelsRefresh();
-    const catalog = useCatalog();
-    const [repo, setRepo] = useState("");
-    const add = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/catalog/hub", { body: { repo: repo.trim() } })),
-        onSuccess: async (entry) => {
-            await refresh();
-            onClose();
-            router.history.push(`/discover/${encodeURIComponent(entry.id)}`);
-        },
-    });
-    const browse = () => {
-        onClose();
-        router.history.push("/discover");
-    };
-    const data = catalog.data;
-    if (data && !data.downloads_allowed) {
-        return (
-            <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                    The Model sources policy allows imported files only. Download the files
-                    elsewhere, then import them from a folder or an S3 bucket.
-                </p>
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>
-                        Close
-                    </Button>
-                </DialogFooter>
-            </div>
-        );
-    }
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (repo.trim()) {
-            add.mutate();
-        }
-    };
+function useDebounced(value: string, ms: number): string {
+    const [settled, setSettled] = useState(value);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setSettled(value), ms);
+        return () => window.clearTimeout(timer);
+    }, [value, ms]);
+    return settled;
+}
+
+const PATH_HELP =
+    "A Hugging Face format model: config.json, tokenizer files and .safetensors weights (sharded is fine). Use an absolute folder path on the minibrain server, or an s3:// URL read with the server's AWS_* credentials.";
+
+function PathLabel() {
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-                Discover lists the models we support, with hardware fit, licence and access checks
-                before you download.
-            </p>
-            <div>
-                <Button type="button" onClick={browse}>
-                    Browse the catalogue
-                </Button>
-            </div>
-            {data?.hub_add_allowed && (
-                <>
-                    <Field
-                        id="hub-repo"
-                        label="Or paste a Hugging Face link or id"
-                        hint="minibrain reads that one model's details and adds it to Discover, badged untested unless our engines support its architecture."
+        <span className="flex items-center gap-1.5">
+            <label htmlFor="import-location" className="text-sm font-medium">
+                Folder or S3 path
+            </label>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label="What can I import?"
+                        className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                        <Input
-                            id="hub-repo"
-                            value={repo}
-                            onChange={(event) => setRepo(event.target.value)}
-                            placeholder="Qwen/Qwen3-8B"
-                            className="font-mono"
-                        />
-                    </Field>
-                    <ErrorLine error={add.error} />
-                    <Footer
-                        onCancel={onClose}
-                        submit={add.isPending ? "Checking…" : "Add to Discover"}
-                        disabled={!repo.trim() || add.isPending}
-                    />
-                </>
-            )}
-        </form>
+                        <Info className="size-4" />
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-80 whitespace-normal">{PATH_HELP}</TooltipContent>
+            </Tooltip>
+        </span>
     );
 }
 
-function ImportForm({ kind, onClose }: { kind: "folder" | "s3"; onClose: () => void }) {
+type Inspection = {
+    ok: boolean;
+    problem?: string | null;
+    warning?: string | null;
+    source_type?: string | null;
+    architecture?: string | null;
+    files?: number;
+    size_bytes?: number;
+    match?: string | null;
+};
+
+function PathCheck({
+    loading,
+    empty,
+    found,
+}: {
+    loading: boolean;
+    empty: boolean;
+    found: Inspection | undefined;
+}) {
+    if (empty) {
+        return null;
+    }
+    if (loading || !found) {
+        return <span className="text-sm text-muted-foreground">Checking…</span>;
+    }
+    if (!found.ok) {
+        return (
+            <StatusText tone="destructive">{found.problem ?? "Cannot read this path"}</StatusText>
+        );
+    }
+    const where = found.source_type === "s3" ? "S3" : "Folder";
+    return (
+        <div className="flex flex-col gap-0.5 rounded-md border px-3 py-2 text-sm">
+            <StatusText tone="success">
+                {`${where} · ${found.architecture || "unknown architecture"} · ${found.files} files · ${bytes(found.size_bytes)}`}
+            </StatusText>
+            <span className="text-muted-foreground">
+                {found.match
+                    ? `Matches ${found.match} in the catalogue; files are checked against its checksums.`
+                    : "No catalogue match: it imports as not verified."}
+            </span>
+            {found.warning && <StatusText tone="warning">{found.warning}</StatusText>}
+        </div>
+    );
+}
+
+function ImportForm({ onClose }: { onClose: () => void }) {
     const refresh = useModelsRefresh();
-    const sources = useModelSources();
-    const catalog = useCatalog();
     const [location, setLocation] = useState("");
     const [name, setName] = useState("");
+    const [named, setNamed] = useState(false);
     const [description, setDescription] = useState("");
-    const [match, setMatch] = useState("detect");
-    const s3 = sources.data?.find((source) => source.type === "s3");
-    const variants = (catalog.data?.entries ?? []).flatMap((entry) =>
-        entry.variants.map((variant) => ({
-            id: variant.id,
-            label: `${entry.name} · ${variant.label}`,
-        })),
-    );
+    const path = useDebounced(location.trim(), 400);
+    const check = useQuery({
+        queryKey: ["models", "inspect", path],
+        queryFn: () => unwrap(api.POST("/api/models/inspect", { body: { location: path } })),
+        enabled: path.length > 1,
+        staleTime: 10_000,
+    });
+    const found = path === location.trim() ? check.data : undefined;
+    const shownName = named ? name : (found?.name ?? name);
     const start = useMutation({
         mutationFn: () =>
             unwrap(
                 api.POST("/api/models/import", {
                     body: {
-                        name: name.trim(),
-                        source_type: kind,
+                        name: shownName.trim(),
                         location: location.trim(),
                         description: description.trim(),
                         tags: [],
-                        variant_id: match === "detect" ? null : match,
+                        variant_id: found?.variant_id ?? null,
                     },
                 }),
             ),
@@ -344,85 +554,58 @@ function ImportForm({ kind, onClose }: { kind: "folder" | "s3"; onClose: () => v
             onClose();
         },
     });
+    const ready = Boolean(found?.ok) && shownName.trim().length > 0;
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (name.trim() && location.trim()) {
+        if (ready) {
             start.mutate();
         }
     };
-    const placeholder =
-        kind === "folder"
-            ? "/srv/models/qwen3-1.7b"
-            : s3?.location
-              ? "qwen3-1.7b"
-              : "s3://bucket/models/qwen3-1.7b";
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-                Copies a Hugging Face format folder (config, tokenizer, safetensors) into managed
-                storage. Files stay on your infrastructure; nothing is sent anywhere.
-            </p>
-            <Field
-                id="import-location"
-                label={kind === "folder" ? "Folder path" : "Bucket path"}
-                hint={
-                    kind === "folder"
-                        ? "Works with `hf download <repo> --revision <sha> --local-dir <dir>`."
-                        : s3?.location
-                          ? `Relative to ${s3.location}, or a full s3:// URL.`
-                          : "A full s3:// URL; credentials come from the server's AWS_* variables."
-                }
-            >
+        <form onSubmit={submit} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-1">
+                <PathLabel />
                 <Input
                     id="import-location"
                     value={location}
                     onChange={(event) => setLocation(event.target.value)}
-                    placeholder={placeholder}
+                    placeholder="/srv/models/qwen3-1.7b or s3://bucket/models/qwen3-1.7b"
                     className="font-mono"
                     autoFocus
                 />
-            </Field>
+                <PathCheck
+                    loading={check.isFetching || path !== location.trim()}
+                    empty={location.trim().length < 2}
+                    found={found}
+                />
+            </div>
             <Field id="import-name" label="Name">
                 <Input
                     id="import-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    value={shownName}
+                    onChange={(event) => {
+                        setName(event.target.value);
+                        setNamed(true);
+                    }}
                 />
             </Field>
-            <Field id="import-description" label="Description">
-                <Input
-                    id="import-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                />
-            </Field>
-            <Field
-                id="import-match"
-                label="Catalogue match"
-                hint="A match is checked file by file against the catalogue checksums; anything else imports as not verified."
-            >
-                <Select
-                    value={match}
-                    onValueChange={(value) => setMatch(String(value ?? "detect"))}
-                >
-                    <SelectTrigger id="import-match" className="w-full">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="detect">Detect from download metadata</SelectItem>
-                        {variants.map((variant) => (
-                            <SelectItem key={variant.id} value={variant.id}>
-                                {variant.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
+            <MoreOptions>
+                <Field id="import-description" label="Description">
+                    <Input
+                        id="import-description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                    />
+                </Field>
+            </MoreOptions>
+            <p className="text-sm text-muted-foreground">
+                Files are copied into managed storage and stay on your infrastructure.
+            </p>
             <ErrorLine error={start.error} />
-            <Footer
+            <DialogButtons
                 onCancel={onClose}
-                submit="Import"
-                disabled={!name.trim() || !location.trim() || start.isPending}
+                submit={start.isPending ? "Importing…" : "Import"}
+                disabled={!ready || start.isPending}
             />
         </form>
     );
@@ -439,6 +622,7 @@ export function AddModelDialog({
     source?: AddSource;
     base?: string;
 }) {
+    const router = useRouter();
     const [chosen, setChosen] = useState<{ for: AddSource; value: AddSource } | null>(null);
     const current = chosen && chosen.for === source ? chosen.value : source;
     const close = () => {
@@ -447,23 +631,61 @@ export function AddModelDialog({
     };
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Add model</DialogTitle>
                     <DialogDescription>Choose what to add.</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-5">
-                    <SourceCards
-                        value={current}
-                        onChange={(value) => setChosen({ for: source, value })}
-                    />
-                    {current === "custom" && (
+                    <fieldset className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <legend className="sr-only">What to add</legend>
+                        {SOURCES.map((option) => {
+                            const selected = option.key === current;
+                            const Icon = option.icon;
+                            return (
+                                <RadioCard
+                                    key={option.key}
+                                    name="add-source"
+                                    value={option.key}
+                                    checked={selected}
+                                    onChange={() => setChosen({ for: source, value: option.key })}
+                                    className="items-start gap-3 p-3 pr-9"
+                                >
+                                    <Icon
+                                        aria-hidden="true"
+                                        className={cn(
+                                            "size-6 shrink-0",
+                                            selected ? "text-primary" : "text-muted-foreground",
+                                        )}
+                                    />
+                                    <span className="flex flex-col">
+                                        <span className="font-semibold">{option.label}</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {option.hint}
+                                        </span>
+                                    </span>
+                                </RadioCard>
+                            );
+                        })}
+                    </fieldset>
+                    {current === "custom" ? (
                         <CustomForm key={`custom-${base}`} base={base} onClose={close} />
+                    ) : (
+                        <ImportForm key="import" onClose={close} />
                     )}
-                    {current === "huggingface" && <HubForm onClose={close} />}
-                    {(current === "folder" || current === "s3") && (
-                        <ImportForm key={current} kind={current} onClose={close} />
-                    )}
+                    <p className="border-t pt-3 text-sm text-muted-foreground">
+                        Looking for a model to download?{" "}
+                        <button
+                            type="button"
+                            className="text-primary hover:underline"
+                            onClick={() => {
+                                close();
+                                router.history.push("/discover");
+                            }}
+                        >
+                            Browse Discover
+                        </button>
+                    </p>
                 </div>
             </DialogContent>
         </Dialog>
