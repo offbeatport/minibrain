@@ -263,7 +263,7 @@ export function SecurityPage() {
     });
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
-        <SettingsLayout caption="Values from minibrain.yaml or MINIBRAIN_POLICY_* variables are locked here. Every change is recorded.">
+        <SettingsLayout>
             <ErrorLine error={policies.error} />
             <PanelSections>
                 {policies.data &&
