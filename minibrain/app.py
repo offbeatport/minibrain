@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.api import (
     catalog,
     compute,
+    data,
     internal,
     internal_gateway,
     jobs,
@@ -163,6 +164,7 @@ def create_app(
         app.add_exception_handler(error, domain_error)
     for module in (
         minibrains,
+        data,
         models,
         catalog,
         compute,

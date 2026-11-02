@@ -28,6 +28,38 @@ class MappingInfo(BaseModel):
     sql: str | None
 
 
+class SourceSummary(BaseModel):
+    id: int
+    name: str
+    filename: str
+    size: int
+    rows: int
+    columns: list[ColumnInfo]
+    datasets: list[str]
+    created_at: datetime
+
+
+class DatasetSummary(BaseModel):
+    slug: str
+    name: str
+    source_id: int
+    source_name: str
+    rows: int
+    columns: list[ColumnInfo]
+    mapping: MappingInfo
+    models: list[str]
+    updated_at: datetime
+
+
+class DatasetCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    source_id: int
+
+
+class DatasetChoice(BaseModel):
+    dataset: str | None
+
+
 class MappingUpdate(BaseModel):
     input_column: str | None = None
     label_column: str | None = None
@@ -132,6 +164,8 @@ class MinibrainSummary(BaseModel):
 class MinibrainDetail(MinibrainSummary):
     source: SourceInfo | None
     mapping: MappingInfo
+    dataset: str | None = None
+    dataset_name: str | None = None
     snapshot: SnapshotInfo | None
     models: list[str]
 

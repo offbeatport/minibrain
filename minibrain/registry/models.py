@@ -72,6 +72,36 @@ class Artifact(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
 
+class Source(Base):
+    __tablename__ = "sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    filename: Mapped[str]
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    size: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    datasets: Mapped[list["Dataset"]] = relationship(back_populates="source")
+
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"))
+    input_column: Mapped[str | None] = mapped_column(default=None)
+    label_column: Mapped[str | None] = mapped_column(default=None)
+    sql: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    source: Mapped[Source] = relationship(back_populates="datasets")
+    minibrains: Mapped[list["Minibrain"]] = relationship(back_populates="dataset")
+
+
 class Minibrain(Base):
     __tablename__ = "minibrains"
 
@@ -80,11 +110,7 @@ class Minibrain(Base):
     name: Mapped[str]
     task: Mapped[str]
     base_model: Mapped[str]
-    source_file: Mapped[str | None] = mapped_column(default=None)
-    source_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
-    input_column: Mapped[str | None] = mapped_column(default=None)
-    label_column: Mapped[str | None] = mapped_column(default=None)
-    sql: Mapped[str | None] = mapped_column(default=None)
+    dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     current_version: Mapped[int | None] = mapped_column(default=None)
     deployed: Mapped[bool] = mapped_column(default=False, server_default=false())
     last_version: Mapped[int] = mapped_column(default=-1, server_default="-1")
@@ -94,6 +120,7 @@ class Minibrain(Base):
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
+    dataset: Mapped["Dataset | None"] = relationship(back_populates="minibrains")
     snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")

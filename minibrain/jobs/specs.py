@@ -5,12 +5,12 @@ from sqlalchemy.orm import Session
 from minibrain.models.registry import resolve_spec
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
-from minibrain.registry.models import Minibrain, Version
+from minibrain.registry.models import Dataset, Version
 from minibrain.settings import Settings
 
 
-def prepare_params(session: Session, minibrain: Minibrain, sql: str) -> dict[str, Any]:
-    source = ref(session, minibrain.source_artifact_id)
+def prepare_params(session: Session, dataset: Dataset, sql: str) -> dict[str, Any]:
+    source = ref(session, dataset.source.artifact_id)
     if source is None:
         raise MissingArtifactError("upload a data file first")
     return {"source": source, "sql": sql}

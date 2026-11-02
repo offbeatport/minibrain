@@ -197,6 +197,16 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 
 ## Data
 
+Data is shared across models:
+
+- A **source** is a file, folder, bucket or database query, stored once (content-addressed) and staged for queries.
+- A **dataset** is a source plus a mapping (input and label columns, or SQL). Datasets are shared; each custom model
+  points at one, and several models can use the same dataset to compare fairly.
+- **Snapshots** stay per model and are built from its dataset. Builds are deterministic and content-addressed, so models
+  on the same dataset get identical splits and share storage; each version records the snapshot it used.
+- Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
+  model gets a new dataset. A dataset or source still in use cannot be deleted.
+
 ### Sources
 
 - v1: Postgres, Parquet, S3, files, queried in place by DuckDB: `ATTACH '…' AS src (TYPE postgres, READ_ONLY)`,

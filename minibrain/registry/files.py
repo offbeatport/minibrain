@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore, Packing
-from minibrain.registry.models import Artifact, Minibrain, Snapshot, Version
+from minibrain.registry.models import Artifact, Snapshot, Version
 from minibrain.settings import Settings
 
 
@@ -74,12 +74,6 @@ def adapter_dir(session: Session, store: ArtifactStore, version: Version) -> Pat
     return Path(version.adapter_dir) if version.adapter_dir else None
 
 
-def source_path(session: Session, store: ArtifactStore, minibrain: Minibrain) -> Path | None:
-    if minibrain.source_artifact_id is None:
-        return None
-    return materialize(session, store, minibrain.source_artifact_id)
-
-
 def backfill(session: Session, settings: Settings) -> int:
     store = store_for(settings)
     moved = 0
@@ -92,11 +86,6 @@ def backfill(session: Session, settings: Settings) -> int:
         if version.adapter_dir and Path(version.adapter_dir).is_dir():
             artifact = store_dir(session, store, Path(version.adapter_dir), ArtifactKind.ADAPTER, "adapter")
             version.adapter_artifact_id = artifact.id
-            moved += 1
-    for minibrain in session.scalars(select(Minibrain).where(Minibrain.source_artifact_id.is_(None))):
-        legacy = settings.minibrain_dir(minibrain.slug) / "source" / (minibrain.source_file or "")
-        if minibrain.source_file and legacy.is_file():
-            minibrain.source_artifact_id = store_file(session, store, legacy, ArtifactKind.SOURCE).id
             moved += 1
     session.commit()
     return moved

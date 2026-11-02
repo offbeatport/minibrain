@@ -1,15 +1,14 @@
 import shutil
-from pathlib import Path
-from typing import BinaryIO
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.api.data import apply_mapping, preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
-    ChatMessage,
+    DatasetChoice,
     DeployRequest,
     ExampleInfo,
     JobInfo,
@@ -19,20 +18,18 @@ from minibrain.api.schemas import (
     MinibrainSummary,
     ModelUpdate,
     PreviewResponse,
-    PreviewRow,
-    QualityInfo,
     QueryRequest,
     QueryResponse,
 )
-from minibrain.api.views import detail, job_info, staging_path, summary
-from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.api.views import detail, job_info, summary
 from minibrain.base_models import DEFAULT_BASE_MODEL
-from minibrain.data import quality, snapshot
-from minibrain.data.sources import describe, labelled_rows, mapping_sql, run_query, safe_filename, stage, to_text
+from minibrain.data import snapshot
+from minibrain.data.shared import attach_upload, dataset_of, dataset_sql, get_dataset, staging_of
+from minibrain.data.sources import safe_filename
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
 from minibrain.models.registry import trainable_bases
-from minibrain.registry.files import ArtifactKind, register, snapshot_dir
+from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
 from minibrain.registry.service import (
     ConflictError,
@@ -42,33 +39,9 @@ from minibrain.registry.service import (
     list_minibrains,
     slugify,
 )
-from minibrain.settings import Settings, sample_file
-from minibrain.tasks.classify import trained_messages
+from minibrain.settings import sample_file
 
 router = APIRouter(prefix="/api/minibrains", tags=["minibrains"])
-
-INPUT_NAMES = ("input", "text", "message", "question", "query", "prompt", "utterance", "body", "content")
-LABEL_NAMES = ("label", "category", "intent", "class", "target", "topic", "tag")
-PREVIEW_ROWS = 20
-QUERY_ROWS = 50
-
-
-def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
-    lowered = {column.lower(): column for column in columns}
-    return next((lowered[name] for name in names if name in lowered), None)
-
-
-def saved_sql(minibrain: Minibrain) -> str:
-    if not minibrain.sql:
-        raise ConflictError("map an input column and a label column first")
-    return minibrain.sql
-
-
-def require_source(settings: Settings, minibrain: Minibrain) -> Path:
-    staging = staging_path(settings, minibrain)
-    if not staging.exists():
-        raise ConflictError("upload a data file first")
-    return staging
 
 
 @router.get("")
@@ -137,23 +110,6 @@ SAMPLE_FILE = "travel_intents.jsonl"
 SAMPLE_DESCRIPTION = "Sample: sort travel support messages into intents such as lost luggage or refunds."
 
 
-def attach_source(
-    session: Session, settings: Settings, store: ArtifactStore, minibrain: Minibrain, filename: str, stream: BinaryIO
-) -> None:
-    stored = store.put_stream(stream)
-    artifact = register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
-    staging = staging_path(settings, minibrain)
-    staging.parent.mkdir(parents=True, exist_ok=True)
-    stage(store.materialize(artifact.id, Packing.FILE, filename), staging)
-    minibrain.source_artifact_id = artifact.id
-    columns = [column.name for column in describe(staging)[0]]
-    input_column, label_column = guess(columns, INPUT_NAMES), guess(columns, LABEL_NAMES)
-    minibrain.source_file = filename
-    minibrain.input_column = input_column
-    minibrain.label_column = label_column
-    minibrain.sql = mapping_sql(input_column, label_column) if input_column and label_column else None
-
-
 @router.post("/{slug}/deploy")
 def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
@@ -168,7 +124,7 @@ def upload_source(
     slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    attach_source(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
+    attach_upload(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
     session.commit()
     return detail(settings, minibrain)
 
@@ -184,58 +140,48 @@ def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     minibrain = create_minibrain(session, free_name(session, SAMPLE_NAME), "classify", DEFAULT_BASE_MODEL)
     minibrain.description = SAMPLE_DESCRIPTION
     with sample_file(SAMPLE_FILE).open("rb") as stream:
-        attach_source(session, settings, store, minibrain, SAMPLE_FILE, stream)
+        attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
+    session.commit()
+    return detail(settings, minibrain)
+
+
+@router.put("/{slug}/dataset")
+def choose_dataset(slug: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+    minibrain = get_minibrain(session, slug)
+    minibrain.dataset = get_dataset(session, body.dataset) if body.dataset else None
+    minibrain.updated_at = now()
     session.commit()
     return detail(settings, minibrain)
 
 
 @router.put("/{slug}/mapping")
-def update_mapping(slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+def update_mapping(
+    slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    staging = require_source(settings, minibrain)
-    if body.sql is not None:
-        run_query(staging, body.sql, 1)
-        minibrain.sql = body.sql
-        minibrain.input_column = None
-        minibrain.label_column = None
-    elif body.input_column and body.label_column:
-        sql = mapping_sql(body.input_column, body.label_column)
-        run_query(staging, sql, 1)
-        minibrain.input_column = body.input_column
-        minibrain.label_column = body.label_column
-        minibrain.sql = sql
-    else:
-        raise ConflictError("send an input column and a label column, or SQL")
+    dataset = dataset_of(minibrain)
+    apply_mapping(staging_of(settings, store, dataset.source), dataset, body)
     session.commit()
     return detail(settings, minibrain)
 
 
 @router.post("/{slug}/query")
-def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep) -> QueryResponse:
-    minibrain = get_minibrain(session, slug)
-    result = run_query(require_source(settings, minibrain), body.sql, QUERY_ROWS)
-    return QueryResponse(columns=result.columns, rows=[[to_text(value) for value in row] for row in result.rows])
+def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
+    dataset = dataset_of(get_minibrain(session, slug))
+    return query_rows(staging_of(settings, store, dataset.source), body.sql)
 
 
 @router.get("/{slug}/preview")
-def preview(slug: str, session: SessionDep, settings: SettingsDep) -> PreviewResponse:
-    minibrain = get_minibrain(session, slug)
-    rows = labelled_rows(require_source(settings, minibrain), saved_sql(minibrain))
-    assessed = quality.assess(rows)
-    labels = sorted({label.strip() for _, label in rows if label and label.strip()})
-    first = next((text for text, label in rows if text and label), "")
-    return PreviewResponse(
-        rows=[PreviewRow(input=text, label=label) for text, label in rows[:PREVIEW_ROWS]],
-        quality=QualityInfo.model_validate(assessed, from_attributes=True),
-        labels=labels[:200],
-        example=[ChatMessage.model_validate(message) for message in trained_messages(first)],
-    )
+def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
+    dataset = dataset_of(get_minibrain(session, slug))
+    return preview_of(staging_of(settings, store, dataset.source), dataset_sql(dataset))
 
 
 @router.post("/{slug}/snapshots", status_code=202)
 def build_snapshot(slug: str, session: SessionDep) -> JobInfo:
     minibrain = get_minibrain(session, slug)
-    params = prepare_params(session, minibrain, saved_sql(minibrain))
+    dataset = dataset_of(minibrain)
+    params = prepare_params(session, dataset, dataset_sql(dataset))
     job = enqueue(
         session, JobKind.PREPARE, params, minibrain_id=minibrain.id, idempotency_key=f"prepare:{minibrain.id}"
     )

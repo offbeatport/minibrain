@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from minibrain.api.schemas import (
     AttemptInfo,
     ColumnInfo,
@@ -15,27 +13,40 @@ from minibrain.api.schemas import (
     SplitScore,
     VersionInfo,
 )
+from minibrain.data.shared import staging_of
 from minibrain.data.sources import describe
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, ApiKey, Job, JobAttempt, Minibrain, Snapshot, Version
+from minibrain.registry.files import store_for
+from minibrain.registry.models import (
+    ACTIVE_JOB_STATUSES,
+    ApiKey,
+    Dataset,
+    Job,
+    JobAttempt,
+    Minibrain,
+    Snapshot,
+    Version,
+)
 from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
 
 
-def staging_path(settings: Settings, minibrain: Minibrain) -> Path:
-    return settings.minibrain_dir(minibrain.slug) / "staging.duckdb"
-
-
 def source_info(settings: Settings, minibrain: Minibrain) -> SourceInfo | None:
-    staging = staging_path(settings, minibrain)
-    if minibrain.source_file is None or not staging.exists():
+    if minibrain.dataset is None:
         return None
-    columns, rows = describe(staging)
+    source = minibrain.dataset.source
+    columns, rows = describe(staging_of(settings, store_for(settings), source))
     return SourceInfo(
-        file=minibrain.source_file,
+        file=source.filename,
         columns=[ColumnInfo(name=column.name, type=column.type) for column in columns],
         rows=rows,
     )
+
+
+def mapping_info(dataset: Dataset | None) -> MappingInfo:
+    if dataset is None:
+        return MappingInfo(input_column=None, label_column=None, sql=None)
+    return MappingInfo(input_column=dataset.input_column, label_column=dataset.label_column, sql=dataset.sql)
 
 
 def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
@@ -158,9 +169,9 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         versions=len(minibrain.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
         source=source_info(settings, minibrain),
-        mapping=MappingInfo(
-            input_column=minibrain.input_column, label_column=minibrain.label_column, sql=minibrain.sql
-        ),
+        mapping=mapping_info(minibrain.dataset),
+        dataset=minibrain.dataset.slug if minibrain.dataset else None,
+        dataset_name=minibrain.dataset.name if minibrain.dataset else None,
         snapshot=snapshot_info(current) if current is not None else None,
         models=model_names(minibrain),
     )
