@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.api import (
@@ -69,12 +69,17 @@ async def domain_error(_request: Request, error: Exception) -> JSONResponse:
     return JSONResponse(status_code=ERROR_STATUS.get(type(error), 400), content={"detail": str(error)})
 
 
-def mount_web(app: FastAPI, dist: Path) -> None:
+def mount_web(app: FastAPI, dist: Path, ui_url: str | None = None) -> None:
     root = dist.resolve()
 
     @app.get("/{path:path}", include_in_schema=False)
-    def web(path: str) -> FileResponse:
-        if path.startswith(API_PREFIXES) or not (root / "index.html").exists():
+    def web(path: str, request: Request) -> Response:
+        if path.startswith(API_PREFIXES):
+            raise HTTPException(status_code=404)
+        if ui_url:
+            query = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(f"{ui_url}/{path.lstrip('/')}{query}")
+        if not (root / "index.html").exists():
             raise HTTPException(status_code=404)
         candidate = (root / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(root):
@@ -171,5 +176,5 @@ def create_app(
         ops,
     ):
         app.include_router(module.router)
-    mount_web(app, settings.web_dist)
+    mount_web(app, settings.web_dist, settings.ui_url)
     return app

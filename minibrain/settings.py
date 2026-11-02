@@ -11,6 +11,7 @@ class Settings:
     home: Path
     web_dist: Path
     database: str | None = None
+    ui_url: str | None = None
 
     @property
     def database_url(self) -> str:
@@ -49,4 +50,9 @@ def load_settings() -> Settings:
     home = Path(os.environ.get("MINIBRAIN_HOME", Path.home() / ".minibrain")).expanduser()
     web_dist = Path(os.environ.get("MINIBRAIN_WEB_DIST", default_web_dist()))
     home.mkdir(parents=True, exist_ok=True)
-    return Settings(home=home, web_dist=web_dist, database=os.environ.get("MINIBRAIN_DATABASE_URL") or None)
+    return Settings(
+        home=home,
+        web_dist=web_dist,
+        database=os.environ.get("MINIBRAIN_DATABASE_URL") or None,
+        ui_url=os.environ.get("MINIBRAIN_UI_URL", "").rstrip("/") or None,
+    )
