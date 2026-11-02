@@ -24,6 +24,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Skeleton,
     Switch,
     Tooltip,
     TooltipContent,
@@ -805,6 +806,66 @@ function MachineBar({
     );
 }
 
+const SKELETON_GROUPS = ["presets", "fit", "use", "download", "support"];
+
+function DiscoverSkeleton({
+    columns,
+    search,
+    update,
+}: {
+    columns: ColumnDef<CatalogEntry, unknown>[];
+    search: ModelsSearch;
+    update: (patch: ModelsSearch) => void;
+}) {
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex h-11 items-center gap-3 rounded-md border bg-card px-3">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="ml-auto h-6 w-36" />
+            </div>
+            <div className="flex items-start gap-4">
+                <aside className="hidden w-52 shrink-0 min-[1400px]:block">
+                    <div className="flex flex-col divide-y rounded-md border bg-card">
+                        {SKELETON_GROUPS.map((group) => (
+                            <div key={group} className="flex flex-col gap-2.5 px-3 py-3">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-4 w-36" />
+                                <Skeleton className="h-4 w-32" />
+                            </div>
+                        ))}
+                    </div>
+                </aside>
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <SearchInput
+                            aria-label="Search supported models"
+                            placeholder="Search supported models"
+                            value={search.q ?? ""}
+                            onValueChange={(q) => update({ q })}
+                            className="w-64"
+                        />
+                        <Skeleton className="h-8 w-44" />
+                        <span className="text-sm text-muted-foreground">
+                            Loading the catalogue…
+                        </span>
+                    </div>
+                    <DataGrid
+                        columns={columns}
+                        rows={[]}
+                        loading
+                        loadingRows={10}
+                        storageKey="minibrain.discover.columns"
+                        hiddenColumns={HIDDEN_COLUMNS}
+                        minWidth="min-w-[840px]"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function Discover({
     search,
     update,
@@ -839,7 +900,7 @@ export function Discover({
     );
     const tableColumns = useMemo(() => columns(on, names), [on, names]);
     if (catalog.isLoading) {
-        return <p className="text-sm text-muted-foreground">Loading the catalogue…</p>;
+        return <DiscoverSkeleton columns={tableColumns} search={search} update={update} />;
     }
     if (catalog.error || !data) {
         return (

@@ -1,7 +1,7 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Info, Layers, Scale } from "lucide-react";
-import { Button, DataGrid, Link } from "obp-ui";
+import { Button, DataGrid, Link, Skeleton } from "obp-ui";
 import { type ReactNode, useMemo, useState } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
@@ -194,7 +194,19 @@ export function DiscoverModelPage() {
                 Discover
             </Link>
             <ErrorLine error={catalog.error} />
-            {catalog.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {catalog.isLoading && (
+                <div className="flex flex-col gap-8 pt-2">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="size-8" />
+                        <div className="flex flex-col gap-2">
+                            <Skeleton className="h-6 w-56" />
+                            <Skeleton className="h-4 w-72" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                </div>
+            )}
             {data && !entry && (
                 <p className="text-sm text-muted-foreground">No model {id} in the catalogue.</p>
             )}
