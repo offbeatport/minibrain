@@ -1,5 +1,5 @@
 {
- "snapshot": "2026-11-02T18:00",
+ "snapshot": "2026-11-02T21:00",
  "source": "https://huggingface.co",
  "entries": [
   {
@@ -34,7 +34,6 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 0.75,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -158,7 +157,6 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 2.03,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -292,7 +290,6 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 4.02,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -431,7 +428,6 @@
    "architecture": "qwen3",
    "tier": "M",
    "params_b": 8.19,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -651,7 +647,6 @@
    "architecture": "qwen3",
    "tier": "M",
    "params_b": 14.77,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -789,7 +784,6 @@
    "architecture": "qwen3",
    "tier": "L",
    "params_b": 32.76,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -972,7 +966,6 @@
    "architecture": "qwen3_moe",
    "tier": "L",
    "params_b": 30.53,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -1150,7 +1143,6 @@
    "architecture": "qwen3_moe",
    "tier": "XL",
    "params_b": 235.09,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -1837,7 +1829,6 @@
    "architecture": "qwen3",
    "tier": "S",
    "params_b": 4.02,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -1948,7 +1939,6 @@
    "architecture": "qwen3_moe",
    "tier": "L",
    "params_b": 30.53,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -2125,7 +2115,6 @@
    "architecture": "qwen3_moe",
    "tier": "L",
    "params_b": 30.53,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -2306,7 +2295,6 @@
    "architecture": "qwen2",
    "tier": "S",
    "params_b": 0.49,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -2402,7 +2390,6 @@
    "architecture": "qwen2",
    "tier": "S",
    "params_b": 1.54,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -2498,7 +2485,6 @@
    "architecture": "qwen2",
    "tier": "M",
    "params_b": 7.62,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -2614,7 +2600,6 @@
    "architecture": "qwen2",
    "tier": "M",
    "params_b": 14.77,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -2750,7 +2735,6 @@
    "architecture": "qwen2",
    "tier": "L",
    "params_b": 32.76,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -2931,7 +2915,6 @@
    "architecture": "qwen2",
    "tier": "XL",
    "params_b": 72.71,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3214,7 +3197,6 @@
    "architecture": "qwen2",
    "tier": "M",
    "params_b": 7.62,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3327,7 +3309,6 @@
    "architecture": "gemma3_text",
    "tier": "S",
    "params_b": 1.0,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3415,7 +3396,6 @@
    "architecture": "gemma2",
    "tier": "S",
    "params_b": 2.61,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3508,7 +3488,6 @@
    "architecture": "gemma2",
    "tier": "M",
    "params_b": 9.24,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3611,7 +3590,6 @@
    "architecture": "gemma2",
    "tier": "L",
    "params_b": 27.23,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3757,7 +3735,6 @@
    "architecture": "llama",
    "tier": "S",
    "params_b": 1.24,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3845,7 +3822,6 @@
    "architecture": "llama",
    "tier": "S",
    "params_b": 3.21,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -3946,7 +3922,6 @@
    "architecture": "llama",
    "tier": "M",
    "params_b": 8.03,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4059,7 +4034,6 @@
    "architecture": "llama",
    "tier": "XL",
    "params_b": 70.55,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4303,7 +4277,6 @@
    "architecture": "mistral",
    "tier": "M",
    "params_b": 7.25,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4401,7 +4374,6 @@
    "architecture": "mistral",
    "tier": "M",
    "params_b": 12.25,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4519,7 +4491,6 @@
    "architecture": "mistral",
    "tier": "L",
    "params_b": 23.57,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4652,7 +4623,6 @@
    "architecture": "mixtral",
    "tier": "XL",
    "params_b": 46.7,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -4831,7 +4801,6 @@
    "architecture": "phi3",
    "tier": "S",
    "params_b": 3.82,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -4937,7 +4906,6 @@
    "architecture": "phi3",
    "tier": "S",
    "params_b": 3.84,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5050,7 +5018,6 @@
    "architecture": "phi3",
    "tier": "M",
    "params_b": 14.66,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5183,7 +5150,6 @@
    "architecture": "granite",
    "tier": "M",
    "params_b": 8.17,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5303,7 +5269,6 @@
    "architecture": "granite",
    "tier": "S",
    "params_b": 2.53,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5411,7 +5376,6 @@
    "architecture": "granite",
    "tier": "M",
    "params_b": 8.17,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5529,7 +5493,6 @@
    "architecture": "llama",
    "tier": "M",
    "params_b": 8.03,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5633,7 +5596,6 @@
    "architecture": "qwen2",
    "tier": "S",
    "params_b": 1.78,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5717,7 +5679,6 @@
    "architecture": "qwen2",
    "tier": "M",
    "params_b": 7.62,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5811,7 +5772,6 @@
    "architecture": "llama",
    "tier": "M",
    "params_b": 8.03,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -5905,7 +5865,6 @@
    "architecture": "qwen2",
    "tier": "M",
    "params_b": 14.77,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -6009,7 +5968,6 @@
    "architecture": "qwen2",
    "tier": "L",
    "params_b": 32.76,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -6133,7 +6091,6 @@
    "architecture": "llama",
    "tier": "XL",
    "params_b": 70.55,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -6302,7 +6259,6 @@
    "architecture": "deepseek_v3",
    "tier": "XL",
    "params_b": 684.49,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7192,7 +7148,6 @@
    "architecture": "gpt_oss",
    "tier": "L",
    "params_b": 20.91,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -7301,7 +7256,6 @@
    "architecture": "gpt_oss",
    "tier": "XL",
    "params_b": 116.83,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -7472,7 +7426,6 @@
    "architecture": "olmo2",
    "tier": "S",
    "params_b": 1.48,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7565,7 +7518,6 @@
    "architecture": "olmo2",
    "tier": "M",
    "params_b": 7.3,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7673,7 +7625,6 @@
    "architecture": "olmo2",
    "tier": "M",
    "params_b": 13.72,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7796,7 +7747,6 @@
    "architecture": "llama",
    "tier": "S",
    "params_b": 0.36,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7891,7 +7841,6 @@
    "architecture": "llama",
    "tier": "S",
    "params_b": 1.71,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -7984,7 +7933,6 @@
    "architecture": "smollm3",
    "tier": "S",
    "params_b": 3.08,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -8086,7 +8034,6 @@
    "architecture": "glm4",
    "tier": "M",
    "params_b": 9.4,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -8203,7 +8150,6 @@
    "architecture": "glm4",
    "tier": "L",
    "params_b": 32.57,
-   "support": "supported",
    "moe": false,
    "variants": [
     {
@@ -8373,7 +8319,6 @@
    "architecture": "glm4_moe",
    "tier": "XL",
    "params_b": 110.47,
-   "support": "supported",
    "moe": true,
    "variants": [
     {
@@ -8699,7 +8644,6 @@
    "architecture": "glm4_moe",
    "tier": "XL",
    "params_b": 356.79,
-   "support": "supported",
    "moe": true,
    "variants": [
     {

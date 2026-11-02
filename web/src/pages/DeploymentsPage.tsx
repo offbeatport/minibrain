@@ -241,7 +241,6 @@ export function DeploymentsPage() {
                             storageKey="minibrain.deployments.columns"
                             columnPicker
                             hiddenColumns={["used", "keys"]}
-                            dropOrder={["keys", "used", "serves", "name", "requests"]}
                             onOpen={(row) => router.history.push(deploymentHref(row))}
                             rowLabel={(row) => `${row.key}, serves ${serves(row)}`}
                             empty={

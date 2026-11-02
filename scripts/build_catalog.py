@@ -343,7 +343,6 @@ class Builder:
             "architecture": architecture,
             "tier": size_tier,
             "params_b": round(params, 2),
-            "support": "supported",
             "moe": moe,
             "variants": variants,
         }

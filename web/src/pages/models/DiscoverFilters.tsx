@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Button, Checkbox, Label } from "obp-ui";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import type { CatalogEntry, CatalogVariantInfo, FitInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { ModelsSearch, ModelsSearchKey } from "~/lib/modelsSearch";
@@ -37,25 +37,7 @@ const TIERS = [
     { value: "XL", label: "XL · 70B+, multi-GPU" },
 ];
 
-const SUPPORT = [
-    { value: "supported", label: "Supported" },
-    { value: "untested", label: "Untested" },
-];
-
-export const SUPPORT_LABEL: Record<string, string> = Object.fromEntries(
-    SUPPORT.map((item) => [item.value, item.label]),
-);
-
-type Facet =
-    | "access"
-    | "publishers"
-    | "tasks"
-    | "tiers"
-    | "fit"
-    | "support"
-    | "licences"
-    | "train"
-    | "latest";
+type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "licences" | "train" | "latest";
 
 export type Filters = Record<Facet, string[]> & { q: string };
 
@@ -65,7 +47,6 @@ const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
     tasks: "task",
     tiers: "tier",
     fit: "fit",
-    support: "support",
     licences: "licence",
     train: "train",
     latest: "latest",
@@ -83,7 +64,6 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
     tasks: (entry) => entry.capabilities,
     tiers: (entry) => [entry.tier],
     fit: (entry) => [bestFit(entry).fit.level],
-    support: (entry) => [entry.support],
     licences: (entry) => [licenceOf(entry)],
     train: (entry) => (entry.trainable ? [YES] : []),
     latest: (entry) => (entry.superseded_by ? [] : [YES]),
@@ -93,7 +73,6 @@ const LABELS: Partial<Record<Facet, Record<string, string>>> = {
     access: Object.fromEntries(ACCESS.map((item) => [item.value, item.label])),
     tiers: Object.fromEntries(TIERS.map((item) => [item.value, item.label])),
     fit: FIT_OPTIONS,
-    support: SUPPORT_LABEL,
     train: { [YES]: "Can fine-tune" },
     latest: { [YES]: "Latest generation only" },
 };
@@ -128,7 +107,6 @@ export function readFilters(search: ModelsSearch, fitsKnown: boolean): Filters {
         tasks: list(search.task),
         tiers: list(search.tier),
         fit: fitsKnown ? readFit(search) : [],
-        support: list(search.support),
         licences: list(search.licence),
         train: list(search.train),
         latest: list(search.latest),
@@ -179,7 +157,6 @@ const FILTERS_CLEARED: ModelsSearch = {
     tier: "",
     fits: "",
     fit: "",
-    support: "",
     licence: "",
     train: "",
     latest: "",
@@ -206,20 +183,6 @@ function removal(chip: Chip, filters: Filters): ModelsSearch {
     return encode(
         chip.facet,
         filters[chip.facet].filter((value) => value !== chip.value),
-    );
-}
-
-type Preset = { label: string; patch: ModelsSearch; needsFit?: boolean };
-
-const PRESETS: Preset[] = [
-    { label: "Fine-tune here", patch: { train: YES, fit: "fits" }, needsFit: true },
-    { label: "Small and fast", patch: { tier: "S" } },
-    { label: "Permissive licence", patch: { licence: "Apache 2.0,MIT" } },
-];
-
-function presetActive(preset: Preset, search: ModelsSearch): boolean {
-    return (Object.keys(FILTERS_CLEARED) as ModelsSearchKey[]).every(
-        (key) => (search[key] ?? "") === (preset.patch[key] ?? ""),
     );
 }
 
@@ -256,6 +219,32 @@ export function FilterChips({
                 Clear all
             </Button>
         </div>
+    );
+}
+
+const SHOWN = 5;
+
+type OptionItem = { key: string; checked: boolean; node: ReactNode };
+
+function OptionList({ items }: { items: OptionItem[] }) {
+    const [expanded, setExpanded] = useState(false);
+    const hidden = items.filter((item, index) => index >= SHOWN && !item.checked).length;
+    const shown = expanded ? items : items.filter((item, index) => index < SHOWN || item.checked);
+    return (
+        <>
+            {shown.map((item) => (
+                <Fragment key={item.key}>{item.node}</Fragment>
+            ))}
+            {hidden > 0 && (
+                <button
+                    type="button"
+                    onClick={() => setExpanded(!expanded)}
+                    className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    {expanded ? "Show less" : `Show ${hidden} more`}
+                </button>
+            )}
+        </>
     );
 }
 
@@ -300,7 +289,6 @@ function Option({
 export function FilterPanel({
     entries,
     filters,
-    search,
     update,
     fitsKnown,
     fitsHint,
@@ -308,7 +296,6 @@ export function FilterPanel({
 }: {
     entries: CatalogEntry[];
     filters: Filters;
-    search: ModelsSearch;
     update: (patch: ModelsSearch) => void;
     fitsKnown: boolean;
     fitsHint: string;
@@ -334,6 +321,12 @@ export function FilterPanel({
             {label}
         </Option>
     );
+    const items = (facet: Facet, values: string[], label?: (value: string) => ReactNode) =>
+        values.map((value) => ({
+            key: value,
+            checked: filters[facet].includes(value),
+            node: option(facet, value, label ? label(value) : undefined),
+        }));
     const distinct = (facet: Facet) =>
         [...new Set(entries.flatMap((entry) => FACET_VALUES[facet](entry)))].sort();
     return (
@@ -346,69 +339,46 @@ export function FilterPanel({
                     </Button>
                 )}
             </div>
-            <Group title="Presets">
-                <div className="flex flex-wrap gap-1.5">
-                    {PRESETS.map((preset) => {
-                        const active = presetActive(preset, search);
-                        return (
-                            <Button
-                                key={preset.label}
-                                variant={active ? "secondary" : "outline"}
-                                size="sm"
-                                aria-pressed={active}
-                                disabled={preset.needsFit && !fitsKnown}
-                                onClick={() =>
-                                    update(
-                                        active
-                                            ? FILTERS_CLEARED
-                                            : { ...FILTERS_CLEARED, ...preset.patch },
-                                    )
-                                }
-                            >
-                                {preset.label}
-                            </Button>
-                        );
-                    })}
-                </div>
-            </Group>
             <Group title="Hardware fit">
                 {pool}
-                {fitsKnown ? (
+                <p className="text-sm text-muted-foreground">{fitsHint}</p>
+                {fitsKnown &&
                     FIT_ORDER.filter((level) => level !== "unknown").map((level) =>
                         option("fit", level),
-                    )
-                ) : (
-                    <p className="text-sm text-muted-foreground">{fitsHint}</p>
-                )}
+                    )}
             </Group>
             <Group title="Use">
                 {option("train", YES)}
                 {option("latest", YES)}
             </Group>
             <Group title="Download">{ACCESS.map((item) => option("access", item.value))}</Group>
-            <Group title="Support">{SUPPORT.map((item) => option("support", item.value))}</Group>
             <Group title="Publisher">
-                {distinct("publishers").map((publisher) =>
-                    option(
-                        "publishers",
-                        publisher,
+                <OptionList
+                    items={items("publishers", distinct("publishers"), (publisher) => (
                         <>
                             <PublisherLogo publisher={publisher} name={publisher} size="sm" />
                             <span className="line-clamp-2 break-words">{publisher}</span>
-                        </>,
-                    ),
-                )}
+                        </>
+                    ))}
+                />
             </Group>
-            <Group title="Task">{distinct("tasks").map((task) => option("tasks", task))}</Group>
-            <Group title="Size">{TIERS.map((tier) => option("tiers", tier.value))}</Group>
+            <Group title="Task">
+                <OptionList items={items("tasks", distinct("tasks"))} />
+            </Group>
+            <Group title="Size">
+                <OptionList
+                    items={items(
+                        "tiers",
+                        TIERS.map((tier) => tier.value),
+                    )}
+                />
+            </Group>
             <Group title="Licence">
-                {distinct("licences").map((licence) =>
-                    option(
-                        "licences",
-                        licence,
-                        <span className="line-clamp-2 break-words">{licence}</span>,
-                    ),
-                )}
+                <OptionList
+                    items={items("licences", distinct("licences"), (licence) => (
+                        <span className="line-clamp-2 break-words">{licence}</span>
+                    ))}
+                />
             </Group>
         </div>
     );

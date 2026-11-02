@@ -78,6 +78,10 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
     if weights == 0:
         raise HubAddError(f"{repo} has no safetensors weights; minibrain only loads safetensors")
     architecture = str(config.get("model_type", ""))
+    if architecture not in SUPPORTED_ARCHITECTURES:
+        raise HubAddError(
+            f"{repo} uses the {architecture or 'unknown'} architecture, which minibrain's engines do not run yet"
+        )
     params = ((info.get("safetensors") or {}).get("total") or weights / 2) / 1e9
     moe = "num_experts" in config or "num_local_experts" in config or "moe" in architecture
     size_tier = tier(params, moe and params > 15, weights / 1e9)
@@ -109,7 +113,6 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
         "tier": size_tier,
         "params_b": round(params, 2),
         "moe": moe,
-        "support": "supported" if architecture in SUPPORTED_ARCHITECTURES else "untested",
         "superseded_by": None,
         "variants": [
             {

@@ -520,7 +520,6 @@ class CatalogEntry(BaseModel):
     tier: str
     params_b: float
     moe: bool
-    support: str
     superseded_by: str | None
     origin: str
     variants: list[CatalogVariantInfo]

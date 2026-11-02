@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ExternalLink } from "lucide-react";
@@ -26,7 +26,6 @@ import {
     SelectTrigger,
     SelectValue,
     Skeleton,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -38,13 +37,12 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import type { ModelsSearch } from "~/lib/modelsSearch";
-import { bytes, relativeTime } from "~/lib/time";
+import { bytes } from "~/lib/time";
 import {
     CLEARED,
     FIT_ORDER,
     FilterChips,
     FilterPanel,
-    SUPPORT_LABEL,
     activeFilters,
     bestFit,
     matches,
@@ -268,79 +266,6 @@ export function DownloadDialog({
     );
 }
 
-function RequirementsDialog({
-    open,
-    entry,
-    catalog,
-    onOpenChange,
-}: {
-    open: boolean;
-    entry: CatalogEntry | null;
-    catalog: CatalogResponse;
-    onOpenChange: (open: boolean) => void;
-}) {
-    const entries = entry ? [entry] : catalog.entries;
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>
-                        {entry
-                            ? `${entry.name} requirements`
-                            : `Requirements on ${poolPhrase(catalog)}`}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Estimates for serving, from the weights' size; real use also depends on
-                        context length and batch size.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="max-h-96 overflow-y-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-muted-foreground">
-                            <tr>
-                                <th className="py-1 pr-3 font-medium">Model</th>
-                                <th className="py-1 pr-3 font-medium">Needs</th>
-                                <th className="py-1 font-medium">Fit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {entries.flatMap((item) =>
-                                item.variants.map((variant) => (
-                                    <tr key={variant.id} className="border-t align-top">
-                                        <td className="py-1.5 pr-3">
-                                            {item.name}
-                                            <span className="block text-muted-foreground">
-                                                {variant.label}
-                                            </span>
-                                        </td>
-                                        <td className="py-1.5 pr-3 tabular-nums">
-                                            {bytes(variant.fit.needed_bytes)}
-                                        </td>
-                                        <td className="py-1.5">
-                                            <StatusText tone={FIT_TONES[variant.fit.level]}>
-                                                {fitLabel(variant.fit)}
-                                            </StatusText>
-                                            <span className="block text-muted-foreground">
-                                                {variant.fit.basis}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                )),
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-                {entry?.gated && <AccessSteps entry={entry} catalog={catalog} />}
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Close
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 export type Actions = {
     download: (entry: CatalogEntry) => void;
     requirements: (entry: CatalogEntry) => void;
@@ -457,10 +382,8 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
 
 function recommendedOrder(entry: CatalogEntry): number[] {
     const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
-    const support = ["supported", "untested"].indexOf(entry.support);
     return [
         fitRank < 0 ? 9 : fitRank,
-        support < 0 ? 9 : support,
         entry.recommended ? 0 : 1,
         entry.superseded_by ? 1 : 0,
         -entry.popularity,
@@ -589,21 +512,6 @@ export function discoverHref(entry: CatalogEntry, pool?: string): string {
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-const DROP_ORDER = [
-    "repo",
-    "support",
-    "generation",
-    "architecture",
-    "downloads",
-    "finetune",
-    "tasks",
-    "publisher",
-    "newer",
-    "size",
-    "licence",
-    "parameters",
-];
-
 const HIDDEN_COLUMNS = [
     "size",
     "newer",
@@ -613,7 +521,6 @@ const HIDDEN_COLUMNS = [
     "downloads",
     "architecture",
     "generation",
-    "support",
     "repo",
 ];
 
@@ -710,11 +617,6 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
         { id: "architecture", header: "Architecture", accessorFn: (entry) => entry.architecture },
         { id: "generation", header: "Generation", accessorFn: (entry) => entry.generation },
         {
-            id: "support",
-            header: "Support",
-            accessorFn: (entry) => SUPPORT_LABEL[entry.support] ?? entry.support,
-        },
-        {
             id: "repo",
             header: "Repository",
             accessorFn: (entry) => entry.repo,
@@ -760,87 +662,7 @@ export function poolPhrase(catalog: CatalogResponse): string {
     return catalog.pool === "local" ? "this machine" : `pool ${catalog.pool}`;
 }
 
-function MachineBar({
-    catalog,
-    onRequirements,
-}: {
-    catalog: CatalogResponse;
-    onRequirements: () => void;
-}) {
-    const refresh = useModelsRefresh();
-    const { hardware } = catalog;
-    const sync = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/catalog/sync")),
-        onSuccess: refresh,
-    });
-    const daily = useMutation({
-        mutationFn: (value: boolean) =>
-            unwrap(api.PUT("/api/catalog/settings", { body: { daily_sync: value } })),
-    });
-    const settings = useQuery({
-        queryKey: ["catalog", "settings"],
-        queryFn: () => unwrap(api.GET("/api/catalog/settings")),
-    });
-    const [dailyOn, setDailyOn] = useState<boolean | null>(null);
-    const syncing = catalog.sync_job && ["queued", "running"].includes(catalog.sync_job.status);
-    return (
-        <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-2 text-sm">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {catalog.pools.length > 1 && (
-                    <span className="text-muted-foreground">
-                        {catalog.pools.find((pool) => pool.name === catalog.pool)?.label ??
-                            catalog.pool}
-                    </span>
-                )}
-                <span className="font-semibold">{hardware.machine}</span>
-                <span className="text-muted-foreground">{hardware.accelerator}</span>
-                {hardware.known ? (
-                    <span className="tabular-nums text-muted-foreground">
-                        {bytes(hardware.memory_bytes)} {hardware.memory_label}
-                    </span>
-                ) : (
-                    <StatusText tone="neutral">Compatibility not checked</StatusText>
-                )}
-                <Button variant="ghost" size="xs" onClick={onRequirements}>
-                    View requirements
-                </Button>
-                <span className="ml-auto flex items-center gap-3 text-muted-foreground">
-                    <span>
-                        {catalog.synced_at
-                            ? `Checked ${relativeTime(catalog.synced_at)}`
-                            : "Bundled catalogue"}
-                        {catalog.sync_job?.status === "failed" ? " · last check failed" : ""}
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => sync.mutate()}
-                        disabled={catalog.online === false || Boolean(syncing) || sync.isPending}
-                    >
-                        {syncing ? "Checking…" : "Check for updates"}
-                    </Button>
-                    <span className="flex items-center gap-1.5">
-                        <Switch
-                            id="daily-sync"
-                            checked={dailyOn ?? settings.data?.daily_sync ?? false}
-                            onCheckedChange={(checked) => {
-                                setDailyOn(checked);
-                                daily.mutate(checked);
-                            }}
-                            disabled={catalog.offline_forced}
-                        />
-                        <Label htmlFor="daily-sync" className="text-sm text-muted-foreground">
-                            Daily
-                        </Label>
-                    </span>
-                </span>
-            </div>
-            <ErrorLine error={sync.error ?? daily.error} />
-        </div>
-    );
-}
-
-const SKELETON_GROUPS = ["presets", "fit", "use", "download", "support"];
+const SKELETON_GROUPS = ["fit", "use", "download", "publisher"];
 
 function DiscoverSkeleton({
     columns,
@@ -853,12 +675,6 @@ function DiscoverSkeleton({
 }) {
     return (
         <div className="flex flex-col gap-3">
-            <div className="flex h-11 items-center gap-3 rounded-md border bg-card px-3">
-                <Skeleton className="h-4 w-36" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="ml-auto h-6 w-36" />
-            </div>
             <div className="flex items-start gap-4">
                 <aside className="hidden w-52 shrink-0 min-[1400px]:block">
                     <div className="flex flex-col divide-y rounded-md border bg-card">
@@ -915,7 +731,6 @@ export function Discover({
     const [downloading, setDownloading] = useState<CatalogEntry | null>(null);
     const [adding, setAdding] = useState(false);
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [requirements, setRequirements] = useState<{ entry: CatalogEntry | null } | null>(null);
     const data = catalog.data;
     const on: Actions = useMemo(
         () => ({
@@ -956,10 +771,13 @@ export function Discover({
         <FilterPanel
             entries={data.entries}
             filters={filters}
-            search={search}
             update={update}
             fitsKnown={data.hardware.known}
-            fitsHint={`Not checked: the memory of ${poolPhrase(data)} is unknown.`}
+            fitsHint={
+                data.hardware.known
+                    ? `For ${poolPhrase(data)}: ${bytes(data.hardware.memory_bytes)} ${data.hardware.memory_label}`
+                    : `Not checked: the memory of ${poolPhrase(data)} is unknown.`
+            }
             pool={
                 <PoolSelect
                     catalog={data}
@@ -980,7 +798,6 @@ export function Discover({
     );
     return (
         <div className="flex flex-col gap-3">
-            <MachineBar catalog={data} onRequirements={() => setRequirements({ entry: null })} />
             {data.online === false && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 px-3 py-2 text-sm">
                     <StatusText tone="warning">
@@ -996,7 +813,7 @@ export function Discover({
                 </div>
             )}
             <div className="flex items-start gap-4">
-                <aside className="sticky top-4 hidden w-52 shrink-0 min-[1400px]:block">
+                <aside className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] w-56 shrink-0 overflow-y-auto min-[1400px]:block">
                     {panel}
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -1050,7 +867,6 @@ export function Discover({
                         onOpen={(entry) => router.history.push(discoverHref(entry, search.pool))}
                         columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
-                        dropOrder={DROP_ORDER}
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
                         empty={empty}
                         minWidth="min-w-[840px]"
@@ -1089,12 +905,6 @@ export function Discover({
                 entry={downloading}
                 catalog={data}
                 onOpenChange={(open) => !open && setDownloading(null)}
-            />
-            <RequirementsDialog
-                open={requirements !== null}
-                entry={requirements?.entry ?? null}
-                catalog={data}
-                onOpenChange={(open) => !open && setRequirements(null)}
             />
             <Link href="/models" className="sr-only">
                 Models

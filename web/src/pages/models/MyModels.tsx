@@ -682,19 +682,6 @@ function modelOrder(entry: Entry): string {
 }
 
 const HIDDEN_COLUMNS = ["type", "base", "kind", "used", "size", "tags", "updated"];
-const DROP_ORDER = [
-    "updated",
-    "tags",
-    "size",
-    "used",
-    "kind",
-    "base",
-    "type",
-    "score",
-    "requests",
-    "version",
-];
-
 function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
     return [
         {
@@ -981,7 +968,6 @@ export function MyModels({
                     storageKey="minibrain.models.columns"
                     columnPicker
                     hiddenColumns={HIDDEN_COLUMNS}
-                    dropOrder={DROP_ORDER}
                     onOpen={(entry) => on.open(detailHref(entry.model))}
                     rowLabel={(entry) =>
                         `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`

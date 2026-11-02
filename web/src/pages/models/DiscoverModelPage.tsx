@@ -22,7 +22,6 @@ import {
     parameters,
     poolPhrase,
 } from "./Discover";
-import { SUPPORT_LABEL } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
@@ -60,11 +59,10 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
                                 ? "Can be used as a base for training"
                                 : "Serving only for now",
                         ],
-                        [
-                            "Support",
-                            `${SUPPORT_LABEL[entry.support] ?? entry.support}${entry.origin === "hub" ? " · added from Hugging Face" : ""}`,
-                        ],
                         ["Downloads", `${DOWNLOADS.format(entry.popularity)} on Hugging Face`],
+                        ...(entry.origin === "hub"
+                            ? ([["Origin", "Added from Hugging Face"]] as [string, string][])
+                            : []),
                         ...(entry.recommendation
                             ? ([["Why recommended", entry.recommendation]] as [string, string][])
                             : []),

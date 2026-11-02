@@ -27,7 +27,7 @@ def test_bundled_catalogue_follows_the_rules() -> None:
         assert entry["architecture"] in build.SUPPORTED_ARCHITECTURES
         assert entry["tier"] in {"S", "M", "L", "XL"}
         assert entry["superseded_by"] is None or entry["superseded_by"] in ids
-        assert entry["support"] == "supported"
+        assert "support" not in entry
         for variant in entry["variants"]:
             assert re.fullmatch(r"[0-9a-f]{40}", variant["revision"])
             assert variant["files"] and all(item["size"] > 0 for item in variant["files"])

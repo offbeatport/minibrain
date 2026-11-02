@@ -115,7 +115,6 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         tier=entry.tier,
         params_b=entry.params_b,
         moe=entry.moe,
-        support=entry.support,
         superseded_by=entry.superseded_by,
         origin=entry.origin,
         variants=[variant_info(variant, machines) for variant in entry.variants],

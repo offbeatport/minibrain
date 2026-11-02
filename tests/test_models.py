@@ -446,7 +446,7 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
     response = harness.client.post("/api/catalog/hub", json={"repo": f"{os.environ['MINIBRAIN_HF_ENDPOINT']}/{REPO}"})
     assert response.status_code == 201
     entry = response.json()
-    assert (entry["origin"], entry["support"], entry["architecture"]) == ("hub", "supported", "qwen3")
+    assert (entry["origin"], entry["architecture"]) == ("hub", "qwen3")
     assert entry["variants"][0]["revision"] == "b" * 40
     again = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
     assert again["id"] == entry["id"]
@@ -456,9 +456,9 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
     assert harness.client.post("/api/catalog/hub", json={"repo": REPO}).status_code == 403
 
 
-def test_unknown_architecture_is_marked_untested(harness: Harness, hub: Path) -> None:
-    entry = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
-    assert entry["support"] == "untested"
+def test_unknown_architectures_are_refused(harness: Harness, hub: Path) -> None:
+    refused = harness.client.post("/api/catalog/hub", json={"repo": REPO})
+    assert refused.status_code == 409 and "do not run yet" in refused.json()["detail"]
     assert harness.client.post("/api/catalog/hub", json={"repo": "test/missing"}).status_code == 409
 
 
