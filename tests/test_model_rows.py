@@ -110,3 +110,12 @@ def test_rows_count_api_keys(harness: Harness) -> None:
     add_key(harness, name="app")
     add_key(harness, name="batch")
     assert custom_row(harness, SLUG)["key_count"] == 2
+
+
+def test_a_deployed_model_must_be_undeployed_before_it_is_deleted(harness: Harness) -> None:
+    create_with_dataset(harness)
+    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": True})
+    refused = harness.client.delete(f"/api/minibrains/{SLUG}")
+    assert refused.status_code == 409 and "undeploy it first" in refused.json()["detail"]
+    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204

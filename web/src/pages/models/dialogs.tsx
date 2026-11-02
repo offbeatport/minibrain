@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import {
     Button,
+    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -436,6 +437,7 @@ export type Confirmation = {
     description: ReactNode;
     confirmLabel: string;
     destructive?: boolean;
+    acknowledge?: string;
     run: () => Promise<unknown>;
 };
 
@@ -446,10 +448,13 @@ export function ConfirmAction({
     confirmation: Confirmation | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const [acknowledgedFor, setAcknowledgedFor] = useState<Confirmation | null>(null);
+    const acknowledged = acknowledgedFor !== null && acknowledgedFor === confirmation;
     const action = useMutation({
         mutationFn: async () => confirmation?.run(),
         onSuccess: () => onOpenChange(false),
     });
+    const blocked = Boolean(confirmation?.acknowledge) && !acknowledged;
     return (
         <Dialog open={confirmation !== null} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
@@ -459,6 +464,17 @@ export function ConfirmAction({
                         <div className="flex flex-col gap-2">{confirmation?.description}</div>
                     </DialogDescription>
                 </DialogHeader>
+                {confirmation?.acknowledge && (
+                    <Label className="flex items-center gap-2 font-normal">
+                        <Checkbox
+                            checked={acknowledged}
+                            onCheckedChange={(value) =>
+                                setAcknowledgedFor(value === true ? confirmation : null)
+                            }
+                        />
+                        {confirmation.acknowledge}
+                    </Label>
+                )}
                 <ErrorLine error={action.error} />
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -467,7 +483,7 @@ export function ConfirmAction({
                     <Button
                         variant={confirmation?.destructive ? "destructive" : "default"}
                         onClick={() => action.mutate()}
-                        disabled={action.isPending}
+                        disabled={blocked || action.isPending}
                     >
                         {confirmation?.confirmLabel}
                     </Button>

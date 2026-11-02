@@ -270,35 +270,52 @@ function deleteModel(row: ModelRow) {
         : unwrap(api.DELETE("/api/minibrains/{slug}", { params: { path: { slug: row.key } } }));
 }
 
+function DeployedWarning({ row }: { row: ModelRow }) {
+    return (
+        <p>
+            It has to be undeployed before it can be deleted. Apps calling{" "}
+            <span className="font-mono">{row.key}</span> get errors from then on.
+        </p>
+    );
+}
+
 function deleteConfirmation(row: ModelRow, on: Handlers): Confirmation {
     const deployed = row.deployment.state !== "not_deployed";
-    return {
-        title: `Delete ${row.name}?`,
-        description:
-            row.kind === "base" ? (
+    const removed =
+        row.kind === "base" ? (
+            <p>
+                {row.size_bytes
+                    ? `Its weights (${bytes(row.size_bytes)}) are removed from storage, with its API keys.`
+                    : "Its record and API keys are removed."}{" "}
+                You can download or import it again later.
+            </p>
+        ) : (
+            <p>
+                Its data, versions, evaluation results and API keys are removed. This cannot be
+                undone.
+            </p>
+        );
+    if (deployed) {
+        return {
+            title: `${row.name} is deployed. Delete it?`,
+            description: (
                 <>
-                    <p>
-                        {row.size_bytes
-                            ? `Its weights (${bytes(row.size_bytes)}) are removed from storage, with its API keys.`
-                            : "Its record and API keys are removed."}{" "}
-                        You can download or import it again later.
-                    </p>
-                    {deployed && <p>It is deployed: undeploy it first.</p>}
-                </>
-            ) : (
-                <>
-                    <p>
-                        Its data, versions, evaluation results and API keys are removed. This cannot
-                        be undone.
-                    </p>
-                    {deployed && (
-                        <p>
-                            It is deployed: apps calling{" "}
-                            <span className="font-mono">{row.key}</span> start getting errors.
-                        </p>
-                    )}
+                    <DeployedWarning row={row} />
+                    {removed}
                 </>
             ),
+            acknowledge: `Undeploy and delete ${row.name}`,
+            confirmLabel: "Undeploy and delete",
+            destructive: true,
+            run: () =>
+                setDeployed(row, false)
+                    .then(() => deleteModel(row))
+                    .then(on.refresh),
+        };
+    }
+    return {
+        title: `Delete ${row.name}?`,
+        description: removed,
         confirmLabel: "Delete",
         destructive: true,
         run: () => deleteModel(row).then(on.refresh),
@@ -324,31 +341,33 @@ function deleteVersion(row: ModelRow, number: number) {
 function deleteVersionConfirmation(entry: Entry, on: Handlers): Confirmation {
     const row = entry.model;
     const number = entry.version?.number ?? 0;
+    const removed = (
+        <p>
+            Its adapter, scores and results are removed. This cannot be undone; the number v{number}{" "}
+            is not reused.
+        </p>
+    );
     if (entry.version?.live) {
         return {
-            title: `v${number} of ${row.name} is deployed`,
+            title: `v${number} of ${row.name} is deployed. Delete it?`,
             description: (
                 <>
-                    <p>Undeploy it first, then delete it.</p>
-                    <p>
-                        Apps calling <span className="font-mono">{row.key}</span> get errors until
-                        you deploy the model again.
-                    </p>
+                    <DeployedWarning row={row} />
+                    {removed}
                 </>
             ),
-            confirmLabel: "Undeploy",
+            acknowledge: `Undeploy ${row.name} and delete v${number}`,
+            confirmLabel: "Undeploy and delete",
             destructive: true,
-            run: () => setDeployed(row, false).then(on.refresh),
+            run: () =>
+                setDeployed(row, false)
+                    .then(() => deleteVersion(row, number))
+                    .then(on.refresh),
         };
     }
     return {
         title: `Delete v${number} of ${row.name}?`,
-        description: (
-            <p>
-                Its adapter, scores and results are removed. This cannot be undone; the number v
-                {number} is not reused.
-            </p>
-        ),
+        description: removed,
         confirmLabel: "Delete version",
         destructive: true,
         run: () => deleteVersion(row, number).then(on.refresh),

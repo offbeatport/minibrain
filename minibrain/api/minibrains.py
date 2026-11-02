@@ -89,6 +89,8 @@ def read(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDeta
 @router.delete("/{slug}", status_code=204)
 def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
+    if minibrain.deployed:
+        raise ConflictError(f"{minibrain.name} is deployed; undeploy it first")
     if any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
         raise ConflictError("cancel the running jobs first")
     session.add(
