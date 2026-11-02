@@ -300,6 +300,7 @@ class ModelRow(BaseModel):
     current_version: int | None
     ready_version: int | None
     needed_bytes: int | None
+    publisher: str | None = None
 
 
 class ModelFile(BaseModel):
@@ -444,6 +445,7 @@ class CatalogResponse(BaseModel):
     pool: str
     online: bool | None
     offline_forced: bool
+    hub_add_allowed: bool
     endpoint: str
     token_configured: bool
     synced_at: datetime | None

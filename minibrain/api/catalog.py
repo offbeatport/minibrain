@@ -145,6 +145,7 @@ def catalogue(
         pool=chosen.name,
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
+        hub_add_allowed=policy["model_sources"] == "any",
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),

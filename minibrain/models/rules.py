@@ -12,6 +12,11 @@ PUBLISHERS = {
     "HuggingFaceTB": "Hugging Face",
 }
 
+
+def publisher_of(repo: str | None) -> str | None:
+    return PUBLISHERS.get(repo.split("/", 1)[0]) if repo else None
+
+
 LICENCES = {
     "apache-2.0": (
         "Apache 2.0",

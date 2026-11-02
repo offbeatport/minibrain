@@ -3393,6 +3393,17 @@
             ],
             "title": "Needed Bytes"
           },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -3857,6 +3868,10 @@
             "type": "boolean",
             "title": "Offline Forced"
           },
+          "hub_add_allowed": {
+            "type": "boolean",
+            "title": "Hub Add Allowed"
+          },
           "endpoint": {
             "type": "string",
             "title": "Endpoint"
@@ -3907,6 +3922,7 @@
           "pool",
           "online",
           "offline_forced",
+          "hub_add_allowed",
           "endpoint",
           "token_configured",
           "synced_at",
@@ -5760,6 +5776,17 @@
               }
             ],
             "title": "Needed Bytes"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
           }
         },
         "type": "object",

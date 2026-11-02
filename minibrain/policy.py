@@ -54,7 +54,7 @@ FIELDS: tuple[Field, ...] = (
         "Model sources",
         "Approved publishers only, any model (badged untested), or imported files only.",
         "choice",
-        "any",
+        "approved",
         ("approved", "any", "imports"),
     ),
     Field(

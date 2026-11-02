@@ -37,6 +37,7 @@ import {
     unwrap,
 } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
@@ -539,35 +540,39 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Model",
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex min-w-56 max-w-80 flex-col">
-                    <span className="flex items-center gap-2">
-                        <span className="font-semibold">{row.original.name}</span>
-                        {row.original.recommended && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button type="button" className="rounded-sm">
-                                        <Badge variant="outline">Recommended</Badge>
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent>{row.original.recommendation}</TooltipContent>
-                            </Tooltip>
-                        )}
-                    </span>
-                    <span className="line-clamp-2 whitespace-normal text-sm text-muted-foreground">
-                        {row.original.description}
-                    </span>
-                    <span className="text-sm tabular-nums text-muted-foreground">
-                        {`${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
-                            SUPPORT_LABEL[row.original.support] ?? row.original.support
-                        }${row.original.origin === "hub" ? " · Added from Hugging Face" : ""}`}
-                    </span>
-                    {row.original.superseded_by && (
-                        <span className="text-sm text-muted-foreground">
-                            {`Newer version available: ${
-                                names.get(row.original.superseded_by) ?? row.original.superseded_by
-                            }`}
+                <div className="flex min-w-64 max-w-80 items-start gap-3">
+                    <PublisherLogo publisher={row.original.provider} name={row.original.name} />
+                    <div className="flex min-w-0 flex-col">
+                        <span className="flex items-center gap-2">
+                            <span className="font-semibold">{row.original.name}</span>
+                            {row.original.recommended && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button type="button" className="rounded-sm">
+                                            <Badge variant="outline">Recommended</Badge>
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{row.original.recommendation}</TooltipContent>
+                                </Tooltip>
+                            )}
                         </span>
-                    )}
+                        <span className="line-clamp-2 whitespace-normal text-sm text-muted-foreground">
+                            {row.original.description}
+                        </span>
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                            {`${row.original.tier} · ${row.original.params_b.toFixed(1)}B · ${
+                                SUPPORT_LABEL[row.original.support] ?? row.original.support
+                            }${row.original.origin === "hub" ? " · Added from Hugging Face" : ""}`}
+                        </span>
+                        {row.original.superseded_by && (
+                            <span className="text-sm text-muted-foreground">
+                                {`Newer version available: ${
+                                    names.get(row.original.superseded_by) ??
+                                    row.original.superseded_by
+                                }`}
+                            </span>
+                        )}
+                    </div>
                 </div>
             ),
         },
@@ -895,14 +900,16 @@ export function Discover({
                         <SelectItem value="needs-access">{`Needs access (${gatedCount})`}</SelectItem>
                     </SelectContent>
                 </Select>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAdding(true)}
-                    disabled={data.offline_forced}
-                >
-                    Add from Hugging Face
-                </Button>
+                {data.hub_add_allowed && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAdding(true)}
+                        disabled={data.offline_forced}
+                    >
+                        Add from Hugging Face
+                    </Button>
+                )}
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <span className="flex items-center gap-1.5">

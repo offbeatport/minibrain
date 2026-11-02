@@ -24,6 +24,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
@@ -357,19 +358,22 @@ function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
             header: "Model",
             accessorFn: (row) => row.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex min-w-56 max-w-80 flex-col">
-                    <Link
-                        href={detailHref(row.original)}
-                        className="font-semibold text-foreground hover:underline"
-                    >
-                        {row.original.name}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                        {row.original.description ||
-                            (row.original.kind === "custom"
-                                ? `Classify model on ${row.original.base_model}`
-                                : row.original.key)}
-                    </span>
+                <div className="flex min-w-64 max-w-88 items-start gap-3">
+                    <PublisherLogo publisher={row.original.publisher} name={row.original.name} />
+                    <div className="flex min-w-0 flex-col">
+                        <Link
+                            href={detailHref(row.original)}
+                            className="font-semibold text-foreground hover:underline"
+                        >
+                            {row.original.name}
+                        </Link>
+                        <span className="truncate text-sm text-muted-foreground">
+                            {row.original.description ||
+                                (row.original.kind === "custom"
+                                    ? `Classify model on ${row.original.base_model}`
+                                    : row.original.key)}
+                        </span>
+                    </div>
                 </div>
             ),
         },

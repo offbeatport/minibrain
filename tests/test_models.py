@@ -12,8 +12,11 @@ import pytest
 
 from minibrain.models.catalog import bundled, seed
 from minibrain.models.hardware import GIB, Hardware, fit
+from minibrain.models.rules import publisher_of
 from minibrain.models.sources import StorageSource, location_url
+from minibrain.policy import PREFIX
 from minibrain.registry.models import CatalogModel, CatalogVariant
+from minibrain.registry.settings_store import write
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 
@@ -39,7 +42,10 @@ class Quiet(SimpleHTTPRequestHandler):
 
 
 @pytest.fixture
-def hub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+def hub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, harness: Harness) -> Iterator[Path]:
+    with harness.sessions() as session:
+        write(session, f"{PREFIX}model_sources", "any")
+        session.commit()
     root = tmp_path / "hub"
     for name, data in FILES.items():
         target = root / REPO / "resolve" / REVISION / name
@@ -148,10 +154,11 @@ def test_download_appears_in_my_models_and_validates(harness: Harness, hub: Path
     add_tiny(harness)
     assert harness.client.post("/api/catalog/tiny/download", json={"variant": "tiny:bf16"}).status_code == 409
     row = download_tiny(harness)
-    assert (row["kind"], row["availability"]["state"], row["deployment"]["state"]) == (
+    assert (row["kind"], row["availability"]["state"], row["deployment"]["state"], row["publisher"]) == (
         "base",
         "downloading",
         "not_deployed",
+        "Test",
     )
     added = next(e for e in harness.client.get("/api/catalog").json()["entries"] if e["id"] == "tiny")["added"]
     assert added[0]["availability"]["state"] == "downloading"
@@ -390,6 +397,11 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
 
     assert parse_repo("https://huggingface.co/Qwen/Qwen3-8B/tree/main") == "Qwen/Qwen3-8B"
     assert parse_repo(" Qwen/Qwen3-8B ") == "Qwen/Qwen3-8B"
+    assert (publisher_of("meta-llama/Llama-3.1-8B"), publisher_of("someone/model"), publisher_of(None)) == (
+        "Meta",
+        None,
+        None,
+    )
     with pytest.raises(HubAddError):
         parse_repo("not a repo")
     api = hub / "api" / "models" / REPO

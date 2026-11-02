@@ -1145,6 +1145,8 @@ export interface components {
             ready_version: number | null;
             /** Needed Bytes */
             needed_bytes: number | null;
+            /** Publisher */
+            publisher?: string | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1275,6 +1277,8 @@ export interface components {
             online: boolean | null;
             /** Offline Forced */
             offline_forced: boolean;
+            /** Hub Add Allowed */
+            hub_add_allowed: boolean;
             /** Endpoint */
             endpoint: string;
             /** Token Configured */
@@ -1938,6 +1942,8 @@ export interface components {
             ready_version: number | null;
             /** Needed Bytes */
             needed_bytes: number | null;
+            /** Publisher */
+            publisher?: string | null;
         };
         /** ModelUpdate */
         ModelUpdate: {

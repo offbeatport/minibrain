@@ -9,7 +9,7 @@ log with who, before and after.
 | Policy | Values | Enforced at |
 |---|---|---|
 | Network | Open, Allowlist (hosts), Offline (`MINIBRAIN_OFFLINE` forces it) | Downloads, retries, S3 imports, catalogue sync, Add from Hugging Face, the online check |
-| Model sources | Approved publishers, any (badged untested), imports only | Download, retry, Add from Hugging Face |
+| Model sources | Approved publishers (default), any (badged untested), imports only | Download, retry, Add from Hugging Face (shown only with any) |
 | Licences | Allowlist of reviewed licences; unreviewed ones off by default | Download, retry |
 | Safetensors only | Always on | Download file filter; pickle weights are never loaded |
 | Request logs | On or off, retention in days | Gateway config; hourly purge on the leader |

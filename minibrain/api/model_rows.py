@@ -8,6 +8,7 @@ from minibrain.api.schemas import Activity, Availability, AvailabilityState, Dep
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.registry import files_present
+from minibrain.models.rules import publisher_of
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     CatalogVariant,
@@ -191,6 +192,7 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health) 
         current_version=None,
         ready_version=None,
         needed_bytes=needed_bytes(weights) if weights else None,
+        publisher=variant.model.provider if variant is not None else publisher_of(model.repo),
     )
 
 

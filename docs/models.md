@@ -16,7 +16,8 @@
 
 Paste a link or id; `main` reads that one repository's metadata, on request, from the configured endpoint (Hugging Face
 or a mirror), checks `config.json`'s architecture and badges the entry "Tested by us", "Supported architecture" or
-"Untested". The [policies](security.md#policies) apply.
+"Untested". Only when an admin sets the Model sources [policy](security.md#policies) to Any; the default,
+Approved publishers, keeps everyone on the curated list.
 
 ## Sources
 
