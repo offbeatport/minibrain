@@ -525,7 +525,9 @@ function render(shape, failure, focus, colors, interactive) {
     }
     const parts = [];
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1130 620" role="img" aria-label="minibrain roles in the ${escapeText(SHAPES.find((s) => s.id === shape).label)} shape" font-family="${escapeText(colors.body)}">`);
-    parts.push(`<rect width="1130" height="620" fill="${colors.surface}"/>`);
+    if (colors.background) {
+        parts.push(`<rect width="1130" height="620" fill="${colors.background}"/>`);
+    }
     parts.push(`<defs>${["inference", "ui", "config", "jobs", "data", "down"].map((kind) => {
         const color = kind === "down" ? colors.down : planeColors(EDGE_STYLE[kind].plane, colors)[0];
         return `<marker id="arrow-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="${color}"/></marker>`;
