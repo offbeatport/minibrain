@@ -1,6 +1,19 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Search, X } from "lucide-react";
+import {
+    Archive,
+    ArchiveRestore,
+    CircleX,
+    Eye,
+    GraduationCap,
+    MoreHorizontal,
+    Pencil,
+    PowerOff,
+    Rocket,
+    Search,
+    Trash2,
+    X,
+} from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -323,25 +336,30 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                         <MoreHorizontal />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-64">
                     <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
+                        <Eye />
                         View details
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => on.edit(row)}>
+                        <Pencil />
                         Edit name, description and tags
                     </DropdownMenuItem>
                     {row.kind === "custom" && (
                         <DropdownMenuItem onSelect={() => on.open(scoped("/training", row))}>
+                            <GraduationCap />
                             Train
                         </DropdownMenuItem>
                     )}
                     {row.kind === "base" && row.trainable && (
                         <DropdownMenuItem onSelect={() => on.createFrom(row.key)}>
+                            <GraduationCap />
                             Train a model on it
                         </DropdownMenuItem>
                     )}
                     {row.kind === "custom" && (
                         <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
+                            <Rocket />
                             {deployed ? "Change deployed version" : "Deploy a version"}
                         </DropdownMenuItem>
                     )}
@@ -371,6 +389,7 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                                 })
                             }
                         >
+                            {deployed ? <PowerOff /> : <Rocket />}
                             {deployed ? "Undeploy" : "Deploy"}
                         </DropdownMenuItem>
                     )}
@@ -388,17 +407,20 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
                                 })
                             }
                         >
+                            <CircleX />
                             Cancel {row.activity.kind === "import" ? "import" : "download"}
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => on.confirm(archiveConfirmation(row, on))}>
+                        {row.archived ? <ArchiveRestore /> : <Archive />}
                         {row.archived ? "Restore" : "Archive"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         variant="destructive"
                         onSelect={() => on.confirm(deleteConfirmation(row, on))}
                     >
+                        <Trash2 />
                         Delete
                     </DropdownMenuItem>
                 </DropdownMenuContent>
