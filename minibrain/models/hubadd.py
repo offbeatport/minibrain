@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 
 from minibrain.models import hub
-from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, SUPPORTED_ARCHITECTURES, needed, tier
+from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, needed, tier
 
 REPO = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")
 TIMEOUT = httpx.Timeout(20.0)
@@ -78,10 +78,6 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
     if weights == 0:
         raise HubAddError(f"{repo} has no safetensors weights; minibrain only loads safetensors")
     architecture = str(config.get("model_type", ""))
-    if architecture not in SUPPORTED_ARCHITECTURES:
-        raise HubAddError(
-            f"{repo} uses the {architecture or 'unknown'} architecture, which minibrain's engines do not run yet"
-        )
     params = ((info.get("safetensors") or {}).get("total") or weights / 2) / 1e9
     moe = "num_experts" in config or "num_local_experts" in config or "moe" in architecture
     size_tier = tier(params, moe and params > 15, weights / 1e9)
@@ -102,7 +98,6 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
         "gated": bool(info.get("gated")),
         "recommended": False,
         "recommendation": None,
-        "trainable": False,
         "template_kwargs": {},
         "stop_tokens": [],
         "popularity": int(info.get("downloads") or 0),

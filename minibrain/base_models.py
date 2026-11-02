@@ -14,7 +14,6 @@ class BaseModelSpec:
     template_kwargs: dict[str, Any] = field(default_factory=dict)
     stop_tokens: tuple[str, ...] = QWEN_STOP_TOKENS
     path: str | None = None
-    trainable: bool = True
     format: str = "safetensors"
     weights_file: str | None = None
 
@@ -36,7 +35,6 @@ class BaseModelSpec:
             template_kwargs=dict(data.get("template_kwargs") or {}),
             stop_tokens=tuple(data.get("stop_tokens") or QWEN_STOP_TOKENS),
             path=data.get("path"),
-            trainable=bool(data.get("trainable", True)),
             format=str(data.get("format") or "safetensors"),
             weights_file=data.get("weights_file"),
         )

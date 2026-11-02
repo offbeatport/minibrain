@@ -1356,8 +1356,6 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
-            /** Trainable */
-            trainable: boolean;
             /** Can Test */
             can_test: boolean;
             /** Update Available */
@@ -1472,8 +1470,6 @@ export interface components {
             recommended: boolean;
             /** Recommendation */
             recommendation: string | null;
-            /** Trainable */
-            trainable: boolean;
             /** Popularity */
             popularity: number;
             /** Family */
@@ -1853,8 +1849,6 @@ export interface components {
             ok: boolean;
             /** Problem */
             problem?: string | null;
-            /** Warning */
-            warning?: string | null;
             /** Source Type */
             source_type?: ("folder" | "s3") | null;
             /** Resolved */
@@ -2304,8 +2298,6 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
-            /** Trainable */
-            trainable: boolean;
             /** Can Test */
             can_test: boolean;
             /** Update Available */

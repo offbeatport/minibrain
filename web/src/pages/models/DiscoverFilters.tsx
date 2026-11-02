@@ -37,7 +37,7 @@ const TIERS = [
     { value: "XL", label: "XL · 70B+, multi-GPU" },
 ];
 
-type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "licences" | "train" | "latest";
+type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "licences" | "latest";
 
 export type Filters = Record<Facet, string[]> & { q: string };
 
@@ -48,7 +48,6 @@ const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
     tiers: "tier",
     fit: "fit",
     licences: "licence",
-    train: "train",
     latest: "latest",
 };
 
@@ -65,7 +64,6 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
     tiers: (entry) => [entry.tier],
     fit: (entry) => [bestFit(entry).fit.level],
     licences: (entry) => [licenceOf(entry)],
-    train: (entry) => (entry.trainable ? [YES] : []),
     latest: (entry) => (entry.superseded_by ? [] : [YES]),
 };
 
@@ -73,7 +71,6 @@ const LABELS: Partial<Record<Facet, Record<string, string>>> = {
     access: Object.fromEntries(ACCESS.map((item) => [item.value, item.label])),
     tiers: Object.fromEntries(TIERS.map((item) => [item.value, item.label])),
     fit: FIT_OPTIONS,
-    train: { [YES]: "Can fine-tune" },
     latest: { [YES]: "Latest generation only" },
 };
 
@@ -105,7 +102,6 @@ export function readFilters(search: ModelsSearch, fitsKnown: boolean): Filters {
         tiers: list(search.tier),
         fit: fitsKnown ? readFit(search) : [],
         licences: list(search.licence),
-        train: list(search.train),
         latest: list(search.latest),
     };
 }
@@ -147,7 +143,6 @@ const FILTERS_CLEARED: ModelsSearch = {
     fits: "",
     fit: "",
     licence: "",
-    train: "",
     latest: "",
 };
 
@@ -329,10 +324,7 @@ export function FilterPanel({
                         option("fit", level),
                     )}
             </Group>
-            <Group title="Use">
-                {option("train", YES)}
-                {option("latest", YES)}
-            </Group>
+            <Group title="Generation">{option("latest", YES)}</Group>
             <Group title="Download">{ACCESS.map((item) => option("access", item.value))}</Group>
             <Group title="Publisher">
                 <OptionList

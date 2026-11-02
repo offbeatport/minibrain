@@ -48,7 +48,6 @@ def spec_for(settings: Settings, model: Model) -> BaseModelSpec:
         template_kwargs=dict(model.template_kwargs),
         stop_tokens=tuple(model.stop_tokens) or QWEN_STOP_TOKENS,
         path=str(model_dir(settings, model.id)),
-        trainable=model.trainable,
         format="gguf" if weights_file else "safetensors",
         weights_file=weights_file,
     )
@@ -146,7 +145,6 @@ def apply_catalogue(model: Model, entry: CatalogModel, variant: CatalogVariant) 
     model.variant_id = variant.id
     model.repo = variant.repo
     model.revision = variant.revision
-    model.trainable = entry.trainable and variant.format == "safetensors"
     model.template_kwargs = dict(entry.template_kwargs)
     model.stop_tokens = list(entry.stop_tokens)
     model.license = entry.license
@@ -176,7 +174,6 @@ def start_import(
         source_path=f"{source_type}:{location}",
         variant_id=variant_id,
         status=ModelStatus.IMPORTING,
-        trainable=False,
         stop_tokens=[],
     )
     session.add(model)
@@ -232,8 +229,8 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
     return model
 
 
-def trainable_bases(session: Session) -> list[str]:
-    downloaded = session.scalars(select(Model.id).where(Model.status == ModelStatus.AVAILABLE, Model.trainable))
+def available_bases(session: Session) -> list[str]:
+    downloaded = session.scalars(select(Model.id).where(Model.status == ModelStatus.AVAILABLE))
     return sorted(set(BASE_MODELS) | set(downloaded))
 
 
@@ -250,4 +247,4 @@ def base_readiness(session: Session, key: str) -> str:
         return "pending"
     if model.status != ModelStatus.AVAILABLE:
         return "missing"
-    return "ready" if model.trainable else "serve_only"
+    return "ready"

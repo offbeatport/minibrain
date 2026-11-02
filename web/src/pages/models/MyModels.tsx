@@ -459,7 +459,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Train
                 </DropdownMenuItem>
             )}
-            {row.kind === "base" && row.trainable && (
+            {row.kind === "base" && row.availability.state === "available" && (
                 <DropdownMenuItem onSelect={() => on.createFrom(row.key)}>
                     <GraduationCap />
                     Train a model on it

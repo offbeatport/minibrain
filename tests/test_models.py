@@ -90,7 +90,6 @@ def add_tiny(harness: Harness, gated: bool = False) -> None:
             license_summary="Permissive",
             license_url="https://x",
             gated=gated,
-            trainable=True,
             template_kwargs={},
             stop_tokens=["<|im_end|>"],
             position=99,
@@ -404,7 +403,7 @@ def test_hf_download_folder_is_verified_against_the_catalogue(harness: Harness, 
     add_tiny(harness)
     verified = import_folder(harness, "Tiny Copy", hf_folder(tmp_path / "hf"))
     assert (verified["verified"], verified["catalog_id"], verified["revision"]) == (True, "tiny", REVISION)
-    assert verified["trainable"] is True and verified["availability"]["state"] == "available"
+    assert verified["availability"]["state"] == "available"
     plain = import_folder(harness, "Plain", hf_folder(tmp_path / "plain", revision=None))
     assert (plain["verified"], plain["catalog_id"]) == (False, None)
     picked = import_folder(harness, "Picked", hf_folder(tmp_path / "picked", revision=None), variant_id="tiny:bf16")
@@ -456,9 +455,9 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
     assert harness.client.post("/api/catalog/hub", json={"repo": REPO}).status_code == 403
 
 
-def test_unknown_architectures_are_refused(harness: Harness, hub: Path) -> None:
-    refused = harness.client.post("/api/catalog/hub", json={"repo": REPO})
-    assert refused.status_code == 409 and "do not run yet" in refused.json()["detail"]
+def test_any_architecture_can_be_added_from_the_hub(harness: Harness, hub: Path) -> None:
+    added = harness.client.post("/api/catalog/hub", json={"repo": REPO})
+    assert added.status_code == 201
     assert harness.client.post("/api/catalog/hub", json={"repo": "test/missing"}).status_code == 409
 
 
@@ -469,7 +468,6 @@ def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Pat
         (folder / name).write_bytes(data)
     found = harness.client.post("/api/models/inspect", json={"location": str(folder)}).json()
     assert (found["ok"], found["source_type"], found["name"], found["files"]) == (True, "folder", "corp model v2", 3)
-    assert "untested" in found["warning"]
     empty = harness.client.post("/api/models/inspect", json={"location": str(tmp_path)}).json()
     assert not empty["ok"] and "config.json" in empty["problem"]
     monkeypatch.delenv("MINIBRAIN_MODELS_S3_URL", raising=False)
@@ -491,7 +489,7 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     pending = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "prompt"})
     assert pending.status_code == 409 and "still being imported" in pending.json()["detail"]
     harness.worker(kinds=["import"]).run_once()
-    refused = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "lora"})
-    assert refused.status_code == 409 and "can be served but not trained" in refused.json()["detail"]
+    trained = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "lora"})
+    assert "build the dataset" in trained.json()["detail"]
     missing = harness.client.post("/api/minibrains", json={"name": "Nowhere", "base_model": "nope"})
     assert missing.status_code == 409

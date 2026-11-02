@@ -12,7 +12,6 @@ from minibrain.models.rules import (
     LICENCES,
     PUBLISHERS,
     SUPPORTED_ARCHITECTURES,
-    TESTED_ARCHITECTURES,
     needed,
     tier,
 )
@@ -295,7 +294,6 @@ class Builder:
                 variants.append(gguf)
         name, summary, url = LICENCES[licence]
         tokens = candidate.get("tokens", {"stop_tokens": [], "template_kwargs": {}})
-        tested = architecture in TESTED_ARCHITECTURES
         base = {
             "id": entry_id,
             "name": repo.split("/", 1)[1].replace("-", " ").replace("_", " "),
@@ -307,7 +305,6 @@ class Builder:
             "capabilities": ["Chat", "Classification", "Extraction", *candidate.get("extra", [])],
             "recommended": False,
             "recommendation": None,
-            "trainable": tested and not moe,
             "gated": bool(info.get("gated")),
             "stop_tokens": tokens["stop_tokens"],
             "template_kwargs": tokens["template_kwargs"],
@@ -321,7 +318,6 @@ class Builder:
                     "capabilities",
                     "recommended",
                     "recommendation",
-                    "trainable",
                     "stop_tokens",
                     "template_kwargs",
                 )

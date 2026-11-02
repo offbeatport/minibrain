@@ -17,7 +17,6 @@ const KEYS = [
     "fit",
     "support",
     "licence",
-    "train",
     "latest",
     "sort",
 ] as const;
@@ -40,7 +39,6 @@ const PAGE_KEYS: Record<ModelsPath, readonly ModelsSearchKey[]> = {
         "pool",
         "support",
         "licence",
-        "train",
         "latest",
         "sort",
     ],

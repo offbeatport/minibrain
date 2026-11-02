@@ -3913,10 +3913,6 @@
             "format": "date-time",
             "title": "Updated At"
           },
-          "trainable": {
-            "type": "boolean",
-            "title": "Trainable"
-          },
           "can_test": {
             "type": "boolean",
             "title": "Can Test"
@@ -4191,7 +4187,6 @@
           "activity",
           "deployment",
           "updated_at",
-          "trainable",
           "can_test",
           "update_available",
           "current_version",
@@ -4329,10 +4324,6 @@
             ],
             "title": "Recommendation"
           },
-          "trainable": {
-            "type": "boolean",
-            "title": "Trainable"
-          },
           "popularity": {
             "type": "integer",
             "title": "Popularity"
@@ -4406,7 +4397,6 @@
           "gated",
           "recommended",
           "recommendation",
-          "trainable",
           "popularity",
           "family",
           "generation",
@@ -5402,17 +5392,6 @@
               }
             ],
             "title": "Problem"
-          },
-          "warning": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Warning"
           },
           "source_type": {
             "anyOf": [
@@ -6774,10 +6753,6 @@
             "format": "date-time",
             "title": "Updated At"
           },
-          "trainable": {
-            "type": "boolean",
-            "title": "Trainable"
-          },
           "can_test": {
             "type": "boolean",
             "title": "Can Test"
@@ -6918,7 +6893,6 @@
           "activity",
           "deployment",
           "updated_at",
-          "trainable",
           "can_test",
           "update_available",
           "current_version",

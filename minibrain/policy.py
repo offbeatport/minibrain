@@ -52,7 +52,7 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "model_sources",
         "Model sources",
-        "Approved publishers only, any model our engines can run, or imported files only.",
+        "Approved publishers only, any model, or imported files only.",
         "choice",
         "approved",
         ("approved", "any", "imports"),
@@ -103,7 +103,7 @@ CHOICE_LABELS = {
     "allowlist": "Allowlist",
     "offline": "Offline",
     "approved": "Approved publishers",
-    "any": "Any model our engines can run",
+    "any": "Any model",
     "imports": "Imports only",
     "selected": "Only selected licences",
     "all": "Any licence",

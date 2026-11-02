@@ -229,7 +229,6 @@ const PATH_HELP =
 type Inspection = {
     ok: boolean;
     problem?: string | null;
-    warning?: string | null;
     source_type?: string | null;
     architecture?: string | null;
     files?: number;
@@ -263,10 +262,9 @@ function PathCheck({
             </StatusText>
             <span className="text-muted-foreground">
                 {found.match
-                    ? `Matches ${found.match}; it is checked against the catalogue and can be trained.`
-                    : "No catalogue match: it imports as not verified, so it can be served but not trained."}
+                    ? `Matches ${found.match}; files are checked against its catalogue checksums.`
+                    : "No catalogue match: it imports as not verified."}
             </span>
-            {found.warning && <StatusText tone="warning">{found.warning}</StatusText>}
         </div>
     );
 }
@@ -517,10 +515,7 @@ function AddModelForm({
                             Import from a folder or S3
                         </Choice>
                     </fieldset>
-                    <Link
-                        href="/discover?train=yes"
-                        className="ml-auto text-sm text-primary hover:underline"
-                    >
+                    <Link href="/discover" className="ml-auto text-sm text-primary hover:underline">
                         Download one from Discover
                     </Link>
                 </div>

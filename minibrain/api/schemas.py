@@ -377,7 +377,6 @@ class ModelRow(BaseModel):
     activity: Activity
     deployment: Deployment
     updated_at: datetime
-    trainable: bool
     can_test: bool
     update_available: bool
     current_version: int | None
@@ -440,7 +439,6 @@ class InspectRequest(BaseModel):
 class ImportCheck(BaseModel):
     ok: bool
     problem: str | None = None
-    warning: str | None = None
     source_type: Literal["folder", "s3"] | None = None
     resolved: str | None = None
     architecture: str | None = None
@@ -512,7 +510,6 @@ class CatalogEntry(BaseModel):
     gated: bool
     recommended: bool
     recommendation: str | None
-    trainable: bool
     popularity: int
     family: str
     generation: str

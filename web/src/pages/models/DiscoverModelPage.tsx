@@ -53,12 +53,6 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
                         ["Parameters", `${parameters(entry)} · size ${entry.tier}`],
                         ["Architecture", `${entry.architecture} · generation ${entry.generation}`],
                         ["Tasks", entry.capabilities.join(", ")],
-                        [
-                            "Fine-tuning",
-                            entry.trainable
-                                ? "Can be used as a base for training"
-                                : "Serving only for now",
-                        ],
                         ["Downloads", `${DOWNLOADS.format(entry.popularity)} on Hugging Face`],
                         ...(entry.origin === "hub"
                             ? ([["Origin", "Added from Hugging Face"]] as [string, string][])

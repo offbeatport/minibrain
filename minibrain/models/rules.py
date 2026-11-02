@@ -93,7 +93,6 @@ SUPPORTED_ARCHITECTURES = {
     "glm4_moe",
 }
 
-TESTED_ARCHITECTURES = {"qwen3"}
 
 KEEP_FILES = {
     "config.json",

@@ -13,7 +13,7 @@ from minibrain.api.views import detail, version_info
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
-from minibrain.models.registry import base_readiness
+from minibrain.models.registry import base_readiness, resolve_spec
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, VersionKind
 from minibrain.registry.service import (
     ConflictError,
@@ -43,9 +43,9 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
         raise ConflictError(f"{minibrain.base_model} is still being imported or downloaded; try once it is available")
     if readiness == "missing":
         raise ConflictError(f"{minibrain.base_model} is no longer on this install")
-    if kind == VersionKind.LORA and readiness == "serve_only":
+    if kind == VersionKind.LORA and resolve_spec(session, settings, minibrain.base_model).format == "gguf":
         raise ConflictError(
-            f"{minibrain.base_model} is not verified against the catalogue, so it can be served but not trained"
+            f"{minibrain.base_model} has GGUF weights, which can be served but not fine-tuned; use safetensors"
         )
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
     version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})

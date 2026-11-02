@@ -28,7 +28,7 @@ from minibrain.data.shared import attach_upload, dataset_of, dataset_sql, get_da
 from minibrain.data.sources import safe_filename
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
-from minibrain.models.registry import base_readiness, trainable_bases
+from minibrain.models.registry import available_bases, base_readiness
 from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
 from minibrain.registry.service import (
@@ -69,7 +69,7 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
 
 @router.get("/bases")
 def bases(session: SessionDep) -> list[str]:
-    return trainable_bases(session)
+    return available_bases(session)
 
 
 @router.patch("/{slug}")

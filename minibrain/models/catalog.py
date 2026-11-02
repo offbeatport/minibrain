@@ -23,7 +23,6 @@ ENTRY_FIELDS = (
     "gated",
     "recommended",
     "recommendation",
-    "trainable",
     "template_kwargs",
     "stop_tokens",
     "popularity",

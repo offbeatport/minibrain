@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from minibrain.ml.context import FinalError
 from minibrain.models.importer import detected_revision, validate
-from minibrain.models.rules import SUPPORTED_ARCHITECTURES
 from minibrain.models.sources import FOLDER, S3, StorageSource, location_url, s3_base, s3_endpoint
 from minibrain.policy import PolicyError
 from minibrain.policy import load as load_policy
@@ -60,10 +59,8 @@ def inspect_location(session: Session, location: str) -> dict[str, Any]:
     architecture = str(config.get("model_type") or "")
     matched = catalogue_match(session, detected_revision(source))
     variant, entry = matched if matched else (None, None)
-    supported = architecture in SUPPORTED_ARCHITECTURES
     return found | {
         "ok": True,
-        "warning": None if supported else f"Architecture {architecture or 'unknown'} is untested with our engines",
         "architecture": architecture,
         "files": len(files),
         "size_bytes": sum(item["size"] for item in files),

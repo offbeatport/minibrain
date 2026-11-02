@@ -311,7 +311,6 @@ class CatalogModel(Base):
     gated: Mapped[bool] = mapped_column(default=False)
     recommended: Mapped[bool] = mapped_column(default=False)
     recommendation: Mapped[str | None] = mapped_column(default=None)
-    trainable: Mapped[bool] = mapped_column(default=False)
     template_kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     stop_tokens: Mapped[list[str]] = mapped_column(JSON, default=list)
     popularity: Mapped[int] = mapped_column(default=0)
@@ -369,7 +368,6 @@ class Model(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     status: Mapped[str]
     error: Mapped[str | None] = mapped_column(default=None)
-    trainable: Mapped[bool] = mapped_column(default=False)
     template_kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     stop_tokens: Mapped[list[str]] = mapped_column(JSON, default=list)
     license: Mapped[str | None] = mapped_column(default=None)

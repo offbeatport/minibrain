@@ -243,12 +243,6 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                     {model.storage_path}
                                 </span>,
                             ],
-                            [
-                                "Training",
-                                model.trainable
-                                    ? "Can be used as a base for training"
-                                    : "Not tested for training",
-                            ],
                         ]}
                     />
                     {model.error && <p className="mt-2 text-sm text-destructive">{model.error}</p>}

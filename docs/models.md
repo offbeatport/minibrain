@@ -14,7 +14,7 @@
 - Every generation stays; older ones show "Newer version available".
 - Size tiers: S ≤4B, M 7–14B, L 24–35B or a small mixture of experts, XL 70B+ (multi-GPU).
 - Default order: recommended for the selected pool; also by popularity, size or name. Filters: hardware fit levels on
-  the selected pool, can fine-tune, latest generation only, download access, publisher, task, size and licence (long
+  the selected pool, latest generation only, download access, publisher, task, size and licence (long
   groups show five options and "Show more"), with removable chips. Columns can be shown or hidden; a row opens the
   model's page (`/discover/<id>`): variants with fit, requirements, licence and files.
 - Catalogue updates: Settings → General → Model catalogue (Check for updates, or every day).
@@ -22,7 +22,7 @@
 ## Add from Hugging Face
 
 Paste a link or id; `main` reads that one repository's metadata, on request, from the configured endpoint (Hugging Face
-or a mirror), checks `config.json`'s architecture and refuses architectures our engines do not run. Only when an admin sets the Model
+or a mirror), reads `config.json` and adds the model to Discover. Only when an admin sets the Model
 sources [policy](security.md#policies) to Any; the default, Approved publishers, keeps everyone on the curated list.
 
 ## Sources

@@ -517,7 +517,6 @@ const HIDDEN_COLUMNS = [
     "newer",
     "publisher",
     "tasks",
-    "finetune",
     "downloads",
     "architecture",
     "generation",
@@ -601,12 +600,6 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             id: "tasks",
             header: "Tasks",
             accessorFn: (entry) => entry.capabilities.join(", "),
-        },
-        {
-            id: "finetune",
-            header: "Fine-tuning",
-            accessorFn: (entry) => (entry.trainable ? 0 : 1),
-            cell: ({ row }) => (row.original.trainable ? "Yes" : muted("No")),
         },
         {
             id: "downloads",

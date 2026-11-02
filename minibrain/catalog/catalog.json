@@ -1,5 +1,5 @@
 {
- "snapshot": "2026-11-02T21:00",
+ "snapshot": "2026-11-02T22:00",
  "source": "https://huggingface.co",
  "entries": [
   {
@@ -15,7 +15,6 @@
    ],
    "recommended": true,
    "recommendation": "Tested default base; trains on a laptop.",
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -138,7 +137,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -271,7 +269,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -409,7 +406,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -628,7 +624,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -765,7 +760,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -947,7 +941,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -1124,7 +1117,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -1812,7 +1804,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": true,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -1922,7 +1913,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2098,7 +2088,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2278,7 +2267,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2373,7 +2361,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2468,7 +2455,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2583,7 +2569,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2718,7 +2703,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -2898,7 +2882,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -3180,7 +3163,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>",
@@ -3295,7 +3277,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -3382,7 +3363,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -3474,7 +3454,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -3576,7 +3555,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -3718,7 +3696,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [
     "<|eot_id|>",
@@ -3808,7 +3785,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -3905,7 +3881,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [
     "<|eot_id|>",
@@ -4020,7 +3995,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": true,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4263,7 +4237,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4360,7 +4333,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4477,7 +4449,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4609,7 +4580,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4787,7 +4757,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -4889,7 +4858,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|end|>",
@@ -5004,7 +4972,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5136,7 +5103,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5253,7 +5219,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|end_of_text|>"
@@ -5362,7 +5327,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5479,7 +5443,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5582,7 +5545,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5665,7 +5627,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5758,7 +5719,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5851,7 +5811,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -5954,7 +5913,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -6077,7 +6035,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -6245,7 +6202,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7134,7 +7090,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7242,7 +7197,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7410,7 +7364,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|endoftext|>"
@@ -7504,7 +7457,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7611,7 +7563,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7733,7 +7684,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -7825,7 +7775,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|im_end|>"
@@ -7919,7 +7868,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [],
    "template_kwargs": {},
@@ -8016,7 +7964,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|endoftext|>",
@@ -8132,7 +8079,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|endoftext|>",
@@ -8299,7 +8245,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|endoftext|>",
@@ -8624,7 +8569,6 @@
    ],
    "recommended": false,
    "recommendation": null,
-   "trainable": false,
    "gated": false,
    "stop_tokens": [
     "<|endoftext|>",

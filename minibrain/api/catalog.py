@@ -107,7 +107,6 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         gated=entry.gated,
         recommended=entry.recommended,
         recommendation=entry.recommendation,
-        trainable=entry.trainable,
         popularity=entry.popularity,
         family=entry.family,
         generation=entry.generation,
