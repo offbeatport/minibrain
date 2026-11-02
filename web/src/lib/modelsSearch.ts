@@ -21,14 +21,19 @@ export type ModelsSearch = Partial<Record<ModelsSearchKey, string>>;
 
 export type ModelsPath = "/models" | "/discover";
 
+const PAGE_KEYS: Record<ModelsPath, readonly ModelsSearchKey[]> = {
+    "/models": ["q", "type", "availability", "deployment", "tag", "archived"],
+    "/discover": ["q", "task", "provider", "fits", "access", "tier", "pool"],
+};
+
 function storageKey(path: ModelsPath): string {
     return `minibrain${path.replace("/", ".")}.search`;
 }
 
-export function readModelsSearch(search: unknown): ModelsSearch {
+export function readModelsSearch(search: unknown, path?: ModelsPath): ModelsSearch {
     const source = (search ?? {}) as Record<string, unknown>;
     const found: ModelsSearch = {};
-    for (const key of KEYS) {
+    for (const key of path ? PAGE_KEYS[path] : KEYS) {
         const value = source[key];
         if (value !== undefined && value !== null && String(value) !== "") {
             found[key] = String(value);
@@ -63,7 +68,10 @@ export function modelsHref(): string {
 
 function remembered(path: ModelsPath): string {
     try {
-        return window.sessionStorage.getItem(storageKey(path)) ?? "";
+        const stored = window.sessionStorage.getItem(storageKey(path)) ?? "";
+        return searchString(
+            readModelsSearch(Object.fromEntries(new URLSearchParams(stored)), path),
+        );
     } catch {
         return "";
     }
@@ -72,26 +80,22 @@ function remembered(path: ModelsPath): string {
 export function useModelsSearch(path: ModelsPath) {
     const router = useRouter();
     const raw = useRouterState({
-        select: (state) => searchString(readModelsSearch(state.location.search)),
+        select: (state) => searchString(readModelsSearch(state.location.search, path)),
     });
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
     useEffect(() => {
         const saved = remembered(path);
-        if (!raw && saved) {
+        if (pathname === path && !raw && saved) {
             router.history.replace(`${path}${saved}`);
         }
-    }, [raw, router, path]);
+    }, [pathname, raw, router, path]);
     const search = useMemo(
-        () => readModelsSearch(Object.fromEntries(new URLSearchParams(raw))),
-        [raw],
+        () => readModelsSearch(Object.fromEntries(new URLSearchParams(raw)), path),
+        [raw, path],
     );
     const update = useCallback(
         (patch: ModelsSearch) => {
-            const next = { ...search, ...patch };
-            for (const key of KEYS) {
-                if (!next[key]) {
-                    delete next[key];
-                }
-            }
+            const next = readModelsSearch({ ...search, ...patch }, path);
             remember(path, next);
             router.history.replace(`${path}${searchString(next)}`);
         },
