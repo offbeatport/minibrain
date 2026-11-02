@@ -1,9 +1,9 @@
 import { useRouterState } from "@tanstack/react-router";
 import { ShieldCheck, SlidersHorizontal } from "lucide-react";
-import { NavItem } from "obp-ui/shell";
 import type { ReactNode } from "react";
 import { PageHeader } from "~/components/PageHeader";
 import { Page } from "~/components/Section";
+import { SideMenuLayout } from "~/components/SideMenu";
 
 const PAGES = [
     { label: "General", href: "/settings", icon: SlidersHorizontal },
@@ -15,25 +15,9 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
     return (
         <Page>
             <PageHeader title="Settings" />
-            <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                <nav
-                    aria-label="Settings pages"
-                    className="flex shrink-0 gap-1 md:sticky md:top-4 md:w-48 md:flex-col"
-                >
-                    {PAGES.map((page) => (
-                        <NavItem
-                            key={page.href}
-                            icon={page.icon}
-                            label={page.label}
-                            href={page.href}
-                            active={pathname === page.href}
-                            collapsed={false}
-                            iconStyle="plain"
-                        />
-                    ))}
-                </nav>
-                <div className="flex min-w-0 flex-1 flex-col gap-4">{children}</div>
-            </div>
+            <SideMenuLayout label="Settings pages" items={PAGES} active={pathname}>
+                {children}
+            </SideMenuLayout>
         </Page>
     );
 }

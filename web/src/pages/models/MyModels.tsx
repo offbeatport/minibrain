@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Layers, MoreHorizontal, Search, Target, X } from "lucide-react";
+import { MoreHorizontal, Search, X } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -26,7 +26,7 @@ import { useMemo, useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { Requests, Stages } from "~/components/models/ModelMetrics";
 import { SortableTable } from "~/components/models/SortableTable";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
@@ -70,7 +70,6 @@ const DEPLOYMENT_TONES: Record<string, Tone> = {
     starting: "info",
     unhealthy: "destructive",
 };
-const STATE_ORDER = ["downloading", "importing", "missing", "available", "not_downloaded", "none"];
 
 export function detailHref(row: ModelRow): string {
     return `/models/${row.kind}/${encodeURIComponent(row.key)}`;
@@ -401,107 +400,16 @@ function RowActions({ row, on }: { row: ModelRow; on: Handlers }) {
     );
 }
 
-function ModelName({ row }: { row: ModelRow }) {
-    return (
-        <div className="flex min-w-52 max-w-72 items-start gap-3">
-            <PublisherLogo publisher={row.publisher} name={row.name} />
-            <div className="flex min-w-0 flex-col">
-                <Link
-                    href={detailHref(row)}
-                    className="font-semibold text-foreground hover:underline"
-                >
-                    {row.name}
-                </Link>
-                <span className="truncate text-sm text-muted-foreground">
-                    {row.description ||
-                        (row.kind === "custom" ? `Classify model on ${row.base_model}` : row.key)}
-                </span>
-            </div>
-        </div>
-    );
-}
+type ModelState = "live" | "attention" | "progress" | "ready";
 
-function requestTotal(row: ModelRow): number {
-    return (row.usage?.daily ?? []).reduce((sum, value) => sum + value, 0);
-}
+const STATE_LABELS: Record<ModelState, string> = {
+    live: "Live",
+    attention: "Needs you",
+    progress: "In progress",
+    ready: "Ready",
+};
 
-function usageColumn(): ColumnDef<ModelRow, unknown> {
-    return {
-        id: "usage",
-        header: "Usage, 7 days",
-        accessorFn: requestTotal,
-        cell: ({ row }) => <Requests usage={row.original.usage} />,
-    };
-}
-
-function actionsColumn(on: Handlers): ColumnDef<ModelRow, unknown> {
-    return {
-        id: "actions",
-        header: () => <span className="sr-only">Actions</span>,
-        enableSorting: false,
-        cell: ({ row }) => <RowActions row={row.original} on={on} />,
-    };
-}
-
-function customColumns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
-    return [
-        {
-            id: "model",
-            header: "Model",
-            accessorFn: (row) => row.name.toLowerCase(),
-            cell: ({ row }) => <ModelName row={row.original} />,
-        },
-        {
-            id: "progress",
-            header: "Progress",
-            accessorFn: (row) => row.accuracy ?? -1,
-            cell: ({ row }) => <Stages stages={row.original.stages ?? []} />,
-        },
-        usageColumn(),
-        actionsColumn(on),
-    ];
-}
-
-function baseColumns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
-    return [
-        {
-            id: "model",
-            header: "Model",
-            accessorFn: (row) => row.name.toLowerCase(),
-            cell: ({ row }) => <ModelName row={row.original} />,
-        },
-        {
-            id: "availability",
-            header: "Availability",
-            accessorFn: (row) => STATE_ORDER.indexOf(row.availability.state),
-            cell: ({ row }) =>
-                row.original.activity.state === "failed" ? (
-                    <Activity row={row.original} />
-                ) : (
-                    <Availability row={row.original} />
-                ),
-        },
-        {
-            id: "size",
-            header: "Size",
-            accessorFn: (row) => row.size_bytes ?? 0,
-            cell: ({ row }) =>
-                row.original.size_bytes ? (
-                    <span className="tabular-nums">{bytes(row.original.size_bytes)}</span>
-                ) : (
-                    <span className="text-muted-foreground">—</span>
-                ),
-        },
-        usageColumn(),
-        {
-            id: "deployment",
-            header: "Deployment",
-            accessorFn: (row) => row.deployment.state,
-            cell: ({ row }) => <Deployment row={row.original} />,
-        },
-        actionsColumn(on),
-    ];
-}
+const STATE_RANK: ModelState[] = ["live", "attention", "progress", "ready"];
 
 const ATTENTION_STATES = ["failed", "needs_examples", "ready"];
 
@@ -513,7 +421,114 @@ function needsAttention(row: ModelRow): boolean {
     );
 }
 
-type Facet = "type" | "availability" | "deployment" | "tag" | "attention";
+function inProgress(row: ModelRow): boolean {
+    return (
+        ["running", "queued"].includes(row.activity.state) ||
+        ["downloading", "importing"].includes(row.availability.state)
+    );
+}
+
+function stateOf(row: ModelRow): ModelState {
+    if (row.deployment.state !== "not_deployed" && row.deployment.state !== "unhealthy") {
+        return "live";
+    }
+    if (needsAttention(row)) {
+        return "attention";
+    }
+    return inProgress(row) ? "progress" : "ready";
+}
+
+function StatusCell({ row }: { row: ModelRow }) {
+    const state = stateOf(row);
+    if (state === "live") {
+        return <Deployment row={row} />;
+    }
+    if (state === "progress") {
+        return row.kind === "base" ? <Availability row={row} /> : <Activity row={row} />;
+    }
+    if (state === "attention") {
+        if (row.availability.state === "missing") {
+            return <Availability row={row} />;
+        }
+        if (row.deployment.state === "unhealthy") {
+            return <Deployment row={row} />;
+        }
+        return <Activity row={row} />;
+    }
+    if (row.kind === "base" && row.availability.state === "not_downloaded") {
+        return <Availability row={row} />;
+    }
+    return <StatusText tone="neutral">Not deployed</StatusText>;
+}
+
+function ModelName({ row }: { row: ModelRow }) {
+    const detail =
+        row.kind === "custom"
+            ? `Custom · on ${row.base_model}`
+            : `Base${row.size_bytes ? ` · ${bytes(row.size_bytes)}` : ""}`;
+    return (
+        <div className="flex min-w-52 max-w-72 items-start gap-3">
+            <PublisherLogo publisher={row.publisher} name={row.name} />
+            <div className="flex min-w-0 flex-col">
+                <Link
+                    href={detailHref(row)}
+                    className="font-semibold text-foreground hover:underline"
+                >
+                    {row.name}
+                </Link>
+                <span className="truncate text-sm text-muted-foreground">{detail}</span>
+            </div>
+        </div>
+    );
+}
+
+function requestTotal(row: ModelRow): number {
+    return (row.usage?.daily ?? []).reduce((sum, value) => sum + value, 0);
+}
+
+function columns(on: Handlers): ColumnDef<ModelRow, unknown>[] {
+    return [
+        {
+            id: "model",
+            header: "Model",
+            accessorFn: (row) => row.name.toLowerCase(),
+            cell: ({ row }) => <ModelName row={row.original} />,
+        },
+        {
+            id: "status",
+            header: "Status",
+            accessorFn: (row) => STATE_RANK.indexOf(stateOf(row)),
+            cell: ({ row }) => <StatusCell row={row.original} />,
+        },
+        {
+            id: "progress",
+            header: "Progress",
+            accessorFn: (row) => row.accuracy ?? -1,
+            cell: ({ row }) =>
+                row.original.kind === "custom" ? (
+                    <Stages stages={row.original.stages ?? []} />
+                ) : (
+                    <span className="text-sm text-muted-foreground">
+                        {row.original.trainable ? "Can be fine-tuned" : "Serving only"}
+                    </span>
+                ),
+        },
+        {
+            id: "usage",
+            header: "Usage, 7 days",
+            accessorFn: requestTotal,
+            cell: ({ row }) => <Requests usage={row.original.usage} />,
+        },
+        {
+            id: "actions",
+            header: () => <span className="sr-only">Actions</span>,
+            enableSorting: false,
+            cell: ({ row }) => <RowActions row={row.original} on={on} />,
+        },
+    ];
+}
+
+type Facet = "type" | "state" | "tag";
 
 function matches(row: ModelRow, search: ModelsSearch, skip?: Facet): boolean {
     const text = (search.q ?? "").trim().toLowerCase();
@@ -523,24 +538,15 @@ function matches(row: ModelRow, search: ModelsSearch, skip?: Facet): boolean {
     if (skip !== "type" && search.type && row.kind !== search.type) {
         return false;
     }
-    if (
-        skip !== "availability" &&
-        search.availability &&
-        row.availability.state !== search.availability
-    ) {
-        return false;
-    }
-    const deployed = row.deployment.state !== "not_deployed";
-    if (skip !== "deployment" && search.deployment === "deployed" && !deployed) {
-        return false;
-    }
-    if (skip !== "deployment" && search.deployment === "not-deployed" && deployed) {
-        return false;
-    }
-    if (skip !== "attention" && search.attention === "true" && !needsAttention(row)) {
+    if (skip !== "state" && search.state && stateOf(row) !== search.state) {
         return false;
     }
     return skip === "tag" || !search.tag || row.tags.includes(search.tag);
+}
+
+function byState(left: ModelRow, right: ModelRow): number {
+    const rank = STATE_RANK.indexOf(stateOf(left)) - STATE_RANK.indexOf(stateOf(right));
+    return rank !== 0 ? rank : right.updated_at.localeCompare(left.updated_at);
 }
 
 function FilterSelect({
@@ -574,43 +580,20 @@ function FilterSelect({
     );
 }
 
-const DEPLOYMENT_OPTIONS: [string, string][] = [
-    ["deployed", "Deployed"],
-    ["not-deployed", "Not deployed"],
-];
-
 function chips(search: ModelsSearch): { label: string; clear: ModelsSearch }[] {
     return [
         search.q ? { label: `“${search.q}”`, clear: { q: "" } } : null,
+        search.state && search.state in STATE_LABELS
+            ? { label: STATE_LABELS[search.state as ModelState], clear: { state: "" } }
+            : null,
         search.type
             ? { label: search.type === "base" ? "Base" : "Custom", clear: { type: "" } }
-            : null,
-        search.attention === "true" ? { label: "Needs attention", clear: { attention: "" } } : null,
-        search.availability
-            ? { label: AVAILABILITY_LABELS[search.availability], clear: { availability: "" } }
-            : null,
-        search.deployment
-            ? {
-                  label: search.deployment === "deployed" ? "Deployed" : "Not deployed",
-                  clear: { deployment: "" },
-              }
             : null,
         search.tag ? { label: `Tag ${search.tag}`, clear: { tag: "" } } : null,
     ].filter((chip) => chip !== null);
 }
 
-const CLEARED: ModelsSearch = {
-    q: "",
-    type: "",
-    availability: "",
-    deployment: "",
-    tag: "",
-    attention: "",
-};
-
-function plural(total: number, noun: string): string {
-    return `${total} ${noun}${total === 1 ? "" : "s"}`;
-}
+const CLEARED: ModelsSearch = { q: "", type: "", state: "", tag: "" };
 
 export function MyModels({
     search,
@@ -666,24 +649,24 @@ export function MyModels({
         }),
         [router, refresh],
     );
-    const customTable = useMemo(() => customColumns(on), [on]);
-    const baseTable = useMemo(() => baseColumns(on), [on]);
+    const tableColumns = useMemo(() => columns(on), [on]);
     const rows = models.data ?? [];
-    const visible = rows.filter((row) => matches(row, search));
-    const custom = visible.filter((row) => row.kind === "custom");
-    const base = visible.filter((row) => row.kind === "base");
+    const visible = rows.filter((row) => matches(row, search)).sort(byState);
     const facetCount = (facet: Facet, test: (row: ModelRow) => boolean) =>
         rows.filter((row) => matches(row, search, facet) && test(row)).length;
     const tags = [...new Set(rows.flatMap((row) => row.tags))].sort();
     const active = chips(search);
-    const attention = search.attention === "true";
-    const attentionCount = facetCount("attention", needsAttention);
     const filtering = active.length > 0;
     const clear = () => update(CLEARED);
-    const showCustom = search.type !== "base";
-    const showBase = search.type !== "custom";
     const firstRun = !rows.some((row) => row.kind === "custom") && !filtering && !archived;
-    const baseBytes = base.reduce((sum, row) => sum + (row.size_bytes ?? 0), 0);
+    const stateTabs = [
+        { key: "all", label: "All", badge: facetCount("state", () => true) },
+        ...STATE_RANK.map((state) => ({
+            key: state,
+            label: STATE_LABELS[state],
+            badge: facetCount("state", (row) => stateOf(row) === state),
+        })),
+    ];
     const noMatch = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No models match these filters.</p>
@@ -694,29 +677,9 @@ export function MyModels({
             )}
         </div>
     );
-    const noBase = filtering ? (
-        noMatch
-    ) : (
-        <div className="flex flex-wrap items-center gap-2">
-            <p className="text-muted-foreground">
-                No base models downloaded yet; Qwen3 0.6B is still ready for training.
-            </p>
-            <Button variant="outline" size="sm" onClick={onDiscover}>
-                Discover base models
-            </Button>
-        </div>
-    );
-    const typeTabs = [
-        { key: "all", label: "All", badge: facetCount("type", () => true) },
-        {
-            key: "custom",
-            label: "Custom",
-            badge: facetCount("type", (row) => row.kind === "custom"),
-        },
-        { key: "base", label: "Base", badge: facetCount("type", (row) => row.kind === "base") },
-    ];
     return (
         <div className="flex flex-col gap-3">
+            {firstRun && <GetStarted onDiscover={onDiscover} onCreate={onCreate} />}
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -729,42 +692,18 @@ export function MyModels({
                     />
                 </div>
                 <SegmentedTabs
-                    tabs={typeTabs}
-                    active={search.type || "all"}
-                    onSelect={(key) => update({ type: key === "all" ? "" : key })}
-                />
-                <Button
-                    variant={attention ? "secondary" : "outline"}
-                    aria-pressed={attention}
-                    disabled={!attention && attentionCount === 0}
-                    onClick={() => update({ attention: attention ? "" : "true" })}
-                >
-                    Needs attention
-                    <span className="tabular-nums text-muted-foreground">{attentionCount}</span>
-                </Button>
-                <FilterSelect
-                    label="Availability"
-                    value={search.availability}
-                    options={Object.entries(AVAILABILITY_LABELS).map(([key, text]) => [
-                        key,
-                        text,
-                        facetCount("availability", (row) => row.availability.state === key),
-                    ])}
-                    onChange={(availability) => update({ availability })}
+                    tabs={stateTabs}
+                    active={search.state || "all"}
+                    onSelect={(key) => update({ state: key === "all" ? "" : key })}
                 />
                 <FilterSelect
-                    label="Deployment"
-                    value={search.deployment}
-                    options={DEPLOYMENT_OPTIONS.map(([key, text]) => [
-                        key,
-                        text,
-                        facetCount(
-                            "deployment",
-                            (row) =>
-                                (row.deployment.state !== "not_deployed") === (key === "deployed"),
-                        ),
-                    ])}
-                    onChange={(deployment) => update({ deployment })}
+                    label="Type"
+                    value={search.type}
+                    options={[
+                        ["custom", "Custom", facetCount("type", (row) => row.kind === "custom")],
+                        ["base", "Base", facetCount("type", (row) => row.kind === "base")],
+                    ]}
+                    onChange={(type) => update({ type })}
                 />
                 {tags.length > 0 && (
                     <FilterSelect
@@ -818,55 +757,16 @@ export function MyModels({
                     </Button>
                 </div>
             ) : (
-                <PanelSections>
-                    {showCustom && (
-                        <PanelSection
-                            icon={Target}
-                            title="Custom models"
-                            bare
-                            actions={
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {plural(custom.length, "model")}
-                                </span>
-                            }
-                        >
-                            {firstRun ? (
-                                <GetStarted onDiscover={onDiscover} onCreate={onCreate} />
-                            ) : (
-                                <SortableTable
-                                    columns={customTable}
-                                    rows={custom}
-                                    onOpen={(row) => on.open(detailHref(row))}
-                                    rowLabel={(row) => `${row.name}, custom model`}
-                                    empty={noMatch}
-                                    minWidth="min-w-[880px]"
-                                />
-                            )}
-                        </PanelSection>
-                    )}
-                    {showBase && (
-                        <PanelSection
-                            icon={Layers}
-                            title="Base models"
-                            bare
-                            actions={
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {plural(base.length, "model")}
-                                    {baseBytes > 0 ? ` · ${bytes(baseBytes)}` : ""}
-                                </span>
-                            }
-                        >
-                            <SortableTable
-                                columns={baseTable}
-                                rows={base}
-                                onOpen={(row) => on.open(detailHref(row))}
-                                rowLabel={(row) => `${row.name}, base model`}
-                                empty={noBase}
-                                minWidth="min-w-[880px]"
-                            />
-                        </PanelSection>
-                    )}
-                </PanelSections>
+                <SortableTable
+                    columns={tableColumns}
+                    rows={visible}
+                    onOpen={(row) => on.open(detailHref(row))}
+                    rowLabel={(row) =>
+                        `${row.name}, ${row.kind} model, ${STATE_LABELS[stateOf(row)]}`
+                    }
+                    empty={noMatch}
+                    minWidth="min-w-[880px]"
+                />
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
