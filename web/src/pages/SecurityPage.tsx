@@ -7,12 +7,15 @@ import {
     Checkbox,
     Input,
     Label,
+    RadioGroup,
+    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
     Switch,
+    cn,
 } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
@@ -37,7 +40,7 @@ const GROUPS = [
     {
         icon: Box,
         title: "Models",
-        names: ["model_sources", "licences", "allow_unreviewed_licences", "safetensors_only"],
+        names: ["model_sources", "licence_mode", "safetensors_only"],
     },
     {
         icon: KeyRound,
@@ -190,6 +193,92 @@ function Control({ policy }: { policy: PolicyInfo }) {
     );
 }
 
+function LicenceList({ policy, disabled }: { policy: PolicyInfo; disabled: boolean }) {
+    const change = useChange(policy.name);
+    const chosen = new Set(asList(policy.value));
+    const toggle = (item: string, on: boolean) =>
+        change.mutate(
+            policy.choices
+                .map((choice) => choice.value)
+                .filter((value) => (value === item ? on : chosen.has(value))),
+        );
+    return (
+        <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                {policy.choices.map((choice) => (
+                    <Label
+                        key={choice.value}
+                        className={cn(
+                            "flex items-center gap-2 font-normal",
+                            disabled && "text-muted-foreground",
+                        )}
+                    >
+                        <Checkbox
+                            checked={chosen.has(choice.value)}
+                            disabled={disabled || policy.locked || change.isPending}
+                            onCheckedChange={(checked) => toggle(choice.value, checked === true)}
+                        />
+                        {choice.label}
+                    </Label>
+                ))}
+            </div>
+            {policy.locked && (
+                <Badge variant="neutral" className="w-fit">
+                    {SOURCE_LABEL[policy.source] ?? policy.source}
+                </Badge>
+            )}
+            <ErrorLine error={change.error} />
+        </div>
+    );
+}
+
+function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | undefined }) {
+    const change = useChange(mode.name);
+    const value = String(mode.value);
+    return (
+        <div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 max-w-md">
+                    <div className="text-sm font-medium">{mode.label}</div>
+                    <p className="text-sm text-muted-foreground">{mode.description}</p>
+                </div>
+                {mode.locked && (
+                    <Badge variant="neutral">{SOURCE_LABEL[mode.source] ?? mode.source}</Badge>
+                )}
+            </div>
+            <RadioGroup
+                value={value}
+                onValueChange={(next) => change.mutate(String(next))}
+                disabled={mode.locked || change.isPending}
+                className="flex flex-col gap-3"
+            >
+                <div className="flex flex-col gap-3">
+                    <Label className="flex items-center gap-2 font-normal">
+                        <RadioGroupItem value="selected" />
+                        Only selected licences
+                    </Label>
+                    {list && (
+                        <div className="pl-6">
+                            <LicenceList policy={list} disabled={value !== "selected"} />
+                        </div>
+                    )}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <Label className="flex items-center gap-2 font-normal">
+                        <RadioGroupItem value="all" />
+                        Any licence
+                    </Label>
+                    <p className="pl-6 text-sm text-muted-foreground">
+                        Includes non-commercial and custom terms we have not reviewed. Check each
+                        model's licence yourself.
+                    </p>
+                </div>
+            </RadioGroup>
+            <ErrorLine error={change.error} />
+        </div>
+    );
+}
+
 function PolicyRow({ policy }: { policy: PolicyInfo }) {
     return (
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0">
@@ -272,7 +361,18 @@ export function SecurityPage() {
                             <div className="divide-y">
                                 {group.names.map((name) => {
                                     const policy = byName.get(name);
-                                    return policy ? <PolicyRow key={name} policy={policy} /> : null;
+                                    if (!policy) {
+                                        return null;
+                                    }
+                                    return name === "licence_mode" ? (
+                                        <LicencesRow
+                                            key={name}
+                                            mode={policy}
+                                            list={byName.get("licences")}
+                                        />
+                                    ) : (
+                                        <PolicyRow key={name} policy={policy} />
+                                    );
                                 })}
                             </div>
                         </PanelSection>

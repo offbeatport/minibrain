@@ -10,7 +10,7 @@ log with who, before and after.
 |---|---|---|
 | Network | Open, Allowlist (hosts), Offline (`MINIBRAIN_OFFLINE` forces it) | Downloads, retries, S3 imports, catalogue sync, Add from Hugging Face, the online check |
 | Model sources | Approved publishers (default), any (badged untested), imports only | Download, retry, Add from Hugging Face (shown only with any) |
-| Licences | Allowlist of reviewed licences; unreviewed ones off by default | Download, retry |
+| Licences | Only selected licences (default; a list of reviewed commercial licences) or any licence, including unreviewed ones | Download, retry, Add from Hugging Face |
 | Safetensors only | Always on | Download file filter; pickle weights are never loaded |
 | Request logs | On or off, retention in days | Gateway config; hourly purge on the leader |
 | API keys | Expiry in days for new keys | Gateway rejects expired keys with 401 |

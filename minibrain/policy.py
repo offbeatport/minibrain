@@ -58,19 +58,20 @@ FIELDS: tuple[Field, ...] = (
         ("approved", "any", "imports"),
     ),
     Field(
-        "licences",
+        "licence_mode",
         "Allowed licences",
-        "Downloads are refused for models under other licences. Non-commercial licences are never on the list.",
+        "Downloads are refused for models under licences that are not allowed here.",
+        "choice",
+        "selected",
+        ("selected", "all"),
+    ),
+    Field(
+        "licences",
+        "Selected licences",
+        "Licences we have reviewed for commercial use. Non-commercial licences are not offered.",
         "list",
         sorted(LICENCES),
         tuple(sorted(LICENCES)),
-    ),
-    Field(
-        "allow_unreviewed_licences",
-        "Allow licences we have not reviewed",
-        "Models added from Hugging Face may carry licences outside the reviewed list.",
-        "bool",
-        False,
     ),
     Field(
         "safetensors_only",
@@ -104,6 +105,8 @@ CHOICE_LABELS = {
     "approved": "Approved publishers",
     "any": "Any model, badged untested",
     "imports": "Imports only",
+    "selected": "Only selected licences",
+    "all": "Any licence",
 } | {key: value[0] for key, value in LICENCES.items()}
 
 BY_NAME = {field.name: field for field in FIELDS}
@@ -189,11 +192,11 @@ class Policy:
             raise PolicyError("Model sources policy is Imports only: download the files elsewhere and import them")
         if sources == "approved" and (origin != "catalogue" or repo.split("/", 1)[0] not in PUBLISHERS):
             raise PolicyError("Model sources policy allows approved publishers only")
-        reviewed = licence in LICENCES
-        if reviewed and licence not in self["licences"]:
+        if self["licence_mode"] == "all" or licence in self["licences"]:
+            return
+        if licence in LICENCES:
             raise PolicyError(f"Licence {licence} is not on the allowed list")
-        if not reviewed and not self["allow_unreviewed_licences"]:
-            raise PolicyError(f"Licence {licence} has not been reviewed; an admin can allow unreviewed licences")
+        raise PolicyError(f"Licence {licence} has not been reviewed; an admin can allow any licence")
 
     def add_from_hub(self) -> None:
         if self["model_sources"] != "any":

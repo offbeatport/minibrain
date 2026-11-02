@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Brain, Layers, MoreHorizontal, Search, X } from "lucide-react";
+import { Layers, MoreHorizontal, Search, Target, X } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -821,7 +821,7 @@ export function MyModels({
                 <PanelSections>
                     {showCustom && (
                         <PanelSection
-                            icon={Brain}
+                            icon={Target}
                             title="Custom models"
                             bare
                             actions={

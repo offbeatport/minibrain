@@ -2,9 +2,14 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import text
 
 from minibrain.app import hub_allowed
 from minibrain.maintenance import purge_request_logs
+from minibrain.policy import Policy, PolicyError
+from minibrain.registry.db import MIGRATIONS, make_engine
 from minibrain.registry.models import ApiKey, AuditEvent, RequestLog, now
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
@@ -79,8 +84,37 @@ def test_model_source_and_licence_policies(harness: Harness, hub: Path) -> None:
     set_policy(harness, "model_sources", "any")
     set_policy(harness, "licences", ["mit"])
     assert harness.client.post("/api/catalog/tiny/download", json=body).status_code == 403
-    set_policy(harness, "licences", ["apache-2.0"])
+    set_policy(harness, "licence_mode", "all")
     assert harness.client.post("/api/catalog/tiny/download", json=body).status_code == 202
+
+
+def test_any_licence_lets_unreviewed_and_unticked_licences_through() -> None:
+    policy = Policy({"model_sources": "any", "licence_mode": "selected", "licences": ["mit"]})
+    with pytest.raises(PolicyError, match="not on the allowed list"):
+        policy.download("org/model", "apache-2.0", "hub")
+    with pytest.raises(PolicyError, match="allow any licence"):
+        policy.download("org/model", "other", "hub")
+    policy = Policy({"model_sources": "any", "licence_mode": "all", "licences": ["mit"]})
+    policy.download("org/model", "apache-2.0", "hub")
+    policy.download("org/model", "other", "hub")
+
+
+def test_unreviewed_switch_becomes_any_licence(tmp_path: Path) -> None:
+    url = f"sqlite:///{tmp_path / 'old.db'}"
+    engine = make_engine(url, foreign_keys=False)
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS))
+    config.attributes["engine"] = engine
+    command.upgrade(config, "0008")
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO app_settings (key, value, updated_at) VALUES (:key, 'true', CURRENT_TIMESTAMP)"),
+            {"key": "policy.allow_unreviewed_licences"},
+        )
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        rows = dict(connection.execute(text("SELECT key, value FROM app_settings")).all())
+    assert rows == {"policy.licence_mode": '"all"'}
 
 
 def test_key_expiry_and_request_log_policies(harness: Harness) -> None:
