@@ -128,6 +128,7 @@ function Option({
     return (
         <Label className="flex min-w-0 items-center gap-2 font-normal">
             <Checkbox
+                size="sm"
                 checked={checked}
                 disabled={disabled}
                 onCheckedChange={(next) => onChange(next === true)}
