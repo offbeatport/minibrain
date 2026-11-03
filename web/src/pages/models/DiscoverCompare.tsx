@@ -63,11 +63,14 @@ type Attribute = {
     label: string;
     key: (entry: CatalogEntry) => string;
     render?: (entry: CatalogEntry, entries: CatalogEntry[]) => ReactNode;
+    amount?: (entry: CatalogEntry) => number;
+    formatDelta?: (amount: number) => string;
+    better?: "lower" | "higher";
 };
 
 type Group = { id: string; title: string; attributes: Attribute[] };
 
-type Focus = { id: string; target: "left" | "right" | "remove" };
+type Focus = { id: string; target: "left" | "right" | "remove" | "baseline"; after: string };
 
 function tierLabel(entry: CatalogEntry): string {
     return TIERS.find((tier) => tier.value === entry.tier)?.label ?? entry.tier;
@@ -118,6 +121,8 @@ function sizedVariants(entry: CatalogEntry, value: (variant: Variant) => number)
 
 const needed = (variant: Variant) => variant.fit.needed_bytes;
 const download = (variant: Variant) => variant.size_bytes;
+const smallest = (value: (variant: Variant) => number) => (entry: CatalogEntry) =>
+    Math.min(...entry.variants.map(value));
 
 function groups(catalog: CatalogResponse, pool?: string): Group[] {
     const names = new Map(catalog.entries.map((entry) => [entry.id, entry]));
@@ -130,6 +135,8 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     id: "parameters",
                     label: "Parameters",
                     key: (entry) => `${parameters(entry)} ${entry.tier}`,
+                    amount: (entry) => entry.params_b,
+                    formatDelta: (amount) => `${amount.toFixed(1)}B`,
                     render: (entry) => (
                         <div className="flex flex-col">
                             <span className="tabular-nums">{parameters(entry)}</span>
@@ -155,6 +162,9 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     id: "memory",
                     label: "Memory needed",
                     key: (entry) => sizedVariants(entry, needed),
+                    amount: smallest(needed),
+                    formatDelta: bytes,
+                    better: "lower",
                     render: (entry, entries) => (
                         <VariantList
                             entry={entry}
@@ -168,6 +178,9 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     id: "download",
                     label: "Download size",
                     key: (entry) => sizedVariants(entry, download),
+                    amount: smallest(download),
+                    formatDelta: bytes,
+                    better: "lower",
                     render: (entry, entries) => (
                         <VariantList
                             entry={entry}
@@ -298,6 +311,8 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     id: "downloads",
                     label: "Downloads",
                     key: (entry) => DOWNLOADS.format(entry.popularity),
+                    amount: (entry) => entry.popularity,
+                    formatDelta: (amount) => DOWNLOADS.format(amount),
                     render: (entry) => (
                         <span className="tabular-nums">{`${DOWNLOADS.format(entry.popularity)} on Hugging Face`}</span>
                     ),
@@ -307,7 +322,12 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
     ];
 }
 
-function readCompare(search: unknown): { ids: string[]; only: boolean; pool?: string } {
+function readCompare(search: unknown): {
+    ids: string[];
+    only: boolean;
+    pool?: string;
+    baseline?: string;
+} {
     const source = (search ?? {}) as Record<string, unknown>;
     const text = (value: unknown) =>
         value === undefined || value === null ? "" : String(value).trim();
@@ -323,6 +343,7 @@ function readCompare(search: unknown): { ids: string[]; only: boolean; pool?: st
         ids,
         only: text(source.only) === "differences",
         pool: text(source.pool) || undefined,
+        baseline: text(source.baseline) || undefined,
     };
 }
 
@@ -372,35 +393,86 @@ function IconAction({
     );
 }
 
+function BaselineControl({
+    entry,
+    baseline,
+    onBaseline,
+}: {
+    entry: CatalogEntry;
+    baseline: boolean;
+    onBaseline: (on: boolean) => void;
+}) {
+    if (!baseline) {
+        return (
+            <Button
+                variant="link"
+                className="mt-1.5 h-auto p-0"
+                aria-label={`Set as baseline, ${entry.name}`}
+                data-focus="baseline"
+                onClick={() => onBaseline(true)}
+            >
+                Set as baseline
+            </Button>
+        );
+    }
+    return (
+        <span className="mt-1.5 flex items-center gap-2">
+            <Badge variant="accent">Baseline</Badge>
+            <Button
+                variant="link"
+                className="h-auto p-0"
+                aria-label={`Clear baseline, ${entry.name}`}
+                data-focus="baseline"
+                onClick={() => onBaseline(false)}
+            >
+                Clear
+            </Button>
+        </span>
+    );
+}
+
 function ModelHeader({
     entry,
     index,
     count,
     on,
     pool,
+    baseline,
     onMove,
     onRemove,
+    onBaseline,
 }: {
     entry: CatalogEntry;
     index: number;
     count: number;
     on: Actions;
     pool?: string;
+    baseline: boolean;
     onMove: (by: -1 | 1) => void;
     onRemove: () => void;
+    onBaseline: (on: boolean) => void;
 }) {
     return (
         <div className="group/model flex h-full flex-col justify-between gap-2">
             <div className="flex items-start gap-2">
                 <PublisherLogo publisher={entry.provider} name={entry.name} size="sm" />
-                <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 flex-1 flex-col items-start">
                     <Link
                         href={discoverHref(entry, pool)}
                         className="line-clamp-2 font-semibold break-words text-foreground hover:underline"
                     >
                         {entry.name}
                     </Link>
-                    <span className="truncate text-muted-foreground">{entry.provider}</span>
+                    <span className="max-w-full truncate text-muted-foreground">
+                        {entry.provider}
+                    </span>
+                    {count > 1 && (
+                        <BaselineControl
+                            entry={entry}
+                            baseline={baseline}
+                            onBaseline={onBaseline}
+                        />
+                    )}
                 </div>
                 <IconAction
                     label={`Remove ${entry.name} from the comparison`}
@@ -539,10 +611,14 @@ function CompareSkeleton({ ids }: { ids: string[] }) {
     );
 }
 
-function useFocusAfterChange(order: string) {
+function useFocusAfterChange(ids: string[], version: string) {
     const [pending, setPending] = useState<Focus | null>(null);
     useEffect(() => {
-        if (!pending || !order.split(",").includes(pending.id)) {
+        if (!pending || pending.after === version) {
+            return;
+        }
+        if (!ids.includes(pending.id)) {
+            setPending(null);
             return;
         }
         const cell = document.querySelector(
@@ -554,7 +630,7 @@ function useFocusAfterChange(order: string) {
             ) ?? cell?.querySelector<HTMLButtonElement>("[data-focus]:not(:disabled)");
         button?.focus();
         setPending(null);
-    }, [pending, order]);
+    }, [pending, ids, version]);
     return setPending;
 }
 
@@ -562,7 +638,7 @@ export function DiscoverComparePage() {
     const router = useRouter();
     const refresh = useModelsRefresh();
     const raw = useRouterState({ select: (state) => state.location.search });
-    const { ids, only, pool } = useMemo(() => readCompare(raw), [raw]);
+    const { ids, only, pool, baseline } = useMemo(() => readCompare(raw), [raw]);
     const catalog = useCatalog(pool);
     const data = catalog.data;
     const [picking, setPicking] = useState(false);
@@ -584,7 +660,9 @@ export function DiscoverComparePage() {
     const shown = known.slice(0, COMPARE_MAX);
     const extra = known.slice(COMPARE_MAX);
     const entries = shown.flatMap((id) => byId.get(id) ?? []);
-    const focusLater = useFocusAfterChange(shown.join(","));
+    const pinned = baseline && shown.includes(baseline) ? baseline : undefined;
+    const version = `${shown.join(",")}|${pinned ?? ""}`;
+    const focusLater = useFocusAfterChange(shown, version);
     useEffect(() => {
         if (copy !== "copied") {
             return;
@@ -592,8 +670,12 @@ export function DiscoverComparePage() {
         const timer = window.setTimeout(() => setCopy("idle"), 2000);
         return () => window.clearTimeout(timer);
     }, [copy]);
-    const go = (next: string[], nextOnly: boolean) =>
-        router.history.replace(compareHref(next, pool, nextOnly));
+    const go = (next: string[], nextOnly: boolean, nextBaseline = pinned ?? null) =>
+        router.history.replace(
+            nextBaseline && next.includes(nextBaseline)
+                ? `${compareHref(next, pool, nextOnly)}&baseline=${encodeURIComponent(nextBaseline)}`
+                : compareHref(next, pool, nextOnly),
+        );
     const comparing = entries.length > 1;
     const filtering = only && comparing;
     const all: CompareSection[] = data
@@ -607,6 +689,9 @@ export function DiscoverComparePage() {
                   cells: entries.map((entry) =>
                       attribute.render ? attribute.render(entry, entries) : attribute.key(entry),
                   ),
+                  values: entries.map((entry) => attribute.amount?.(entry) ?? attribute.key(entry)),
+                  formatDelta: attribute.formatDelta,
+                  better: attribute.better,
               })),
           }))
         : [];
@@ -621,13 +706,13 @@ export function DiscoverComparePage() {
     const move = (index: number, by: -1 | 1) => {
         const next = [...shown];
         [next[index], next[index + by]] = [next[index + by], next[index]];
-        focusLater({ id: shown[index], target: by < 0 ? "left" : "right" });
+        focusLater({ id: shown[index], target: by < 0 ? "left" : "right", after: version });
         go(next, only);
     };
     const remove = (index: number) => {
         const neighbour = shown[index + 1] ?? shown[index - 1];
         if (neighbour) {
-            focusLater({ id: neighbour, target: "remove" });
+            focusLater({ id: neighbour, target: "remove", after: version });
         }
         go(
             shown.filter((_, position) => position !== index),
@@ -654,8 +739,13 @@ export function DiscoverComparePage() {
                 count={entries.length}
                 on={on}
                 pool={pool}
+                baseline={entry.id === pinned}
                 onMove={(by) => move(index, by)}
                 onRemove={() => remove(index)}
+                onBaseline={(next) => {
+                    focusLater({ id: entry.id, target: "baseline", after: version });
+                    go(shown, only, next ? entry.id : null);
+                }}
             />
         ),
     }));
@@ -756,6 +846,7 @@ export function DiscoverComparePage() {
                         className={comparing ? undefined : "max-w-3xl"}
                         columns={columns}
                         sections={sections}
+                        baseline={pinned}
                         onReorder={(next) => go(next, only)}
                         corner={
                             <DifferencesToggle
