@@ -199,9 +199,9 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 
 Data is shared across models:
 
-- A **source** is something minibrain reads: an upload (stored once, content-addressed, staged into DuckDB) or a
-  folder on the server (read in place). S3, database and Iceberg sources come later. Each source is a table in
-  dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
+- A **source** is something minibrain reads: an upload (stored once, content-addressed, staged into DuckDB), a
+  folder on the server, an S3 path, a database table or query, or an Iceberg table (the last four read in place, the
+  last three through a connection). Each source is a table in dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
   `support_tickets_2`); renaming the source keeps the table name, so saved SQL keeps working.
 - A **dataset** stands on its own: one saved DuckDB query that returns `input` and `label`, plus any extra columns,
   over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
@@ -219,7 +219,9 @@ Data is shared across models:
 - User SQL is parsed first (`json_serialize_sql`): exactly one SELECT, whose table names pick the sources to expose.
   It then runs in an in-memory DuckDB with external access off and the configuration locked: uploads are attached
   read-only, a folder is a view over its listed files and `allowed_paths` names exactly those files, and a query
-  stops after 30 seconds.
+  stops after 30 seconds. Sources are named by table name alone: a catalog- or schema-qualified name and the scanner
+  table functions (`postgres_query`, `mysql_*`, `iceberg_*`, `query`, `query_table`) are refused, so dataset SQL
+  cannot reach past its sources into the rest of an attached database.
 
 ### Sources
 
@@ -229,8 +231,25 @@ Data is shared across models:
   10,000 files. Only folders inside the Folder sources policy (Settings → Security, lockable from config or
   `MINIBRAIN_POLICY_DATA_FOLDERS`) can be added, and a folder taken off that list stops being readable. Each folder
   shows its file count, size and last change.
-- Later: Postgres, S3 and Iceberg queried in place by DuckDB: `ATTACH '…' AS src (TYPE postgres, READ_ONLY)`,
-  `read_parquet('s3://…')`.
+- S3: a connection plus `s3://bucket/prefix/*.parquet` (or `.csv`, `.json`, a single object, or a prefix whose most
+  common format wins), read in place by DuckDB's httpfs as one table, at most 10,000 objects; names starting with `.`
+  or `_` (`_SUCCESS`) are skipped. The listing (s3fs) gives the exact objects DuckDB reads, `allowed_paths` names
+  exactly those, and a DuckDB secret scoped to the bucket carries the keys. Fingerprint: SHA-256 of key, size and
+  ETag per object.
+- Database: a PostgreSQL or MySQL connection plus a table (`name` or `schema.name`) or one read-only query (SELECT or
+  WITH, no second statement; it runs wrapped as a subquery). DuckDB's postgres or mysql scanner attaches the database
+  `READ_ONLY` through a DuckDB secret; PostgreSQL sessions also get `default_transaction_read_only=on` and a 30-second
+  `statement_timeout`. Fingerprint: with an updated-at column, the row count plus its maximum; without one, the query
+  plus the time read, so every read counts as new data. Use a read-only database user: minibrain never writes, but
+  the user's grants are the real control.
+- Iceberg: an S3 connection plus the table's folder. minibrain lists `metadata/`, takes the highest-numbered
+  `*.metadata.json` and its `current-snapshot-id`, and DuckDB's iceberg extension reads that snapshot
+  (`iceberg_scan(…, version, snapshot_from_id)`) with `allowed_directories` limited to the table folder.
+  Fingerprint: the snapshot id. REST catalogues come later; DuckDB can attach them, but tables on S3 need nothing
+  beyond the S3 connection.
+- Remote fingerprints are cached for 30 seconds per source so listing pages does not hit a bucket or database on
+  every request. Everything goes through the row limit and the 30-second timeout, and snapshots copy the rows to
+  Parquet like any other source.
 - Materialize into the minibrain's DuckDB file only when previews get slow or the source must not be hit repeatedly.
 - dlt arrives with the first API source (Zendesk, Jira, Confluence), loading into the same DuckDB file. Its incremental
   state is what v2 "retrain on new data" runs on.
@@ -360,6 +379,33 @@ before a run starts:
   is kept in a 0600 file under `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection"
   writes, reads back and removes a probe object; saving S3 runs the same check. Artifacts already stored stay readable
   after switching either way.
+
+### Connections
+
+Storage is where minibrain keeps its own files; a connection is someone else's bucket or database that minibrain reads
+from. They have different endpoints and keys, so they are configured apart.
+
+- Settings → Connections: named connections of three kinds. S3-compatible: endpoint, region, bucket (optional; when
+  set, paths must be in it), access key, secret key, path-style addressing. PostgreSQL and MySQL: host, port,
+  database, user, password, SSL mode. "Test connection" lists the bucket (or the buckets) or the database's tables;
+  it works on unsaved changes too.
+- Each connection's endpoint must pass the network policy when it is saved, tested and every time it is used; a
+  blocked one says which host to add under Allowed hosts.
+- Secrets are write-only: encrypted at rest with AES-256-GCM (`cryptography`, through OpenSSL) under a master key at
+  `<home>/secrets/master.key` (0600, created on first use) or the file `MINIBRAIN_MASTER_KEY_FILE` names (container
+  secret mounts), with the connection's id as associated data. The API only says whether a secret is set; Replace
+  writes a new one. Create, update and delete are audited (`connection.create`, `connection.update` with the changed
+  field names and whether the secret was replaced, `connection.delete`), never with secret values.
+- Locked-down installs declare connections in `minibrain.yaml` under `connections:` (a list with `name`, `kind` and
+  the fields above), with the secret only as a reference: `secret_env: NAME` or `secret_file: /run/secrets/name`. They
+  show as locked ("Set in minibrain.yaml"); a plaintext `password` or `secret_key` there is refused, and a variable or
+  file that is missing shows "secret not found". A connection removed from the file goes away, unless a source still
+  uses it.
+- A connection used by a source cannot be deleted. Sources keep their connection's id, so renaming one is safe.
+- Model import uses connections for `s3://` paths: the Import tab picks the first S3 connection whose bucket matches,
+  or asks. The job's parameters hold only the connection id; the worker receives the credentials with the claim and
+  hands them to the import or repair child in its environment, never on disk. Without a connection, the server's
+  environment credentials (`AWS_*`) stay the fallback.
 
 ## Training
 
@@ -606,8 +652,10 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   recent server warnings, with every known secret value scrubbed and secret-named fields redacted.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
 - Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with Datasets first, then sources by
-  kind (Uploads, Folders, S3, Databases); the selected item's detail on the right. A source shows its table name,
-  columns, stats, first rows and the datasets that read it; a folder also shows its file count, size and last change.
+  kind (Uploads, Folders, S3, Databases, Iceberg); the selected item's detail on the right. One "Add source" menu:
+  Upload a file, Connect a folder, S3 path, Database table or query, Iceberg table. A source shows its table name,
+  columns, stats, first rows and the datasets that read it; a folder also shows its file count, size and last change;
+  a connected source shows its connection, path, table or query, and how its changes are tracked.
   A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
   preview, label balance, splits, its snapshots (tick two to compare), the models that use it, "Save snapshot now"
   and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
@@ -615,6 +663,8 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   the permalink; `/data/datasets/<slug>` redirects to it.
 - Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
   their limits. Settings → Storage: where artifacts live, and the base model cache budget.
+- Settings → Connections: the buckets and databases that sources and imports read (see Connections), with each
+  one's address, secret state, sources and test, and which DuckDB extensions are installed.
 
 | Need | obp-ui |
 |---|---|
@@ -665,6 +715,19 @@ Fully offline by default. Nothing in the data, labelling, training, serving or g
 - Install bundle: Docker images, Python wheels, Presidio's spaCy model, the frontend build. Nothing downloads at install
   or run time.
 - No telemetry.
+- DuckDB extensions: S3, database and Iceberg sources need httpfs, postgres_scanner, mysql_scanner, iceberg and avro.
+  DuckDB downloads extensions from the internet by default; minibrain never lets it (`autoinstall_known_extensions`
+  and `autoload_known_extensions` off on every connection) and loads them only from its own extension directory
+  (`<home>/duckdb/extensions`, or `MINIBRAIN_DUCKDB_EXTENSIONS`). They are not in git or the wheel: one set is tens
+  of MB per platform and DuckDB release. Vendoring: on a connected machine,
+  `minibrain extensions download --to ./duckdb-extensions --platform linux_amd64 --platform linux_arm64` saves
+  DuckDB's repository layout (`<version>/<platform>/<name>.duckdb_extension.gz`) for the installed DuckDB version; the
+  folder goes into the install bundle or the image (`MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY` pointing at it), and
+  `minibrain extensions install --from <folder or internal mirror URL>` installs it. A missing extension is installed
+  from that local folder on first use; never from a URL at run time. DuckDB still checks each extension's signature
+  when loading it. Updating DuckDB means downloading the set for the new version (paths are versioned, so both can
+  sit side by side). `minibrain extensions` and Settings → Connections show what is installed, and a source that needs
+  a missing extension names it and the install command.
 - Air-gap test in CI: the M1 flow runs in a container with networking disabled.
 - Updates: signed bundles for the app and for new base models, carried across the gap by disk. Verified offline before
   install; the previous version stays installed for rollback.
@@ -774,7 +837,8 @@ Everything in the v1 scope below, after M1.
 - [ ] `response_format` with `json_schema`
 - [ ] Cost and latency in eval
 - [ ] `minibrain.yaml` and `minibrain run`
-- [ ] Sources: Postgres, Parquet, S3, files via DuckDB scanners (uploads and server folders done)
+- [x] Sources: uploads, server folders, S3, PostgreSQL, MySQL and Iceberg on S3 via DuckDB, through connections with
+      encrypted write-only secrets; DuckDB extensions installed offline
 - [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor (column picker and SQL over several sources
       done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
