@@ -467,6 +467,34 @@ function cancelTransferConfirmation(row: ModelRow, on: Handlers): Confirmation {
     };
 }
 
+function TrainItem({
+    label,
+    blocked,
+    onSelect,
+}: {
+    label: string;
+    blocked: { label: string } | null;
+    onSelect: () => void;
+}) {
+    if (!blocked) {
+        return (
+            <DropdownMenuItem onSelect={onSelect}>
+                <GraduationCap />
+                {label}
+            </DropdownMenuItem>
+        );
+    }
+    return (
+        <DropdownMenuItem disabled className="items-start">
+            <GraduationCap className="mt-0.5" />
+            <span className="flex flex-col">
+                <span>{label}</span>
+                <span className="text-sm text-muted-foreground">{`Fix the base model first: ${blocked.label}`}</span>
+            </span>
+        </DropdownMenuItem>
+    );
+}
+
 function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
     const version = entry.version;
@@ -519,16 +547,18 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                 Edit name, description and tags
             </DropdownMenuItem>
             {row.kind === "custom" && (
-                <DropdownMenuItem onSelect={() => on.open(scoped("/training", row))}>
-                    <GraduationCap />
-                    Train
-                </DropdownMenuItem>
+                <TrainItem
+                    label="Train"
+                    blocked={row.health?.state === "base_unusable" ? row.health : null}
+                    onSelect={() => on.open(scoped("/training", row))}
+                />
             )}
             {row.kind === "base" && row.availability.state === "available" && (
-                <DropdownMenuItem onSelect={() => on.createFrom(row.key)}>
-                    <GraduationCap />
-                    Train a model on it
-                </DropdownMenuItem>
+                <TrainItem
+                    label="Train a model on it"
+                    blocked={row.health ?? null}
+                    onSelect={() => on.createFrom(row.key)}
+                />
             )}
             {row.kind === "custom" && !version && (row.versions ?? []).length > 0 && (
                 <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
