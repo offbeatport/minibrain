@@ -869,7 +869,7 @@ Everything in the v1 scope below, after M1.
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
 - [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step
 - [x] Playground
-- [ ] Harness config export
+- [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
 - [ ] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [ ] FIPS-ready crypto rules enforced in CI

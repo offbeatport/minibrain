@@ -14,6 +14,7 @@ import {
 } from "~/api/client";
 import { useMinibrain, useModels } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
+import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
@@ -22,34 +23,6 @@ import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetri
 import { StatusText } from "~/components/models/StatusText";
 import { count, percent } from "~/lib/format";
 import { Deployment as DeploymentCell } from "./models/MyModels";
-
-function Code({ children }: { children: string }) {
-    return (
-        <pre className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm">
-            {children}
-        </pre>
-    );
-}
-
-function snippets(baseUrl: string, model: string, secret: string) {
-    const curl = [
-        `curl ${baseUrl}/chat/completions \\`,
-        `  -H "Authorization: Bearer ${secret}" \\`,
-        `  -H "Content-Type: application/json" \\`,
-        `  -d '{"model": "${model}", "messages": [{"role": "user", "content": "I was charged twice"}]}'`,
-    ].join("\n");
-    const python = [
-        "from openai import OpenAI",
-        "",
-        `client = OpenAI(base_url="${baseUrl}", api_key="${secret}")`,
-        "reply = client.chat.completions.create(",
-        `    model="${model}",`,
-        '    messages=[{"role": "user", "content": "I was charged twice"}],',
-        ")",
-        "print(reply.choices[0].message.content)",
-    ].join("\n");
-    return { curl, python };
-}
 
 function serving(detail: MinibrainDetail): string {
     if (!detail.deployed) {
@@ -94,7 +67,6 @@ function Connect({ slug }: { slug: string }) {
     }
     const baseUrl = `${window.location.origin}/v1`;
     const model = detail.models[0] ?? slug;
-    const code = snippets(baseUrl, model, created?.secret ?? "YOUR_KEY");
     return (
         <>
             <PanelSection icon={Plug} title="Connect">
@@ -119,8 +91,11 @@ function Connect({ slug }: { slug: string }) {
                             <span className="font-mono">{slug}@N</span> pins one.
                         </p>
                     </div>
-                    <Code>{code.curl}</Code>
-                    <Code>{code.python}</Code>
+                    <HarnessConfigs
+                        baseUrl={baseUrl}
+                        model={model}
+                        keyValue={created?.secret ?? null}
+                    />
                 </div>
             </PanelSection>
             <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
