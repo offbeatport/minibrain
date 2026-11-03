@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import {
-    Badge,
     Button,
     ConfirmDialog,
     Dialog,
@@ -23,6 +22,7 @@ import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { LabelCount } from "~/api/client";
 import { keys, useModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
+import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { splitTags } from "../models/dialogs";
 
 export type Described = { name: string; description: string; tags: string[] };
@@ -181,15 +181,7 @@ export function About({ item, onEdit }: { item: Described; onEdit: () => void })
             {item.description && (
                 <p className="text-base whitespace-pre-line">{item.description}</p>
             )}
-            {item.tags.length > 0 && (
-                <ul aria-label="Tags" className="flex flex-wrap gap-1.5">
-                    {item.tags.map((tag) => (
-                        <li key={tag}>
-                            <Badge variant="outline">{tag}</Badge>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <Tags tags={item.tags} />
         </div>
     );
 }
@@ -209,12 +201,12 @@ export function EditDialog({
 }) {
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
-    const [tags, setTags] = useState(item.tags.join(", "));
+    const [tags, setTags] = useState(editableTags(item.tags));
     useEffect(() => {
         if (open) {
             setName(item.name);
             setDescription(item.description);
-            setTags(item.tags.join(", "));
+            setTags(editableTags(item.tags));
         }
     }, [open, item]);
     const save = useMutation({
@@ -256,7 +248,7 @@ export function EditDialog({
                                 onChange={(event) => setDescription(event.target.value)}
                             />
                         </Field>
-                        <Field id="data-edit-tags" label="Tags" hint="Comma separated.">
+                        <Field id="data-edit-tags" label="Tags" hint={TAGS_HINT}>
                             <Input
                                 id="data-edit-tags"
                                 value={tags}

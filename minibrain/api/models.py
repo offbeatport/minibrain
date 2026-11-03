@@ -56,6 +56,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import ConflictError, NotFoundError, drop_orphan_keys
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
+from minibrain.tags import merged_tags, user_tags
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -141,7 +142,7 @@ def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep) ->
 
 @router.post("/import", status_code=202)
 def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
-    tags = [tag.strip() for tag in body.tags if tag.strip()]
+    tags = user_tags(body.tags)
     try:
         kind = body.source_type or source_type_of(body.location)
     except FinalError as error:
@@ -176,7 +177,7 @@ def update_base(
     if body.description is not None:
         model.description = body.description.strip()
     if body.tags is not None:
-        model.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+        model.tags = merged_tags(model.tags, body.tags)
     model.updated_at = now()
     session.commit()
     return detail_of(session, settings, request, model)

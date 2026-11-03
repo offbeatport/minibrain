@@ -87,6 +87,7 @@ from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
+from minibrain.tags import merged_tags
 from minibrain.tasks.classify import trained_messages
 
 router = APIRouter(prefix="/api", tags=["data"])
@@ -243,17 +244,13 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
     )
 
 
-def clean_tags(tags: list[str]) -> list[str]:
-    return sorted({tag.strip() for tag in tags if tag.strip()})
-
-
 def describe_item(item: Source | Dataset, body: CatalogueUpdate) -> None:
     if body.name is not None:
         item.name = body.name.strip()
     if body.description is not None:
         item.description = body.description.strip() or None
     if body.tags is not None:
-        item.tags = clean_tags(body.tags) or None
+        item.tags = merged_tags(item.tags, body.tags) or None
 
 
 def column_source(session: Session, dataset: Dataset, body: MappingUpdate) -> Source:

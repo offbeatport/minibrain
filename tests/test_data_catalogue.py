@@ -70,7 +70,7 @@ def test_description_and_tags_round_trip_on_sources_and_datasets(harness: Harnes
     assert (edited["slug"], edited["description"], edited["tags"]) == (
         "tickets",
         "Category per ticket",
-        ["en", "triage"],
+        ["triage", "en"],
     )
     cleared = harness.client.patch("/api/datasets/tickets", json={"description": "", "tags": []}).json()
     assert (cleared["description"], cleared["tags"], cleared["name"]) == ("", [], "Tickets")
@@ -133,7 +133,7 @@ def test_samples_are_listed_and_can_be_added_again_after_a_delete(harness: Harne
     assert [sample["file"] for sample in samples] == ["travel_intents.jsonl", "banking77.csv", "clinc150.parquet"]
     first = harness.client.post("/api/samples/banking77.csv").json()
     assert first["filename"] == "banking77.csv"
-    assert first["tags"] == ["sample"]
+    assert first["tags"] == ["minibrain:sample"]
     assert first["rows"] == 13_083
     assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
     again = harness.client.post("/api/samples/banking77.csv").json()
@@ -151,3 +151,22 @@ def test_a_new_file_never_reads_a_deleted_file_staging(harness: Harness) -> None
     second = harness.client.post("/api/samples/travel_intents.jsonl").json()
     assert second["rows"] == 750
     assert {column["name"] for column in second["columns"]} != {column["name"] for column in first["columns"]}
+
+
+def test_tags_keep_key_value_form_and_refuse_the_system_prefix(harness: Harness) -> None:
+    source = upload(harness)
+    changed = harness.client.patch(
+        f"/api/sources/{source['id']}", json={"tags": ["Team : fraud", "eu", "team:fraud", " eu "]}
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["tags"] == ["team:fraud", "eu"]
+    refused = harness.client.patch(f"/api/sources/{source['id']}", json={"tags": ["minibrain:sample"]})
+    assert refused.status_code == 422
+    assert harness.client.patch(f"/api/sources/{source['id']}", json={"tags": ["team:"]}).status_code == 422
+
+
+def test_editing_tags_keeps_the_system_tags(harness: Harness) -> None:
+    sample = harness.client.post("/api/samples/travel_intents.jsonl").json()
+    assert sample["tags"] == ["minibrain:sample"]
+    edited = harness.client.patch(f"/api/sources/{sample['id']}", json={"tags": ["demo"]}).json()
+    assert edited["tags"] == ["minibrain:sample", "demo"]

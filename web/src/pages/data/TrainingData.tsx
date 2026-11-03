@@ -11,7 +11,7 @@ import { DatasetMapping } from "./DatasetDetail";
 
 type DataSource = "upload" | "dataset" | "sample";
 
-const SAMPLE_TAG = "sample";
+const SAMPLE_TAGS = ["minibrain:sample", "sample"];
 
 const FILE_BUTTON_FOCUS =
     "cursor-pointer has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-1 has-focus-visible:ring-offset-background";
@@ -108,7 +108,8 @@ function sampleDataset(
     datasets: DatasetSummary[],
 ): { dataset?: DatasetSummary; sourceId?: number } {
     const matching = sources.filter(
-        (source) => source.filename === file && source.tags.includes(SAMPLE_TAG),
+        (source) =>
+            source.filename === file && source.tags.some((tag) => SAMPLE_TAGS.includes(tag)),
     );
     const ids = new Set(matching.map((source) => source.id));
     const dataset = datasets.find(

@@ -59,6 +59,7 @@ from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.settings import Settings, load_settings
+from minibrain.tags import TagError
 
 EXPIRY_SECONDS = 5.0
 API_PREFIXES = ("api/", "v1/", "internal/", "healthz", "readyz", "metrics")
@@ -70,6 +71,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     JobStateError: 409,
     MissingArtifactError: 409,
     SourceError: 422,
+    TagError: 422,
     SnapshotError: 422,
     ArtifactError: 422,
     EngineUnavailableError: 503,

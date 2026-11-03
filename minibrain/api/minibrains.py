@@ -46,6 +46,7 @@ from minibrain.registry.service import (
     slugify,
 )
 from minibrain.settings import sample_file
+from minibrain.tags import merged_tags, user_tags
 
 router = APIRouter(prefix="/api/minibrains", tags=["minibrains"])
 
@@ -64,7 +65,7 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
         raise ConflictError(f"{base} is not a base model on this install")
     minibrain = create_minibrain(session, body.name, body.task, base)
     minibrain.description = body.description.strip()
-    minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+    minibrain.tags = user_tags(body.tags)
     if body.sample:
         with sample_file(SAMPLE_FILE).open("rb") as stream:
             attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
@@ -85,7 +86,7 @@ def update(slug: str, body: ModelUpdate, session: SessionDep, settings: Settings
     if body.description is not None:
         minibrain.description = body.description.strip()
     if body.tags is not None:
-        minibrain.tags = sorted({tag.strip() for tag in body.tags if tag.strip()})
+        minibrain.tags = merged_tags(minibrain.tags, body.tags)
     minibrain.updated_at = now()
     session.commit()
     return detail(settings, minibrain)

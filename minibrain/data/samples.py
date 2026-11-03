@@ -8,7 +8,7 @@ from minibrain.registry.models import Source
 from minibrain.registry.service import NotFoundError
 from minibrain.settings import sample_file
 
-SAMPLE_TAG = "sample"
+SAMPLE_TAG = "minibrain:sample"
 
 
 @dataclass(frozen=True)

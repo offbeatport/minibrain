@@ -17,6 +17,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { type ModelRow, api, succeed, unwrap } from "~/api/client";
 import { keys } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
+import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { bytes } from "~/lib/time";
 
 export function useModelsRefresh() {
@@ -52,7 +53,7 @@ export function EditModelDialog({
         if (row) {
             setName(row.name);
             setDescription(row.description);
-            setTags(row.tags.join(", "));
+            setTags(editableTags(row.tags));
         }
     }, [row]);
     const save = useMutation({
@@ -117,7 +118,7 @@ export function EditModelDialog({
                             rows={2}
                         />
                     </Field>
-                    <Field id="edit-tags" label="Tags" hint="Comma separated.">
+                    <Field id="edit-tags" label="Tags" hint={TAGS_HINT}>
                         <Input
                             id="edit-tags"
                             value={tags}
