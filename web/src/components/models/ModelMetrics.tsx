@@ -106,17 +106,41 @@ function Trend({ usage }: { usage: ModelUsage }) {
     );
 }
 
+function Sparkline({ values }: { values: number[] }) {
+    const peak = Math.max(...values, 1);
+    const step = 100 / Math.max(values.length - 1, 1);
+    const points = values.map((value, index) => `${index * step},${32 - (value / peak) * 28}`);
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 100 32"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 size-full"
+        >
+            <path d={`M0,32 L${points.join(" L")} L100,32 Z`} className="fill-primary/15" />
+            <path
+                d={`M${points.join(" L")}`}
+                vectorEffect="non-scaling-stroke"
+                strokeWidth={1}
+                className="fill-none stroke-primary"
+            />
+        </svg>
+    );
+}
+
 export function Requests({ usage }: { usage: ModelUsage | null | undefined }) {
     if (!usage) {
         return <span className="text-muted-foreground">Never used</span>;
     }
     const days =
         usage.days?.length === usage.daily.length ? usage.days : recentDays(usage.daily.length);
+    const used = usage.daily.some((value) => value > 0);
     return (
-        <span className="flex">
+        <span className="relative flex h-8 w-full max-w-36 items-center">
+            {used && <Sparkline values={usage.daily} />}
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <span className="inline-flex w-fit items-baseline gap-2 rounded-sm tabular-nums">
+                    <span className="relative inline-flex w-fit items-baseline gap-2 rounded-sm px-1 tabular-nums">
                         <span className="font-semibold">
                             {count(
                                 usage.total ?? usage.daily.reduce((sum, value) => sum + value, 0),
