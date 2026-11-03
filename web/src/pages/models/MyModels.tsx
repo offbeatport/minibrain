@@ -475,7 +475,8 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
     const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
     const deployable =
         !row.health && (row.kind === "custom" || row.availability.state === "available");
-    const more = (entryHealth(entry)?.actions ?? []).slice(1);
+    const fixes = entryHealth(entry)?.actions ?? [];
+    const more = fixes.slice(1);
     const verifiable =
         row.kind === "base" &&
         row.availability.state === "available" &&
@@ -484,10 +485,14 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
         row.health?.actions[0]?.kind !== "verify";
     return (
         <>
-            {more
+            {fixes
                 .filter((action) => action.kind !== "remove")
                 .map((action) => (
-                    <DropdownMenuItem key={action.kind} onSelect={() => on.health(row, action)}>
+                    <DropdownMenuItem
+                        key={action.kind}
+                        className={action === fixes[0] ? "md:hidden" : undefined}
+                        onSelect={() => on.health(row, action)}
+                    >
                         <Wrench />
                         {action.label}
                     </DropdownMenuItem>
