@@ -761,6 +761,15 @@ v1, the evidence regulated buyers ask for first:
   - Non-security hashing (MinHash) passes `usedforsecurity=False`.
   - All crypto through OpenSSL or the `cryptography` library; nothing hand-rolled.
   - Base images that can run in FIPS mode (Red Hat UBI).
+  - Enforced in CI and `mise run check` by ruff `S324` and `scripts/check_crypto.py` (tested in
+    `tests/test_check_crypto.py`), which fails on: MD5, SHA-1 or BLAKE2 through `hashlib` without
+    `usedforsecurity=False`; HMAC or PBKDF2 with anything but SHA-256; scrypt; imports of PyCryptodome, PyNaCl,
+    bcrypt, argon2, passlib, `rsa`, `ecdsa` and other crypto outside OpenSSL and `cryptography`; `cryptography`'s
+    non-approved primitives (MD5, SHA-1, BLAKE2, ChaCha20, the `decrepit` module); `random` feeding a token, secret,
+    password, salt, nonce or API key (`secrets` does that); in `web/`, SHA-1 or MD5 literals (Web Crypto included)
+    and JavaScript crypto libraries (crypto-js, tweetnacl, noble, node-forge, the md5 and sha1 packages). The same
+    library lists are checked against `uv.lock`, `web/package.json` and `web/pnpm-lock.yaml`, so no dependency
+    brings one in transitively.
 
 v2, for defense and critical infrastructure:
 
@@ -768,6 +777,19 @@ v2, for defense and critical infrastructure:
 - Hardened images: DoD STIG, Iron Bank listing.
 - Native SAML and CAC / PIV login, if customers' proxies are not enough; roles by team.
 - Control mappings: CMMC / NIST 800-171, NIST 800-53, HIPAA.
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request; no secrets, and tests make no outbound
+calls.
+
+- Python, on 3.12 and 3.13: `uv sync --locked`, ruff, ruff format, `scripts/check_crypto.py`, pyright, pytest. The
+  mlx and llama.cpp extras are not installed on Linux, so pyright reports their imports as warnings, only in the three
+  files that use them (`executionEnvironments` in `pyproject.toml`).
+- Web: `pnpm install --frozen-lockfile`, Biome, `tsc`, `vite build`.
+- Wheel, once both pass: `uv build --wheel` with the built UI inside, uploaded as the `minibrain-wheel` artifact.
+- `mise run check` runs the same checks locally; change both together.
+- Third-party actions pinned to full commit SHAs; uv, Node and pnpm versions fixed; uv and pnpm caches on.
 
 ## Platforms
 
@@ -882,14 +904,14 @@ Everything in the v1 scope below, after M1.
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
 - [ ] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
-- [ ] FIPS-ready crypto rules enforced in CI
+- [x] FIPS-ready crypto rules enforced in CI: ruff `S324` and `scripts/check_crypto.py`
 - [ ] Local install via uv on Linux, macOS, Windows; production Docker image (CUDA)
 - [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
 - [x] Developer tasks in `mise.toml` (setup, dev, check, build)
-- [ ] CI on every push: `mise run check`, then build the UI and the wheel
+- [x] CI on every push: the `mise run check` checks, then build the UI and the wheel
 - [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
 - [ ] Install docs for `uvx`, `uv tool install`, `pip install` and Docker
-- [ ] Python 3.13: allow it in `requires-python` (uvx already ran the wheel on 3.13)
+- [x] Python 3.13: allowed in `requires-python`; CI tests 3.12 and 3.13
 - [ ] Offline install bundle; air-gap CI test
 - [ ] Signed offline update bundles (app and base models) with rollback
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys

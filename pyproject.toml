@@ -91,5 +91,20 @@ typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 
+[[tool.pyright.executionEnvironments]]
+root = "minibrain/serve/mlx_backend.py"
+extraPaths = ["."]
+reportMissingImports = "warning"
+
+[[tool.pyright.executionEnvironments]]
+root = "minibrain/serve/llamacpp_backend.py"
+extraPaths = ["."]
+reportMissingImports = "warning"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests/test_engines.py"
+extraPaths = ["."]
+reportMissingImports = "warning"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
