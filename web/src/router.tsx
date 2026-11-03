@@ -114,7 +114,7 @@ const routeTree = rootRoute.addChildren([
         },
     }),
     scopedPage("/training", TrainingPage),
-    scopedPage("/evaluations", EvaluationsPage),
+    globalPage("/evaluations", EvaluationsPage),
     scopedPage("/feedback", FeedbackPage),
     createRoute({
         getParentRoute: () => rootRoute,

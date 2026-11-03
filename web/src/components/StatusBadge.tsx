@@ -18,6 +18,30 @@ const JOB_BADGE: Record<string, { variant: Variant; label: string }> = {
     cancelled: { variant: "neutral", label: "Cancelled" },
 };
 
+export const JOB_STATUSES = ["running", "queued", "succeeded", "failed", "cancelled"];
+
+export const VERSION_STATES = ["live", "ready", "evaluating", "training", "failed"];
+
+export function jobStatusLabel(status: string): string {
+    return JOB_BADGE[status]?.label ?? status;
+}
+
+export function versionState(version: { status: string; live: boolean }): string {
+    return version.live ? "live" : version.status;
+}
+
+export function versionStateLabel(state: string): string {
+    return state === "live" ? "Live" : (VERSION_BADGE[state]?.label ?? state);
+}
+
+export function VersionState({ version }: { version: { status: string; live: boolean } }) {
+    if (version.live) {
+        return <Badge variant="success">Live</Badge>;
+    }
+    const badge = VERSION_BADGE[version.status] ?? { variant: "neutral", label: version.status };
+    return <Badge variant={badge.variant}>{badge.label}</Badge>;
+}
+
 export function VersionStatus({ version }: { version: VersionInfo }) {
     if (version.current) {
         return <Badge variant="success">Current</Badge>;
