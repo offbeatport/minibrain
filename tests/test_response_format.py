@@ -124,18 +124,6 @@ def test_choices_compile_to_a_grammar_and_a_token_trie() -> None:
     assert unfenced('  {"a": 1}\n') == '{"a": 1}'
 
 
-def test_mlx_masks_every_token_outside_the_choices() -> None:
-    pytest.importorskip("mlx_lm")
-    import mlx.core as mx
-
-    from minibrain.serve.mlx_backend import choice_processor
-
-    process = choice_processor(TokenTrie([[1, 2, 0], [3, 0]]), 1, 0)
-    logits = mx.zeros((1, 5))
-    assert mx.isfinite(process(mx.array([9]), logits)).tolist() == [[False, True, False, True, False]]
-    assert mx.isfinite(process(mx.array([9, 1]), logits)).tolist() == [[False, False, True, False, False]]
-
-
 def test_llama_cpp_builds_grammars_and_reports_ones_it_cannot() -> None:
     pytest.importorskip("llama_cpp")
     from minibrain.serve.llamacpp_backend import grammar

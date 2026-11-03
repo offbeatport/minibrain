@@ -14,6 +14,7 @@ from minibrain.serve.backend import AdapterRef, CompletionRequest, TransformersB
 from minibrain.serve.engine import load_backend, pull_base
 from minibrain.serve.select import NoEngineError, choose_engine, installed_engines
 from minibrain.serve.sglang_backend import SglangBackend
+from minibrain.serve.structured import TokenTrie
 from tests.conftest import Harness
 from tests.test_models import FILES, add_tiny, download_tiny, hub  # noqa: F401
 
@@ -108,6 +109,18 @@ def test_mlx_converts_peft_lora_weights(tmp_path: Path) -> None:
     assert (adapter.shape.rank, adapter.shape.scale, adapter.shape.keys) == (4, 2.0, ("self_attn.q_proj",))
     assert adapter.weights["model.layers.0.self_attn.q_proj.lora_a"].shape == (16, 4)
     assert adapter.weights["model.layers.0.self_attn.q_proj.lora_b"].shape == (4, 32)
+
+
+def test_mlx_masks_every_token_outside_the_choices() -> None:
+    pytest.importorskip("mlx_lm")
+    import mlx.core as mx
+
+    from minibrain.serve.mlx_backend import choice_processor
+
+    process = choice_processor(TokenTrie([[1, 2, 0], [3, 0]]), 1, 0)
+    logits = mx.zeros((1, 5))
+    assert mx.isfinite(process(mx.array([9]), logits)).tolist() == [[False, True, False, True, False]]
+    assert mx.isfinite(process(mx.array([9, 1]), logits)).tolist() == [[False, False, True, False, False]]
 
 
 def test_remote_engines_pull_weights_from_main_not_the_hub(harness: Harness, hub: Path, tmp_path: Path) -> None:  # noqa: F811
