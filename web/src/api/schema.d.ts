@@ -472,6 +472,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{slug}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Snapshots */
+        get: operations["list_snapshots_api_datasets__slug__snapshots_get"];
+        put?: never;
+        /** Save Snapshot */
+        post: operations["save_snapshot_api_datasets__slug__snapshots_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Data Settings */
+        get: operations["read_data_settings_api_settings_data_get"];
+        /** Update Data Settings */
+        put: operations["update_data_settings_api_settings_data_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models": {
         parameters: {
             query?: never;
@@ -1692,6 +1728,15 @@ export interface components {
             /** Tags */
             tags?: string[] | null;
         };
+        /** ChangeInfo */
+        ChangeInfo: {
+            /** Data */
+            data: boolean;
+            /** Query */
+            query: boolean;
+            /** Dataset */
+            dataset: boolean;
+        };
         /** ChatCompletionRequest */
         ChatCompletionRequest: {
             /** Model */
@@ -1790,6 +1835,20 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
+        /** DataSettings */
+        DataSettings: {
+            /** Row Limit */
+            row_limit: number;
+            /** Keep Snapshots */
+            keep_snapshots: number;
+        };
+        /** DataSettingsUpdate */
+        DataSettingsUpdate: {
+            /** Row Limit */
+            row_limit?: number | null;
+            /** Keep Snapshots */
+            keep_snapshots?: number | null;
+        };
         /** DatasetChoice */
         DatasetChoice: {
             /** Dataset */
@@ -1840,6 +1899,13 @@ export interface components {
             splits: {
                 [key: string]: number;
             } | null;
+            snapshot?: components["schemas"]["SnapshotInfo"] | null;
+            changed?: components["schemas"]["ChangeInfo"] | null;
+            /**
+             * Row Limit
+             * @default 0
+             */
+            row_limit?: number;
             /**
              * Updated At
              * Format: date-time
@@ -2092,6 +2158,7 @@ export interface components {
             web: string;
             /** Stores */
             stores: components["schemas"]["StoreInfo"][];
+            snapshots?: components["schemas"]["SnapshotUsage"] | null;
         };
         /** InspectRequest */
         InspectRequest: {
@@ -2414,6 +2481,7 @@ export interface components {
             /** Dataset Name */
             dataset_name?: string | null;
             snapshot: components["schemas"]["SnapshotInfo"] | null;
+            changed?: components["schemas"]["ChangeInfo"] | null;
             /** Models */
             models: string[];
         };
@@ -2714,19 +2782,46 @@ export interface components {
         };
         /** SnapshotInfo */
         SnapshotInfo: {
+            /** Id */
+            id: number;
             /** Hash */
             hash: string;
+            /** Dataset */
+            dataset: string | null;
+            /** Rows */
+            rows: number;
+            /** Size */
+            size: number;
             /** Counts */
             counts: {
                 [key: string]: number;
             };
             /** Labels */
             labels: string[];
+            /** Saved */
+            saved: boolean;
+            /** Versions */
+            versions: string[];
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Taken At */
+            taken_at: string | null;
+        };
+        /** SnapshotUsage */
+        SnapshotUsage: {
+            /** Count */
+            count: number;
+            /** Size */
+            size: number;
+            /** For Versions */
+            for_versions: number;
+            /** Saved */
+            saved: number;
+            /** Keep */
+            keep: number;
         };
         /** SourceInfo */
         SourceInfo: {
@@ -2956,6 +3051,15 @@ export interface components {
             current: boolean;
             /** Snapshot Hash */
             snapshot_hash: string;
+            /** Snapshot Id */
+            snapshot_id: number;
+            /** Snapshot Dataset */
+            snapshot_dataset?: string | null;
+            /**
+             * Snapshot Rows
+             * @default 0
+             */
+            snapshot_rows?: number;
             /** Recipe */
             recipe: {
                 [key: string]: unknown;
@@ -3445,12 +3549,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            202: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JobInfo"];
+                    "application/json": components["schemas"]["MinibrainDetail"];
                 };
             };
             /** @description Validation Error */
@@ -4113,6 +4217,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_snapshots_api_datasets__slug__snapshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_snapshot_api_datasets__slug__snapshots_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_data_settings_api_settings_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSettings"];
+                };
+            };
+        };
+    };
+    update_data_settings_api_settings_data_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSettings"];
                 };
             };
             /** @description Validation Error */

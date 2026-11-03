@@ -83,6 +83,26 @@ class FolderRoots(BaseModel):
     locked: bool
 
 
+class SnapshotInfo(BaseModel):
+    id: int
+    hash: str
+    dataset: str | None
+    rows: int
+    size: int
+    counts: dict[str, int]
+    labels: list[str]
+    saved: bool
+    versions: list[str]
+    created_at: datetime
+    taken_at: datetime | None
+
+
+class ChangeInfo(BaseModel):
+    data: bool
+    query: bool
+    dataset: bool
+
+
 class DatasetSummary(BaseModel):
     slug: str
     name: str
@@ -97,6 +117,9 @@ class DatasetSummary(BaseModel):
     mapping: MappingInfo
     models: list[str]
     splits: dict[str, int] | None
+    snapshot: SnapshotInfo | None = None
+    changed: ChangeInfo | None = None
+    row_limit: int = 0
     updated_at: datetime
 
 
@@ -140,11 +163,22 @@ class MappingUpdate(BaseModel):
     sql: str | None = None
 
 
-class SnapshotInfo(BaseModel):
-    hash: str
-    counts: dict[str, int]
-    labels: list[str]
-    created_at: datetime
+class DataSettings(BaseModel):
+    row_limit: int = Field(ge=100, le=50_000_000)
+    keep_snapshots: int = Field(ge=0, le=1000)
+
+
+class DataSettingsUpdate(BaseModel):
+    row_limit: int | None = Field(default=None, ge=100, le=50_000_000)
+    keep_snapshots: int | None = Field(default=None, ge=0, le=1000)
+
+
+class SnapshotUsage(BaseModel):
+    count: int
+    size: int
+    for_versions: int
+    saved: int
+    keep: int
 
 
 class JobInfo(BaseModel):
@@ -212,6 +246,9 @@ class VersionInfo(BaseModel):
     status: str
     current: bool
     snapshot_hash: str
+    snapshot_id: int
+    snapshot_dataset: str | None = None
+    snapshot_rows: int = 0
     recipe: dict[str, Any]
     golden: SplitScore | None
     held_out: SplitScore | None
@@ -241,6 +278,7 @@ class MinibrainDetail(MinibrainSummary):
     dataset: str | None = None
     dataset_name: str | None = None
     snapshot: SnapshotInfo | None
+    changed: ChangeInfo | None = None
     models: list[str]
 
 
@@ -386,6 +424,7 @@ class InfrastructureInfo(BaseModel):
     home: str
     web: str
     stores: list[StoreInfo]
+    snapshots: SnapshotUsage | None = None
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]

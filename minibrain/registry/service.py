@@ -57,6 +57,8 @@ def create_minibrain(session: Session, name: str, task: str, base_model: str) ->
 
 
 def latest_snapshot(minibrain: Minibrain) -> Snapshot | None:
+    if minibrain.snapshot is not None:
+        return minibrain.snapshot
     return max(minibrain.snapshots, key=lambda snapshot: snapshot.id, default=None)
 
 
@@ -80,7 +82,7 @@ def next_version_number(minibrain: Minibrain) -> int:
 def create_version(session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any]) -> Version:
     snapshot = latest_snapshot(minibrain)
     if snapshot is None:
-        raise ConflictError("build the dataset before creating a version")
+        raise ConflictError("pick a dataset before creating a version")
     version = Version(
         minibrain=minibrain,
         snapshot=snapshot,

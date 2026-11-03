@@ -10,6 +10,7 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.api.views import detail, version_info
+from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
@@ -48,6 +49,7 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
             f"{minibrain.base_model} has GGUF weights, which can be served but not fine-tuned; use safetensors"
         )
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
+    require_splits(snapshot_for_model(session, settings, minibrain, saved=False))
     version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})
     if kind == VersionKind.LORA:
         params = train_params(session, settings, version)
@@ -60,7 +62,7 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
 
 
 @router.delete("/minibrains/{slug}/versions/{number}", status_code=204)
-def delete_version(slug: str, number: int, session: SessionDep) -> None:
+def delete_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     version = get_version(minibrain, number)
     if minibrain.deployed and minibrain.current_version == number:
@@ -78,6 +80,8 @@ def delete_version(slug: str, number: int, session: SessionDep) -> None:
         )
     )
     session.delete(version)
+    session.flush()
+    cleanup(session, settings)
     session.commit()
 
 

@@ -561,12 +561,12 @@
           }
         ],
         "responses": {
-          "202": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobInfo"
+                  "$ref": "#/components/schemas/MinibrainDetail"
                 }
               }
             }
@@ -1443,6 +1443,152 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/{slug}/snapshots": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "List Snapshots",
+        "operationId": "list_snapshots_api_datasets__slug__snapshots_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SnapshotInfo"
+                  },
+                  "title": "Response List Snapshots Api Datasets  Slug  Snapshots Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Save Snapshot",
+        "operationId": "save_snapshot_api_datasets__slug__snapshots_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/data": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Read Data Settings",
+        "operationId": "read_data_settings_api_settings_data_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Update Data Settings",
+        "operationId": "update_data_settings_api_settings_data_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSettings"
                 }
               }
             }
@@ -5049,6 +5195,29 @@
         "type": "object",
         "title": "CatalogueUpdate"
       },
+      "ChangeInfo": {
+        "properties": {
+          "data": {
+            "type": "boolean",
+            "title": "Data"
+          },
+          "query": {
+            "type": "boolean",
+            "title": "Query"
+          },
+          "dataset": {
+            "type": "boolean",
+            "title": "Dataset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "query",
+          "dataset"
+        ],
+        "title": "ChangeInfo"
+      },
       "ChatCompletionRequest": {
         "properties": {
           "model": {
@@ -5316,6 +5485,60 @@
         ],
         "title": "CompleteResponse"
       },
+      "DataSettings": {
+        "properties": {
+          "row_limit": {
+            "type": "integer",
+            "maximum": 50000000.0,
+            "minimum": 100.0,
+            "title": "Row Limit"
+          },
+          "keep_snapshots": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Keep Snapshots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_limit",
+          "keep_snapshots"
+        ],
+        "title": "DataSettings"
+      },
+      "DataSettingsUpdate": {
+        "properties": {
+          "row_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50000000.0,
+                "minimum": 100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Limit"
+          },
+          "keep_snapshots": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Snapshots"
+          }
+        },
+        "type": "object",
+        "title": "DataSettingsUpdate"
+      },
       "DatasetChoice": {
         "properties": {
           "dataset": {
@@ -5494,6 +5717,31 @@
               }
             ],
             "title": "Splits"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row_limit": {
+            "type": "integer",
+            "title": "Row Limit",
+            "default": 0
           },
           "updated_at": {
             "type": "string",
@@ -6215,6 +6463,16 @@
             },
             "type": "array",
             "title": "Stores"
+          },
+          "snapshots": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7208,6 +7466,16 @@
               }
             ]
           },
+          "changed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -8127,9 +8395,32 @@
       },
       "SnapshotInfo": {
         "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "hash": {
             "type": "string",
             "title": "Hash"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
           },
           "counts": {
             "additionalProperties": {
@@ -8145,20 +8436,83 @@
             "type": "array",
             "title": "Labels"
           },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "versions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "taken_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taken At"
           }
         },
         "type": "object",
         "required": [
+          "id",
           "hash",
+          "dataset",
+          "rows",
+          "size",
           "counts",
           "labels",
-          "created_at"
+          "saved",
+          "versions",
+          "created_at",
+          "taken_at"
         ],
         "title": "SnapshotInfo"
+      },
+      "SnapshotUsage": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "for_versions": {
+            "type": "integer",
+            "title": "For Versions"
+          },
+          "saved": {
+            "type": "integer",
+            "title": "Saved"
+          },
+          "keep": {
+            "type": "integer",
+            "title": "Keep"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "size",
+          "for_versions",
+          "saved",
+          "keep"
+        ],
+        "title": "SnapshotUsage"
       },
       "SourceInfo": {
         "properties": {
@@ -8815,6 +9169,26 @@
             "type": "string",
             "title": "Snapshot Hash"
           },
+          "snapshot_id": {
+            "type": "integer",
+            "title": "Snapshot Id"
+          },
+          "snapshot_dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Dataset"
+          },
+          "snapshot_rows": {
+            "type": "integer",
+            "title": "Snapshot Rows",
+            "default": 0
+          },
           "recipe": {
             "additionalProperties": true,
             "type": "object",
@@ -8903,6 +9277,7 @@
           "status",
           "current",
           "snapshot_hash",
+          "snapshot_id",
           "recipe",
           "golden",
           "held_out",

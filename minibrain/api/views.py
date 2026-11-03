@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.schemas import (
     AttemptInfo,
+    ChangeInfo,
     ColumnInfo,
     JobDetail,
     JobInfo,
@@ -17,7 +18,8 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.data.shared import table_of
-from minibrain.data.sources import describe
+from minibrain.data.snapshots import Changes, changes_since, model_snapshot
+from minibrain.data.sources import SourceError, describe
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -56,8 +58,31 @@ def mapping_info(dataset: Dataset | None) -> MappingInfo:
 
 def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
     return SnapshotInfo(
-        hash=snapshot.hash, counts=snapshot.counts, labels=snapshot.labels, created_at=snapshot.created_at
+        id=snapshot.id,
+        hash=snapshot.hash,
+        dataset=snapshot.dataset.slug if snapshot.dataset is not None else None,
+        rows=snapshot.rows or sum(snapshot.counts.values()),
+        size=snapshot.size,
+        counts=snapshot.counts,
+        labels=snapshot.labels,
+        saved=snapshot.saved,
+        versions=sorted(f"{version.minibrain.slug}@{version.number}" for version in snapshot.versions),
+        created_at=snapshot.created_at,
+        taken_at=snapshot.taken_at,
     )
+
+
+def change_info(changes: Changes | None) -> ChangeInfo | None:
+    return None if changes is None else ChangeInfo(data=changes.data, query=changes.query, dataset=changes.dataset)
+
+
+def model_changes(minibrain: Minibrain) -> ChangeInfo | None:
+    if minibrain.dataset is None:
+        return None
+    try:
+        return change_info(changes_since(minibrain.dataset, model_snapshot(minibrain)))
+    except SourceError:
+        return None
 
 
 def job_fields(job: Job) -> dict:
@@ -128,6 +153,9 @@ def version_info(minibrain: Minibrain, version: Version) -> VersionInfo:
         status=version.status,
         current=minibrain.current_version == version.number,
         snapshot_hash=version.snapshot.hash,
+        snapshot_id=version.snapshot.id,
+        snapshot_dataset=version.snapshot.dataset.slug if version.snapshot.dataset is not None else None,
+        snapshot_rows=version.snapshot.rows or sum(version.snapshot.counts.values()),
         recipe=version.recipe,
         golden=split_score(metrics, "golden"),
         held_out=split_score(metrics, "eval"),
@@ -178,6 +206,7 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         dataset=minibrain.dataset.slug if minibrain.dataset else None,
         dataset_name=minibrain.dataset.name if minibrain.dataset else None,
         snapshot=snapshot_info(current) if current is not None else None,
+        changed=model_changes(minibrain),
         models=model_names(minibrain),
     )
 

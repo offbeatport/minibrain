@@ -497,6 +497,6 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     assert pending.status_code == 409 and "still being imported" in pending.json()["detail"]
     harness.worker(kinds=["import"]).run_once()
     trained = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "lora"})
-    assert "build the dataset" in trained.json()["detail"]
+    assert "pick a dataset" in trained.json()["detail"]
     missing = harness.client.post("/api/minibrains", json={"name": "Nowhere", "base_model": "nope"})
     assert missing.status_code == 409

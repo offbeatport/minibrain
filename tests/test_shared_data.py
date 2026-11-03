@@ -8,9 +8,9 @@ def upload(harness: Harness, name: str = "tickets.csv") -> dict:
 
 
 def snapshot_hash(harness: Harness, slug: str) -> str:
-    assert harness.client.post(f"/api/minibrains/{slug}/snapshots").status_code == 202
-    assert harness.worker(kinds=["prepare"]).run_once()
-    return harness.client.get(f"/api/minibrains/{slug}").json()["snapshot"]["hash"]
+    response = harness.client.post(f"/api/minibrains/{slug}/snapshots")
+    assert response.status_code == 201, response.text
+    return response.json()["snapshot"]["hash"]
 
 
 def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:

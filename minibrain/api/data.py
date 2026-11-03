@@ -4,16 +4,19 @@ from typing import Any
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
     CatalogueUpdate,
+    ChangeInfo,
     ChatMessage,
     ColumnInfo,
     ColumnStats,
     DatasetCreate,
     DatasetSummary,
+    DataSettings,
+    DataSettingsUpdate,
     FolderCreate,
     FolderRoots,
     LabelCount,
@@ -24,14 +27,16 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     SampleInfo,
+    SnapshotInfo,
     SourceKind,
     SourceRef,
     SourceStats,
     SourceSummary,
 )
-from minibrain.api.views import mapping_info
+from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.data.folders import allowed_roots
+from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     FOLDER,
@@ -48,6 +53,7 @@ from minibrain.data.shared import (
     table_of,
     tables_of,
 )
+from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_snapshot, taken
 from minibrain.data.sources import (
     SourceError,
     Table,
@@ -65,7 +71,7 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.policy import locked_sources
-from minibrain.registry.models import Dataset, Source, now
+from minibrain.registry.models import Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError
 from minibrain.settings import Settings
 from minibrain.tasks.classify import trained_messages
@@ -144,15 +150,17 @@ def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> 
     )
 
 
-def known_splits(dataset: Dataset) -> dict[str, int] | None:
-    built = [
-        snapshot
-        for minibrain in dataset.minibrains
-        for snapshot in minibrain.snapshots
-        if snapshot.created_at >= dataset.updated_at
-    ]
-    newest = max(built, key=lambda snapshot: snapshot.created_at, default=None)
-    return dict(newest.counts) if newest else None
+def dataset_changes(dataset: Dataset, latest: Snapshot | None) -> ChangeInfo | None:
+    try:
+        return change_info(changes_since(dataset, latest))
+    except SourceError:
+        return None
+
+
+def known_splits(latest: Snapshot | None, changed: ChangeInfo | None) -> dict[str, int] | None:
+    if latest is None or not latest.counts or changed is None or changed.data or changed.query:
+        return None
+    return dict(latest.counts)
 
 
 def dataset_shape(
@@ -171,6 +179,9 @@ def dataset_shape(
 def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) -> DatasetSummary:
     columns, rows, problem = dataset_shape(settings, store, dataset)
     columns_mode = bool(dataset.input_column and dataset.label_column) or not dataset.sql
+    latest = latest_of(dataset)
+    changed = dataset_changes(dataset, latest)
+    session = object_session(dataset)
     return DatasetSummary(
         slug=dataset.slug,
         name=dataset.name,
@@ -184,7 +195,10 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         error=problem,
         mapping=mapping_info(dataset),
         models=[minibrain.slug for minibrain in dataset.minibrains],
-        splits=known_splits(dataset),
+        splits=known_splits(latest, changed),
+        snapshot=snapshot_info(latest) if latest is not None else None,
+        changed=changed,
+        row_limit=load_limits(session).row_limit if session is not None else DataLimits().row_limit,
         updated_at=dataset.updated_at,
     )
 
@@ -423,10 +437,45 @@ def dataset_query(
 
 
 @router.delete("/datasets/{slug}", status_code=204)
-def delete_dataset(slug: str, session: SessionDep) -> None:
+def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     dataset = get_dataset(session, slug)
     if dataset.minibrains:
         names = ", ".join(minibrain.name for minibrain in dataset.minibrains)
         raise ConflictError(f"{dataset.name} is used by {names}; pick another dataset for them first")
+    for snapshot in dataset.snapshots:
+        snapshot.dataset = None
     session.delete(dataset)
+    session.flush()
+    cleanup(session, settings)
     session.commit()
+
+
+@router.get("/datasets/{slug}/snapshots")
+def list_snapshots(slug: str, session: SessionDep) -> list[SnapshotInfo]:
+    dataset = get_dataset(session, slug)
+    return [snapshot_info(snapshot) for snapshot in sorted(dataset.snapshots, key=taken, reverse=True)]
+
+
+@router.post("/datasets/{slug}/snapshots", status_code=201)
+def save_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> SnapshotInfo:
+    snapshot = take_snapshot(session, settings, get_dataset(session, slug), saved=True)
+    cleanup(session, settings)
+    session.commit()
+    return snapshot_info(snapshot)
+
+
+def data_settings(limits: DataLimits) -> DataSettings:
+    return DataSettings(row_limit=limits.row_limit, keep_snapshots=limits.keep_snapshots)
+
+
+@router.get("/settings/data")
+def read_data_settings(session: SessionDep) -> DataSettings:
+    return data_settings(load_limits(session))
+
+
+@router.put("/settings/data")
+def update_data_settings(body: DataSettingsUpdate, session: SessionDep, settings: SettingsDep) -> DataSettings:
+    limits = save_limits(session, body.model_dump(exclude_none=True))
+    cleanup(session, settings)
+    session.commit()
+    return data_settings(limits)

@@ -12,15 +12,18 @@ from minibrain.api.schemas import (
     InfrastructureInfo,
     InstallSettings,
     LoadedModel,
+    SnapshotUsage,
     StoreInfo,
     SystemInfo,
 )
+from minibrain.data.limits import load_limits
 from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.models.registry import models_dir
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
-from minibrain.registry.models import Artifact, Job, Model, ModelStatus
+from minibrain.registry.files import ArtifactKind
+from minibrain.registry.models import Artifact, Job, Model, ModelStatus, Snapshot, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -113,7 +116,8 @@ def setup_of(session: Session, node: NodeReport, database: StoreInfo) -> Setup:
 def infrastructure(session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> InfrastructureInfo:
     database = database_store(settings)
     weights = session.scalar(select(func.sum(Model.size_bytes)).where(Model.status == ModelStatus.AVAILABLE))
-    artifacts = session.scalar(select(func.sum(Artifact.size)))
+    artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind != ArtifactKind.SNAPSHOT))
+    usage = snapshot_usage(session)
     return InfrastructureInfo(
         setup=setup_of(session, node, database),
         host=node.host,
@@ -122,8 +126,23 @@ def infrastructure(session: SessionDep, settings: SettingsDep, node: LocalNodeDe
         stores=[
             database,
             folder_store("Model files", models_dir(settings), int(weights or 0)),
-            folder_store("Datasets, adapters and results", settings.artifacts_dir(), int(artifacts or 0)),
+            folder_store("Snapshots", settings.artifacts_dir(), usage.size),
+            folder_store("Uploads, adapters and results", settings.artifacts_dir(), int(artifacts or 0)),
         ],
+        snapshots=usage,
+    )
+
+
+def snapshot_usage(session: Session) -> SnapshotUsage:
+    snapshots = session.scalars(select(Snapshot).where(Snapshot.minibrain_id.is_(None))).all()
+    used = set(session.scalars(select(Version.snapshot_id)))
+    stored = {snapshot.artifact_id: snapshot.size for snapshot in snapshots if snapshot.artifact_id}
+    return SnapshotUsage(
+        count=len(snapshots),
+        size=sum(stored.values()),
+        for_versions=sum(snapshot.id in used for snapshot in snapshots),
+        saved=sum(snapshot.saved and snapshot.id not in used for snapshot in snapshots),
+        keep=load_limits(session).keep_snapshots,
     )
 
 

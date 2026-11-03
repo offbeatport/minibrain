@@ -6,10 +6,9 @@ SLUG = "support-triage"
 
 
 def build_dataset(harness: Harness) -> dict[str, Any]:
-    job = harness.client.post(f"/api/minibrains/{SLUG}/snapshots")
-    assert job.status_code == 202
-    assert harness.worker(kinds=["prepare"]).run_once()
-    return harness.client.get(f"/api/minibrains/{SLUG}").json()["snapshot"]
+    response = harness.client.post(f"/api/minibrains/{SLUG}/snapshots")
+    assert response.status_code == 201, response.text
+    return response.json()["snapshot"]
 
 
 def create_with_dataset(harness: Harness) -> dict[str, Any]:
@@ -68,16 +67,16 @@ def test_upload_guesses_mapping_and_previews(harness: Harness) -> None:
     assert len(preview["rows"]) == 20
 
 
-def test_snapshot_is_built_by_a_prepare_job(harness: Harness) -> None:
+def test_snapshot_is_taken_from_the_dataset_without_a_job(harness: Harness) -> None:
     snapshot = create_with_dataset(harness)
     assert snapshot["counts"] == {"golden": 20, "eval": 30, "shots": 4, "train": 146}
     assert snapshot["labels"] == ["account", "billing", "bug", "feature"]
+    assert (snapshot["rows"], snapshot["saved"], snapshot["dataset"]) == (200, True, SLUG)
     again = build_dataset(harness)
-    assert again["hash"] == snapshot["hash"]
+    assert (again["hash"], again["id"]) == (snapshot["hash"], snapshot["id"])
     golden = harness.client.get(f"/api/minibrains/{SLUG}/golden").json()
     assert len(golden) == 20
-    prepare = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=prepare").json()
-    assert [job["status"] for job in prepare] == ["succeeded", "succeeded"]
+    assert harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=prepare").json() == []
 
 
 def test_scored_versions_go_live_only_when_deployed(harness: Harness) -> None:

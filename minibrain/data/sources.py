@@ -128,7 +128,9 @@ def table_relation(table: Table, attached: str) -> str:
     return f"SELECT * FROM {table.reader}({file_list(table.files)}, union_by_name = true)"
 
 
-def connect(tables: Sequence[Table], aliases: dict[str, str] | None = None) -> duckdb.DuckDBPyConnection:
+def connect(
+    tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
+) -> duckdb.DuckDBPyConnection:
     connection = duckdb.connect()
     try:
         readable: list[str] = []
@@ -140,6 +142,8 @@ def connect(tables: Sequence[Table], aliases: dict[str, str] | None = None) -> d
             connection.execute(f"CREATE VIEW {quote_identifier(table.name)} AS {table_relation(table, attached)}")
         if readable:
             connection.execute(f"SET allowed_paths = {file_list(readable)}")
+        if output is not None:
+            connection.execute(f"SET allowed_directories = [{quote_literal(str(output) + '/')}]")
         names = {table.name for table in tables}
         for alias, target in (aliases or {}).items():
             if target in names and alias not in names:
@@ -153,8 +157,10 @@ def connect(tables: Sequence[Table], aliases: dict[str, str] | None = None) -> d
 
 
 @contextmanager
-def sandbox(tables: Sequence[Table], aliases: dict[str, str] | None = None) -> Iterator[duckdb.DuckDBPyConnection]:
-    connection = connect(tables, aliases)
+def sandbox(
+    tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
+) -> Iterator[duckdb.DuckDBPyConnection]:
+    connection = connect(tables, aliases, output)
     timer = threading.Timer(QUERY_TIMEOUT_SECONDS, connection.interrupt)
     timer.start()
     try:
@@ -339,3 +345,20 @@ def labelled_rows(
         raise SourceError("the query must return an input column and a label column")
     input_index, label_index = result.columns.index("input"), result.columns.index("label")
     return [(to_text(row[input_index]), to_text(row[label_index])) for row in result.rows]
+
+
+def copy_rows(
+    tables: Sequence[Table], sql: str, target: Path, limit: int, aliases: dict[str, str] | None = None
+) -> int:
+    require_mapping(output_columns(tables, sql, aliases))
+    rows = (
+        "SELECT * REPLACE (CAST(input AS VARCHAR) AS input, CAST(label AS VARCHAR) AS label) "
+        f"FROM ({wrapped(sql, limit + 1)}) ORDER BY ALL"
+    )
+    with sandbox(tables, aliases, target.parent) as connection:
+        connection.execute(
+            f"COPY ({rows}) TO {quote_literal(str(target))} (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 100000)"
+        )
+    with duckdb.connect() as connection:
+        found = connection.execute("SELECT count(*) FROM read_parquet(?)", [str(target)]).fetchone()
+    return int(found[0]) if found else 0

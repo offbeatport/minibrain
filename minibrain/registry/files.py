@@ -21,8 +21,14 @@ class ArtifactKind(StrEnum):
     LOG = "log"
 
 
+STORES: dict[Path, ArtifactStore] = {}
+
+
 def store_for(settings: Settings) -> ArtifactStore:
-    return ArtifactStore(settings.artifacts_dir(), settings.cache_dir())
+    root = settings.artifacts_dir()
+    if root not in STORES:
+        STORES[root] = ArtifactStore(root, settings.cache_dir())
+    return STORES[root]
 
 
 def register(session: Session, artifact_id: str, kind: str, packing: str, name: str, size: int) -> Artifact:

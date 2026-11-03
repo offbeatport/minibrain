@@ -247,5 +247,5 @@ def test_jobs_filter_by_several_kinds(harness: Harness) -> None:
     kinds = [item["kind"] for item in harness.client.get("/api/jobs?kind=train&kind=eval").json()]
     assert kinds == ["eval", "train"]
     everything = {item["kind"] for item in harness.client.get("/api/jobs").json()}
-    assert everything == {"prepare", "train", "eval"}
+    assert everything == {"train", "eval"}
     assert [item["kind"] for item in harness.client.get("/api/jobs?kind=train").json()] == ["train"]

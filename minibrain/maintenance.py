@@ -5,10 +5,12 @@ from datetime import timedelta
 from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.data.snapshots import cleanup
 from minibrain.leader import Leader
 from minibrain.policy import load
 from minibrain.registry.compute import forget_stale
 from minibrain.registry.models import RequestLog, now
+from minibrain.settings import Settings
 
 PURGE_SECONDS = 3600.0
 
@@ -24,7 +26,7 @@ def purge_request_logs(session: Session) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
-def purge_forever(sessions: sessionmaker[Session], stop: threading.Event, leader: Leader) -> None:
+def purge_forever(sessions: sessionmaker[Session], settings: Settings, stop: threading.Event, leader: Leader) -> None:
     while not stop.wait(PURGE_SECONDS):
         try:
             if not leader.held():
@@ -32,6 +34,7 @@ def purge_forever(sessions: sessionmaker[Session], stop: threading.Event, leader
             with sessions() as session:
                 purge_request_logs(session)
                 forget_stale(session)
+                cleanup(session, settings)
                 session.commit()
         except Exception:
             log.exception("request log purge failed")

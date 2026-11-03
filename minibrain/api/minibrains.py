@@ -11,7 +11,6 @@ from minibrain.api.schemas import (
     DatasetChoice,
     DeployRequest,
     ExampleInfo,
-    JobInfo,
     MappingUpdate,
     MinibrainCreate,
     MinibrainDetail,
@@ -21,24 +20,22 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
 )
-from minibrain.api.views import detail, job_info, summary
+from minibrain.api.views import detail, summary
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import snapshot
 from minibrain.data.shared import (
     aliases_for,
     attach_upload,
     dataset_of,
-    dataset_sql,
     get_dataset,
     sources_in,
     tables_of,
 )
+from minibrain.data.snapshots import cleanup, take_snapshot
 from minibrain.data.sources import safe_filename
-from minibrain.jobs.queue import enqueue
-from minibrain.jobs.specs import prepare_params
 from minibrain.models.registry import available_bases, base_readiness
 from minibrain.registry.files import snapshot_dir
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, now
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, Minibrain, now
 from minibrain.registry.service import (
     ConflictError,
     create_minibrain,
@@ -116,6 +113,7 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     )
     session.delete(minibrain)
     drop_orphan_keys(session)
+    cleanup(session, settings)
     session.commit()
     shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
 
@@ -191,16 +189,13 @@ def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreD
     return dataset_preview_of(settings, store, dataset_of(get_minibrain(session, slug)))
 
 
-@router.post("/{slug}/snapshots", status_code=202)
-def build_snapshot(slug: str, session: SessionDep) -> JobInfo:
+@router.post("/{slug}/snapshots", status_code=201)
+def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    dataset = dataset_of(minibrain)
-    params = prepare_params(session, dataset, dataset_sql(dataset))
-    job = enqueue(
-        session, JobKind.PREPARE, params, minibrain_id=minibrain.id, idempotency_key=f"prepare:{minibrain.id}"
-    )
+    minibrain.snapshot = take_snapshot(session, settings, dataset_of(minibrain), saved=True)
+    cleanup(session, settings)
     session.commit()
-    return job_info(job)
+    return detail(settings, minibrain)
 
 
 @router.get("/{slug}/golden")

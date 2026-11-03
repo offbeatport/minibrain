@@ -123,6 +123,7 @@ class Dataset(Base):
         secondary=dataset_sources, back_populates="datasets", order_by="Source.name"
     )
     minibrains: Mapped[list["Minibrain"]] = relationship(back_populates="dataset")
+    snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="dataset", order_by="Snapshot.id")
 
 
 class Minibrain(Base):
@@ -135,6 +136,9 @@ class Minibrain(Base):
     task: Mapped[str]
     base_model: Mapped[str]
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
+    snapshot_id: Mapped[int | None] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="SET NULL", use_alter=True), default=None
+    )
     current_version: Mapped[int | None] = mapped_column(default=None)
     deployed: Mapped[bool] = mapped_column(default=False, server_default=false())
     last_version: Mapped[int] = mapped_column(default=-1, server_default="-1")
@@ -144,7 +148,10 @@ class Minibrain(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="minibrains")
-    snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
+    snapshot: Mapped["Snapshot | None"] = relationship(foreign_keys=[snapshot_id], post_update=True)
+    snapshots: Mapped[list["Snapshot"]] = relationship(
+        back_populates="minibrain", cascade="all, delete-orphan", foreign_keys="Snapshot.minibrain_id"
+    )
     versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
@@ -152,18 +159,30 @@ class Minibrain(Base):
 
 class Snapshot(Base):
     __tablename__ = "snapshots"
-    __table_args__ = ({"sqlite_autoincrement": True},)
+    __table_args__ = (
+        Index("uq_snapshots_dataset_hash", "dataset_id", "hash", unique=True),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
+    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     hash: Mapped[str]
     directory: Mapped[str | None] = mapped_column(default=None)
     artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
     counts: Mapped[dict[str, int]] = mapped_column(JSON)
     labels: Mapped[list[str]] = mapped_column(JSON)
+    rows: Mapped[int] = mapped_column(default=0, server_default="0")
+    size: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    fingerprints: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
+    sql: Mapped[str | None] = mapped_column(default=None)
+    saved: Mapped[bool] = mapped_column(default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
-    minibrain: Mapped[Minibrain] = relationship(back_populates="snapshots")
+    minibrain: Mapped[Minibrain | None] = relationship(back_populates="snapshots", foreign_keys=[minibrain_id])
+    dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
+    versions: Mapped[list["Version"]] = relationship(back_populates="snapshot")
 
 
 class Version(Base):
@@ -183,7 +202,7 @@ class Version(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     minibrain: Mapped[Minibrain] = relationship(back_populates="versions")
-    snapshot: Mapped[Snapshot] = relationship()
+    snapshot: Mapped[Snapshot] = relationship(back_populates="versions")
 
 
 class Worker(Base):

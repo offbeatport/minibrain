@@ -106,7 +106,7 @@ def custom_activity(minibrain: Minibrain, jobs: list[Job]) -> Activity:
     ready = candidate(minibrain)
     if ready is not None:
         return Activity(state="ready", label=f"v{ready.number} ready", version=ready.number)
-    if not minibrain.snapshots:
+    if latest_snapshot(minibrain) is None:
         return Activity(state="needs_examples", label="Needs examples")
     return Activity(state="idle", label="No active jobs")
 

@@ -5,21 +5,8 @@ from sqlalchemy.orm import Session
 from minibrain.models.registry import resolve_spec
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
-from minibrain.registry.models import Dataset, Version
-from minibrain.registry.service import ConflictError
+from minibrain.registry.models import Version
 from minibrain.settings import Settings
-
-
-def prepare_params(session: Session, dataset: Dataset, sql: str) -> dict[str, Any]:
-    if len(dataset.sources) != 1:
-        raise ConflictError("this dataset reads several sources; save a snapshot of it from the Data page instead")
-    table = dataset.sources[0]
-    if table.artifact_id is None:
-        raise ConflictError("this dataset reads a folder; save a snapshot of it from the Data page instead")
-    source = ref(session, table.artifact_id)
-    if source is None:
-        raise MissingArtifactError("upload a data file first")
-    return {"source": source, "table": table.table_name, "sql": sql}
 
 
 def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:

@@ -103,6 +103,10 @@ class ArtifactStore:
             while chunk := stream.read(CHUNK):
                 yield chunk
 
+    def delete(self, artifact_id: str) -> None:
+        self.path(artifact_id).unlink(missing_ok=True)
+        shutil.rmtree(self.cache / artifact_id, ignore_errors=True)
+
     def materialize(self, artifact_id: str, packing: str, name: str) -> Path:
         target = self.cache / artifact_id
         done = target / ".complete"

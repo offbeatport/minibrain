@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         for target, args in (
             (expire_forever, (app.state.queue, stop, leader)),
             (schedule_forever, (app.state.sessions, stop, leader)),
-            (purge_forever, (app.state.sessions, stop, leader)),
+            (purge_forever, (app.state.sessions, app.state.settings, stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
         ):

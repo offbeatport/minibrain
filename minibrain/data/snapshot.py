@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 
+import duckdb
+
 GOLDEN_MAX = 50
 EVAL_MAX = 500
 SHOTS_MAX = 10
@@ -93,16 +95,37 @@ def write(splits: dict[str, list[Example]], directory: Path) -> SnapshotFiles:
     return SnapshotFiles(hash=digest, directory=directory, counts=counts, labels=labels)
 
 
-def read_split(directory: Path, name: str) -> list[Example]:
-    lines = (directory / f"{name}.jsonl").read_text().splitlines()
+def read_rows(path: Path) -> list[tuple[str | None, str | None]]:
+    with duckdb.connect() as connection:
+        found = connection.execute(
+            "SELECT CAST(input AS VARCHAR), CAST(label AS VARCHAR) FROM read_parquet(?)", [str(path)]
+        ).fetchall()
+    return [(text, label) for text, label in found]
+
+
+@lru_cache(maxsize=8)
+def parquet_splits(path: str) -> dict[str, list[Example]]:
+    return split(clean(read_rows(Path(path))))
+
+
+def labels_of(splits: dict[str, list[Example]]) -> list[str]:
+    return sorted({example.label for examples in splits.values() for example in examples})
+
+
+def read_split(path: Path, name: str) -> list[Example]:
+    if path.is_file():
+        return list(parquet_splits(str(path))[name])
+    lines = (path / f"{name}.jsonl").read_text().splitlines()
     return [Example(**json.loads(line)) for line in lines]
 
 
-def read_labels(directory: Path) -> list[str]:
-    return json.loads((directory / "labels.json").read_text())
+def read_labels(path: Path) -> list[str]:
+    if path.is_file():
+        return labels_of(parquet_splits(str(path)))
+    return json.loads((path / "labels.json").read_text())
 
 
 @lru_cache(maxsize=64)
-def prompt_context(directory: str) -> tuple[tuple[str, ...], tuple[Example, ...]]:
-    path = Path(directory)
+def prompt_context(location: str) -> tuple[tuple[str, ...], tuple[Example, ...]]:
+    path = Path(location)
     return tuple(read_labels(path)), tuple(read_split(path, "shots"))
