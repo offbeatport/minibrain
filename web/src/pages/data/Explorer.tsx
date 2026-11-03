@@ -1,7 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
-    ChevronDown,
     Cloud,
     Database,
     FileBraces,
@@ -15,10 +13,6 @@ import {
 } from "lucide-react";
 import {
     Button,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     EmptyState,
     Link,
     SearchInput,
@@ -40,9 +34,9 @@ import {
     useRef,
     useState,
 } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import type { DatasetSummary, SourceSummary } from "~/api/client";
 import { useFolderRoots } from "~/api/dataQueries";
-import { useDatasets, useSamples, useSources } from "~/api/queries";
+import { useDatasets, useSources } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -200,61 +194,6 @@ function allBranches(nodes: TreeNode[]): string[] {
     );
 }
 
-function SampleMenu({ onUploaded }: { onUploaded: (source: SourceSummary) => void }) {
-    const samples = useSamples();
-    const refresh = useDataRefresh();
-    const add = useMutation({
-        mutationFn: (file: string) =>
-            unwrap(api.POST("/api/samples/{file}", { params: { path: { file } } })),
-        onSuccess: async (source) => {
-            await refresh();
-            onUploaded(source);
-        },
-    });
-    return (
-        <div className="flex flex-col items-end gap-1">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" disabled={add.isPending}>
-                        {add.isPending ? "Adding…" : "Add sample data"}
-                        <ChevronDown />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                    {(samples.data ?? []).map((sample) => (
-                        <DropdownMenuItem
-                            key={sample.file}
-                            onSelect={() => add.mutate(sample.file)}
-                            className="flex-col items-start gap-0.5"
-                        >
-                            <span className="font-medium">{sample.name}</span>
-                            <span className="text-sm text-muted-foreground tabular-nums">
-                                {`${sample.format} · ${count(sample.rows)} rows · ${count(sample.labels)} labels`}
-                            </span>
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <ErrorLine error={add.error ?? samples.error} />
-        </div>
-    );
-}
-
-function DataActions({
-    onUploaded,
-    onAdd,
-}: {
-    onUploaded: (source: SourceSummary) => void;
-    onAdd: (kind: AddKind) => void;
-}) {
-    return (
-        <div className="flex flex-wrap items-start gap-2">
-            <SampleMenu onUploaded={onUploaded} />
-            <AddSourceMenu onUploaded={onUploaded} onAdd={onAdd} />
-        </div>
-    );
-}
-
 function GroupDetail({
     kind,
     sources,
@@ -311,7 +250,7 @@ function GroupDetail({
                     className="mx-0 mt-0"
                     action={
                         <div className="mt-3 flex justify-center">
-                            <DataActions onUploaded={onUploaded} onAdd={onAdd} />
+                            <AddSourceMenu onUploaded={onUploaded} onAdd={onAdd} />
                         </div>
                     }
                 >
@@ -501,7 +440,7 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."
-                    actions={<DataActions onUploaded={onUploaded} onAdd={add} />}
+                    actions={<AddSourceMenu onUploaded={onUploaded} onAdd={add} />}
                 />
                 <ErrorLine error={sources.error ?? datasets.error} />
             </div>

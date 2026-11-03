@@ -5,12 +5,16 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "obp-ui";
 import { type ChangeEvent, useRef } from "react";
-import { type SourceSummary, uploadFile } from "~/api/client";
+import { type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
+import { useSamples } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
+import { count } from "~/lib/format";
 import { useDataRefresh } from "./parts";
 
 export type AddKind = "folder" | "s3" | "database" | "iceberg";
@@ -35,13 +39,18 @@ export function AddSourceMenu({
 }) {
     const refresh = useDataRefresh();
     const input = useRef<HTMLInputElement>(null);
-    const upload = useMutation({
-        mutationFn: uploadFile,
-        onSuccess: async (source) => {
-            await refresh();
-            onUploaded(source);
-        },
+    const samples = useSamples();
+    const added = async (source: SourceSummary) => {
+        await refresh();
+        onUploaded(source);
+    };
+    const upload = useMutation({ mutationFn: uploadFile, onSuccess: added });
+    const sample = useMutation({
+        mutationFn: (file: string) =>
+            unwrap(api.POST("/api/samples/{file}", { params: { path: { file } } })),
+        onSuccess: added,
     });
+    const busy = upload.isPending || sample.isPending;
     const choose = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -53,8 +62,12 @@ export function AddSourceMenu({
         <div className="flex flex-col items-end gap-1">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button disabled={upload.isPending}>
-                        {upload.isPending ? "Uploading…" : "Add source"}
+                    <Button disabled={busy}>
+                        {upload.isPending
+                            ? "Uploading…"
+                            : sample.isPending
+                              ? "Adding…"
+                              : "Add source"}
                         <ChevronDown />
                     </Button>
                 </DropdownMenuTrigger>
@@ -78,6 +91,24 @@ export function AddSourceMenu({
                             <span className="text-sm text-muted-foreground">{choice.detail}</span>
                         </DropdownMenuItem>
                     ))}
+                    {(samples.data ?? []).length > 0 && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Sample data</DropdownMenuLabel>
+                            {(samples.data ?? []).map((item) => (
+                                <DropdownMenuItem
+                                    key={item.file}
+                                    onSelect={() => sample.mutate(item.file)}
+                                    className="flex-col items-start gap-0.5"
+                                >
+                                    <span className="font-medium">{item.name}</span>
+                                    <span className="text-sm text-muted-foreground tabular-nums">
+                                        {`${item.format} · ${count(item.rows)} rows · ${count(item.labels)} labels`}
+                                    </span>
+                                </DropdownMenuItem>
+                            ))}
+                        </>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
             <input
@@ -90,7 +121,7 @@ export function AddSourceMenu({
                 onChange={choose}
                 disabled={upload.isPending}
             />
-            <ErrorLine error={upload.error} />
+            <ErrorLine error={upload.error ?? sample.error ?? samples.error} />
         </div>
     );
 }
