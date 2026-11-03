@@ -377,15 +377,17 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex w-56 items-center gap-2.5">
+                <div className="flex w-64 items-center gap-2.5">
                     <PublisherLogo
                         publisher={row.original.provider}
                         name={row.original.name}
                         size="sm"
                     />
                     <div className="flex min-w-0 flex-col">
-                        <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate font-semibold">{row.original.name}</span>
+                        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="min-w-0 truncate text-base font-semibold">
+                                {row.original.name}
+                            </span>
                             {row.original.recommended && (
                                 <Badge variant="outline">Recommended</Badge>
                             )}
@@ -440,9 +442,9 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             cell: ({ row }) => (
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <span className="flex max-w-36 flex-col">
+                        <span className="flex max-w-48 flex-col">
                             <span className="truncate">{row.original.license_name}</span>
-                            <DataGridDetail className="text-sm text-muted-foreground">
+                            <DataGridDetail className="truncate text-sm text-muted-foreground">
                                 {`Commercial use: ${licenceUseLabel(row.original.license_use).toLowerCase()}`}
                             </DataGridDetail>
                         </span>
