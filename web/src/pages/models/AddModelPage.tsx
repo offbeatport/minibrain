@@ -243,8 +243,8 @@ function DiskPanel({
     );
 }
 
-function trainingHref(slug: string, copy: CopySource | null): string {
-    const path = `/training/${encodeURIComponent(slug)}`;
+function modelHref(slug: string, copy: CopySource | null): string {
+    const path = `/models/custom/${encodeURIComponent(slug)}`;
     if (!copy?.recipe) {
         return path;
     }
@@ -337,6 +337,8 @@ export function AddModelPage() {
     };
     const pick = (chosen: BaseOption) => {
         if (chosen.kind === "custom" && chosen.custom) {
+            setDescription(chosen.custom.description ?? "");
+            setTags((chosen.custom.tags ?? []).join(", "));
             startFrom.mutate(chosen.custom);
             return;
         }
@@ -389,11 +391,7 @@ export function AddModelPage() {
         },
         onSuccess: async (created) => {
             await refresh();
-            router.history.push(
-                copy || dataset
-                    ? trainingHref(created.slug, copy)
-                    : `/models/custom/${encodeURIComponent(created.slug)}`,
-            );
+            router.history.push(modelHref(created.slug, copy));
         },
     });
     const baseReady =

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "@tanstack/react-router";
+import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
 import { Badge, Button, Card, CardContent, DataGrid, Link, cn } from "obp-ui";
@@ -438,6 +438,14 @@ function CustomModelView({ row }: { row: ModelRow }) {
     const jobs = useJobs(row.key);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const router = useRouter();
+    const recipe = useRouterState({
+        select: (state) => {
+            const search = state.location.search as { rows?: unknown; epochs?: unknown };
+            return search.rows && search.epochs
+                ? `?rows=${String(search.rows)}&epochs=${String(search.epochs)}`
+                : "";
+        },
+    });
     const active = (jobs.data ?? []).filter(isActiveJob);
     const open = (_row: ModelRow, action: HealthAction) => {
         if (action.kind === "open_base" && row.base_model) {
@@ -460,7 +468,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                         </Button>
                         <Button
                             variant="outline"
-                            onClick={() => router.history.push(trainingHref(row.key))}
+                            onClick={() => router.history.push(`${trainingHref(row.key)}${recipe}`)}
                         >
                             Train
                         </Button>

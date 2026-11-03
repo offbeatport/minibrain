@@ -198,7 +198,7 @@ function ComputeHelp({ option, catalog }: { option: BaseOption; catalog: Catalog
 function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) {
     const data = copy.datasetName ? `its training data (${copy.datasetName})` : null;
     const recipe = copy.recipe
-        ? `its training settings from version ${copy.recipe.version} (${count(copy.recipe.rows)} rows, ${copy.recipe.epochs} ${copy.recipe.epochs === 1 ? "epoch" : "epochs"}), filled in on the Training page`
+        ? `its training settings from version ${copy.recipe.version} (${count(copy.recipe.rows)} rows, ${copy.recipe.epochs} ${copy.recipe.epochs === 1 ? "epoch" : "epochs"}), used when you train it`
         : "default training settings, as it has no trained version yet";
     return (
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft px-3 py-2 text-sm">
