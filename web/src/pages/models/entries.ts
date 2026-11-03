@@ -1,4 +1,5 @@
 import type { ModelRow, ModelUsage, ModelVersionRow } from "~/api/client";
+import type { Health } from "~/components/models/HealthStatus";
 import { failingShare } from "~/components/models/ModelMetrics";
 
 export type Entry = { key: string; model: ModelRow; version: ModelVersionRow | null };
@@ -45,8 +46,17 @@ export function failingEntry(entry: Entry): boolean {
     return isLive(entry) && failingShare(usageOf(entry)) >= FAILING_SHARE;
 }
 
+export function entryHealth(entry: Entry): Health | null {
+    const { model, version } = entry;
+    if (!version) {
+        return model.health ?? null;
+    }
+    return version.health ?? (version.live ? (model.health ?? null) : null);
+}
+
 function modelError(model: ModelRow): boolean {
     return (
+        Boolean(model.health) ||
         model.activity.state === "failed" ||
         model.availability.state === "missing" ||
         model.deployment.state === "unhealthy"
@@ -60,6 +70,7 @@ export function stateOfEntry(entry: Entry): EntryState {
     }
     if (version) {
         if (
+            entryHealth(entry) ||
             version.status === "failed" ||
             (version.live && model.deployment.state === "unhealthy")
         ) {

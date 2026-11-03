@@ -12,6 +12,10 @@ const KIND_TITLES: Record<string, string> = {
     prepare: "Building dataset",
     train: "Training",
     eval: "Scoring",
+    download: "Downloading",
+    import: "Importing",
+    verify: "Verifying files",
+    repair: "Repairing",
 };
 
 function jobTitle(job: JobInfo): string {

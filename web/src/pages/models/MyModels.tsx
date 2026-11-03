@@ -4,6 +4,7 @@ import {
     ArrowUpDown,
     CircleX,
     Eye,
+    FileCheck,
     FlaskConical,
     GraduationCap,
     MoreHorizontal,
@@ -12,6 +13,7 @@ import {
     Rocket,
     RotateCcw,
     Trash2,
+    Wrench,
     X,
 } from "lucide-react";
 import {
@@ -37,7 +39,7 @@ import {
     TooltipTrigger,
     cn,
 } from "obp-ui";
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
 import { type ModelRow, api, succeed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import {
@@ -52,6 +54,7 @@ import {
 } from "~/components/ListColumns";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
+import { type HealthAction, HealthStatus } from "~/components/models/HealthStatus";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import {
@@ -77,10 +80,12 @@ import {
     STATE_LABELS,
     STATE_RANK,
     entriesOf,
+    entryHealth,
     failingEntry,
     stateOfEntry,
     usageOf,
 } from "./entries";
+import { useHealthActions } from "./healthActions";
 
 const AVAILABILITY_LABELS: Record<string, string> = {
     available: "Available",
@@ -236,7 +241,12 @@ type Handlers = {
     confirm: (confirmation: Confirmation) => void;
     createFrom: (base: string) => void;
     refresh: () => Promise<unknown>;
+    health: (row: ModelRow, action: HealthAction) => void;
 };
+
+function healthStep(row: ModelRow, action: HealthAction | undefined, on: Handlers) {
+    return action ? { label: action.label, run: () => on.health(row, action) } : null;
+}
 
 function retry(row: ModelRow) {
     return unwrap(api.POST("/api/models/base/{key}/retry", { params: { path: { key: row.key } } }));
@@ -261,6 +271,9 @@ function setDeployed(row: ModelRow, deployed: boolean) {
 
 function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () => void } | null {
     const deployed = row.deployment.state === "running";
+    if (row.health) {
+        return healthStep(row, row.health.actions[0], on);
+    }
     if (row.kind === "base") {
         if (row.activity.state === "failed" && row.availability.state === "not_downloaded") {
             return { label: "Retry", run: () => retry(row).then(on.refresh) };
@@ -404,6 +417,10 @@ function versionAction(entry: Entry, on: Handlers): { label: string; run: () => 
     if (!version) {
         return null;
     }
+    const health = entryHealth(entry);
+    if (health) {
+        return healthStep(row, health.actions[0], on);
+    }
     if (version.live) {
         return { label: "Use API", run: () => on.open(scoped("/deployments", row)) };
     }
@@ -456,9 +473,25 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
     const version = entry.version;
     const deployed = row.deployment.state !== "not_deployed";
     const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
-    const deployable = row.kind === "custom" || row.availability.state === "available";
+    const deployable =
+        !row.health && (row.kind === "custom" || row.availability.state === "available");
+    const more = (entryHealth(entry)?.actions ?? []).slice(1);
+    const verifiable =
+        row.kind === "base" &&
+        row.availability.state === "available" &&
+        !transferring &&
+        !more.some((action) => action.kind === "verify") &&
+        row.health?.actions[0]?.kind !== "verify";
     return (
         <>
+            {more
+                .filter((action) => action.kind !== "remove")
+                .map((action) => (
+                    <DropdownMenuItem key={action.kind} onSelect={() => on.health(row, action)}>
+                        <Wrench />
+                        {action.label}
+                    </DropdownMenuItem>
+                ))}
             {version?.status === "ready" && !version.live && (
                 <DropdownMenuItem
                     onSelect={() => promoteVersion(row, version.number).then(on.refresh)}
@@ -505,15 +538,30 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Deploy
                 </DropdownMenuItem>
             )}
+            {verifiable && (
+                <DropdownMenuItem
+                    onSelect={() => on.health(row, { kind: "verify", label: "Verify files" })}
+                >
+                    <FileCheck />
+                    Verify files
+                </DropdownMenuItem>
+            )}
             {transferring && row.activity.job_id !== null && (
                 <DropdownMenuItem onSelect={() => on.confirm(cancelTransferConfirmation(row, on))}>
                     <CircleX />
-                    Cancel {row.activity.kind === "import" ? "import" : "download"}
+                    Cancel {TRANSFER_NOUNS[row.activity.kind ?? ""] ?? "download"}
                 </DropdownMenuItem>
             )}
         </>
     );
 }
+
+const TRANSFER_NOUNS: Record<string, string> = {
+    download: "download",
+    import: "import",
+    verify: "verification",
+    repair: "repair",
+};
 
 function StopItems({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
@@ -636,6 +684,10 @@ function ErrorStatus({ label, detail }: { label: string; detail: string }) {
 function StatusCell({ entry }: { entry: Entry }) {
     const { model, version } = entry;
     const state = stateOfEntry(entry);
+    const health = entryHealth(entry);
+    if (health && !failingEntry(entry)) {
+        return <HealthStatus health={health} />;
+    }
     if (state === "error") {
         const share = Math.round(failingShare(usageOf(entry)) * 100);
         const label = failingEntry(entry) ? `${share}% of requests failing` : failedLabel(entry);
@@ -662,7 +714,12 @@ function StatusCell({ entry }: { entry: Entry }) {
         );
     }
     if (state === "progress") {
-        return model.kind === "base" ? <Availability row={model} /> : <Activity row={model} />;
+        const checking = ["verify", "repair"].includes(model.activity.kind ?? "");
+        return model.kind === "base" && !checking ? (
+            <Availability row={model} />
+        ) : (
+            <Activity row={model} />
+        );
     }
     if (model.kind === "base" && model.availability.state === "not_downloaded") {
         return <Availability row={model} />;
@@ -1272,6 +1329,7 @@ export function MyModels({
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
+    const healthActions = useRef<Handlers["health"] | null>(null);
     const on: Handlers = useMemo(
         () => ({
             open: (path) => router.history.push(path),
@@ -1305,9 +1363,16 @@ export function MyModels({
             createFrom: (base) =>
                 router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
             refresh,
+            health: (row, action) => healthActions.current?.(row, action),
         }),
         [router, refresh],
     );
+    const health = useHealthActions({
+        refresh,
+        confirm: setConfirmation,
+        remove: (row) => setConfirmation(deleteConfirmation(row, on)),
+    });
+    healthActions.current = health.run;
     const rows = models.data ?? [];
     const entries = entriesOf(rows);
     const sort = parseSort(search.sort);
@@ -1403,6 +1468,7 @@ export function MyModels({
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
+            {health.dialogs}
         </div>
     );
 }

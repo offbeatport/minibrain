@@ -1864,6 +1864,236 @@
         }
       }
     },
+    "/api/models/base/{key}/verify": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Verify Base",
+        "operationId": "verify_base_api_models_base__key__verify_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/repair": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Repair Base",
+        "operationId": "repair_base_api_models_base__key__repair_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/reimport": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Reimport Base",
+        "operationId": "reimport_base_api_models_base__key__reimport_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/relocate": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Relocate Base",
+        "operationId": "relocate_base_api_models_base__key__relocate_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/recheck": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Recheck Base",
+        "operationId": "recheck_base_api_models_base__key__recheck_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/base/{key}/retry": {
       "post": {
         "tags": [
@@ -4553,6 +4783,27 @@
             "title": "Key Count",
             "default": 0
           },
+          "health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Health"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -4657,17 +4908,6 @@
             ],
             "title": "License Ack At"
           },
-          "catalog_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Catalog Id"
-          },
           "variant_id": {
             "anyOf": [
               {
@@ -4686,6 +4926,34 @@
           "verified": {
             "type": "boolean",
             "title": "Verified"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "relocated": {
+            "type": "boolean",
+            "title": "Relocated",
+            "default": false
           }
         },
         "type": "object",
@@ -4716,7 +4984,6 @@
           "license_url",
           "license_ack_by",
           "license_ack_at",
-          "catalog_id",
           "variant_id",
           "deployed",
           "verified"
@@ -5925,6 +6192,28 @@
             "type": "object",
             "title": "Hardware",
             "default": {}
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
           }
         },
         "type": "object",
@@ -6031,6 +6320,17 @@
               }
             ],
             "title": "Log"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
           }
         },
         "type": "object",
@@ -6239,6 +6539,88 @@
           "known"
         ],
         "title": "HardwareInfo"
+      },
+      "Health": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "corrupt",
+              "missing",
+              "download_failed",
+              "no_space",
+              "needs_access",
+              "source_gone",
+              "cant_run",
+              "no_memory",
+              "base_changed",
+              "base_unusable"
+            ],
+            "title": "State"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/HealthAction"
+            },
+            "type": "array",
+            "title": "Actions"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "label",
+          "detail",
+          "actions"
+        ],
+        "title": "Health"
+      },
+      "HealthAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "repair",
+              "reimport",
+              "relocate",
+              "remove",
+              "resume",
+              "storage",
+              "get_access",
+              "pick_variant",
+              "try_again",
+              "verify",
+              "open_base",
+              "retrain"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "HealthAction"
       },
       "HeartbeatResponse": {
         "properties": {
@@ -7096,6 +7478,21 @@
         ],
         "title": "LoadedModel"
       },
+      "LocationRequest": {
+        "properties": {
+          "location": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location"
+        ],
+        "title": "LocationRequest"
+      },
       "LogBody": {
         "properties": {
           "at": {
@@ -7611,6 +8008,18 @@
               }
             ],
             "title": "Sha256"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "corrupt",
+              "missing",
+              "wrong_size",
+              "unchecked"
+            ],
+            "title": "State",
+            "default": "unchecked"
           }
         },
         "type": "object",
@@ -7823,6 +8232,27 @@
             "type": "integer",
             "title": "Key Count",
             "default": 0
+          },
+          "health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Health"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalog_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Id"
           }
         },
         "type": "object",
@@ -9366,6 +9796,16 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Health"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

@@ -595,6 +595,91 @@ export interface paths {
         patch: operations["update_base_api_models_base__key__patch"];
         trace?: never;
     };
+    "/api/models/base/{key}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Base */
+        post: operations["verify_base_api_models_base__key__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repair Base */
+        post: operations["repair_base_api_models_base__key__repair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/reimport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reimport Base */
+        post: operations["reimport_base_api_models_base__key__reimport_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/relocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Relocate Base */
+        post: operations["relocate_base_api_models_base__key__relocate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/base/{key}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recheck Base */
+        post: operations["recheck_base_api_models_base__key__recheck_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/base/{key}/retry": {
         parameters: {
             query?: never;
@@ -1549,6 +1634,9 @@ export interface components {
              * @default 0
              */
             key_count?: number;
+            health?: components["schemas"]["Health"] | null;
+            /** Catalog Id */
+            catalog_id?: string | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1571,14 +1659,21 @@ export interface components {
             license_ack_by: string | null;
             /** License Ack At */
             license_ack_at: string | null;
-            /** Catalog Id */
-            catalog_id: string | null;
             /** Variant Id */
             variant_id: string | null;
             /** Deployed */
             deployed: boolean;
             /** Verified */
             verified: boolean;
+            /** Verified At */
+            verified_at?: string | null;
+            /** Content Hash */
+            content_hash?: string | null;
+            /**
+             * Relocated
+             * @default false
+             */
+            relocated?: boolean;
         };
         /** BaseWeights */
         BaseWeights: {
@@ -1980,6 +2075,10 @@ export interface components {
             hardware?: {
                 [key: string]: unknown;
             };
+            /** Error */
+            error?: string | null;
+            /** Code */
+            code?: string | null;
         };
         /** EventBody */
         EventBody: {
@@ -2022,6 +2121,8 @@ export interface components {
             retryable?: boolean;
             /** Log */
             log?: string | null;
+            /** Code */
+            code?: string | null;
         };
         /** FitInfo */
         FitInfo: {
@@ -2083,6 +2184,32 @@ export interface components {
             gpus: number;
             /** Known */
             known: boolean;
+        };
+        /** Health */
+        Health: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "corrupt" | "missing" | "download_failed" | "no_space" | "needs_access" | "source_gone" | "cant_run" | "no_memory" | "base_changed" | "base_unusable";
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Actions */
+            actions: components["schemas"]["HealthAction"][];
+            /** Files */
+            files?: string[];
+        };
+        /** HealthAction */
+        HealthAction: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain";
+            /** Label */
+            label: string;
         };
         /** HeartbeatResponse */
         HeartbeatResponse: {
@@ -2357,6 +2484,11 @@ export interface components {
             /** Adapters */
             adapters: string[];
         };
+        /** LocationRequest */
+        LocationRequest: {
+            /** Location */
+            location: string;
+        };
         /** LogBody */
         LogBody: {
             /**
@@ -2526,6 +2658,12 @@ export interface components {
             size: number;
             /** Sha256 */
             sha256: string | null;
+            /**
+             * State
+             * @default unchecked
+             * @enum {string}
+             */
+            state?: "ok" | "corrupt" | "missing" | "wrong_size" | "unchecked";
         };
         /** ModelRef */
         ModelRef: {
@@ -2598,6 +2736,9 @@ export interface components {
              * @default 0
              */
             key_count?: number;
+            health?: components["schemas"]["Health"] | null;
+            /** Catalog Id */
+            catalog_id?: string | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -3105,6 +3246,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            health?: components["schemas"]["Health"] | null;
         };
         /** WorkerBody */
         WorkerBody: {
@@ -4527,6 +4669,169 @@ export interface operations {
                 "application/json": components["schemas"]["ModelUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_base_api_models_base__key__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repair_base_api_models_base__key__repair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reimport_base_api_models_base__key__reimport_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relocate_base_api_models_base__key__relocate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recheck_base_api_models_base__key__recheck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

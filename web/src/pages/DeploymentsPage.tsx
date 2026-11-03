@@ -17,6 +17,7 @@ import { ApiKeys } from "~/components/ApiKeys";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { HealthStatus } from "~/components/models/HealthStatus";
 import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
 import { count, percent } from "~/lib/format";
@@ -149,6 +150,9 @@ function serves(row: ModelRow): string {
 }
 
 function DeploymentStatus({ row }: { row: ModelRow }) {
+    if (row.health) {
+        return <HealthStatus health={row.health} />;
+    }
     const share = failingShare(row.usage);
     if (share >= 0.01) {
         return (

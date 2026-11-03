@@ -12,10 +12,12 @@ import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus";
+import { StatusText } from "~/components/models/StatusText";
 import { percent } from "~/lib/format";
 import { deploymentPageHref, evaluationsHref, modelDataHref, trainingHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
-import { bytes, exactTime } from "~/lib/time";
+import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
     ConfirmAction,
@@ -24,6 +26,7 @@ import {
     TestBaseDialog,
     useModelsRefresh,
 } from "./models/dialogs";
+import { useHealthActions } from "./models/healthActions";
 
 function BackLink() {
     return (
@@ -66,6 +69,52 @@ function StatusStrip({ row }: { row: ModelRow }) {
     );
 }
 
+function HealthNotice({
+    row,
+    run,
+    shown = () => true,
+}: {
+    row: ModelRow;
+    run: (row: ModelRow, action: HealthAction) => void;
+    shown?: (action: HealthAction) => boolean;
+}) {
+    const health = row.health;
+    if (!health) {
+        return null;
+    }
+    const actions = health.actions.filter(shown);
+    return (
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive-soft p-3 text-sm">
+            <div className="flex min-w-0 max-w-3xl flex-col gap-1">
+                <StatusText tone="destructive" className="font-semibold">
+                    {health.label}
+                </StatusText>
+                <p>{health.detail}</p>
+            </div>
+            {actions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {actions.map((action, index) => (
+                        <Button
+                            key={action.kind}
+                            variant={index === 0 ? "default" : "outline"}
+                            onClick={() => run(row, action)}
+                        >
+                            {action.label}
+                        </Button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function verifiedText(model: BaseModelDetail): string {
+    if (!model.verified_at) {
+        return "Each file is checked against the SHA-256 saved at install.";
+    }
+    return `Each file is checked against the SHA-256 saved at install; last verified ${relativeTime(model.verified_at)}.`;
+}
+
 function useJob(jobId: number | null | undefined) {
     return useQuery({
         queryKey: ["jobs", "detail", jobId],
@@ -103,6 +152,7 @@ function ApiSection({ model }: { model: BaseModelDetail }) {
 }
 
 function BaseModelView({ model }: { model: BaseModelDetail }) {
+    const router = useRouter();
     const refresh = useModelsRefresh();
     const queryClient = useQueryClient();
     const [testing, setTesting] = useState<ModelRow | null>(null);
@@ -115,7 +165,30 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
     };
     const path = { params: { path: { key: model.key } } };
     const deployed = model.deployed;
-    const available = model.availability.state === "available";
+    const available = model.availability.state === "available" && !model.health;
+    const health = useHealthActions({
+        refresh: reload,
+        confirm: setConfirmation,
+        remove: (row) =>
+            setConfirmation({
+                title: `Delete ${row.name}?`,
+                description: (
+                    <p>
+                        {model.relocated
+                            ? `Its record and API keys are removed; the files in ${model.storage_path} stay.`
+                            : "Its record, files and API keys are removed. You can download or import it again later."}
+                    </p>
+                ),
+                confirmLabel: "Delete",
+                destructive: true,
+                run: () =>
+                    unwrap(api.DELETE("/api/models/base/{key}", path)).then(() => {
+                        router.history.push(modelsHref());
+                    }),
+            }),
+    });
+    const busy = ["running", "queued"].includes(model.activity.state);
+    const verify = () => health.run(model, { kind: "verify", label: "Verify files" });
     const deployConfirmation = (): Confirmation => ({
         title: deployed ? `Undeploy ${model.name}?` : `Deploy ${model.name}?`,
         description: deployed ? (
@@ -158,23 +231,12 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 caption={model.description || model.key}
                 actions={
                     <>
-                        {model.activity.state === "failed" && !available && (
-                            <Button
-                                onClick={() =>
-                                    unwrap(api.POST("/api/models/base/{key}/retry", path)).then(
-                                        reload,
-                                    )
-                                }
-                            >
-                                Retry
-                            </Button>
-                        )}
                         {available && (
                             <Button variant="outline" onClick={() => setTesting(model)}>
                                 Test
                             </Button>
                         )}
-                        {available && (
+                        {(available || deployed) && (
                             <Button
                                 variant={deployed ? "outline" : "default"}
                                 onClick={() => setConfirmation(deployConfirmation())}
@@ -189,6 +251,11 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 }
             />
             <StatusStrip row={model} />
+            <HealthNotice
+                row={model}
+                run={health.run}
+                shown={(action) => action.kind !== "verify" || model.health?.actions[0] === action}
+            />
             <PanelSections>
                 <PanelSection icon={Info} title="Overview">
                     <Facts
@@ -241,6 +308,16 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                             ],
                             ["Size", `${bytes(model.size_bytes)} in ${model.files.length} files`],
                             [
+                                "Content hash",
+                                model.content_hash ? (
+                                    <span key="hash" className="font-mono">
+                                        {model.content_hash.slice(0, 16)}
+                                    </span>
+                                ) : (
+                                    "—"
+                                ),
+                            ],
+                            [
                                 "Storage",
                                 <span key="storage" className="font-mono">
                                     {model.storage_path}
@@ -248,13 +325,22 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                             ],
                         ]}
                     />
-                    {model.error && <p className="mt-2 text-sm text-destructive">{model.error}</p>}
+                    {model.error && !model.health && (
+                        <p className="mt-2 text-sm text-destructive">{model.error}</p>
+                    )}
                 </PanelSection>
                 {job.data && <JobPanel job={job.data} slug="" />}
                 <PanelSection
                     icon={Files}
                     title="Files"
-                    description="Checked on download or import; each is re-checked by size when listed."
+                    description={verifiedText(model)}
+                    actions={
+                        model.availability.state === "available" && (
+                            <Button variant="outline" onClick={verify} disabled={busy}>
+                                Verify files
+                            </Button>
+                        )
+                    }
                     bare
                 >
                     <DataGrid columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
@@ -267,6 +353,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
+            {health.dialogs}
         </>
     );
 }
@@ -290,6 +377,15 @@ const FILE_COLUMNS: ColumnDef<BaseModelDetail["files"][number], unknown>[] = [
                 {String(info.getValue() ?? "—").slice(0, 16)}
             </span>
         ),
+    },
+    {
+        header: "Hash",
+        id: "state",
+        accessorFn: (file) => file.state ?? "unchecked",
+        cell: ({ row }) => {
+            const state = FILE_STATES[row.original.state ?? "unchecked"];
+            return <StatusText tone={state.tone}>{state.label}</StatusText>;
+        },
     },
 ];
 
@@ -324,6 +420,11 @@ function CustomModelView({ row }: { row: ModelRow }) {
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const router = useRouter();
     const active = (jobs.data ?? []).filter(isActiveJob);
+    const open = (_row: ModelRow, action: HealthAction) => {
+        if (action.kind === "open_base" && row.base_model) {
+            router.history.push(`/models/base/${encodeURIComponent(row.base_model)}`);
+        }
+    };
     return (
         <>
             <PageHeader
@@ -364,6 +465,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 }
             />
             <StatusStrip row={row} />
+            <HealthNotice row={row} run={open} />
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}

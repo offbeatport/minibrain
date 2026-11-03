@@ -301,8 +301,20 @@ function PolicyRow({ policy }: { policy: PolicyInfo }) {
     );
 }
 
+const MODEL_ACTIONS: Record<string, (detail: Record<string, unknown>) => string> = {
+    "model.verify": (detail) => `Verify started for ${String(detail.files ?? "all")} files`,
+    "model.repair": (detail) => `Repair from ${String(detail.source ?? "the model hub")}`,
+    "model.reimport": (detail) => `Re-import from ${String(detail.source ?? "a copy")}`,
+    "model.relocate": (detail) =>
+        `Moved from ${String(detail.from ?? "—")} to ${String(detail.to ?? "—")}`,
+};
+
 function describe(event: AuditInfo, byName: Map<string, PolicyInfo>): [string, string] {
     const detail = event.detail as Record<string, unknown>;
+    const repair = MODEL_ACTIONS[event.action];
+    if (repair) {
+        return [`Model ${String(detail.name ?? event.target)}`, repair(detail)];
+    }
     if (event.action === "model.delete") {
         const size =
             typeof detail.size_bytes === "number" ? ` · freed ${bytes(detail.size_bytes)}` : "";
