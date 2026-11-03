@@ -186,14 +186,24 @@ def base_tables(node: Any, found: set[str]) -> set[str]:
     return found
 
 
+def error_context(statement: str, position: int) -> str:
+    before = statement.encode()[:position].decode(errors="ignore").split("\n")
+    line = statement.split("\n")[len(before) - 1].rstrip("\r")
+    prefix = f"LINE {len(before)}: "
+    return f"\n\n{prefix}{line}\n{' ' * (len(prefix) + len(before[-1]))}^"
+
+
 def statement_tables(sql: str) -> set[str]:
+    statement = sql.strip().rstrip(";")
     with duckdb.connect(config={"enable_external_access": False}) as connection:
-        found = connection.execute("SELECT json_serialize_sql(?)", [sql.strip().rstrip(";")]).fetchone()
+        found = connection.execute("SELECT json_serialize_sql(?)", [statement]).fetchone()
     parsed = json.loads(found[0]) if found else {"error": True, "error_message": "empty query"}
     if parsed.get("error"):
         message = str(parsed.get("error_message") or "the query could not be read")
         if "Only SELECT" in message:
             message = "only a single SELECT query can run here"
+        elif str(parsed.get("position", "")).isdigit():
+            message += error_context(statement, int(parsed["position"]))
         raise SourceError(message)
     statements = parsed.get("statements") or []
     if len(statements) != 1:

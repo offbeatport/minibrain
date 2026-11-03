@@ -70,6 +70,12 @@ def test_statement_tables_reads_every_table_a_query_names() -> None:
         statement_tables("DROP TABLE tickets")
 
 
+def test_parse_errors_point_at_the_line_and_column() -> None:
+    with pytest.raises(SourceError) as raised:
+        statement_tables("\n  SELECT 'é' AS input,\n  label FORM tickets;")
+    assert str(raised.value) == ('syntax error at or near "tickets"\n\nLINE 2:   label FORM tickets\n' + " " * 21 + "^")
+
+
 def test_split_is_disjoint_and_deterministic() -> None:
     rows = [(f"text {index}", f"label {index % 7}") for index in range(400)] + [("", "x"), ("text 1", "dup")]
     examples = snapshot.clean(rows)
