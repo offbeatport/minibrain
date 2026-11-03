@@ -14,9 +14,15 @@ minibrain is a Python package with the web UI built in, so running it needs no N
 uvx --python 3.12 minibrain serve
 ```
 
-`uv tool install minibrain` or `pip install minibrain`, then `minibrain serve`, work too. There is no published release
-yet; until then build the wheel from this repo (see Develop) and run it with
-`uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`.
+`uv tool install minibrain` or `pip install minibrain`, then `minibrain serve`, work too. minibrain is not on PyPI yet:
+until it is, pass the wheel from [GitHub Releases](https://github.com/offbeatport/minibrain/releases) instead of
+`minibrain`, or, before the first release, build it from this repo (see Develop) and run it with
+`uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`. With Docker (CPU; the `cuda` tag is
+for NVIDIA hosts):
+
+```sh
+docker run -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+```
 
 [`docs/install.md`](docs/install.md) covers every install path, PyTorch backends (CUDA, ROCm, MPS, CPU), the Docker
 image and compose file, air-gapped installs, upgrades and where data lives.

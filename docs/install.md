@@ -5,13 +5,17 @@ commands below use 3.12, which the Docker image runs.
 
 | Way | For |
 |---|---|
+| [Run with Docker](#run-with-docker) | Trying it on any machine with Docker, and production on Linux with NVIDIA GPUs |
+| [Install from GitHub Releases](#install-from-github-releases) | The released wheel with uv, pipx or pip |
 | [`uvx`](#uvx) | Trying it without installing anything |
 | [`uv tool install`](#uv-tool-install) | A `minibrain` command that stays installed |
 | [`pip` in a virtual environment](#pip-in-a-virtual-environment) | Machines without uv |
-| [Docker](#docker) | Production on Linux with NVIDIA GPUs |
 
-There is no published release yet. Until there is, build the wheel from this repo with `mise run build` (or
-`uv build --wheel`; both need Node with pnpm) and pass the wheel wherever a command below installs `minibrain`:
+Releases are on [GitHub Releases](https://github.com/offbeatport/minibrain/releases) (wheel, sdist, SBOMs,
+`SHA256SUMS`) and in GHCR (`ghcr.io/offbeatport/minibrain`); how they are made: [`releasing.md`](releasing.md).
+minibrain is not on PyPI yet, so wherever a command below installs `minibrain`, pass the release wheel's URL instead
+(see [Install from GitHub Releases](#install-from-github-releases)). Before the first release, build the wheel from
+this repo with `mise run build` (or `uv build --wheel`; both need Node with pnpm) and pass the file:
 
 ```sh
 uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve
@@ -20,8 +24,56 @@ pip install dist/minibrain-0.0.0-py3-none-any.whl
 ```
 
 Verified: `uvx` and `minibrain serve` on macOS (Apple silicon) and on Linux (Debian, CPU torch); the CPU image; the
-CUDA image built for amd64 and arm64 and started without a GPU. Not verified yet: native Windows, and the CUDA image
-on a machine with an NVIDIA GPU.
+CUDA image built for amd64 and arm64 and started without a GPU; the release workflow's dry run (wheel, sdist and all
+four images built). Not verified yet: native Windows, the CUDA image on a machine with an NVIDIA GPU, and a tagged
+release (no image is on GHCR until the first one).
+
+## Run with Docker
+
+```sh
+docker run -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+```
+
+Open http://127.0.0.1:8000. That is the CPU image: it runs wherever Docker does, Docker Desktop on macOS (Apple silicon
+and Intel) and Windows included. Training on CPU suits models up to about 0.5B. Everything minibrain writes stays in the `minibrain-data` volume. With no accounts configured, the first visitor
+creates the admin account, so keep the port on `127.0.0.1` until you have (see
+[Security → Accounts and sign-in](security.md#accounts-and-sign-in)).
+
+Images for linux/amd64 and linux/arm64, built from the release wheel:
+
+| Tag | Image |
+|---|---|
+| `latest`, `<version>` (`0.1.0`) | CPU: Python 3.12 slim (Debian 13) with CPU torch, about 1.7 GB |
+| `cuda`, `<version>-cuda` (`0.1.0-cuda`) | NVIDIA CUDA 13.2 (Ubuntu 24.04), about 7 GB. Linux hosts with NVIDIA GPUs |
+
+`latest` and `cuda` move with each stable release; pre-releases (`0.2.0rc1`) get only their version tags. Pin a
+version in production, or its digest (`docker inspect --format '{{index .RepoDigests 0}}' <image>` after a pull). The
+images are not signed yet. For NVIDIA GPUs, the full `docker run` is under [Docker → Run](#run) and the compose file
+under [Compose](#compose).
+
+## Install from GitHub Releases
+
+Each release carries the wheel, with the web UI inside, and an sdist. Take the URL from the
+[release page](https://github.com/offbeatport/minibrain/releases); it has this form:
+
+```sh
+WHEEL=https://github.com/offbeatport/minibrain/releases/download/v0.1.0/minibrain-0.1.0-py3-none-any.whl
+uv tool install --python 3.12 "$WHEEL"
+pipx install --python python3.12 "$WHEEL"
+pip install "$WHEEL"
+uvx --python 3.12 --from "$WHEEL" minibrain serve
+```
+
+Use one of them, `pip` inside a virtual environment (below). With extras, name the package before the URL:
+`"minibrain[postgres] @ $WHEEL"` (uv and pip). To check the download first:
+
+```sh
+curl -fsSLO "$WHEEL"
+curl -fsSLO https://github.com/offbeatport/minibrain/releases/download/v0.1.0/SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Then install the local file the same way.
 
 ## uvx
 
@@ -120,9 +172,12 @@ engines use `transformers`.
 
 ## Docker
 
-The image is for production on Linux. Docker on macOS has no GPU access, so use a native install there.
+The CUDA image is for production on Linux. Docker on macOS has no GPU access: use the CPU image there
+([Run with Docker](#run-with-docker)), or a native install, which gets the Metal build of torch.
 
 ### Build
+
+The release images are on GHCR; build your own to change a build argument or to build from a checkout:
 
 ```sh
 docker build -t minibrain:cuda --build-arg COMMIT=$(git rev-parse HEAD) .
@@ -145,6 +200,14 @@ The build runs the UI build and `uv build` in builder stages, installs the wheel
 the DuckDB extensions for the image's platform. Build on the architecture you deploy, or use
 `docker buildx build --platform linux/amd64`.
 
+To install a wheel you already have instead of building one, pass a folder that holds only that wheel as the `wheel`
+build context; the UI and wheel stages are then skipped. The release workflow builds its images this way, from the
+wheel it publishes:
+
+```sh
+docker buildx build --build-context wheel=./release-wheel --build-arg VARIANT=cpu -t minibrain:cpu .
+```
+
 A CycloneDX SBOM of the built image comes from syft: [Security → Docker image](security.md#docker-image).
 
 ### Run
@@ -158,17 +221,17 @@ docker run -d --name minibrain --restart unless-stopped --stop-timeout 30 \
   -p 127.0.0.1:8000:8000 \
   -v minibrain-data:/data \
   -v /srv/models:/models:ro \
-  minibrain:cuda
+  ghcr.io/offbeatport/minibrain:cuda
 ```
 
-Login is not built yet: anyone who can reach port 8000 can use everything. Publish the port on `127.0.0.1`, as above,
-or put it behind a reverse proxy that authenticates.
+With no accounts configured, the first visitor creates the admin account: publish the port on `127.0.0.1`, as above,
+until you have, or put it behind a reverse proxy ([Security → Accounts and sign-in](security.md#accounts-and-sign-in)).
 
 - The container runs as user `minibrain` (uid 1000), not root.
 - `/data` is `MINIBRAIN_HOME` and a volume. A bind mount must be writable by uid 1000:
   `sudo chown -R 1000:1000 /srv/minibrain-data`.
 - PID 1 is `tini`. The entrypoint is `minibrain` and the default command is `serve --host 0.0.0.0 --port 8000`, so
-  `docker run --rm minibrain:cuda extensions` runs another command and `docker exec minibrain minibrain extensions`
+  `docker run --rm ghcr.io/offbeatport/minibrain:cuda extensions` runs another command and `docker exec minibrain minibrain extensions`
   runs one in a running container.
 - `--shm-size` gives PyTorch shared memory for data loading; Docker's default of 64 MB is too small.
 - `--stop-timeout 30` gives main time to finish open requests on `docker stop`; it can take about 25 seconds, and
@@ -224,16 +287,21 @@ review allows it.
 
 ### Compose
 
-[`compose.yaml`](../compose.yaml) runs one service on an NVIDIA host: all GPUs reserved, the port on `127.0.0.1`, data
-in the `minibrain-data` volume and `./models` mounted read-only at `/models`.
+[`compose.yaml`](../compose.yaml) runs one service on an NVIDIA host from `ghcr.io/offbeatport/minibrain:cuda`: all
+GPUs reserved, the port on `127.0.0.1`, data in the `minibrain-data` volume and `./models` mounted read-only at
+`/models`.
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f
 ```
 
 Put overrides in a `.env` file next to it: `MINIBRAIN_DATABASE_URL`, `MINIBRAIN_MODELS_DIR` (the host folder for
-`/models`), `MINIBRAIN_IMAGE` (the image tag).
+`/models`), `MINIBRAIN_IMAGE` (the image, such as `ghcr.io/offbeatport/minibrain:0.1.0-cuda` to pin a release).
+
+The file keeps its `build:` section for local builds. `docker compose up -d --build` builds the image from the checkout
+and tags it as `MINIBRAIN_IMAGE`, so set `MINIBRAIN_IMAGE=minibrain:cuda` with it, to keep a local build apart from the
+release image.
 
 ### SGLang in Docker
 
@@ -247,19 +315,22 @@ across on disk.
 
 ### The app
 
-Docker: save the image on the connected machine and load it on the target.
+Docker: pull the image on the connected machine, save it, and load it on the target. Pull with
+`--platform linux/arm64` when the target's architecture differs.
 
 ```sh
-docker save minibrain:cuda | gzip > minibrain-cuda.tar.gz
-docker load -i minibrain-cuda.tar.gz
+docker pull ghcr.io/offbeatport/minibrain:0.1.0-cuda
+docker save ghcr.io/offbeatport/minibrain:0.1.0-cuda | gzip > minibrain-0.1.0-cuda.tar.gz
+docker load -i minibrain-0.1.0-cuda.tar.gz
 ```
 
-Native: collect the wheels on a connected machine with the same OS, CPU architecture and Python 3.12 as the target.
+Native: collect the wheels on a connected machine with the same OS, CPU architecture and Python 3.12 as the target,
+in a checkout of the release tag, with the release wheel downloaded next to it.
 
 ```sh
 uv export --frozen --no-dev --no-emit-project --extra postgres -o requirements.txt
 python3.12 -m pip download --only-binary=:all: -d wheels -r requirements.txt
-cp dist/minibrain-0.0.0-py3-none-any.whl wheels/
+cp minibrain-0.1.0-py3-none-any.whl wheels/
 ```
 
 On the target, Python 3.12 must already be installed. Then:
@@ -312,14 +383,14 @@ Database migrations run when main starts. To go back to an older version, restor
 | `uvx` | `uvx --refresh --python 3.12 minibrain serve`, or pin one with `uvx --python 3.12 minibrain@<version> serve` |
 | `uv tool` | `uv tool upgrade minibrain` |
 | `pip` | `pip install --upgrade minibrain` |
-| Docker | Build or load the new image, then replace the container and keep the volume (below) |
-| Compose | `docker compose up -d --build` |
+| Docker | Pull (or build, or load) the new image, then replace the container and keep the volume (below) |
+| Compose | `docker compose pull && docker compose up -d`; `docker compose up -d --build` for a local build |
 
 Docker, with a backup of the volume on the way:
 
 ```sh
 docker stop minibrain
-docker run --rm --user 0 --entrypoint tar -v minibrain-data:/data -v "$PWD":/backup minibrain:cuda \
+docker run --rm --user 0 --entrypoint tar -v minibrain-data:/data -v "$PWD":/backup ghcr.io/offbeatport/minibrain:cuda \
   czf /backup/minibrain-data.tgz -C /data .
 docker rm minibrain
 ```

@@ -828,14 +828,18 @@ v2, for defense and critical infrastructure:
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) on every push and pull request; no secrets, and tests make no outbound
-calls.
+GitHub Actions (`.github/workflows/ci.yml`) on every branch push and pull request; no secrets, and tests make no
+outbound calls.
 
 - Python, on 3.12 and 3.13: `uv sync --locked`, ruff, ruff format, `scripts/check_crypto.py`, pyright, pytest. The
   mlx and llama.cpp extras are not installed on Linux, so pyright reports their imports as warnings, only in the three
   files that use them (`executionEnvironments` in `pyproject.toml`).
 - Web: `pnpm install --frozen-lockfile`, Biome, `tsc`, `vite build`.
-- Wheel, once both pass: `uv build --wheel` with the built UI inside, uploaded as the `minibrain-wheel` artifact.
+- Wheel and sdist, once both pass: `uv build` with the built UI inside both, uploaded as the `minibrain-wheel` and
+  `minibrain-sdist` artifacts.
+- Releases: a `v*` tag runs `.github/workflows/release.yml`, which calls this workflow (`workflow_call`), builds the
+  CPU and CUDA images for amd64 and arm64 from its wheel, and publishes them to GHCR and the wheel, sdist, SBOMs and
+  `SHA256SUMS` to GitHub Releases; `workflow_dispatch` is a dry run. Details: `docs/releasing.md`.
 - `mise run check` runs the same checks locally; change both together.
 - Third-party actions pinned to full commit SHAs; uv, Node and pnpm versions fixed; uv and pnpm caches on.
 
@@ -969,6 +973,9 @@ Everything in the v1 scope below, after M1.
 - [x] Developer tasks in `mise.toml` (setup, dev, check, build)
 - [x] CI on every push: the `mise run check` checks, then build the UI and the wheel
 - [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
+      (built: `release.yml` on `v*` tags puts the wheel, sdist, SBOMs and `SHA256SUMS` on GitHub Releases and CPU
+      and CUDA images for amd64 and arm64 on GHCR, the images installing that same wheel; dry run passed, no tag
+      pushed yet. PyPI not yet: Trusted Publishing steps in `docs/releasing.md`; no private index)
 - [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install.md`
 - [x] Python 3.13: allowed in `requires-python`; CI tests 3.12 and 3.13
 - [ ] Offline install bundle; air-gap CI test
