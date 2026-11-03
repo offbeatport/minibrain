@@ -87,16 +87,16 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["variant_id"], ["catalog_variants.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("description", sa.String(), nullable=False, server_default=""))
         batch.add_column(sa.Column("tags", sa.JSON(), nullable=False, server_default="[]"))
         batch.add_column(sa.Column("archived_at", TIMESTAMP, nullable=True))
         batch.add_column(sa.Column("updated_at", TIMESTAMP, nullable=True))
-    with op.batch_alter_table("api_keys") as batch:
+    with op.batch_alter_table("api_keys", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.alter_column("minibrain_id", existing_type=sa.Integer(), nullable=True)
         batch.add_column(sa.Column("model_id", sa.String(), nullable=True))
         batch.create_foreign_key("fk_api_keys_model", "models", ["model_id"], ["id"], ondelete="CASCADE")
-    with op.batch_alter_table("jobs") as batch:
+    with op.batch_alter_table("jobs", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("model_id", sa.String(), nullable=True))
         batch.create_foreign_key("fk_jobs_model", "models", ["model_id"], ["id"], ondelete="SET NULL")
 

@@ -13,19 +13,20 @@ def upgrade() -> None:
         sa.Column("minibrain_id", sa.Integer(), sa.ForeignKey("minibrains.id", ondelete="CASCADE"), nullable=True),
         sa.Column("model_id", sa.String(), sa.ForeignKey("models.id", ondelete="CASCADE"), nullable=True),
         sa.UniqueConstraint("key_id", "minibrain_id", "model_id"),
+        sqlite_autoincrement=True,
     )
     op.execute(
         "INSERT INTO api_key_scopes (key_id, minibrain_id, model_id) "
         "SELECT id, minibrain_id, model_id FROM api_keys WHERE minibrain_id IS NOT NULL OR model_id IS NOT NULL"
     )
-    with op.batch_alter_table("api_keys") as batch:
+    with op.batch_alter_table("api_keys", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.drop_constraint("fk_api_keys_model", type_="foreignkey")
         batch.drop_column("model_id")
         batch.drop_column("minibrain_id")
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("api_keys") as batch:
+    with op.batch_alter_table("api_keys", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("minibrain_id", sa.Integer(), nullable=True))
         batch.add_column(sa.Column("model_id", sa.String(), nullable=True))
         batch.create_foreign_key("fk_api_keys_minibrain", "minibrains", ["minibrain_id"], ["id"], ondelete="CASCADE")

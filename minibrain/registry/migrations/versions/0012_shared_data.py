@@ -28,6 +28,7 @@ def upgrade() -> None:
         sa.Column("artifact_id", sa.String(), sa.ForeignKey("artifacts.id"), nullable=False),
         sa.Column("size", sa.BigInteger(), nullable=False, server_default="0"),
         sa.Column("created_at", TIMESTAMP, nullable=False),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "datasets",
@@ -40,8 +41,9 @@ def upgrade() -> None:
         sa.Column("sql", sa.String(), nullable=True),
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("updated_at", TIMESTAMP, nullable=False),
+        sqlite_autoincrement=True,
     )
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("dataset_id", sa.Integer(), nullable=True))
         batch.create_foreign_key("fk_minibrains_dataset", "datasets", ["dataset_id"], ["id"], ondelete="SET NULL")
     connection = op.get_bind()
@@ -85,13 +87,13 @@ def upgrade() -> None:
             sa.text("UPDATE minibrains SET dataset_id = :dataset WHERE id = :id"),
             {"dataset": dataset, "id": minibrain_id},
         )
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         for column in MOVED:
             batch.drop_column(column)
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("source_file", sa.String(), nullable=True))
         batch.add_column(sa.Column("source_artifact_id", sa.String(), nullable=True))
         batch.add_column(sa.Column("input_column", sa.String(), nullable=True))
@@ -99,7 +101,7 @@ def downgrade() -> None:
         batch.add_column(sa.Column("sql", sa.String(), nullable=True))
     for statement in DOWNGRADE_COPY:
         op.execute(statement)
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.drop_constraint("fk_minibrains_dataset", type_="foreignkey")
         batch.drop_column("dataset_id")
     op.drop_table("datasets")

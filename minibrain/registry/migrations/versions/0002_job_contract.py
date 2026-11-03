@@ -42,14 +42,14 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("source_artifact_id", sa.String(), nullable=True))
         batch.create_foreign_key("fk_minibrains_source_artifact", "artifacts", ["source_artifact_id"], ["id"])
-    with op.batch_alter_table("snapshots") as batch:
+    with op.batch_alter_table("snapshots", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("artifact_id", sa.String(), nullable=True))
         batch.alter_column("directory", existing_type=sa.String(), nullable=True)
         batch.create_foreign_key("fk_snapshots_artifact", "artifacts", ["artifact_id"], ["id"])
-    with op.batch_alter_table("versions") as batch:
+    with op.batch_alter_table("versions", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("adapter_artifact_id", sa.String(), nullable=True))
         batch.create_foreign_key("fk_versions_adapter_artifact", "artifacts", ["adapter_artifact_id"], ["id"])
     op.create_table(
@@ -122,6 +122,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["log_artifact_id"], ["artifacts.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("job_id", "number"),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "job_events",

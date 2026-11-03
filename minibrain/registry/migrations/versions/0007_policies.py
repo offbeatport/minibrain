@@ -17,11 +17,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sqlite_autoincrement=True,
     )
-    with op.batch_alter_table("api_keys") as batch:
+    with op.batch_alter_table("api_keys", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("api_keys") as batch:
+    with op.batch_alter_table("api_keys", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.drop_column("expires_at")
     op.drop_table("audit_events")

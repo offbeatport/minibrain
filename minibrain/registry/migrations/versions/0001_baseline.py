@@ -23,6 +23,7 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("slug"),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "api_keys",
@@ -36,6 +37,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("digest"),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "snapshots",
@@ -48,6 +50,7 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "versions",
@@ -65,6 +68,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["snapshot_id"], ["snapshots.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("minibrain_id", "number"),
+        sqlite_autoincrement=True,
     )
     op.create_table(
         "jobs",

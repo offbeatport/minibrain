@@ -6,7 +6,7 @@ down_revision = "0010"
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.add_column(sa.Column("last_version", sa.Integer(), nullable=False, server_default="-1"))
     op.execute(
         "UPDATE minibrains SET last_version = "
@@ -15,5 +15,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("minibrains") as batch:
+    with op.batch_alter_table("minibrains", table_kwargs={"sqlite_autoincrement": True}) as batch:
         batch.drop_column("last_version")

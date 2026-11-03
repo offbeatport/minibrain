@@ -74,6 +74,7 @@ class Artifact(Base):
 
 class Source(Base):
     __tablename__ = "sources"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
@@ -89,6 +90,7 @@ class Source(Base):
 
 class Dataset(Base):
     __tablename__ = "datasets"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(unique=True)
@@ -108,6 +110,7 @@ class Dataset(Base):
 
 class Minibrain(Base):
     __tablename__ = "minibrains"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(unique=True)
@@ -132,6 +135,7 @@ class Minibrain(Base):
 
 class Snapshot(Base):
     __tablename__ = "snapshots"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
@@ -147,7 +151,7 @@ class Snapshot(Base):
 
 class Version(Base):
     __tablename__ = "versions"
-    __table_args__ = (UniqueConstraint("minibrain_id", "number"),)
+    __table_args__ = (UniqueConstraint("minibrain_id", "number"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(primary_key=True)
     minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
@@ -225,7 +229,7 @@ class Job(Base):
 
 class JobAttempt(Base):
     __tablename__ = "job_attempts"
-    __table_args__ = (UniqueConstraint("job_id", "number"),)
+    __table_args__ = (UniqueConstraint("job_id", "number"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"))
@@ -256,6 +260,7 @@ class JobEvent(Base):
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
@@ -272,7 +277,7 @@ class ApiKey(Base):
 
 class KeyScope(Base):
     __tablename__ = "api_key_scopes"
-    __table_args__ = (UniqueConstraint("key_id", "minibrain_id", "model_id"),)
+    __table_args__ = (UniqueConstraint("key_id", "minibrain_id", "model_id"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"))
