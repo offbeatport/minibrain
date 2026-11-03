@@ -66,7 +66,6 @@ import {
 } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
-import { GetStarted } from "./GetStarted";
 import {
     ConfirmAction,
     type Confirmation,
@@ -1319,13 +1318,9 @@ function BulkBar({
 export function MyModels({
     search,
     update,
-    onDiscover,
-    onCreate,
 }: {
     search: ModelsSearch;
     update: (patch: ModelsSearch) => void;
-    onDiscover: () => void;
-    onCreate: () => void;
 }) {
     const router = useRouter();
     const refresh = useModelsRefresh();
@@ -1396,7 +1391,6 @@ export function MyModels({
         entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
     const filtering = Boolean(search.q || search.state);
     const clear = () => update(CLEARED);
-    const firstRun = !rows.some((row) => row.kind === "custom") && !filtering;
     const stateOptions = STATE_RANK.map((state) => ({
         value: state,
         label: STATE_LABELS[state],
@@ -1414,7 +1408,6 @@ export function MyModels({
     );
     return (
         <div className="flex flex-col gap-3">
-            {firstRun && <GetStarted onDiscover={onDiscover} onCreate={onCreate} />}
             {selected.length > 0 ? (
                 <BulkBar
                     chosen={entries.filter((entry) => selected.includes(entry.key))}
@@ -1464,7 +1457,15 @@ export function MyModels({
                     onSelected={setSelected}
                     sort={sort}
                     onSort={toggleSort}
-                    empty={noMatch}
+                    empty={
+                        rows.length === 0 ? (
+                            <p className="text-muted-foreground">
+                                No models yet. Add one to start from a base model.
+                            </p>
+                        ) : (
+                            noMatch
+                        )
+                    }
                 />
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />

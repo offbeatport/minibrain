@@ -23,12 +23,7 @@ export function ModelsPage() {
                     </Button>
                 }
             />
-            <MyModels
-                search={search}
-                update={update}
-                onDiscover={() => router.history.push("/discover")}
-                onCreate={add}
-            />
+            <MyModels search={search} update={update} />
         </Page>
     );
 }
