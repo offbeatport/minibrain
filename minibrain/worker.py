@@ -292,7 +292,11 @@ class Worker:
                 "checkpoints": str(workdir / "checkpoints"),
             }
         if claim["kind"] == JobKind.EVAL:
-            spec |= {"version_kind": params["version_kind"], "adapter": self.material(params.get("adapter"))}
+            spec |= {
+                "version_kind": params["version_kind"],
+                "adapter": self.material(params.get("adapter")),
+                "pool": self.config.pool,
+            }
         return spec
 
     def outputs(self, kind: str, attempt_dir: Path) -> dict[str, str]:

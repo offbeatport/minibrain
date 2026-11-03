@@ -10,6 +10,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    InfoTip,
     Link,
 } from "obp-ui";
 import { useMemo } from "react";
@@ -23,6 +24,7 @@ import {
     versionState,
     versionStateLabel,
 } from "~/components/StatusBadge";
+import { costSortValue, costText, deviceTime, headline, measuredOn, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { modelCardHref } from "~/lib/modelLinks";
@@ -85,6 +87,27 @@ function Change({ line }: { line: Line }) {
     );
 }
 
+const COST_INFO =
+    "Measured GPU time per 1,000 held-out requests, times the pool's price per hour from Settings. Without a price, the GPU time itself.";
+
+function baselineOf(line: Line): ModelVersionRow | undefined {
+    const earlier = (line.model.versions ?? []).filter(
+        (version) =>
+            version.number < line.version.number &&
+            version.status === "ready" &&
+            version.accuracy !== null,
+    );
+    const prompts = earlier
+        .filter((version) => version.kind === "prompt")
+        .sort((a, b) => a.number - b.number);
+    return earlier.find((version) => version.number === 0) ?? prompts[0];
+}
+
+function lineHeadline(line: Line): string | null {
+    const base = baselineOf(line);
+    return base ? headline(base, line.version) : null;
+}
+
 function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[] {
     return [
         {
@@ -127,6 +150,35 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
             header: "vs live",
             accessorFn: (line) => change(line) ?? Number.NEGATIVE_INFINITY,
             cell: ({ row }) => <Change line={row.original} />,
+        },
+        {
+            id: "p50",
+            header: "p50",
+            accessorFn: (line) => line.version.latency_p50_ms ?? Number.POSITIVE_INFINITY,
+            cell: ({ row }) => (
+                <span className="tabular-nums">
+                    {milliseconds(row.original.version.latency_p50_ms)}
+                </span>
+            ),
+        },
+        {
+            id: "p95",
+            header: "p95",
+            accessorFn: (line) => line.version.latency_p95_ms ?? Number.POSITIVE_INFINITY,
+            cell: ({ row }) => (
+                <span className="tabular-nums">
+                    {milliseconds(row.original.version.latency_p95_ms)}
+                </span>
+            ),
+        },
+        {
+            id: "cost",
+            header: "Cost per 1,000",
+            meta: { info: COST_INFO },
+            accessorFn: (line) => costSortValue(line.version.cost),
+            cell: ({ row }) => (
+                <span className="tabular-nums">{costText(row.original.version.cost)}</span>
+            ),
         },
         {
             id: "created",
@@ -192,12 +244,15 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
     const info = versions.data?.find((item) => item.number === line.version.number);
     const { model, version } = line;
     const kind = KIND_NAMES[version.kind] ?? version.kind;
+    const summary = lineHeadline(line);
+    const cost = info?.cost ?? version.cost;
     return (
         <>
             <DialogHeader>
                 <DialogTitle>{`${model.name} v${version.number}`}</DialogTitle>
                 <DialogDescription>{`${kind} · created ${relativeTime(version.created_at)}`}</DialogDescription>
             </DialogHeader>
+            {summary && <p className="text-base font-semibold tabular-nums">{summary}</p>}
             <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <Stat label="Status" value={<VersionState version={version} />} />
                 <Stat label="Held-out" value={percent(info?.held_out?.accuracy)} />
@@ -216,8 +271,23 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                 <Stat label="Macro F1" value={info?.held_out?.macro_f1.toFixed(3) ?? "–"} />
                 <Stat label="Invalid" value={percent(info?.held_out?.invalid_rate)} />
                 <Stat label="p50" value={milliseconds(info?.latency_p50_ms)} />
+                <Stat label="p95" value={milliseconds(info?.latency_p95_ms)} />
+                <Stat
+                    label="GPU time per 1,000"
+                    value={
+                        <span className="inline-flex items-center gap-1">
+                            {deviceTime(cost)}
+                            <InfoTip label="How cost is measured">{COST_INFO}</InfoTip>
+                        </span>
+                    }
+                />
+                {priced(cost) && <Stat label="Cost per 1,000" value={costText(cost)} />}
                 <Stat label="Prompt tokens" value={count(info?.prompt_tokens)} />
+                <Stat label="Output tokens" value={count(cost?.completion_tokens)} />
             </div>
+            {cost?.device_name && (
+                <p className="text-sm text-muted-foreground">{measuredOn(cost)}</p>
+            )}
             {info && info.mistakes.length > 0 && (
                 <div className="flex min-w-0 flex-col gap-2">
                     <div>
@@ -403,7 +473,7 @@ export function EvaluationsPage() {
                         </p>
                     )
                 }
-                minWidth="min-w-[760px]"
+                minWidth="min-w-[1000px]"
             />
             <VersionDialog
                 target={target}

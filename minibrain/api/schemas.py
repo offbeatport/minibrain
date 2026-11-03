@@ -359,6 +359,21 @@ class SplitScore(BaseModel):
     invalid_rate: float
 
 
+class EvalCost(BaseModel):
+    source: Literal["device_time"]
+    pool: str | None
+    device: str | None
+    device_name: str | None
+    batch_size: int | None
+    requests: int
+    device_seconds_per_1k: float
+    prompt_tokens: float | None
+    completion_tokens: float | None
+    hourly_price: float | None
+    currency: str | None
+    per_1k: float | None
+
+
 class Mistake(BaseModel):
     input: str
     gold: str
@@ -380,6 +395,7 @@ class VersionInfo(BaseModel):
     latency_p50_ms: float | None
     latency_p95_ms: float | None
     prompt_tokens: float | None
+    cost: EvalCost | None = None
     mistakes: list[Mistake]
     job: JobInfo | None
     created_at: datetime
@@ -678,6 +694,9 @@ class VersionRow(BaseModel):
     usage: Usage | None
     created_at: datetime
     health: Health | None = None
+    latency_p50_ms: float | None = None
+    latency_p95_ms: float | None = None
+    cost: EvalCost | None = None
 
 
 class ModelRow(BaseModel):

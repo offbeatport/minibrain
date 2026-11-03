@@ -21,6 +21,7 @@ from minibrain.models.cache import touch
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, VersionKind
+from minibrain.registry.prices import load_prices
 from minibrain.registry.service import (
     ConflictError,
     create_version,
@@ -42,7 +43,8 @@ def audit_version(session: Session, minibrain: Minibrain, number: int, action: s
 def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
     minibrain = get_minibrain(session, slug)
     versions = sorted(minibrain.versions, key=lambda version: version.number, reverse=True)
-    return [version_info(minibrain, version) for version in versions]
+    prices = load_prices(session)
+    return [version_info(minibrain, version, prices) for version in versions]
 
 
 @router.post("/minibrains/{slug}/versions", status_code=201)

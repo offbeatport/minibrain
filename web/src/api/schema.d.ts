@@ -1214,6 +1214,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/compute/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Prices */
+        get: operations["read_prices_api_compute_prices_get"];
+        /** Update Prices */
+        put: operations["update_prices_api_compute_prices_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policies": {
         parameters: {
             query?: never;
@@ -2614,6 +2632,9 @@ export interface components {
             latency_p50_ms: number | null;
             /** Accuracy Change */
             accuracy_change: number | null;
+            /** Latency P95 Ms */
+            latency_p95_ms?: number | null;
+            cost?: components["schemas"]["CardCost"] | null;
         };
         /** CardConfusion */
         CardConfusion: {
@@ -2623,6 +2644,33 @@ export interface components {
             predicted: string | null;
             /** Count */
             count: number;
+        };
+        /** CardCost */
+        CardCost: {
+            /** Source */
+            source: string;
+            /** Pool */
+            pool: string | null;
+            /** Device */
+            device: string | null;
+            /** Device Name */
+            device_name: string | null;
+            /** Batch Size */
+            batch_size: number | null;
+            /** Requests */
+            requests: number;
+            /** Device Seconds Per 1K */
+            device_seconds_per_1k: number;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Hourly Price */
+            hourly_price: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Per 1K */
+            per_1k: number | null;
         };
         /** CardData */
         CardData: {
@@ -2664,6 +2712,7 @@ export interface components {
             run: components["schemas"]["CardRun"] | null;
             prompt_only: components["schemas"]["CardComparison"] | null;
             previous: components["schemas"]["CardComparison"] | null;
+            cost?: components["schemas"]["CardCost"] | null;
         };
         /** CardEvent */
         CardEvent: {
@@ -3491,6 +3540,22 @@ export interface components {
             /** Cpu Count */
             cpu_count: number;
         };
+        /** DevicePricesInfo */
+        DevicePricesInfo: {
+            /** Currency */
+            currency: string;
+            /** Pools */
+            pools: components["schemas"]["PoolPrice"][];
+        };
+        /** DevicePricesUpdate */
+        DevicePricesUpdate: {
+            /** Currency */
+            currency?: string | null;
+            /** Hourly */
+            hourly?: {
+                [key: string]: number;
+            } | null;
+        };
         /** DiffRow */
         DiffRow: {
             /** Input */
@@ -3543,6 +3608,36 @@ export interface components {
             error?: string | null;
             /** Code */
             code?: string | null;
+        };
+        /** EvalCost */
+        EvalCost: {
+            /**
+             * Source
+             * @constant
+             */
+            source: "device_time";
+            /** Pool */
+            pool: string | null;
+            /** Device */
+            device: string | null;
+            /** Device Name */
+            device_name: string | null;
+            /** Batch Size */
+            batch_size: number | null;
+            /** Requests */
+            requests: number;
+            /** Device Seconds Per 1K */
+            device_seconds_per_1k: number;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Hourly Price */
+            hourly_price: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Per 1K */
+            per_1k: number | null;
         };
         /** EventBody */
         EventBody: {
@@ -4847,6 +4942,17 @@ export interface components {
             /** Engines */
             engines: components["schemas"]["ReplicaInfo"][];
         };
+        /** PoolPrice */
+        PoolPrice: {
+            /** Pool */
+            pool: string;
+            /** Label */
+            label: string;
+            /** Accelerators */
+            accelerators: string[];
+            /** Hourly Price */
+            hourly_price: number | null;
+        };
         /** PreviewResponse */
         PreviewResponse: {
             /** Rows */
@@ -5373,6 +5479,7 @@ export interface components {
             latency_p95_ms: number | null;
             /** Prompt Tokens */
             prompt_tokens: number | null;
+            cost?: components["schemas"]["EvalCost"] | null;
             /** Mistakes */
             mistakes: components["schemas"]["Mistake"][];
             job: components["schemas"]["JobInfo"] | null;
@@ -5407,6 +5514,11 @@ export interface components {
              */
             created_at: string;
             health?: components["schemas"]["Health"] | null;
+            /** Latency P50 Ms */
+            latency_p50_ms?: number | null;
+            /** Latency P95 Ms */
+            latency_p95_ms?: number | null;
+            cost?: components["schemas"]["EvalCost"] | null;
         };
         /** WorkerBody */
         WorkerBody: {
@@ -8137,6 +8249,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolInfo"][];
+                };
+            };
+        };
+    };
+    read_prices_api_compute_prices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePricesInfo"];
+                };
+            };
+        };
+    };
+    update_prices_api_compute_prices_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePricesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePricesInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

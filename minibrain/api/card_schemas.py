@@ -141,6 +141,21 @@ class CardConfusion(BaseModel):
     count: int
 
 
+class CardCost(BaseModel):
+    source: str
+    pool: str | None
+    device: str | None
+    device_name: str | None
+    batch_size: int | None
+    requests: int
+    device_seconds_per_1k: float
+    prompt_tokens: float | None
+    completion_tokens: float | None
+    hourly_price: float | None
+    currency: str | None
+    per_1k: float | None
+
+
 class CardComparison(BaseModel):
     number: int
     kind: str
@@ -150,6 +165,8 @@ class CardComparison(BaseModel):
     test_accuracy: float | None
     latency_p50_ms: float | None
     accuracy_change: float | None
+    latency_p95_ms: float | None = None
+    cost: CardCost | None = None
 
 
 class CardEvaluation(BaseModel):
@@ -163,6 +180,7 @@ class CardEvaluation(BaseModel):
     run: CardRun | None
     prompt_only: CardComparison | None
     previous: CardComparison | None
+    cost: CardCost | None = None
 
 
 class CardLimit(BaseModel):

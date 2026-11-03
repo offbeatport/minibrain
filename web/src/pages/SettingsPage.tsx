@@ -1,12 +1,25 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { BookMarked, GraduationCap, Palette, Split } from "lucide-react";
-import { Button, SettingsGroup, SettingsRow, Switch } from "obp-ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookMarked, Coins, GraduationCap, Palette, Split } from "lucide-react";
+import {
+    Button,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    SettingsGroup,
+    SettingsRow,
+    Switch,
+} from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useCatalog, useInstallSettings } from "~/api/queries";
+import type { components } from "~/api/schema";
+import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ThemeChoice } from "~/components/ThemeChoice";
+import { CURRENCIES } from "~/lib/cost";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { useModelsRefresh } from "./models/dialogs";
@@ -93,6 +106,113 @@ function ModelCatalogue() {
     );
 }
 
+type PoolPrice = components["schemas"]["PoolPrice"];
+type PricesUpdate = components["schemas"]["DevicePricesUpdate"];
+
+const PRICES_KEY = ["compute", "prices"] as const;
+const MAX_HOURLY_PRICE = 1_000_000;
+
+function useSavePrices() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (body: PricesUpdate) => unwrap(api.PUT("/api/compute/prices", { body })),
+        onSuccess: async (saved) => {
+            client.setQueryData(PRICES_KEY, saved);
+            await client.invalidateQueries({
+                predicate: (query) => query.queryKey[0] !== "compute",
+            });
+        },
+    });
+}
+
+function CurrencyRow({ value }: { value: string | undefined }) {
+    const save = useSavePrices();
+    const choices = value && !CURRENCIES.includes(value) ? [value, ...CURRENCIES] : CURRENCIES;
+    return (
+        <SettingsRow
+            id="price-currency"
+            label="Currency"
+            description="Used for every price below. No exchange rates: changing it relabels the prices."
+            error={errorMessage(save.error)}
+            control={
+                <Select
+                    value={value ?? "USD"}
+                    onValueChange={(next) => save.mutate({ currency: String(next) })}
+                >
+                    <SelectTrigger
+                        id="price-currency"
+                        aria-describedby="price-currency-description"
+                        className="w-32"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {choices.map((code) => (
+                            <SelectItem key={code} value={code}>
+                                {code}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            }
+        />
+    );
+}
+
+function poolDescription(pool: PoolPrice): string {
+    const machines = pool.accelerators.length
+        ? pool.accelerators.join("; ")
+        : "No machine reports here now";
+    return `${machines}. 0 shows GPU time instead of cost.`;
+}
+
+function PoolPriceRow({ pool, currency }: { pool: PoolPrice; currency: string }) {
+    const save = useSavePrices();
+    return (
+        <NumberSettingRow
+            id={`price-${pool.pool}`}
+            label={pool.pool === "local" ? pool.label : `Pool ${pool.label}`}
+            description={poolDescription(pool)}
+            value={pool.hourly_price ?? 0}
+            min={0}
+            max={MAX_HOURLY_PRICE}
+            step={0.1}
+            largeStep={1}
+            format={{ style: "currency", currency, maximumFractionDigits: 4 }}
+            unit="per hour"
+            groupClassName="w-36"
+            pending={save.isPending}
+            error={save.error}
+            onSave={(next, saved) =>
+                save.mutate({ hourly: { [pool.pool]: next } }, { onSuccess: saved })
+            }
+        />
+    );
+}
+
+function ComputePrices() {
+    const prices = useQuery({
+        queryKey: PRICES_KEY,
+        queryFn: () => unwrap(api.GET("/api/compute/prices")),
+    });
+    const data = prices.data;
+    return (
+        <PanelSection
+            icon={Coins}
+            title="Compute prices"
+            description="Scoring measures GPU time per request. A price per hour turns it into cost per 1,000 requests; without one, Evaluations and model cards show the time."
+        >
+            <ErrorLine error={prices.error} />
+            <SettingsGroup>
+                <CurrencyRow value={data?.currency} />
+                {(data?.pools ?? []).map((pool) => (
+                    <PoolPriceRow key={pool.pool} pool={pool} currency={data?.currency ?? "USD"} />
+                ))}
+            </SettingsGroup>
+        </PanelSection>
+    );
+}
+
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     return (
@@ -101,6 +221,7 @@ export function SettingsPage() {
             <PanelSections>
                 <Appearance />
                 <ModelCatalogue />
+                <ComputePrices />
                 <PanelSection icon={GraduationCap} title="Default training recipe">
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (

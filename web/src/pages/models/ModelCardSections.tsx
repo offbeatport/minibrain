@@ -28,6 +28,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { PanelSection, Stat } from "~/components/Section";
 import { auditHref } from "~/lib/audit";
+import { costText, deviceTime, duration, headline, measuredOn, money, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
 import { exactTime } from "~/lib/time";
 import { itemHref } from "../data/catalogue";
@@ -539,7 +540,41 @@ function metrics(card: ModelCard): Metric[] {
             show: milliseconds,
             better: "lower",
         },
+        {
+            id: "p95",
+            label: "Latency p95",
+            mine: evaluation.latency_p95_ms,
+            pick: (other) => other.latency_p95_ms,
+            show: milliseconds,
+            better: "lower",
+        },
     ];
+}
+
+function costRow(card: ModelCard, others: Compared[]): CompareRow {
+    const costs = [card.evaluation.cost, ...others.map((other) => other.comparison.cost)];
+    const currency = costs.find((cost) => cost?.currency)?.currency;
+    const allPriced = Boolean(currency) && costs.every((cost) => cost?.per_1k != null);
+    const values = costs.map((cost) =>
+        cost ? (allPriced ? cost.per_1k : cost.device_seconds_per_1k) : null,
+    );
+    return {
+        id: "cost",
+        label: allPriced ? "Cost per 1,000" : "GPU time per 1,000",
+        cells: costs.map((cost, index) => (
+            <Numeric
+                key={index === 0 ? "this" : others[index - 1]?.id}
+                value={allPriced ? costText(cost) : deviceTime(cost)}
+            />
+        )),
+        values,
+        differs: new Set(values.map(String)).size > 1,
+        formatDelta:
+            allPriced && currency
+                ? (amount) => money(amount, currency)
+                : (amount) => duration(amount),
+        better: "lower",
+    };
 }
 
 function ComparisonTable({ card }: { card: ModelCard }) {
@@ -569,6 +604,7 @@ function ComparisonTable({ card }: { card: ModelCard }) {
             ],
         },
         ...metrics(card).map((metric) => metricRow(metric, others)),
+        costRow(card, others),
     ];
     return (
         <CompareTable
@@ -641,9 +677,25 @@ function confusionKey(item: Confusion): string {
     return `${item.expected}→${item.predicted ?? ""}`;
 }
 
+function cardHeadline(card: ModelCard): string | null {
+    const baseline = card.evaluation.prompt_only;
+    if (!baseline) {
+        return null;
+    }
+    return headline(
+        { number: baseline.number, accuracy: baseline.held_out_accuracy, cost: baseline.cost },
+        {
+            number: card.version.number,
+            accuracy: card.evaluation.held_out?.accuracy,
+            cost: card.evaluation.cost,
+        },
+    );
+}
+
 export function EvaluationSection({ card }: { card: ModelCard }) {
     const evaluation = card.evaluation;
     const held = evaluation.held_out;
+    const summary = cardHeadline(card);
     return (
         <PanelSection
             icon={Gauge}
@@ -653,6 +705,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
         >
             <Panel>
                 {!evaluation.scored && <p className="pb-3 text-sm text-warning">Not scored yet.</p>}
+                {summary && <p className="pb-3 text-base font-semibold tabular-nums">{summary}</p>}
                 <div className="flex flex-wrap gap-x-8 gap-y-4">
                     <Stat label="Held-out rows" value={count(held?.examples)} />
                     <Stat label="Held-out accuracy" value={percent(held?.accuracy)} />
@@ -661,7 +714,16 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
                     <Stat label="Test set" value={percent(evaluation.test_set?.accuracy)} />
                     <Stat label="p50" value={milliseconds(evaluation.latency_p50_ms)} />
                     <Stat label="p95" value={milliseconds(evaluation.latency_p95_ms)} />
+                    <Stat label="GPU time per 1,000" value={deviceTime(evaluation.cost)} />
+                    {priced(evaluation.cost) && (
+                        <Stat label="Cost per 1,000" value={costText(evaluation.cost)} />
+                    )}
                 </div>
+                {evaluation.cost?.device_name && (
+                    <p className="pt-3 text-sm text-muted-foreground">
+                        {measuredOn(evaluation.cost)}
+                    </p>
+                )}
                 <div className="pt-4">
                     <Facts items={runFacts(evaluation.run)} />
                 </div>

@@ -493,6 +493,11 @@ once it matches; only the cache budget below removes files.
   with the task type's metric.
 - Reported per model: score, p50 / p95 latency, cost per 1,000 requests (GPU time for local models, list price for API
   teachers). The headline reads like "base 54% → minibrain 91% at 1/20 of the teacher's cost".
+- Local cost: the eval job times the device per batch of 8 held-out rows and records GPU-seconds, requests, tokens in
+  and out, the device and the worker's pool (`metrics.cost`, source `device_time`). Cost per 1,000 requests is that
+  time × the pool's price per hour from Settings → General → Compute prices (one currency per install, audited as
+  `settings.prices`). With no price it shows the GPU time instead; prices are never looked up online. An API teacher
+  will record source `list_price` with its token counts.
 - Deploy at any step. A custom model can be deployed the moment it exists: with no version yet it serves its base model.
   Any ready version can then be deployed, scored or not, whatever its score; scores inform the choice and never block
   it. Training or scoring never changes what is live.
@@ -902,7 +907,9 @@ Everything in the v1 scope below, after M1.
 - [ ] `response_format` with `json_schema` (built: SGLang gets EBNF or `json_schema`, llama.cpp grammars, MLX and
       `transformers` token tries for labels and finite schemas, every JSON answer checked in the gateway; llama.cpp,
       MLX and `transformers` verified on Qwen3-0.6B, SGLang only against a fake process: verify on a GPU box)
-- [ ] Cost and latency in eval
+- [ ] Cost and latency in eval (p50 / p95, GPU time and cost per 1,000 requests priced per pool, and the headline
+      against v0 on Evaluations and model cards done; list price for API teachers waits for the teacher pool, and
+      "no training needed" for `target.min_score`, which does not exist yet)
 - [ ] `minibrain.yaml` and `minibrain run`
 - [x] Sources: uploads, server folders, S3, PostgreSQL, MySQL and Iceberg on S3 via DuckDB, through connections with
       encrypted write-only secrets; DuckDB extensions installed offline

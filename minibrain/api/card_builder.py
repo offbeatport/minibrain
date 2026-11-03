@@ -11,6 +11,7 @@ from minibrain.api.card_schemas import (
     CardCheck,
     CardComparison,
     CardConfusion,
+    CardCost,
     CardData,
     CardEvaluation,
     CardEvent,
@@ -52,6 +53,7 @@ from minibrain.registry.models import (
     VersionStatus,
     Worker,
 )
+from minibrain.registry.prices import DevicePrices, eval_cost, load_prices
 from minibrain.settings import Settings
 
 CARD_ACTIONS = ("version.create", "version.promote", "model.deploy", "model.undeploy")
@@ -339,7 +341,27 @@ def accuracy_of(version: Version) -> float | None:
     return None if split is None else float(split.get("accuracy", 0.0))
 
 
-def comparison(version: Version, other: Version) -> CardComparison:
+def cost_card(metrics: dict[str, Any] | None, prices: DevicePrices) -> CardCost | None:
+    found = eval_cost(metrics, prices)
+    if found is None:
+        return None
+    return CardCost(
+        source=found.source,
+        pool=found.pool,
+        device=found.device,
+        device_name=found.device_name,
+        batch_size=found.batch_size,
+        requests=found.requests,
+        device_seconds_per_1k=rounded(found.device_seconds_per_1k, 3) or 0.0,
+        prompt_tokens=rounded(found.prompt_tokens, 1),
+        completion_tokens=rounded(found.completion_tokens, 1),
+        hourly_price=rounded(found.hourly_price),
+        currency=found.currency,
+        per_1k=rounded(found.per_1k, 6),
+    )
+
+
+def comparison(version: Version, other: Version, prices: DevicePrices) -> CardComparison:
     metrics = other.metrics or {}
     mine, theirs = accuracy_of(version), accuracy_of(other)
     change = None if mine is None or theirs is None else rounded(mine - theirs)
@@ -352,6 +374,8 @@ def comparison(version: Version, other: Version) -> CardComparison:
         test_accuracy=rounded((metrics.get("golden") or {}).get("accuracy")),
         latency_p50_ms=rounded((metrics.get("latency") or {}).get("p50_ms"), 1),
         accuracy_change=change,
+        latency_p95_ms=rounded((metrics.get("latency") or {}).get("p95_ms"), 1),
+        cost=cost_card(metrics, prices),
     )
 
 
@@ -379,6 +403,7 @@ def evaluation_card(session: Session, minibrain: Minibrain, version: Version) ->
     previous = previous_version(minibrain, version)
     labels = (split or {}).get("labels")
     confusions = (split or {}).get("confusion")
+    prices = load_prices(session)
     return CardEvaluation(
         scored=is_scored(version),
         held_out=score_card(split),
@@ -388,8 +413,9 @@ def evaluation_card(session: Session, minibrain: Minibrain, version: Version) ->
         per_label=None if labels is None else [label_score(item) for item in labels],
         confusion=None if confusions is None else [confusion_card(item) for item in confusions],
         run=run_card(session, version_job(minibrain, version, JobKind.EVAL), metrics.get("device")),
-        prompt_only=comparison(version, baseline) if baseline is not None else None,
-        previous=comparison(version, previous) if previous is not None else None,
+        prompt_only=comparison(version, baseline, prices) if baseline is not None else None,
+        previous=comparison(version, previous, prices) if previous is not None else None,
+        cost=cost_card(metrics, prices),
     )
 
 

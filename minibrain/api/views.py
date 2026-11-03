@@ -1,3 +1,6 @@
+from dataclasses import asdict
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from minibrain.api.schemas import (
@@ -5,6 +8,7 @@ from minibrain.api.schemas import (
     ChangeInfo,
     CheckInfo,
     ColumnInfo,
+    EvalCost,
     JobDetail,
     JobInfo,
     KeyInfo,
@@ -33,6 +37,7 @@ from minibrain.registry.models import (
     Snapshot,
     Version,
 )
+from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
@@ -154,7 +159,12 @@ def latest_job(minibrain: Minibrain, version: Version) -> Job | None:
     return max(jobs, key=lambda job: job.id, default=None)
 
 
-def version_info(minibrain: Minibrain, version: Version) -> VersionInfo:
+def cost_info(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost | None:
+    found = eval_cost(metrics, prices)
+    return None if found is None else EvalCost.model_validate(asdict(found))
+
+
+def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | None = None) -> VersionInfo:
     metrics = version.metrics or {}
     latency = metrics.get("latency") or {}
     job = latest_job(minibrain, version)
@@ -173,6 +183,7 @@ def version_info(minibrain: Minibrain, version: Version) -> VersionInfo:
         latency_p50_ms=latency.get("p50_ms"),
         latency_p95_ms=latency.get("p95_ms"),
         prompt_tokens=metrics.get("prompt_tokens"),
+        cost=cost_info(metrics, prices or DevicePrices()),
         mistakes=[Mistake.model_validate(item) for item in (metrics.get("eval") or {}).get("mistakes", [])],
         job=job_info(job) if job is not None else None,
         created_at=version.created_at,

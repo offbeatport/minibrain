@@ -20,6 +20,7 @@ from minibrain.api.schemas import (
     Usage,
     VersionRow,
 )
+from minibrain.api.views import cost_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
@@ -42,6 +43,7 @@ from minibrain.registry.models import (
     VersionStatus,
     now,
 )
+from minibrain.registry.prices import DevicePrices, load_prices
 from minibrain.registry.service import held_out_accuracy, latest_snapshot
 from minibrain.settings import Settings
 
@@ -263,11 +265,13 @@ def version_rows(
     jobs: list[Job],
     version_usage: dict[tuple[int, int], Usage],
     base_hash: str | None = None,
+    prices: DevicePrices | None = None,
 ) -> list[VersionRow]:
     rows: list[VersionRow] = []
     for version in sorted(minibrain.versions, key=lambda item: item.number, reverse=True):
         job = next((item for item in jobs if item.version_id == version.id), None)
         active = job is not None and job.status in ACTIVE_JOB_STATUSES
+        latency = (version.metrics or {}).get("latency") or {}
         rows.append(
             VersionRow(
                 number=version.number,
@@ -281,6 +285,9 @@ def version_rows(
                 usage=version_usage.get((minibrain.id, version.number)),
                 created_at=version.created_at,
                 health=version_health(minibrain, version, base_hash),
+                latency_p50_ms=latency.get("p50_ms"),
+                latency_p95_ms=latency.get("p95_ms"),
+                cost=cost_info(version.metrics, prices or DevicePrices()),
             )
         )
     return rows
@@ -315,6 +322,7 @@ def custom_row(
     usage: Usage | None = None,
     version_usage: dict[tuple[int, int], Usage] | None = None,
     base: tuple[str, Health | None, str | None, Availability | None] | None = None,
+    prices: DevicePrices | None = None,
 ) -> ModelRow:
     base_name, broken, base_hash, base_state = base or (minibrain.base_model, None, None, None)
     availability = custom_availability(minibrain, store)
@@ -350,7 +358,7 @@ def custom_row(
         update_available=False,
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
-        versions=version_rows(minibrain, jobs, version_usage or {}, base_hash),
+        versions=version_rows(minibrain, jobs, version_usage or {}, base_hash, prices),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         stages=custom_stages(minibrain, jobs),
@@ -469,6 +477,7 @@ def all_rows(
     by_minibrain, by_model = jobs_by(session)
     weights = base_weights(session)
     usage = usage_index(session)
+    prices = load_prices(session)
     models = list(session.scalars(select(Model)))
     base_rows = [
         base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id), context) for model in models
@@ -492,6 +501,7 @@ def all_rows(
             usage.custom.get(minibrain.id),
             usage.versions,
             bases.get(minibrain.base_model),
+            prices,
         )
         for minibrain in session.scalars(select(Minibrain))
     ]

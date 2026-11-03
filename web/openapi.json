@@ -3594,6 +3594,66 @@
         }
       }
     },
+    "/api/compute/prices": {
+      "get": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "Read Prices",
+        "operationId": "read_prices_api_compute_prices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePricesInfo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "compute"
+        ],
+        "summary": "Update Prices",
+        "operationId": "update_prices_api_compute_prices_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePricesUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicePricesInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/policies": {
       "get": {
         "tags": [
@@ -8223,6 +8283,27 @@
               }
             ],
             "title": "Accuracy Change"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardCost"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8267,6 +8348,137 @@
           "count"
         ],
         "title": "CardConfusion"
+      },
+      "CardCost": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Size"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "device_seconds_per_1k": {
+            "type": "number",
+            "title": "Device Seconds Per 1K"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "hourly_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Price"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "per_1k": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per 1K"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "pool",
+          "device",
+          "device_name",
+          "batch_size",
+          "requests",
+          "device_seconds_per_1k",
+          "prompt_tokens",
+          "completion_tokens",
+          "hourly_price",
+          "currency",
+          "per_1k"
+        ],
+        "title": "CardCost"
       },
       "CardData": {
         "properties": {
@@ -8473,6 +8685,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CardComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardCost"
               },
               {
                 "type": "null"
@@ -11004,6 +11226,65 @@
         ],
         "title": "DeviceInfo"
       },
+      "DevicePricesInfo": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/PoolPrice"
+            },
+            "type": "array",
+            "title": "Pools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "pools"
+        ],
+        "title": "DevicePricesInfo"
+      },
+      "DevicePricesUpdate": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "hourly": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number",
+                  "maximum": 1000000.0,
+                  "minimum": 0.0
+                },
+                "propertyNames": {
+                  "maxLength": 200,
+                  "minLength": 1
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly"
+          }
+        },
+        "type": "object",
+        "title": "DevicePricesUpdate"
+      },
       "DiffRow": {
         "properties": {
           "input": {
@@ -11125,6 +11406,138 @@
           "state"
         ],
         "title": "EngineBody"
+      },
+      "EvalCost": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "const": "device_time",
+            "title": "Source"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Size"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "device_seconds_per_1k": {
+            "type": "number",
+            "title": "Device Seconds Per 1K"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "hourly_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Price"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "per_1k": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per 1K"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "pool",
+          "device",
+          "device_name",
+          "batch_size",
+          "requests",
+          "device_seconds_per_1k",
+          "prompt_tokens",
+          "completion_tokens",
+          "hourly_price",
+          "currency",
+          "per_1k"
+        ],
+        "title": "EvalCost"
       },
       "EventBody": {
         "properties": {
@@ -15241,6 +15654,44 @@
         ],
         "title": "PoolInfo"
       },
+      "PoolPrice": {
+        "properties": {
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "accelerators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Accelerators"
+          },
+          "hourly_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hourly Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool",
+          "label",
+          "accelerators",
+          "hourly_price"
+        ],
+        "title": "PoolPrice"
+      },
       "PreviewResponse": {
         "properties": {
           "rows": {
@@ -16789,6 +17240,16 @@
             ],
             "title": "Prompt Tokens"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvalCost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "mistakes": {
             "items": {
               "$ref": "#/components/schemas/Mistake"
@@ -16913,6 +17374,38 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Health"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P50 Ms"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvalCost"
               },
               {
                 "type": "null"

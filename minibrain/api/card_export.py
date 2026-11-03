@@ -7,6 +7,7 @@ from typing import Any
 from minibrain.api.card_schemas import (
     CANONICAL_FORM,
     CardComparison,
+    CardCost,
     CardEvent,
     CardRun,
     CardScore,
@@ -101,6 +102,41 @@ def duration(seconds: float | None) -> str:
     if hours:
         return f"{hours} h {minutes} min"
     return f"{minutes} min {rest} s" if minutes else f"{rest} s"
+
+
+def device_time(cost: CardCost | None) -> str:
+    if cost is None:
+        return NONE
+    value = cost.device_seconds_per_1k
+    shown = f"{value:.3g} s" if value < 60 else duration(value)
+    return f"{shown} of {'CPU' if cost.device == 'cpu' else 'GPU'} time"
+
+
+def money(amount: float, currency: str | None) -> str:
+    shown = f"{amount:,.2f}" if amount >= 1 else f"{amount:.3g}"
+    return f"{shown} {currency or ''}".strip()
+
+
+def cost_text(cost: CardCost | None) -> str:
+    if cost is None:
+        return NONE
+    if cost.per_1k is None:
+        return f"No price per hour set for pool {cost.pool or NONE}"
+    rate = money(cost.hourly_price or 0.0, cost.currency)
+    return f"{money(cost.per_1k, cost.currency)} at {rate} per device hour"
+
+
+def tokens_text(cost: CardCost | None) -> str:
+    if cost is None or cost.prompt_tokens is None or cost.completion_tokens is None:
+        return NONE
+    return f"{cost.prompt_tokens:,.1f} in and {cost.completion_tokens:,.1f} out"
+
+
+def measured_on(cost: CardCost | None) -> str:
+    if cost is None:
+        return NONE
+    pool = f", pool {cost.pool}" if cost.pool else ""
+    return f"{cost.requests:,} held-out requests in batches of {cost.batch_size or 1} on {cost.device_name}{pool}"
 
 
 def table(header: list[str], rows: Iterable[list[Any]]) -> list[str]:
@@ -281,6 +317,9 @@ def compare_lines(card: ModelCard) -> list[str]:
         ],
         ["Test set accuracy", percent(test.accuracy if test else None), *(percent(o.test_accuracy) for o in columns)],
         ["Latency p50", ms(evaluation.latency_p50_ms), *(ms(o.latency_p50_ms) for o in columns)],
+        ["Latency p95", ms(evaluation.latency_p95_ms), *(ms(o.latency_p95_ms) for o in columns)],
+        ["Device time per 1,000 requests", device_time(evaluation.cost), *(device_time(o.cost) for o in columns)],
+        ["Cost per 1,000 requests", cost_text(evaluation.cost), *(cost_text(o.cost) for o in columns)],
     ]
     return table(header, rows)
 
@@ -313,6 +352,10 @@ def evaluation_section(card: ModelCard) -> list[str]:
         ("Answers not a label", percent(held.invalid_rate) if held else None),
         ("Test set", score_text(evaluation.test_set)),
         ("Latency p50 and p95", f"{ms(evaluation.latency_p50_ms)} and {ms(evaluation.latency_p95_ms)}"),
+        ("Device time per 1,000 requests", device_time(evaluation.cost)),
+        ("Cost per 1,000 requests", cost_text(evaluation.cost)),
+        ("Tokens per request", tokens_text(evaluation.cost)),
+        ("Cost measured on", measured_on(evaluation.cost)),
     ]
     intro = [] if evaluation.scored else ["Not scored yet.", ""]
     lines = section("## Evaluation", intro + facts(rows + run_rows(evaluation.run)))
