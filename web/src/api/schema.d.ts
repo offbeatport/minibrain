@@ -4834,7 +4834,7 @@ export interface operations {
             query?: {
                 minibrain?: string | null;
                 status?: string | null;
-                kind?: string | null;
+                kind?: string[] | null;
                 limit?: number;
             };
             header?: never;

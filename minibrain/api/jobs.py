@@ -1,8 +1,9 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
@@ -31,7 +32,7 @@ def list_jobs(
     session: SessionDep,
     minibrain: str | None = None,
     status: str | None = None,
-    kind: str | None = None,
+    kind: Annotated[list[str] | None, Query()] = None,
     limit: int = 50,
 ) -> list[JobInfo]:
     query = select(Job).order_by(Job.id.desc()).limit(max(1, min(limit, 500)))
@@ -39,8 +40,8 @@ def list_jobs(
         query = query.where(Job.minibrain_id == get_minibrain(session, minibrain).id)
     if status is not None:
         query = query.where(Job.status == status)
-    if kind is not None:
-        query = query.where(Job.kind == kind)
+    if kind:
+        query = query.where(Job.kind.in_(kind))
     return [job_info(job) for job in session.scalars(query)]
 
 

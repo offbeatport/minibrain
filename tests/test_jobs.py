@@ -235,3 +235,17 @@ def test_job_rows_cascade_with_the_minibrain(harness: Harness) -> None:
     assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
     with harness.sessions() as session:
         assert session.get(Job, claim["job_id"]) is None
+
+
+def test_jobs_filter_by_several_kinds(harness: Harness) -> None:
+    lora_job(harness)
+    claim = harness.claim(["train"])
+    assert claim is not None
+    adapter = harness.upload(b"not really a tar", "adapter", "tar", "adapter")
+    body = {"token": claim["token"], "result": {"summary": {}}, "outputs": {"adapter": adapter}}
+    assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
+    kinds = [item["kind"] for item in harness.client.get("/api/jobs?kind=train&kind=eval").json()]
+    assert kinds == ["eval", "train"]
+    everything = {item["kind"] for item in harness.client.get("/api/jobs").json()}
+    assert everything == {"prepare", "train", "eval"}
+    assert [item["kind"] for item in harness.client.get("/api/jobs?kind=train").json()] == ["train"]
