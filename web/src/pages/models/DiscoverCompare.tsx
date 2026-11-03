@@ -146,7 +146,7 @@ function attributes(catalog: CatalogResponse, pool?: string): Attribute[] {
         },
         {
             id: "use",
-            label: "Licence group",
+            label: "Commercial use",
             key: (entry) => licenceUseLabel(entry.license_use),
         },
         {

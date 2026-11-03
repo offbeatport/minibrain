@@ -32,10 +32,10 @@ export const TIERS = [
 export type LicenceUse = CatalogEntry["license_use"];
 
 const LICENCE_USES: { value: LicenceUse; label: string }[] = [
-    { value: "commercial", label: "Commercial use allowed" },
-    { value: "restricted", label: "Commercial use with conditions" },
-    { value: "non-commercial", label: "Non-commercial only" },
-    { value: "unknown", label: "Check the terms" },
+    { value: "commercial", label: "Allowed" },
+    { value: "restricted", label: "With conditions" },
+    { value: "non-commercial", label: "Not allowed" },
+    { value: "unknown", label: "Unreviewed" },
 ];
 
 export function licenceUseLabel(use: LicenceUse): string {
@@ -58,7 +58,6 @@ const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
 };
 
 const FACETS = Object.keys(FACET_KEYS) as Facet[];
-const LICENCE_FACETS: Facet[] = ["uses", "licences"];
 const PANEL_FACETS: Facet[] = ["tasks", "tiers", "uses", "licences", "publishers", "access"];
 
 export function licenceOf(entry: CatalogEntry): string {
@@ -79,6 +78,7 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
 const LABELS: Partial<Record<Facet, Record<string, string>>> = {
     access: Object.fromEntries(ACCESS.map((item) => [item.value, item.label])),
     tiers: Object.fromEntries(TIERS.map((item) => [item.value, item.label])),
+    uses: Object.fromEntries(LICENCE_USES.map((item) => [item.value, item.label])),
 };
 
 function labelOf(facet: Facet, value: string): string {
@@ -121,26 +121,12 @@ function facetHit(entry: CatalogEntry, filters: Filters, facet: Facet): boolean 
     );
 }
 
-function licenceHit(entry: CatalogEntry, filters: Filters): boolean {
-    if (filters.uses.length === 0 && filters.licences.length === 0) {
-        return true;
-    }
-    return filters.uses.includes(entry.license_use) || filters.licences.includes(licenceOf(entry));
-}
-
 export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): boolean {
     const text = `${entry.name} ${entry.description} ${entry.provider} ${entry.repo} ${entry.family} ${entry.architecture}`;
     if (filters.q && !text.toLowerCase().includes(filters.q)) {
         return false;
     }
-    const skipLicence = skip !== undefined && LICENCE_FACETS.includes(skip);
-    return (
-        FACETS.every(
-            (facet) =>
-                facet === skip || LICENCE_FACETS.includes(facet) || facetHit(entry, filters, facet),
-        ) &&
-        (skipLicence || licenceHit(entry, filters))
-    );
+    return FACETS.every((facet) => facet === skip || facetHit(entry, filters, facet));
 }
 
 export function activeFilters(filters: Filters): number {
@@ -182,10 +168,10 @@ const SHOWN = 5;
 
 type OptionItem = { key: string; checked: boolean; node: ReactNode };
 
-function OptionList({ items }: { items: OptionItem[] }) {
+function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: number }) {
     const [expanded, setExpanded] = useState(false);
-    const hidden = items.filter((item, index) => index >= SHOWN && !item.checked).length;
-    const shown = expanded ? items : items.filter((item, index) => index < SHOWN || item.checked);
+    const hidden = items.filter((item, index) => index >= limit && !item.checked).length;
+    const shown = expanded ? items : items.filter((item, index) => index < limit || item.checked);
     return (
         <>
             {shown.map((item) => (
@@ -247,87 +233,6 @@ export function Option({
     );
 }
 
-function LicenceOptions({
-    entries,
-    filters,
-    update,
-    count,
-}: {
-    entries: CatalogEntry[];
-    filters: Filters;
-    update: (patch: ModelsSearch) => void;
-    count: (facet: Facet, value: string) => number;
-}) {
-    const uses = new Map(entries.map((entry) => [licenceOf(entry), entry.license_use]));
-    const namesOf = (use: LicenceUse) =>
-        [...uses]
-            .filter(([, found]) => found === use)
-            .map(([name]) => name)
-            .sort();
-    const groups = LICENCE_USES.filter(
-        (group) => group.value !== "unknown" || namesOf("unknown").length > 0,
-    );
-    const save = (picked: string[], names: string[]) =>
-        update({ use: picked.join(","), licence: [...new Set(names)].join(",") });
-    const toggleGroup = (use: LicenceUse, checked: boolean) => {
-        const names = namesOf(use);
-        const others = filters.uses.filter((value) => value !== use);
-        save(
-            checked ? [...others, use] : others,
-            filters.licences.filter((name) => !names.includes(name)),
-        );
-    };
-    const toggleName = (use: LicenceUse, name: string, checked: boolean) => {
-        const names = namesOf(use);
-        const current = filters.uses.includes(use)
-            ? [...filters.licences, ...names]
-            : filters.licences;
-        const next = checked ? [...current, name] : current.filter((item) => item !== name);
-        const others = filters.uses.filter((value) => value !== use);
-        const whole = names.length > 0 && names.every((item) => next.includes(item));
-        save(
-            whole ? [...others, use] : others,
-            whole ? next.filter((item) => !names.includes(item)) : next,
-        );
-    };
-    return groups.map((group) => {
-        const names = namesOf(group.value);
-        const grouped = filters.uses.includes(group.value);
-        const picked = names.filter((name) => grouped || filters.licences.includes(name));
-        const state =
-            grouped || (names.length > 0 && picked.length === names.length)
-                ? true
-                : picked.length > 0
-                  ? "indeterminate"
-                  : false;
-        return (
-            <Fragment key={group.value}>
-                <Option
-                    checked={state}
-                    onChange={(checked) => toggleGroup(group.value, checked)}
-                    count={count("uses", group.value)}
-                >
-                    {group.label}
-                </Option>
-                {names.length > 0 && (
-                    <div className="flex flex-col gap-2 pl-6">
-                        {names.map((name) => (
-                            <Option
-                                key={name}
-                                checked={picked.includes(name)}
-                                onChange={(checked) => toggleName(group.value, name, checked)}
-                                count={count("licences", name)}
-                            >
-                                <span className="line-clamp-2 break-words">{name}</span>
-                            </Option>
-                        ))}
-                    </div>
-                )}
-            </Fragment>
-        );
-    });
-}
-
 export function FilterPanel({
     entries,
     filters,
@@ -367,6 +272,20 @@ export function FilterPanel({
         }));
     const distinct = (facet: Facet) =>
         [...new Set(entries.flatMap((entry) => FACET_VALUES[facet](entry)))].sort();
+    const popularity = (facet: Facet) => {
+        const tally = new Map<string, number>();
+        for (const value of entries.flatMap((entry) => FACET_VALUES[facet](entry))) {
+            tally.set(value, (tally.get(value) ?? 0) + 1);
+        }
+        return tally;
+    };
+    const byPopularity = (facet: Facet) => {
+        const tally = popularity(facet);
+        return [...tally.keys()].sort(
+            (left, right) =>
+                (tally.get(right) ?? 0) - (tally.get(left) ?? 0) || left.localeCompare(right),
+        );
+    };
     const active = activeFilters(filters);
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
@@ -400,9 +319,6 @@ export function FilterPanel({
                     )}
                 />
             </Group>
-            <Group title="Licence">
-                <LicenceOptions entries={entries} filters={filters} update={update} count={count} />
-            </Group>
             <Group title="Publisher">
                 <OptionList
                     items={items("publishers", distinct("publishers"), (publisher) => (
@@ -410,6 +326,19 @@ export function FilterPanel({
                             <PublisherLogo publisher={publisher} name={publisher} size="sm" />
                             <span className="line-clamp-2 break-words">{publisher}</span>
                         </>
+                    ))}
+                />
+            </Group>
+            <Group title="Commercial use">
+                {LICENCE_USES.filter(
+                    (use) => use.value !== "unknown" || popularity("uses").has("unknown"),
+                ).map((use) => option("uses", use.value))}
+            </Group>
+            <Group title="Licence">
+                <OptionList
+                    limit={2}
+                    items={items("licences", byPopularity("licences"), (licence) => (
+                        <span className="line-clamp-2 break-words">{licence}</span>
                     ))}
                 />
             </Group>

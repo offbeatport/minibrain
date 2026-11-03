@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, Info, Plus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Plus } from "lucide-react";
 import {
     Badge,
     Button,
@@ -12,6 +12,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    InfoTip,
     Link,
     SearchInput,
     Select,
@@ -436,12 +437,19 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             header: "Licence",
             accessorFn: (entry) => entry.license_name,
             cell: ({ row }) => (
-                <span
-                    className="block max-w-28 truncate"
-                    title={`${row.original.license_name} · ${licenceUseLabel(row.original.license_use)}`}
-                >
-                    {row.original.license_name}
-                </span>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="flex max-w-36 flex-col">
+                            <span className="truncate">{row.original.license_name}</span>
+                            <DataGridDetail className="text-sm text-muted-foreground">
+                                {`Commercial use: ${licenceUseLabel(row.original.license_use).toLowerCase()}`}
+                            </DataGridDetail>
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-72">
+                        {row.original.license_summary}
+                    </TooltipContent>
+                </Tooltip>
             ),
         },
         {
@@ -529,18 +537,7 @@ function FitsOption({
                 count={known ? count : undefined}
             >
                 {`Fits ${poolPhrase(catalog)}`}
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="About hardware fit"
-                            className="flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        >
-                            <Info className="size-3.5" />
-                        </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-72">{fitHint(catalog)}</TooltipContent>
-                </Tooltip>
+                <InfoTip label="About hardware fit">{fitHint(catalog)}</InfoTip>
             </Option>
             <PoolSelect catalog={catalog} onPool={onPool} />
         </>
