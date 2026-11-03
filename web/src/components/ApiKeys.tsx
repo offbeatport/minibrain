@@ -155,7 +155,7 @@ function KeyDialog({
                         event.preventDefault();
                         save.mutate();
                     }}
-                    className="flex flex-col gap-5"
+                    className="contents"
                 >
                     <DialogHeader>
                         <DialogTitle>
