@@ -11,7 +11,7 @@ const STEPS = [
         body: "Qwen3 0.6B is ready to train on any machine. Discover has larger ones.",
     },
     {
-        title: "Add examples",
+        title: "Add training data",
         body: "A CSV or JSONL file with a text column and a label column, or a SQL query.",
     },
     {

@@ -120,7 +120,7 @@ def data_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None)
         return Stage(key="data", state="done", label=f"{sum(snapshot.counts.values()):,} examples")
     if failed is not None and failed.kind == JobKind.PREPARE:
         return Stage(key="data", state="failed", label="Dataset build failed")
-    return Stage(key="data", state="todo", label="Add examples")
+    return Stage(key="data", state="todo", label="Add training data")
 
 
 def train_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:

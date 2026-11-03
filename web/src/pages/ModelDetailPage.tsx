@@ -374,7 +374,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 <DataGrid
                     columns={VERSION_COLUMNS}
                     rows={versions.data ?? []}
-                    empty="No revisions yet: add examples, then train or score a prompt."
+                    empty="No revisions yet: add training data on Training, then train or score a prompt."
                 />
             </PanelSection>
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />

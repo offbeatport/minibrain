@@ -164,7 +164,7 @@ export function Activity({ row }: { row: ModelRow }) {
         state === "ready"
             ? scoped("/evaluations", row)
             : state === "needs_examples"
-              ? scoped("/data", row)
+              ? scoped("/training", row)
               : jobId
                 ? jobHref(row)
                 : null;
@@ -263,7 +263,7 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
         return null;
     }
     if (row.activity.state === "needs_examples") {
-        return { label: "Add examples", run: () => on.open(scoped("/data", row)) };
+        return { label: "Train", run: () => on.open(scoped("/training", row)) };
     }
     if (row.activity.state === "ready") {
         return { label: "Review results", run: () => on.open(scoped("/evaluations", row)) };
@@ -482,7 +482,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Train a model on it
                 </DropdownMenuItem>
             )}
-            {row.kind === "custom" && !version && (
+            {row.kind === "custom" && !version && (row.versions ?? []).length > 0 && (
                 <DropdownMenuItem onSelect={() => on.open(scoped("/evaluations", row))}>
                     <Rocket />
                     {deployed ? "Change deployed version" : "Deploy a version"}
