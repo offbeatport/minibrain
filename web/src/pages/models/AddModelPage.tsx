@@ -309,7 +309,7 @@ function TrainingData({
         onSuccess: (created) => onDataset(created.slug),
     });
     return (
-        <div className="flex flex-col gap-4 pl-10">
+        <div className="flex flex-col gap-4">
             <Select
                 value={source}
                 onValueChange={(next) => {
@@ -585,22 +585,28 @@ export function AddModelPage() {
                     </PanelSection>
                     <PanelSection icon={Database} title="Training data">
                         <div className="flex flex-col gap-3">
-                            <Label className="flex items-center gap-2 font-normal">
-                                <Switch checked={withData} onCheckedChange={setWithData} />
-                                Add training data now
-                            </Label>
-                            {withData ? (
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col gap-0.5">
+                                    <Label htmlFor="with-data">Add training data now</Label>
+                                    <span className="text-sm text-muted-foreground">
+                                        {withData
+                                            ? "Upload a file, use a dataset or start from the sample data."
+                                            : "You can add examples later on the Data page. Until it is trained, the model serves its base model."}
+                                    </span>
+                                </div>
+                                <Switch
+                                    id="with-data"
+                                    checked={withData}
+                                    onCheckedChange={setWithData}
+                                />
+                            </div>
+                            {withData && (
                                 <TrainingData
                                     source={dataSource}
                                     onSource={setDataSource}
                                     dataset={dataset}
                                     onDataset={setDataset}
                                 />
-                            ) : (
-                                <p className="pl-10 text-sm text-muted-foreground">
-                                    You can add examples later on the Data page. Until it is
-                                    trained, the model serves its base model.
-                                </p>
                             )}
                         </div>
                     </PanelSection>
