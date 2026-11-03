@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
+from minibrain.serve.structured import Constraint
 
 if TYPE_CHECKING:
     from minibrain.ml.runtime import Runtime
@@ -23,6 +24,10 @@ class AdapterNotSupportedError(Exception):
     pass
 
 
+class OutputFormatError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class AdapterRef:
     name: str
@@ -36,6 +41,10 @@ class CompletionRequest:
     messages: list[Message]
     adapter: AdapterRef | None
     max_tokens: int
+    constraint: Constraint | None = None
+
+    def decoding_choices(self) -> tuple[str, ...]:
+        return self.constraint.options() if self.constraint else ()
 
 
 class ServingBackend(Protocol):
@@ -81,7 +90,8 @@ class TransformersBackend:
             if request.adapter is not None:
                 self.use_adapter(runtime, request.adapter)
             adapter = request.adapter.name if request.adapter else None
-            return runtime.generate([runtime.render(request.messages)], adapter, request.max_tokens)[0]
+            prompt = runtime.render(request.messages)
+            return runtime.generate([prompt], adapter, request.max_tokens, request.decoding_choices())[0]
 
     def status(self) -> list[dict[str, Any]]:
         return [

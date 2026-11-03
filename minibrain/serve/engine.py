@@ -20,10 +20,12 @@ from minibrain.serve.backend import (
     AdapterRef,
     CompletionRequest,
     EngineRuntime,
+    OutputFormatError,
     ServingBackend,
     TransformersBackend,
 )
 from minibrain.serve.select import NoEngineError, choose_engine
+from minibrain.serve.structured import Constraint
 from minibrain.worker import HttpClient, StreamReader
 
 
@@ -37,6 +39,7 @@ class GenerateBody(BaseModel):
     messages: list[dict[str, str]]
     adapter: AdapterBody | None = None
     max_tokens: int = 64
+    constraint: Constraint | None = None
 
 
 class GenerateResult(BaseModel):
@@ -241,9 +244,13 @@ def create_engine_app(
                 raise HTTPException(status_code=409, detail=mismatch)
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
         try:
-            completion = serving.complete(CompletionRequest(spec, body.messages, adapter, body.max_tokens))
+            completion = serving.complete(
+                CompletionRequest(spec, body.messages, adapter, body.max_tokens, body.constraint)
+            )
         except AdapterNotSupportedError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except OutputFormatError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         return GenerateResult(**completion.__dict__)
 
     return app

@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
@@ -17,8 +18,17 @@ from transformers import (
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.ml.devices import pick_device
+from minibrain.serve.structured import TokenTrie
 
 Message = dict[str, str]
+AllowedTokens = Callable[[int, torch.Tensor], list[int]]
+
+
+def choice_filter(trie: TokenTrie, prompt_length: int, stop: int) -> AllowedTokens:
+    def allowed(_row: int, tokens: torch.Tensor) -> list[int]:
+        return trie.allowed(tokens[prompt_length:].tolist()) or [stop]
+
+    return allowed
 
 
 def stop_ids(tokenizer: PreTrainedTokenizerBase, tokens: tuple[str, ...]) -> list[int]:
@@ -60,11 +70,14 @@ def render_prompt(tokenizer: PreTrainedTokenizerBase, spec: BaseModelSpec, messa
 
 
 def generate_tokens(
-    model: PreTrainedModel | PeftModelForCausalLM, batch: BatchEncoding, config: GenerationConfig
+    model: PreTrainedModel | PeftModelForCausalLM,
+    batch: BatchEncoding,
+    config: GenerationConfig,
+    allowed: AllowedTokens | None = None,
 ) -> torch.Tensor:
     if not isinstance(model, PeftModelForCausalLM | GenerationMixin):
         raise TypeError(f"{type(model).__name__} cannot generate")
-    output = model.generate(**batch, generation_config=config)
+    output = model.generate(**batch, generation_config=config, prefix_allowed_tokens_fn=allowed)
     if not isinstance(output, torch.Tensor):
         raise TypeError(f"expected generated token ids, got {type(output).__name__}")
     return output
@@ -122,8 +135,16 @@ class Runtime:
             seconds=seconds,
         )
 
-    def generate(self, prompts: list[str], adapter: str | None, max_new_tokens: int) -> list[Completion]:
+    def choice_trie(self, choices: Sequence[str]) -> TokenTrie:
+        stop = self.stop_ids[0]
+        return TokenTrie([[*self.tokenizer.encode(choice, add_special_tokens=False), stop] for choice in choices])
+
+    def generate(
+        self, prompts: list[str], adapter: str | None, max_new_tokens: int, choices: Sequence[str] = ()
+    ) -> list[Completion]:
         batch = self.tokenizer(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
+        prompt_length = batch["input_ids"].shape[1]
+        allowed = choice_filter(self.choice_trie(choices), prompt_length, self.stop_ids[0]) if choices else None
         config = GenerationConfig(
             max_new_tokens=max_new_tokens,
             do_sample=False,
@@ -132,9 +153,8 @@ class Runtime:
         )
         started = time.perf_counter()
         with self.adapter_scope(adapter), torch.inference_mode():
-            output = generate_tokens(self.model, batch, config)
+            output = generate_tokens(self.model, batch, config, allowed)
         seconds = time.perf_counter() - started
-        prompt_length = batch["input_ids"].shape[1]
         counts = batch["attention_mask"].sum(dim=1).tolist()
         return [
             self.completion(row[prompt_length:].tolist(), count, seconds)

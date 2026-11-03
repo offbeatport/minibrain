@@ -2935,6 +2935,11 @@ export interface components {
              * @default false
              */
             stream?: boolean;
+            /**
+             * Response Format
+             * @description An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or {"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}.
+             */
+            response_format?: unknown;
         } & {
             [key: string]: unknown;
         };

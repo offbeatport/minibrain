@@ -28,10 +28,11 @@ LABELS = ("billing", "bug", "account", "feature")
 class FakeBackend:
     output: str = "billing"
     requests: list[CompletionRequest] = field(default_factory=list)
+    stopped: bool = True
 
     def complete(self, request: CompletionRequest) -> Completion:
         self.requests.append(request)
-        return Completion(text=self.output, prompt_tokens=12, completion_tokens=2, stopped=True, seconds=0.01)
+        return Completion(text=self.output, prompt_tokens=12, completion_tokens=2, stopped=self.stopped, seconds=0.01)
 
     def status(self) -> list[dict[str, Any]]:
         return []

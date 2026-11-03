@@ -10,8 +10,9 @@ import httpx
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
+from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
 from minibrain.serve.select import sglang_python
+from minibrain.serve.structured import Constraint, choice_grammar
 from minibrain.serve.weights import local_dir
 from minibrain.supervise import Supervisor
 
@@ -41,6 +42,23 @@ def launch_command(spec: BaseModelSpec, port: int) -> list[str]:
         "--max-loras-per-batch",
         str(MAX_LORAS_PER_BATCH),
     ]
+
+
+def constraint_fields(constraint: Constraint | None) -> dict[str, Any]:
+    if constraint is None:
+        return {}
+    if constraint.choices:
+        return {"ebnf": choice_grammar(constraint.choices)}
+    json_schema = {"name": "response", "schema": constraint.json_schema, "strict": True}
+    return {"response_format": {"type": "json_schema", "json_schema": json_schema}}
+
+
+def error_message(response: httpx.Response) -> str:
+    try:
+        found = response.json()
+    except ValueError:
+        return response.text
+    return str(found.get("message") or found.get("detail") or found) if isinstance(found, dict) else str(found)
 
 
 class SglangBackend:
@@ -103,12 +121,14 @@ class SglangBackend:
             "temperature": 0.0,
             "stop": list(spec.stop_tokens),
             "chat_template_kwargs": spec.template_kwargs,
-        }
+        } | constraint_fields(request.constraint)
         if request.adapter is not None:
             self.ensure_adapter(spec, url, request.adapter.name, request.adapter.artifact)
             body["lora_path"] = request.adapter.name
         started = time.perf_counter()
         response = self.http.post(f"{url}/v1/chat/completions", json=body)
+        if response.status_code == 400 and request.constraint is not None:
+            raise OutputFormatError(f"SGLang refused it ({error_message(response)})")
         response.raise_for_status()
         result = response.json()
         choice = result["choices"][0]

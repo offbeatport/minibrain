@@ -194,6 +194,7 @@ def create_app(
     app.state.background = background
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
+    app.add_exception_handler(gateway.OpenAIError, gateway.openai_error)
     app.add_middleware(PeerAddress)
     for module in (
         minibrains,

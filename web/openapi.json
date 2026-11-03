@@ -9436,6 +9436,10 @@
             "type": "boolean",
             "title": "Stream",
             "default": false
+          },
+          "response_format": {
+            "title": "Response Format",
+            "description": "An OpenAI response_format: {\"type\": \"text\"}, {\"type\": \"json_object\"} or {\"type\": \"json_schema\", \"json_schema\": {\"name\": ..., \"schema\": {...}, \"strict\": true}}."
           }
         },
         "additionalProperties": true,

@@ -47,6 +47,31 @@ An inference request never touches the database.
   bottleneck long before gateways or the database.
 - Very high log volume moves to ClickHouse or Parquet in object storage, or to sampling.
 
+## Structured output
+
+`/v1/chat/completions` takes OpenAI's `response_format`: `{"type": "text"}`, `{"type": "json_object"}` or
+`{"type": "json_schema", "json_schema": {"name", "schema", "strict"}}`.
+
+| Request | SGLang | llama.cpp | MLX, `transformers` |
+|---|---|---|---|
+| Classify model, no `response_format` or `text` | Held to the labels (EBNF grammar) | Held to the labels (GBNF grammar) | Held to the labels (token trie) |
+| `json_object` | Constrained (schema `{"type": "object"}`) | Constrained (grammar from the schema) | Free, then checked |
+| `json_schema` | Constrained (`response_format` passed on) | Constrained (grammar from the schema) | Constrained when the schema has a finite set of answers (enums, booleans, objects of them); otherwise free, then checked |
+
+- A Classify answer stays the bare label, as before. If an engine refuses the label grammar, the gateway answers
+  without it and logs a warning.
+- Every JSON answer is checked against the schema in the gateway, whatever the engine. One that does not parse or
+  match is a 422 with `error.code` `invalid_json` or `schema_mismatch`; an answer cut off by `max_tokens`
+  (`finish_reason: length`) comes back as it is. A JSON answer inside a Markdown code fence is unwrapped.
+- A malformed `response_format` or schema is a 400 with an OpenAI `error` object (`message`, `type`, `param`,
+  `code`). A schema the engine cannot compile is a 400 too.
+- Streaming works: the answer is checked, then streamed.
+- The check covers `type`, `enum`, `const`, `properties`, `required`, `additionalProperties`, `items`,
+  `prefixItems`, item and length bounds, number bounds, `anyOf`, `oneOf`, `allOf`, `not` and local `$ref`. It does
+  not run `pattern` (a caller's regular expression could stall the gateway; llama.cpp applies it while decoding) or
+  check `format`, `multipleOf` and `patternProperties`.
+- `strict` is accepted and changes nothing: every answer is constrained, checked, or both.
+
 ## Engines
 
 One engine process serves one base model with many adapters. It picks its engine when it starts, from its own

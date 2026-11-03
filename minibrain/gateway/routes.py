@@ -1,12 +1,15 @@
 import contextlib
 import json
+import logging
+import re
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from typing import Annotated, Literal
+from dataclasses import replace
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from minibrain.base_models import BaseModelSpec, base_model
@@ -18,16 +21,56 @@ from minibrain.ml.completion import Completion
 from minibrain.models.health import base_changed
 from minibrain.registry.models import now
 from minibrain.registry.service import KEY_PREFIX, key_digest
-from minibrain.serve.backend import AdapterRef, CompletionRequest, EngineUnavailableError, ServingBackend
+from minibrain.serve.backend import (
+    AdapterRef,
+    CompletionRequest,
+    EngineUnavailableError,
+    OutputFormatError,
+    ServingBackend,
+)
+from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
 from minibrain.tasks.classify import build_messages
 
 router = APIRouter(prefix="/v1", tags=["openai"])
+log = logging.getLogger("minibrain.gateway")
 
 DEFAULT_MAX_TOKENS = 64
 TEXT_MAX = 50_000
 COMMENT_MAX = 2_000
+FORMAT = "response_format"
+SCHEMA_FORMAT = f"{FORMAT}.json_schema"
+FORMAT_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
+UNCONSTRAINED = "only SGLang and llama.cpp engines constrain decoding, the others check the answer afterwards."
+FORMAT_HELP = (
+    'An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or '
+    '{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}.'
+)
 
 FeedbackSink = Callable[[Submission], int]
+
+
+class OpenAIError(Exception):
+    def __init__(
+        self, status_code: int, message: str, param: str | None = None, code: str | None = None, kind: str = ""
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.message = message
+        self.param = param
+        self.code = code
+        self.kind = kind or "invalid_request_error"
+
+    def body(self) -> dict[str, Any]:
+        return {"error": {"message": self.message, "type": self.kind, "param": self.param, "code": self.code}}
+
+
+async def openai_error(_request: Request, error: Exception) -> JSONResponse:
+    found = error if isinstance(error, OpenAIError) else OpenAIError(500, str(error), kind="server_error")
+    return JSONResponse(status_code=found.status_code, content=found.body())
+
+
+def invalid(param: str, message: str, code: str = "invalid_value") -> OpenAIError:
+    return OpenAIError(400, message, param, code)
 
 
 class Message(BaseModel):
@@ -45,6 +88,7 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = None
     max_completion_tokens: int | None = None
     stream: bool = False
+    response_format: Any = Field(default=None, description=FORMAT_HELP)
 
 
 def gateway_config(request: Request) -> GatewayConfig:
@@ -84,8 +128,72 @@ def route_messages(route: Route, messages: list[dict[str, str]]) -> list[dict[st
     return build_messages(route.kind, texts[-1], route.labels, shots)
 
 
+def schema_format(spec: Any) -> dict[str, Any]:
+    if not isinstance(spec, dict):
+        message = "response_format.json_schema is required when response_format.type is json_schema."
+        raise invalid(SCHEMA_FORMAT, message, "missing_required_parameter")
+    name = spec.get("name")
+    if not isinstance(name, str) or not FORMAT_NAME.fullmatch(name):
+        message = "response_format.json_schema.name must be 1-64 letters, digits, underscores or dashes."
+        raise invalid(f"{SCHEMA_FORMAT}.name", message)
+    if spec.get("strict") is not None and not isinstance(spec["strict"], bool):
+        raise invalid(f"{SCHEMA_FORMAT}.strict", "response_format.json_schema.strict must be true or false.")
+    schema = spec.get("schema")
+    if not isinstance(schema, dict):
+        message = "response_format.json_schema.schema must be a JSON Schema object."
+        raise invalid(
+            f"{SCHEMA_FORMAT}.schema", message, "missing_required_parameter" if schema is None else "invalid_value"
+        )
+    problem = schema_problem(schema)
+    if problem is not None:
+        raise invalid(f"{SCHEMA_FORMAT}.schema", f"Invalid JSON Schema: {problem}.")
+    return schema
+
+
+def requested_format(raw: Any) -> Constraint | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise invalid(FORMAT, 'response_format must be an object such as {"type": "json_object"}.')
+    kind = raw.get("type")
+    if kind == "text":
+        return None
+    if kind == "json_object":
+        return Constraint(json_schema=JSON_OBJECT)
+    if kind != "json_schema":
+        raise invalid(f"{FORMAT}.type", "response_format.type must be text, json_object or json_schema.")
+    return Constraint(json_schema=schema_format(raw.get("json_schema")))
+
+
+def task_constraint(route: Route) -> Constraint | None:
+    if route.kind != "base" and route.task == "classify" and route.labels:
+        return Constraint(choices=tuple(route.labels))
+    return None
+
+
+def conformed(requested: Constraint | None, completion: Completion) -> Completion:
+    schema = requested.json_schema if requested else None
+    if schema is None or not completion.stopped:
+        return completion
+    text = unfenced(completion.text)
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as error:
+        message = f"The model's answer is not valid JSON ({error.msg}); {UNCONSTRAINED}"
+        raise OpenAIError(422, message, FORMAT, "invalid_json", "invalid_output_error") from error
+    problem = violation(schema, value)
+    if problem is not None:
+        message = f"The model's answer does not match response_format: {problem}; {UNCONSTRAINED}"
+        raise OpenAIError(422, message, FORMAT, "schema_mismatch", "invalid_output_error")
+    return replace(completion, text=text)
+
+
 def completion_request(
-    config: GatewayConfig, route: Route, messages: list[dict[str, str]], max_tokens: int
+    config: GatewayConfig,
+    route: Route,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    constraint: Constraint | None = None,
 ) -> CompletionRequest:
     problem = config.problems.get(route.base_model)
     if problem is not None:
@@ -103,16 +211,35 @@ def completion_request(
         messages=route_messages(route, messages),
         adapter=adapter,
         max_tokens=max_tokens,
+        constraint=constraint,
     )
 
 
-def run(
-    backend: ServingBackend, config: GatewayConfig, route: Route, messages: list[dict[str, str]], max_tokens: int
-) -> Completion:
+def complete(backend: ServingBackend, request: CompletionRequest, requested: bool) -> Completion:
     try:
-        return backend.complete(completion_request(config, route, messages, max_tokens))
+        return backend.complete(request)
+    except OutputFormatError as error:
+        if requested or request.constraint is None:
+            raise
+        log.warning("answering %s without its label constraint: %s", request.base.key, error)
+        return backend.complete(replace(request, constraint=None))
+
+
+def run(
+    backend: ServingBackend,
+    config: GatewayConfig,
+    route: Route,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    requested: Constraint | None = None,
+) -> Completion:
+    constraint = requested or task_constraint(route)
+    try:
+        return complete(backend, completion_request(config, route, messages, max_tokens, constraint), bool(requested))
     except EngineUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except OutputFormatError as error:
+        raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
 
 
 def plain(messages: list[Message]) -> list[dict[str, str]]:
@@ -189,12 +316,15 @@ def chat_completions(
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
+        requested = requested_format(body.response_format)
         max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
-        completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens)
-    except HTTPException as error:
+        completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens, requested)
+        completion = conformed(requested, completion)
+    except (HTTPException, OpenAIError) as error:
         status = error.status_code
         raise
     finally:
+        answered = completion is not None and status == 200
         logs.add(
             LogEntry(
                 at=now(),
@@ -206,9 +336,9 @@ def chat_completions(
                 latency_ms=(time.monotonic() - started) * 1000,
                 prompt_tokens=completion.prompt_tokens if completion else 0,
                 completion_tokens=completion.completion_tokens if completion else 0,
-                response_id=identifier if completion else None,
-                input=last_user_text(body.messages) if completion and config.request_bodies else None,
-                output=completion.text if completion and config.request_bodies else None,
+                response_id=identifier if answered else None,
+                input=last_user_text(body.messages) if answered and config.request_bodies else None,
+                output=completion.text if completion and answered and config.request_bodies else None,
                 recorded=config.request_logs,
             )
         )

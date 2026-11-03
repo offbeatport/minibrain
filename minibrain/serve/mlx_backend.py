@@ -2,7 +2,7 @@ import json
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,6 +10,7 @@ from typing import Any
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest
+from minibrain.serve.structured import TokenTrie
 from minibrain.serve.weights import local_dir
 
 PEFT_PREFIX = "base_model.model."
@@ -56,6 +57,18 @@ def convert_peft(path: Path) -> MlxAdapter:
     return MlxAdapter(LoraShape(rank, float(config["lora_alpha"]) / rank, keys), weights)
 
 
+def choice_processor(trie: TokenTrie, prompt_length: int, stop: int) -> Callable[[Any, Any], Any]:
+    import mlx.core as mx
+
+    def process(tokens: Any, logits: Any) -> Any:
+        allowed = mx.array(trie.allowed(tokens[prompt_length:].tolist()) or [stop])
+        mask = mx.full(logits.shape, -mx.inf, dtype=logits.dtype)
+        mask[:, allowed] = 0
+        return logits + mask
+
+    return process
+
+
 class MlxRuntime:
     def __init__(self, spec: BaseModelSpec) -> None:
         from mlx_lm import load
@@ -65,9 +78,12 @@ class MlxRuntime:
         loaded = load(self.source)
         self.model: Any = loaded[0]
         self.tokenizer: Any = loaded[1]
+        vocabulary = self.tokenizer.get_vocab()
+        stops = [vocabulary[token] for token in spec.stop_tokens if token in vocabulary]
         for token in spec.stop_tokens:
-            if token in self.tokenizer.get_vocab():
+            if token in vocabulary:
                 self.tokenizer.add_eos_token(token)
+        self.stop: int = stops[0] if stops else self.tokenizer.eos_token_id
         self.shape: LoraShape | None = None
         self.adapters: OrderedDict[str, MlxAdapter] = OrderedDict()
         self.active: str | None = None
@@ -124,7 +140,13 @@ class MlxRuntime:
         self.model.load_weights(list(adapter.weights.items()), strict=False)
         self.active = name
 
-    def generate(self, messages: list[dict[str, str]], max_tokens: int) -> Completion:
+    def processors(self, choices: Sequence[str], prompt_length: int) -> list[Callable[[Any, Any], Any]] | None:
+        if not choices:
+            return None
+        trie = TokenTrie([[*self.tokenizer.encode(choice, add_special_tokens=False), self.stop] for choice in choices])
+        return [choice_processor(trie, prompt_length, self.stop)]
+
+    def generate(self, messages: list[dict[str, str]], max_tokens: int, choices: Sequence[str] = ()) -> Completion:
         from mlx_lm import stream_generate
         from mlx_lm.sample_utils import make_sampler
 
@@ -133,7 +155,12 @@ class MlxRuntime:
         parts: list[str] = []
         stopped, generated = False, 0
         for response in stream_generate(
-            self.model, self.tokenizer, prompt, max_tokens=max_tokens, sampler=make_sampler(temp=0.0)
+            self.model,
+            self.tokenizer,
+            prompt,
+            max_tokens=max_tokens,
+            sampler=make_sampler(temp=0.0),
+            logits_processors=self.processors(choices, len(prompt)),
         ):
             parts.append(response.text)
             generated = response.generation_tokens
@@ -167,7 +194,7 @@ class MlxBackend:
             if request.adapter is not None:
                 runtime.ensure_adapter(request.adapter.name, self.materialize(request.adapter.artifact))
             runtime.activate(request.adapter.name if request.adapter else None)
-            return runtime.generate(request.messages, request.max_tokens)
+            return runtime.generate(request.messages, request.max_tokens, request.decoding_choices())
 
     def status(self) -> list[dict[str, Any]]:
         return [

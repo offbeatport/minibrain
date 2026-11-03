@@ -41,6 +41,7 @@ class Route:
     labels: list[str]
     shots: list[list[str]]
     adapter: dict[str, Any] | None
+    task: str = ""
 
 
 @dataclass(frozen=True)
@@ -130,6 +131,7 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
             labels=list(labels),
             shots=[[shot.input, shot.label] for shot in shots],
             adapter=adapter,
+            task=minibrain.task,
         )
         routes.append(route)
         if minibrain.deployed and version.number == minibrain.current_version:

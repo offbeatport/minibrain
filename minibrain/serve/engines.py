@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import asdict
 from typing import Any
 
 import httpx
@@ -13,7 +14,7 @@ import httpx
 from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
+from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
 from minibrain.settings import Settings
 from minibrain.supervise import Supervisor
 from minibrain.worker import HttpClient
@@ -159,6 +160,8 @@ class EngineBackend:
             else None
         )
         body = {"messages": request.messages, "adapter": adapter, "max_tokens": request.max_tokens}
+        if request.constraint is not None:
+            body["constraint"] = asdict(request.constraint)
         key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)
         deadline = time.monotonic() + STARTUP_SECONDS
         tried: set[str] = set()
@@ -187,6 +190,8 @@ class EngineBackend:
                 continue
             if response.status_code in (FAILED_STATUS, 409):
                 raise EngineUnavailableError(engine_detail(response))
+            if response.status_code == 400:
+                raise OutputFormatError(engine_detail(response))
             response.raise_for_status()
             self.balancer.mark(url, "ready")
             if tried:

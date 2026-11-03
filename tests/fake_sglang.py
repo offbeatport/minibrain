@@ -29,6 +29,9 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
             if self.path == "/load_lora_adapter":
                 self.reply(200, {"success": True})
                 return
+            if "x-refuse" in json.dumps(body.get("response_format")):
+                self.reply(400, {"object": "error", "message": "grammar compilation failed", "code": 400})
+                return
             text = f"{body.get('lora_path') or 'base'}:{body['messages'][-1]['content']}"
             choice = {"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}
             self.reply(200, {"choices": [choice], "usage": {"prompt_tokens": 7, "completion_tokens": 2}})

@@ -69,6 +69,7 @@ def create_gateway_app(
     app.state.feedback = send_feedback
     serving = backend or EngineBackend(lambda: source.current().engines)
     app.state.backend = serving
+    app.add_exception_handler(routes.OpenAIError, routes.openai_error)
     app.include_router(routes.router)
 
     @app.get("/healthz")

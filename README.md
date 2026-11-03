@@ -70,7 +70,9 @@ reply = client.chat.completions.create(
 print(reply.choices[0].message.content)
 ```
 
-`support-triage` follows the current version; `support-triage@2` pins one.
+`support-triage` follows the current version; `support-triage@2` pins one. A Classify model answers with one of its
+labels. `response_format` (`json_object` or `json_schema`) returns JSON that matches the schema, or an error: see
+[Structured output](docs/serving.md#structured-output).
 
 ## Develop
 

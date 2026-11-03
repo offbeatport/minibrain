@@ -56,8 +56,8 @@ mapping comes down to a few fields.
 | Distill | Any prompt → the teacher's answer | LLM judge or exact match vs teacher | As the teacher |
 | Answer | Question + retrieved chunks → answer | LLM judge vs reference, citation precision | Free text + citations |
 
-- Classify and Extract are served with `response_format: json_schema`; SGLang constrains decoding so the output always
-  parses.
+- Classify is served held to its labels (a grammar on SGLang and llama.cpp, a token trie on MLX and `transformers`)
+  and still answers with the bare label; Extract will be served with its schema as `response_format: json_schema`.
 - Rewrite also accepts raw documents as a style source, not only input/output pairs.
 
 ## Concepts
@@ -558,7 +558,8 @@ once it matches; only the cache budget below removes files.
 ## API and access
 
 - `/v1/chat/completions` with streaming, `/v1/models`.
-- `response_format` (`json_schema`) passed through; Classify and Extract minibrains set it by default.
+- `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema;
+  Classify minibrains hold decoding to their labels by default, Extract minibrains will set their schema.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the minibrain by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and
@@ -888,7 +889,9 @@ Everything in the v1 scope below, after M1.
 - [ ] `generate_qa` with check pass
 - [ ] Teacher labelling with review queue
 - [ ] Gateway upstream routes for distillation
-- [ ] `response_format` with `json_schema`
+- [ ] `response_format` with `json_schema` (built: SGLang gets EBNF or `json_schema`, llama.cpp grammars, MLX and
+      `transformers` token tries for labels and finite schemas, every JSON answer checked in the gateway; llama.cpp,
+      MLX and `transformers` verified on Qwen3-0.6B, SGLang only against a fake process: verify on a GPU box)
 - [ ] Cost and latency in eval
 - [ ] `minibrain.yaml` and `minibrain run`
 - [x] Sources: uploads, server folders, S3, PostgreSQL, MySQL and Iceberg on S3 via DuckDB, through connections with
@@ -921,8 +924,8 @@ Everything in the v1 scope below, after M1.
 - [x] `transformers` backend for local mode and tests
 - [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
-- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step (response ids on request logs and
-      opt-in request inputs and answers done)
+- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step (`response_format`, response ids on
+      request logs and opt-in request inputs and answers done)
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
