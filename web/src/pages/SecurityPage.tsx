@@ -8,15 +8,15 @@ import {
     DataGrid,
     Input,
     Label,
-    RadioGroup,
-    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
     Switch,
-    cn,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
@@ -59,6 +59,33 @@ const SOURCE_LABEL: Record<string, string> = {
     environment: "Set by environment",
     "built in": "Always on",
 };
+
+const SOURCE_DETAIL: Record<string, string> = {
+    "config file": "Set in the server's minibrain.yaml, so it can only be changed there.",
+    environment: "Set by an environment variable on the server, so it can only be changed there.",
+};
+
+function LockedBadge({ policy }: { policy: PolicyInfo }) {
+    const badge = (
+        <Badge variant="neutral" className="w-fit">
+            {SOURCE_LABEL[policy.source] ?? policy.source}
+        </Badge>
+    );
+    const detail = SOURCE_DETAIL[policy.source];
+    if (!detail) {
+        return badge;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="w-fit rounded-sm">
+                    {badge}
+                </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{detail}</TooltipContent>
+        </Tooltip>
+    );
+}
 
 const LIST_PLACEHOLDERS: Record<string, string> = {
     allowed_hosts: "hf-mirror.internal, s3.internal",
@@ -143,7 +170,7 @@ function Control({ policy }: { policy: PolicyInfo }) {
         return (
             <div className="flex flex-wrap items-center justify-end gap-2">
                 <span className="text-sm">{display(policy, policy.value)}</span>
-                <Badge variant="neutral">{SOURCE_LABEL[policy.source] ?? policy.source}</Badge>
+                <LockedBadge policy={policy} />
             </div>
         );
     }
@@ -203,7 +230,7 @@ function Control({ policy }: { policy: PolicyInfo }) {
     );
 }
 
-function LicenceList({ policy, disabled }: { policy: PolicyInfo; disabled: boolean }) {
+function LicenceList({ policy }: { policy: PolicyInfo }) {
     const change = useChange(policy.name);
     const chosen = new Set(asList(policy.value));
     const toggle = (item: string, on: boolean) =>
@@ -213,77 +240,61 @@ function LicenceList({ policy, disabled }: { policy: PolicyInfo; disabled: boole
                 .filter((value) => (value === item ? on : chosen.has(value))),
         );
     return (
-        <div className="flex flex-col gap-1">
+        <fieldset className="flex flex-col gap-2">
+            <legend className="sr-only">{policy.label}</legend>
+            {policy.locked && <LockedBadge policy={policy} />}
             <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
                 {policy.choices.map((choice) => (
-                    <Label
-                        key={choice.value}
-                        className={cn(
-                            "flex items-center gap-2 font-normal",
-                            disabled && "text-muted-foreground",
-                        )}
-                    >
+                    <Label key={choice.value} className="flex items-center gap-2 font-normal">
                         <Checkbox
                             checked={chosen.has(choice.value)}
-                            disabled={disabled || policy.locked || change.isPending}
+                            disabled={policy.locked}
+                            readOnly={change.isPending}
                             onCheckedChange={(checked) => toggle(choice.value, checked === true)}
                         />
                         {choice.label}
                     </Label>
                 ))}
             </div>
-            {policy.locked && (
-                <Badge variant="neutral" className="w-fit">
-                    {SOURCE_LABEL[policy.source] ?? policy.source}
-                </Badge>
+            {chosen.size === 0 && (
+                <p className="text-sm text-warning">
+                    No licence is allowed until you tick one, so every download is refused.
+                </p>
             )}
             <ErrorLine error={change.error} />
-        </div>
+        </fieldset>
     );
 }
 
 function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | undefined }) {
     const change = useChange(mode.name);
-    const value = String(mode.value);
+    const anyLicence = mode.value === "all";
     return (
         <div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 max-w-md">
-                    <div className="text-sm font-medium">{mode.label}</div>
-                    <p className="text-sm text-muted-foreground">{mode.description}</p>
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <Label
+                    htmlFor="licence-any"
+                    className="flex min-w-0 max-w-md flex-1 basis-48 flex-col items-start gap-0.5 font-normal"
+                >
+                    <span className="font-medium">Allow any licence</span>
+                    <span className="text-sm text-muted-foreground">
+                        {anyLicence
+                            ? "Includes non-commercial and custom terms we have not reviewed. Check each model's licence yourself."
+                            : "Only the licences ticked below, each reviewed for commercial use."}
+                    </span>
+                </Label>
+                <div className="flex shrink-0 items-center gap-2">
+                    {mode.locked && <LockedBadge policy={mode} />}
+                    <Switch
+                        id="licence-any"
+                        checked={anyLicence}
+                        disabled={mode.locked}
+                        readOnly={change.isPending}
+                        onCheckedChange={(checked) => change.mutate(checked ? "all" : "selected")}
+                    />
                 </div>
-                {mode.locked && (
-                    <Badge variant="neutral">{SOURCE_LABEL[mode.source] ?? mode.source}</Badge>
-                )}
             </div>
-            <RadioGroup
-                value={value}
-                onValueChange={(next) => change.mutate(String(next))}
-                disabled={mode.locked || change.isPending}
-                className="flex flex-col gap-3"
-            >
-                <div className="flex flex-col gap-3">
-                    <Label className="flex items-center gap-2 font-normal">
-                        <RadioGroupItem value="selected" />
-                        Only selected licences
-                    </Label>
-                    {list && (
-                        <div className="pl-6">
-                            <LicenceList policy={list} disabled={value !== "selected"} />
-                        </div>
-                    )}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <Label className="flex items-center gap-2 font-normal">
-                        <RadioGroupItem value="all" />
-                        Any licence
-                    </Label>
-                    <p className="pl-6 text-sm text-muted-foreground">
-                        Includes non-commercial and custom terms we have not reviewed. Check each
-                        model's licence yourself.
-                    </p>
-                </div>
-            </RadioGroup>
+            {!anyLicence && list && <LicenceList policy={list} />}
             <ErrorLine error={change.error} />
         </div>
     );
