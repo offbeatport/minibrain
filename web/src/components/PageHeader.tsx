@@ -32,12 +32,12 @@ export function PageHeader({
     return (
         <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
             <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="flex items-center gap-2.5 text-2xl font-semibold">
+                <h1 className="flex items-center gap-3 text-3xl font-light">
                     {icon}
                     {Icon && (
                         <Icon
                             aria-hidden="true"
-                            className="size-6 shrink-0 text-muted-foreground"
+                            className="size-7 shrink-0 text-muted-foreground"
                         />
                     )}
                     {title}
@@ -46,8 +46,8 @@ export function PageHeader({
                     <p
                         className={cn(
                             "text-base text-muted-foreground",
-                            Icon && "pl-8.5",
-                            icon && "pl-10.5",
+                            Icon && "pl-10",
+                            icon && "pl-11",
                         )}
                     >
                         {caption}
