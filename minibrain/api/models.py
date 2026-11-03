@@ -2,10 +2,11 @@ import shutil
 import time
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import admin, builder, viewer
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep, get_local_node
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
@@ -125,22 +126,22 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
     )
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(viewer)])
 def list_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
     return all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
 
 
-@router.get("/sources")
+@router.get("/sources", dependencies=[Depends(viewer)])
 def model_sources() -> list[dict[str, Any]]:
     return configured()
 
 
-@router.post("/inspect")
+@router.post("/inspect", dependencies=[Depends(admin)])
 def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep) -> ImportCheck:
     return ImportCheck(**inspect_location(session, settings, body.location, body.connection_id))
 
 
-@router.post("/import", status_code=202)
+@router.post("/import", status_code=202, dependencies=[Depends(admin)])
 def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
     tags = user_tags(body.tags)
     try:
@@ -162,12 +163,12 @@ def import_model(body: ImportRequest, request: Request, session: SessionDep, set
     return row_of(session, settings, request, model)
 
 
-@router.get("/base/{key}")
+@router.get("/base/{key}", dependencies=[Depends(viewer)])
 def read_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     return detail_of(session, settings, request, get_model(session, key))
 
 
-@router.patch("/base/{key}")
+@router.patch("/base/{key}", dependencies=[Depends(admin)])
 def update_base(
     key: str, body: ModelUpdate, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
@@ -183,7 +184,7 @@ def update_base(
     return detail_of(session, settings, request, model)
 
 
-@router.delete("/base/{key}", status_code=204)
+@router.delete("/base/{key}", status_code=204, dependencies=[Depends(admin)])
 def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
     model = get_model(session, key)
     if model.deployed:
@@ -216,7 +217,7 @@ def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
     )
 
 
-@router.post("/base/{key}/verify", status_code=202)
+@router.post("/base/{key}/verify", status_code=202, dependencies=[Depends(admin)])
 def verify_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     model = get_model(session, key)
     job = start_verify(session, settings, model)
@@ -225,7 +226,7 @@ def verify_base(key: str, request: Request, session: SessionDep, settings: Setti
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/repair", status_code=202)
+@router.post("/base/{key}/repair", status_code=202, dependencies=[Depends(admin)])
 def repair_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     model = get_model(session, key)
     job = start_repair(session, settings, model)
@@ -234,7 +235,7 @@ def repair_base(key: str, request: Request, session: SessionDep, settings: Setti
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/reimport", status_code=202)
+@router.post("/base/{key}/reimport", status_code=202, dependencies=[Depends(admin)])
 def reimport_base(
     key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
@@ -245,7 +246,7 @@ def reimport_base(
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/relocate")
+@router.post("/base/{key}/relocate", dependencies=[Depends(admin)])
 def relocate_base(
     key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
@@ -257,7 +258,7 @@ def relocate_base(
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/recheck")
+@router.post("/base/{key}/recheck", dependencies=[Depends(admin)])
 def recheck_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     model = get_model(session, key)
     if model.health not in LOAD_PROBLEMS:
@@ -269,14 +270,14 @@ def recheck_base(key: str, request: Request, session: SessionDep, settings: Sett
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/retry", status_code=202)
+@router.post("/base/{key}/retry", status_code=202, dependencies=[Depends(admin)])
 def retry_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     model = retry(session, settings, get_model(session, key))
     session.commit()
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/pin")
+@router.post("/base/{key}/pin", dependencies=[Depends(admin)])
 def pin_base(
     key: str, body: PinRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
@@ -288,7 +289,7 @@ def pin_base(
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/deploy")
+@router.post("/base/{key}/deploy", dependencies=[Depends(builder)])
 def deploy_base(
     key: str, body: DeployRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
@@ -303,7 +304,7 @@ def deploy_base(
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base/{key}/test")
+@router.post("/base/{key}/test", dependencies=[Depends(viewer)])
 def test_base(
     key: str, body: TestRequest, session: SessionDep, settings: SettingsDep, backend: BackendDep
 ) -> TestResponse:

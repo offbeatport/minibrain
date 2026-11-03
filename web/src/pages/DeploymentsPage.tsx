@@ -22,6 +22,7 @@ import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Secti
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
@@ -39,6 +40,7 @@ function serving(detail: MinibrainDetail): string {
 
 function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
     const client = useQueryClient();
+    const can = useCan();
     const toggle = useMutation({
         mutationFn: () =>
             unwrap(
@@ -49,6 +51,9 @@ function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
             ),
         onSuccess: () => client.invalidateQueries(),
     });
+    if (!can.build) {
+        return null;
+    }
     return (
         <Button
             variant={deployed ? "outline" : "default"}
@@ -63,6 +68,7 @@ function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
 function Connect({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const [created, setCreated] = useState<KeyCreated | null>(null);
+    const can = useCan();
     if (!detail) {
         return null;
     }
@@ -105,7 +111,7 @@ function Connect({ slug }: { slug: string }) {
                 slug={slug}
                 keyValue={created?.secret ?? null}
             />
-            <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
+            {can.build && <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />}
         </>
     );
 }
@@ -213,6 +219,7 @@ const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
 export function DeploymentsPage() {
     const router = useRouter();
     const models = useModels();
+    const can = useCan();
     const live = (models.data ?? []).filter((row) => row.deployment.state !== "not_deployed");
     return (
         <Page wide>
@@ -244,7 +251,7 @@ export function DeploymentsPage() {
                         />
                     )}
                 </PanelSection>
-                <ApiKeys />
+                {can.build && <ApiKeys />}
             </PanelSections>
         </Page>
     );
@@ -252,6 +259,7 @@ export function DeploymentsPage() {
 
 function VersionHistory({ row }: { row: ModelRow }) {
     const client = useQueryClient();
+    const can = useCan();
     const deploy = useMutation({
         mutationFn: (number: number) =>
             unwrap(
@@ -308,7 +316,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
             header: () => <span className="sr-only">Actions</span>,
             id: "actions",
             cell: ({ row: item }) =>
-                item.original.status === "ready" && !item.original.live ? (
+                can.build && item.original.status === "ready" && !item.original.live ? (
                     <Button
                         variant="outline"
                         size="xs"

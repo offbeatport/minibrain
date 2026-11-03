@@ -9,12 +9,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, make_url, select
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import admin
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.system import database_store, install_settings, storage_settings
 from minibrain.artifacts import ArtifactStore
@@ -252,7 +253,7 @@ def install_info(session: Session, settings: Settings, store: ArtifactStore, nod
     )
 
 
-@router.get("/install")
+@router.get("/install", dependencies=[Depends(admin)])
 def install(session: SessionDep, settings: SettingsDep, store: StoreDep, node: LocalNodeDep) -> InstallInfo:
     return install_info(session, settings, store, node)
 
@@ -321,7 +322,12 @@ def diagnostics_files(session: Session, settings: Settings, store: ArtifactStore
     }
 
 
-@router.get("/diagnostics", response_class=Response, responses={200: {"content": {"application/zip": {}}}})
+@router.get(
+    "/diagnostics",
+    response_class=Response,
+    responses={200: {"content": {"application/zip": {}}}},
+    dependencies=[Depends(admin)],
+)
 def diagnostics(session: SessionDep, settings: SettingsDep, store: StoreDep, node: LocalNodeDep) -> Response:
     stamp = now().strftime("%Y%m%d-%H%M%S")
     folder = f"minibrain-diagnostics-{stamp}"

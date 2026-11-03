@@ -11,7 +11,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, csrf_matches
 from minibrain.auth.gate import FORWARDED_HEADERS, Identity, RequestFacts, identify
-from minibrain.auth.identity import CURRENT, Person
+from minibrain.auth.identity import CURRENT, Person, current_role
 from minibrain.auth.roles import LABELS, Role, allows
 from minibrain.registry.models import SIGNED_IN
 
@@ -108,6 +108,12 @@ class Guard:
     level: Role | None
     public: bool = False
 
+    @property
+    def name(self) -> str:
+        if self.public:
+            return "public"
+        return self.level.value if self.level is not None else "signed_in"
+
     def __call__(self, request: Request) -> Person | None:
         found = identity_of(request)
         if self.public:
@@ -122,6 +128,10 @@ class Guard:
         if not allows(person.role, self.level):
             raise HTTPException(status_code=403, detail=f"This needs the {LABELS[self.level]} role")
         return person
+
+
+def sees_rows() -> bool:
+    return allows(current_role(), Role.BUILDER)
 
 
 public = Guard(level=None, public=True)

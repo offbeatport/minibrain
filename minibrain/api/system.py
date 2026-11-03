@@ -2,10 +2,11 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, make_url, select
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import admin, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
     DeviceInfo,
@@ -73,7 +74,7 @@ def loaded_models(backend: ServingBackend) -> list[LoadedModel]:
     ]
 
 
-@router.get("/system")
+@router.get("/system", dependencies=[Depends(viewer)])
 def system(request: Request, session: SessionDep, backend: BackendDep) -> SystemInfo:
     counts = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
     return SystemInfo(
@@ -156,12 +157,12 @@ def storage_update(body: StorageUpdate) -> StorageConfig:
     )
 
 
-@router.get("/settings/storage")
+@router.get("/settings/storage", dependencies=[Depends(admin)])
 def read_storage(session: SessionDep, settings: SettingsDep, store: StoreDep) -> StorageSettings:
     return storage_settings(session, settings, store)
 
 
-@router.put("/settings/storage")
+@router.put("/settings/storage", dependencies=[Depends(admin)])
 def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> StorageSettings:
     try:
         save_storage(session, settings, storage_update(body), body.secret, current_actor())
@@ -172,7 +173,7 @@ def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsD
     return storage_settings(session, settings, store)
 
 
-@router.post("/settings/storage/test")
+@router.post("/settings/storage/test", dependencies=[Depends(admin)])
 def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     config = storage_update(body)
     try:
@@ -183,7 +184,7 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
 
 
-@router.get("/system/infrastructure")
+@router.get("/system/infrastructure", dependencies=[Depends(viewer)])
 def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
@@ -219,7 +220,7 @@ def snapshot_usage(session: Session) -> SnapshotUsage:
     )
 
 
-@router.get("/settings")
+@router.get("/settings", dependencies=[Depends(viewer)])
 def install_settings() -> InstallSettings:
     return InstallSettings(
         recipe=DEFAULT_RECIPE,

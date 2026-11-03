@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import builder
 from minibrain.api.deps import SessionDep
 from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate, ModelRef
 from minibrain.api.views import key_info
@@ -40,12 +41,12 @@ def audit(session: Session, action: str, key: ApiKey) -> None:
     )
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(builder)])
 def list_keys(session: SessionDep) -> list[KeyInfo]:
     return [key_info(session, key) for key in session.scalars(select(ApiKey).order_by(ApiKey.id.desc()))]
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(builder)])
 def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     minibrains, model_ids = resolve(session, body.models)
     key, secret = create_key(session, body.name, minibrains, model_ids)
@@ -55,7 +56,7 @@ def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     return KeyCreated(secret=secret, **key_info(session, key).model_dump())
 
 
-@router.put("/{key_id}/models")
+@router.put("/{key_id}/models", dependencies=[Depends(builder)])
 def update_models(key_id: int, body: KeyScopeUpdate, session: SessionDep) -> KeyInfo:
     key = get_key(session, key_id)
     minibrains, model_ids = resolve(session, body.models)
@@ -65,7 +66,7 @@ def update_models(key_id: int, body: KeyScopeUpdate, session: SessionDep) -> Key
     return key_info(session, key)
 
 
-@router.delete("/{key_id}", status_code=204)
+@router.delete("/{key_id}", status_code=204, dependencies=[Depends(builder)])
 def revoke(key_id: int, session: SessionDep) -> None:
     key = get_key(session, key_id)
     audit(session, "key.revoke", key)

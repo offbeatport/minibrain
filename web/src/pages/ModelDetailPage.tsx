@@ -15,6 +15,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus";
 import { StatusText } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import {
     deploymentPageHref,
@@ -84,14 +85,14 @@ function HealthNotice({
     shown = () => true,
 }: {
     row: ModelRow;
-    run: (row: ModelRow, action: HealthAction) => void;
+    run?: (row: ModelRow, action: HealthAction) => void;
     shown?: (action: HealthAction) => boolean;
 }) {
     const health = row.health;
     if (!health) {
         return null;
     }
-    const actions = health.actions.filter(shown);
+    const actions = run ? health.actions.filter(shown) : [];
     const removed = health.state === "evicted";
     return (
         <div
@@ -114,7 +115,7 @@ function HealthNotice({
                         <Button
                             key={action.kind}
                             variant={index === 0 ? "default" : "outline"}
-                            onClick={() => run(row, action)}
+                            onClick={() => run?.(row, action)}
                         >
                             {action.label}
                         </Button>
@@ -145,6 +146,7 @@ function useJob(jobId: number | null | undefined) {
 
 function ApiSection({ model }: { model: BaseModelDetail }) {
     const origin = window.location.origin;
+    const can = useCan();
     return (
         <>
             <PanelSection
@@ -163,13 +165,14 @@ function ApiSection({ model }: { model: BaseModelDetail }) {
                     {`curl ${origin}/v1/chat/completions \\\n  -H "Authorization: Bearer $MINIBRAIN_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "${model.key}", "messages": [{"role": "user", "content": "Hello"}]}'`}
                 </pre>
             </PanelSection>
-            <ApiKeys scope={{ kind: "base", key: model.key }} />
+            {can.build && <ApiKeys scope={{ kind: "base", key: model.key }} />}
         </>
     );
 }
 
 function BaseModelView({ model }: { model: BaseModelDetail }) {
     const router = useRouter();
+    const can = useCan();
     const refresh = useModelsRefresh();
     const queryClient = useQueryClient();
     const [testing, setTesting] = useState<ModelRow | null>(null);
@@ -253,7 +256,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                 Test
                             </Button>
                         )}
-                        {(available || deployed) && (
+                        {can.build && (available || deployed) && (
                             <Button
                                 variant={deployed ? "outline" : "default"}
                                 onClick={() => setConfirmation(deployConfirmation())}
@@ -261,16 +264,18 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                 {deployed ? "Undeploy" : "Deploy"}
                             </Button>
                         )}
-                        <Button variant="ghost" onClick={() => setEditing(model)}>
-                            Edit
-                        </Button>
+                        {can.admin && (
+                            <Button variant="ghost" onClick={() => setEditing(model)}>
+                                Edit
+                            </Button>
+                        )}
                     </>
                 }
             />
             <StatusStrip row={model} />
             <HealthNotice
                 row={model}
-                run={health.run}
+                run={can.admin ? health.run : undefined}
                 shown={(action) => action.kind !== "verify" || model.health?.actions[0] === action}
             />
             <PanelSections>
@@ -361,6 +366,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                     title="Files"
                     description={verifiedText(model)}
                     actions={
+                        can.admin &&
                         model.availability.state === "available" && (
                             <Button variant="outline" onClick={verify} disabled={busy}>
                                 Verify files
@@ -442,6 +448,7 @@ const VERSION_COLUMNS: ColumnDef<VersionInfo, unknown>[] = [
 
 function CustomModelView({ row }: { row: ModelRow }) {
     const versions = useVersions(row.key);
+    const can = useCan();
     const jobs = useJobs(row.key);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const router = useRouter();
@@ -467,18 +474,24 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 caption={row.description || `Custom model on ${row.base_model}`}
                 actions={
                     <>
-                        <Button
-                            variant="outline"
-                            onClick={() => router.history.push(modelDataHref(row.key))}
-                        >
-                            Data
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => router.history.push(`${trainingHref(row.key)}${recipe}`)}
-                        >
-                            Train
-                        </Button>
+                        {can.build && (
+                            <Button
+                                variant="outline"
+                                onClick={() => router.history.push(modelDataHref(row.key))}
+                            >
+                                Data
+                            </Button>
+                        )}
+                        {can.build && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.history.push(`${trainingHref(row.key)}${recipe}`)
+                                }
+                            >
+                                Train
+                            </Button>
+                        )}
                         <Button
                             variant="outline"
                             onClick={() => router.history.push(evaluationsHref(row.key))}
@@ -492,9 +505,11 @@ function CustomModelView({ row }: { row: ModelRow }) {
                                 Use API
                             </Button>
                         )}
-                        <Button variant="ghost" onClick={() => setEditing(row)}>
-                            Edit
-                        </Button>
+                        {can.build && (
+                            <Button variant="ghost" onClick={() => setEditing(row)}>
+                                Edit
+                            </Button>
+                        )}
                     </>
                 }
             />

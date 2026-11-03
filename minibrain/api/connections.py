@@ -1,8 +1,9 @@
 from typing import cast
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import admin, builder
 from minibrain.api.data import source_summary
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
@@ -83,21 +84,21 @@ def connection_info(session: Session, settings: Settings, connection: Connection
     )
 
 
-@router.get("/connections")
+@router.get("/connections", dependencies=[Depends(builder)])
 def read_connections(session: SessionDep, settings: SettingsDep) -> list[ConnectionInfo]:
     found = list_connections(session)
     session.commit()
     return [connection_info(session, settings, connection) for connection in found]
 
 
-@router.post("/connections", status_code=201)
+@router.post("/connections", status_code=201, dependencies=[Depends(admin)])
 def add_connection(body: ConnectionBody, session: SessionDep, settings: SettingsDep) -> ConnectionInfo:
     connection = create_connection(session, settings, body.name, body_config(body), body.secret, current_actor())
     session.commit()
     return connection_info(session, settings, connection)
 
 
-@router.put("/connections/{connection_id}")
+@router.put("/connections/{connection_id}", dependencies=[Depends(admin)])
 def change_connection(
     connection_id: int, body: ConnectionBody, session: SessionDep, settings: SettingsDep
 ) -> ConnectionInfo:
@@ -107,7 +108,7 @@ def change_connection(
     return connection_info(session, settings, connection)
 
 
-@router.delete("/connections/{connection_id}", status_code=204)
+@router.delete("/connections/{connection_id}", status_code=204, dependencies=[Depends(admin)])
 def remove_connection(connection_id: int, session: SessionDep) -> None:
     delete_connection(session, get_connection(session, connection_id), current_actor())
     session.commit()
@@ -124,7 +125,7 @@ def draft_resolved(session: Session, settings: Settings, body: ConnectionTestBod
     return Resolved(id=body.id or 0, name=name, config=config, secret=secret)
 
 
-@router.post("/connections/test")
+@router.post("/connections/test", dependencies=[Depends(admin)])
 def test_connection(body: ConnectionTestBody, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
     try:
         return ConnectionCheck(ok=True, message=probe(draft_resolved(session, settings, body)))
@@ -132,7 +133,7 @@ def test_connection(body: ConnectionTestBody, session: SessionDep, settings: Set
         return ConnectionCheck(ok=False, message=str(error))
 
 
-@router.post("/connections/{connection_id}/test")
+@router.post("/connections/{connection_id}/test", dependencies=[Depends(admin)])
 def test_saved_connection(connection_id: int, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
     try:
         return ConnectionCheck(
@@ -142,7 +143,7 @@ def test_saved_connection(connection_id: int, session: SessionDep, settings: Set
         return ConnectionCheck(ok=False, message=str(error))
 
 
-@router.get("/connections/{connection_id}/tables")
+@router.get("/connections/{connection_id}/tables", dependencies=[Depends(builder)])
 def connection_tables(connection_id: int, session: SessionDep, settings: SettingsDep) -> ConnectionTables:
     connection = resolve(session, settings, get_connection(session, connection_id))
     if connection.config.kind not in ("postgres", "mysql"):
@@ -150,7 +151,7 @@ def connection_tables(connection_id: int, session: SessionDep, settings: Setting
     return ConnectionTables(tables=database_tables(connection))
 
 
-@router.get("/extensions")
+@router.get("/extensions", dependencies=[Depends(builder)])
 def read_extensions() -> ExtensionsInfo:
     return ExtensionsInfo(
         version=extensions.engine_version(),
@@ -170,13 +171,13 @@ def added(session: Session, settings: Settings, store: ArtifactStore, source_id:
     return source_summary(settings, store, get_source(session, source_id))
 
 
-@router.post("/sources/s3", status_code=201)
+@router.post("/sources/s3", status_code=201, dependencies=[Depends(builder)])
 def add_s3_source(body: S3SourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
     source = add_remote(session, settings, S3_SOURCE, body.connection_id, body.name, path=body.path, format=body.format)
     return added(session, settings, store, source.id)
 
 
-@router.post("/sources/database", status_code=201)
+@router.post("/sources/database", status_code=201, dependencies=[Depends(builder)])
 def add_database_source(
     body: DatabaseSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceSummary:
@@ -193,7 +194,7 @@ def add_database_source(
     return added(session, settings, store, source.id)
 
 
-@router.post("/sources/iceberg", status_code=201)
+@router.post("/sources/iceberg", status_code=201, dependencies=[Depends(builder)])
 def add_iceberg_source(
     body: IcebergSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceSummary:

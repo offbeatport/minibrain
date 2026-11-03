@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
     CompleteRequest,
@@ -41,15 +42,16 @@ def audit_version(session: Session, minibrain: Minibrain, number: int, action: s
     )
 
 
-@router.get("/minibrains/{slug}/versions")
+@router.get("/minibrains/{slug}/versions", dependencies=[Depends(viewer)])
 def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
     minibrain = get_minibrain(session, slug)
     versions = sorted(minibrain.versions, key=lambda version: version.number, reverse=True)
     prices = load_prices(session)
-    return [version_info(minibrain, version, prices) for version in versions]
+    found = [version_info(minibrain, version, prices) for version in versions]
+    return found if sees_rows() else [info.model_copy(update={"mistakes": []}) for info in found]
 
 
-@router.post("/minibrains/{slug}/versions", status_code=201)
+@router.post("/minibrains/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
 def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: SettingsDep) -> VersionInfo:
     minibrain = get_minibrain(session, slug)
     kind = VersionKind(body.kind)
@@ -86,7 +88,7 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     return version_info(minibrain, version)
 
 
-@router.delete("/minibrains/{slug}/versions/{number}", status_code=204)
+@router.delete("/minibrains/{slug}/versions/{number}", status_code=204, dependencies=[Depends(builder)])
 def delete_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     version = get_version(minibrain, number)
@@ -110,7 +112,7 @@ def delete_version(slug: str, number: int, session: SessionDep, settings: Settin
     session.commit()
 
 
-@router.post("/minibrains/{slug}/versions/{number}/promote")
+@router.post("/minibrains/{slug}/versions/{number}/promote", dependencies=[Depends(builder)])
 def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     version = get_version(minibrain, number)
@@ -129,7 +131,7 @@ def promote_version(slug: str, number: int, session: SessionDep, settings: Setti
     return detail(settings, minibrain)
 
 
-@router.post("/minibrains/{slug}/complete")
+@router.post("/minibrains/{slug}/complete", dependencies=[Depends(viewer)])
 def complete(
     slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, request: Request
 ) -> CompleteResponse:

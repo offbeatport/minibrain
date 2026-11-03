@@ -21,6 +21,7 @@ import { useGolden, useMinibrain, useMinibrains, useVersions } from "~/api/queri
 import { AnswerFeedback } from "~/components/AnswerFeedback";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
+import { useCan } from "~/lib/access";
 import { asCode, milliseconds } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { playgroundHref, trainingHref } from "~/lib/modelLinks";
@@ -90,7 +91,8 @@ function Reply({
 function Playground({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const { data: versions } = useVersions(slug);
-    const golden = useGolden(slug, Boolean(detail?.snapshot));
+    const can = useCan();
+    const golden = useGolden(slug, can.build && Boolean(detail?.snapshot));
     const ready = (versions ?? [])
         .filter((version) => version.status === "ready")
         .map((v) => v.number);

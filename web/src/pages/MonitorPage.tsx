@@ -21,6 +21,7 @@ import { isActiveJob } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { jobDuration, jobSeconds } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { exactTime, relativeTime } from "~/lib/time";
@@ -93,6 +94,7 @@ function JobStatus({ job }: { job: JobInfo }) {
 
 function JobActions({ job }: { job: JobInfo }) {
     const client = useQueryClient();
+    const can = useCan();
     const act = useMutation({
         mutationFn: (action: "cancel" | "retry") =>
             action === "cancel"
@@ -110,7 +112,7 @@ function JobActions({ job }: { job: JobInfo }) {
     });
     return (
         <div className="flex items-center justify-end gap-1">
-            {isActiveJob(job) && !job.cancel_requested && (
+            {can.build && isActiveJob(job) && !job.cancel_requested && (
                 <Button
                     variant="outline"
                     size="xs"
@@ -120,7 +122,7 @@ function JobActions({ job }: { job: JobInfo }) {
                     Cancel
                 </Button>
             )}
-            {job.status === "failed" && (
+            {can.build && job.status === "failed" && (
                 <Button
                     variant="outline"
                     size="xs"

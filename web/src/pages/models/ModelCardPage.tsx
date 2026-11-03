@@ -22,6 +22,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
+import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { modelAibomHref, modelCardDownloadHref } from "~/lib/modelLinks";
 import {
@@ -245,6 +246,7 @@ function CardView({
     form: string | undefined;
 }) {
     const [editing, setEditing] = useState<Focus | null>(null);
+    const can = useCan();
     const versions = useVersions(target.slug);
     const minibrain = useMinibrain(target.slug);
     const current = versions.data?.find((item) => item.number === target.number)?.current ?? false;
@@ -266,12 +268,18 @@ function CardView({
             <Summary card={card} live={live} />
             <PanelSections>
                 <PurposeSection card={card} />
-                <UseSection card={card} onEdit={() => setEditing("intended_use")} />
+                <UseSection
+                    card={card}
+                    onEdit={can.build ? () => setEditing("intended_use") : undefined}
+                />
                 <BaseSection card={card} />
                 <DataSection card={card} />
                 <TrainingSection card={card} />
                 <EvaluationSection card={card} />
-                <LimitsSection card={card} onEdit={() => setEditing("known_limits")} />
+                <LimitsSection
+                    card={card}
+                    onEdit={can.build ? () => setEditing("known_limits") : undefined}
+                />
                 <ApprovalsSection card={card} />
                 <IntegritySection sha256={sha256} form={form} />
             </PanelSections>

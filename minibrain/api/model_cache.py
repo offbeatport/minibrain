@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from minibrain.api.access import admin, viewer
 from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.auth.identity import current_actor
 from minibrain.models.cache import (
@@ -95,12 +96,12 @@ def settings_info(settings: CacheSettings) -> ModelCacheSettings:
     return ModelCacheSettings(enabled=settings.enabled, budget_gb=settings.budget_gb)
 
 
-@router.get("/settings/model-cache")
+@router.get("/settings/model-cache", dependencies=[Depends(viewer)])
 def read_cache_settings(session: SessionDep) -> ModelCacheSettings:
     return settings_info(load_settings(session))
 
 
-@router.put("/settings/model-cache")
+@router.put("/settings/model-cache", dependencies=[Depends(admin)])
 def update_cache_settings(body: ModelCacheSettings, session: SessionDep) -> ModelCacheSettings:
     before = load_settings(session)
     saved = save_settings(session, body.model_dump())
@@ -111,7 +112,7 @@ def update_cache_settings(body: ModelCacheSettings, session: SessionDep) -> Mode
     return settings_info(saved)
 
 
-@router.get("/models/cache")
+@router.get("/models/cache", dependencies=[Depends(viewer)])
 def model_cache(session: SessionDep) -> ModelCacheInfo:
     settings = load_settings(session)
     bases = cached_bases(session)
@@ -126,11 +127,11 @@ def model_cache(session: SessionDep) -> ModelCacheInfo:
     )
 
 
-@router.post("/models/cache/estimate")
+@router.post("/models/cache/estimate", dependencies=[Depends(viewer)])
 def estimate_download(body: CacheEstimateRequest, session: SessionDep) -> CachePlanInfo:
     return plan_info(estimate(session, body.size_bytes))
 
 
-@router.post("/models/cache/free")
+@router.post("/models/cache/free", dependencies=[Depends(admin)])
 def free_up_space(session: SessionDep, settings: SettingsDep) -> CachePlanInfo:
     return plan_info(evict(session, settings, "manual", current_actor()))

@@ -1,9 +1,10 @@
 import shutil
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Depends, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
@@ -51,12 +52,12 @@ from minibrain.tags import merged_tags, user_tags
 router = APIRouter(prefix="/api/minibrains", tags=["minibrains"])
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(viewer)])
 def list_all(session: SessionDep) -> list[MinibrainSummary]:
     return [summary(minibrain) for minibrain in list_minibrains(session)]
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(builder)])
 def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> MinibrainDetail:
     base = body.base_model or DEFAULT_BASE_MODEL
     if body.task != "classify":
@@ -73,12 +74,12 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
     return detail(settings, minibrain)
 
 
-@router.get("/bases")
+@router.get("/bases", dependencies=[Depends(viewer)])
 def bases(session: SessionDep) -> list[str]:
     return available_bases(session)
 
 
-@router.patch("/{slug}")
+@router.patch("/{slug}", dependencies=[Depends(builder)])
 def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     if body.name is not None:
@@ -92,12 +93,16 @@ def update(slug: str, body: ModelUpdate, session: SessionDep, settings: Settings
     return detail(settings, minibrain)
 
 
-@router.get("/{slug}")
+@router.get("/{slug}", dependencies=[Depends(viewer)])
 def read(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
-    return detail(settings, get_minibrain(session, slug))
+    found = detail(settings, get_minibrain(session, slug))
+    if sees_rows() or found.snapshot is None:
+        return found
+    checks = [check.model_copy(update={"examples": []}) for check in found.snapshot.checks]
+    return found.model_copy(update={"snapshot": found.snapshot.model_copy(update={"checks": checks})})
 
 
-@router.delete("/{slug}", status_code=204)
+@router.delete("/{slug}", status_code=204, dependencies=[Depends(builder)])
 def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     minibrain = get_minibrain(session, slug)
     if minibrain.deployed:
@@ -124,7 +129,7 @@ SAMPLE_FILE = "travel_intents.jsonl"
 SAMPLE_DESCRIPTION = "Sample: sort travel support messages into intents such as lost luggage or refunds."
 
 
-@router.post("/{slug}/deploy")
+@router.post("/{slug}/deploy", dependencies=[Depends(builder)])
 def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     if minibrain.deployed != body.deployed:
@@ -137,7 +142,7 @@ def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: Settin
     return detail(settings, minibrain)
 
 
-@router.post("/{slug}/source")
+@router.post("/{slug}/source", dependencies=[Depends(builder)])
 def upload_source(
     slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
@@ -153,7 +158,7 @@ def free_name(session: Session, name: str) -> str:
     return next(candidate for candidate in candidates if slugify(candidate) not in taken)
 
 
-@router.post("/sample", status_code=201)
+@router.post("/sample", status_code=201, dependencies=[Depends(builder)])
 def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> MinibrainDetail:
     minibrain = create_minibrain(session, free_name(session, SAMPLE_NAME), "classify", DEFAULT_BASE_MODEL)
     minibrain.description = SAMPLE_DESCRIPTION
@@ -163,7 +168,7 @@ def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     return detail(settings, minibrain)
 
 
-@router.put("/{slug}/dataset")
+@router.put("/{slug}/dataset", dependencies=[Depends(builder)])
 def choose_dataset(slug: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     minibrain.dataset = get_dataset(session, body.dataset) if body.dataset else None
@@ -172,7 +177,7 @@ def choose_dataset(slug: str, body: DatasetChoice, session: SessionDep, settings
     return detail(settings, minibrain)
 
 
-@router.put("/{slug}/mapping")
+@router.put("/{slug}/mapping", dependencies=[Depends(builder)])
 def update_mapping(
     slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
@@ -182,19 +187,19 @@ def update_mapping(
     return detail(settings, minibrain)
 
 
-@router.post("/{slug}/query")
+@router.post("/{slug}/query", dependencies=[Depends(builder)])
 def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     dataset = dataset_of(get_minibrain(session, slug))
     sources = sources_in(session, body.sql, dataset.sources)
     return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
-@router.get("/{slug}/preview")
+@router.get("/{slug}/preview", dependencies=[Depends(builder)])
 def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
     return dataset_preview_of(settings, store, dataset_of(get_minibrain(session, slug)))
 
 
-@router.post("/{slug}/snapshots", status_code=201)
+@router.post("/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
 def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
     minibrain.snapshot = model_snapshot_now(session, settings, minibrain, saved=True)
@@ -203,7 +208,7 @@ def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> Min
     return detail(settings, minibrain)
 
 
-@router.get("/{slug}/golden")
+@router.get("/{slug}/golden", dependencies=[Depends(builder)])
 def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
     current = latest_snapshot(get_minibrain(session, slug))
     if current is None:

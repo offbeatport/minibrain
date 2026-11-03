@@ -21,8 +21,10 @@ import {
     Workflow,
 } from "lucide-react";
 import type { IconComponent } from "obp-ui/shell";
+import type { Role } from "~/api/authQueries";
+import { allows } from "~/lib/access";
 
-export type NavEntry = { label: string; path: string; icon: IconComponent };
+export type NavEntry = { label: string; path: string; icon: IconComponent; role?: Role };
 
 export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
@@ -37,10 +39,10 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     {
         label: "Create",
         items: [
-            { label: "Data", path: "/data", icon: Database },
+            { label: "Data", path: "/data", icon: Database, role: "builder" },
             { label: "Training", path: "/training", icon: GraduationCap },
             { label: "Evaluations", path: "/evaluations", icon: Gauge },
-            { label: "Feedback", path: "/feedback", icon: ThumbsUp },
+            { label: "Feedback", path: "/feedback", icon: ThumbsUp, role: "builder" },
         ],
     },
     {
@@ -56,14 +58,18 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
 
 export const SETTINGS_PAGES: NavEntry[] = [
     { label: "General", path: "/settings", icon: SlidersHorizontal },
-    { label: "Security", path: "/settings/security", icon: ShieldCheck },
-    { label: "Accounts", path: "/settings/accounts", icon: Users },
-    { label: "Audit log", path: "/settings/audit", icon: ScrollText },
-    { label: "Data", path: "/settings/data", icon: Table2 },
-    { label: "Storage", path: "/settings/storage", icon: HardDrive },
-    { label: "Connections", path: "/settings/connections", icon: Cable },
-    { label: "This install", path: "/settings/install", icon: Info },
+    { label: "Security", path: "/settings/security", icon: ShieldCheck, role: "admin" },
+    { label: "Accounts", path: "/settings/accounts", icon: Users, role: "admin" },
+    { label: "Audit log", path: "/settings/audit", icon: ScrollText, role: "admin" },
+    { label: "Data", path: "/settings/data", icon: Table2, role: "admin" },
+    { label: "Storage", path: "/settings/storage", icon: HardDrive, role: "admin" },
+    { label: "Connections", path: "/settings/connections", icon: Cable, role: "admin" },
+    { label: "This install", path: "/settings/install", icon: Info, role: "admin" },
 ];
+
+export function visibleTo(role: Role | null | undefined): (entry: NavEntry) => boolean {
+    return (entry) => !entry.role || allows(role, entry.role);
+}
 
 export function isSettingsPath(pathname: string): boolean {
     return pathname === "/settings" || pathname.startsWith("/settings/");

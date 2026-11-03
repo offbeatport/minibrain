@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StringConstraints
 
+from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.registry.compute import Pool, pools
@@ -57,7 +58,7 @@ class PoolInfo(BaseModel):
     engines: list[ReplicaInfo]
 
 
-@router.get("/pools")
+@router.get("/pools", dependencies=[Depends(viewer)])
 def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
     found: list[PoolInfo] = []
     for pool in pools(session, node):
@@ -126,12 +127,12 @@ def prices_info(found: list[Pool], prices: DevicePrices) -> DevicePricesInfo:
     return DevicePricesInfo(currency=prices.currency, pools=listed + gone)
 
 
-@router.get("/prices")
+@router.get("/prices", dependencies=[Depends(viewer)])
 def read_prices(session: SessionDep, node: LocalNodeDep) -> DevicePricesInfo:
     return prices_info(pools(session, node), load_prices(session))
 
 
-@router.put("/prices")
+@router.put("/prices", dependencies=[Depends(admin)])
 def update_prices(body: DevicePricesUpdate, session: SessionDep, node: LocalNodeDep) -> DevicePricesInfo:
     before = load_prices(session)
     saved = save_prices(session, body.currency, body.hourly)

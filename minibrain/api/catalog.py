@@ -2,11 +2,12 @@ import logging
 import threading
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.model_rows import base_availability, model_job
 from minibrain.api.schemas import (
@@ -128,7 +129,7 @@ def latest_sync(session: Session) -> Job | None:
     return session.scalar(query)
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(viewer)])
 def catalogue(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, pool: str | None = None
 ) -> CatalogResponse:
@@ -157,7 +158,7 @@ def catalogue(
     )
 
 
-@router.post("/{catalog_id}/download", status_code=202)
+@router.post("/{catalog_id}/download", status_code=202, dependencies=[Depends(admin)])
 def download(
     catalog_id: str, body: DownloadRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> ModelRow:
@@ -188,7 +189,7 @@ class HubAddRequest(BaseModel):
     repo: str
 
 
-@router.post("/hub", status_code=201)
+@router.post("/hub", status_code=201, dependencies=[Depends(admin)])
 def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> CatalogEntry:
     policy = load_policy(session)
     policy.add_from_hub()
@@ -216,7 +217,7 @@ def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep
     return entry_info(session, settings, added, local_machines(session, node))
 
 
-@router.delete("/{catalog_id}", status_code=204)
+@router.delete("/{catalog_id}", status_code=204, dependencies=[Depends(admin)])
 def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
     entry = session.get(CatalogModel, catalog_id)
     if entry is None:
@@ -229,7 +230,7 @@ def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
     session.commit()
 
 
-@router.post("/sync", status_code=202)
+@router.post("/sync", status_code=202, dependencies=[Depends(admin)])
 def sync(session: SessionDep) -> JobInfo:
     if hub.offline():
         raise ConflictError("Offline: the catalogue sync needs a connection; the bundled catalogue stays in use")
@@ -246,12 +247,12 @@ class CatalogSettings(BaseModel):
     daily_sync: bool
 
 
-@router.get("/settings")
+@router.get("/settings", dependencies=[Depends(viewer)])
 def read_settings(session: SessionDep) -> CatalogSettings:
     return CatalogSettings(daily_sync=daily_sync(session))
 
 
-@router.put("/settings")
+@router.put("/settings", dependencies=[Depends(admin)])
 def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettings:
     write(session, DAILY_SYNC_KEY, body.daily_sync)
     session.commit()

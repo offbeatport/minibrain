@@ -10,6 +10,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { discoverListHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import {
@@ -170,7 +171,8 @@ export function DiscoverModelPage() {
         }),
         [router, refresh, data?.online, data?.token_configured],
     );
-    const blocked = !on.online || Boolean(entry?.gated && !on.tokenConfigured);
+    const can = useCan();
+    const blocked = !can.admin || !on.online || Boolean(entry?.gated && !on.tokenConfigured);
     const table = useMemo(
         () =>
             variantColumns(!blocked, (variant) => {

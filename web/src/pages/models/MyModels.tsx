@@ -58,6 +58,7 @@ import { ErrorLine } from "~/components/Section";
 import { type HealthAction, HealthStatus } from "~/components/models/HealthStatus";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { type Abilities, useCan } from "~/lib/access";
 import {
     deploymentPageHref,
     evaluationsHref,
@@ -507,8 +508,9 @@ function TrainItem({
     );
 }
 
-function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
+function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: boolean }) {
     const row = entry.model;
+    const manages = admin || row.kind === "custom";
     const version = entry.version;
     const deployed = row.deployment.state !== "not_deployed";
     const transferring = row.kind === "base" && ["running", "queued"].includes(row.activity.state);
@@ -525,7 +527,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
     return (
         <>
             {fixes
-                .filter((action) => action.kind !== "remove")
+                .filter((action) => manages && action.kind !== "remove")
                 .map((action) => (
                     <DropdownMenuItem
                         key={action.kind}
@@ -554,10 +556,12 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                 <Eye />
                 View details
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => on.edit(row)}>
-                <Pencil />
-                Edit name, description and tags
-            </DropdownMenuItem>
+            {manages && (
+                <DropdownMenuItem onSelect={() => on.edit(row)}>
+                    <Pencil />
+                    Edit name, description and tags
+                </DropdownMenuItem>
+            )}
             {row.kind === "custom" && (
                 <TrainItem
                     label="Train"
@@ -584,7 +588,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Deploy
                 </DropdownMenuItem>
             )}
-            {row.kind === "base" && row.availability.state === "available" && (
+            {admin && row.kind === "base" && row.availability.state === "available" && (
                 <DropdownMenuCheckboxItem
                     checked={row.pinned ?? false}
                     onCheckedChange={(pinned) => setPinned(row, pinned).then(on.refresh)}
@@ -592,7 +596,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Keep on disk
                 </DropdownMenuCheckboxItem>
             )}
-            {verifiable && (
+            {admin && verifiable && (
                 <DropdownMenuItem
                     onSelect={() => on.health(row, { kind: "verify", label: "Verify files" })}
                 >
@@ -600,7 +604,7 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     Verify files
                 </DropdownMenuItem>
             )}
-            {transferring && row.activity.job_id !== null && (
+            {admin && transferring && row.activity.job_id !== null && (
                 <DropdownMenuItem onSelect={() => on.confirm(cancelTransferConfirmation(row, on))}>
                     <CircleX />
                     Cancel {TRANSFER_NOUNS[row.activity.kind ?? ""] ?? "download"}
@@ -617,7 +621,7 @@ const TRANSFER_NOUNS: Record<string, string> = {
     repair: "repair",
 };
 
-function StopItems({ entry, on }: { entry: Entry; on: Handlers }) {
+function StopItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: boolean }) {
     const row = entry.model;
     const version = entry.version;
     const deployed = row.deployment.state !== "not_deployed";
@@ -642,12 +646,49 @@ function StopItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     {`Delete v${version.number} only`}
                 </DropdownMenuItem>
             )}
-            <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => on.confirm(deleteConfirmation(row, on))}
-            >
-                <Trash2 />
-                {row.kind === "custom" ? "Delete model and all versions" : "Delete model"}
+            {(admin || row.kind === "custom") && (
+                <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => on.confirm(deleteConfirmation(row, on))}
+                >
+                    <Trash2 />
+                    {row.kind === "custom" ? "Delete model and all versions" : "Delete model"}
+                </DropdownMenuItem>
+            )}
+        </>
+    );
+}
+
+const VIEWER_STEPS = new Set(["Use API", "Review results", "Test", "Details"]);
+
+function allowedStep(
+    step: { label: string; run: () => void } | null,
+    row: ModelRow,
+    can: Abilities,
+): { label: string; run: () => void } | null {
+    if (!step || can.admin) {
+        return step;
+    }
+    if (!can.build) {
+        return VIEWER_STEPS.has(step.label) ? step : null;
+    }
+    return row.kind === "base" && (row.health || step.label === "Retry") ? null : step;
+}
+
+function ViewerItems({ entry, on }: { entry: Entry; on: Handlers }) {
+    const row = entry.model;
+    const version = entry.version;
+    return (
+        <>
+            {version?.status === "ready" && (
+                <DropdownMenuItem onSelect={() => on.test(row)}>
+                    <FlaskConical />
+                    {`Test v${version.number}`}
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
+                <Eye />
+                View details
             </DropdownMenuItem>
         </>
     );
@@ -655,7 +696,9 @@ function StopItems({ entry, on }: { entry: Entry; on: Handlers }) {
 
 function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
-    const primary = entry.version ? versionAction(entry, on) : primaryAction(row, on);
+    const can = useCan();
+    const step = entry.version ? versionAction(entry, on) : primaryAction(row, on);
+    const primary = allowedStep(step, row, can);
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
@@ -679,9 +722,15 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
-                    <ActionItems entry={entry} on={on} />
-                    <DropdownMenuSeparator />
-                    <StopItems entry={entry} on={on} />
+                    {can.build ? (
+                        <>
+                            <ActionItems entry={entry} on={on} admin={can.admin} />
+                            <DropdownMenuSeparator />
+                            <StopItems entry={entry} on={on} admin={can.admin} />
+                        </>
+                    ) : (
+                        <ViewerItems entry={entry} on={on} />
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
@@ -1373,6 +1422,7 @@ export function MyModels({
     search: ModelsSearch;
     update: (patch: ModelsSearch) => void;
 }) {
+    const can = useCan();
     const router = useRouter();
     const refresh = useModelsRefresh();
     const models = useModels();
@@ -1459,7 +1509,7 @@ export function MyModels({
     );
     return (
         <div className="flex flex-col gap-3">
-            {selected.length > 0 ? (
+            {can.build && selected.length > 0 ? (
                 <BulkBar
                     chosen={entries.filter((entry) => selected.includes(entry.key))}
                     onClear={() => setSelected([])}

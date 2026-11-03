@@ -32,6 +32,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, JobStatus, jobStatusLabel } from "~/components/StatusBadge";
 import { ProgressBar } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { jobDuration, jobSeconds } from "~/lib/jobs";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { evaluationsHref, trainingHref } from "~/lib/modelLinks";
@@ -282,6 +283,7 @@ function jobId(value: string | undefined): number | null {
 
 export function TrainingListPage() {
     const { search, update } = useListSearch(PATH, KEYS);
+    const can = useCan();
     const minibrains = useMinibrains();
     const [picking, setPicking] = useState(false);
     const [order, setOrder] = useState<JobOrder>("newest");
@@ -318,7 +320,9 @@ export function TrainingListPage() {
             <PageHeader
                 title="Training"
                 caption="Training and scoring runs across every model. One job runs at a time; the rest wait in the queue."
-                actions={<Button onClick={() => setPicking(true)}>Train a model</Button>}
+                actions={
+                    can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
+                }
             />
             <div className="flex flex-wrap items-center gap-2">
                 <SearchInput

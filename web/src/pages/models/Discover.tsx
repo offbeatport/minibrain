@@ -32,6 +32,7 @@ import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import {
@@ -145,6 +146,10 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             unwrap(api.POST("/api/models/base/{key}/retry", { params: { path: { key } } })),
         onSuccess: on.refresh,
     });
+    const can = useCan();
+    if (!can.build) {
+        return null;
+    }
     if (moving) {
         const progress = moving.availability.progress;
         return (
@@ -182,6 +187,9 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
                 </Button>
             </div>
         );
+    }
+    if (!can.admin) {
+        return null;
     }
     if (failed && on.online) {
         return (

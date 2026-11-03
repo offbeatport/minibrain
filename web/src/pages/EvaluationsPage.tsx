@@ -24,6 +24,7 @@ import {
     versionState,
     versionStateLabel,
 } from "~/components/StatusBadge";
+import { useCan } from "~/lib/access";
 import { costSortValue, costText, deviceTime, headline, measuredOn, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
@@ -241,6 +242,7 @@ const MISTAKE_COLUMNS: ColumnDef<Mistake, unknown>[] = [
 function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
     const versions = useVersions(line.model.key);
     const promote = usePromote();
+    const can = useCan();
     const info = versions.data?.find((item) => item.number === line.version.number);
     const { model, version } = line;
     const kind = KIND_NAMES[version.kind] ?? version.kind;
@@ -309,7 +311,7 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                 <Button variant="outline" asChild>
                     <Link href={modelCardHref(model.key, version.number)}>Model card</Link>
                 </Button>
-                {deployable(version) && (
+                {can.build && deployable(version) && (
                     <Button
                         disabled={promote.isPending}
                         onClick={() =>
@@ -362,6 +364,7 @@ export function EvaluationsPage() {
     const { search, update } = useListSearch(PATH, KEYS);
     const models = useModels();
     const promote = usePromote();
+    const can = useCan();
     const all = useMemo(() => linesOf(models.data ?? []), [models.data]);
     const chosenModels = splitList(search.model);
     const statuses = splitList(search.status);
@@ -437,7 +440,7 @@ export function EvaluationsPage() {
                     `${line.model.name} v${line.version.number}, ${percent(line.version.accuracy)} held-out, ${versionStateLabel(versionState(line.version))}`
                 }
                 rowActions={(line) =>
-                    deployable(line.version) ? (
+                    can.build && deployable(line.version) ? (
                         <Button
                             variant="outline"
                             size="xs"

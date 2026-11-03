@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from minibrain.api.access import builder, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
@@ -182,7 +183,7 @@ def after_cursor(cursor: str) -> ColumnElement[bool]:
     )
 
 
-@router.get("/feedback")
+@router.get("/feedback", dependencies=[Depends(builder)])
 def list_feedback(
     session: SessionDep,
     filters: FilterDep,
@@ -204,7 +205,7 @@ def list_feedback(
     )
 
 
-@router.get("/feedback/facets")
+@router.get("/feedback/facets", dependencies=[Depends(builder)])
 def feedback_facets(session: SessionDep, filters: FilterDep) -> FeedbackFacets:
     by_status = select(Feedback.status, func.count()).where(*filters.conditions("status")).group_by(Feedback.status)
     by_minibrain = (
@@ -255,12 +256,12 @@ def feedback_detail(session: Session, item: Feedback) -> FeedbackDetail:
     return FeedbackDetail.model_validate(feedback_info(item).model_dump() | extra)
 
 
-@router.get("/feedback/{feedback_id}")
+@router.get("/feedback/{feedback_id}", dependencies=[Depends(builder)])
 def read_feedback(feedback_id: int, session: SessionDep) -> FeedbackDetail:
     return feedback_detail(session, get_feedback(session, feedback_id))
 
 
-@router.post("/feedback/{feedback_id}/review")
+@router.post("/feedback/{feedback_id}/review", dependencies=[Depends(builder)])
 def review_feedback(feedback_id: int, body: ReviewRequest, session: SessionDep) -> FeedbackDetail:
     item = store.review(
         session, get_feedback(session, feedback_id), body.decision == "accept", body.label, current_actor()
@@ -269,14 +270,14 @@ def review_feedback(feedback_id: int, body: ReviewRequest, session: SessionDep) 
     return feedback_detail(session, item)
 
 
-@router.post("/feedback/{feedback_id}/assign")
+@router.post("/feedback/{feedback_id}/assign", dependencies=[Depends(builder)])
 def assign_feedback(feedback_id: int, body: AssignRequest, session: SessionDep) -> FeedbackDetail:
     item = store.assign(session, get_feedback(session, feedback_id), body.mine, current_actor())
     session.commit()
     return feedback_detail(session, item)
 
 
-@router.post("/minibrains/{slug}/feedback", status_code=201)
+@router.post("/minibrains/{slug}/feedback", status_code=201, dependencies=[Depends(viewer)])
 def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep) -> FeedbackInfo:
     minibrain = get_minibrain(session, slug)
     submission = Submission(
@@ -295,7 +296,7 @@ def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep
     return feedback_info(item)
 
 
-@router.get("/minibrains/{slug}/feedback/summary")
+@router.get("/minibrains/{slug}/feedback/summary", dependencies=[Depends(viewer)])
 def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
     found = store.summary(session, get_minibrain(session, slug))
     return FeedbackSummary(

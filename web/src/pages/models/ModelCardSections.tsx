@@ -155,16 +155,18 @@ export function PurposeSection({ card }: { card: ModelCard }) {
     );
 }
 
-export function UseSection({ card, onEdit }: { card: ModelCard; onEdit: () => void }) {
+export function UseSection({ card, onEdit }: { card: ModelCard; onEdit?: () => void }) {
     return (
         <PanelSection
             icon={UserRound}
             title="Intended use and owner"
             description="Written by people; stored with this version and audited on every change."
             actions={
-                <Button variant="outline" onClick={onEdit}>
-                    Edit
-                </Button>
+                onEdit && (
+                    <Button variant="outline" onClick={onEdit}>
+                        Edit
+                    </Button>
+                )
             }
         >
             <Facts
@@ -765,7 +767,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
     );
 }
 
-export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit: () => void }) {
+export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () => void }) {
     const derived = card.limits.derived;
     return (
         <PanelSection
@@ -773,9 +775,11 @@ export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit: () =>
             title="Limits"
             description="Facts read from the data and scores, then what people know beyond them."
             actions={
-                <Button variant="outline" onClick={onEdit}>
-                    Edit known limits
-                </Button>
+                onEdit && (
+                    <Button variant="outline" onClick={onEdit}>
+                        Edit known limits
+                    </Button>
+                )
             }
         >
             <div className="flex flex-col gap-4 text-sm">

@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from minibrain.api.access import admin
 from minibrain.api.deps import SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.policy import describe, update
@@ -32,12 +33,12 @@ class PolicyUpdate(BaseModel):
     value: Any
 
 
-@router.get("/policies")
+@router.get("/policies", dependencies=[Depends(admin)])
 def policies(session: SessionDep) -> list[PolicyInfo]:
     return [PolicyInfo(**item) for item in describe(session)]
 
 
-@router.put("/policies/{name}")
+@router.put("/policies/{name}", dependencies=[Depends(admin)])
 def change_policy(name: str, body: PolicyUpdate, session: SessionDep) -> list[PolicyInfo]:
     update(session, name, body.value, current_actor())
     session.commit()

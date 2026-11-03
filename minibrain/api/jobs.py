@@ -11,6 +11,7 @@ from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from starlette.concurrency import run_in_threadpool
 
+from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import QueueDep, SessionDep, StoreDep
 from minibrain.api.schemas import JobDetail, JobEventInfo, JobFacets, JobInfo, JobPage
 from minibrain.api.views import job_detail, job_info
@@ -104,7 +105,7 @@ def count_jobs(session: Session, where: list[ColumnElement[bool]]) -> int:
     return session.scalar(select(func.count()).select_from(Job).where(*where)) or 0
 
 
-@router.get("/jobs")
+@router.get("/jobs", dependencies=[Depends(viewer)])
 def list_jobs(
     session: SessionDep,
     filters: FilterDep,
@@ -129,7 +130,7 @@ def list_jobs(
     )
 
 
-@router.get("/jobs/facets")
+@router.get("/jobs/facets", dependencies=[Depends(viewer)])
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
     by_minibrain = (
@@ -146,9 +147,10 @@ def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     )
 
 
-@router.get("/jobs/{job_id}")
+@router.get("/jobs/{job_id}", dependencies=[Depends(viewer)])
 def read_job(job_id: int, session: SessionDep) -> JobDetail:
-    return job_detail(get_job(session, job_id))
+    found = job_detail(get_job(session, job_id))
+    return found if sees_rows() else found.model_copy(update={"result": None, "outputs": {}})
 
 
 def event_info(event: JobEvent) -> JobEventInfo:
@@ -165,7 +167,7 @@ def events_after(request: Request, job_id: int, after: int) -> tuple[list[JobEve
         return events, job.status in FINAL_JOB_STATUSES
 
 
-@router.get("/jobs/{job_id}/events", response_class=StreamingResponse)
+@router.get("/jobs/{job_id}/events", response_class=StreamingResponse, dependencies=[Depends(viewer)])
 async def stream_events(job_id: int, request: Request, session: SessionDep, after: int = 0) -> StreamingResponse:
     get_job(session, job_id)
 
@@ -186,7 +188,7 @@ async def stream_events(job_id: int, request: Request, session: SessionDep, afte
     return StreamingResponse(stream(), media_type="text/event-stream", headers=headers)
 
 
-@router.post("/jobs/{job_id}/cancel")
+@router.post("/jobs/{job_id}/cancel", dependencies=[Depends(builder)])
 def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     job = get_job(session, job_id)
     queue.cancel(session, job)
@@ -194,14 +196,14 @@ def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     return job_info(job)
 
 
-@router.post("/jobs/{job_id}/retry", status_code=201)
+@router.post("/jobs/{job_id}/retry", status_code=201, dependencies=[Depends(builder)])
 def retry_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     again = queue.retry(session, get_job(session, job_id))
     session.commit()
     return job_info(again)
 
 
-@router.get("/artifacts/{artifact_id}", response_class=StreamingResponse)
+@router.get("/artifacts/{artifact_id}", response_class=StreamingResponse, dependencies=[Depends(builder)])
 def download(artifact_id: str, session: SessionDep, store: StoreDep) -> StreamingResponse:
     artifact = session.get(Artifact, artifact_id)
     if artifact is None or not store.has(artifact_id):

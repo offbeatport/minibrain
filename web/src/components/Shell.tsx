@@ -11,8 +11,8 @@ import {
     SectionLabel,
 } from "obp-ui/shell";
 import { type MouseEvent, type ReactNode, useEffect } from "react";
-import { useSession, useSignOut } from "~/api/authQueries";
-import { SECTIONS, SETTINGS_PAGES, isSettingsPath } from "~/components/navigation";
+import { usePerson, useSession, useSignOut } from "~/api/authQueries";
+import { SECTIONS, SETTINGS_PAGES, isSettingsPath, visibleTo } from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
 import { NoAccessPage, SetPasswordPage, SetupPage, SignInPage } from "~/pages/auth/AuthPages";
@@ -36,9 +36,14 @@ function KitLink({ href, onClick, ...rest }: UILinkProps) {
 }
 
 function Navigation({ pathname }: { pathname: string }) {
+    const shown = visibleTo(usePerson()?.role);
+    const sections = SECTIONS.map((section) => ({
+        ...section,
+        items: section.items.filter(shown),
+    }));
     return (
         <>
-            {SECTIONS.map((section) => (
+            {sections.map((section) => (
                 <div key={section.label ?? section.items[0].path} className="flex flex-col">
                     {section.label && (
                         <SectionLabel tone="subtle" className={SECTION_LABEL}>
@@ -64,6 +69,7 @@ function Navigation({ pathname }: { pathname: string }) {
 }
 
 function SettingsNavigation({ pathname }: { pathname: string }) {
+    const shown = visibleTo(usePerson()?.role);
     return (
         <>
             <NavItem
@@ -77,7 +83,7 @@ function SettingsNavigation({ pathname }: { pathname: string }) {
                 <SectionLabel tone="subtle" className={SECTION_LABEL}>
                     Settings
                 </SectionLabel>
-                {SETTINGS_PAGES.map((entry) => (
+                {SETTINGS_PAGES.filter(shown).map((entry) => (
                     <NavItem
                         key={entry.path}
                         icon={entry.icon}

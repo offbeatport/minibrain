@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
+from minibrain.api.access import builder, viewer
 from minibrain.api.aibom import MEDIA_TYPE, adapter_of, build_aibom, edited_at, export_aibom
 from minibrain.api.card_builder import build_card
 from minibrain.api.card_export import card_data, digest, export_json, export_markdown
@@ -45,20 +46,20 @@ def edits(version: Version, body: ModelCardEdit) -> dict[str, tuple[str, str]]:
     return found
 
 
-@router.get("/{slug}/versions/{number}/card")
+@router.get("/{slug}/versions/{number}/card", dependencies=[Depends(viewer)])
 def read_card(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelCardExport:
     minibrain = get_minibrain(session, slug)
     return exported(card_of(session, settings, minibrain, get_version(minibrain, number)))
 
 
-@router.get("/{slug}/versions/{number}/card.json", response_class=Response)
+@router.get("/{slug}/versions/{number}/card.json", response_class=Response, dependencies=[Depends(viewer)])
 def card_json(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
     minibrain = get_minibrain(session, slug)
     card = card_of(session, settings, minibrain, get_version(minibrain, number))
     return download(export_json(card_data(card)), "application/json", f"{slug}-v{number}-model-card.json")
 
 
-@router.get("/{slug}/versions/{number}/card.md", response_class=Response)
+@router.get("/{slug}/versions/{number}/card.md", response_class=Response, dependencies=[Depends(viewer)])
 def card_markdown(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
     minibrain = get_minibrain(session, slug)
     card = card_of(session, settings, minibrain, get_version(minibrain, number))
@@ -66,7 +67,7 @@ def card_markdown(slug: str, number: int, session: SessionDep, settings: Setting
     return download(body, "text/markdown; charset=utf-8", f"{slug}-v{number}-model-card.md")
 
 
-@router.get("/{slug}/versions/{number}/aibom.json", response_class=Response)
+@router.get("/{slug}/versions/{number}/aibom.json", response_class=Response, dependencies=[Depends(viewer)])
 def aibom_json(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
     minibrain = get_minibrain(session, slug)
     version = get_version(minibrain, number)
@@ -76,7 +77,7 @@ def aibom_json(slug: str, number: int, session: SessionDep, settings: SettingsDe
     return download(export_aibom(bom), MEDIA_TYPE, f"{slug}-v{number}-aibom.cdx.json")
 
 
-@router.put("/{slug}/versions/{number}/card")
+@router.put("/{slug}/versions/{number}/card", dependencies=[Depends(builder)])
 def edit_card(
     slug: str, number: int, body: ModelCardEdit, session: SessionDep, settings: SettingsDep
 ) -> ModelCardExport:

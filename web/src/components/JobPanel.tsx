@@ -5,6 +5,7 @@ import { type JobInfo, api, unwrap } from "~/api/client";
 import { isActiveJob } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
+import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { describeLine, useInvalidate, useJobLog } from "~/lib/jobs";
 
@@ -26,6 +27,7 @@ function jobTitle(job: JobInfo): string {
 export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
     const lines = useJobLog(job);
     const invalidate = useInvalidate(slug);
+    const can = useCan();
     const target = { params: { path: { job_id: job.id } } };
     const cancel = useMutation({
         mutationFn: () => unwrap(api.POST("/api/jobs/{job_id}/cancel", target)),
@@ -47,12 +49,12 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
                         {job.attempt > 1 && ` · attempt ${job.attempt} of ${job.max_attempts}`}
                     </span>
                 </div>
-                {isActiveJob(job) && !job.cancel_requested && (
+                {can.build && isActiveJob(job) && !job.cancel_requested && (
                     <Button variant="outline" size="sm" onClick={() => cancel.mutate()}>
                         Cancel
                     </Button>
                 )}
-                {retriable && (
+                {can.build && retriable && (
                     <Button variant="outline" size="sm" onClick={() => retry.mutate()}>
                         Retry
                     </Button>

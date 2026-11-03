@@ -19,6 +19,7 @@ import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ThemeChoice } from "~/components/ThemeChoice";
+import { useCan } from "~/lib/access";
 import { CURRENCIES } from "~/lib/cost";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
@@ -215,13 +216,14 @@ function ComputePrices() {
 
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
+    const can = useCan();
     return (
         <SettingsLayout title="General">
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />
-                <ModelCatalogue />
-                <ComputePrices />
+                {can.admin && <ModelCatalogue />}
+                {can.admin && <ComputePrices />}
                 <PanelSection icon={GraduationCap} title="Default training recipe">
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (

@@ -13,6 +13,7 @@ from sqlalchemy import ColumnElement, String, cast, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from minibrain.api.access import admin
 from minibrain.api.deps import SessionDep
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
@@ -175,7 +176,7 @@ def page_rows(
     return newest(session, conditions, size)
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(admin)])
 def list_events(
     session: SessionDep,
     found: FilterDep,
@@ -200,7 +201,7 @@ def list_events(
     )
 
 
-@router.get("/facets")
+@router.get("/facets", dependencies=[Depends(admin)])
 def facets(session: SessionDep) -> AuditFacets:
     def counted(column: Any) -> list[AuditFacet]:
         rows = session.execute(select(column, func.count()).group_by(column).order_by(column)).all()
@@ -246,7 +247,12 @@ def export_stream(
         yield from (csv_lines(rows) if kind == "csv" else jsonl_lines(rows))
 
 
-@router.get("/export", response_class=StreamingResponse, responses={200: {"content": {"text/csv": {}}}})
+@router.get(
+    "/export",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/csv": {}}}},
+    dependencies=[Depends(admin)],
+)
 def export(request: Request, found: FilterDep, format: Literal["csv", "jsonl"] = "csv") -> StreamingResponse:
     name = f"minibrain-audit-{now().strftime('%Y%m%d-%H%M%S')}.{format}"
     return StreamingResponse(
@@ -283,12 +289,12 @@ def siem_info(session: Session) -> SiemInfo:
     )
 
 
-@router.get("/chain")
+@router.get("/chain", dependencies=[Depends(admin)])
 def chain(session: SessionDep) -> AuditChainInfo:
     return chain_info(verify(session), siem_info(session))
 
 
-@router.get("/{event_id}")
+@router.get("/{event_id}", dependencies=[Depends(admin)])
 def event(event_id: int, session: SessionDep) -> AuditInfo:
     found = session.get(AuditEvent, event_id)
     if found is None:

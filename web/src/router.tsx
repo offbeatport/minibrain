@@ -6,6 +6,8 @@ import {
     createRouter,
     redirect,
 } from "@tanstack/react-router";
+import type { Role } from "./api/authQueries";
+import { NeedsRole } from "./components/NeedsRole";
 import { Shell } from "./components/Shell";
 import { hrefWith } from "./lib/listSearch";
 import {
@@ -51,6 +53,16 @@ const rootRoute = createRootRoute({ component: Shell });
 
 function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
+}
+
+function guarded(role: Role, Component: RouteComponent): RouteComponent {
+    return function Guarded() {
+        return (
+            <NeedsRole role={role}>
+                <Component />
+            </NeedsRole>
+        );
+    };
 }
 
 function unscopedPage(path: string, component: RouteComponent, keepModel = true): AnyRoute {
@@ -121,12 +133,12 @@ const routeTree = rootRoute.addChildren([
     globalPage("/discover", DiscoverPage),
     globalPage("/discover/compare", DiscoverComparePage),
     globalPage("/discover/$id", DiscoverModelPage),
-    globalPage("/models/new", AddModelPage),
+    globalPage("/models/new", guarded("builder", AddModelPage)),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
     globalPage("/models/custom/$slug/versions/$number/card", ModelCardPage),
     unscopedPage("/playground", PlaygroundPage),
-    globalPage("/data", DataPage),
+    globalPage("/data", guarded("builder", DataPage)),
     createRoute({
         getParentRoute: () => rootRoute,
         path: "/data/datasets/$slug",
@@ -135,9 +147,9 @@ const routeTree = rootRoute.addChildren([
         },
     }),
     unscopedPage("/training", TrainingListPage),
-    globalPage("/training/$slug", ModelTrainingPage),
+    globalPage("/training/$slug", guarded("builder", ModelTrainingPage)),
     unscopedPage("/evaluations", EvaluationsPage),
-    unscopedPage("/feedback", FeedbackPage, false),
+    unscopedPage("/feedback", guarded("builder", FeedbackPage), false),
     createRoute({
         getParentRoute: () => rootRoute,
         path: "/deployments",
@@ -162,13 +174,13 @@ const routeTree = rootRoute.addChildren([
     }),
     globalPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
-    globalPage("/settings/security", SecurityPage),
-    globalPage("/settings/accounts", AccountsSettingsPage),
-    globalPage("/settings/audit", AuditLogPage),
-    globalPage("/settings/data", DataSettingsPage),
-    globalPage("/settings/storage", StorageSettingsPage),
-    globalPage("/settings/connections", ConnectionsSettingsPage),
-    globalPage("/settings/install", InstallSettingsPage),
+    globalPage("/settings/security", guarded("admin", SecurityPage)),
+    globalPage("/settings/accounts", guarded("admin", AccountsSettingsPage)),
+    globalPage("/settings/audit", guarded("admin", AuditLogPage)),
+    globalPage("/settings/data", guarded("admin", DataSettingsPage)),
+    globalPage("/settings/storage", guarded("admin", StorageSettingsPage)),
+    globalPage("/settings/connections", guarded("admin", ConnectionsSettingsPage)),
+    globalPage("/settings/install", guarded("admin", InstallSettingsPage)),
     globalPage("/proto/logos", LogosPage),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),
