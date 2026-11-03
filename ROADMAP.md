@@ -325,6 +325,37 @@ PII counts.
 - Chat template parity test per base model: the prompt rendered at training time equals the one rendered at serving
   time.
 
+### Base model health
+
+Every install (download, import) saves a SHA-256 list of its files: the hub's LFS hashes where published, a local hash
+otherwise. It is stored on the model and as `minibrain-model.json` in its folder. The base's content hash is the
+SHA-256 of that list. Nothing is ever deleted automatically: a repair writes to `.part` files and replaces a file only
+once it matches.
+
+| Failure | Detected by | State | Primary action |
+|---|---|---|---|
+| Corrupt files | "Verify files": a job that re-hashes every file, with progress, log and cancel | Corrupt (n files) | Repair: re-download only the bad files; Re-import when the hub is unreachable or the model has no hub source |
+| Missing files | Size check at start-up, on every list, before load, deploy and train | Missing files | Repair, Point to new location (checked against the saved list, then verified), Remove |
+| Interrupted download | Failed or cancelled transfer job; `.part` files resume with HTTP ranges | Download failed | Resume (keeps complete files) |
+| Disk full | Free space checked in the job before writing; `ENOSPC` while writing | Not enough space | Free up space (Infrastructure → Storage), then Try again |
+| Access revoked, token expired | 401 or 403 from the hub | Needs access | Get access (the gated-model steps), then Retry |
+| Upstream revision gone | 404 on the pinned revision | Can't repair from source | Re-import; the local copy stays usable if it verifies |
+| Runtime missing or not supported | Engine load error reported to main; GGUF with no llama.cpp in any pool | Can't run here | The reason with what to install, or another variant |
+| Not enough memory | Out of memory while loading | Failed to start | A smaller or quantized catalogue variant |
+| Adapter vs base mismatch | Each LoRA version records the base's content hash when training starts | Base changed | Refused at the gateway, the engine and deploy; train again |
+
+- Repair and Re-import are one job kind (`repair`) that reads from the hub at the pinned revision, a folder or an S3
+  path, and accepts only files matching the saved list; a copy with different files is refused ("import it as a new
+  model"), so adapters keep their base.
+- Failure codes travel with the job (`needs_access`, `source_gone`, `no_space`, `offline`); engines report load
+  failures (`cant_run`, `no_memory`) to main, which records them on the model until "Try again".
+- A base with any of these problems is not started by the gateway; requests get a 503 with the reason. Custom models
+  and deployments on it show "Base …" with a link to the base.
+- Audit events: `model.verify`, `model.repair`, `model.reimport`, `model.relocate`. Deleting a relocated model keeps
+  its external folder.
+- UI: the state is the Models list status cell, the primary action is the row button, the rest are in the row menu.
+  The model page's Files section lists each file with size and hash state, the last verified time and "Verify files".
+
 ## Eval and promote
 
 - Eval first: the golden set (20–50 human-verified examples) is written or picked before any training.
@@ -657,6 +688,8 @@ Everything in the v1 scope below, after M1.
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
+- [x] Base model health: saved SHA-256 file list, verify, repair, re-import, relocate, failure states with one action
+      each, adapters pinned to their base's content hash
 - [x] Eval vs base, side-by-side review, deploy any version at any step, rollback
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
