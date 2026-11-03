@@ -16,7 +16,14 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import type { ChangeEvent } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
+import {
+    type DatasetSummary,
+    type SourceSummary,
+    api,
+    succeed,
+    unwrap,
+    uploadFile,
+} from "~/api/client";
 import {
     keys,
     useDataset,
@@ -239,12 +246,12 @@ export function DataLibrary() {
     const remove = useMutation({
         mutationFn: (target: { dataset?: string; source?: number }) =>
             target.dataset
-                ? unwrap(
+                ? succeed(
                       api.DELETE("/api/datasets/{slug}", {
                           params: { path: { slug: target.dataset } },
                       }),
                   )
-                : unwrap(
+                : succeed(
                       api.DELETE("/api/sources/{source_id}", {
                           params: { path: { source_id: target.source ?? 0 } },
                       }),

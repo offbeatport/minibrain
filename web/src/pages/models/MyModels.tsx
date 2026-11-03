@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -30,7 +31,7 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { useMemo, useState } from "react";
-import { type ModelRow, api, unwrap } from "~/api/client";
+import { type ModelRow, api, succeed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
@@ -263,8 +264,8 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
 
 function deleteModel(row: ModelRow) {
     return row.kind === "base"
-        ? unwrap(api.DELETE("/api/models/base/{key}", { params: { path: { key: row.key } } }))
-        : unwrap(api.DELETE("/api/minibrains/{slug}", { params: { path: { slug: row.key } } }));
+        ? succeed(api.DELETE("/api/models/base/{key}", { params: { path: { key: row.key } } }))
+        : succeed(api.DELETE("/api/minibrains/{slug}", { params: { path: { slug: row.key } } }));
 }
 
 function DeployedWarning({ row }: { row: ModelRow }) {
@@ -328,7 +329,7 @@ function promoteVersion(row: ModelRow, number: number) {
 }
 
 function deleteVersion(row: ModelRow, number: number) {
-    return unwrap(
+    return succeed(
         api.DELETE("/api/minibrains/{slug}/versions/{number}", {
             params: { path: { slug: row.key, number } },
         }),
@@ -840,6 +841,158 @@ function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
 
 const CLEARED: ModelsSearch = { q: "", state: "" };
 
+function liveOf(entry: Entry): boolean {
+    return entry.version ? entry.version.live : entry.model.deployment.state !== "not_deployed";
+}
+
+function deployable(entry: Entry): boolean {
+    if (entry.version) {
+        return entry.version.status === "ready" && !entry.version.live;
+    }
+    const { model } = entry;
+    return (
+        model.deployment.state === "not_deployed" &&
+        (model.kind === "custom" || model.availability.state === "available")
+    );
+}
+
+function unique(rows: ModelRow[]): ModelRow[] {
+    return [...new Map(rows.map((row) => [`${row.kind}:${row.key}`, row])).values()];
+}
+
+async function deploySelected(chosen: Entry[]): Promise<void> {
+    for (const entry of chosen) {
+        if (entry.version) {
+            await promoteVersion(entry.model, entry.version.number);
+        } else {
+            await setDeployed(entry.model, true);
+        }
+    }
+}
+
+async function undeploySelected(chosen: Entry[]): Promise<void> {
+    for (const row of unique(chosen.filter(liveOf).map((entry) => entry.model))) {
+        await setDeployed(row, false);
+    }
+}
+
+async function deleteSelected(chosen: Entry[]): Promise<void> {
+    await undeploySelected(chosen);
+    const whole = unique(chosen.filter((entry) => !entry.version).map((entry) => entry.model));
+    const wholeKeys = new Set(whole.map((row) => `${row.kind}:${row.key}`));
+    for (const entry of chosen) {
+        if (entry.version && !wholeKeys.has(`${entry.model.kind}:${entry.model.key}`)) {
+            await deleteVersion(entry.model, entry.version.number);
+        }
+    }
+    for (const row of whole) {
+        await deleteModel(row);
+    }
+}
+
+function plural(count: number, word: string): string {
+    return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function bulkDeleteConfirmation(chosen: Entry[], run: () => Promise<unknown>): Confirmation {
+    const versions = chosen.filter((entry) => entry.version).length;
+    const models = chosen.length - versions;
+    const live = chosen.filter(liveOf).length;
+    const parts = [
+        models ? plural(models, "model") : "",
+        versions ? plural(versions, "version") : "",
+    ].filter(Boolean);
+    return {
+        title: `Delete ${parts.join(" and ")}?`,
+        description: (
+            <>
+                <p>
+                    {models
+                        ? "Models go with all their versions, data links, scores and API keys. "
+                        : ""}
+                    {versions ? "Versions go with their adapters, scores and results. " : ""}
+                    This cannot be undone.
+                </p>
+                {live > 0 && (
+                    <p>
+                        {`${plural(live, "selected row")} ${live === 1 ? "is" : "are"} deployed and must be undeployed first; apps calling them get errors from then on.`}
+                    </p>
+                )}
+            </>
+        ),
+        acknowledge: live > 0 ? "Undeploy and delete" : undefined,
+        confirmLabel: live > 0 ? "Undeploy and delete" : "Delete",
+        destructive: true,
+        run,
+    };
+}
+
+function BulkBar({
+    chosen,
+    onClear,
+    onConfirm,
+    onDone,
+}: {
+    chosen: Entry[];
+    onClear: () => void;
+    onConfirm: (confirmation: Confirmation) => void;
+    onDone: () => Promise<unknown>;
+}) {
+    const act = useMutation({
+        mutationFn: (run: (rows: Entry[]) => Promise<void>) => run(chosen),
+        onSettled: onDone,
+    });
+    const models = new Set(chosen.map((entry) => `${entry.model.kind}:${entry.model.key}`));
+    const canDeploy =
+        chosen.length > 0 && models.size === chosen.length && chosen.every(deployable);
+    const canUndeploy = chosen.some(liveOf);
+    return (
+        <div className="flex min-h-8 flex-wrap items-center gap-2">
+            <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={!canDeploy || act.isPending}
+                title={
+                    canDeploy
+                        ? undefined
+                        : "Pick rows that are ready and not live, at most one per model"
+                }
+                onClick={() => act.mutate(deploySelected)}
+            >
+                <Rocket />
+                Deploy
+            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={!canUndeploy || act.isPending}
+                onClick={() => act.mutate(undeploySelected)}
+            >
+                <PowerOff />
+                Undeploy
+            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={act.isPending}
+                onClick={() =>
+                    onConfirm(
+                        bulkDeleteConfirmation(chosen, () => deleteSelected(chosen).then(onDone)),
+                    )
+                }
+            >
+                <Trash2 />
+                Delete
+            </Button>
+            <ErrorLine error={act.error} />
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>
+                Clear selection
+            </Button>
+        </div>
+    );
+}
+
 export function MyModels({
     search,
     update,
@@ -857,6 +1010,7 @@ export function MyModels({
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const [selected, setSelected] = useState<string[]>([]);
     const on: Handlers = useMemo(
         () => ({
             open: (path) => router.history.push(path),
@@ -921,32 +1075,46 @@ export function MyModels({
     return (
         <div className="flex flex-col gap-3">
             {firstRun && <GetStarted onDiscover={onDiscover} onCreate={onCreate} />}
-            <div className="flex flex-wrap items-center gap-2">
-                <SearchInput
-                    aria-label="Search models"
-                    placeholder="Search models"
-                    value={search.q ?? ""}
-                    onValueChange={(q) => update({ q })}
-                    className="w-full max-w-xs flex-1"
+            {selected.length > 0 ? (
+                <BulkBar
+                    chosen={entries.filter((entry) => selected.includes(entry.key))}
+                    onClear={() => setSelected([])}
+                    onConfirm={setConfirmation}
+                    onDone={async () => {
+                        setSelected([]);
+                        await refresh();
+                    }}
                 />
-                <div className="ml-auto flex flex-wrap items-center gap-2">
-                    <CheckboxSelect
-                        label="Status"
-                        allLabel="All statuses"
-                        noun="statuses"
-                        options={stateOptions}
-                        value={picked(search.state)}
-                        onValueChange={(states) => update({ state: states.join(",") })}
+            ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                    <SearchInput
+                        aria-label="Search models"
+                        placeholder="Search models"
+                        value={search.q ?? ""}
+                        onValueChange={(q) => update({ q })}
+                        className="w-full max-w-xs flex-1"
                     />
-                    <Label className="flex items-center gap-2 font-normal text-muted-foreground">
-                        <Switch
-                            checked={search.bases === "yes"}
-                            onCheckedChange={(checked) => update({ bases: checked ? "yes" : "" })}
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                        <CheckboxSelect
+                            label="Status"
+                            allLabel="All statuses"
+                            noun="statuses"
+                            options={stateOptions}
+                            value={picked(search.state)}
+                            onValueChange={(states) => update({ state: states.join(",") })}
                         />
-                        {`Show base models (${baseCount})`}
-                    </Label>
+                        <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+                            <Switch
+                                checked={search.bases === "yes"}
+                                onCheckedChange={(checked) =>
+                                    update({ bases: checked ? "yes" : "" })
+                                }
+                            />
+                            {`Show base models (${baseCount})`}
+                        </Label>
+                    </div>
                 </div>
-            </div>
+            )}
             {models.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading models…</p>
             ) : models.error ? (
@@ -963,6 +1131,9 @@ export function MyModels({
                     storageKey="minibrain.models.columns"
                     columnPicker
                     hiddenColumns={HIDDEN_COLUMNS}
+                    getRowId={(entry) => entry.key}
+                    selectedIds={selected}
+                    onSelectedIdsChange={setSelected}
                     onOpen={(entry) => on.open(detailHref(entry.model))}
                     rowLabel={(entry) =>
                         `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`
