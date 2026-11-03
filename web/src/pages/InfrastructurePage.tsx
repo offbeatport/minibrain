@@ -1,6 +1,15 @@
 import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Cpu, Gauge, HardDrive, MemoryStick, Network, Server, TriangleAlert } from "lucide-react";
+import {
+    Archive,
+    Cpu,
+    Gauge,
+    HardDrive,
+    MemoryStick,
+    Network,
+    Server,
+    TriangleAlert,
+} from "lucide-react";
 import {
     Badge,
     DataGrid,
@@ -396,6 +405,32 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     );
 }
 
+function SnapshotUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
+    const usage = info?.snapshots;
+    return (
+        <PanelSection
+            icon={Archive}
+            title="Snapshots"
+            description="Frozen copies of datasets that versions train and score on. Identical rows are stored once."
+        >
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                    <Stat label="Snapshots" value={count(usage?.count)} />
+                    <Stat label="Stored" value={bytes(usage?.size)} />
+                    <Stat label="Used by versions" value={count(usage?.for_versions)} />
+                    <Stat label="Saved, unused" value={count(usage?.saved)} />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    {`Snapshots a version uses are kept; those of deleted versions are removed, and the last ${count(usage?.keep)} saved per dataset stay. `}
+                    <Link href="/settings/data" className="text-primary hover:underline">
+                        Change retention
+                    </Link>
+                </p>
+            </div>
+        </PanelSection>
+    );
+}
+
 function gigabytes(megabytes: number | null | undefined): string {
     return megabytes === null || megabytes === undefined
         ? "–"
@@ -581,6 +616,7 @@ export function InfrastructurePage() {
             {active === "/infrastructure/storage" && (
                 <PanelSections>
                     <StorageSection info={infrastructure.data} />
+                    <SnapshotUsageSection info={infrastructure.data} />
                 </PanelSections>
             )}
         </Page>

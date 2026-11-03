@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params
 from minibrain.models.catalog import apply_sync
+from minibrain.models.health import apply_check, apply_repair, set_health
 from minibrain.models.registry import apply_catalogue
 from minibrain.registry.files import MissingArtifactError
 from minibrain.registry.models import (
@@ -39,6 +40,10 @@ class DomainEffects:
             self.transferred(session, job)
         elif job.kind == JobKind.CATALOG_SYNC:
             apply_sync(session, job.result or {})
+        elif job.kind == JobKind.VERIFY:
+            self.verified(session, job)
+        elif job.kind == JobKind.REPAIR:
+            self.repaired(session, job)
 
     def on_failure(self, session: Session, job: Job) -> None:
         if job.version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
@@ -46,6 +51,9 @@ class DomainEffects:
         model = session.get(Model, job.model_id) if job.model_id else None
         if model is not None and job.kind in TRANSFERS:
             model.status = ModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else ModelStatus.FAILED
+            model.error = job.error
+            model.updated_at = now()
+        if model is not None and job.kind in (JobKind.REPAIR, JobKind.VERIFY):
             model.error = job.error
             model.updated_at = now()
 
@@ -75,6 +83,23 @@ class DomainEffects:
             if entry is not None:
                 apply_catalogue(model, entry, variant)
         model.verified = job.kind == JobKind.DOWNLOAD or variant is not None
+        model.status = ModelStatus.AVAILABLE
+        model.error = None
+        model.verified_at = now()
+        set_health(model, None)
+
+    def verified(self, session: Session, job: Job) -> None:
+        model = session.get(Model, job.model_id) if job.model_id else None
+        if model is None:
+            return
+        apply_check(model, list((job.result or {}).get("files", [])))
+        model.error = None
+
+    def repaired(self, session: Session, job: Job) -> None:
+        model = session.get(Model, job.model_id) if job.model_id else None
+        if model is None:
+            return
+        apply_repair(model, list((job.result or {}).get("files", [])))
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()

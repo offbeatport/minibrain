@@ -38,6 +38,8 @@ from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever
 from minibrain.models import hub
 from minibrain.models.catalog import seed
+from minibrain.models.health import report_problems
+from minibrain.models.registry import model_folder
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
 from minibrain.registry.db import make_sessions, migrate
@@ -142,6 +144,7 @@ def create_app(
     with sessions() as session:
         backfill(session, settings)
         seed(session)
+        report_problems(session, lambda model: model_folder(settings, model))
     app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.sessions = sessions

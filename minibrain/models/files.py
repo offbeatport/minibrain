@@ -2,7 +2,7 @@ import hashlib
 import os
 import shutil
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -57,13 +57,6 @@ def file_chunks(path: Path) -> Iterator[bytes]:
     with path.open("rb") as stream:
         while chunk := stream.read(CHUNK):
             yield chunk
-
-
-def check(entry: dict[str, Any], target: Path, digest: str, fail: Callable[[str], Exception]) -> None:
-    size = target.stat().st_size
-    if size != entry["size"] or (entry.get("sha256") and digest != entry["sha256"]):
-        target.unlink(missing_ok=True)
-        raise fail(f"{entry['path']} failed validation: expected {entry['size']} bytes and the published SHA-256")
 
 
 def clear(path: Path) -> None:

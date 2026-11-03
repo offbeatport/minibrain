@@ -22,6 +22,7 @@ GENERATE_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 STARTUP_SECONDS = 600.0
 IDLE_SECONDS = 900.0
 PROBE_SECONDS = 5.0
+FAILED_STATUS = 500
 
 log = logging.getLogger("minibrain.engines")
 
@@ -101,6 +102,12 @@ class EngineManager:
     def touch(self, key: str) -> None:
         self.used[key] = time.monotonic()
 
+    def stop_one(self, key: str) -> None:
+        with self.lock:
+            found = self.engines.pop(key, None)
+        if found is not None:
+            found[1].shutdown()
+
     def url(self, base: str) -> str | None:
         found = self.engines.get(base)
         return found[0] if found else None
@@ -116,7 +123,8 @@ class EngineManager:
             response = None
         if response is not None and response.status_code == 200:
             return "running"
-        return "unhealthy" if supervisor.restarts > 0 else "starting"
+        failed = response is not None and response.status_code == FAILED_STATUS
+        return "unhealthy" if failed or supervisor.restarts > 0 else "starting"
 
     def stop(self) -> None:
         for _, supervisor in self.engines.values():
@@ -124,6 +132,13 @@ class EngineManager:
 
 
 Engines = Callable[[], dict[str, list[dict[str, str]]]]
+
+
+def engine_detail(response: Any) -> str:
+    try:
+        return str(response.json().get("detail") or response.text)
+    except ValueError:
+        return response.text
 
 
 class EngineBackend:
@@ -138,7 +153,11 @@ class EngineBackend:
 
     def complete(self, request: CompletionRequest) -> Completion:
         base = request.base.key
-        adapter = {"name": request.adapter.name, "artifact": request.adapter.artifact} if request.adapter else None
+        adapter = (
+            {"name": request.adapter.name, "artifact": request.adapter.artifact, "base_hash": request.adapter.base_hash}
+            if request.adapter
+            else None
+        )
         body = {"messages": request.messages, "adapter": adapter, "max_tokens": request.max_tokens}
         key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)
         deadline = time.monotonic() + STARTUP_SECONDS
@@ -166,6 +185,8 @@ class EngineBackend:
                 self.balancer.mark(url, "loading")
                 tried.add(url)
                 continue
+            if response.status_code in (FAILED_STATUS, 409):
+                raise EngineUnavailableError(engine_detail(response))
             response.raise_for_status()
             self.balancer.mark(url, "ready")
             if tried:

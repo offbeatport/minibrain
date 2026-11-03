@@ -11,6 +11,7 @@ import {
     Server,
     ShieldCheck,
     SlidersHorizontal,
+    Table2,
     ThumbsUp,
     Workflow,
 } from "lucide-react";
@@ -51,6 +52,7 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
 export const SETTINGS_PAGES: NavEntry[] = [
     { label: "General", path: "/settings", icon: SlidersHorizontal },
     { label: "Security", path: "/settings/security", icon: ShieldCheck },
+    { label: "Data", path: "/settings/data", icon: Table2 },
 ];
 
 export function isSettingsPath(pathname: string): boolean {

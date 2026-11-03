@@ -89,6 +89,7 @@ class FailBody(TokenBody):
     error: str
     retryable: bool = True
     log: str | None = None
+    code: str | None = None
 
 
 class StoredArtifact(BaseModel):
@@ -177,7 +178,7 @@ def complete(job_id: int, body: CompleteBody, queue: QueueDep, session: SessionD
 @router.post("/jobs/{job_id}/fail", status_code=204)
 def fail(job_id: int, body: FailBody, queue: QueueDep, session: SessionDep) -> None:
     require_artifacts(session, [body.log])
-    queue.fail(job_id, body.token, body.error, body.retryable, body.log)
+    queue.fail(job_id, body.token, body.error, body.retryable, body.log, body.code)
 
 
 @router.put("/artifacts/{artifact_id}")

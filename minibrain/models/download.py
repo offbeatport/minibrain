@@ -1,56 +1,26 @@
-import json
 from typing import Any
 
 import httpx
 
-from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
-from minibrain.models import hub
-from minibrain.models.files import Progress, check, sha256_of, valid, write_stream
+from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.models.sources import HubSource
+from minibrain.models.transfer import ChecksumError, hub_errors, hub_ready, install, write_manifest
 
 TIMEOUT = httpx.Timeout(30.0, read=300.0)
-
-
-class ChecksumError(Exception):
-    pass
-
-
-def gated_message(spec: JobSpec) -> str:
-    return (
-        f"{spec.raw['name']} is gated. Accept its licence at {hub.endpoint()}/{spec.raw['repo']} "
-        "and set HF_TOKEN on the minibrain server, then retry."
-    )
+OFFLINE = "Offline: downloads need a connection. Import the model files instead."
 
 
 def main(spec: JobSpec) -> None:
     out = spec.path("out")
-    out.mkdir(parents=True, exist_ok=True)
     files: list[dict[str, Any]] = spec.raw["files"]
-    progress = Progress(sum(entry["size"] for entry in files), "downloading")
-    report(0.0, step="checking existing files")
-    with httpx.Client(timeout=TIMEOUT, follow_redirects=True) as client:
-        source = HubSource(spec.raw["repo"], spec.raw["revision"], files, client)
-        recorded: list[dict[str, Any]] = []
-        for entry in files:
-            target = out / entry["path"]
-            if valid(target, entry):
-                progress.add(entry["size"], entry["path"])
-                recorded.append(entry | {"sha256": entry.get("sha256") or sha256_of(target)})
-                continue
-            if source.cached(entry["path"]) is None:
-                if hub.offline():
-                    raise FinalError("Offline: downloads need a connection. Import the model files instead.")
-                if spec.raw.get("gated") and hub.token() is None:
-                    raise FinalError(gated_message(spec))
-            try:
-                digest = write_stream(source.chunks(entry["path"]), target, progress, entry["path"])
-            except PermissionError as error:
-                raise FinalError(gated_message(spec)) from error
-            check(entry, target, digest, ChecksumError)
-            recorded.append(entry | {"sha256": digest})
-    manifest = {"repo": spec.raw["repo"], "revision": spec.raw["revision"], "files": recorded}
-    (out / "minibrain-model.json").write_text(json.dumps(manifest, indent=1))
-    write_result(spec, {"files": recorded, "size_bytes": progress.total, "revision": spec.raw["revision"]})
+    repo, revision = spec.raw["repo"], spec.raw["revision"]
+    with httpx.Client(timeout=TIMEOUT, follow_redirects=True) as client, hub_errors(repo, revision):
+        source = HubSource(repo, revision, files, client)
+        ready = hub_ready(source, spec.raw["name"], bool(spec.raw.get("gated")), OFFLINE)
+        recorded, _ = install(source, files, out, "downloading", ChecksumError, ready)
+    write_manifest(out, {"repo": repo, "revision": revision, "files": recorded})
+    size = sum(int(entry["size"]) for entry in files)
+    write_result(spec, {"files": recorded, "size_bytes": size, "revision": revision})
     report(1.0, step="validated", files=len(files))
 
 

@@ -30,7 +30,10 @@ MODULES: dict[str, str] = {
     JobKind.DOWNLOAD: "minibrain.models.download",
     JobKind.IMPORT: "minibrain.models.importer",
     JobKind.CATALOG_SYNC: "minibrain.models.sync",
+    JobKind.VERIFY: "minibrain.models.verify",
+    JobKind.REPAIR: "minibrain.models.repair",
 }
+PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, JobKind.VERIFY, JobKind.REPAIR)
 REMOTE_KINDS = [JobKind.PREPARE, JobKind.TRAIN, JobKind.EVAL]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
@@ -154,9 +157,11 @@ class MainClient:
         body = {"token": token, "result": result, "outputs": outputs, "log": log}
         self.call("POST", f"/internal/worker/jobs/{job_id}/complete", json=body)
 
-    def fail(self, job_id: int, token: str, error: str, retryable: bool, log: str | None) -> None:
+    def fail(
+        self, job_id: int, token: str, error: str, retryable: bool, log: str | None, code: str | None = None
+    ) -> None:
         body = {"token": token, "error": error, "retryable": retryable, "log": log}
-        self.call("POST", f"/internal/worker/jobs/{job_id}/fail", json=body)
+        self.call("POST", f"/internal/worker/jobs/{job_id}/fail", json=body | ({"code": code} if code else {}))
 
     def upload(self, store: ArtifactStore, artifact_id: str, kind: str, packing: str, name: str) -> str:
         headers = {"X-Artifact-Kind": kind, "X-Artifact-Packing": packing, "X-Artifact-Name": name}
@@ -233,12 +238,13 @@ def parse_json(line: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def failure_from(tail: list[str], exit_code: int) -> tuple[str, bool]:
+def failure_from(tail: list[str], exit_code: int) -> tuple[str, bool, str | None]:
     for line in reversed(tail):
         parsed = parse_json(line)
         if parsed is not None and "error" in parsed:
-            return str(parsed["error"]), bool(parsed.get("retryable", True))
-    return f"exited with code {exit_code}", exit_code != FINAL_EXIT
+            code = parsed.get("code")
+            return str(parsed["error"]), bool(parsed.get("retryable", True)), str(code) if code else None
+    return f"exited with code {exit_code}", exit_code != FINAL_EXIT, None
 
 
 class Worker:
@@ -276,7 +282,7 @@ class Worker:
     def spec(self, claim: dict[str, Any], workdir: Path, attempt_dir: Path) -> dict[str, Any]:
         params = claim["params"]
         spec: dict[str, Any] = {"result": str(attempt_dir / "result.json")}
-        if claim["kind"] in (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC):
+        if claim["kind"] in PASSTHROUGH_KINDS:
             return params | spec
         if claim["kind"] == JobKind.PREPARE:
             spec |= {
@@ -330,8 +336,8 @@ class Worker:
                 self.client.complete(job_id, token, result, self.outputs(kind, attempt_dir), log)
                 shutil.rmtree(workdir, ignore_errors=True)
             else:
-                error, retryable = failure_from(tail, exit_code)
-                self.client.fail(job_id, token, error, retryable, log)
+                error, retryable, code = failure_from(tail, exit_code)
+                self.client.fail(job_id, token, error, retryable, log, code)
         except LeaseLostError:
             return
         except Exception as error:

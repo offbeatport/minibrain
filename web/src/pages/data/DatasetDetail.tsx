@@ -17,6 +17,7 @@ import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
+import { ChangeNotice, RowLimitNotice, SaveSnapshot, SnapshotsSection } from "./Snapshots";
 import { DATASETS_GROUP, type ItemRef, itemHref, plural, stem } from "./catalogue";
 import {
     About,
@@ -271,6 +272,7 @@ export function DatasetDetail({
                                 Train a model
                             </Link>
                         </Button>
+                        <SaveSnapshot dataset={dataset} />
                         <Button variant="outline" onClick={() => setEditing(true)}>
                             Edit
                         </Button>
@@ -292,6 +294,12 @@ export function DatasetDetail({
             {dataset.error && (
                 <p className="text-sm text-destructive">{`The query fails: ${dataset.error}`}</p>
             )}
+            <RowLimitNotice rows={dataset.rows} limit={dataset.row_limit ?? 0} />
+            <ChangeNotice
+                changed={dataset.changed}
+                snapshot={dataset.snapshot}
+                after="Models take a new one when they next train."
+            />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
                 <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
@@ -305,7 +313,9 @@ export function DatasetDetail({
                         label="Splits"
                         value={
                             <span className="font-normal text-muted-foreground">
-                                Set when a snapshot is taken
+                                {dataset.snapshot
+                                    ? "Unknown since the change"
+                                    : "Set by the first snapshot"}
                             </span>
                         }
                     />
@@ -327,6 +337,7 @@ export function DatasetDetail({
                     loading={preview.isLoading}
                 />
             )}
+            <SnapshotsSection dataset={dataset} />
             <UsedBy dataset={dataset} />
             <EditDialog
                 item={dataset}

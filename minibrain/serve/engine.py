@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
+from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
 from minibrain.serve.backend import (
     AdapterNotSupportedError,
     AdapterRef,
@@ -22,13 +23,14 @@ from minibrain.serve.backend import (
     ServingBackend,
     TransformersBackend,
 )
-from minibrain.serve.select import choose_engine
+from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.worker import HttpClient, StreamReader
 
 
 class AdapterBody(BaseModel):
     name: str
     artifact: dict[str, Any]
+    base_hash: str | None = None
 
 
 class GenerateBody(BaseModel):
@@ -63,6 +65,31 @@ ANNOUNCE_SECONDS = 10.0
 log = logging.getLogger("minibrain.engine")
 
 
+INSTALL_HINTS = {
+    "llama_cpp": "install minibrain[llamacpp] on this machine",
+    "mlx_lm": "install minibrain[mlx] on this machine",
+    "sglang": "install SGLang on this machine or set MINIBRAIN_SGLANG_PYTHON",
+}
+
+
+def out_of_memory(error: BaseException) -> bool:
+    text = str(error).lower()
+    return isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError" or "out of memory" in text
+
+
+def load_failure(error: BaseException, spec: BaseModelSpec, host: str) -> dict[str, str]:
+    if out_of_memory(error):
+        message = f"Ran out of memory loading {spec.key} on {host}: {str(error).splitlines()[0][:200]}."
+        return {"code": NO_MEMORY, "error": message}
+    if isinstance(error, ModuleNotFoundError) and error.name:
+        hint = INSTALL_HINTS.get(error.name.split(".")[0], f"install the Python package {error.name}")
+        return {"code": CANT_RUN, "error": f"{host} cannot load {spec.key}: {error.name} is not installed; {hint}."}
+    if isinstance(error, NoEngineError):
+        return {"code": CANT_RUN, "error": f"{error}."}
+    first = str(error).splitlines()[0][:300] if str(error) else type(error).__name__
+    return {"code": CANT_RUN, "error": f"{host} could not load {spec.key}: {first}."}
+
+
 class Announcer:
     def __init__(self, client: HttpClient, token: str, body: Callable[[], dict[str, Any]]) -> None:
         self.client = client
@@ -73,10 +100,10 @@ class Announcer:
         body = self.body() | {"state": state}
         self.client.request("POST", "/internal/gateway/engines", json=body, headers=self.headers).raise_for_status()
 
-    def forever(self, ready: threading.Event, stop: threading.Event) -> None:
+    def forever(self, ready: threading.Event, stop: threading.Event, failed: threading.Event | None = None) -> None:
         while True:
             try:
-                self.announce("ready" if ready.is_set() else "loading")
+                self.announce("failed" if failed and failed.is_set() else "ready" if ready.is_set() else "loading")
             except Exception:
                 log.warning("could not reach main to announce this engine")
             if stop.wait(ANNOUNCE_SECONDS):
@@ -152,7 +179,11 @@ def create_engine_app(
     client: HttpClient = http or httpx.Client(base_url=main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     materialize = artifact_fetcher(store, client, token)
     ready = threading.Event()
-    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend}
+    failed = threading.Event()
+    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend, "failure": None}
+
+    def announced() -> dict[str, Any]:
+        return {"engine": current["engine"]} | (current["failure"] or {})
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -163,11 +194,17 @@ def create_engine_app(
         if url is not None:
             body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
             body |= {"pool": pool, "hardware": hardware.as_dict()}
-            announcer = Announcer(client, token, lambda: body | {"engine": current["engine"]})
-            threading.Thread(target=announcer.forever, args=(ready, stop), daemon=True).start()
+            announcer = Announcer(client, token, lambda: body | announced())
+            threading.Thread(target=announcer.forever, args=(ready, stop, failed), daemon=True).start()
         if current["backend"] is None:
-            current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
-        ready.set()
+            try:
+                current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
+            except Exception as error:
+                log.exception("could not load %s", spec.key)
+                current["failure"] = load_failure(error, spec, hardware.host)
+                failed.set()
+        if current["failure"] is None:
+            ready.set()
         yield
         stop.set()
         closing = getattr(current["backend"], "close", None)
@@ -178,6 +215,8 @@ def create_engine_app(
 
     @app.get("/health")
     def health() -> dict[str, Any]:
+        if current["failure"] is not None:
+            raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
         if not ready.is_set() or serving is None:
             raise HTTPException(status_code=503, detail="loading")
@@ -191,9 +230,15 @@ def create_engine_app(
 
     @app.post("/generate")
     def generate(body: GenerateBody) -> GenerateResult:
+        if current["failure"] is not None:
+            raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
         if serving is None:
             raise HTTPException(status_code=503, detail="loading")
+        if body.adapter is not None:
+            mismatch = base_changed(body.adapter.name, base, body.adapter.base_hash, spec.content_hash)
+            if mismatch is not None:
+                raise HTTPException(status_code=409, detail=mismatch)
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
         try:
             completion = serving.complete(CompletionRequest(spec, body.messages, adapter, body.max_tokens))

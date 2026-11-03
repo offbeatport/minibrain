@@ -13,6 +13,7 @@ from minibrain.data.snapshot import Example
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.ml.completion import Completion
+from minibrain.models.health import base_changed
 from minibrain.registry.models import now
 from minibrain.registry.service import KEY_PREFIX, key_digest
 from minibrain.serve.backend import AdapterRef, CompletionRequest, EngineUnavailableError, ServingBackend
@@ -80,9 +81,19 @@ def route_messages(route: Route, messages: list[dict[str, str]]) -> list[dict[st
 def completion_request(
     config: GatewayConfig, route: Route, messages: list[dict[str, str]], max_tokens: int
 ) -> CompletionRequest:
-    adapter = AdapterRef(route.adapter["name"], route.adapter["artifact"]) if route.adapter else None
+    problem = config.problems.get(route.base_model)
+    if problem is not None:
+        raise HTTPException(status_code=503, detail=problem)
+    base = spec_for(config, route.base_model)
+    adapter = None
+    if route.adapter:
+        trained = route.adapter.get("base_hash")
+        mismatch = base_changed(f"{route.slug}@{route.version}", route.base_model, trained, base.content_hash)
+        if mismatch is not None:
+            raise HTTPException(status_code=409, detail=mismatch)
+        adapter = AdapterRef(route.adapter["name"], route.adapter["artifact"], trained)
     return CompletionRequest(
-        base=spec_for(config, route.base_model),
+        base=base,
         messages=route_messages(route, messages),
         adapter=adapter,
         max_tokens=max_tokens,

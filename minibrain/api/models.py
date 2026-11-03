@@ -6,15 +6,18 @@ from fastapi import APIRouter, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep
-from minibrain.api.model_rows import Health, all_rows, base_row, model_job
+from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep, get_local_node
+from minibrain.api.model_health import HealthContext, health_context
+from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
 from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
+    FileState,
     ImportCheck,
     ImportRequest,
     InspectRequest,
+    LocationRequest,
     ModelFile,
     ModelRow,
     ModelUpdate,
@@ -22,8 +25,20 @@ from minibrain.api.schemas import (
     TestResponse,
 )
 from minibrain.ml.context import FinalError
+from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
 from minibrain.models.inspect import inspect_location, source_type_of
-from minibrain.models.registry import model_dir, resolve_spec, retry, start_import
+from minibrain.models.registry import (
+    model_dir,
+    model_folder,
+    relocate,
+    require_usable,
+    resolve_spec,
+    retry,
+    start_import,
+    start_reimport,
+    start_repair,
+    start_verify,
+)
 from minibrain.models.sources import configured
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -43,7 +58,7 @@ from minibrain.settings import Settings
 router = APIRouter(prefix="/api/models", tags=["models"])
 
 
-def health_for(request: Request) -> Health:
+def health_for(request: Request) -> EngineHealth:
     if request.app.state.engines is None:
         return lambda _key: "running"
     backend = request.app.state.backend
@@ -57,8 +72,28 @@ def get_model(session: Session, key: str) -> Model:
     return model
 
 
+def context_for(session: Session, settings: Settings, request: Request) -> HealthContext:
+    return health_context(session, settings, get_local_node(request))
+
+
 def row_of(session: Session, settings: Settings, request: Request, model: Model) -> ModelRow:
-    return base_row(model, model_job(session, model.id), settings, health_for(request))
+    context = context_for(session, settings, request)
+    return base_row(model, model_job(session, model.id), settings, health_for(request), context=context)
+
+
+def file_rows(settings: Settings, model: Model) -> list[ModelFile]:
+    sizes = size_problems(model_folder(settings, model), model.files) if model.status == ModelStatus.AVAILABLE else {}
+    flagged = file_states(model) if model.health == CORRUPT else {}
+    checked = model.verified_at is not None
+    rows: list[ModelFile] = []
+    for entry in model.files:
+        path = str(entry["path"])
+        state: FileState = "ok" if checked and entry.get("sha256") else "unchecked"
+        found = sizes.get(path) or flagged.get(path)
+        if found in ("corrupt", "missing", "wrong_size"):
+            state = found
+        rows.append(ModelFile(path=path, size=int(entry["size"]), sha256=entry.get("sha256"), state=state))
+    return rows
 
 
 def detail_of(session: Session, settings: Settings, request: Request, model: Model) -> BaseModelDetail:
@@ -70,23 +105,25 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         repo=model.repo,
         latest_revision=model.variant.latest_revision if model.variant else None,
         source_path=model.source_path,
-        storage_path=str(model_dir(settings, model.id)),
-        files=[ModelFile(path=f["path"], size=f["size"], sha256=f.get("sha256")) for f in model.files],
+        storage_path=str(model_folder(settings, model)),
+        files=file_rows(settings, model),
         license=model.license,
         license_name=entry.license_name if entry else None,
         license_url=entry.license_url if entry else None,
         license_ack_by=model.license_ack_by,
         license_ack_at=model.license_ack_at,
-        catalog_id=model.catalog_id,
         variant_id=model.variant_id,
         deployed=model.deployed,
         verified=model.verified,
+        verified_at=model.verified_at,
+        content_hash=content_hash(model.files),
+        relocated=model.path is not None,
     )
 
 
 @router.get("")
 def list_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
-    return all_rows(session, settings, store, health_for(request))
+    return all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
 
 
 @router.get("/sources")
@@ -152,12 +189,70 @@ def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
             actor=LOCAL_USER,
             action="model.delete",
             target=model.id,
-            detail={"name": model.name, "kind": "base", "size_bytes": model.size_bytes},
+            detail={"name": model.name, "kind": "base", "size_bytes": model.size_bytes}
+            | ({"kept": model.path} if model.path else {}),
         )
     )
     session.delete(model)
     session.commit()
     shutil.rmtree(model_dir(settings, model.id), ignore_errors=True)
+
+
+def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
+    session.add(AuditEvent(actor=LOCAL_USER, action=action, target=model.id, detail={"name": model.name, **detail}))
+
+
+@router.post("/base/{key}/verify", status_code=202)
+def verify_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = get_model(session, key)
+    job = start_verify(session, settings, model)
+    audit(session, "model.verify", model, job=job.id, files=len(model.files))
+    session.commit()
+    return detail_of(session, settings, request, model)
+
+
+@router.post("/base/{key}/repair", status_code=202)
+def repair_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = get_model(session, key)
+    job = start_repair(session, settings, model)
+    audit(session, "model.repair", model, job=job.id, source=f"{model.repo}@{model.revision}")
+    session.commit()
+    return detail_of(session, settings, request, model)
+
+
+@router.post("/base/{key}/reimport", status_code=202)
+def reimport_base(
+    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
+) -> BaseModelDetail:
+    model = get_model(session, key)
+    job = start_reimport(session, settings, model, body.location)
+    audit(session, "model.reimport", model, job=job.id, source=body.location.strip())
+    session.commit()
+    return detail_of(session, settings, request, model)
+
+
+@router.post("/base/{key}/relocate")
+def relocate_base(
+    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
+) -> BaseModelDetail:
+    model = get_model(session, key)
+    before = str(model_folder(settings, model))
+    job = relocate(session, settings, model, body.location)
+    audit(session, "model.relocate", model, job=job.id, **{"from": before, "to": str(model_folder(settings, model))})
+    session.commit()
+    return detail_of(session, settings, request, model)
+
+
+@router.post("/base/{key}/recheck")
+def recheck_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = get_model(session, key)
+    if model.health not in LOAD_PROBLEMS:
+        raise ConflictError(f"{model.name} has no start-up failure to clear")
+    set_health(model, None)
+    session.commit()
+    if request.app.state.engines is not None:
+        request.app.state.engines.stop_one(model.id)
+    return detail_of(session, settings, request, model)
 
 
 @router.post("/base/{key}/retry", status_code=202)
@@ -174,6 +269,8 @@ def deploy_base(
     model = get_model(session, key)
     if body.deployed and model.status != ModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; deploy it once its files are available")
+    if body.deployed:
+        require_usable(session, settings, model.id)
     model.deployed = body.deployed
     model.updated_at = now()
     session.commit()
@@ -187,6 +284,7 @@ def test_base(
     model = get_model(session, key)
     if model.status != ModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; test it once its files are available")
+    require_usable(session, settings, model.id)
     spec = resolve_spec(session, settings, key)
     started = time.monotonic()
     try:

@@ -31,6 +31,8 @@ class JobKind(StrEnum):
     DOWNLOAD = "download"
     IMPORT = "import"
     CATALOG_SYNC = "catalog_sync"
+    VERIFY = "verify"
+    REPAIR = "repair"
 
 
 class ModelStatus(StrEnum):
@@ -197,6 +199,7 @@ class Version(Base):
     status: Mapped[str]
     adapter_dir: Mapped[str | None] = mapped_column(default=None)
     adapter_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
+    base_hash: Mapped[str | None] = mapped_column(default=None)
     recipe: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
@@ -252,6 +255,7 @@ class Job(Base):
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     outputs: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
     error: Mapped[str | None] = mapped_column(default=None)
+    error_code: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
@@ -420,6 +424,10 @@ class Model(Base):
     license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     deployed: Mapped[bool] = mapped_column(default=False)
     verified: Mapped[bool] = mapped_column(default=False, server_default=false())
+    path: Mapped[str | None] = mapped_column(default=None)
+    health: Mapped[str | None] = mapped_column(default=None)
+    health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
+    verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

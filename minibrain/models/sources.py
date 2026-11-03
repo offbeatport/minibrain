@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -16,12 +17,31 @@ S3 = "s3"
 HUB = "hub"
 
 
+class HubAccessError(Exception):
+    def __init__(self, path: str, status: int) -> None:
+        super().__init__(path)
+        self.path = path
+        self.status = status
+
+
+class HubGoneError(Exception):
+    def __init__(self, path: str) -> None:
+        super().__init__(path)
+        self.path = path
+
+
 class ModelSource(Protocol):
     def describe(self) -> str: ...
 
     def files(self) -> list[dict[str, Any]]: ...
 
     def chunks(self, path: str) -> Iterator[bytes]: ...
+
+
+class FileSource(Protocol):
+    def describe(self) -> str: ...
+
+    def opened(self, path: str, offset: int) -> AbstractContextManager[tuple[int, Iterator[bytes]]]: ...
 
 
 def s3_endpoint() -> str:
@@ -94,6 +114,24 @@ class StorageSource:
             while chunk := stream.read(CHUNK):
                 yield chunk
 
+    def size(self, path: str) -> int | None:
+        try:
+            return int(self.fs.info(f"{self.root}/{path}").get("size") or 0)
+        except FileNotFoundError:
+            return None
+
+    @contextmanager
+    def opened(self, path: str, offset: int) -> Iterator[tuple[int, Iterator[bytes]]]:
+        with self.fs.open(f"{self.root}/{path}", "rb") as stream:
+            if offset:
+                stream.seek(offset)
+
+            def read() -> Iterator[bytes]:
+                while chunk := stream.read(CHUNK):
+                    yield chunk
+
+            yield offset, read()
+
 
 class HubSource:
     def __init__(self, repo: str, revision: str, manifest: list[dict[str, Any]], client: httpx.Client) -> None:
@@ -115,15 +153,21 @@ class HubSource:
         return Path(found) if isinstance(found, str) and Path(found).is_file() else None
 
     def chunks(self, path: str) -> Iterator[bytes]:
+        with self.opened(path, 0) as (_start, chunks):
+            yield from chunks
+
+    @contextmanager
+    def opened(self, path: str, offset: int) -> Iterator[tuple[int, Iterator[bytes]]]:
         local = self.cached(path)
         if local is not None:
-            yield from file_chunks(local)
+            yield 0, file_chunks(local)
             return
         url = hub.file_url(self.repo, self.revision, path)
-        with self.client.stream("GET", url, headers=hub.headers()) as response:
+        headers = hub.headers() | ({"Range": f"bytes={offset}-"} if offset else {})
+        with self.client.stream("GET", url, headers=headers) as response:
             if response.status_code in (401, 403):
-                raise PermissionError(path)
+                raise HubAccessError(path, response.status_code)
             if response.status_code == 404:
-                raise FinalError(f"{path} is not published at revision {self.revision[:12]}")
+                raise HubGoneError(path)
             response.raise_for_status()
-            yield from response.iter_bytes(CHUNK)
+            yield (offset if response.status_code == 206 else 0), response.iter_bytes(CHUNK)

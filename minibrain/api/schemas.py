@@ -470,6 +470,47 @@ class Usage(BaseModel):
     p50_ms: float | None
 
 
+HealthState = Literal[
+    "corrupt",
+    "missing",
+    "download_failed",
+    "no_space",
+    "needs_access",
+    "source_gone",
+    "cant_run",
+    "no_memory",
+    "base_changed",
+    "base_unusable",
+]
+HealthActionKind = Literal[
+    "repair",
+    "reimport",
+    "relocate",
+    "remove",
+    "resume",
+    "storage",
+    "get_access",
+    "pick_variant",
+    "try_again",
+    "verify",
+    "open_base",
+    "retrain",
+]
+
+
+class HealthAction(BaseModel):
+    kind: HealthActionKind
+    label: str
+
+
+class Health(BaseModel):
+    state: HealthState
+    label: str
+    detail: str
+    actions: list[HealthAction]
+    files: list[str] = Field(default_factory=list)
+
+
 class VersionRow(BaseModel):
     number: int
     kind: str
@@ -481,6 +522,7 @@ class VersionRow(BaseModel):
     error: str | None
     usage: Usage | None
     created_at: datetime
+    health: Health | None = None
 
 
 class ModelRow(BaseModel):
@@ -508,12 +550,18 @@ class ModelRow(BaseModel):
     error: str | None = None
     versions: list[VersionRow] = []
     key_count: int = 0
+    health: Health | None = None
+    catalog_id: str | None = None
+
+
+FileState = Literal["ok", "corrupt", "missing", "wrong_size", "unchecked"]
 
 
 class ModelFile(BaseModel):
     path: str
     size: int
     sha256: str | None
+    state: FileState = "unchecked"
 
 
 class BaseModelDetail(ModelRow):
@@ -528,10 +576,12 @@ class BaseModelDetail(ModelRow):
     license_url: str | None
     license_ack_by: str | None
     license_ack_at: datetime | None
-    catalog_id: str | None
     variant_id: str | None
     deployed: bool
     verified: bool
+    verified_at: datetime | None = None
+    content_hash: str | None = None
+    relocated: bool = False
 
 
 class ModelUpdate(BaseModel):
@@ -547,6 +597,10 @@ class ImportRequest(BaseModel):
     variant_id: str | None = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
+
+
+class LocationRequest(BaseModel):
+    location: str = Field(min_length=1, max_length=4096)
 
 
 class InspectRequest(BaseModel):

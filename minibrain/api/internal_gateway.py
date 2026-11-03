@@ -12,6 +12,7 @@ from minibrain.artifacts import is_artifact_id
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.registry import resolve_spec
 from minibrain.registry.compute import EngineReport, record_engine
 from minibrain.serve.weights import local_dir
@@ -55,11 +56,17 @@ class EngineBody(BaseModel):
     state: str
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = {}
+    error: str | None = None
+    code: str | None = None
 
 
 @router.post("/engines", status_code=204)
 def register_engine(body: EngineBody, session: SessionDep) -> None:
-    record_engine(session, EngineReport(**body.model_dump()))
+    record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code"})))
+    if body.state == "failed":
+        record_load_failure(session, body.base_model, body.code, body.error, body.host)
+    elif body.state == "ready":
+        record_loaded(session, body.base_model)
     session.commit()
 
 

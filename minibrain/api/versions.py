@@ -14,7 +14,8 @@ from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
-from minibrain.models.registry import base_readiness, resolve_spec
+from minibrain.models.health import base_changed
+from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, VersionKind
 from minibrain.registry.service import (
     ConflictError,
@@ -44,6 +45,7 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
         raise ConflictError(f"{minibrain.base_model} is still being imported or downloaded; try once it is available")
     if readiness == "missing":
         raise ConflictError(f"{minibrain.base_model} is no longer on this install")
+    require_usable(session, settings, minibrain.base_model)
     if kind == VersionKind.LORA and resolve_spec(session, settings, minibrain.base_model).format == "gguf":
         raise ConflictError(
             f"{minibrain.base_model} has GGUF weights, which can be served but not fine-tuned; use safetensors"
@@ -52,6 +54,7 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     require_splits(snapshot_for_model(session, settings, minibrain, saved=False))
     version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})
     if kind == VersionKind.LORA:
+        version.base_hash = base_hash(session, minibrain.base_model)
         params = train_params(session, settings, version)
         enqueue(session, JobKind.TRAIN, params, minibrain.id, version.id, f"train:{version.id}")
     else:
@@ -88,7 +91,13 @@ def delete_version(slug: str, number: int, session: SessionDep, settings: Settin
 @router.post("/minibrains/{slug}/versions/{number}/promote")
 def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    promote(minibrain, get_version(minibrain, number))
+    version = get_version(minibrain, number)
+    mismatch = base_changed(
+        f"{slug}@{number}", minibrain.base_model, version.base_hash, base_hash(session, minibrain.base_model)
+    )
+    if mismatch is not None:
+        raise ConflictError(mismatch)
+    promote(minibrain, version)
     session.commit()
     return detail(settings, minibrain)
 

@@ -16,7 +16,8 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
 from minibrain.data.snapshot import prompt_context
 from minibrain.models.hardware import LOCAL_POOL
-from minibrain.models.registry import resolve_spec
+from minibrain.models.health import problem_of
+from minibrain.models.registry import model_folder, resolve_spec
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import live_engines
 from minibrain.registry.files import ref, snapshot_dir
@@ -73,6 +74,7 @@ class GatewayConfig:
     engines: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
     request_logs: bool = True
+    problems: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -88,6 +90,7 @@ class GatewayConfig:
             engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
             request_logs=bool(data.get("request_logs", True)),
+            problems=dict(data.get("problems", {})),
         )
 
 
@@ -111,6 +114,7 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
             adapter = {
                 "name": adapter_name(minibrain.slug, version.number),
                 "artifact": ref(session, version.adapter_artifact_id),
+                "base_hash": version.base_hash,
             }
         route = Route(
             name=f"{minibrain.slug}@{version.number}",
@@ -169,11 +173,17 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     deployed = select(Model).where(Model.deployed.is_(True), Model.status == ModelStatus.AVAILABLE)
     routes |= {model.id: base_route(model) for model in session.scalars(deployed)}
     bases: dict[str, dict[str, Any]] = {}
+    problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()
         except NotFoundError:
             routes = {name: route for name, route in routes.items() if route.base_model != key}
+            continue
+        model = session.get(Model, key)
+        problem = problem_of(model, model_folder(settings, model)) if model is not None else None
+        if problem is not None:
+            problems[key] = problem
     models: dict[str, list[str]] = {}
     for route in routes.values():
         models.setdefault(route.owner, []).append(route.name)
@@ -188,7 +198,14 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     }
     logging = bool(load_policy(session)["request_logs"])
     config = GatewayConfig(
-        version="", routes=routes, keys=keys, models=models, engines=engines, bases=bases, request_logs=logging
+        version="",
+        routes=routes,
+        keys=keys,
+        models=models,
+        engines=engines,
+        bases=bases,
+        request_logs=logging,
+        problems=problems,
     )
     return replace(config, version=hash_of(config.to_json()))
 
@@ -243,7 +260,9 @@ class LocalConfig:
     def rebuild(self) -> GatewayConfig:
         with self.lock, self.sessions() as session:
             draft = build_config(session, self.store, self.settings, {})
-            specs = {key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items()}
+            specs = {
+                key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items() if key not in draft.problems
+            }
             registered = registered_replicas(session, specs)
             managed = self.engines(specs, registered)
             replicas = merge_replicas(managed, registered)

@@ -27,6 +27,7 @@ class AdapterNotSupportedError(Exception):
 class AdapterRef:
     name: str
     artifact: dict[str, Any]
+    base_hash: str | None = None
 
 
 @dataclass(frozen=True)

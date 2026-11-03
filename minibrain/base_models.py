@@ -16,6 +16,7 @@ class BaseModelSpec:
     path: str | None = None
     format: str = "safetensors"
     weights_file: str | None = None
+    content_hash: str | None = None
 
     def source(self) -> tuple[str, str | None]:
         if self.path and (Path(self.path) / "config.json").is_file():
@@ -37,6 +38,7 @@ class BaseModelSpec:
             path=data.get("path"),
             format=str(data.get("format") or "safetensors"),
             weights_file=data.get("weights_file"),
+            content_hash=data.get("content_hash"),
         )
 
 

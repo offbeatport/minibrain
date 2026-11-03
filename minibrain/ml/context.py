@@ -12,7 +12,9 @@ FINAL_EXIT = 2
 
 
 class FinalError(Exception):
-    pass
+    def __init__(self, message: str, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -53,7 +55,8 @@ def run_child(main: Callable[[JobSpec], None], final_errors: tuple[type[Exceptio
     try:
         main(spec)
     except (FinalError, *final_errors) as error:
-        print(json.dumps({"error": str(error), "retryable": False}), flush=True)
+        code = getattr(error, "code", None)
+        print(json.dumps({"error": str(error), "retryable": False} | ({"code": code} if code else {})), flush=True)
         sys.exit(FINAL_EXIT)
     except Exception as error:
         traceback.print_exc()

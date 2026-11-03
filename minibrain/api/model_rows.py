@@ -7,12 +7,14 @@ from typing import Any
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
+from minibrain.api.model_health import HealthContext, base_health, custom_health, version_health
 from minibrain.api.schemas import (
     Activity,
     Availability,
     AvailabilityState,
     Deployment,
     DeploymentState,
+    Health,
     ModelRow,
     Stage,
     Usage,
@@ -20,6 +22,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
+from minibrain.models.health import content_hash
 from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
 from minibrain.registry.models import (
@@ -47,6 +50,14 @@ FAILED_LABELS: dict[str, str] = {
     JobKind.PREPARE: "Dataset build failed",
     JobKind.DOWNLOAD: "Download failed",
     JobKind.IMPORT: "Import failed",
+    JobKind.VERIFY: "Verify failed",
+    JobKind.REPAIR: "Repair failed",
+}
+TRANSFER_LABELS: dict[str, str] = {
+    JobKind.DOWNLOAD: "Downloading",
+    JobKind.IMPORT: "Importing",
+    JobKind.VERIFY: "Verifying files",
+    JobKind.REPAIR: "Repairing",
 }
 STATE_LABELS = {"running": "Running", "starting": "Starting", "unhealthy": "Unhealthy"}
 USAGE_DAYS = 7
@@ -54,7 +65,7 @@ FAILED_STATUS = 500
 LATENCY_SAMPLE = 2000
 
 
-Health = Callable[[str], str | None]
+EngineHealth = Callable[[str], str | None]
 
 
 def running_progress(job: Job) -> float | None:
@@ -70,11 +81,7 @@ def version_label(job: Job) -> str:
 
 
 def active_activity(job: Job) -> Activity:
-    label = (
-        version_label(job)
-        if job.kind not in (JobKind.DOWNLOAD, JobKind.IMPORT)
-        else ("Downloading" if job.kind == JobKind.DOWNLOAD else "Importing")
-    )
+    label = TRANSFER_LABELS.get(job.kind) or version_label(job)
     queued = job.status == JobStatus.QUEUED
     if queued:
         label += " · retrying" if job.attempt > 0 else " · queued"
@@ -251,7 +258,10 @@ def usage_index(session: Session) -> UsageIndex:
 
 
 def version_rows(
-    minibrain: Minibrain, jobs: list[Job], version_usage: dict[tuple[int, int], Usage]
+    minibrain: Minibrain,
+    jobs: list[Job],
+    version_usage: dict[tuple[int, int], Usage],
+    base_hash: str | None = None,
 ) -> list[VersionRow]:
     rows: list[VersionRow] = []
     for version in sorted(minibrain.versions, key=lambda item: item.number, reverse=True):
@@ -269,6 +279,7 @@ def version_rows(
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
                 usage=version_usage.get((minibrain.id, version.number)),
                 created_at=version.created_at,
+                health=version_health(minibrain, version, base_hash),
             )
         )
     return rows
@@ -298,11 +309,13 @@ def custom_row(
     minibrain: Minibrain,
     jobs: list[Job],
     store: ArtifactStore,
-    health: Health,
+    health: EngineHealth,
     base_weights: int | None = None,
     usage: Usage | None = None,
     version_usage: dict[tuple[int, int], Usage] | None = None,
+    base: tuple[str, Health | None, str | None] | None = None,
 ) -> ModelRow:
+    base_name, broken, base_hash = base or (minibrain.base_model, None, None)
     latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
     current = minibrain.current_version
@@ -333,12 +346,13 @@ def custom_row(
         update_available=False,
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
-        versions=version_rows(minibrain, jobs, version_usage or {}),
+        versions=version_rows(minibrain, jobs, version_usage or {}, base_hash),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         stages=custom_stages(minibrain, jobs),
         accuracy=shown_accuracy(minibrain),
         usage=usage,
+        health=custom_health(broken, base_name),
     )
 
 
@@ -360,8 +374,16 @@ def base_activity(job: Job | None) -> Activity:
     return Activity(state="idle", label="No active jobs")
 
 
-def base_row(model: Model, job: Job | None, settings: Settings, health: Health, usage: Usage | None = None) -> ModelRow:
+def base_row(
+    model: Model,
+    job: Job | None,
+    settings: Settings,
+    health: EngineHealth,
+    usage: Usage | None = None,
+    context: HealthContext | None = None,
+) -> ModelRow:
     availability = base_availability(model, job, settings)
+    problem = base_health(model, job, context or HealthContext(settings=settings, hub_ok=False))
     variant = model.variant
     latest = variant.latest_revision if variant is not None else None
     weights = sum(entry["size"] for entry in model.files if entry["path"].endswith(".safetensors"))
@@ -377,7 +399,7 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health, 
         activity=base_activity(job),
         deployment=deployment("", model.deployed, health(model.id) if model.deployed else None, []),
         updated_at=updated,
-        can_test=availability.state == "available",
+        can_test=availability.state == "available" and problem is None,
         update_available=latest is not None and model.revision is not None and latest != model.revision,
         current_version=None,
         ready_version=None,
@@ -387,6 +409,8 @@ def base_row(model: Model, job: Job | None, settings: Settings, health: Health, 
         size_bytes=model.size_bytes or None,
         usage=usage,
         revision=model.revision,
+        health=problem,
+        catalog_id=model.catalog_id,
     )
 
 
@@ -410,10 +434,20 @@ def base_weights(session: Session) -> dict[str, int]:
     return weights
 
 
-def all_rows(session: Session, settings: Settings, store: ArtifactStore, health: Health) -> list[ModelRow]:
+def all_rows(
+    session: Session, settings: Settings, store: ArtifactStore, health: EngineHealth, context: HealthContext
+) -> list[ModelRow]:
     by_minibrain, by_model = jobs_by(session)
     weights = base_weights(session)
     usage = usage_index(session)
+    models = list(session.scalars(select(Model)))
+    base_rows = [
+        base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id), context) for model in models
+    ]
+    bases = {
+        model.id: (model.name, row.health, content_hash(model.files) if model.status == ModelStatus.AVAILABLE else None)
+        for model, row in zip(models, base_rows, strict=True)
+    }
     rows = [
         custom_row(
             minibrain,
@@ -423,13 +457,11 @@ def all_rows(session: Session, settings: Settings, store: ArtifactStore, health:
             weights.get(minibrain.base_model),
             usage.custom.get(minibrain.id),
             usage.versions,
+            bases.get(minibrain.base_model),
         )
         for minibrain in session.scalars(select(Minibrain))
     ]
-    rows += [
-        base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id))
-        for model in session.scalars(select(Model))
-    ]
+    rows += base_rows
     custom_keys = dict(
         session.execute(
             select(KeyScope.minibrain_id, func.count())

@@ -244,6 +244,8 @@ class SqlJobQueue:
     def finish(self, session: Session, job: Job, status: JobStatus, error: str | None = None) -> None:
         job.status = status
         job.error = error
+        if error is None:
+            job.error_code = None
         job.finished_at = self.clock()
         self.release(job)
         add_event(session, job, "state", status if error is None else f"{status}: {error}")
@@ -282,11 +284,14 @@ class SqlJobQueue:
             return
         self.finish(session, job, JobStatus.FAILED, error)
 
-    def fail(self, job_id: int, token: str, error: str, retryable: bool, log: str | None) -> None:
+    def fail(
+        self, job_id: int, token: str, error: str, retryable: bool, log: str | None, code: str | None = None
+    ) -> None:
         with self.lock, self.sessions() as session:
             job = self.leased(session, job_id, token)
             outcome = AttemptOutcome.CANCELLED if job.cancel_requested else AttemptOutcome.FAILED
             self.close_attempt(job, outcome, error, retryable, log)
+            job.error_code = code
             self.settle_failure(session, job, error, retryable)
             session.commit()
 

@@ -1,9 +1,11 @@
+import errno
 import json
 from typing import Any
 
 from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
 from minibrain.models.files import Progress, write_stream
 from minibrain.models.sources import StorageSource, location_url
+from minibrain.models.transfer import check_room, disk_full, write_manifest
 
 TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json")
 PICKLE_SUFFIXES = (".bin", ".pt", ".pth", ".pkl", ".ckpt")
@@ -72,17 +74,23 @@ def main(spec: JobSpec) -> None:
     variant = match(spec, detected_revision(source))
     out = spec.path("out")
     out.mkdir(parents=True, exist_ok=True)
+    check_room(out, files)
     progress = Progress(sum(entry["size"] for entry in files), "importing")
     copied: dict[str, dict[str, Any]] = {}
     for entry in files:
         target = out / entry["path"]
-        digest = write_stream(source.chunks(entry["path"]), target, progress, entry["path"])
+        try:
+            digest = write_stream(source.chunks(entry["path"]), target, progress, entry["path"])
+        except OSError as error:
+            if error.errno == errno.ENOSPC:
+                raise disk_full(out, entry["path"]) from error
+            raise
         copied[entry["path"]] = {"path": entry["path"], "size": target.stat().st_size, "sha256": digest}
     if variant is not None:
         verify(variant, copied)
     manifest = sorted(copied.values(), key=lambda item: item["path"])
     record = {"source": url, "files": manifest, "variant_id": variant["id"] if variant else None}
-    (out / "minibrain-model.json").write_text(json.dumps(record, indent=1))
+    write_manifest(out, record)
     result = {"files": manifest, "size_bytes": progress.total, "source": url, "variant_id": record["variant_id"]}
     write_result(spec, result)
     report(1.0, step="verified against the catalogue" if variant else "imported, not verified", files=len(manifest))
