@@ -20,10 +20,10 @@ class Clock:
 
 
 def lora_job(harness: Harness) -> Clock:
-    clock = Clock()
-    harness.queue.clock = clock
     create_with_dataset(harness)
     add_version(harness, "lora")
+    clock = Clock()
+    harness.queue.clock = clock
     return clock
 
 
