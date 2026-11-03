@@ -55,6 +55,8 @@ const ACTIONS: Record<string, string> = {
 
 const KEY_LABELS: Record<string, string> = {
     budget_bytes: "Budget",
+    cut_hash: "Hash at the cut",
+    cut_seq: "Cut at seq",
     days: "Retention",
     deleted: "Events deleted",
     files: "Files",
@@ -117,6 +119,9 @@ export function plainValue(value: unknown, policy?: PolicyInfo, key = ""): strin
     if (typeof value === "number") {
         if (key.endsWith("_bytes")) {
             return bytes(value);
+        }
+        if (key.endsWith("_port")) {
+            return String(value);
         }
         if (key === "days" || key.endsWith("_days")) {
             return value === 0 ? "Forever" : `${value.toLocaleString()} days`;
@@ -216,7 +221,9 @@ function listChange(before: unknown[], after: unknown[], policy?: PolicyInfo): s
 
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "audit.prune": (detail) =>
-        `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}`,
+        `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}${
+            typeof detail.cut_seq === "number" ? `, up to seq ${plainValue(detail.cut_seq)}` : ""
+        }`,
     "feedback.accept": (detail) => `Right answer: ${plainValue(detail.label)}`,
     "feedback.fix": (detail) => `Fixed to ${plainValue(detail.label)}`,
     "feedback.reject": () => "Kept out of the training data",

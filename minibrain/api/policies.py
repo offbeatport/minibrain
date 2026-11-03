@@ -22,6 +22,7 @@ class PolicyInfo(BaseModel):
     description: str
     kind: str
     choices: list[PolicyChoice]
+    maximum: int | None = None
     value: Any
     locked: bool
     source: str

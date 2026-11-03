@@ -549,6 +549,7 @@ class AuditEvent(Base):
         Index("ix_audit_events_at", "at"),
         Index("ix_audit_events_action", "action"),
         Index("ix_audit_events_actor", "actor"),
+        Index("ix_audit_events_seq", "seq", unique=True),
         {"sqlite_autoincrement": True},
     )
 
@@ -559,6 +560,20 @@ class AuditEvent(Base):
     target: Mapped[str]
     detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     ip: Mapped[str | None] = mapped_column(default=peer_address)
+    seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    prev_hash: Mapped[str | None] = mapped_column(default=None)
+    hash: Mapped[str | None] = mapped_column(default=None)
+
+
+class AuditChain(Base):
+    __tablename__ = "audit_chain"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger)
+    hash: Mapped[str]
+    forwarded_seq: Mapped[int] = mapped_column(BigInteger, default=0)
+    forwarded_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    forward_error: Mapped[str | None] = mapped_column(default=None)
 
 
 class Node(Base):

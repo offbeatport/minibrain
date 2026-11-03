@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Timer } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShieldCheck, Timer } from "lucide-react";
 import {
     Badge,
     Button,
@@ -14,6 +14,7 @@ import {
     DialogTitle,
     Input,
     Label,
+    Link,
     SearchInput,
     Select,
     SelectContent,
@@ -29,7 +30,7 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { Facts } from "~/components/Facts";
@@ -57,8 +58,11 @@ import { exactTime, relativeTime } from "~/lib/time";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Policies = Map<string, PolicyInfo>;
+type ChainInfo = components["schemas"]["AuditChainInfo"];
+type SiemInfo = components["schemas"]["SiemInfo"];
 
 const PAGE_SIZE = 50;
+const SECURITY_PATH = "/settings/security";
 const SEARCH_DELAY_MS = 300;
 const RETENTION = "audit_retention_days";
 const DAY_MS = 24 * 3600 * 1000;
@@ -269,6 +273,14 @@ function ChangeTable({ event, policies }: { event: AuditEvent; policies: Policie
     );
 }
 
+function Hash({ value }: { value: string | null | undefined }) {
+    return value ? (
+        <span className="font-mono break-all">{value}</span>
+    ) : (
+        <span className="text-muted-foreground">Not sealed yet</span>
+    );
+}
+
 function EventBody({ event, policies }: { event: AuditEvent; policies: Policies }) {
     const target = targetLabel(event, policies);
     const facts: [string, ReactNode][] = [
@@ -301,6 +313,22 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
             </span>,
         ]);
     }
+    facts.push(
+        [
+            "Sequence",
+            event.seq === null ? (
+                <span key="seq" className="text-muted-foreground">
+                    Not sealed yet
+                </span>
+            ) : (
+                <span key="seq" className="tabular-nums">
+                    {count(event.seq)}
+                </span>
+            ),
+        ],
+        ["Hash", <Hash key="hash" value={event.hash} />],
+        ["Previous hash", <Hash key="prev" value={event.prev_hash} />],
+    );
     const fields = otherFields(event).filter(
         ([name]) => name !== "name" || target !== event.detail.name,
     );
@@ -358,6 +386,162 @@ function EventDialog({
                 {event && <EventBody event={event} policies={policies} />}
             </DialogContent>
         </Dialog>
+    );
+}
+
+function useChain() {
+    return useQuery({
+        queryKey: ["audit", "chain"],
+        queryFn: () => unwrap(api.GET("/api/audit/chain")),
+    });
+}
+
+function seqRange(first: number, last: number): string {
+    return first === last ? `seq ${count(first)}` : `seq ${count(first)} to ${count(last)}`;
+}
+
+function events(total: number): string {
+    return `${count(total)} ${total === 1 ? "event" : "events"}`;
+}
+
+function queued(total: number): string {
+    return total === 1 ? "1 event waits" : `${count(total)} events wait`;
+}
+
+function chainText(chain: ChainInfo): string {
+    if (chain.broken) {
+        const intact =
+            chain.events > 0 ? ` Events up to seq ${count(chain.last_seq)} are intact.` : "";
+        return `Seq ${count(chain.broken.seq)}: ${chain.broken.reason}.${intact} Compare it with your SIEM's copy or an earlier export to see what changed.`;
+    }
+    const parts: string[] = [];
+    if (chain.events > 0 && chain.first_seq !== null) {
+        parts.push(
+            `${events(chain.events)}, ${seqRange(chain.first_seq, chain.last_seq)}, match their hashes and link to the one before.`,
+        );
+    } else {
+        parts.push("Each event is sealed into the chain within seconds of being recorded.");
+    }
+    if (chain.anchor_seq > 0) {
+        parts.push(
+            `The chain starts where the last prune cut it, after seq ${count(chain.anchor_seq)}.`,
+        );
+    }
+    if (chain.pending > 0) {
+        parts.push(`${events(chain.pending)} not sealed yet.`);
+    }
+    return parts.join(" ");
+}
+
+function ChainBadge({ chain }: { chain: ChainInfo | undefined }) {
+    if (!chain) {
+        return <Badge variant="neutral">Checking</Badge>;
+    }
+    return chain.broken ? (
+        <Badge variant="destructive">{`Broken at seq ${count(chain.broken.seq)}`}</Badge>
+    ) : (
+        <Badge variant="success">Verified</Badge>
+    );
+}
+
+function SettingsLink({ children }: { children: ReactNode }) {
+    return (
+        <Link href={SECURITY_PATH} className="text-primary hover:underline">
+            {children}
+        </Link>
+    );
+}
+
+type SiemState = {
+    variant: ComponentProps<typeof Badge>["variant"];
+    label: string;
+    detail: string;
+};
+
+function siemState(siem: SiemInfo): SiemState {
+    if (!siem.target) {
+        return { variant: "neutral", label: "Off", detail: "Events stay on this install." };
+    }
+    const when = siem.forwarded_at ? `, ${relativeTime(siem.forwarded_at)}` : "";
+    const sent =
+        siem.forwarded_seq > 0
+            ? `Sent up to seq ${count(siem.forwarded_seq)}${when}.`
+            : "Nothing sent yet.";
+    if (siem.error) {
+        return {
+            variant: "destructive",
+            label: "Failing",
+            detail: `${siem.error}. ${sent} ${queued(siem.waiting)} and will go out in order once the SIEM answers.`,
+        };
+    }
+    if (siem.waiting > 0) {
+        return {
+            variant: "info",
+            label: "Sending",
+            detail: `${sent} ${events(siem.waiting)} to go.`,
+        };
+    }
+    return {
+        variant: "success",
+        label: "Up to date",
+        detail: `${sent} Every sealed event is sent.`,
+    };
+}
+
+const CHECKING: SiemState = { variant: "neutral", label: "Checking", detail: "" };
+
+function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
+    const state = siem ? siemState(siem) : CHECKING;
+    return (
+        <SettingsRow
+            label="SIEM export"
+            description={
+                <>
+                    {siem?.target && (
+                        <>
+                            <span className="font-mono break-all">{siem.target}</span>
+                            {". "}
+                        </>
+                    )}
+                    {state.detail}{" "}
+                    <SettingsLink>
+                        {siem?.target ? "Change it in Security" : "Set it up in Security"}
+                    </SettingsLink>
+                    {"."}
+                </>
+            }
+            control={<Badge variant={state.variant}>{state.label}</Badge>}
+        />
+    );
+}
+
+function Integrity() {
+    const chain = useChain();
+    return (
+        <PanelSection
+            icon={ShieldCheck}
+            title="Integrity"
+            description="Every event carries a SHA-256 hash of its fields and of the event before it, so an edit or a deletion breaks the chain."
+            actions={
+                <Button
+                    variant="outline"
+                    disabled={chain.isFetching}
+                    onClick={() => void chain.refetch()}
+                >
+                    {chain.isFetching ? "Verifying…" : "Verify again"}
+                </Button>
+            }
+        >
+            <SettingsGroup>
+                <SettingsRow
+                    label="Hash chain"
+                    description={chain.data ? chainText(chain.data) : "Checking every event…"}
+                    error={errorMessage(chain.error)}
+                    control={<ChainBadge chain={chain.data} />}
+                />
+                <SiemRow siem={chain.data?.siem} />
+            </SettingsGroup>
+        </PanelSection>
     );
 }
 
@@ -592,11 +776,10 @@ export function AuditLogPage() {
                     />
                 )}
             </div>
-            {retention && (
-                <PanelSections>
-                    <Retention policy={retention} />
-                </PanelSections>
-            )}
+            <PanelSections>
+                <Integrity />
+                {retention && <Retention policy={retention} />}
+            </PanelSections>
             <EventDialog
                 id={eventId}
                 loaded={loaded}

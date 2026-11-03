@@ -31,6 +31,7 @@ class Field:
     default: Any
     choices: tuple[str, ...] = ()
     editable: bool = True
+    maximum: int | None = None
 
 
 FIELDS: tuple[Field, ...] = (
@@ -118,6 +119,38 @@ FIELDS: tuple[Field, ...] = (
         "int",
         0,
     ),
+    Field(
+        "siem_protocol",
+        "SIEM export",
+        "Send every audit event, in order, to your SIEM as RFC 5424 syslog. TLS checks the SIEM's certificate; "
+        "UDP can lose events without notice. Off sends nothing.",
+        "choice",
+        "off",
+        ("off", "tls", "tcp", "udp"),
+    ),
+    Field(
+        "siem_host",
+        "SIEM host",
+        "Name or address of the syslog receiver. Audit events go there and nowhere else.",
+        "host",
+        "",
+    ),
+    Field(
+        "siem_port",
+        "SIEM port",
+        "0 uses the standard port: 6514 for TLS, 514 for TCP and UDP.",
+        "int",
+        0,
+        maximum=65535,
+    ),
+    Field(
+        "siem_ca_bundle",
+        "SIEM CA bundle",
+        "PEM file on this server with the CA certificates that sign the SIEM's TLS certificate. Empty trusts the "
+        "system's CAs.",
+        "text",
+        "",
+    ),
 )
 
 CHOICE_LABELS = {
@@ -129,6 +162,10 @@ CHOICE_LABELS = {
     "imports": "Imports only",
     "selected": "Only selected licences",
     "all": "Any licence",
+    "off": "Off",
+    "tls": "TLS",
+    "tcp": "TCP",
+    "udp": "UDP",
 } | {key: value[0] for key, value in LICENCES.items()}
 
 BY_NAME = {field.name: field for field in FIELDS}
@@ -160,7 +197,18 @@ def coerce(field: Field, value: Any) -> Any:
         number = int(value)
         if number < 0:
             raise PolicyError(f"{field.label} cannot be negative")
+        if field.maximum is not None and number > field.maximum:
+            raise PolicyError(f"{field.label} cannot be more than {field.maximum}")
         return number
+    if field.kind == "host":
+        host = str(value).strip()
+        if any(character.isspace() or character in "/@" for character in host):
+            raise PolicyError(f"{field.label} is a host name or address, without a scheme, path or spaces")
+        if host.count(":") == 1:
+            raise PolicyError(f"{field.label} takes the host alone; the port has its own setting")
+        return host
+    if field.kind == "text":
+        return str(value).strip()
     if field.kind == "list":
         items = value.split(",") if isinstance(value, str) else list(value)
         cleaned = [str(item).strip() for item in items if str(item).strip()]
@@ -250,6 +298,7 @@ def describe(session: Session) -> list[dict[str, Any]]:
             "description": field.description,
             "kind": field.kind,
             "choices": [choice_of(field, choice) for choice in field.choices],
+            "maximum": field.maximum,
             "value": policy[field.name],
             "locked": field.name in locked or not field.editable,
             "source": locked[field.name][0] if field.name in locked else ("built in" if not field.editable else "ui"),

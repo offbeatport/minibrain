@@ -332,7 +332,7 @@ function NetworkSection({ info }: { info: InstallInfo }) {
                                 {!endpoint.by_policy && (
                                     <span>
                                         {" "}
-                                        Storage you configured; the network policy does not apply.
+                                        You configured this; the network policy does not apply.
                                     </span>
                                 )}
                             </>

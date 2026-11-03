@@ -3978,6 +3978,27 @@
         }
       }
     },
+    "/api/audit/chain": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Chain",
+        "operationId": "chain_api_audit_chain_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditChainInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit/{event_id}": {
       "get": {
         "tags": [
@@ -7035,6 +7056,72 @@
         ],
         "title": "AttemptInfo"
       },
+      "AuditChainInfo": {
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "first_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seq"
+          },
+          "last_seq": {
+            "type": "integer",
+            "title": "Last Seq"
+          },
+          "anchor_seq": {
+            "type": "integer",
+            "title": "Anchor Seq"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "broken": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChainBreakInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "siem": {
+            "$ref": "#/components/schemas/SiemInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verified",
+          "events",
+          "first_seq",
+          "last_seq",
+          "anchor_seq",
+          "pending",
+          "broken",
+          "checked_at",
+          "siem"
+        ],
+        "title": "AuditChainInfo"
+      },
       "AuditFacet": {
         "properties": {
           "value": {
@@ -7115,6 +7202,39 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Detail"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
+          "prev_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Hash"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
           }
         },
         "type": "object",
@@ -7125,7 +7245,10 @@
           "ip",
           "action",
           "target",
-          "detail"
+          "detail",
+          "seq",
+          "prev_hash",
+          "hash"
         ],
         "title": "AuditInfo"
       },
@@ -9373,6 +9496,36 @@
         },
         "type": "object",
         "title": "CatalogueUpdate"
+      },
+      "ChainBreakInfo": {
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "event_id",
+          "reason"
+        ],
+        "title": "ChainBreakInfo"
       },
       "ChangeInfo": {
         "properties": {
@@ -14944,6 +15097,17 @@
             "type": "array",
             "title": "Choices"
           },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
           "value": {
             "title": "Value"
           },
@@ -15388,6 +15552,61 @@
           "credit"
         ],
         "title": "SampleInfo"
+      },
+      "SiemInfo": {
+        "properties": {
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "forwarded_seq": {
+            "type": "integer",
+            "title": "Forwarded Seq"
+          },
+          "forwarded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forwarded At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "forwarded_seq",
+          "forwarded_at",
+          "error",
+          "waiting"
+        ],
+        "title": "SiemInfo"
       },
       "SnapshotDiff": {
         "properties": {

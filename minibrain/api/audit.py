@@ -14,16 +14,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.api.deps import SessionDep
+from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
+from minibrain.registry.audit_chain import ChainReport, head_of, verify
 from minibrain.registry.models import PEER_ADDRESS, AuditEvent, now
 from minibrain.registry.service import NotFoundError
+from minibrain.siem import target_of, waiting
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 PAGE_SIZE = 50
 PAGE_MAX = 500
 EXPORT_BATCH = 1000
-EXPORT_COLUMNS = ("id", "at", "actor", "ip", "action", "target", "detail")
+EXPORT_COLUMNS = ("id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash")
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"}
 
@@ -49,6 +52,9 @@ class AuditInfo(BaseModel):
     action: str
     target: str
     detail: dict[str, Any]
+    seq: int | None
+    prev_hash: str | None
+    hash: str | None
 
 
 class AuditPage(BaseModel):
@@ -67,6 +73,32 @@ class AuditFacet(BaseModel):
 class AuditFacets(BaseModel):
     actions: list[AuditFacet]
     actors: list[AuditFacet]
+
+
+class ChainBreakInfo(BaseModel):
+    seq: int
+    event_id: int | None
+    reason: str
+
+
+class SiemInfo(BaseModel):
+    target: str | None
+    forwarded_seq: int
+    forwarded_at: datetime | None
+    error: str | None
+    waiting: int
+
+
+class AuditChainInfo(BaseModel):
+    verified: bool
+    events: int
+    first_seq: int | None
+    last_seq: int
+    anchor_seq: int
+    pending: int
+    broken: ChainBreakInfo | None
+    checked_at: datetime
+    siem: SiemInfo
 
 
 @dataclass(frozen=True)
@@ -117,6 +149,9 @@ def event_info(event: AuditEvent) -> AuditInfo:
         action=event.action,
         target=event.target,
         detail=redact(dict(event.detail)),
+        seq=event.seq,
+        prev_hash=event.prev_hash,
+        hash=event.hash,
     )
 
 
@@ -219,6 +254,38 @@ def export(request: Request, found: FilterDep, format: Literal["csv", "jsonl"] =
         media_type=MEDIA_TYPES[format],
         headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
+
+
+def chain_info(report: ChainReport, siem: SiemInfo) -> AuditChainInfo:
+    broken = report.broken
+    return AuditChainInfo(
+        verified=report.verified,
+        events=report.events,
+        first_seq=report.first_seq,
+        last_seq=report.last_seq,
+        anchor_seq=report.anchor_seq,
+        pending=report.pending,
+        broken=ChainBreakInfo(seq=broken.seq, event_id=broken.event_id, reason=broken.reason) if broken else None,
+        checked_at=now(),
+        siem=siem,
+    )
+
+
+def siem_info(session: Session) -> SiemInfo:
+    target = target_of(load_policy(session))
+    head = head_of(session)
+    return SiemInfo(
+        target=target.describe() if target else None,
+        forwarded_seq=head.forwarded_seq,
+        forwarded_at=head.forwarded_at,
+        error=head.forward_error,
+        waiting=waiting(session, head.forwarded_seq),
+    )
+
+
+@router.get("/chain")
+def chain(session: SessionDep) -> AuditChainInfo:
+    return chain_info(verify(session), siem_info(session))
 
 
 @router.get("/{event_id}")

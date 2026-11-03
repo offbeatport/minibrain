@@ -31,6 +31,7 @@ from minibrain.registry.compute import NODE_FRESH, pools
 from minibrain.registry.models import CatalogModel, Job, JobStatus, Model, Node, now
 from minibrain.registry.settings_store import read
 from minibrain.settings import REPO_ROOT, Settings
+from minibrain.siem import target_of
 from minibrain.versions import library_version
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -229,6 +230,9 @@ def network(session: Session, settings: Settings, store: ArtifactStore) -> Insta
     storage = storage_settings(session, settings, store)
     if storage.kind == "s3" and storage.endpoint:
         endpoints.append(InstallEndpoint(name="Artifact storage", url=storage.endpoint, allowed=True, by_policy=False))
+    siem = target_of(policy)
+    if siem is not None:
+        endpoints.append(InstallEndpoint(name="SIEM export", url=siem.describe(), allowed=True, by_policy=False))
     return InstallNetwork(
         mode=policy["network"],
         locked=bool(described["locked"]),

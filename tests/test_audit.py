@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Any
 
 from minibrain.maintenance import purge_audit_events
+from minibrain.registry.audit_chain import seal_all
 from minibrain.registry.models import AuditEvent, now
 from tests.conftest import Harness
 
@@ -87,7 +88,8 @@ def test_exports_follow_the_filter_and_defuse_formulas(harness: Harness) -> None
     assert response.headers["content-disposition"].startswith('attachment; filename="minibrain-audit-')
     rows = list(csv.DictReader(io.StringIO(response.text)))
     assert [row["target"] for row in rows] == ["mb_0002", "mb_0001", "mb_0000"]
-    assert set(rows[0]) == {"id", "at", "actor", "ip", "action", "target", "detail"}
+    assert list(rows[0]) == ["id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash"]
+    assert (rows[0]["seq"], rows[0]["hash"]) == ("", "")
     risky = list(csv.DictReader(io.StringIO(harness.client.get("/api/audit/export?action=model.delete").text)))
     assert risky[0]["target"] == "'=HYPERLINK(1)"
     lines = harness.client.get("/api/audit/export", params={"format": "jsonl"}).text.splitlines()
@@ -124,6 +126,8 @@ def test_retention_prunes_old_events_and_records_the_prune(harness: Harness) -> 
         session.commit()
     assert harness.client.put("/api/policies/audit_retention_days", json={"value": 90}).status_code == 200
     with harness.sessions() as session:
+        assert purge_audit_events(session) == 0
+        seal_all(session)
         assert purge_audit_events(session) == 2
     events = page(harness)["events"]
     assert [event["action"] for event in events] == ["audit.prune", "policy.update", "key.create"]

@@ -7,11 +7,16 @@ import socket
 import sys
 import threading
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import uvicorn
 
 from minibrain.supervise import Supervisor
+
+if TYPE_CHECKING:
+    from minibrain.registry.audit_chain import ChainReport
 
 
 def local_url(host: str, port: int) -> str:
@@ -168,6 +173,46 @@ def extensions(args: argparse.Namespace) -> None:
         print(f"  {state.name:<18} {'installed' if state.installed else 'missing':<10} {state.purpose}")
 
 
+def chain_summary(report: "ChainReport") -> str:
+    if report.broken is not None:
+        found = f" (event {report.broken.event_id})" if report.broken.event_id is not None else ""
+        verified = f" Verified up to seq {report.last_seq}." if report.events else ""
+        return f"Audit chain broken at seq {report.broken.seq}{found}: {report.broken.reason}.{verified}"
+    if report.events == 0:
+        text = "Audit chain verified: no sealed events"
+    else:
+        text = f"Audit chain verified: {report.events} events, seq {report.first_seq} to {report.last_seq}"
+    if report.anchor_seq:
+        text += f", starting after the prune at seq {report.anchor_seq}"
+    if report.pending == 1:
+        text += ". 1 newer event is not sealed yet"
+    elif report.pending:
+        text += f". {report.pending} newer events are not sealed yet"
+    return text + "."
+
+
+def audit(args: argparse.Namespace) -> None:
+    from minibrain.registry.audit_chain import verify, verify_records
+
+    if args.file is not None:
+        lines = args.file.read_text().splitlines()
+        report = verify_records(json.loads(line) for line in lines if line.strip())
+    else:
+        from minibrain.registry.db import make_sessions, migrate
+        from minibrain.settings import load_settings
+
+        settings = load_settings()
+        migrate(settings.database_url)
+        with make_sessions(settings.database_url)() as session:
+            report = verify(session)
+    if args.json:
+        print(json.dumps(asdict(report) | {"verified": report.verified}, indent=2))
+    else:
+        print(chain_summary(report))
+    if not report.verified:
+        raise SystemExit(1)
+
+
 def openapi(output: Path | None) -> None:
     from minibrain.app import create_app
 
@@ -221,6 +266,11 @@ def main() -> None:
     download_command.add_argument("--from", dest="source", default="https://extensions.duckdb.org")
     download_command.add_argument("--version", default=None, help="DuckDB version, such as v2.0.0")
     download_command.add_argument("names", nargs="*")
+    audit_command = commands.add_parser("audit", help="check the audit log's hash chain")
+    audit_actions = audit_command.add_subparsers(dest="action", required=True)
+    verify_command = audit_actions.add_parser("verify", help="walk the chain and report the first break")
+    verify_command.add_argument("--file", type=Path, default=None, help="a full JSONL export instead of the database")
+    verify_command.add_argument("--json", action="store_true", help="print the report as JSON")
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -234,6 +284,8 @@ def main() -> None:
         engine(args)
     elif args.command == "extensions":
         extensions(args)
+    elif args.command == "audit":
+        audit(args)
     else:
         openapi(args.output)
 

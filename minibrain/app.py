@@ -47,7 +47,7 @@ from minibrain.gateway.logs import LogBuffer, database_sink
 from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
 from minibrain.leader import Leader, leader_for
-from minibrain.maintenance import purge_forever
+from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
 from minibrain.models.cache import CacheKeeper
 from minibrain.models.catalog import seed
@@ -63,6 +63,7 @@ from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.settings import Settings, load_settings
+from minibrain.siem import Forwarder
 from minibrain.tags import TagError
 
 EXPIRY_SECONDS = 5.0
@@ -137,6 +138,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (expire_forever, (app.state.queue, stop, leader)),
             (schedule_forever, (app.state.sessions, stop, leader)),
             (purge_forever, (app.state.sessions, app.state.settings, stop, leader)),
+            (seal_forever, (app.state.sessions, stop, leader)),
+            (app.state.siem.forever, (stop, leader)),
             (app.state.cache.forever, (stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
@@ -191,6 +194,7 @@ def create_app(
     )
     app.state.request_logs = LogBuffer(database_sink(sessions))
     app.state.feedback = database_feedback(sessions)
+    app.state.siem = Forwarder(sessions)
     app.state.background = background
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)

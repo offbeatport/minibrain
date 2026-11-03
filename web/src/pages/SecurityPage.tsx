@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Box, FolderLock, Globe, KeyRound } from "lucide-react";
+import { Box, FolderLock, Globe, KeyRound, type LucideIcon, ScrollText } from "lucide-react";
 import {
     Badge,
     Button,
@@ -19,13 +19,13 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
-import { auditHref } from "~/lib/audit";
+import { AUDIT_PATH, auditHref } from "~/lib/audit";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 
@@ -33,7 +33,9 @@ const POLICIES = ["policies"] as const;
 const AUDIT = ["audit"] as const;
 const POLICY_CHANGES = auditHref({ action: "policy.update" });
 
-const GROUPS = [
+type Group = { icon: LucideIcon; title: string; names: string[]; description?: ReactNode };
+
+const GROUPS: Group[] = [
     {
         icon: Globe,
         title: "Network",
@@ -53,6 +55,20 @@ const GROUPS = [
         icon: KeyRound,
         title: "Request logs and API keys",
         names: ["request_logs", "request_bodies", "log_retention_days", "key_expiry_days"],
+    },
+    {
+        icon: ScrollText,
+        title: "Audit log export",
+        names: ["siem_protocol", "siem_host", "siem_port", "siem_ca_bundle"],
+        description: (
+            <>
+                {"The "}
+                <Link href={AUDIT_PATH} className="text-primary hover:underline">
+                    audit log
+                </Link>
+                {" shows whether the SIEM is keeping up and whether the hash chain verifies."}
+            </>
+        ),
     },
 ];
 
@@ -90,10 +106,15 @@ function LockedBadge({ policy }: { policy: PolicyInfo }) {
 }
 
 const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
+const FORMATS: Record<string, Intl.NumberFormatOptions> = {
+    siem_port: { maximumFractionDigits: 0, useGrouping: false },
+};
 
-const LIST_PLACEHOLDERS: Record<string, string> = {
+const PLACEHOLDERS: Record<string, string> = {
     allowed_hosts: "hf-mirror.internal, s3.internal",
     data_folders: "/srv/exports, /mnt/shared/datasets",
+    siem_host: "siem.internal",
+    siem_ca_bundle: "/etc/minibrain/siem-ca.pem",
 };
 
 function asList(value: unknown): string[] {
@@ -108,6 +129,9 @@ function display(policy: PolicyInfo | undefined, value: unknown): string {
         policy?.choices.find((choice) => choice.value === item)?.label ?? item;
     if (Array.isArray(value)) {
         return value.length ? value.map((item) => label(String(item))).join(", ") : "None";
+    }
+    if (value === "" || value === null || value === undefined) {
+        return "Not set";
     }
     return label(String(value));
 }
@@ -159,7 +183,7 @@ function TextRow({ policy }: { policy: PolicyInfo }) {
                             value={value}
                             aria-describedby={`${id}-description`}
                             onChange={(event) => setDraft(event.target.value)}
-                            placeholder={LIST_PLACEHOLDERS[policy.name]}
+                            placeholder={PLACEHOLDERS[policy.name]}
                         />
                         {draft !== null && draft !== current && (
                             <Button type="submit" disabled={change.isPending}>
@@ -182,7 +206,8 @@ function NumberRow({ policy }: { policy: PolicyInfo }) {
             description={policy.description}
             value={typeof policy.value === "number" ? policy.value : undefined}
             min={0}
-            format={WHOLE}
+            max={policy.maximum ?? undefined}
+            format={FORMATS[policy.name] ?? WHOLE}
             pending={change.isPending}
             error={change.error}
             onSave={(next, saved) => change.mutate(next, { onSuccess: saved })}
@@ -408,7 +433,12 @@ export function SecurityPage() {
             <PanelSections>
                 {policies.data &&
                     GROUPS.map((group) => (
-                        <PanelSection key={group.title} icon={group.icon} title={group.title}>
+                        <PanelSection
+                            key={group.title}
+                            icon={group.icon}
+                            title={group.title}
+                            description={group.description}
+                        >
                             <SettingsGroup>
                                 {group.names.map((name) => {
                                     const policy = byName.get(name);

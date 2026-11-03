@@ -1299,6 +1299,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit/chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chain */
+        get: operations["chain_api_audit_chain_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit/{event_id}": {
         parameters: {
             query?: never;
@@ -2247,6 +2264,28 @@ export interface components {
             /** Finished At */
             finished_at: string | null;
         };
+        /** AuditChainInfo */
+        AuditChainInfo: {
+            /** Verified */
+            verified: boolean;
+            /** Events */
+            events: number;
+            /** First Seq */
+            first_seq: number | null;
+            /** Last Seq */
+            last_seq: number;
+            /** Anchor Seq */
+            anchor_seq: number;
+            /** Pending */
+            pending: number;
+            broken: components["schemas"]["ChainBreakInfo"] | null;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            siem: components["schemas"]["SiemInfo"];
+        };
         /** AuditFacet */
         AuditFacet: {
             /** Value */
@@ -2282,6 +2321,12 @@ export interface components {
             detail: {
                 [key: string]: unknown;
             };
+            /** Seq */
+            seq: number | null;
+            /** Prev Hash */
+            prev_hash: string | null;
+            /** Hash */
+            hash: string | null;
         };
         /** AuditPage */
         AuditPage: {
@@ -2910,6 +2955,15 @@ export interface components {
             description?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** ChainBreakInfo */
+        ChainBreakInfo: {
+            /** Seq */
+            seq: number;
+            /** Event Id */
+            event_id: number | null;
+            /** Reason */
+            reason: string;
         };
         /** ChangeInfo */
         ChangeInfo: {
@@ -4744,6 +4798,8 @@ export interface components {
             kind: string;
             /** Choices */
             choices: components["schemas"]["PolicyChoice"][];
+            /** Maximum */
+            maximum?: number | null;
             /** Value */
             value: unknown;
             /** Locked */
@@ -4888,6 +4944,19 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+        };
+        /** SiemInfo */
+        SiemInfo: {
+            /** Target */
+            target: string | null;
+            /** Forwarded Seq */
+            forwarded_seq: number;
+            /** Forwarded At */
+            forwarded_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Waiting */
+            waiting: number;
         };
         /** SnapshotDiff */
         SnapshotDiff: {
@@ -8200,6 +8269,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chain_api_audit_chain_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditChainInfo"];
                 };
             };
         };

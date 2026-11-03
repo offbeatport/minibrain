@@ -8,11 +8,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.data.snapshots import cleanup
 from minibrain.leader import Leader
 from minibrain.policy import load
+from minibrain.registry.audit_chain import head_of, prune_cut, seal_all
 from minibrain.registry.compute import forget_stale
 from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, RequestLog, now
 from minibrain.settings import Settings
+from minibrain.siem import target_of
 
 PURGE_SECONDS = 3600.0
+SEAL_SECONDS = 1.0
 
 log = logging.getLogger("minibrain")
 
@@ -27,17 +30,39 @@ def purge_request_logs(session: Session) -> int:
 
 
 def purge_audit_events(session: Session) -> int:
-    days = int(load(session)["audit_retention_days"])
+    policy = load(session)
+    days = int(policy["audit_retention_days"])
     if days <= 0:
         return 0
     cutoff = now() - timedelta(days=days)
-    result = session.execute(delete(AuditEvent).where(AuditEvent.at < cutoff))
+    forwarded = head_of(session).forwarded_seq if target_of(policy) is not None else None
+    cut = prune_cut(session, cutoff, forwarded)
+    if cut is None:
+        return 0
+    seq, digest = cut
+    result = session.execute(delete(AuditEvent).where(AuditEvent.seq <= seq))
     deleted = int(getattr(result, "rowcount", 0) or 0)
     if deleted:
-        detail = {"deleted": deleted, "older_than": cutoff.isoformat(), "days": days}
+        detail = {
+            "deleted": deleted,
+            "older_than": cutoff.isoformat(),
+            "days": days,
+            "cut_seq": seq,
+            "cut_hash": digest,
+        }
         session.add(AuditEvent(actor=SYSTEM_ACTOR, action="audit.prune", target="audit_events", detail=detail))
     session.commit()
     return deleted
+
+
+def seal_forever(sessions: sessionmaker[Session], stop: threading.Event, leader: Leader) -> None:
+    while not stop.wait(SEAL_SECONDS):
+        try:
+            if leader.held():
+                with sessions() as session:
+                    seal_all(session)
+        except Exception:
+            log.exception("audit chain seal failed")
 
 
 def purge_forever(sessions: sessionmaker[Session], settings: Settings, stop: threading.Event, leader: Leader) -> None:
