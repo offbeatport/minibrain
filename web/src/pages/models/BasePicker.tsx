@@ -4,7 +4,6 @@ import {
     CheckboxSelect,
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -209,7 +208,6 @@ export function BasePicker({
     catalog,
     models,
     picks,
-    taskNoun,
     open,
     onOpenChange,
     tab,
@@ -221,7 +219,6 @@ export function BasePicker({
     catalog: CatalogResponse | undefined;
     models: ModelRow[];
     picks: Recommendations;
-    taskNoun: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     tab: PickerTab;
@@ -243,8 +240,15 @@ export function BasePicker({
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
     const custom = customOptions(entries, models);
     const imported = localBases(entries, models);
+    const listed = new Set(
+        [...picks.here, ...picks.more, ...picks.unchecked].map((pick) => pick.key),
+    );
     const recommended: TabbedSearchListGroup<Row>[] = [
-        groupOf("recent", "Recently used", picks.recent),
+        groupOf(
+            "recent",
+            "Recently used",
+            picks.recent.filter((pick) => !listed.has(pick.key)),
+        ),
         groupOf("here", "Runs on this machine", picks.here),
         groupOf("more", "Needs more compute: train or serve it on a GPU pool", picks.more),
         groupOf("unchecked", "Suggested; fit not checked yet", picks.unchecked),
@@ -322,18 +326,12 @@ export function BasePicker({
             panel: (query) => <ImportPanel seed={query} onUse={onImport} />,
         },
     ];
-    const hardware = catalog?.hardware;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <Trigger value={value} />
             <DialogContent className="flex h-[min(46rem,calc(100%-2rem))] flex-col sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Choose a base model</DialogTitle>
-                    <DialogDescription>
-                        {hardware?.known
-                            ? `Suggestions for ${taskNoun}. Fit is judged against ${hardware.machine}: ${bytes(hardware.memory_bytes)} ${hardware.memory_label}.`
-                            : `Suggestions for ${taskNoun}. This machine has not reported its memory, so fit is not checked.`}
-                    </DialogDescription>
                 </DialogHeader>
                 <TabbedSearchList
                     tabs={tabs}
@@ -351,7 +349,7 @@ export function BasePicker({
                     currentKey={value.option?.key}
                     onPick={(row) => onPick(row.option)}
                     label="Search base models"
-                    placeholder="Search every tab"
+                    placeholder="Search"
                     className="min-h-0 flex-1"
                     listClassName="max-h-none"
                 />

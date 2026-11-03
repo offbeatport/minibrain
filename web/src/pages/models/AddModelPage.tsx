@@ -338,7 +338,6 @@ export function AddModelPage() {
             add.mutate();
         }
     };
-    const taskNoun = TASKS.find((item) => item.key === task)?.noun ?? "classification";
     return (
         <Page>
             <Link
@@ -383,7 +382,6 @@ export function AddModelPage() {
                                         catalog={catalog.data}
                                         models={rows}
                                         picks={picks}
-                                        taskNoun={taskNoun}
                                         open={open}
                                         onOpenChange={setOpen}
                                         tab={tab}
