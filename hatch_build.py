@@ -13,6 +13,7 @@ WEB_DIR = "web"
 DIST_DIR = "web/dist"
 PACKAGED_DIR = "minibrain/web"
 BUILD_INFO = "minibrain/build.json"
+SDIST_METADATA = "PKG-INFO"
 
 
 class CustomBuildHook(BuildHookInterface):
@@ -20,11 +21,14 @@ class CustomBuildHook(BuildHookInterface):
         if version == "editable":
             return
         root = Path(self.root)
-        self.build_web(root / WEB_DIR)
+        from_sdist = (root / SDIST_METADATA).is_file()
+        if not from_sdist:
+            self.build_web(root / WEB_DIR)
         if not (root / DIST_DIR / "index.html").is_file():
             raise RuntimeError("web/dist is missing; install pnpm so the build can produce it")
-        build_data["force_include"][str(root / DIST_DIR)] = PACKAGED_DIR
-        build_data["force_include"][self.build_info(root)] = BUILD_INFO
+        build_data["force_include"][str(root / DIST_DIR)] = DIST_DIR if self.target_name == "sdist" else PACKAGED_DIR
+        if not from_sdist:
+            build_data["force_include"][self.build_info(root)] = BUILD_INFO
 
     def build_info(self, root: Path) -> str:
         commit = os.environ.get("MINIBRAIN_BUILD_COMMIT", "").strip() or self.git_commit(root)

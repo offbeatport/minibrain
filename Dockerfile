@@ -32,7 +32,7 @@ RUN mkdir /lock \
     && uv export --frozen --only-group dev --no-emit-project --no-header --no-annotate --no-hashes -o /lock/build.txt \
     && rm /lock/all.txt /lock/without-torch.txt
 
-FROM python AS wheel
+FROM python AS wheel-build
 WORKDIR /src
 COPY --from=lock /lock/build.txt /lock/build.txt
 COPY LICENSE hatch_build.py pyproject.toml ./
@@ -43,12 +43,15 @@ ARG COMMIT=""
 RUN --mount=type=cache,id=minibrain-uv,target=/root/.cache/uv \
     MINIBRAIN_BUILD_COMMIT="${COMMIT}" uv build --wheel --out-dir /dist --build-constraint /lock/build.txt
 
+FROM scratch AS wheel
+COPY --from=wheel-build /dist/ /
+
 FROM python AS extensions
 ENV VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:${PATH}
 RUN --mount=type=cache,id=minibrain-uv,target=/root/.cache/uv \
     --mount=type=bind,from=lock,source=/lock/requirements.txt,target=/lock/requirements.txt \
     uv venv /opt/venv && uv pip install --require-hashes --no-deps --requirement /lock/requirements.txt
-RUN --mount=type=bind,from=wheel,source=/dist,target=/dist uv pip install --no-deps /dist/minibrain-*.whl
+RUN --mount=type=bind,from=wheel,target=/dist uv pip install --no-deps /dist/minibrain-*.whl
 ARG INCLUDE_MYSQL=false
 RUN set -- httpfs postgres_scanner iceberg avro \
     && if [ "${INCLUDE_MYSQL}" = "true" ]; then set -- "$@" mysql_scanner; fi \
@@ -85,7 +88,7 @@ RUN --mount=type=cache,id=minibrain-uv,target=/root/.cache/uv \
     --mount=type=bind,from=lock,source=/lock/requirements.txt,target=/lock/requirements.txt \
     uv pip install --require-hashes --no-deps --requirement /lock/requirements.txt
 COPY --from=extensions /extensions /opt/duckdb-extensions
-RUN --mount=type=bind,from=wheel,source=/dist,target=/dist \
+RUN --mount=type=bind,from=wheel,target=/dist \
     uv pip install --no-deps /dist/minibrain-*.whl
 ENV MINIBRAIN_HOME=/data \
     MINIBRAIN_OFFLINE=1 \

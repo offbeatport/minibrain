@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
+    branches: ["**"]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -77,7 +79,7 @@ jobs:
         run: pnpm build
 
   package:
-    name: Wheel
+    name: Wheel and sdist
     needs: [python, web]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -97,14 +99,21 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-      - name: Build the wheel with the UI
-        run: uv build --wheel
-      - name: Check the wheel carries the UI
-        run: unzip -l dist/minibrain-*.whl | grep -q "minibrain/web/index.html"
+      - name: Build the sdist and the wheel with the UI
+        run: uv build
+      - name: Check the wheel and the sdist carry the UI
+        run: |
+          unzip -l dist/minibrain-*.whl | grep -q "minibrain/web/index.html"
+          tar -tzf dist/minibrain-*.tar.gz | grep -q "/web/dist/index.html"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: minibrain-wheel
           path: dist/*.whl
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: minibrain-sdist
+          path: dist/*.tar.gz
           if-no-files-found: error
       - name: Python SBOM from uv.lock
         run: >-
