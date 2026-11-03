@@ -18,7 +18,7 @@ export function bestFit(entry: CatalogEntry): CatalogVariantInfo {
 }
 
 const ACCESS = [
-    { value: READY, label: "One-click download" },
+    { value: READY, label: "Open access" },
     { value: NEEDS_ACCESS, label: "Needs access" },
 ];
 

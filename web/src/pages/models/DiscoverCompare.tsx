@@ -234,7 +234,7 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     id: "access",
                     label: "Access",
                     key: (entry) =>
-                        entry.gated ? "Needs access from the publisher" : "One-click download",
+                        entry.gated ? "Needs access from the publisher" : "Open access",
                 },
             ],
         },

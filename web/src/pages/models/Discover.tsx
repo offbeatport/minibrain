@@ -167,12 +167,9 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     if (available) {
         return (
             <div className="flex justify-end">
-                <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => on.open(`/models/base/${available.key}`)}
-                >
-                    View model
+                <Button size="xs" onClick={() => on.download(entry)}>
+                    <Plus />
+                    Add model
                 </Button>
             </div>
         );
@@ -250,11 +247,14 @@ function AddedStatus({ entry }: { entry: CatalogEntry }) {
             </StatusText>
         );
     }
-    if (states.some((state) => state.state === "available")) {
+    const available = entry.added.find((added) => added.availability.state === "available");
+    if (available) {
         return (
-            <StatusText tone="success" className="text-sm">
-                Added
-            </StatusText>
+            <Link href={`/models/base/${available.key}`} className="w-fit hover:underline">
+                <StatusText tone="success" className="text-sm">
+                    On this install
+                </StatusText>
+            </Link>
         );
     }
     if (states.some((state) => state.state === "not_downloaded")) {
