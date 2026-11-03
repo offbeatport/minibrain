@@ -230,7 +230,7 @@ export function EditDialog({
                         event.preventDefault();
                         save.mutate();
                     }}
-                    className="flex flex-col gap-5"
+                    className="contents"
                 >
                     <DialogHeader>
                         <DialogTitle>{`Edit ${noun}`}</DialogTitle>
