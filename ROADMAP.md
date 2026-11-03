@@ -528,7 +528,8 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
 - Enforcement is in the backend: one dependency per route states the role it needs, and a test lists every `/api`
   route with its role so a new route cannot ship unguarded. The UI hides what a role cannot do, but never decides.
 - Audit events record the real person and how they signed in (local, OIDC, proxy) instead of the local user. API keys
-  record who created them.
+  record who created them. Events already record the client address of the connection; a forwarded address will
+  count only from configured proxy addresses.
 - UI: a sign-in page; Settings → Accounts for admins (people, role, sign-in source, last sign-in, disable, reset a
   local password with a one-time link shown once); the user menu shows the person and Sign out.
 - Tables: `users` (email, name, source, subject, role, disabled, password hash for local accounts, last sign-in) and
@@ -568,9 +569,21 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
 - Old links redirect: `?minibrain=<slug>` on Training, Evaluations and Playground becomes `?model=<slug>`;
   `/deployments?minibrain=<slug>` goes to `/deployments/<slug>`; `/m/<slug>/<tab>` goes to the matching page.
 - Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
-  General: You (appearance; profile once accounts exist) and This install (paths, base models, recipe, splits;
-  admin-only once accounts exist). Security: the policies, locked when set by config, and their recent changes.
-  Accounts (admin) once accounts exist.
+  General: You (appearance; profile once accounts exist), the model catalogue, recipe and splits. Security: the
+  policies, locked when set by config, with a link to their changes in the audit log. Accounts (admin) once accounts
+  exist. Install settings and the audit log become admin-only with accounts.
+- Settings → Audit log: every audited change in the kit's `DataGrid`, newest first: time, actor and client address,
+  action, target and a details summary. Search, action, actor and a date range (`?q=&action=&actor=&from=&to=`, local
+  days) stay in the URL; paging is server-side by event id (`?before=<id>`, `?after=<id>`), so history size does not
+  matter. A row opens the full event as fields with before and after values (`?event=<id>`). Export downloads CSV or
+  JSONL of the current filter from `/api/audit/export`. Retention is the `audit_retention_days` policy: keep forever
+  by default; the hourly purge deletes older events and records an `audit.prune` event.
+- Settings → This install, read only: minibrain version and build commit, Python, DuckDB, PyTorch, Transformers, OS
+  and architecture; home, database (location and size), artifact storage (folder, or bucket and endpoint; never
+  credentials) and the web build; catalogue version and when catalogue and model files were last checked; pools,
+  machines, workers and engines online; outbound access and which endpoints the network policy allows. "Download
+  diagnostics" is a plain link to `/api/system/diagnostics`: a zip of versions, settings, policies, job counts and
+  recent server warnings, with every known secret value scrubbed and secret-named fields redacted.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
 - Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with Datasets first, then sources by
   kind (Uploads, Folders, S3, Databases); the selected item's detail on the right. A source shows its table name,
@@ -643,7 +656,8 @@ v1, the evidence regulated buyers ask for first:
 - SBOM (CycloneDX) for every image and Python dependency set.
 - AI bill of materials per version: base model weights hash, license, training data snapshot hash, recipe, eval result.
 - Signed images and update bundles (cosign), verified offline with a key shipped in the install bundle.
-- Audit log: append-only and hash-chained so tampering shows, exported to the customer's SIEM over syslog.
+- Audit log: append-only and hash-chained so tampering shows, exported to the customer's SIEM over syslog. The
+  chain has to survive retention: a prune is itself an audited event that carries the hash it cuts at.
 - Encryption at rest for snapshots, staging files and adapters.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
@@ -787,6 +801,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Feedback endpoint, thumbs-down / correct in playground and review screens → review queue
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement
 - [ ] SBOM, AI bill of materials per version, signed images
+- [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
+- [x] This install page with a diagnostics zip that never carries secrets
 - [ ] Hash-chained audit log with SIEM export; encryption at rest
 - [ ] Model card and validation report per version
 - [ ] Reference hardware configs
