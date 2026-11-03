@@ -32,22 +32,20 @@ import {
     cn,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { type CatalogEntry, type ModelRow, api, unwrap, uploadFile } from "~/api/client";
-import { useBases, useCatalog, useDatasets, useModels } from "~/api/queries";
+import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
+import { useBases, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
-import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
-import { DatasetMapping } from "../data/DatasetDetail";
+import { TrainingData } from "../data/TrainingData";
 import { SourceField, type SourceState, useSourcePlan } from "./BaseSource";
 import { bestFit } from "./DiscoverFilters";
 import { splitTags, useModelsRefresh } from "./dialogs";
 
 type BaseSource = "installed" | "fetch";
-type DataSource = "upload" | "dataset" | "sample";
 
 const TASKS: { key: string; label: string; hint: string; ready: boolean; icon: LucideIcon }[] = [
     { key: "classify", label: "Classify", hint: "Text → one label", ready: true, icon: Tags },
@@ -274,129 +272,6 @@ function TaskSelect({ value, onChange }: { value: string; onChange: (task: strin
     );
 }
 
-function stem(filename: string): string {
-    return (
-        filename
-            .replace(/\.[^.]+$/, "")
-            .replace(/[_-]+/g, " ")
-            .trim() || "Uploaded data"
-    );
-}
-
-function TrainingData({
-    source,
-    onSource,
-    dataset,
-    onDataset,
-}: {
-    source: DataSource;
-    onSource: (source: DataSource) => void;
-    dataset: string;
-    onDataset: (slug: string) => void;
-}) {
-    const datasets = useDatasets();
-    const hasDatasets = (datasets.data ?? []).length > 0;
-    const [file, setFile] = useState<File | null>(null);
-    const upload = useMutation({
-        mutationFn: async (chosen: File) => {
-            const uploaded = await uploadFile(chosen);
-            return unwrap(
-                api.POST("/api/datasets", {
-                    body: { name: stem(chosen.name), source_id: uploaded.id },
-                }),
-            );
-        },
-        onSuccess: (created) => onDataset(created.slug),
-    });
-    return (
-        <div className="flex flex-col gap-4">
-            <Select
-                value={source}
-                onValueChange={(next) => {
-                    onSource((next ?? "upload") as DataSource);
-                    onDataset("");
-                }}
-            >
-                <SelectTrigger aria-label="Training data source" className="w-full max-w-sm">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="upload" description="CSV, TSV, JSON Lines or Parquet">
-                        Upload a file
-                    </SelectItem>
-                    <SelectItem
-                        value="dataset"
-                        disabled={!hasDatasets}
-                        description={hasDatasets ? "One from the Data page" : "No datasets yet"}
-                    >
-                        Use a dataset
-                    </SelectItem>
-                    <SelectItem
-                        value="sample"
-                        description="Travel support messages labelled with intents"
-                    >
-                        Sample data
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-            {source === "upload" && (
-                <div className="flex flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button asChild variant="outline">
-                            <label className="cursor-pointer">
-                                {file ? "Choose another file" : "Choose file"}
-                                <input
-                                    type="file"
-                                    accept={DATA_FILE_TYPES}
-                                    className="sr-only"
-                                    onChange={(event) => {
-                                        const chosen = event.target.files?.[0];
-                                        event.target.value = "";
-                                        if (chosen) {
-                                            setFile(chosen);
-                                            upload.mutate(chosen);
-                                        }
-                                    }}
-                                />
-                            </label>
-                        </Button>
-                        {file && (
-                            <span className="text-sm text-muted-foreground">
-                                {upload.isPending
-                                    ? `Reading ${file.name}…`
-                                    : `${file.name} · ${bytes(file.size)}`}
-                            </span>
-                        )}
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                        The file is added to Data, where other models can use it too.
-                    </span>
-                    <ErrorLine error={upload.error} />
-                </div>
-            )}
-            {source === "dataset" && (
-                <Select value={dataset} onValueChange={(value) => onDataset(String(value ?? ""))}>
-                    <SelectTrigger aria-label="Dataset" className="w-full max-w-sm">
-                        <SelectValue placeholder="Choose a dataset" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {(datasets.data ?? []).map((item) => (
-                            <SelectItem key={item.slug} value={item.slug}>
-                                {item.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            )}
-            {source !== "sample" && dataset && (
-                <div className="flex flex-col gap-4">
-                    <DatasetMapping slug={dataset} />
-                </div>
-            )}
-        </div>
-    );
-}
-
 export function AddModelPage() {
     const router = useRouter();
     const refresh = useModelsRefresh();
@@ -437,7 +312,6 @@ export function AddModelPage() {
     const [tags, setTags] = useState("");
     const presetDataset = params.dataset === undefined ? "" : String(params.dataset);
     const [withData, setWithData] = useState(presetDataset !== "");
-    const [dataSource, setDataSource] = useState<DataSource>(presetDataset ? "dataset" : "upload");
     const [dataset, setDataset] = useState(presetDataset);
     const catalog = useCatalog();
     const recommended = (bases.data ?? []).find((key) =>
@@ -460,11 +334,10 @@ export function AddModelPage() {
                         tags: splitTags(tags),
                         base_model: baseModel || null,
                         task: "classify",
-                        sample: withData && dataSource === "sample",
                     },
                 }),
             );
-            if (withData && dataSource !== "sample" && dataset) {
+            if (withData && dataset) {
                 await unwrap(
                     api.PUT("/api/minibrains/{slug}/dataset", {
                         params: { path: { slug: created.slug } },
@@ -480,7 +353,7 @@ export function AddModelPage() {
         },
     });
     const baseReady = source === "installed" ? Boolean(baseKey) : plan.ready;
-    const dataReady = !withData || dataSource === "sample" || dataset !== "";
+    const dataReady = !withData || dataset !== "";
     const ready = baseReady && dataReady && (name.trim() || suggestedName).length > 0;
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -592,8 +465,8 @@ export function AddModelPage() {
                                     <Label htmlFor="with-data">Add training data now</Label>
                                     <span className="text-sm text-muted-foreground">
                                         {withData
-                                            ? "Upload a file, use a dataset or start from the sample data."
-                                            : "You can add examples later on the Data page. Until it is trained, the model serves its base model."}
+                                            ? "Upload a file, use a dataset or start from sample data."
+                                            : "You can add it later on the Training page. Until it is trained, the model serves its base model."}
                                     </span>
                                 </div>
                                 <Switch
@@ -602,14 +475,7 @@ export function AddModelPage() {
                                     onCheckedChange={setWithData}
                                 />
                             </div>
-                            {withData && (
-                                <TrainingData
-                                    source={dataSource}
-                                    onSource={setDataSource}
-                                    dataset={dataset}
-                                    onDataset={setDataset}
-                                />
-                            )}
+                            {withData && <TrainingData dataset={dataset} onDataset={setDataset} />}
                         </div>
                     </PanelSection>
                 </PanelSections>
