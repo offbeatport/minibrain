@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from minibrain import policy
+from minibrain.auth.config import AuthConfig
 from minibrain.auth.identity import Person
 from minibrain.auth.passwords import check_strength, hash_password, verify_password
 from minibrain.auth.roles import Role, role_of
@@ -31,8 +32,10 @@ LOCK_LIFETIME = timedelta(minutes=15)
 TOUCH_EVERY = timedelta(seconds=60)
 AGENT_LENGTH = 300
 NAME_LENGTH = 200
+MAX_GROUPS = 200
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+")
 WRONG = "Wrong email or password"
+TURNED_OFF = "This account is turned off. Ask an admin to turn it back on."
 TAKEN = "This install already has an admin account; sign in instead"
 
 
@@ -208,7 +211,7 @@ def sign_in(session: Session, email: str, password: str) -> User:
                 user.failed_sign_ins = 0
         raise SignInError(WRONG)
     if user.disabled:
-        raise SignInError("This account is turned off. Ask an admin to turn it back on.")
+        raise SignInError(TURNED_OFF)
     user.failed_sign_ins = 0
     user.locked_until = None
     return user
@@ -242,12 +245,73 @@ def redeem_reset(session: Session, token: str, password: str) -> User:
     return user
 
 
+def role_for(session: Session, user: User, config: AuthConfig) -> tuple[Role | None, bool]:
+    mapped = config.mapped_role(list(user.groups or []))
+    if mapped is not None:
+        return mapped, True
+    own = role_of(user.role)
+    if own is not None or user.source == LOCAL:
+        return own, False
+    return role_of(str(policy.value(session, "default_role"))), False
+
+
 def person_of(user: User, role: Role | None = None, locked: bool = False) -> Person:
     return Person(
         id=user.id,
         name=user.name,
         email=user.email,
         source=user.source,
-        role=role if locked else role_of(user.role),
+        role=role,
         role_locked=locked,
     )
+
+
+def person_for(session: Session, user: User, config: AuthConfig) -> Person:
+    role, locked = role_for(session, user, config)
+    return person_of(user, role, locked)
+
+
+def groups_of(value: str | None) -> list[str]:
+    found: list[str] = []
+    for item in (value or "").split(","):
+        group = item.strip()[:NAME_LENGTH]
+        if group and group not in found:
+            found.append(group)
+    return found[:MAX_GROUPS]
+
+
+def find_external(session: Session, source: str, subject: str) -> User | None:
+    return session.scalar(select(User).where(User.source == source, User.subject == subject))
+
+
+def external_user(
+    session: Session, source: str, subject: str, email: str | None, name: str | None, groups: list[str]
+) -> tuple[User, bool]:
+    address = (email or "").strip().lower()[:NAME_LENGTH] or None
+    user = find_external(session, source, subject)
+    if user is not None:
+        if address and address != user.email:
+            user.email = address
+        if groups != list(user.groups or []):
+            user.groups = groups
+        return user, False
+    user = User(
+        email=address,
+        name=clean_name(name or "", subject),
+        source=source,
+        subject=subject,
+        role=None,
+        groups=groups,
+        disabled=False,
+        failed_sign_ins=0,
+    )
+    session.add(user)
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        found = find_external(session, source, subject)
+        if found is None:
+            raise
+        return found, False
+    return user, True

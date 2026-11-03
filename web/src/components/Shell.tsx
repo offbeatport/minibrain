@@ -103,6 +103,7 @@ function Account() {
     const signOut = useSignOut();
     const person = session.data?.person;
     const signedIn = person != null && person.source !== "single_user";
+    const signsOut = signedIn && person.source !== "proxy";
     const name = person?.name ?? "Local user";
     const sub = signedIn
         ? (person.email ?? (person.role ? ROLE_LABELS[person.role] : "No role"))
@@ -110,13 +111,17 @@ function Account() {
     const items: AccountMenuItem[] = [
         { icon: <Settings />, label: "Settings", href: "/settings" },
         { kind: "theme", icon: <SunMoon />, label: "Theme" },
-        {
-            icon: <LogOut />,
-            label: "Sign out",
-            separatorBefore: true,
-            disabled: !signedIn || signOut.isPending,
-            onSelect: () => signOut.mutate(),
-        },
+        ...(signsOut || !signedIn
+            ? [
+                  {
+                      icon: <LogOut />,
+                      label: "Sign out",
+                      separatorBefore: true,
+                      disabled: !signsOut || signOut.isPending,
+                      onSelect: () => signOut.mutate(),
+                  },
+              ]
+            : []),
     ];
     return (
         <AccountMenu

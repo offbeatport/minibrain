@@ -54,7 +54,7 @@ const GROUPS: Group[] = [
     {
         icon: LogIn,
         title: "Sign-in",
-        names: ["session_idle_minutes", "session_hours"],
+        names: ["default_role", "session_idle_minutes", "session_hours"],
         description: "Applies when accounts are on.",
     },
     {

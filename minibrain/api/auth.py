@@ -15,12 +15,15 @@ from minibrain.auth.accounts import (
     csrf_for,
     end_session,
     lifetimes,
+    person_for,
     person_of,
     redeem_reset,
     sign_in,
     start_session,
 )
-from minibrain.auth.gate import Identity, loopback_name
+from minibrain.auth.addresses import loopback_name
+from minibrain.auth.config import AuthConfig
+from minibrain.auth.gate import Identity
 from minibrain.auth.identity import Person
 from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent, LoginSession, User, peer_address
@@ -84,7 +87,8 @@ def person_info(person: Person | None) -> PersonInfo | None:
 
 
 def methods_of(request: Request) -> SignInMethods:
-    return SignInMethods()
+    config: AuthConfig = request.app.state.auth
+    return SignInMethods(proxy=config.proxy is not None)
 
 
 def session_info(request: Request, found: Identity, person: Person | None, csrf_subject: str | None) -> SessionInfo:
@@ -124,7 +128,7 @@ def signed_in_info(request: Request, response: Response, session: SessionDep, us
     audit_sign_in(session, user, row)
     session.commit()
     set_session_cookie(request, response, token, int(lifetimes(session).absolute.total_seconds()))
-    signed = Identity(person=person_of(user), accounts=True, users=True)
+    signed = Identity(person=person_for(session, user, request.app.state.auth), accounts=True, users=True)
     return session_info(request, signed, signed.person, f"session:{row.token_hash}")
 
 

@@ -44,7 +44,7 @@ def serve(host: str, port: int, with_worker: bool) -> None:
     if worker is not None:
         worker.start()
     try:
-        uvicorn.run("minibrain.app:create_app", factory=True, host=host, port=port)
+        uvicorn.run("minibrain.app:create_app", factory=True, host=host, port=port, proxy_headers=False)
     finally:
         if worker is not None:
             worker.shutdown()

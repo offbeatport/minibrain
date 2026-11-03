@@ -7443,11 +7443,43 @@
             },
             "type": "array",
             "title": "People"
+          },
+          "mapping": {
+            "items": {
+              "$ref": "#/components/schemas/RoleMapping"
+            },
+            "type": "array",
+            "title": "Mapping"
+          },
+          "default_role": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "builder",
+              "admin",
+              "none"
+            ],
+            "title": "Default Role"
+          },
+          "default_role_locked": {
+            "type": "boolean",
+            "title": "Default Role Locked"
+          },
+          "proxy_addresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Proxy Addresses"
           }
         },
         "type": "object",
         "required": [
-          "people"
+          "people",
+          "mapping",
+          "default_role",
+          "default_role_locked",
+          "proxy_addresses"
         ],
         "title": "AccountsInfo"
       },
@@ -16557,6 +16589,23 @@
           "admin"
         ],
         "title": "Role"
+      },
+      "RoleMapping": {
+        "properties": {
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group",
+          "role"
+        ],
+        "title": "RoleMapping"
       },
       "S3SourceCreate": {
         "properties": {

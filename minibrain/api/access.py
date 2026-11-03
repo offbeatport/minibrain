@@ -10,12 +10,16 @@ from starlette.requests import cookie_parser
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, csrf_matches
+from minibrain.auth.addresses import ip_of
+from minibrain.auth.config import ProxyConfig
 from minibrain.auth.gate import FORWARDED_HEADERS, Identity, RequestFacts, identify
 from minibrain.auth.identity import CURRENT, Person, current_role
 from minibrain.auth.roles import LABELS, Role, allows
 from minibrain.registry.models import SIGNED_IN
 
 API_PREFIX = "/api/"
+VIA_PROXY = "minibrain.via_proxy"
+FORWARDED_SCHEMES = {"http": ("http", "https"), "websocket": ("ws", "wss")}
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 PUBLIC_PATHS = frozenset(
     {
@@ -32,6 +36,34 @@ CSRF_MISSING = "This request has no valid CSRF token. Reload the page and try ag
 NO_ROLE = "You do not have access yet. Ask an admin to give you a role."
 
 
+def forwarded_client(value: str | None, proxy: ProxyConfig) -> str | None:
+    hops = [hop.strip() for hop in (value or "").split(",") if hop.strip()]
+    for hop in reversed(hops):
+        if not proxy.trusts(hop):
+            return hop if ip_of(hop) is not None else None
+    return hops[0] if hops else None
+
+
+class TrustedProxy:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        proxy = scope["app"].state.auth.proxy if scope["type"] in ("http", "websocket") else None
+        client = scope.get("client")
+        if proxy is not None and client and proxy.trusts(client[0]):
+            headers = Headers(scope=scope)
+            scope = dict(scope)
+            scope[VIA_PROXY] = True
+            forwarded = forwarded_client(headers.get("x-forwarded-for"), proxy)
+            if forwarded:
+                scope["client"] = (forwarded, 0)
+            scheme = headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+            if scheme in FORWARDED_SCHEMES[scope["type"]]:
+                scope["scheme"] = scheme
+        await self.app(scope, receive, send)
+
+
 def facts_of(scope: Scope) -> RequestFacts:
     headers = Headers(scope=scope)
     cookies = cookie_parser(headers.get("cookie", ""))
@@ -46,12 +78,14 @@ def facts_of(scope: Scope) -> RequestFacts:
         client=client[0] if client else None,
         user_agent=headers.get("user-agent"),
         forwarded=any(name in headers for name in FORWARDED_HEADERS),
+        via_proxy=bool(scope.get(VIA_PROXY)),
+        headers={name.decode("latin-1").lower(): value.decode("latin-1") for name, value in scope["headers"]},
     )
 
 
 def resolve(state: Any, facts: RequestFacts) -> Identity:
     with state.sessions() as session:
-        found = identify(session, state.settings.listen, state.accounts_on, facts)
+        found = identify(session, state.settings.listen, state.accounts_on, facts, state.auth)
         session.commit()
     if found.users:
         state.accounts_on = True
@@ -59,6 +93,8 @@ def resolve(state: Any, facts: RequestFacts) -> Identity:
 
 
 def refusal(found: Identity, facts: RequestFacts, key: bytes) -> tuple[int, str] | None:
+    if found.refused is not None:
+        return 403, found.refused
     if facts.path in PUBLIC_PATHS:
         return None
     if found.person is None:

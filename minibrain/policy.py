@@ -138,6 +138,15 @@ FIELDS: tuple[Field, ...] = (
         minimum=1,
     ),
     Field(
+        "default_role",
+        "Role for new people",
+        "The role of people who sign in through single sign-on or a proxy without a group mapped in "
+        "minibrain.yaml. With No role they see Ask an admin for access until an admin gives them one.",
+        "choice",
+        "none",
+        ("none", "viewer", "builder", "admin"),
+    ),
+    Field(
         "siem_protocol",
         "SIEM export",
         "Send every audit event, in order, to your SIEM as RFC 5424 syslog. TLS checks the SIEM's certificate; "
@@ -184,6 +193,10 @@ CHOICE_LABELS = {
     "tls": "TLS",
     "tcp": "TCP",
     "udp": "UDP",
+    "none": "No role",
+    "viewer": "Viewer",
+    "builder": "Builder",
+    "admin": "Admin",
 } | {key: value[0] for key, value in LICENCES.items()}
 
 BY_NAME = {field.name: field for field in FIELDS}
@@ -197,13 +210,21 @@ def config_path() -> Path:
     return Path(os.environ.get("MINIBRAIN_HOME", Path.home() / ".minibrain")).expanduser() / "minibrain.yaml"
 
 
-def from_file() -> dict[str, Any]:
+def config_file() -> dict[str, Any]:
     path = config_path()
     if not path.is_file():
         return {}
     loaded = yaml.safe_load(path.read_text()) or {}
-    section = loaded.get("policy") if isinstance(loaded, dict) else None
-    return section if isinstance(section, dict) else {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def config_section(name: str) -> dict[str, Any]:
+    found = config_file().get(name)
+    return found if isinstance(found, dict) else {}
+
+
+def from_file() -> dict[str, Any]:
+    return config_section("policy")
 
 
 def coerce(field: Field, value: Any) -> Any:
@@ -249,6 +270,9 @@ def locked_sources() -> dict[str, tuple[str, Any]]:
     for name, value in from_file().items():
         if name in BY_NAME:
             found[name] = ("config file", coerce(BY_NAME[name], value))
+    auth = config_section("auth")
+    if "default_role" in auth:
+        found["default_role"] = ("config file", coerce(BY_NAME["default_role"], auth["default_role"]))
     for name, variable in ENV.items():
         if os.environ.get(variable):
             found[name] = ("environment", coerce(BY_NAME[name], os.environ[variable]))

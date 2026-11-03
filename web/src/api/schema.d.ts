@@ -2436,6 +2436,17 @@ export interface components {
         AccountsInfo: {
             /** People */
             people: components["schemas"]["AccountInfo"][];
+            /** Mapping */
+            mapping: components["schemas"]["RoleMapping"][];
+            /**
+             * Default Role
+             * @enum {string}
+             */
+            default_role: "viewer" | "builder" | "admin" | "none";
+            /** Default Role Locked */
+            default_role_locked: boolean;
+            /** Proxy Addresses */
+            proxy_addresses: string[];
         };
         /** Activity */
         Activity: {
@@ -5270,6 +5281,12 @@ export interface components {
          * @enum {string}
          */
         Role: "viewer" | "builder" | "admin";
+        /** RoleMapping */
+        RoleMapping: {
+            /** Group */
+            group: string;
+            role: components["schemas"]["Role"];
+        };
         /** S3SourceCreate */
         S3SourceCreate: {
             /** Connection Id */

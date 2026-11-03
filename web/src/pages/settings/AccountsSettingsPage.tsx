@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Users } from "lucide-react";
+import { KeyRound, MoreHorizontal, Users } from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,6 +25,17 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    SettingsGroup,
+    SettingsRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { type FormEvent, useEffect, useState } from "react";
 import {
@@ -349,6 +360,32 @@ function PersonMenu({
     );
 }
 
+function RoleCell({ person }: { person: AccountInfo }) {
+    const label = person.role ? (
+        ROLE_LABELS[person.role]
+    ) : (
+        <span className="text-muted-foreground">None</span>
+    );
+    if (!person.role_locked) {
+        return label;
+    }
+    return (
+        <span className="flex items-center gap-2">
+            {label}
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button type="button" className="rounded-sm">
+                        <Badge variant="neutral">From groups</Badge>
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs whitespace-normal">
+                    {`Groups ${person.groups.join(", ")} map to this role in minibrain.yaml.`}
+                </TooltipContent>
+            </Tooltip>
+        </span>
+    );
+}
+
 function columns(): ColumnDef<AccountInfo, unknown>[] {
     return [
         {
@@ -368,12 +405,7 @@ function columns(): ColumnDef<AccountInfo, unknown>[] {
             header: "Role",
             id: "role",
             accessorFn: (row) => row.role ?? "",
-            cell: ({ row }) =>
-                row.original.role ? (
-                    ROLE_LABELS[row.original.role]
-                ) : (
-                    <span className="text-muted-foreground">None</span>
-                ),
+            cell: ({ row }) => <RoleCell person={row.original} />,
         },
         {
             header: "Signs in with",
@@ -467,6 +499,77 @@ function People() {
     );
 }
 
+function SignInSources() {
+    const session = useSession();
+    const list = useAccounts(true);
+    const methods = session.data?.methods;
+    const info = list.data;
+    const defaultRole =
+        info && info.default_role !== "none" ? ROLE_LABELS[info.default_role] : "No role";
+    return (
+        <PanelSection
+            icon={KeyRound}
+            title="Sign-in and roles"
+            description="Set in minibrain.yaml on the server, so they cannot be changed here."
+        >
+            <SettingsGroup>
+                <SettingsRow
+                    label="Passwords"
+                    description="People an admin adds here sign in with a password they choose."
+                    control={<Badge variant="success">On</Badge>}
+                />
+                <SettingsRow
+                    label="Reverse proxy"
+                    description={
+                        info?.proxy_addresses.length
+                            ? `Trusts user, email and groups headers from ${info.proxy_addresses.join(", ")} only.`
+                            : "Add auth.proxy.addresses to sign people in from your proxy's headers."
+                    }
+                    control={
+                        <Badge variant={methods?.proxy ? "success" : "neutral"}>
+                            {methods?.proxy ? "On" : "Off"}
+                        </Badge>
+                    }
+                />
+                <SettingsRow
+                    label="Role for people with no mapped group"
+                    description={
+                        info?.default_role_locked
+                            ? "Set by auth.default_role in minibrain.yaml."
+                            : "Change it under Security."
+                    }
+                    control={<span className="text-sm">{defaultRole}</span>}
+                />
+            </SettingsGroup>
+            {info && info.mapping.length > 0 ? (
+                <div className="mt-4 overflow-x-auto rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Group</TableHead>
+                                <TableHead>Role</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {info.mapping.map((item) => (
+                                <TableRow key={item.group}>
+                                    <TableCell className="font-mono">{item.group}</TableCell>
+                                    <TableCell>{ROLE_LABELS[item.role]}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            ) : (
+                <p className="mt-4 text-sm text-muted-foreground">
+                    No groups are mapped. auth.roles in minibrain.yaml maps identity provider groups
+                    to roles.
+                </p>
+            )}
+        </PanelSection>
+    );
+}
+
 function AccountsOff() {
     return (
         <PanelSection
@@ -486,7 +589,10 @@ export function AccountsSettingsPage() {
     const accounts = session.data?.accounts ?? false;
     return (
         <SettingsLayout title="Accounts">
-            <PanelSections>{accounts ? <People /> : <AccountsOff />}</PanelSections>
+            <PanelSections>
+                {accounts ? <People /> : <AccountsOff />}
+                {accounts && <SignInSources />}
+            </PanelSections>
         </SettingsLayout>
     );
 }
