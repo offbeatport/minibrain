@@ -15,14 +15,12 @@ import {
 import {
     Button,
     Card,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
-    DropdownMenuTrigger,
     Field,
     Input,
+    Label,
     Link,
+    RadioGroup,
+    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
@@ -188,59 +186,49 @@ function chosenOption(
     return null;
 }
 
-function slugOf(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-    return slug.slice(0, 48).replace(/-+$/, "") || "minibrain";
-}
-
 const LOW_SPACE = 5 * 1024 ** 3;
 
-function FormatChange({
+function hasFormatChoice(plan: SourcePlan): boolean {
+    return (
+        plan.target.kind === "catalogue" && !!plan.variant && plan.target.entry.variants.length > 1
+    );
+}
+
+function FormatChoice({
     plan,
     onVariant,
 }: {
     plan: SourcePlan;
     onVariant: (variant: string) => void;
 }) {
-    if (
-        plan.target.kind !== "catalogue" ||
-        !plan.variant ||
-        plan.target.entry.variants.length < 2
-    ) {
+    if (plan.target.kind !== "catalogue" || !plan.variant) {
         return null;
     }
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button type="button" variant="link" size="sm" className="h-auto w-fit px-0">
-                    Change format
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-                <DropdownMenuRadioGroup
-                    value={plan.variant.id}
-                    onValueChange={(value) => onVariant(String(value))}
-                >
-                    {plan.target.entry.variants.map((variant) => (
-                        <DropdownMenuRadioItem
-                            key={variant.id}
-                            value={variant.id}
-                            className="items-start"
+        <RadioGroup
+            aria-label="Format"
+            value={plan.variant.id}
+            onValueChange={(value) => onVariant(String(value))}
+            className="gap-3"
+        >
+            {plan.target.entry.variants.map((variant) => {
+                const id = `format-${variant.id}`;
+                return (
+                    <div key={variant.id} className="flex items-start gap-2">
+                        <RadioGroupItem value={variant.id} id={id} className="mt-0.5" />
+                        <Label
+                            htmlFor={id}
+                            className="flex flex-col items-start gap-0.5 leading-snug font-normal"
                         >
-                            <span className="flex flex-col gap-0.5">
-                                <span>{formatLabel(variant)}</span>
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
-                                </span>
+                            <span>{formatLabel(variant)}</span>
+                            <span className="text-sm text-muted-foreground tabular-nums">
+                                {`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
                             </span>
-                        </DropdownMenuRadioItem>
-                    ))}
-                </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                        </Label>
+                    </div>
+                );
+            })}
+        </RadioGroup>
     );
 }
 
@@ -273,15 +261,20 @@ function DiskPanel({
             ? `${bytes(free)} free, not enough`
             : `${bytes(free)} free, ${bytes(after)} after`;
     return (
-        <Card className="gap-3 px-5 text-sm">
+        <Card className="gap-3 px-panel text-sm">
             <dl className="flex flex-col gap-3">
                 <div className="flex flex-col gap-0.5">
                     <dt className="text-muted-foreground">Format</dt>
                     <dd>
-                        {variant ? formatLabel(variant) : option ? "As installed" : "Not chosen"}
-                    </dd>
-                    <dd>
-                        <FormatChange plan={plan} onVariant={onVariant} />
+                        {hasFormatChoice(plan) ? (
+                            <FormatChoice plan={plan} onVariant={onVariant} />
+                        ) : variant ? (
+                            formatLabel(variant)
+                        ) : option ? (
+                            "As installed"
+                        ) : (
+                            "Not chosen"
+                        )}
                     </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -490,7 +483,7 @@ export function AddModelPage() {
                 onKeyDown={shortcut}
                 className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]"
             >
-                <Card className="gap-6 p-6">
+                <Card className="gap-field p-panel">
                     <TaskSelect value={task} onChange={setTask} />
                     <div className="flex flex-col gap-3">
                         <Field id="base-model" label="Model">
@@ -528,11 +521,7 @@ export function AddModelPage() {
                             onPickAnother={() => setOpen(true)}
                         />
                     </div>
-                    <Field
-                        id="create-name"
-                        label="Name"
-                        hint={`Apps call it as ${slugOf(finalName)}.`}
-                    >
+                    <Field id="create-name" label="Name">
                         <Input
                             id="create-name"
                             value={name}

@@ -367,7 +367,7 @@ export function PreviewSection({
         >
             <ErrorLine error={error} />
             {quality && (
-                <div className="flex flex-wrap gap-x-8 gap-y-3 border-b px-5 py-4">
+                <div className="flex flex-wrap gap-x-8 gap-y-3 border-b px-panel py-4">
                     <Stat label="Rows" value={count(quality.rows)} />
                     <Stat label="Empty" value={count(quality.empty)} />
                     <Stat label="Duplicate inputs" value={count(quality.duplicates)} />
@@ -391,7 +391,7 @@ export function PreviewSection({
                 empty="The query returned no rows."
             />
             {data && data.example.length > 0 && (
-                <div className="flex max-w-2xl flex-col gap-2 border-t px-5 py-4">
+                <div className="flex max-w-2xl flex-col gap-2 border-t px-panel py-4">
                     <h3 className="text-sm font-semibold">One training example</h3>
                     {data.example.map((message) => (
                         <ChatBubble

@@ -112,7 +112,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
     };
     const s3 = draft.kind === "s3";
     return (
-        <form onSubmit={submit} className="flex flex-col gap-5">
+        <form onSubmit={submit} className="flex flex-col gap-field">
             <RadioGroup
                 value={draft.kind}
                 onValueChange={(next) => set({ kind: next === "s3" ? "s3" : "local" })}
@@ -238,7 +238,7 @@ export function StorageSettingsPage() {
                     description="Uploads, snapshots, adapters and logs. New ones go to the place chosen here; ones already stored stay readable where they are."
                 >
                     {settings.data && (
-                        <div className="flex flex-col gap-5">
+                        <div className="flex flex-col gap-field">
                             <p className="text-sm">
                                 <span className="text-muted-foreground">Now: </span>
                                 <span className="font-mono break-all">
