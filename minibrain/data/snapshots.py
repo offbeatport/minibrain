@@ -120,16 +120,17 @@ def latest_of(dataset: Dataset) -> Snapshot | None:
     return max(dataset.snapshots, key=taken, default=None)
 
 
-def current_prints(dataset: Dataset) -> dict[str, str]:
-    return {source.table_name: fingerprint(source) for source in dataset.sources}
+def current_prints(settings: Settings, dataset: Dataset) -> dict[str, str]:
+    return {source.table_name: fingerprint(settings, source) for source in dataset.sources}
 
 
-def changes_since(dataset: Dataset, snapshot: Snapshot | None) -> Changes | None:
+def changes_since(settings: Settings, dataset: Dataset, snapshot: Snapshot | None) -> Changes | None:
     if snapshot is None:
         return None
     if snapshot.dataset_id != dataset.id:
         return Changes(data=False, query=False, dataset=True)
-    return Changes(data=current_prints(dataset) != (snapshot.fingerprints or {}), query=dataset.sql != snapshot.sql)
+    changed = current_prints(settings, dataset) != (snapshot.fingerprints or {})
+    return Changes(data=changed, query=dataset.sql != snapshot.sql)
 
 
 def model_snapshot(minibrain: Minibrain) -> Snapshot | None:

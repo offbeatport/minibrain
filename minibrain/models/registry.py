@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.base_models import BASE_MODELS, QWEN_STOP_TOKENS, BaseModelSpec
+from minibrain.connections.imports import check_connection_policy, pick_connection
 from minibrain.jobs.queue import enqueue
 from minibrain.ml.context import FinalError
 from minibrain.models import hub
@@ -152,6 +153,7 @@ def import_params(session: Session, settings: Settings, model: Model) -> dict[st
         "variant_id": model.variant_id,
         "catalog": catalogue_manifests(session),
         "out": str(model_folder(settings, model)),
+        "connection_id": model.connection_id,
     }
 
 
@@ -174,9 +176,10 @@ def start_import(
     description: str,
     tags: list[str],
     variant_id: str | None = None,
+    connection_id: int | None = None,
 ) -> Model:
-    if source_type == S3:
-        load_policy(session).outbound(s3_endpoint())
+    connection = pick_connection(session, location, connection_id) if source_type == S3 else None
+    check_s3_policy(session, source_type, connection.id if connection else None)
     model_id = slugify(name)
     if session.get(Model, model_id) is not None:
         raise ConflictError(f"a model called {model_id} already exists")
@@ -190,6 +193,7 @@ def start_import(
         variant_id=variant_id,
         status=ModelStatus.IMPORTING,
         stop_tokens=[],
+        connection_id=connection.id if connection else None,
     )
     session.add(model)
     session.flush()
@@ -198,11 +202,20 @@ def start_import(
     return model
 
 
+def check_s3_policy(session: Session, source_type: str, connection_id: int | None) -> None:
+    if source_type != S3:
+        return
+    if connection_id is not None:
+        check_connection_policy(session, connection_id)
+    else:
+        load_policy(session).outbound(s3_endpoint())
+
+
 def check_transfer(session: Session, model: Model) -> None:
     policy = load_policy(session)
     if model.source == "import":
-        if (model.source_path or "").startswith(f"{S3}:"):
-            policy.outbound(s3_endpoint())
+        kind = (model.source_path or "").partition(":")[0]
+        check_s3_policy(session, kind, model.connection_id)
         return
     variant = model.variant
     if variant is None:
@@ -221,7 +234,7 @@ def check_job(session: Session, job: Job) -> None:
     if job.kind in (JobKind.DOWNLOAD, JobKind.IMPORT):
         check_transfer(session, model)
     elif job.kind == JobKind.REPAIR:
-        check_repair(session, model, str(job.params.get("source") or ""))
+        check_repair(session, model, str(job.params.get("source") or ""), job.params.get("connection_id"))
 
 
 def last_transfer(session: Session, model: Model) -> Job | None:
@@ -233,7 +246,8 @@ def retry_repair(session: Session, settings: Settings, model: Model, job: Job) -
     if job.params.get("source") == HUB:
         start_repair(session, settings, model)
     else:
-        start_reimport(session, settings, model, str(job.params.get("location") or ""))
+        location, connection_id = str(job.params.get("location") or ""), job.params.get("connection_id")
+        start_reimport(session, settings, model, location, connection_id)
     model.error = None
     model.updated_at = now()
     return model
@@ -318,7 +332,12 @@ def start_verify(session: Session, settings: Settings, model: Model) -> Job:
 
 
 def repair_params(
-    session: Session, settings: Settings, model: Model, source: str, location: str | None = None
+    session: Session,
+    settings: Settings,
+    model: Model,
+    source: str,
+    location: str | None = None,
+    connection_id: int | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {
         "model_id": model.id,
@@ -328,15 +347,14 @@ def repair_params(
         "source": source,
     }
     if source != HUB:
-        return params | {"location": location}
+        return params | {"location": location, "connection_id": connection_id}
     entry = session.get(CatalogModel, model.catalog_id) if model.catalog_id else None
     return params | {"repo": model.repo, "revision": model.revision, "gated": bool(entry and entry.gated)}
 
 
-def check_repair(session: Session, model: Model, source: str) -> None:
+def check_repair(session: Session, model: Model, source: str, connection_id: int | None = None) -> None:
     policy = load_policy(session)
-    if source == S3:
-        policy.outbound(s3_endpoint())
+    check_s3_policy(session, source, connection_id)
     if source != HUB:
         return
     entry = session.get(CatalogModel, model.catalog_id) if model.catalog_id else None
@@ -371,7 +389,9 @@ def start_repair(session: Session, settings: Settings, model: Model) -> Job:
     return enqueue(session, JobKind.REPAIR, params, idempotency_key=f"repair:{model.id}", model_id=model.id)
 
 
-def start_reimport(session: Session, settings: Settings, model: Model, location: str) -> Job:
+def start_reimport(
+    session: Session, settings: Settings, model: Model, location: str, connection_id: int | None = None
+) -> Job:
     ensure_idle(session, model)
     if not model.files:
         raise ConflictError(f"{model.name} has no saved file list to re-import against")
@@ -379,8 +399,10 @@ def start_reimport(session: Session, settings: Settings, model: Model, location:
         source = source_type_of(location)
     except FinalError as error:
         raise ConflictError(str(error)) from error
-    check_repair(session, model, source)
-    params = repair_params(session, settings, model, source, location.strip())
+    connection = pick_connection(session, location, connection_id) if source == S3 else None
+    chosen = connection.id if connection else None
+    check_repair(session, model, source, chosen)
+    params = repair_params(session, settings, model, source, location.strip(), chosen)
     return enqueue(session, JobKind.REPAIR, params, idempotency_key=f"repair:{model.id}", model_id=model.id)
 
 

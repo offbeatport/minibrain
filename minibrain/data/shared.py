@@ -6,7 +6,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.connections.store import get_connection, resolve
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
+from minibrain.data.remote import (
+    DATABASE,
+    ICEBERG,
+    REMOTE_KINDS,
+    S3_SOURCE,
+    RemoteState,
+    cached,
+    check_column,
+    check_query,
+    check_table,
+    database_state,
+    iceberg_state,
+    require_kind,
+    s3_state,
+)
 from minibrain.data.sources import (
     READERS,
     SOURCE_TABLE,
@@ -51,7 +67,31 @@ def folder_scan(source: Source) -> FolderScan:
     return scan(Path(source.path), source.format or detect_format(Path(source.path)))
 
 
+def remote_state(settings: Settings, source: Source) -> RemoteState:
+    session = object_session(source)
+    if session is None or source.connection is None:
+        raise SourceError(f"{source.name} has no connection")
+    connection = resolve(session, settings, source.connection)
+    key = (
+        source.id,
+        source.connection.id,
+        source.connection.updated_at,
+        source.path,
+        source.format,
+        source.query,
+        source.change_column,
+    )
+    if source.kind == S3_SOURCE:
+        return cached(key, lambda: s3_state(connection, source.path or "", source.format))
+    if source.kind == ICEBERG:
+        return cached(key, lambda: iceberg_state(connection, source.path or ""))
+    return cached(key, lambda: database_state(connection, source.path, source.query, source.change_column))
+
+
 def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
+    if source.kind in REMOTE_KINDS:
+        state = remote_state(settings, source)
+        return Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader)
     if source.kind == FOLDER:
         found = folder_scan(source)
         return Table(
@@ -60,10 +100,14 @@ def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
             reader=READERS[found.format],
             fingerprint=found.fingerprint,
         )
-    return Table(name=source.table_name, staging=staging_of(settings, store, source), fingerprint=fingerprint(source))
+    return Table(
+        name=source.table_name, staging=staging_of(settings, store, source), fingerprint=fingerprint(settings, source)
+    )
 
 
-def fingerprint(source: Source) -> str:
+def fingerprint(settings: Settings, source: Source) -> str:
+    if source.kind in REMOTE_KINDS:
+        return remote_state(settings, source).fingerprint
     return folder_scan(source).fingerprint if source.kind == FOLDER else str(source.artifact_id)
 
 
@@ -119,6 +163,53 @@ def add_folder(session: Session, path: str, name: str | None, format: str | None
     )
     session.add(source)
     session.flush()
+    return source
+
+
+def add_remote(
+    session: Session,
+    settings: Settings,
+    kind: str,
+    connection_id: int,
+    name: str | None,
+    path: str | None = None,
+    format: str | None = None,
+    query: str | None = None,
+    change_column: str | None = None,
+) -> Source:
+    connection = get_connection(session, connection_id)
+    require_kind(kind, resolve(session, settings, connection))
+    if format is not None and format not in READERS:
+        raise SourceError("pick CSV, TSV, JSON, JSON Lines or Parquet")
+    if kind == DATABASE:
+        table = check_table(path) if path and path.strip() else None
+        query = check_query(query) if query and query.strip() else None
+        if (table is None) == (query is None):
+            raise SourceError("give either a table or a query")
+        path, change_column = table, check_column(change_column)
+        label = table or "query"
+    else:
+        path = (path or "").strip()
+        label = path.rstrip("/").rsplit("/", 1)[-1] or path
+    title = (name or "").strip() or (connection.name if label == "query" else label)
+    source = Source(
+        name=title,
+        filename=label,
+        table_name=free_table_name(session, title),
+        kind=kind,
+        connection=connection,
+        path=path,
+        format=format,
+        query=query,
+        change_column=change_column,
+    )
+    session.add(source)
+    session.flush()
+    state = remote_state(settings, source)
+    source.size = state.size
+    if kind == S3_SOURCE and source.format is None:
+        source.format = state.format
+    describe(Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader))
     return source
 
 

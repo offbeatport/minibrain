@@ -5,12 +5,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.connections.imports import pick_connection
+from minibrain.connections.s3 import filesystem
+from minibrain.connections.spec import ConnectionProblem
+from minibrain.connections.store import resolve
 from minibrain.ml.context import FinalError
 from minibrain.models.importer import detected_revision, validate
 from minibrain.models.sources import FOLDER, S3, StorageSource, location_url, s3_base, s3_endpoint
 from minibrain.policy import PolicyError
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import CatalogModel, CatalogVariant
+from minibrain.settings import Settings
 
 
 def source_type_of(location: str) -> str:
@@ -39,19 +44,26 @@ def catalogue_match(session: Session, revision: str | None) -> tuple[CatalogVari
     return (variant, entry) if entry is not None else None
 
 
-def inspect_location(session: Session, location: str) -> dict[str, Any]:
+def inspect_location(
+    session: Session, settings: Settings, location: str, connection_id: int | None = None
+) -> dict[str, Any]:
     found: dict[str, Any] = {"ok": False, "problem": None, "source_type": None, "resolved": None}
     try:
         kind = source_type_of(location)
         found["source_type"] = kind
-        if kind == S3:
-            load_policy(session).outbound(s3_endpoint())
         url = location_url(kind, location)
         found["resolved"] = url
-        source = StorageSource(url)
+        connection = pick_connection(session, url, connection_id) if kind == S3 else None
+        if connection is not None:
+            found |= {"connection_id": connection.id, "connection": connection.name}
+            source = StorageSource(url, filesystem(resolve(session, settings, connection)))
+        else:
+            if kind == S3:
+                load_policy(session).outbound(s3_endpoint())
+            source = StorageSource(url)
         files = source.files()
         validate(source, files)
-    except (FinalError, PolicyError) as error:
+    except (FinalError, PolicyError, ConnectionProblem) as error:
         return found | {"problem": str(error)}
     except Exception as error:
         return found | {"problem": f"Cannot read {found['resolved'] or location}: {error}"}

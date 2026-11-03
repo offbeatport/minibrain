@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
@@ -43,9 +43,11 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
+from minibrain.connections.spec import ConnectionProblem
 from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
+from minibrain.data.remote import REMOTE_KINDS
 from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     FOLDER,
@@ -58,6 +60,7 @@ from minibrain.data.shared import (
     folder_scan,
     get_dataset,
     get_source,
+    remote_state,
     sources_in,
     table_of,
     tables_of,
@@ -79,7 +82,7 @@ from minibrain.data.sources import (
     summarize,
     to_text,
 )
-from minibrain.policy import locked_sources
+from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -112,6 +115,8 @@ def cached_describe(table: Table) -> tuple[tuple[ColumnInfo, ...], int]:
 
 
 def source_kind(source: Source) -> SourceKind:
+    if source.kind in REMOTE_KINDS:
+        return cast(SourceKind, source.kind)
     return "folder" if source.kind == FOLDER else "upload"
 
 
@@ -135,14 +140,39 @@ def folder_fields(source: Source) -> dict[str, Any]:
     }
 
 
+def remote_fields(settings: Settings, source: Source) -> dict[str, Any]:
+    if source.kind not in REMOTE_KINDS:
+        return {}
+    connection = source.connection
+    fields: dict[str, Any] = {
+        "path": source.path,
+        "format": source.format,
+        "query": source.query,
+        "change_column": source.change_column,
+        "connection_id": source.connection_id,
+        "connection": connection.name if connection is not None else None,
+    }
+    try:
+        state = remote_state(settings, source)
+    except (SourceError, ConnectionProblem, PolicyError) as error:
+        return fields | {"error": str(error)}
+    return fields | {
+        "files": state.files,
+        "size": state.size or source.size,
+        "modified_at": state.modified_at,
+        "fingerprint": state.fingerprint,
+        "fingerprint_detail": state.detail,
+    }
+
+
 def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> SourceSummary:
-    fields: dict[str, Any] = {"size": source.size} | folder_fields(source)
+    fields: dict[str, Any] = {"size": source.size} | folder_fields(source) | remote_fields(settings, source)
     columns: tuple[ColumnInfo, ...] = ()
     rows: int | None = None
     if not fields.get("error"):
         try:
             columns, rows = cached_describe(table_of(settings, store, source))
-        except SourceError as error:
+        except (SourceError, ConnectionProblem, PolicyError) as error:
             fields["error"] = str(error)
     return SourceSummary(
         id=source.id,
@@ -160,9 +190,9 @@ def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> 
     )
 
 
-def dataset_changes(dataset: Dataset, latest: Snapshot | None) -> ChangeInfo | None:
+def dataset_changes(settings: Settings, dataset: Dataset, latest: Snapshot | None) -> ChangeInfo | None:
     try:
-        return change_info(changes_since(dataset, latest))
+        return change_info(changes_since(settings, dataset, latest))
     except SourceError:
         return None
 
@@ -190,7 +220,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
     columns, rows, problem = dataset_shape(settings, store, dataset)
     columns_mode = bool(dataset.input_column and dataset.label_column) or not dataset.sql
     latest = latest_of(dataset)
-    changed = dataset_changes(dataset, latest)
+    changed = dataset_changes(settings, dataset, latest)
     session = object_session(dataset)
     return DatasetSummary(
         slug=dataset.slug,
@@ -266,7 +296,7 @@ def apply_mapping(
 
 
 def query_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> QueryResponse:
-    result = run_query(tables, sql, QUERY_ROWS, aliases)
+    result = run_query(tables, sql, QUERY_ROWS, aliases, as_text=True)
     return QueryResponse(columns=result.columns, rows=[[to_text(value) for value in row] for row in result.rows])
 
 

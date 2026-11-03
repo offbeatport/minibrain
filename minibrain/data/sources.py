@@ -3,12 +3,14 @@ import re
 import threading
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import duckdb
+
+from minibrain.data.extensions import ExtensionMissingError, load, offline_config
 
 READERS = {
     ".csv": "read_csv_auto",
@@ -21,6 +23,8 @@ READERS = {
 SOURCE_TABLE = "source"
 QUERY_TIMEOUT_SECONDS = 30
 TABLE_NAME_LENGTH = 48
+BLOCKED_FUNCTIONS = ("query", "query_table", "which_secret")
+BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "sqlite_", "duckdb_secrets")
 
 
 class SourceError(Exception):
@@ -49,6 +53,19 @@ class QueryResult:
     rows: list[list[Any]]
 
 
+class Remote(Protocol):
+    @property
+    def extensions(self) -> tuple[str, ...]: ...
+
+    @property
+    def paths(self) -> tuple[str, ...]: ...
+
+    @property
+    def directories(self) -> tuple[str, ...]: ...
+
+    def open(self, connection: duckdb.DuckDBPyConnection, alias: str) -> str: ...
+
+
 @dataclass(frozen=True)
 class Table:
     name: str
@@ -56,6 +73,7 @@ class Table:
     files: tuple[str, ...] = ()
     reader: str = ""
     fingerprint: str = ""
+    remote: Remote | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -120,7 +138,10 @@ def file_list(files: Sequence[str]) -> str:
     return "[" + ", ".join(quote_literal(file) for file in files) + "]"
 
 
-def table_relation(table: Table, attached: str) -> str:
+def table_relation(connection: duckdb.DuckDBPyConnection, table: Table, attached: str) -> str:
+    if table.remote is not None:
+        load(connection, table.remote.extensions)
+        return table.remote.open(connection, f"remote_{attached}")
     if table.staging is not None:
         return f"SELECT * FROM {attached}.{SOURCE_TABLE}"
     if not table.files:
@@ -131,25 +152,33 @@ def table_relation(table: Table, attached: str) -> str:
 def connect(
     tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
 ) -> duckdb.DuckDBPyConnection:
-    connection = duckdb.connect()
+    connection = duckdb.connect(config=offline_config())
     try:
         readable: list[str] = []
+        directories: list[str] = [str(output) + "/"] if output is not None else []
         for index, table in enumerate(tables):
             attached = f"staged_{index}"
             if table.staging is not None:
                 connection.execute(f"ATTACH {quote_literal(str(table.staging))} AS {attached} (READ_ONLY)")
             readable += table.files
-            connection.execute(f"CREATE VIEW {quote_identifier(table.name)} AS {table_relation(table, attached)}")
+            if table.remote is not None:
+                readable += table.remote.paths
+                directories += table.remote.directories
+            relation = table_relation(connection, table, attached)
+            connection.execute(f"CREATE VIEW {quote_identifier(table.name)} AS {relation}")
         if readable:
             connection.execute(f"SET allowed_paths = {file_list(readable)}")
-        if output is not None:
-            connection.execute(f"SET allowed_directories = [{quote_literal(str(output) + '/')}]")
+        if directories:
+            connection.execute(f"SET allowed_directories = {file_list(directories)}")
         names = {table.name for table in tables}
         for alias, target in (aliases or {}).items():
             if target in names and alias not in names:
                 connection.execute(f"CREATE VIEW {quote_identifier(alias)} AS SELECT * FROM {quote_identifier(target)}")
         connection.execute("SET enable_external_access = false")
         connection.execute("SET lock_configuration = true")
+    except ExtensionMissingError as error:
+        connection.close()
+        raise SourceError(str(error)) from error
     except duckdb.Error as error:
         connection.close()
         raise SourceError(str(error)) from error
@@ -174,8 +203,21 @@ def sandbox(
         connection.close()
 
 
+def check_reference(node: dict[str, Any]) -> None:
+    if node.get("type") == "BASE_TABLE":
+        catalog, schema = str(node.get("catalog_name") or ""), str(node.get("schema_name") or "")
+        if catalog or schema.lower() not in ("", "main"):
+            qualified = ".".join(part for part in (catalog, schema, str(node.get("table_name") or "")) if part)
+            raise SourceError(f"refer to sources by their table name alone, not {qualified}")
+    function = node.get("function") if node.get("type") == "TABLE_FUNCTION" else None
+    name = str(function.get("function_name") or "").lower() if isinstance(function, dict) else ""
+    if name in BLOCKED_FUNCTIONS or name.startswith(BLOCKED_PREFIXES):
+        raise SourceError(f"{name} cannot be used in dataset SQL; read sources by their table names")
+
+
 def base_tables(node: Any, found: set[str]) -> set[str]:
     if isinstance(node, dict):
+        check_reference(node)
         if node.get("type") == "BASE_TABLE" and isinstance(node.get("table_name"), str):
             found.add(node["table_name"].lower())
         for value in node.values():
@@ -256,9 +298,11 @@ def clip(value: Any, limit: int = 80) -> str | None:
 
 
 def run_query(
-    tables: Sequence[Table], sql: str, limit: int | None, aliases: dict[str, str] | None = None
+    tables: Sequence[Table], sql: str, limit: int | None, aliases: dict[str, str] | None = None, as_text: bool = False
 ) -> QueryResult:
     query = wrapped(sql, limit)
+    if as_text:
+        query = f"SELECT COLUMNS(*)::VARCHAR FROM ({query})"
     with sandbox(tables, aliases) as connection:
         cursor = connection.execute(query)
         columns = [description[0] for description in cursor.description or []]

@@ -7,6 +7,7 @@ from typing import Any, Protocol
 import fsspec
 import httpx
 
+from minibrain.connections.s3 import FILESYSTEMS, env_connection
 from minibrain.ml.context import FinalError
 from minibrain.models import hub
 from minibrain.models.files import CHUNK, file_chunks
@@ -73,9 +74,18 @@ def configured() -> list[dict[str, Any]]:
     ]
 
 
+def connection_filesystem(url: str) -> Any | None:
+    found = env_connection() if url.startswith("s3://") else None
+    return FILESYSTEMS["s3"](*found) if found is not None else None
+
+
 class StorageSource:
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, filesystem: Any | None = None) -> None:
         self.url = url
+        chosen = filesystem if filesystem is not None else connection_filesystem(url)
+        if chosen is not None:
+            self.fs, self.root = chosen, url.removeprefix("s3://").rstrip("/")
+            return
         try:
             self.fs, self.root = fsspec.core.url_to_fs(url)
         except ImportError as error:

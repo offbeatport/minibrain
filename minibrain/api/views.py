@@ -86,11 +86,11 @@ def change_info(changes: Changes | None) -> ChangeInfo | None:
     return None if changes is None else ChangeInfo(data=changes.data, query=changes.query, dataset=changes.dataset)
 
 
-def model_changes(minibrain: Minibrain) -> ChangeInfo | None:
+def model_changes(settings: Settings, minibrain: Minibrain) -> ChangeInfo | None:
     if minibrain.dataset is None:
         return None
     try:
-        return change_info(changes_since(minibrain.dataset, model_snapshot(minibrain)))
+        return change_info(changes_since(settings, minibrain.dataset, model_snapshot(minibrain)))
     except SourceError:
         return None
 
@@ -216,7 +216,7 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         dataset=minibrain.dataset.slug if minibrain.dataset else None,
         dataset_name=minibrain.dataset.name if minibrain.dataset else None,
         snapshot=snapshot_info(current) if current is not None else None,
-        changed=model_changes(minibrain),
+        changed=model_changes(settings, minibrain),
         models=model_names(minibrain),
     )
 

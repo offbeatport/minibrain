@@ -318,7 +318,8 @@ class Worker:
         try:
             spec_path = attempt_dir / "spec.json"
             spec_path.write_text(json.dumps(self.spec(claim, workdir, attempt_dir)))
-            exit_code, cancelled, tail = self.supervise(job_id, token, [self.modules[kind], str(spec_path)], log_path)
+            arguments = [self.modules[kind], str(spec_path)]
+            exit_code, cancelled, tail = self.supervise(job_id, token, arguments, log_path, claim.get("env") or {})
             log = self.upload_log(log_path)
             if cancelled:
                 self.client.fail(job_id, token, "cancelled", False, log)
@@ -334,13 +335,15 @@ class Worker:
         except Exception as error:
             self.client.fail(job_id, token, f"worker error: {type(error).__name__}: {error}", True, None)
 
-    def supervise(self, job_id: int, token: str, arguments: list[str], log_path: Path) -> tuple[int, bool, list[str]]:
+    def supervise(
+        self, job_id: int, token: str, arguments: list[str], log_path: Path, env: dict[str, str] | None = None
+    ) -> tuple[int, bool, list[str]]:
         process = subprocess.Popen(
             [sys.executable, "-m", *arguments],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=True,
-            env=os.environ | QUIET_ENV,
+            env=os.environ | QUIET_ENV | (env or {}),
         )
         if process.stdout is None:
             raise RuntimeError("child has no stdout")

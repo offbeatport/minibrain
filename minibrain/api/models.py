@@ -135,8 +135,8 @@ def model_sources() -> list[dict[str, Any]]:
 
 
 @router.post("/inspect")
-def inspect(body: InspectRequest, session: SessionDep) -> ImportCheck:
-    return ImportCheck(**inspect_location(session, body.location))
+def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep) -> ImportCheck:
+    return ImportCheck(**inspect_location(session, settings, body.location, body.connection_id))
 
 
 @router.post("/import", status_code=202)
@@ -147,7 +147,15 @@ def import_model(body: ImportRequest, request: Request, session: SessionDep, set
     except FinalError as error:
         raise ConflictError(str(error)) from error
     model = start_import(
-        session, settings, body.name, kind, body.location.strip(), body.description, tags, body.variant_id
+        session,
+        settings,
+        body.name,
+        kind,
+        body.location.strip(),
+        body.description,
+        tags,
+        body.variant_id,
+        body.connection_id,
     )
     session.commit()
     return row_of(session, settings, request, model)
@@ -228,7 +236,7 @@ def reimport_base(
     key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
     model = get_model(session, key)
-    job = start_reimport(session, settings, model, body.location)
+    job = start_reimport(session, settings, model, body.location, body.connection_id)
     audit(session, "model.reimport", model, job=job.id, source=body.location.strip())
     session.commit()
     return detail_of(session, settings, request, model)

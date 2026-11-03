@@ -32,7 +32,8 @@ class MappingInfo(BaseModel):
     sql: str | None
 
 
-SourceKind = Literal["upload", "folder", "s3", "database"]
+SourceKind = Literal["upload", "folder", "s3", "database", "iceberg"]
+FileFormat = Literal[".csv", ".tsv", ".json", ".jsonl", ".parquet"]
 
 
 class SampleInfo(BaseModel):
@@ -70,6 +71,33 @@ class SourceSummary(BaseModel):
     files: int | None = None
     modified_at: datetime | None = None
     error: str | None = None
+    connection_id: int | None = None
+    connection: str | None = None
+    query: str | None = None
+    change_column: str | None = None
+    fingerprint: str | None = None
+    fingerprint_detail: str | None = None
+
+
+class S3SourceCreate(BaseModel):
+    connection_id: int
+    path: str = Field(min_length=6, max_length=4096)
+    format: FileFormat | None = None
+    name: str | None = Field(default=None, max_length=120)
+
+
+class DatabaseSourceCreate(BaseModel):
+    connection_id: int
+    table: str | None = Field(default=None, max_length=512)
+    query: str | None = Field(default=None, max_length=100_000)
+    change_column: str | None = Field(default=None, max_length=128)
+    name: str | None = Field(default=None, max_length=120)
+
+
+class IcebergSourceCreate(BaseModel):
+    connection_id: int
+    path: str = Field(min_length=6, max_length=4096)
+    name: str | None = Field(default=None, max_length=120)
 
 
 class FolderCreate(BaseModel):
@@ -693,6 +721,7 @@ class ImportRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     source_type: Literal["folder", "s3"] | None = None
     location: str = Field(min_length=1)
+    connection_id: int | None = None
     variant_id: str | None = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
@@ -700,10 +729,12 @@ class ImportRequest(BaseModel):
 
 class LocationRequest(BaseModel):
     location: str = Field(min_length=1, max_length=4096)
+    connection_id: int | None = None
 
 
 class InspectRequest(BaseModel):
     location: str = Field(min_length=1)
+    connection_id: int | None = None
 
 
 class ImportCheck(BaseModel):
@@ -717,6 +748,8 @@ class ImportCheck(BaseModel):
     name: str | None = None
     variant_id: str | None = None
     match: str | None = None
+    connection_id: int | None = None
+    connection: str | None = None
 
 
 class DeployRequest(BaseModel):
@@ -834,3 +867,79 @@ class CatalogResponse(BaseModel):
 class DownloadRequest(BaseModel):
     variant: str
     accept_license: bool = False
+
+
+ConnectionKind = Literal["s3", "postgres", "mysql"]
+
+
+class ConnectionBody(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    kind: ConnectionKind
+    endpoint: str = Field(default="", max_length=2048)
+    region: str = Field(default="", max_length=64)
+    bucket: str = Field(default="", max_length=255)
+    access_key: str = Field(default="", max_length=256)
+    path_style: bool = True
+    host: str = Field(default="", max_length=255)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    database: str = Field(default="", max_length=255)
+    user: str = Field(default="", max_length=255)
+    ssl_mode: str = Field(default="", max_length=32)
+    secret: str | None = Field(default=None, max_length=4096)
+
+
+class ConnectionTestBody(ConnectionBody):
+    id: int | None = None
+
+
+class ConnectionSourceRef(BaseModel):
+    id: int
+    name: str
+
+
+class ConnectionInfo(BaseModel):
+    id: int
+    name: str
+    kind: ConnectionKind
+    endpoint: str
+    region: str
+    bucket: str
+    access_key: str
+    path_style: bool
+    host: str
+    port: int | None
+    database: str
+    user: str
+    ssl_mode: str
+    summary: str
+    secret_set: bool
+    secret_source: str | None
+    locked: bool
+    problem: str | None
+    sources: list[ConnectionSourceRef]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConnectionCheck(BaseModel):
+    ok: bool
+    message: str
+
+
+class ConnectionTables(BaseModel):
+    tables: list[str]
+
+
+class ExtensionInfo(BaseModel):
+    name: str
+    purpose: str
+    installed: bool
+
+
+class ExtensionsInfo(BaseModel):
+    version: str
+    platform: str
+    directory: str
+    repository: str | None
+    command: str
+    extensions: list[ExtensionInfo]

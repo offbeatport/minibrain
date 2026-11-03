@@ -7,16 +7,20 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from minibrain.api.deps import QueueDep, SessionDep, StoreDep
+from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
+from minibrain.connections.s3 import job_env
+from minibrain.connections.spec import ConnectionProblem
+from minibrain.connections.store import get_connection, resolve
 from minibrain.jobs.queue import EventIn, WorkerInfo
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
 from minibrain.registry.compute import record_node
 from minibrain.registry.files import register
-from minibrain.registry.models import Artifact, Job
-from minibrain.registry.service import ConflictError
+from minibrain.registry.models import Artifact, Job, JobKind
+from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.settings import Settings
 from minibrain.versions import JOB_PROTOCOL, library_version
 
 CLAIM_POLL_SECONDS = 0.5
@@ -58,6 +62,7 @@ class ClaimResponse(BaseModel):
     token: str
     params: dict[str, Any]
     lease_seconds: int
+    env: dict[str, str] = Field(default_factory=dict)
 
 
 class TokenBody(BaseModel):
@@ -115,6 +120,14 @@ def policy_refusal(session: SessionDep, job_id: int) -> str | None:
     return None
 
 
+def job_secrets(session: SessionDep, settings: Settings, job_id: int) -> dict[str, str]:
+    job = session.get(Job, job_id)
+    connection_id = job.params.get("connection_id") if job is not None else None
+    if job is None or job.kind not in (JobKind.IMPORT, JobKind.REPAIR) or connection_id is None:
+        return {}
+    return job_env(resolve(session, settings, get_connection(session, int(connection_id))))
+
+
 def report_worker(session: SessionDep, body: WorkerBody) -> None:
     record_node(session, body.pool, body.host, "worker", body.hardware)
     session.commit()
@@ -139,7 +152,7 @@ def register_worker(body: WorkerBody, queue: QueueDep, session: SessionDep) -> N
 
 
 @router.post("/claim", response_model=None)
-def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep) -> ClaimResponse | Response:
+def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: SettingsDep) -> ClaimResponse | Response:
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
     check_protocol(body.worker)
     worker = body.worker.info()
@@ -150,7 +163,12 @@ def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep) -> ClaimResp
         if claimed is not None:
             refusal = policy_refusal(session, claimed.job_id)
             if refusal is None:
-                return ClaimResponse(**claimed.__dict__)
+                try:
+                    env = job_secrets(session, settings, claimed.job_id)
+                except (ConnectionProblem, PolicyError, NotFoundError) as error:
+                    refusal = str(error)
+                else:
+                    return ClaimResponse(**claimed.__dict__, env=env)
             queue.fail(claimed.job_id, claimed.token, refusal, False, None)
             continue
         if time.monotonic() >= deadline:

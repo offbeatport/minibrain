@@ -103,14 +103,36 @@ class Source(Base):
     path: Mapped[str | None] = mapped_column(default=None)
     format: Mapped[str | None] = mapped_column(default=None)
     artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
+    connection_id: Mapped[int | None] = mapped_column(ForeignKey("connections.id"), default=None)
+    query: Mapped[str | None] = mapped_column(default=None)
+    change_column: Mapped[str | None] = mapped_column(default=None)
     size: Mapped[int] = mapped_column(BigInteger, default=0)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
+    connection: Mapped["Connection | None"] = relationship(back_populates="sources")
     datasets: Mapped[list["Dataset"]] = relationship(
         secondary=dataset_sources, back_populates="sources", order_by="Dataset.name"
     )
+
+
+class Connection(Base):
+    __tablename__ = "connections"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    kind: Mapped[str]
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    secret: Mapped[str | None] = mapped_column(default=None)
+    secret_ref: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
+    origin: Mapped[str] = mapped_column(default="ui", server_default="ui")
+    problem: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    sources: Mapped[list[Source]] = relationship(back_populates="connection", order_by="Source.name")
 
 
 class Dataset(Base):
@@ -426,6 +448,7 @@ class Model(Base):
     repo: Mapped[str | None] = mapped_column(default=None)
     revision: Mapped[str | None] = mapped_column(default=None)
     source_path: Mapped[str | None] = mapped_column(default=None)
+    connection_id: Mapped[int | None] = mapped_column(ForeignKey("connections.id", ondelete="SET NULL"), default=None)
     files: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     status: Mapped[str]

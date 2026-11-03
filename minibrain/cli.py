@@ -124,6 +124,45 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None,
     Worker(config).run_forever(stop)
 
 
+def check_outbound(url: str) -> None:
+    from minibrain.policy import load as load_policy
+    from minibrain.registry.db import make_sessions, migrate
+    from minibrain.settings import load_settings
+
+    settings = load_settings()
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        load_policy(session).outbound(url)
+
+
+def extensions(args: argparse.Namespace) -> None:
+    from minibrain.data import extensions as duck
+    from minibrain.policy import PolicyError
+
+    names = getattr(args, "names", None) or list(duck.PURPOSES)
+    try:
+        if args.action == "install":
+            source = args.source or duck.repository()
+            if not source:
+                raise SystemExit(f"give --from <folder or mirror URL>, or set {duck.REPOSITORY_ENV}")
+            if "://" in source:
+                check_outbound(source)
+            done = duck.install(source, names)
+            print(f"Installed {', '.join(done)} into {duck.directory()}")
+        elif args.action == "download":
+            check_outbound(args.source)
+            platforms = args.platform or [duck.platform()]
+            saved = duck.download(args.to, platforms, names, args.source, args.version)
+            print(f"Saved {len(saved)} files under {args.to}")
+            print(f"Install them on the server with: minibrain extensions install --from {args.to}")
+            return
+    except PolicyError as error:
+        raise SystemExit(str(error)) from error
+    print(f"DuckDB {duck.engine_version()} on {duck.platform()}, extensions in {duck.directory()}")
+    for state in duck.status():
+        print(f"  {state.name:<18} {'installed' if state.installed else 'missing':<10} {state.purpose}")
+
+
 def openapi(output: Path | None) -> None:
     from minibrain.app import create_app
 
@@ -163,6 +202,20 @@ def main() -> None:
     )
     engine_command.add_argument("--spec", default=None, help=argparse.SUPPRESS)
     engine_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)
+    extensions_command = commands.add_parser(
+        "extensions", help="list, install or download the DuckDB extensions S3, database and Iceberg sources use"
+    )
+    actions = extensions_command.add_subparsers(dest="action")
+    actions.add_parser("status", help="show which extensions are installed")
+    install_command = actions.add_parser("install", help="install from a local folder or an internal mirror")
+    install_command.add_argument("--from", dest="source", default=None, help="folder or mirror URL")
+    install_command.add_argument("names", nargs="*")
+    download_command = actions.add_parser("download", help="save extensions to a folder on a connected machine")
+    download_command.add_argument("--to", type=Path, required=True)
+    download_command.add_argument("--platform", action="append", default=None, help="for example linux_amd64")
+    download_command.add_argument("--from", dest="source", default="https://extensions.duckdb.org")
+    download_command.add_argument("--version", default=None, help="DuckDB version, such as v2.0.0")
+    download_command.add_argument("names", nargs="*")
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -174,6 +227,8 @@ def main() -> None:
         gateway(args.main_url, args.host, args.port)
     elif args.command == "engine":
         engine(args)
+    elif args.command == "extensions":
+        extensions(args)
     else:
         openapi(args.output)
 

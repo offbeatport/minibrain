@@ -13,6 +13,7 @@ from minibrain.api import (
     audit,
     catalog,
     compute,
+    connections,
     data,
     install,
     internal,
@@ -31,6 +32,9 @@ from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BaseModelSpec
+from minibrain.connections.spec import ConnectionProblem
+from minibrain.connections.store import sync_declared
+from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.snapshot import SnapshotError
 from minibrain.data.sources import SourceError
 from minibrain.gateway import routes as gateway
@@ -71,6 +75,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     EngineUnavailableError: 503,
     PolicyError: 403,
     LockedError: 409,
+    ConnectionProblem: 422,
 }
 
 log = logging.getLogger("minibrain")
@@ -147,12 +152,15 @@ def create_app(
     config_max_age: float = 1.0,
 ) -> FastAPI:
     settings = settings or load_settings()
+    configure_extensions(settings.home)
     capture()
     migrate(settings.database_url)
     sessions = make_sessions(settings.database_url)
     with sessions() as session:
         backfill(session, settings)
         seed(session)
+        sync_declared(session)
+        session.commit()
         report_problems(session, lambda model: model_folder(settings, model))
     app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
     app.state.settings = settings
@@ -182,6 +190,7 @@ def create_app(
     for module in (
         minibrains,
         data,
+        connections,
         models,
         model_cache,
         catalog,
