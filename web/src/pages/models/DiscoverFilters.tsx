@@ -144,7 +144,8 @@ export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): bo
 }
 
 export function activeFilters(filters: Filters): number {
-    return PANEL_FACETS.reduce((sum, facet) => sum + filters[facet].length, 0);
+    const toggles = (filters.fit.length > 0 ? 1 : 0) + (latestOnly(filters) ? 1 : 0);
+    return PANEL_FACETS.reduce((sum, facet) => sum + filters[facet].length, toggles);
 }
 
 const FILTERS_CLEARED: ModelsSearch = {
@@ -154,15 +155,12 @@ const FILTERS_CLEARED: ModelsSearch = {
     tier: "",
     licence: "",
     use: "",
-};
-
-export const CLEARED: ModelsSearch = {
-    ...FILTERS_CLEARED,
-    q: "",
     fits: "",
     fit: "",
     latest: "",
 };
+
+export const CLEARED: ModelsSearch = { ...FILTERS_CLEARED, q: "" };
 
 export function fitsPatch(on: boolean): ModelsSearch {
     return { fit: "", fits: on ? "true" : "" };
@@ -326,10 +324,12 @@ export function FilterPanel({
     entries,
     filters,
     update,
+    toggles,
 }: {
     entries: CatalogEntry[];
     filters: Filters;
     update: (patch: ModelsSearch) => void;
+    toggles: ReactNode;
 }) {
     const count = (facet: Facet, value: string) =>
         entries.filter(
@@ -380,6 +380,7 @@ export function FilterPanel({
                     </>
                 )}
             </div>
+            <div className="flex flex-col gap-3 px-3 py-3">{toggles}</div>
             <Group title="Task">
                 <OptionList items={items("tasks", distinct("tasks"))} />
             </Group>

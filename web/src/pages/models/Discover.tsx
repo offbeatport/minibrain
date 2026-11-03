@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, ExternalLink, Plus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Plus } from "lucide-react";
 import {
     Badge,
     Button,
@@ -14,9 +14,6 @@ import {
     DialogTitle,
     Label,
     Link,
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
     SearchInput,
     Select,
     SelectContent,
@@ -508,6 +505,13 @@ function fitHint(catalog: CatalogResponse): string {
     return `Shows models that fit, or fit with limited headroom, on ${phrase}: ${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}.`;
 }
 
+function memoryCaption(catalog: CatalogResponse): string {
+    if (!catalog.hardware.known) {
+        return "Memory unknown, so fit isn't checked.";
+    }
+    return `${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}`;
+}
+
 function FitsSwitch({
     catalog,
     checked,
@@ -519,56 +523,30 @@ function FitsSwitch({
     onChecked: (checked: boolean) => void;
     onPool: (pool: string) => void;
 }) {
+    const switchId = useId();
     const hintId = useId();
     const known = catalog.hardware.known;
-    const phrase = poolPhrase(catalog);
-    const hint = fitHint(catalog);
-    const label = (
-        <Label
-            className={cn(
-                "flex h-8 items-center gap-2 font-normal",
-                !known && "text-muted-foreground",
-            )}
-        >
-            <Switch
-                checked={known && checked}
-                disabled={!known}
-                onCheckedChange={onChecked}
-                aria-label={`Fits ${phrase}`}
-                aria-describedby={hintId}
-            />
-            Fits
-        </Label>
-    );
     return (
-        <div className="flex items-center">
-            {known ? (
-                label
-            ) : (
-                <Tooltip>
-                    <TooltipTrigger asChild>{label}</TooltipTrigger>
-                    <TooltipContent className="max-w-72">{hint}</TooltipContent>
-                </Tooltip>
-            )}
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        className="gap-1 px-1 font-normal"
-                        aria-label={`Hardware for fit: ${phrase}`}
-                    >
-                        {phrase}
-                        <ChevronDown className="text-muted-foreground" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="flex flex-col gap-3">
-                    <p className="text-sm font-semibold">Hardware fit</p>
-                    <PoolSelect catalog={catalog} onPool={onPool} />
-                    <p className="text-sm text-muted-foreground">{hint}</p>
-                </PopoverContent>
-            </Popover>
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+                <Label
+                    htmlFor={switchId}
+                    className={cn("font-normal", !known && "text-muted-foreground")}
+                >
+                    {`Fits ${poolPhrase(catalog)}`}
+                </Label>
+                <Switch
+                    id={switchId}
+                    checked={known && checked}
+                    disabled={!known}
+                    onCheckedChange={onChecked}
+                    aria-describedby={hintId}
+                />
+            </div>
+            <PoolSelect catalog={catalog} onPool={onPool} />
+            <p className="text-sm text-muted-foreground">{memoryCaption(catalog)}</p>
             <span id={hintId} className="sr-only">
-                {hint}
+                {fitHint(catalog)}
             </span>
         </div>
     );
@@ -581,15 +559,23 @@ function LatestSwitch({
     checked: boolean;
     onChecked: (checked: boolean) => void;
 }) {
+    const switchId = useId();
     const hintId = useId();
     return (
-        <Label className="flex h-8 items-center gap-2 font-normal">
-            <Switch checked={checked} onCheckedChange={onChecked} aria-describedby={hintId} />
-            Latest only
+        <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={switchId} className="font-normal">
+                Latest generation only
+            </Label>
+            <Switch
+                id={switchId}
+                checked={checked}
+                onCheckedChange={onChecked}
+                aria-describedby={hintId}
+            />
             <span id={hintId} className="sr-only">
                 Hides models that have a newer version in the catalogue.
             </span>
-        </Label>
+        </div>
     );
 }
 
@@ -677,8 +663,6 @@ function DiscoverSkeleton({
                             className="w-64"
                         />
                         <Skeleton className="h-8 w-28 min-[1400px]:hidden" />
-                        <Skeleton className="h-8 w-40" />
-                        <Skeleton className="h-8 w-28" />
                         <span className="w-32 text-sm text-muted-foreground">Loading…</span>
                         <Skeleton className="ml-auto h-8 w-44" />
                     </div>
@@ -753,11 +737,27 @@ export function Discover({
     const active = activeFilters(filters);
     const selecting = selected.length > 0;
     const select = (ids: string[]) => update({ selected: ids.join(",") });
-    const panel = <FilterPanel entries={data.entries} filters={filters} update={update} />;
+    const toggles = (
+        <>
+            <FitsSwitch
+                catalog={data}
+                checked={filters.fit.length > 0}
+                onChecked={(checked) => update(fitsPatch(checked))}
+                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
+            />
+            <LatestSwitch
+                checked={latestOnly(filters)}
+                onChecked={(checked) => update(latestPatch(checked))}
+            />
+        </>
+    );
+    const panel = (
+        <FilterPanel entries={data.entries} filters={filters} update={update} toggles={toggles} />
+    );
     const empty: ReactNode = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No supported models match these filters.</p>
-            {(active > 0 || filters.q || filters.fit.length > 0 || latestOnly(filters)) && (
+            {(active > 0 || filters.q) && (
                 <Button variant="outline" size="sm" onClick={() => update(CLEARED)}>
                     Clear filters
                 </Button>
@@ -806,16 +806,6 @@ export function Discover({
                             >
                                 {active > 0 ? `Filters (${active})` : "Filters"}
                             </Button>
-                            <FitsSwitch
-                                catalog={data}
-                                checked={filters.fit.length > 0}
-                                onChecked={(checked) => update(fitsPatch(checked))}
-                                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
-                            />
-                            <LatestSwitch
-                                checked={latestOnly(filters)}
-                                onChecked={(checked) => update(latestPatch(checked))}
-                            />
                             <span className="w-32 text-sm text-muted-foreground tabular-nums">
                                 {`${visible.length} of ${data.entries.length} models`}
                             </span>
