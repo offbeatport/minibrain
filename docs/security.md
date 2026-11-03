@@ -120,8 +120,8 @@ writes the same two into `sbom/`.
 ### Docker image
 
 CI does not build the image (the CUDA one is about 7 GB). Its Python packages are the `--no-dev --extra postgres`
-subset of `minibrain-python.cdx.json`; for the whole image, operating system packages included, run syft against the
-built image:
+subset of `minibrain-python.cdx.json`, except torch, which comes from the PyTorch index as the CUDA or CPU build. For
+the whole image, operating system packages included, run syft against the built image:
 
 ```sh
 SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \
@@ -129,9 +129,8 @@ SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \
   -o cyclonedx-json@1.6=minibrain-cuda.cdx.json
 ```
 
-- `docker:` reads the image from the local Docker daemon; nothing is pulled. On a machine without Docker, scan the
-  saved image instead: `docker save minibrain:cuda -o minibrain-cuda.tar`, then
-  `syft scan docker-archive:minibrain-cuda.tar`.
+- `docker:` reads the image from the local Docker daemon; nothing is pulled. To scan elsewhere, save it
+  (`docker save minibrain:cuda -o minibrain-cuda.tar`) and run `syft scan docker-archive:minibrain-cuda.tar`.
 - `SYFT_FILE_METADATA_DIGESTS=sha256` keeps file digests to SHA-256; syft adds SHA-1 by default.
 - Measured on the CPU image (syft 1.54.1): about 4,100 components (88 Debian packages, 97 Python packages, the Rust
   crates compiled into Python wheels, and the files those packages own with their SHA-256), 3 MB, under a minute.
