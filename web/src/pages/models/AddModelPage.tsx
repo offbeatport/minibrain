@@ -218,7 +218,7 @@ function FormatChange({
                     Change format
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="start" className="w-72">
                 <DropdownMenuRadioGroup
                     value={plan.variant.id}
                     onValueChange={(value) => onVariant(String(value))}
