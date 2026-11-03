@@ -93,17 +93,20 @@ def summarize(staging_path: Path, sample: int) -> tuple[list[ColumnSummary], int
         names = [description[0] for description in cursor.description or []]
         found = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
     sampled = int(found[0]["count"]) if found else 0
-    return [
-        ColumnSummary(
-            name=row["column_name"],
-            type=row["column_type"],
-            nulls=round(sampled * float(row["null_percentage"] or 0) / 100),
-            distinct=int(row["approx_unique"] or 0),
-            min=clip(row["min"]),
-            max=clip(row["max"]),
+    summaries = []
+    for row in found:
+        nulls = round(sampled * float(row["null_percentage"] or 0) / 100)
+        summaries.append(
+            ColumnSummary(
+                name=row["column_name"],
+                type=row["column_type"],
+                nulls=nulls,
+                distinct=min(int(row["approx_unique"] or 0), sampled - nulls),
+                min=clip(row["min"]),
+                max=clip(row["max"]),
+            )
         )
-        for row in found
-    ], sampled
+    return summaries, sampled
 
 
 def clip(value: Any, limit: int = 80) -> str | None:
