@@ -2,7 +2,8 @@
 
 A release is a `v*` tag. Pushing one runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): it
 checks the tag against `pyproject.toml`, runs CI, builds the Docker images from the wheel CI built, and publishes the
-images to GHCR and the files to GitHub Releases. Nothing is signed yet and nothing goes to PyPI yet (both below).
+images to GHCR and the files to GitHub Releases. Every file and image is signed keyless through Sigstore and carries
+SLSA build provenance ([Signing and provenance](#signing-and-provenance)). Nothing goes to PyPI yet (below).
 
 ## Cut a release
 
@@ -53,7 +54,11 @@ GitHub Release `v0.1.0`, with notes and these files:
 | `minibrain-0.1.0.tar.gz` | The sdist, with the built UI in `web/dist`, so a wheel built from it needs no Node |
 | `minibrain-python.cdx.json` | CycloneDX 1.5 SBOM of the Python dependencies, from `uv.lock` ([Security → SBOM](security.md#software-sbom)) |
 | `minibrain-web.cdx.json` | CycloneDX 1.6 SBOM of the web dependencies, from `web/pnpm-lock.yaml` |
-| `SHA256SUMS` | The SHA-256 of the four files above, for `sha256sum --check` |
+| `minibrain-image-{cpu,cuda}-{amd64,arm64}.cdx.json` | CycloneDX 1.6 SBOM of each of the four images, from syft against the built image, operating system packages included |
+| `install.sh` | The installer, as it is at the tag ([Install → Installer](install.md#installer)) |
+| `SHA256SUMS` | The SHA-256 of every file above, for `sha256sum --check` |
+| `<file>.sigstore.json` | One Sigstore bundle per file above, `SHA256SUMS` included: signature, certificate and transparency log proof, for `cosign verify-blob` online or offline |
+| `minibrain-provenance.sigstore.json` | SLSA build provenance for every file above, from `actions/attest` |
 
 Images in `ghcr.io/offbeatport/minibrain`, each a multi-arch index for linux/amd64 and linux/arm64:
 
@@ -63,7 +68,8 @@ Images in `ghcr.io/offbeatport/minibrain`, each a multi-arch index for linux/amd
 | `0.1.0-cuda` and `cuda` | NVIDIA CUDA 13.2 (`VARIANT=cuda`) |
 
 A pre-release gets only its version tags (`0.2.0rc1`, `0.2.0rc1-cuda`), and the GitHub Release is marked as a
-pre-release; `latest` and `cuda` stay on the last stable release.
+pre-release; `latest` and `cuda` stay on the last stable release. Each index and each per-architecture image is signed
+and carries SBOM attestations; each index carries SLSA provenance.
 
 The notes come from [`scripts/release_notes.py`](../scripts/release_notes.py): install lines for the version, then
 every commit since the previous `v*` tag (all commits for the first release) grouped by Conventional Commit type.
@@ -77,15 +83,18 @@ under Other changes; a compare link closes them. Preview them with
 |---|---|---|
 | Version | Reads `version` from `pyproject.toml`; on a tag push, fails unless the tag is `v<version>`. A version with `a`, `b`, `rc` or `.dev` is a pre-release | `contents: read` |
 | CI | All of [`ci.yml`](../.github/workflows/ci.yml), called with `workflow_call`: Python checks on 3.12 and 3.13, web checks, the wheel and sdist, the SBOMs | `contents: read` |
-| Image (4) | `cpu` and `cuda`, each on an amd64 (`ubuntu-24.04`) and an arm64 (`ubuntu-24.04-arm`) runner. Installs CI's wheel; on a tag push, pushes the image by digest | `contents: read`, `packages: write` |
+| Image (4) | `cpu` and `cuda`, each on an amd64 (`ubuntu-24.04`) and an arm64 (`ubuntu-24.04-arm`) runner. Installs CI's wheel; on a tag push, pushes the image by digest. Then loads the same build (all cached) into Docker and writes its SBOM with syft | `contents: read`, `packages: write` |
 | Image tags | Joins each variant's two digests into one multi-arch index and tags it. Tag push only | `packages: write` |
-| Release assets | Checks the wheel, sdist and SBOMs are there for this version, writes `SHA256SUMS` and the notes | `contents: read` |
-| GitHub Release | `gh release create` with the assets and the notes. Tag push only | `contents: write` |
+| Release assets | Checks the wheel, sdist, SBOMs and `install.sh` are there for this version, writes `SHA256SUMS` and the notes | `contents: read` |
+| Sign and attest | Signs every release file and image, attests the SBOMs and the provenance, and checks every signature ([below](#signing-and-provenance)). In a dry run, signs the files with a throwaway key only | `contents: read`, `packages: write`, `id-token: write`, `attestations: write` |
+| GitHub Release | `gh release create` with the assets, their bundles and the notes. Tag push only | `contents: write` |
 
-- The workflow's default token has no permissions; each job asks for what it needs. Only the two image jobs can write
-  packages and only the last job can write to the repository.
-- Every action is pinned to a full commit SHA of a release at least two weeks old, as in `ci.yml`. `actionlint`
-  checks both workflows.
+- The workflow's default token has no permissions; each job asks for what it needs. Only the image jobs and Sign and
+  attest can write packages, only Sign and attest can request an OIDC token or write attestations, and only the last
+  job can write to the repository.
+- Every action is pinned to a full commit SHA of a release at least two weeks old, as in `ci.yml`. cosign and syft are
+  downloaded by version and checked against a pinned SHA-256 (`COSIGN_*` and `SYFT_*` in `release.yml`). `actionlint`
+  checks both workflows; the CI job Shell scripts runs ShellCheck on `install.sh` and `scripts/*.sh`.
 - CI does not run on tag pushes (`push: branches: ["**"]`), since the release runs it. Its concurrency group carries
   the calling workflow's name, so a push to `main` never cancels a release's CI.
 
@@ -122,9 +131,15 @@ The whole run takes about 15 minutes, half of it CI. The images use no exported 
 ### Dry run
 
 `workflow_dispatch` runs everything except publishing: no registry login, the images are built with `push=false`,
-and the Image tags and GitHub Release jobs are skipped. The checksums and notes are uploaded as the run's
+and the Image tags and GitHub Release jobs are skipped. The checksums, image SBOMs and notes are uploaded as the run's
 `release-assets` and `release-notes` artifacts, and the notes show in the run summary. It builds the version in
 `pyproject.toml`, whatever it is, and checks no tag.
+
+Sign and attest runs too, without signing anything for real: it installs cosign, fetches Sigstore's trusted root, makes
+a throwaway key pair in the job and signs and checks every release file with it under a signing config with no
+services, so nothing reaches Sigstore's certificate authority or transparency log. The bundles land in the run's
+`release-assets-signatures` artifact. The image signatures, the SBOM attestations, the provenance and the offline
+check of a saved image need the pushed images and the tag's OIDC identity, so they run only on a tag.
 
 ## PyPI: not set up yet
 
@@ -170,28 +185,43 @@ is stored anywhere. Steps for the account owner:
              name: minibrain-sdist
              path: dist
          - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-           with:
-             attestations: false
    ```
 
-   `attestations: false` keeps PyPI uploads unsigned like everything else; the action's default (`true`) signs PEP 740
-   attestations through Sigstore. Decide it with the signing below.
+   The action's default `attestations: true` signs PEP 740 attestations through Sigstore with this workflow's OIDC
+   identity, the same keyless signing as the release files, so PyPI shows the provenance of each upload.
 4. Drop the "not on PyPI yet" notes from [`install.md`](install.md) and the README: `uvx minibrain` and
    `pip install minibrain` then work as written.
 
-## Signing: where it will go
+## Signing and provenance
 
-Nothing is signed yet: no cosign, no attestations (`provenance: false` and `sbom: false` on the image builds, so the
-indexes hold only the two images). Signing goes into one new job, `sign`, between the jobs that make things and the
-one that publishes them:
+Signing is keyless: no private key is stored anywhere. The Sign and attest job asks GitHub for an OIDC token
+(`id-token: write`), Sigstore's certificate authority (Fulcio) turns it into a certificate valid for ten minutes that
+names the workflow run, and every signature goes into Sigstore's public transparency log (Rekor). The certificate's
+identity is the workflow file at the tag, which is what a verifier checks:
 
-- `needs: [version, assets, image-tags]` and `if: needs.version.outputs.publish == 'true'`.
-- Its inputs are already there: the two index digests as `needs.image-tags.outputs.cpu-digest` and `cuda-digest`, and
-  `SHA256SUMS` in the `release-assets` artifact. Signing `SHA256SUMS` covers the wheel, the sdist and both SBOMs.
-- It uploads its signatures as an artifact named `release-assets-signatures`. The GitHub Release job already attaches
-  every `release-assets*` artifact, so it only adds `sign` to its `needs`.
-- Its permissions stay on that job: `packages: write` to push image signatures next to the images, plus `id-token:
-  write` for keyless Sigstore signing or `attestations: write` for GitHub artifact attestations.
-- The roadmap asks for verification offline with a key shipped in the install bundle. That points at a cosign key
-  pair, with the private key in an environment secret, rather than keyless signing, whose certificates and
-  transparency log are online services.
+| Field | Value |
+|---|---|
+| Identity (certificate SAN) | `https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v<version>` |
+| OIDC issuer | `https://token.actions.githubusercontent.com` |
+
+| Subject | Made with | Stored |
+|---|---|---|
+| Every release file, `SHA256SUMS` and `install.sh` included | `cosign sign-blob --bundle` | `<file>.sigstore.json` on the release |
+| Both image indexes and the four per-architecture images | `cosign sign --recursive` on each index | Next to the image in GHCR, as an OCI referrer |
+| SBOMs on the images: the Python and web SBOMs on both indexes, each image SBOM on its own image | `cosign attest --type cyclonedx` | GHCR |
+| SLSA build provenance of the release files | `actions/attest` | GitHub's attestations API and `minibrain-provenance.sigstore.json` on the release |
+| SLSA build provenance of both image indexes | `actions/attest` with `push-to-registry` | GitHub's attestations API and GHCR |
+
+- `scripts/sign_release.sh` does the cosign part and then checks each signature as a customer would: the identity
+  above, the issuer and Sigstore's trusted root, with no network lookup for the transparency log (the bundles carry
+  its inclusion proof). Last, it saves the CPU image with its signatures (`cosign save`) and checks the saved copy
+  (`cosign verify --local-image`), as an air-gapped host does.
+- `actions/attest` is the action `actions/attest-build-provenance` wraps since its v4. `create-storage-record: false`:
+  storage records need an organization-owned repository.
+- `trusted_root.json` is not attached to the release. A copy downloaded from the same place as the files proves
+  nothing; a verifier gets it from Sigstore's TUF repository with cosign, whose TUF root is built in. The commands,
+  online and offline: [Install → Verify a release](install.md#verify-a-release).
+- A tag whose Sign and attest job fails has pushed and tagged its images but has no GitHub Release. Fix the cause,
+  delete the tag and push it again: the image tags move to the new digests.
+- Update bundles (the roadmap's signed offline bundles for the app and base models) will reuse the blob signing:
+  one more file per bundle with its `.sigstore.json`.

@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SERVER = "https://github.com"
+OIDC_ISSUER = "https://token.actions.githubusercontent.com"
 HEADER = re.compile(r"^(?P<kind>[a-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?: (?P<summary>.+)$")
 BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
 BREAKING = "Breaking changes"
@@ -75,15 +76,31 @@ def changes(ref: str, since: str | None, cwd: Path = ROOT) -> list[Change]:
 
 
 def install_lines(version: str, repo: str, image: str) -> list[str]:
-    wheel = f"{SERVER}/{repo}/releases/download/v{version}/minibrain-{version}-py3-none-any.whl"
+    files = f"{SERVER}/{repo}/releases/download/v{version}"
+    guide = f"{SERVER}/{repo}/blob/v{version}/docs/install.md"
+    wheel = f"{files}/minibrain-{version}-py3-none-any.whl"
+    identity = f"--certificate-identity {SERVER}/{repo}/.github/workflows/release.yml@refs/tags/v{version}"
+    issuer = f"--certificate-oidc-issuer {OIDC_ISSUER}"
     return [
         "## Install",
         "",
+        f"- Installer: `curl -LsSf {files}/install.sh | MINIBRAIN_VERSION={version} sh`",
         f"- Wheel: `uv tool install --python 3.12 {wheel}`",
         f"- Docker, CPU: `docker run -p 127.0.0.1:8000:8000 -v minibrain-data:/data {image}:{version}`",
         f"- Docker, NVIDIA CUDA 13.2: `{image}:{version}-cuda`",
-        "- Check downloads with `sha256sum --check --ignore-missing SHA256SUMS`",
-        f"- Guide: [docs/install.md]({SERVER}/{repo}/blob/v{version}/docs/install.md)",
+        "",
+        "## Verify",
+        "",
+        "Every file has a Sigstore bundle (`<file>.sigstore.json`) and every image a signature, signed keyless by this",
+        "release's workflow run. With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):",
+        "",
+        f"- Files: `cosign verify-blob --bundle SHA256SUMS.sigstore.json {identity} {issuer} SHA256SUMS`, then",
+        "  `sha256sum --check --ignore-missing SHA256SUMS`",
+        f"- Images: `cosign verify {identity} {issuer} {image}:{version}`",
+        f"- Provenance: `gh attestation verify <file or oci://{image}:{version}> --repo {repo}`",
+        f"- Offline and air-gapped: [docs/install.md]({guide}#verify-a-release)",
+        "",
+        f"Guide: [docs/install.md]({guide})",
     ]
 
 

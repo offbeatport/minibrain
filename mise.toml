@@ -48,6 +48,7 @@ run = [
     "uv run ruff format --check .",
     "uv run python scripts/check_crypto.py",
     "uv run pyright",
+    "shellcheck install.sh scripts/*.sh",
     "pnpm --dir web lint",
     "pnpm --dir web typecheck",
 ]

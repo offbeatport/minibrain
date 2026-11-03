@@ -13,6 +13,9 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/offbeatport/minibrain
+  COSIGN_VERSION: "3.1.4"
+  COSIGN_SHA256: "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa"
+  SYFT_VERSION: "1.54.1"
 
 jobs:
   version:
@@ -82,8 +85,10 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-24.04
+            syft-sha256: c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47
           - arch: arm64
             runner: ubuntu-24.04-arm
+            syft-sha256: dfdf0537610113edbefe1f1fc6548bc957b2d77439636ec824fcf0e10d46d054
     env:
       DOCKER_BUILD_RECORD_UPLOAD: "false"
     steps:
@@ -126,6 +131,49 @@ jobs:
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        name: Load the same image for its SBOM
+        with:
+          context: .
+          build-contexts: wheel=${{ runner.temp }}/wheel
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            VARIANT=${{ matrix.variant }}
+            COMMIT=${{ github.sha }}
+          labels: org.opencontainers.image.version=${{ needs.version.outputs.version }}
+          provenance: false
+          sbom: false
+          load: true
+          tags: minibrain-sbom:${{ matrix.variant }}-${{ matrix.arch }}
+      - name: Install syft
+        env:
+          SYFT_SHA256: ${{ matrix.syft-sha256 }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/syft.tar.gz" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${ARCH}.tar.gz"
+          echo "${SYFT_SHA256}  ${RUNNER_TEMP}/syft.tar.gz" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/syft.tar.gz" -C "${RUNNER_TEMP}" syft
+      - name: Image SBOM
+        env:
+          VARIANT: ${{ matrix.variant }}
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.version.outputs.version }}
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+          SYFT_FILE_METADATA_DIGESTS: sha256
+        run: |
+          mkdir -p "${RUNNER_TEMP}/image-sbom"
+          sbom="${RUNNER_TEMP}/image-sbom/minibrain-image-${VARIANT}-${ARCH}.cdx.json"
+          "${RUNNER_TEMP}/syft" scan "docker:minibrain-sbom:${VARIANT}-${ARCH}" --quiet \
+            --source-name minibrain --source-version "${VERSION}" -o "cyclonedx-json@1.6=${sbom}"
+          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6" and (.components | length) > 100' "${sbom}" > /dev/null
+          echo "minibrain-image-${VARIANT}-${ARCH}.cdx.json: $(jq '.components | length' "${sbom}") components, $(du -h "${sbom}" | cut -f1)" >> "${GITHUB_STEP_SUMMARY}"
+          docker image rm "minibrain-sbom:${VARIANT}-${ARCH}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: minibrain-image-sbom-${{ matrix.variant }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image-sbom/*.cdx.json
+          if-no-files-found: error
       - name: Disk use
         if: always()
         run: df -h /
@@ -184,7 +232,7 @@ jobs:
 
   assets:
     name: Release assets
-    needs: [version, ci]
+    needs: [version, ci, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -204,7 +252,9 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          for file in "minibrain-${VERSION}-py3-none-any.whl" "minibrain-${VERSION}.tar.gz" minibrain-python.cdx.json minibrain-web.cdx.json; do
+          cp "${GITHUB_WORKSPACE}/install.sh" install.sh
+          for file in "minibrain-${VERSION}-py3-none-any.whl" "minibrain-${VERSION}.tar.gz" minibrain-python.cdx.json \
+            minibrain-web.cdx.json minibrain-image-{cpu,cuda}-{amd64,arm64}.cdx.json install.sh; do
             if [ ! -f "${file}" ]; then
               echo "::error::${file} is missing from the CI artifacts"
               exit 1
@@ -232,9 +282,112 @@ jobs:
           path: ${{ runner.temp }}/notes/notes.md
           if-no-files-found: error
 
+  sign:
+    name: Sign and attest
+    needs: [version, images, image-tags, assets]
+    if: >-
+      !cancelled() && needs.images.result == 'success' && needs.assets.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.image-tags.result)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+      - name: Install cosign
+        run: |
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL -o "${RUNNER_TEMP}/bin/cosign" \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64"
+          echo "${COSIGN_SHA256}  ${RUNNER_TEMP}/bin/cosign" | sha256sum --check --strict
+          chmod +x "${RUNNER_TEMP}/bin/cosign"
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+          "${RUNNER_TEMP}/bin/cosign" version
+          "${RUNNER_TEMP}/bin/cosign" initialize
+      - name: Throwaway key for the dry run
+        if: needs.version.outputs.publish != 'true'
+        env:
+          COSIGN_PASSWORD: ""
+        run: |
+          cosign generate-key-pair --output-key-prefix "${RUNNER_TEMP}/throwaway"
+          echo '{"mediaType": "application/vnd.dev.sigstore.signingconfig.v0.2+json"}' > "${RUNNER_TEMP}/no-services.json"
+          {
+            echo "COSIGN_PASSWORD="
+            echo "SIGN_KEY=${RUNNER_TEMP}/throwaway.key"
+            echo "SIGN_PUBLIC_KEY=${RUNNER_TEMP}/throwaway.pub"
+            echo "SIGN_CONFIG=${RUNNER_TEMP}/no-services.json"
+          } >> "${GITHUB_ENV}"
+          {
+            echo "Dry run: the release files are signed with a throwaway key, no transparency log, nothing published."
+            echo "This run's keyless identity would be $(scripts/sign_release.sh identity); a tag's ends in @refs/tags/v<version>."
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: needs.version.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign the release files
+        run: scripts/sign_release.sh files "${RUNNER_TEMP}/assets" "${RUNNER_TEMP}/signatures"
+      - name: Sign the images and attest their SBOMs
+        if: needs.version.outputs.publish == 'true'
+        env:
+          CPU_DIGEST: ${{ needs.image-tags.outputs.cpu-digest }}
+          CUDA_DIGEST: ${{ needs.image-tags.outputs.cuda-digest }}
+        run: |
+          scripts/sign_release.sh images "${IMAGE}" "${RUNNER_TEMP}/digests" "${RUNNER_TEMP}/assets" \
+            "cpu=${CPU_DIGEST}" "cuda=${CUDA_DIGEST}"
+      - name: Verify a saved copy of the CPU image offline
+        if: needs.version.outputs.publish == 'true'
+        env:
+          CPU_DIGEST: ${{ needs.image-tags.outputs.cpu-digest }}
+        run: scripts/sign_release.sh saved "${IMAGE}@${CPU_DIGEST}" "${RUNNER_TEMP}"
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance
+        if: needs.version.outputs.publish == 'true'
+        with:
+          subject-path: ${{ runner.temp }}/assets/*
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: needs.version.outputs.publish == 'true'
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ needs.image-tags.outputs.cpu-digest }}
+          push-to-registry: true
+          create-storage-record: false
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: needs.version.outputs.publish == 'true'
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ needs.image-tags.outputs.cuda-digest }}
+          push-to-registry: true
+          create-storage-record: false
+      - name: Keep the provenance bundle
+        if: needs.version.outputs.publish == 'true'
+        env:
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: cp "${BUNDLE}" "${RUNNER_TEMP}/signatures/minibrain-provenance.sigstore.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-signatures
+          path: ${{ runner.temp }}/signatures/*
+          if-no-files-found: error
+
   release:
     name: GitHub Release
-    needs: [version, assets, image-tags]
+    needs: [version, assets, image-tags, sign]
     if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10

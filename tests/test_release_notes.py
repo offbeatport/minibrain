@@ -65,6 +65,11 @@ def test_notes_list_breaking_changes_first_and_link_the_comparison() -> None:
     assert "- release workflow (c3)" in notes
     assert "releases/download/v0.2.0/minibrain-0.2.0-py3-none-any.whl" in notes
     assert "`ghcr.io/o/minibrain:0.2.0-cuda`" in notes
+    assert "releases/download/v0.2.0/install.sh | MINIBRAIN_VERSION=0.2.0 sh" in notes
+    identity = (
+        "--certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.2.0"
+    )
+    assert f"cosign verify {identity} --certificate-oidc-issuer https://token.actions.githubusercontent.com" in notes
     assert notes.rstrip().endswith("https://github.com/offbeatport/minibrain/compare/v0.1.0...v0.2.0")
 
 
