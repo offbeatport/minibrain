@@ -30,6 +30,7 @@ import {
     SelectValue,
     Textarea,
     cn,
+    useToast,
 } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
@@ -304,22 +305,11 @@ function DiskPanel({
     );
 }
 
-function modelHref(slug: string, copy: CopySource | null): string {
-    const path = `/models/custom/${encodeURIComponent(slug)}`;
-    if (!copy?.recipe) {
-        return path;
-    }
-    const query = new URLSearchParams({
-        rows: String(copy.recipe.rows),
-        epochs: String(copy.recipe.epochs),
-    });
-    return `${path}?${query.toString()}`;
-}
-
 export function AddModelPage() {
     const router = useRouter();
     const client = useQueryClient();
     const refresh = useModelsRefresh();
+    const toast = useToast();
     const cacheCheck = useCacheCheck();
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useModels();
@@ -451,7 +441,14 @@ export function AddModelPage() {
         },
         onSuccess: async (created) => {
             await refresh();
-            router.history.push(modelHref(created.slug, copy));
+            toast({
+                title: "Model added",
+                description: need
+                    ? `${created.name}: the base model is downloading. Its progress shows in Models.`
+                    : `${created.name} is ready to train.`,
+                tone: "success",
+            });
+            router.history.push(modelsHref());
         },
     });
     const baseReady =

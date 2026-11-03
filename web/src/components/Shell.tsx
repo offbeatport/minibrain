@@ -1,6 +1,6 @@
 import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, LogOut, Settings, SunMoon } from "lucide-react";
-import { type UILinkProps, UIProvider } from "obp-ui";
+import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
     AccountMenu,
@@ -132,9 +132,11 @@ export function Shell() {
             pathname={pathname}
             paths={{ home: () => "/", settings: () => "/settings" }}
         >
-            <AppShell rail={rail}>
-                <Outlet />
-            </AppShell>
+            <ToastProvider>
+                <AppShell rail={rail}>
+                    <Outlet />
+                </AppShell>
+            </ToastProvider>
         </UIProvider>
     );
 }

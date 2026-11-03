@@ -769,7 +769,8 @@ function StatusCell({ entry }: { entry: Entry }) {
     }
     if (state === "progress") {
         const checking = ["verify", "repair"].includes(model.activity.kind ?? "");
-        return model.kind === "base" && !checking ? (
+        const transferring = ["downloading", "importing"].includes(model.availability.state);
+        return (model.kind === "base" && !checking) || transferring ? (
             <Availability row={model} />
         ) : (
             <Activity row={model} />

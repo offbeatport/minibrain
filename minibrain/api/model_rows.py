@@ -314,9 +314,12 @@ def custom_row(
     base_weights: int | None = None,
     usage: Usage | None = None,
     version_usage: dict[tuple[int, int], Usage] | None = None,
-    base: tuple[str, Health | None, str | None] | None = None,
+    base: tuple[str, Health | None, str | None, Availability | None] | None = None,
 ) -> ModelRow:
-    base_name, broken, base_hash = base or (minibrain.base_model, None, None)
+    base_name, broken, base_hash, base_state = base or (minibrain.base_model, None, None, None)
+    availability = custom_availability(minibrain, store)
+    if base_state is not None and base_state.state in ("downloading", "importing"):
+        availability = base_state
     latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
     current = minibrain.current_version
@@ -334,7 +337,7 @@ def custom_row(
         description=minibrain.description,
         tags=list(minibrain.tags or []),
         base_model=minibrain.base_model,
-        availability=custom_availability(minibrain, store),
+        availability=availability,
         activity=custom_activity(minibrain, jobs),
         deployment=deployment(
             f"v{current}" if current is not None else "Base model",
@@ -471,7 +474,12 @@ def all_rows(
         base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id), context) for model in models
     ]
     bases = {
-        model.id: (model.name, row.health, content_hash(model.files) if model.status == ModelStatus.AVAILABLE else None)
+        model.id: (
+            model.name,
+            row.health,
+            content_hash(model.files) if model.status == ModelStatus.AVAILABLE else None,
+            row.availability,
+        )
         for model, row in zip(models, base_rows, strict=True)
     }
     rows = [

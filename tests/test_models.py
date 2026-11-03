@@ -500,3 +500,13 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     assert "pick a dataset" in trained.json()["detail"]
     missing = harness.client.post("/api/minibrains", json={"name": "Nowhere", "base_model": "nope"})
     assert missing.status_code == 409
+
+
+def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> None:
+    add_tiny(harness)
+    download_tiny(harness)
+    created = harness.client.post("/api/minibrains", json={"name": "Tickets", "base_model": "tiny"})
+    assert created.status_code == 201, created.text
+    assert rows(harness)["tickets"]["availability"]["state"] == "downloading"
+    assert harness.worker(kinds=["download"]).run_once()
+    assert rows(harness)["tickets"]["availability"]["state"] == "none"
