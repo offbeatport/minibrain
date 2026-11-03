@@ -103,6 +103,13 @@ FIELDS: tuple[Field, ...] = (
         "int",
         0,
     ),
+    Field(
+        "audit_retention_days",
+        "Audit log retention (days)",
+        "Audit events older than this are deleted for good. 0 keeps every event.",
+        "int",
+        0,
+    ),
 )
 
 CHOICE_LABELS = {

@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Box, FolderLock, Globe, History, KeyRound } from "lucide-react";
+import { Box, FolderLock, Globe, KeyRound } from "lucide-react";
 import {
     Badge,
     Button,
     Checkbox,
-    DataGrid,
     Input,
     Label,
+    Link,
     Select,
     SelectContent,
     SelectItem,
@@ -26,13 +25,13 @@ import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
-import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { auditHref } from "~/lib/audit";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
-type AuditInfo = components["schemas"]["AuditInfo"];
 
 const POLICIES = ["policies"] as const;
 const AUDIT = ["audit"] as const;
+const POLICY_CHANGES = auditHref({ action: "policy.update" });
 
 const GROUPS = [
     {
@@ -383,76 +382,10 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
     );
 }
 
-const MODEL_ACTIONS: Record<string, (detail: Record<string, unknown>) => string> = {
-    "model.verify": (detail) => `Verify started for ${String(detail.files ?? "all")} files`,
-    "model.repair": (detail) => `Repair from ${String(detail.source ?? "the model hub")}`,
-    "model.reimport": (detail) => `Re-import from ${String(detail.source ?? "a copy")}`,
-    "model.relocate": (detail) =>
-        `Moved from ${String(detail.from ?? "—")} to ${String(detail.to ?? "—")}`,
-};
-
-function describe(event: AuditInfo, byName: Map<string, PolicyInfo>): [string, string] {
-    const detail = event.detail as Record<string, unknown>;
-    const repair = MODEL_ACTIONS[event.action];
-    if (repair) {
-        return [`Model ${String(detail.name ?? event.target)}`, repair(detail)];
-    }
-    if (event.action === "model.delete") {
-        const size =
-            typeof detail.size_bytes === "number" ? ` · freed ${bytes(detail.size_bytes)}` : "";
-        return [`Model ${String(detail.name ?? event.target)}`, `Deleted${size}`];
-    }
-    const policy = byName.get(event.target);
-    const label = policy?.label ?? event.target;
-    if (Array.isArray(detail.from) && Array.isArray(detail.to)) {
-        const before: unknown[] = detail.from;
-        const after: unknown[] = detail.to;
-        const added = after.filter((item) => !before.includes(item));
-        const removed = before.filter((item) => !after.includes(item));
-        const parts = [
-            added.length > 0 ? `Added ${display(policy, added)}` : "",
-            removed.length > 0 ? `Removed ${display(policy, removed)}` : "",
-        ].filter(Boolean);
-        return [label, parts.join("; ") || "No change"];
-    }
-    return [label, `${display(policy, detail.from)} → ${display(policy, detail.to)}`];
-}
-
-function auditColumns(byName: Map<string, PolicyInfo>): ColumnDef<AuditInfo, unknown>[] {
-    return [
-        {
-            header: "When",
-            id: "at",
-            cell: ({ row }) => (
-                <span className="tabular-nums" title={exactTime(row.original.at)}>
-                    {relativeTime(row.original.at)}
-                </span>
-            ),
-        },
-        { header: "Who", accessorKey: "actor" },
-        {
-            header: "What",
-            id: "target",
-            cell: ({ row }) => describe(row.original, byName)[0],
-        },
-        {
-            header: "Change",
-            id: "change",
-            cell: ({ row }) => (
-                <span className="whitespace-normal">{describe(row.original, byName)[1]}</span>
-            ),
-        },
-    ];
-}
-
 export function SecurityPage() {
     const policies = useQuery({
         queryKey: POLICIES,
         queryFn: () => unwrap(api.GET("/api/policies")),
-    });
-    const audit = useQuery({
-        queryKey: AUDIT,
-        queryFn: () => unwrap(api.GET("/api/audit", { params: { query: { limit: 50 } } })),
     });
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
@@ -481,14 +414,13 @@ export function SecurityPage() {
                             </SettingsGroup>
                         </PanelSection>
                     ))}
-                <PanelSection icon={History} title="Audit log" bare>
-                    <ErrorLine error={audit.error} />
-                    <DataGrid
-                        columns={auditColumns(byName)}
-                        rows={audit.data ?? []}
-                        empty="No changes yet."
-                    />
-                </PanelSection>
+                <p className="text-sm text-muted-foreground">
+                    {"Every change on this page is recorded in the "}
+                    <Link href={POLICY_CHANGES} className="text-primary hover:underline">
+                        audit log
+                    </Link>
+                    {", with who made it and when."}
+                </p>
             </PanelSections>
         </SettingsLayout>
     );

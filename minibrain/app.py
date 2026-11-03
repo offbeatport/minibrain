@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.api import (
+    audit,
     catalog,
     compute,
     data,
@@ -24,6 +25,7 @@ from minibrain.api import (
     system,
     versions,
 )
+from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BaseModelSpec
@@ -169,6 +171,7 @@ def create_app(
     app.state.background = background
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
+    app.add_middleware(PeerAddress)
     for module in (
         minibrains,
         data,
@@ -176,6 +179,7 @@ def create_app(
         catalog,
         compute,
         policies,
+        audit,
         versions,
         keys,
         jobs,

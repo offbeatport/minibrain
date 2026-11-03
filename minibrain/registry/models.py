@@ -1,3 +1,4 @@
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -7,9 +8,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
 
+PEER_ADDRESS: ContextVar[str | None] = ContextVar("peer_address", default=None)
+SYSTEM_ACTOR = "system"
+
 
 def now() -> datetime:
     return datetime.now(UTC)
+
+
+def peer_address() -> str | None:
+    return PEER_ADDRESS.get()
 
 
 class VersionKind(StrEnum):
@@ -446,7 +454,12 @@ class Setting(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
-    __table_args__ = ({"sqlite_autoincrement": True},)
+    __table_args__ = (
+        Index("ix_audit_events_at", "at"),
+        Index("ix_audit_events_action", "action"),
+        Index("ix_audit_events_actor", "actor"),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
@@ -454,6 +467,7 @@ class AuditEvent(Base):
     action: Mapped[str]
     target: Mapped[str]
     detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    ip: Mapped[str | None] = mapped_column(default=peer_address)
 
 
 class Node(Base):

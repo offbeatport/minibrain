@@ -44,7 +44,7 @@ def test_defaults_and_ui_changes_are_audited(harness: Harness) -> None:
             "network",
             {"from": "open", "to": "allowlist"},
         )
-    assert harness.client.get("/api/audit").json()[0]["target"] == "network"
+    assert harness.client.get("/api/audit").json()["events"][0]["target"] == "network"
 
 
 def test_config_file_and_environment_lock_values(

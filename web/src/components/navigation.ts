@@ -9,6 +9,7 @@ import {
     Home,
     Play,
     Rocket,
+    ScrollText,
     Server,
     ShieldCheck,
     SlidersHorizontal,
@@ -53,6 +54,7 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
 export const SETTINGS_PAGES: NavEntry[] = [
     { label: "General", path: "/settings", icon: SlidersHorizontal },
     { label: "Security", path: "/settings/security", icon: ShieldCheck },
+    { label: "Audit log", path: "/settings/audit", icon: ScrollText },
     { label: "Data", path: "/settings/data", icon: Table2 },
     { label: "Storage", path: "/settings/storage", icon: HardDrive },
 ];

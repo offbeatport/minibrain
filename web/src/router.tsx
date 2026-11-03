@@ -30,6 +30,7 @@ import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
+import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { DataSettingsPage } from "./pages/settings/DataSettingsPage";
 import { StorageSettingsPage } from "./pages/settings/StorageSettingsPage";
 import { ModelTrainingPage, TrainingListPage } from "./pages/training/TrainingPages";
@@ -156,6 +157,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", SecurityPage),
+    globalPage("/settings/audit", AuditLogPage),
     globalPage("/settings/data", DataSettingsPage),
     globalPage("/settings/storage", StorageSettingsPage),
     globalPage("/proto/logos", LogosPage),
