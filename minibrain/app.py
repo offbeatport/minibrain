@@ -53,6 +53,7 @@ from minibrain.data.sources import SourceError
 from minibrain.encryption.envelope import EnvelopeError
 from minibrain.encryption.keys import EncryptionError, ensure_master_key, keys_for
 from minibrain.encryption.providers import KeyUnavailableError
+from minibrain.encryption.rekey import rekey_forever
 from minibrain.gateway import routes as gateway
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogBuffer, database_sink
@@ -159,6 +160,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (schedule_forever, (app.state.sessions, stop, leader)),
             (purge_forever, (app.state.sessions, app.state.settings, stop, leader)),
             (seal_forever, (app.state.sessions, stop, leader)),
+            (rekey_forever, (app.state.sessions, app.state.store, keys_for(app.state.settings), stop, leader)),
             (app.state.siem.forever, (stop, leader)),
             (app.state.cache.forever, (stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),

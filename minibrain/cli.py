@@ -278,6 +278,12 @@ def audit(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def encryption_keys(args: argparse.Namespace) -> None:
+    from minibrain.encryption.commands import run
+
+    run(args)
+
+
 def read_new_password(from_stdin: bool) -> str:
     import getpass
 
@@ -443,6 +449,13 @@ def main() -> None:
     verify_command = audit_actions.add_parser("verify", help="walk the chain and report the first break")
     verify_command.add_argument("--file", type=Path, default=None, help="a full JSONL export instead of the database")
     verify_command.add_argument("--json", action="store_true", help="print the report as JSON")
+    keys_command = commands.add_parser("keys", help="encryption at rest: key status, rotation, encrypting old files")
+    keys_actions = keys_command.add_subparsers(dest="action", required=True)
+    keys_status = keys_actions.add_parser("status", help="show the key provider, key versions and what files use")
+    keys_status.add_argument("--json", action="store_true", help="print the report as JSON")
+    keys_rotate = keys_actions.add_parser("rotate", help="make a new master key version and re-wrap every data key")
+    keys_rotate.add_argument("--retire-now", action="store_true", help="drop old local keys now; no server running")
+    keys_actions.add_parser("encrypt-existing", help="encrypt files written before encryption at rest, in place")
     admin_command = commands.add_parser("admin", help="manage admin accounts")
     admin_actions = admin_command.add_subparsers(dest="action", required=True)
     create_command = admin_actions.add_parser("create", help="create an admin account with a password")
@@ -471,6 +484,8 @@ def main() -> None:
         engine(args)
     elif args.command == "extensions":
         extensions(args)
+    elif args.command == "keys":
+        encryption_keys(args)
     elif args.command == "audit":
         audit(args)
     elif args.command == "admin":
