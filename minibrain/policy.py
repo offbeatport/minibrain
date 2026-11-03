@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import yaml
 from sqlalchemy.orm import Session
 
-from minibrain.models.rules import LICENCES, PUBLISHERS
+from minibrain.models.rules import LICENCES, PUBLISHERS, licence_use
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read, write
 
@@ -225,6 +225,13 @@ def load(session: Session) -> Policy:
     return Policy(values)
 
 
+def choice_of(field: Field, choice: str) -> dict[str, Any]:
+    described: dict[str, Any] = {"value": choice, "label": CHOICE_LABELS.get(choice, choice)}
+    if field.name == "licences":
+        described["use"] = licence_use(choice)
+    return described
+
+
 def describe(session: Session) -> list[dict[str, Any]]:
     locked = locked_sources()
     policy = load(session)
@@ -234,7 +241,7 @@ def describe(session: Session) -> list[dict[str, Any]]:
             "label": field.label,
             "description": field.description,
             "kind": field.kind,
-            "choices": [{"value": choice, "label": CHOICE_LABELS.get(choice, choice)} for choice in field.choices],
+            "choices": [choice_of(field, choice) for choice in field.choices],
             "value": policy[field.name],
             "locked": field.name in locked or not field.editable,
             "source": locked[field.name][0] if field.name in locked else ("built in" if not field.editable else "ui"),

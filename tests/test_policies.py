@@ -162,3 +162,11 @@ def test_queued_downloads_are_refused_when_the_policy_changes(harness: Harness, 
     assert harness.worker(kinds=["download"]).run_once() is False
     detail = harness.client.get("/api/models/base/tiny").json()
     assert detail["activity"]["state"] == "failed" and "Offline" in (detail["error"] or "")
+
+
+def test_licence_choices_carry_their_commercial_use(harness: Harness) -> None:
+    policies = {item["name"]: item for item in harness.client.get("/api/policies").json()}
+    uses = {choice["value"]: choice["use"] for choice in policies["licences"]["choices"]}
+    assert uses["apache-2.0"] == "commercial"
+    assert uses["llama3.2"] == "restricted"
+    assert all(choice.get("use") is None for choice in policies["licence_mode"]["choices"])

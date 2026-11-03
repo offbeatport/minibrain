@@ -347,7 +347,21 @@ function LicenceList({ policy }: { policy: PolicyInfo }) {
 
 function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | undefined }) {
     const change = useChange(mode.name);
+    const listChange = useChange("licences");
     const anyLicence = mode.value === "all";
+    const switchTo = (any: boolean) =>
+        change.mutate(any ? "all" : "selected", {
+            onSuccess: () => {
+                const empty = Array.isArray(list?.value) && list.value.length === 0;
+                if (!any && list && empty && !list.locked) {
+                    listChange.mutate(
+                        list.choices
+                            .filter((choice) => choice.use === "commercial")
+                            .map((choice) => choice.value),
+                    );
+                }
+            },
+        });
     return (
         <SettingsRow
             id="licence-any"
@@ -359,7 +373,7 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
                     ? "Includes non-commercial and custom terms we have not reviewed. Check each model's licence yourself."
                     : "Only the licences ticked below, each reviewed for commercial use."
             }
-            error={errorMessage(change.error)}
+            error={errorMessage(change.error ?? listChange.error)}
             control={
                 <>
                     <Switch
@@ -367,7 +381,7 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
                         checked={anyLicence}
                         disabled={mode.locked}
                         readOnly={change.isPending}
-                        onCheckedChange={(checked) => change.mutate(checked ? "all" : "selected")}
+                        onCheckedChange={(checked) => switchTo(checked === true)}
                     />
                     {mode.locked && <LockedBadge policy={mode} />}
                 </>

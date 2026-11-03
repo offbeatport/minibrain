@@ -13,6 +13,7 @@ LOCAL_USER = "Local user"
 class PolicyChoice(BaseModel):
     value: str
     label: str
+    use: str | None = None
 
 
 class PolicyInfo(BaseModel):
