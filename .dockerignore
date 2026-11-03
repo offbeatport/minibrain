@@ -1,0 +1,13 @@
+*
+!LICENSE
+!hatch_build.py
+!pyproject.toml
+!uv.lock
+!minibrain/
+!samples/
+!web/
+web/node_modules
+web/dist
+**/__pycache__
+**/*.py[co]
+**/.DS_Store

@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -26,12 +27,15 @@ class CustomBuildHook(BuildHookInterface):
         build_data["force_include"][self.build_info(root)] = BUILD_INFO
 
     def build_info(self, root: Path) -> str:
-        git = shutil.which("git")
-        found = subprocess.run([git, "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True) if git else None
-        commit = found.stdout.strip() if found and found.returncode == 0 else None
+        commit = os.environ.get("MINIBRAIN_BUILD_COMMIT", "").strip() or self.git_commit(root)
         target = Path(tempfile.mkdtemp()) / "build.json"
         target.write_text(json.dumps({"commit": commit or None, "built_at": datetime.now(UTC).isoformat()}))
         return str(target)
+
+    def git_commit(self, root: Path) -> str | None:
+        git = shutil.which("git")
+        found = subprocess.run([git, "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True) if git else None
+        return found.stdout.strip() if found and found.returncode == 0 else None
 
     def build_web(self, web: Path) -> None:
         pnpm = shutil.which("pnpm")

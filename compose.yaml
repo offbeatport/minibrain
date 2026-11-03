@@ -1,0 +1,30 @@
+services:
+  minibrain:
+    image: ${MINIBRAIN_IMAGE:-minibrain:cuda}
+    build:
+      context: .
+      args:
+        VARIANT: cuda
+        INCLUDE_MYSQL: "false"
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - minibrain-data:/data
+      - ${MINIBRAIN_MODELS_DIR:-./models}:/models:ro
+    environment:
+      MINIBRAIN_OFFLINE: ${MINIBRAIN_OFFLINE:-1}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      MINIBRAIN_DATABASE_URL: ${MINIBRAIN_DATABASE_URL:-}
+    shm_size: 8gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  minibrain-data:
