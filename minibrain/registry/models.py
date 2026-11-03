@@ -255,6 +255,8 @@ class Version(Base):
     base_hash: Mapped[str | None] = mapped_column(default=None)
     recipe: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    intended_use: Mapped[str | None] = mapped_column(default=None)
+    known_limits: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     minibrain: Mapped[Minibrain] = relationship(back_populates="versions")
