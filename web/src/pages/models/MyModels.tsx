@@ -31,6 +31,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Separator,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -1218,6 +1219,10 @@ function BulkBar({
                     <PowerOff />
                     Undeploy
                 </Button>
+                <Separator
+                    orientation="vertical"
+                    className="mx-1 data-[orientation=vertical]:h-5"
+                />
                 <Button
                     variant="destructive"
                     size="sm"
