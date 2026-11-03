@@ -254,13 +254,30 @@ export function VariantLicence({
     onAccepted: (accepted: boolean) => void;
     onVariant: (variant: string) => void;
 }) {
+    const [changing, setChanging] = useState(false);
     if (plan.target.kind !== "catalogue" || !plan.variant) {
         return null;
     }
     const { entry } = plan.target;
+    const current = plan.variant;
     return (
         <>
-            {entry.variants.length > 1 && (
+            {entry.variants.length > 1 && !changing && (
+                <span className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Variant</span>
+                    <span>{`${current.label} · ${bytes(current.size_bytes)}`}</span>
+                    <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0"
+                        onClick={() => setChanging(true)}
+                    >
+                        Change
+                    </Button>
+                </span>
+            )}
+            {entry.variants.length > 1 && changing && (
                 <Field id="base-variant" label="Variant">
                     <Select
                         value={plan.variant.id}

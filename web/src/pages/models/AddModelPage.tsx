@@ -4,7 +4,10 @@ import {
     BookOpen,
     Boxes,
     Braces,
+    Check,
+    ChevronDown,
     ChevronLeft,
+    Copy,
     Database,
     ExternalLink,
     FlaskConical,
@@ -15,29 +18,29 @@ import {
 } from "lucide-react";
 import {
     Button,
+    Card,
     Field,
     FieldGroup,
     Input,
-    Label,
     Link,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Switch,
     Textarea,
 } from "obp-ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { modelsHref } from "~/lib/modelsSearch";
-import { TrainingData } from "../data/TrainingData";
+import { bytes } from "~/lib/time";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
-import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import { BaseSummary, type CopySource, type DiskNeed, diskBlocks, diskNeed } from "./BaseSummary";
 import {
     type BaseOption,
     type TaskKey,
@@ -176,9 +179,127 @@ function chosenOption(
     return null;
 }
 
-function trainingHref(slug: string, copy: CopySource): string {
+function slugOf(name: string): string {
+    const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    return slug.slice(0, 48).replace(/-+$/, "") || "minibrain";
+}
+
+function downloadText(option: BaseOption | null, need: DiskNeed): string {
+    if (!option) {
+        return "Pick a base model";
+    }
+    if (need) {
+        return `${bytes(need.size)} ${need.verb}`;
+    }
+    return option.added?.availability.state === "missing"
+        ? "On this install, files missing"
+        : "No download, already on this install";
+}
+
+function CopyRequest({ code }: { code: string }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () =>
+        navigator.clipboard?.writeText(code).then(
+            () => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1500);
+            },
+            () => setCopied(false),
+        );
+    return (
+        <Button type="button" variant="outline" size="sm" className="w-fit" onClick={copy}>
+            {copied ? <Check /> : <Copy />}
+            {copied ? "Copied" : "Copy a sample request"}
+        </Button>
+    );
+}
+
+function Summary({
+    option,
+    importText,
+    need,
+    task,
+    model,
+    dataset,
+}: {
+    option: BaseOption | null;
+    importText: string | null;
+    need: DiskNeed;
+    task: TaskKey;
+    model: string;
+    dataset: string | null;
+}) {
+    const origin = typeof window === "undefined" ? "" : window.location.origin;
+    const code = [
+        `curl ${origin}/v1/chat/completions \\`,
+        `  -H "Authorization: Bearer $MINIBRAIN_KEY" \\`,
+        `  -H "Content-Type: application/json" \\`,
+        `  -d '{"model": "${model}", "messages": [{"role": "user", "content": "Hello"}]}'`,
+    ].join("\n");
+    const taskLabel = TASKS.find((item) => item.key === task)?.label ?? task;
+    return (
+        <Card className="gap-4 px-5">
+            <h2 className="text-base font-semibold">What you get</h2>
+            <dl className="flex flex-col gap-3 text-sm">
+                <div className="flex flex-col gap-1">
+                    <dt className="text-muted-foreground">Base model</dt>
+                    <dd className="flex items-center gap-2">
+                        {option ? (
+                            <>
+                                <PublisherLogo
+                                    publisher={option.publisher ?? option.name}
+                                    name={option.name}
+                                    size="sm"
+                                />
+                                <span className="min-w-0 truncate font-medium">{option.name}</span>
+                            </>
+                        ) : (
+                            <span className="truncate font-mono">{importText ?? "None yet"}</span>
+                        )}
+                    </dd>
+                    <dd className="text-muted-foreground tabular-nums">
+                        {importText && !option
+                            ? "Imported when you add it"
+                            : downloadText(option, need)}
+                    </dd>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <dt className="text-muted-foreground">Task</dt>
+                    <dd>{taskLabel}</dd>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <dt className="text-muted-foreground">Training data</dt>
+                    <dd>{dataset ?? "Added after you create it, on its Training page"}</dd>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                    <dt className="text-muted-foreground">Call it as</dt>
+                    <dd className="font-mono">{model}</dd>
+                    <dd>
+                        <CopyRequest code={code} />
+                    </dd>
+                    <dd className="text-muted-foreground">
+                        Until it is trained, it answers with its base model.
+                    </dd>
+                </div>
+            </dl>
+            <div className="flex flex-col gap-1.5 border-t pt-4 text-sm">
+                <span className="text-muted-foreground">After you add it</span>
+                <ol className="flex list-decimal flex-col gap-1 pl-5">
+                    <li>Train it on your data</li>
+                    <li>Compare it with prompting alone</li>
+                    <li>Deploy the better version</li>
+                </ol>
+            </div>
+        </Card>
+    );
+}
+
+function trainingHref(slug: string, copy: CopySource | null): string {
     const path = `/training/${encodeURIComponent(slug)}`;
-    if (!copy.recipe) {
+    if (!copy?.recipe) {
         return path;
     }
     const query = new URLSearchParams({
@@ -206,9 +327,10 @@ export function AddModelPage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
-    const presetDataset = params.dataset === undefined ? "" : String(params.dataset);
-    const [withData, setWithData] = useState(presetDataset !== "");
-    const [dataset, setDataset] = useState(presetDataset);
+    const [more, setMore] = useState(false);
+    const [dataset, setDataset] = useState(
+        params.dataset === undefined ? "" : String(params.dataset),
+    );
     const entries = catalog.data?.entries ?? [];
     const rows = models.data ?? [];
     const picks = recommend(entries, rows, task);
@@ -247,10 +369,7 @@ export function AddModelPage() {
                 trainedVersions.find((version) => version.current) ?? trainedVersions[0];
             setTask(taskOf(detail.task));
             choose({ kind: "base", key: detail.base_model });
-            if (detail.dataset) {
-                setWithData(true);
-                setDataset(detail.dataset);
-            }
+            setDataset(detail.dataset ?? "");
             setCopy({
                 slug: detail.slug,
                 name: detail.name,
@@ -275,7 +394,10 @@ export function AddModelPage() {
             startFrom.mutate(chosen.custom);
             return;
         }
-        setCopy(null);
+        if (copy) {
+            setCopy(null);
+            setDataset(params.dataset === undefined ? "" : String(params.dataset));
+        }
         choose(
             chosen.entry
                 ? { kind: "catalogue", id: chosen.entry.id, variant: chosen.variant?.id ?? "" }
@@ -309,7 +431,7 @@ export function AddModelPage() {
                     },
                 }),
             );
-            if (withData && dataset) {
+            if (dataset) {
                 await unwrap(
                     api.PUT("/api/minibrains/{slug}/dataset", {
                         params: { path: { slug: created.slug } },
@@ -322,7 +444,7 @@ export function AddModelPage() {
         onSuccess: async (created) => {
             await refresh();
             router.history.push(
-                copy
+                copy || dataset
                     ? trainingHref(created.slug, copy)
                     : `/models/custom/${encodeURIComponent(created.slug)}`,
             );
@@ -330,14 +452,20 @@ export function AddModelPage() {
     });
     const baseReady =
         (option?.kind === "local" ? Boolean(option.baseKey) : plan.ready) && !diskBlocks(need);
-    const dataReady = !withData || dataset !== "";
-    const ready = baseReady && dataReady && (name.trim() || suggestedName).length > 0;
+    const finalName = name.trim() || suggestedName;
+    const ready = baseReady && finalName.length > 0;
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (ready) {
+        if (ready && !add.isPending) {
             add.mutate();
         }
     };
+    const shortcut = (event: KeyboardEvent<HTMLFormElement>) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            submit(event);
+        }
+    };
+    const datasetLabel = dataset ? (copy?.datasetName ?? dataset) : null;
     return (
         <Page>
             <Link
@@ -351,7 +479,11 @@ export function AddModelPage() {
                 title="Add model"
                 caption="Start from a base model; train it on your data whenever you like."
             />
-            <form onSubmit={submit} className="flex max-w-4xl flex-col gap-8">
+            <form
+                onSubmit={submit}
+                onKeyDown={shortcut}
+                className="grid max-w-6xl items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+            >
                 <PanelSections>
                     <PanelSection
                         icon={Boxes}
@@ -415,69 +547,76 @@ export function AddModelPage() {
                                     }}
                                     copy={copy}
                                     onClearCopy={() => setCopy(null)}
+                                    onPickAnother={() => setOpen(true)}
                                 />
                             </div>
                         </FieldGroup>
                     </PanelSection>
                     <PanelSection icon={SquarePen} title="Details">
                         <FieldGroup>
-                            <div className="grid gap-5 sm:grid-cols-2">
-                                <Field id="create-name" label="Name">
-                                    <Input
-                                        id="create-name"
-                                        value={name}
-                                        onChange={(event) => setName(event.target.value)}
-                                        placeholder={suggestedName || "IT ticket classifier"}
-                                    />
-                                </Field>
-                                <Field
-                                    id="create-tags"
-                                    label="Tags (optional)"
-                                    hint="Comma separated."
-                                >
-                                    <Input
-                                        id="create-tags"
-                                        value={tags}
-                                        onChange={(event) => setTags(event.target.value)}
-                                    />
-                                </Field>
-                            </div>
-                            <Field id="create-description" label="Description (optional)">
-                                <Textarea
-                                    id="create-description"
-                                    value={description}
-                                    onChange={(event) => setDescription(event.target.value)}
-                                    rows={2}
-                                    placeholder="Routes incoming tickets to the right queue"
+                            <Field
+                                id="create-name"
+                                label="Name"
+                                hint={`Apps call it as ${slugOf(finalName)}.`}
+                            >
+                                <Input
+                                    id="create-name"
+                                    value={name}
+                                    onChange={(event) => setName(event.target.value)}
+                                    placeholder={suggestedName || "IT ticket classifier"}
+                                    className="sm:max-w-sm"
                                 />
                             </Field>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-fit"
+                                aria-expanded={more}
+                                onClick={() => setMore(!more)}
+                            >
+                                <ChevronDown className={more ? "rotate-180" : undefined} />
+                                {more ? "Fewer details" : "Add a description and tags"}
+                            </Button>
+                            {more && (
+                                <>
+                                    <Field id="create-description" label="Description">
+                                        <Textarea
+                                            id="create-description"
+                                            value={description}
+                                            onChange={(event) => setDescription(event.target.value)}
+                                            rows={2}
+                                            placeholder="Routes incoming tickets to the right queue"
+                                        />
+                                    </Field>
+                                    <Field id="create-tags" label="Tags" hint="Comma separated.">
+                                        <Input
+                                            id="create-tags"
+                                            value={tags}
+                                            onChange={(event) => setTags(event.target.value)}
+                                            className="sm:max-w-sm"
+                                        />
+                                    </Field>
+                                </>
+                            )}
                         </FieldGroup>
                     </PanelSection>
-                    <PanelSection icon={Database} title="Training data">
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex flex-col gap-0.5">
-                                    <Label htmlFor="with-data">Add training data now</Label>
-                                    <span className="text-sm text-muted-foreground">
-                                        {withData
-                                            ? copy?.datasetName
-                                                ? `Copied from ${copy.name}. Upload a file or use another dataset to change it.`
-                                                : "Upload a file, use a dataset or start from sample data."
-                                            : "You can add it later on the Training page. Until it is trained, the model serves its base model."}
-                                    </span>
-                                </div>
-                                <Switch
-                                    id="with-data"
-                                    checked={withData}
-                                    onCheckedChange={setWithData}
-                                />
-                            </div>
-                            {withData && <TrainingData dataset={dataset} onDataset={setDataset} />}
-                        </div>
-                    </PanelSection>
                 </PanelSections>
-                <ErrorLine error={add.error} />
-                <div className="flex justify-end gap-2 border-t pt-4">
+                <aside className="lg:sticky lg:top-6 lg:pt-2">
+                    <Summary
+                        option={option}
+                        importText={current?.kind === "import" ? current.text : null}
+                        need={need}
+                        task={task}
+                        model={slugOf(finalName)}
+                        dataset={datasetLabel}
+                    />
+                </aside>
+                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3 lg:col-span-2">
+                    <ErrorLine error={add.error} />
+                    <span className="mr-auto hidden text-sm text-muted-foreground sm:inline">
+                        Ctrl or ⌘ + Enter to add
+                    </span>
                     <Button
                         type="button"
                         variant="outline"

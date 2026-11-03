@@ -37,7 +37,15 @@ export function diskBlocks(need: DiskNeed): boolean {
     return need !== null && need.free !== null && need.size > need.free;
 }
 
-function DiskLine({ option, need }: { option: BaseOption | null; need: DiskNeed }) {
+function DiskLine({
+    option,
+    need,
+    onPickAnother,
+}: {
+    option: BaseOption | null;
+    need: DiskNeed;
+    onPickAnother: () => void;
+}) {
     const state = option?.added?.availability.state;
     if (option && !need) {
         if (state === "downloading" || state === "importing") {
@@ -45,9 +53,21 @@ function DiskLine({ option, need }: { option: BaseOption | null; need: DiskNeed 
         }
         if (state === "missing") {
             return (
-                <StatusText tone="warning" className="whitespace-normal">
-                    On this install, but its files are missing
-                </StatusText>
+                <span className="flex flex-wrap items-center gap-2">
+                    <StatusText tone="warning" className="whitespace-normal">
+                        On this install, but its files are missing
+                    </StatusText>
+                    {option.baseKey && (
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`/models/base/${encodeURIComponent(option.baseKey)}`}>
+                                Repair it
+                            </Link>
+                        </Button>
+                    )}
+                    <Button type="button" variant="ghost" size="sm" onClick={onPickAnother}>
+                        Pick another
+                    </Button>
+                </span>
             );
         }
         return <StatusText tone="success">No download, already on this install</StatusText>;
@@ -201,6 +221,7 @@ export function BaseSummary({
     onVariant,
     copy,
     onClearCopy,
+    onPickAnother,
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
@@ -211,6 +232,7 @@ export function BaseSummary({
     onVariant: (variant: string) => void;
     copy: CopySource | null;
     onClearCopy: () => void;
+    onPickAnother: () => void;
 }) {
     const variant = option?.kind === "catalogue" ? plan.variant : null;
     const fit = variant?.fit.level ?? option?.fit;
@@ -218,7 +240,7 @@ export function BaseSummary({
         <div className="flex flex-col gap-3 text-sm" aria-live="polite">
             {copy && <CopyNote copy={copy} onClear={onClearCopy} />}
             {!option && <PathResult plan={plan} />}
-            <DiskLine option={option} need={need} />
+            <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
             {variant?.format === "gguf" && (
                 <StatusText tone="warning" className="whitespace-normal">
                     GGUF: serves, but cannot be fine-tuned. Pick a safetensors variant to train.
