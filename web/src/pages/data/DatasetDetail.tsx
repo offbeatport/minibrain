@@ -17,9 +17,10 @@ import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { ChecksSection } from "./Checks";
+import { MoveDialog, type MoveTarget, PathLinks, folderRef } from "./DatasetFolders";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
 import { ChangeNotice, RowLimitNotice, SaveSnapshot, SnapshotsSection } from "./Snapshots";
-import { DATASETS_GROUP, type ItemRef, itemHref, plural, stem } from "./catalogue";
+import { type FolderIndex, type ItemRef, itemHref, stem } from "./catalogue";
 import {
     About,
     DeleteAction,
@@ -103,11 +104,13 @@ const EMPTY_MAPPING = { input_column: null, label_column: null, sql: null };
 export function CreateDataset({
     source,
     sources,
+    folderId = null,
     onCreated,
     onCancel,
 }: {
     source?: SourceSummary;
     sources: SourceSummary[];
+    folderId?: number | null;
     onCreated: (dataset: DatasetSummary) => Promise<void>;
     onCancel: () => void;
 }) {
@@ -142,6 +145,7 @@ export function CreateDataset({
                     api.POST("/api/datasets", {
                         body: {
                             name: name.trim() || stem(fallback ?? "") || "New dataset",
+                            folder_id: folderId,
                             ...body,
                         },
                     }),
@@ -216,22 +220,26 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
 export function DatasetDetail({
     dataset,
     sources,
+    index,
     onSelect,
 }: {
     dataset: DatasetSummary;
     sources: SourceSummary[];
+    index: FolderIndex;
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
     const nameOf = useModelNames();
     const [editing, setEditing] = useState(false);
+    const [moving, setMoving] = useState<MoveTarget | null>(null);
+    const folderId = dataset.folder_id ?? null;
     const mapped = Boolean(dataset.mapping.sql);
     const preview = useDatasetPreview(dataset.slug, mapped);
     const path = { params: { path: { slug: dataset.slug } } };
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/datasets/{slug}", path)),
         onSuccess: async () => {
-            onSelect(DATASETS_GROUP);
+            onSelect(folderRef(folderId));
             await refresh();
         },
     });
@@ -245,6 +253,12 @@ export function DatasetDetail({
                     <>
                         Dataset <span className="font-mono">{dataset.slug}</span>
                         {` · ${dataset.mode === "sql" ? "SQL" : "columns"} · updated ${relativeTime(dataset.updated_at)}`}
+                        {folderId !== null && (
+                            <>
+                                {" · in "}
+                                <PathLinks index={index} folderId={folderId} />
+                            </>
+                        )}
                     </>
                 }
                 trail={
@@ -276,6 +290,18 @@ export function DatasetDetail({
                         <SaveSnapshot dataset={dataset} />
                         <Button variant="outline" onClick={() => setEditing(true)}>
                             Edit
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                setMoving({
+                                    item: { kind: "dataset", id: dataset.slug },
+                                    name: dataset.name,
+                                    from: folderId,
+                                })
+                            }
+                        >
+                            Move to…
                         </Button>
                         <DeleteAction
                             blocked={
@@ -341,6 +367,11 @@ export function DatasetDetail({
             )}
             <SnapshotsSection dataset={dataset} />
             <UsedBy dataset={dataset} />
+            <MoveDialog
+                target={moving}
+                index={index}
+                onOpenChange={(open) => !open && setMoving(null)}
+            />
             <EditDialog
                 item={dataset}
                 noun="dataset"
@@ -351,50 +382,5 @@ export function DatasetDetail({
                 }
             />
         </div>
-    );
-}
-
-export function DatasetsGroup({
-    datasets,
-    onCreate,
-    creating,
-}: {
-    datasets: DatasetSummary[];
-    onCreate: () => void;
-    creating: boolean;
-}) {
-    const models = new Set(datasets.flatMap((dataset) => dataset.models));
-    const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
-    return (
-        <header className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="text-2xl font-semibold">Datasets</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Saved queries that turn one or more sources into input and label rows.
-                        Models train on a snapshot of one.
-                    </p>
-                </div>
-                <Button onClick={onCreate} disabled={creating}>
-                    New dataset
-                </Button>
-            </div>
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-                <Stat label="Datasets" value={count(datasets.length)} />
-                <Stat label="Written in SQL" value={count(sql)} />
-                <Stat label="Models using them" value={count(models.size)} />
-            </div>
-            {datasets.length === 0 && !creating && (
-                <p className="text-sm text-muted-foreground">
-                    No datasets yet. Add a file under Uploads, then pick its input and label
-                    columns, or write SQL across several sources.
-                </p>
-            )}
-            {datasets.length > 0 && !creating && (
-                <p className="text-sm text-muted-foreground">
-                    {`${plural(datasets.length, "dataset")}. Pick one to see its query, preview and the models that use it.`}
-                </p>
-            )}
-        </header>
     );
 }

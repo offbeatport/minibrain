@@ -651,16 +651,26 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   diagnostics" is a plain link to `/api/system/diagnostics`: a zip of versions, settings, policies, job counts and
   recent server warnings, with every known secret value scrubbed and secret-named fields redacted.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
-- Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with Datasets first, then sources by
-  kind (Uploads, Folders, S3, Databases, Iceberg); the selected item's detail on the right. One "Add source" menu:
-  Upload a file, Connect a folder, S3 path, Database table or query, Iceberg table. A source shows its table name,
-  columns, stats, first rows and the datasets that read it; a folder also shows its file count, size and last change;
-  a connected source shows its connection, path, table or query, and how its changes are tracked.
+- Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with two sections, Datasets and
+  Sources; the selected item's detail on the right. Sources holds one group per kind (Uploads, Folders, S3, Databases,
+  Iceberg), shown only once it has a source; an empty Sources points to Add source, and a link to an empty group opens
+  Sources. One "Add source" menu: Upload a file, Connect a folder, S3 path, Database table or query, Iceberg table,
+  and the samples. A source shows its table name, columns, stats, first rows and the datasets that read it; a folder
+  also shows its file count, size and last change; a connected source shows its connection, path, table or query, and
+  how its changes are tracked.
   A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
   preview, label balance, splits, its snapshots (tick two to compare), the models that use it, "Save snapshot now"
   and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
-  (`group:datasets`, `group:upload`, `source:12`, `dataset:<slug>`, plus `&compare=<id>~<id>` for a snapshot diff) is
-  the permalink; `/data/datasets/<slug>` redirects to it.
+  (`group:datasets`, `group:sources`, `group:upload`, `folder:3`, `source:12`, `dataset:<slug>`, plus
+  `&compare=<id>~<id>` for a snapshot diff) is the permalink; `/data/datasets/<slug>` redirects to it.
+- Dataset folders (`dataset_folders`, `datasets.folder_id`) only organise; nothing a model trains on depends on them.
+  They nest, sort before datasets (both by name), and a name is unique among its siblings, case aside. New folder sits
+  on Datasets and on every folder; a folder shows its contents with counts, and Rename, Move to… and Delete. Rows move
+  by drag and drop in the tree (the kit's `Tree` with `onMove`), or from the keyboard with "Move to…", a dialog with a
+  folder picker; a folder cannot move into itself or below itself. Deleting a folder moves its datasets and
+  subfolders up one level (a clashing subfolder name gets a number) and deletes nothing else. Search still finds
+  datasets inside folders and opens their path. Create, rename, move and delete are audited (`dataset_folder.*`), and
+  so is a dataset changing folder (`dataset.move`).
 - Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
   their limits. Settings → Storage: where artifacts live, and the base model cache budget.
 - Settings → Connections: the buckets and databases that sources and imports read (see Connections), with each

@@ -20,6 +20,7 @@ import {
 } from "obp-ui";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { LabelCount } from "~/api/client";
+import { dataKeys } from "~/api/dataQueries";
 import { keys, useModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
@@ -35,6 +36,7 @@ export function useDataRefresh() {
         Promise.all([
             client.invalidateQueries({ queryKey: keys.datasets, exact: true }),
             client.invalidateQueries({ queryKey: keys.sources, exact: true }),
+            client.invalidateQueries({ queryKey: dataKeys.datasetFolders }),
             client.invalidateQueries({ queryKey: keys.models }),
             client.invalidateQueries({ queryKey: ["minibrain"] }),
         ]);

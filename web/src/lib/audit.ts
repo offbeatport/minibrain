@@ -21,6 +21,11 @@ export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 
 const ACTIONS: Record<string, string> = {
     "audit.prune": "Audit events deleted",
+    "dataset.move": "Dataset moved",
+    "dataset_folder.create": "Dataset folder created",
+    "dataset_folder.delete": "Dataset folder deleted",
+    "dataset_folder.move": "Dataset folder moved",
+    "dataset_folder.rename": "Dataset folder renamed",
     "key.create": "API key created",
     "key.revoke": "API key revoked",
     "key.update": "API key changed",
@@ -57,6 +62,13 @@ const KEY_LABELS: Record<string, string> = {
     to: "After",
     trigger: "Trigger",
     versions: "Versions",
+};
+
+const CHANGED_FIELDS: Record<string, string> = {
+    "dataset.move": "Location",
+    "dataset_folder.move": "Location",
+    "dataset_folder.rename": "Name",
+    "model.relocate": "Location",
 };
 
 const STORAGE_KINDS: Record<string, string> = { local: "Local folder", s3: "S3-compatible bucket" };
@@ -168,7 +180,7 @@ export function changesOf(event: AuditEvent, policies: Map<string, PolicyInfo>):
                 after: plainValue(after[name], undefined, name),
             }));
     }
-    const field = policy?.label ?? (event.action === "model.relocate" ? "Location" : "Value");
+    const field = policy?.label ?? CHANGED_FIELDS[event.action] ?? "Value";
     return [
         {
             field,

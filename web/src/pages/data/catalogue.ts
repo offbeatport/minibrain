@@ -1,12 +1,14 @@
 import type { DatasetSummary, SourceSummary } from "~/api/client";
+import type { DatasetFolder } from "~/api/dataQueries";
 
 export type SourceKind = SourceSummary["kind"];
 
-export type GroupId = SourceKind | "datasets";
+export type GroupId = SourceKind | "datasets" | "sources";
 
 export type ItemRef =
     | { kind: "group"; id: GroupId }
     | { kind: "source"; id: number }
+    | { kind: "folder"; id: number }
     | { kind: "dataset"; id: string };
 
 export const SOURCE_KINDS: { kind: SourceKind; label: string; noun: string }[] = [
@@ -18,6 +20,8 @@ export const SOURCE_KINDS: { kind: SourceKind; label: string; noun: string }[] =
 ];
 
 export const DATASETS_GROUP: ItemRef = { kind: "group", id: "datasets" };
+
+export const SOURCES_GROUP: ItemRef = { kind: "group", id: "sources" };
 
 export function itemKey(item: ItemRef): string {
     return `${item.kind}:${item.id}`;
@@ -40,10 +44,10 @@ export function parseItem(value: unknown): ItemRef | null {
     if (kind === "dataset") {
         return { kind, id };
     }
-    if (kind === "source" && /^\d+$/.test(id)) {
+    if ((kind === "source" || kind === "folder") && /^\d+$/.test(id)) {
         return { kind, id: Number(id) };
     }
-    if (kind === "group" && id === "datasets") {
+    if (kind === "group" && (id === "datasets" || id === "sources")) {
         return { kind, id };
     }
     const group = SOURCE_KINDS.find((entry) => entry.kind === id);
@@ -96,4 +100,72 @@ export function stem(filename: string): string {
 
 export function plural(count: number, noun: string): string {
     return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+export type FolderIndex = {
+    byId: Map<number, DatasetFolder>;
+    folders: Map<number | null, DatasetFolder[]>;
+    datasets: Map<number | null, DatasetSummary[]>;
+};
+
+function byName(a: { name: string }, b: { name: string }): number {
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+}
+
+function grouped<T>(items: T[], key: (item: T) => number | null): Map<number | null, T[]> {
+    const groups = new Map<number | null, T[]>();
+    for (const item of items) {
+        const at = key(item);
+        groups.set(at, [...(groups.get(at) ?? []), item]);
+    }
+    return groups;
+}
+
+export function folderIndex(folders: DatasetFolder[], datasets: DatasetSummary[]): FolderIndex {
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const known = (id: number | null | undefined) => (id != null && byId.has(id) ? id : null);
+    return {
+        byId,
+        folders: grouped([...folders].sort(byName), (folder) => known(folder.parent_id)),
+        datasets: grouped([...datasets].sort(byName), (dataset) => known(dataset.folder_id)),
+    };
+}
+
+export function folderTrail(index: FolderIndex, id: number | null): DatasetFolder[] {
+    const trail: DatasetFolder[] = [];
+    for (let at = id; at !== null; ) {
+        const folder = index.byId.get(at);
+        if (!folder || trail.includes(folder)) {
+            break;
+        }
+        trail.unshift(folder);
+        at = folder.parent_id;
+    }
+    return trail;
+}
+
+export function folderPath(index: FolderIndex, id: number | null): string {
+    return ["Datasets", ...folderTrail(index, id).map((folder) => folder.name)].join(" / ");
+}
+
+export function insideFolder(index: FolderIndex, id: number): number[] {
+    const below = (index.folders.get(id) ?? []).map((folder) => folder.id);
+    return [id, ...below.flatMap((child) => insideFolder(index, child))];
+}
+
+export function datasetsInside(index: FolderIndex, id: number | null): DatasetSummary[] {
+    const ids = id === null ? [null, ...index.byId.keys()] : insideFolder(index, id);
+    return ids.flatMap((at) => index.datasets.get(at) ?? []);
+}
+
+export function siblingNamed(
+    index: FolderIndex,
+    parentId: number | null,
+    name: string,
+    except?: number,
+): DatasetFolder | undefined {
+    const wanted = name.trim().toLocaleLowerCase();
+    return (index.folders.get(parentId) ?? []).find(
+        (folder) => folder.id !== except && folder.name.toLocaleLowerCase() === wanted,
+    );
 }

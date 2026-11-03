@@ -81,6 +81,29 @@ export function AddFolderDialog({
             onAdded(source);
         },
     });
+    if (roots.length === 0) {
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>No folders allowed yet</DialogTitle>
+                        <DialogDescription>
+                            For safety, minibrain only reads folders an admin allows under Settings,
+                            Security, Folder sources.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button asChild>
+                            <Link href="/settings/security">Open security settings</Link>
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
