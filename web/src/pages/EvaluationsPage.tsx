@@ -26,6 +26,7 @@ import {
 import { count, milliseconds, percent } from "~/lib/format";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { relativeTime } from "~/lib/time";
+import { DataVersus } from "./data/versionData";
 import { Updated } from "./models/MyModels";
 
 const PATH = "/evaluations";
@@ -200,6 +201,16 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                 <Stat label="Status" value={<VersionState version={version} />} />
                 <Stat label="Held-out" value={percent(info?.held_out?.accuracy)} />
                 <Stat label="vs live" value={<Change line={line} />} />
+                <Stat
+                    label="Data vs live"
+                    value={
+                        <DataVersus
+                            versions={versions.data}
+                            number={version.number}
+                            against={line.live?.number}
+                        />
+                    }
+                />
                 <Stat label="Test set" value={percent(info?.golden?.accuracy)} />
                 <Stat label="Macro F1" value={info?.held_out?.macro_f1.toFixed(3) ?? "–"} />
                 <Stat label="Invalid" value={percent(info?.held_out?.invalid_rate)} />

@@ -490,6 +490,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Snapshot */
+        get: operations["read_snapshot_api_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/snapshots/{snapshot_id}/diff/{other_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diff Snapshots */
+        get: operations["diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/data": {
         parameters: {
             query?: never;
@@ -2039,6 +2073,13 @@ export interface components {
             /** Cpu Count */
             cpu_count: number;
         };
+        /** DiffRow */
+        DiffRow: {
+            /** Input */
+            input: string;
+            /** Label */
+            label: string;
+        };
         /** DownloadRequest */
         DownloadRequest: {
             /** Variant */
@@ -2475,6 +2516,15 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** LabelShiftInfo */
+        LabelShiftInfo: {
+            /** Label */
+            label: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+        };
         /** LoadedModel */
         LoadedModel: {
             /** Base Model */
@@ -2884,6 +2934,15 @@ export interface components {
             /** Rows */
             rows: (string | null)[][];
         };
+        /** RelabelInfo */
+        RelabelInfo: {
+            /** Input */
+            input: string;
+            /** Before */
+            before: string;
+            /** After */
+            after: string;
+        };
         /** ReplicaInfo */
         ReplicaInfo: {
             /** Id */
@@ -2920,6 +2979,27 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+        };
+        /** SnapshotDiff */
+        SnapshotDiff: {
+            before: components["schemas"]["SnapshotInfo"];
+            after: components["schemas"]["SnapshotInfo"];
+            /** Added */
+            added: number;
+            /** Removed */
+            removed: number;
+            /** Relabelled */
+            relabelled: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Labels */
+            labels: components["schemas"]["LabelShiftInfo"][];
+            /** Added Rows */
+            added_rows: components["schemas"]["DiffRow"][];
+            /** Removed Rows */
+            removed_rows: components["schemas"]["DiffRow"][];
+            /** Relabelled Rows */
+            relabelled_rows: components["schemas"]["RelabelInfo"][];
         };
         /** SnapshotInfo */
         SnapshotInfo: {
@@ -4421,6 +4501,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SnapshotInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_snapshot_api_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+                other_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotDiff"];
                 };
             };
             /** @description Validation Error */

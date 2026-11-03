@@ -97,6 +97,36 @@ class SnapshotInfo(BaseModel):
     taken_at: datetime | None
 
 
+class LabelShiftInfo(BaseModel):
+    label: str
+    before: int
+    after: int
+
+
+class RelabelInfo(BaseModel):
+    input: str
+    before: str
+    after: str
+
+
+class DiffRow(BaseModel):
+    input: str
+    label: str
+
+
+class SnapshotDiff(BaseModel):
+    before: SnapshotInfo
+    after: SnapshotInfo
+    added: int
+    removed: int
+    relabelled: int
+    unchanged: int
+    labels: list[LabelShiftInfo]
+    added_rows: list[DiffRow]
+    removed_rows: list[DiffRow]
+    relabelled_rows: list[RelabelInfo]
+
+
 class ChangeInfo(BaseModel):
     data: bool
     query: bool

@@ -1546,6 +1546,99 @@
         }
       }
     },
+    "/api/snapshots/{snapshot_id}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Read Snapshot",
+        "operationId": "read_snapshot_api_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{snapshot_id}/diff/{other_id}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Diff Snapshots",
+        "operationId": "diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          },
+          {
+            "name": "other_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Other Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDiff"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/data": {
       "get": {
         "tags": [
@@ -6138,6 +6231,24 @@
         ],
         "title": "DeviceInfo"
       },
+      "DiffRow": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "title": "Input"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input",
+          "label"
+        ],
+        "title": "DiffRow"
+      },
       "DownloadRequest": {
         "properties": {
           "variant": {
@@ -7452,6 +7563,29 @@
         ],
         "title": "LabelCount"
       },
+      "LabelShiftInfo": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "before": {
+            "type": "integer",
+            "title": "Before"
+          },
+          "after": {
+            "type": "integer",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "before",
+          "after"
+        ],
+        "title": "LabelShiftInfo"
+      },
       "LoadedModel": {
         "properties": {
           "base_model": {
@@ -8736,6 +8870,29 @@
         ],
         "title": "QueryResponse"
       },
+      "RelabelInfo": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "title": "Input"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input",
+          "before",
+          "after"
+        ],
+        "title": "RelabelInfo"
+      },
       "ReplicaInfo": {
         "properties": {
           "id": {
@@ -8822,6 +8979,74 @@
           "credit"
         ],
         "title": "SampleInfo"
+      },
+      "SnapshotDiff": {
+        "properties": {
+          "before": {
+            "$ref": "#/components/schemas/SnapshotInfo"
+          },
+          "after": {
+            "$ref": "#/components/schemas/SnapshotInfo"
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added"
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed"
+          },
+          "relabelled": {
+            "type": "integer",
+            "title": "Relabelled"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/LabelShiftInfo"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "added_rows": {
+            "items": {
+              "$ref": "#/components/schemas/DiffRow"
+            },
+            "type": "array",
+            "title": "Added Rows"
+          },
+          "removed_rows": {
+            "items": {
+              "$ref": "#/components/schemas/DiffRow"
+            },
+            "type": "array",
+            "title": "Removed Rows"
+          },
+          "relabelled_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RelabelInfo"
+            },
+            "type": "array",
+            "title": "Relabelled Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after",
+          "added",
+          "removed",
+          "relabelled",
+          "unchanged",
+          "labels",
+          "added_rows",
+          "removed_rows",
+          "relabelled_rows"
+        ],
+        "title": "SnapshotDiff"
       },
       "SnapshotInfo": {
         "properties": {

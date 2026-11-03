@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { useState } from "react";
 import { type DatasetSummary, api, unwrap } from "~/api/client";
 import { type ChangeInfo, type SnapshotInfo, dataKeys, useSnapshots } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
@@ -8,6 +10,7 @@ import { ErrorLine, Section } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { SnapshotDiffDialog, compareParam, parseCompare } from "./SnapshotDiff";
 import { modelHref, useModelNames } from "./parts";
 
 export function takenAt(snapshot: SnapshotInfo): string {
@@ -179,24 +182,67 @@ const SNAPSHOT_COLUMNS: ColumnDef<SnapshotInfo, unknown>[] = [
     },
 ];
 
+function ordered(pair: string[], snapshots: SnapshotInfo[]): [number, number] | null {
+    const picked = snapshots.filter((snapshot) => pair.includes(String(snapshot.id)));
+    if (picked.length !== 2) {
+        return null;
+    }
+    const [older, newer] = picked.sort((left, right) =>
+        takenAt(left).localeCompare(takenAt(right)),
+    );
+    return [older.id, newer.id];
+}
+
 export function SnapshotsSection({ dataset }: { dataset: DatasetSummary }) {
     const snapshots = useSnapshots(dataset.slug);
+    const router = useRouter();
+    const requested = useRouterState({
+        select: (state) => parseCompare((state.location.search as { compare?: unknown }).compare),
+    });
+    const [selected, setSelected] = useState<string[]>([]);
+    const rows = snapshots.data ?? [];
+    const pair = ordered(selected, rows);
+    const close = () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("compare");
+        router.history.replace(`/data?${params.toString()}`);
+    };
     return (
         <Section
             title="Snapshots"
-            caption="Frozen copies of the query's rows. Training and scoring read only a snapshot; a new one is taken when a run starts, and identical rows are stored once."
+            caption="Frozen copies of the query's rows. Training and scoring read only a snapshot; a new one is taken when a run starts, and identical rows are stored once. Tick two to compare them."
+            actions={
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pair === null}
+                    onClick={() => {
+                        if (pair) {
+                            const params = new URLSearchParams(window.location.search);
+                            params.set("compare", compareParam(pair[0], pair[1]));
+                            router.history.replace(`/data?${params.toString()}`);
+                        }
+                    }}
+                >
+                    Compare
+                </Button>
+            }
             flush
         >
             <ErrorLine error={snapshots.error} />
             <DataGrid
                 columns={SNAPSHOT_COLUMNS}
-                rows={snapshots.data ?? []}
+                rows={rows}
+                getRowId={(snapshot) => String(snapshot.id)}
+                selectedIds={selected}
+                onSelectedIdsChange={(ids) => setSelected(ids.slice(-2))}
                 loading={snapshots.isLoading}
                 loadingRows={2}
                 maxHeight="320px"
                 storageKey="minibrain.data.snapshots"
                 empty="No snapshot yet. One is taken when a model trains on this dataset, or with Save snapshot now."
             />
+            <SnapshotDiffDialog pair={requested} onClose={close} />
         </Section>
     );
 }

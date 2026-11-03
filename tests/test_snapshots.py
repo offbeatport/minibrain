@@ -208,3 +208,28 @@ def test_snapshot_migrations_round_trip(tmp_path: Path) -> None:
     command.downgrade(config, "0019")
     with engine.connect() as connection:
         assert connection.execute(text("SELECT minibrain_id FROM snapshots")).scalars().all() == [1]
+
+
+def test_two_snapshots_diff_by_input_with_label_shift(harness: Harness) -> None:
+    dataset_with_model(harness)
+    before = save(harness)
+    harness.client.put(
+        "/api/datasets/tickets/mapping",
+        json={
+            "sql": "SELECT text AS input, CASE WHEN text = 'ticket 0 about billing' THEN 'bug' "
+            "ELSE category END AS label FROM tickets WHERE category <> 'feature' "
+            "UNION ALL SELECT 'a brand new ticket', 'billing'"
+        },
+    )
+    after = save(harness)
+    diff = harness.client.get(f"/api/snapshots/{before['id']}/diff/{after['id']}")
+    assert diff.status_code == 200, diff.text
+    found = diff.json()
+    assert (found["before"]["id"], found["after"]["id"]) == (before["id"], after["id"])
+    assert (found["added"], found["removed"], found["relabelled"], found["unchanged"]) == (1, 50, 1, 149)
+    assert found["added_rows"] == [{"input": "a brand new ticket", "label": "billing"}]
+    assert found["relabelled_rows"] == [{"input": "ticket 0 about billing", "before": "billing", "after": "bug"}]
+    shifts = {item["label"]: (item["before"], item["after"]) for item in found["labels"]}
+    assert shifts == {"billing": (50, 50), "bug": (50, 51), "account": (50, 50), "feature": (50, 0)}
+    assert harness.client.get(f"/api/snapshots/{after['id']}").json()["rows"] == 151
+    assert harness.client.get("/api/snapshots/999/diff/1").status_code == 404

@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, UploadFile
@@ -17,16 +18,20 @@ from minibrain.api.schemas import (
     DatasetSummary,
     DataSettings,
     DataSettingsUpdate,
+    DiffRow,
     FolderCreate,
     FolderRoots,
     LabelCount,
+    LabelShiftInfo,
     MappingUpdate,
     PreviewResponse,
     PreviewRow,
     QualityInfo,
     QueryRequest,
     QueryResponse,
+    RelabelInfo,
     SampleInfo,
+    SnapshotDiff,
     SnapshotInfo,
     SourceKind,
     SourceRef,
@@ -35,6 +40,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
+from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.samples import SAMPLES, add_sample
@@ -71,8 +77,9 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.policy import locked_sources
+from minibrain.registry.files import snapshot_dir
 from minibrain.registry.models import Dataset, Snapshot, Source, now
-from minibrain.registry.service import ConflictError
+from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tasks.classify import trained_messages
 
@@ -462,6 +469,45 @@ def save_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> Snap
     cleanup(session, settings)
     session.commit()
     return snapshot_info(snapshot)
+
+
+def get_snapshot(session: Session, snapshot_id: int) -> Snapshot:
+    found = session.get(Snapshot, snapshot_id)
+    if found is None:
+        raise NotFoundError(f"no snapshot {snapshot_id}")
+    return found
+
+
+def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) -> Path:
+    path = snapshot_dir(session, store, snapshot)
+    if not path.is_file():
+        raise ConflictError(f"snapshot {snapshot.hash[:12]} predates Parquet snapshots and cannot be compared")
+    return path
+
+
+@router.get("/snapshots/{snapshot_id}")
+def read_snapshot(snapshot_id: int, session: SessionDep) -> SnapshotInfo:
+    return snapshot_info(get_snapshot(session, snapshot_id))
+
+
+@router.get("/snapshots/{snapshot_id}/diff/{other_id}")
+def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: StoreDep) -> SnapshotDiff:
+    before, after = get_snapshot(session, snapshot_id), get_snapshot(session, other_id)
+    found = compare(snapshot_file(session, store, before), snapshot_file(session, store, after))
+    return SnapshotDiff(
+        before=snapshot_info(before),
+        after=snapshot_info(after),
+        added=found.added,
+        removed=found.removed,
+        relabelled=found.relabelled,
+        unchanged=found.unchanged,
+        labels=[LabelShiftInfo(label=item.label, before=item.before, after=item.after) for item in found.labels],
+        added_rows=[DiffRow(input=text, label=label) for text, label in found.added_rows],
+        removed_rows=[DiffRow(input=text, label=label) for text, label in found.removed_rows],
+        relabelled_rows=[
+            RelabelInfo(input=item.input, before=item.before, after=item.after) for item in found.relabelled_rows
+        ],
+    )
 
 
 def data_settings(limits: DataLimits) -> DataSettings:

@@ -18,6 +18,7 @@ import { percent } from "~/lib/format";
 import { deploymentPageHref, evaluationsHref, modelDataHref, trainingHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { ModelDataNotice, withDataColumns } from "./data/versionData";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
     ConfirmAction,
@@ -466,6 +467,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
             />
             <StatusStrip row={row} />
             <HealthNotice row={row} run={open} />
+            <ModelDataNotice slug={row.key} />
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}
@@ -476,7 +478,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 bare
             >
                 <DataGrid
-                    columns={VERSION_COLUMNS}
+                    columns={withDataColumns(VERSION_COLUMNS, versions.data ?? [])}
                     rows={versions.data ?? []}
                     empty="No revisions yet: add training data on Training, then train or score a prompt."
                 />
