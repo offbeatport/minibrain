@@ -267,9 +267,7 @@ export function AddModelPage() {
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
-    const [tab, setTab] = useState<PickerTab>(
-        params.source === "import" ? "import" : "catalogue",
-    );
+    const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "import" : "catalogue");
     const [copy, setCopy] = useState<CopySource | null>(null);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
