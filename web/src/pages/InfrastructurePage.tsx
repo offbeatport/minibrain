@@ -10,6 +10,7 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
@@ -315,6 +316,33 @@ const STORE_KIND: Record<StoreInfo["kind"], string> = {
     folder: "Folder",
 };
 
+function diskTone(used: number): string {
+    if (used >= 0.9) {
+        return "bg-destructive";
+    }
+    return used >= 0.75 ? "bg-warning" : "bg-primary";
+}
+
+function DiskFree({ free, total }: { free: number; total: number | null | undefined }) {
+    const used = total ? Math.min(1, Math.max(0, (total - free) / total)) : null;
+    return (
+        <span className="flex w-44 flex-col gap-1.5">
+            <span className="tabular-nums">{`${bytes(free)} free of ${bytes(total)}`}</span>
+            {used !== null && (
+                <span
+                    aria-hidden="true"
+                    className="block h-1 overflow-hidden rounded-sm bg-secondary"
+                >
+                    <span
+                        className={cn("block h-full", diskTone(used))}
+                        style={{ width: `${used * 100}%` }}
+                    />
+                </span>
+            )}
+        </span>
+    );
+}
+
 const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
     { header: "Holds", accessorKey: "name" },
     { header: "Kind", id: "kind", cell: ({ row }) => STORE_KIND[row.original.kind] },
@@ -322,9 +350,16 @@ const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
         header: "Where",
         id: "location",
         cell: ({ row }) => (
-            <span className="block max-w-64 truncate font-mono" title={row.original.location}>
-                {row.original.location}
-            </span>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="block max-w-64 truncate font-mono">
+                        {row.original.location}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-96 font-mono break-all">
+                    {row.original.location}
+                </TooltipContent>
+            </Tooltip>
         ),
     },
     {
@@ -339,9 +374,7 @@ const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
             row.original.free_bytes === null || row.original.free_bytes === undefined ? (
                 <span className="text-muted-foreground">Managed</span>
             ) : (
-                <span className="tabular-nums">
-                    {`${bytes(row.original.free_bytes)} of ${bytes(row.original.total_bytes)}`}
-                </span>
+                <DiskFree free={row.original.free_bytes} total={row.original.total_bytes} />
             ),
     },
 ];
