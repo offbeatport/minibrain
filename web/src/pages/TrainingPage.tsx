@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { useRouterState } from "@tanstack/react-router";
 import { Database } from "lucide-react";
 import { Button, Field, Input, Link } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
@@ -21,8 +22,11 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
             trainButton.current?.focus();
         }
     }, [focusTrain]);
-    const [maxRows, setMaxRows] = useState("3000");
-    const [epochs, setEpochs] = useState("1");
+    const preset = useRouterState({
+        select: (state) => state.location.search as { rows?: unknown; epochs?: unknown },
+    });
+    const [maxRows, setMaxRows] = useState(String(preset.rows ?? "3000"));
+    const [epochs, setEpochs] = useState(String(preset.epochs ?? "1"));
     const create = useMutation({
         mutationFn: (body: { kind: "prompt" | "lora"; max_rows?: number; epochs?: number }) =>
             unwrap(
