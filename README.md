@@ -18,6 +18,9 @@ uvx --python 3.12 minibrain serve
 yet; until then build the wheel from this repo (see Develop) and run it with
 `uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`.
 
+[`docs/install.md`](docs/install.md) covers every install path, PyTorch backends (CUDA, ROCm, MPS, CPU), the Docker
+image and compose file, air-gapped installs, upgrades and where data lives.
+
 Open http://127.0.0.1:8000. `minibrain serve` starts main (UI, API, gateway) and supervises a job worker and one model
 engine per base model, restarting them if they stop. Data, artifacts and the database live in `~/.minibrain` (set
 `MINIBRAIN_HOME` to move them; `MINIBRAIN_DATABASE_URL` points the metadata at Postgres instead of SQLite).

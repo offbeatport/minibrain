@@ -928,12 +928,15 @@ Everything in the v1 scope below, after M1.
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
 - [ ] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [x] FIPS-ready crypto rules enforced in CI: ruff `S324` and `scripts/check_crypto.py`
-- [ ] Local install via uv on Linux, macOS, Windows; production Docker image (CUDA)
+- [x] Local install via uv on Linux and macOS
+- [ ] Local install via uv on Windows (documented in `docs/install.md`; not verified yet)
+- [ ] Production Docker image, CUDA 13.2 with a CPU variant and the DuckDB extensions baked in (built for amd64 and
+      arm64 and started without a GPU; verify on a GPU box)
 - [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
 - [x] Developer tasks in `mise.toml` (setup, dev, check, build)
 - [x] CI on every push: the `mise run check` checks, then build the UI and the wheel
 - [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
-- [ ] Install docs for `uvx`, `uv tool install`, `pip install` and Docker
+- [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install.md`
 - [x] Python 3.13: allowed in `requires-python`; CI tests 3.12 and 3.13
 - [ ] Offline install bundle; air-gap CI test
 - [ ] Signed offline update bundles (app and base models) with rollback
