@@ -10,7 +10,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Textarea,
+    SqlEditor,
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
 import { type ChangeEvent, type ReactNode, useCallback, useEffect, useState } from "react";
@@ -39,6 +39,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
+import { sqlProblem } from "~/lib/sqlError";
 import { DataExplorer } from "./data/Explorer";
 import { itemHref } from "./data/catalogue";
 
@@ -209,6 +210,14 @@ export function MappingSection({
     }, [mapping]);
     const save = useMutation({ mutationFn: onSave });
     const run = useMutation({ mutationFn: onRun });
+    const problem = run.error
+        ? sqlProblem(run.error, run.variables, sql)
+        : sqlProblem(save.error, save.variables?.sql, sql);
+    const runSql = (text: string) => {
+        if (text.trim() && !run.isPending) {
+            run.mutate(text);
+        }
+    };
     return (
         <Section
             title={title}
@@ -225,28 +234,29 @@ export function MappingSection({
             {before}
             {editing ? (
                 <div className="flex flex-col gap-2">
-                    <Textarea
+                    <SqlEditor
                         value={sql}
-                        onChange={(event) => setSql(event.target.value)}
-                        rows={6}
-                        spellCheck={false}
-                        className="font-mono"
+                        onValueChange={setSql}
+                        onRun={runSql}
+                        schema={{ source: columns }}
+                        diagnostics={problem?.diagnostics}
+                        minLines={6}
                         aria-label="SQL"
                     />
                     <p className="text-sm text-muted-foreground">
                         Return two columns named <span className="font-mono">input</span> and{" "}
-                        <span className="font-mono">label</span>. Queries are read-only and cannot
-                        reach files or the network.
+                        <span className="font-mono">label</span>; Cmd/Ctrl+Enter runs it. Queries
+                        are read-only and cannot reach files or the network.
                     </p>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => run.mutate(sql)}>
+                        <Button variant="outline" size="sm" onClick={() => runSql(sql)}>
                             Run
                         </Button>
                         <Button size="sm" onClick={() => save.mutate({ sql })}>
                             {saveLabel ?? "Save SQL"}
                         </Button>
                     </div>
-                    <ErrorLine error={run.error ?? save.error} />
+                    <ErrorLine error={problem?.message} />
                     {run.data && <QueryResult result={run.data} />}
                 </div>
             ) : (

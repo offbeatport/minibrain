@@ -10,7 +10,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Textarea,
+    SqlEditor,
+    type SqlEditorHandle,
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -23,6 +24,7 @@ import type {
 } from "~/api/client";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count } from "~/lib/format";
+import { sqlProblem } from "~/lib/sqlError";
 
 export type MappingBody = {
     source_id?: number;
@@ -195,7 +197,7 @@ export function QueryEditor({
     const [input, setInput] = useState(mapping.input_column ?? "");
     const [label, setLabel] = useState(mapping.label_column ?? "");
     const [sql, setSql] = useState(mapping.sql ?? "");
-    const editor = useRef<HTMLTextAreaElement>(null);
+    const editor = useRef<SqlEditorHandle>(null);
     useEffect(() => {
         setMode(savedMode);
         setInput(mapping.input_column ?? "");
@@ -215,16 +217,16 @@ export function QueryEditor({
         label: column.name,
         description: column.type.toLowerCase(),
     }));
-    const insert = (name: string) => {
-        const area = editor.current;
-        const start = area?.selectionStart ?? sql.length;
-        const end = area?.selectionEnd ?? sql.length;
-        const next = `${sql.slice(0, start)}${name}${sql.slice(end)}`;
-        setSql(next);
-        requestAnimationFrame(() => {
-            area?.focus();
-            area?.setSelectionRange(start + name.length, start + name.length);
-        });
+    const schema = Object.fromEntries(
+        sources.map((item) => [item.table, item.columns.map((column) => column.name)]),
+    );
+    const problem = run.error
+        ? sqlProblem(run.error, run.variables, sql)
+        : sqlProblem(save.error, save.variables?.sql, sql);
+    const runSql = (text: string) => {
+        if (text.trim() && !run.isPending) {
+            run.mutate(text);
+        }
     };
     const switchMode = (next: string) => {
         if (next === "sql" && !sql && chosen && input && label) {
@@ -249,28 +251,33 @@ export function QueryEditor({
             {mode === "sql" ? (
                 <div className="@container flex flex-col gap-3">
                     <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_16rem]">
-                        <Textarea
+                        <SqlEditor
                             ref={editor}
                             value={sql}
-                            onChange={(event) => setSql(event.target.value)}
-                            rows={9}
-                            spellCheck={false}
-                            className="min-h-48 font-mono"
+                            onValueChange={setSql}
+                            onRun={runSql}
+                            schema={schema}
+                            diagnostics={problem?.diagnostics}
+                            minLines={9}
+                            maxLines={24}
                             aria-label="SQL"
                             placeholder="SELECT text AS input, category AS label FROM tickets WHERE category IS NOT NULL"
                         />
-                        <TableList sources={sources} onInsert={insert} />
+                        <TableList
+                            sources={sources}
+                            onInsert={(name) => editor.current?.insert(name)}
+                        />
                     </div>
                     <p className="text-sm text-muted-foreground">
                         Return columns named <span className="font-mono">input</span> and{" "}
                         <span className="font-mono">label</span>; other columns are kept in
-                        snapshots. Join, union, filter and clean up with DuckDB SQL. Queries are
-                        read-only and cannot reach other files or the network.
+                        snapshots. Join, union, filter and clean up with DuckDB SQL; Cmd/Ctrl+Enter
+                        runs it. Queries are read-only and cannot reach other files or the network.
                     </p>
                     <div className="flex flex-wrap gap-2">
                         <Button
                             variant="outline"
-                            onClick={() => run.mutate(sql)}
+                            onClick={() => runSql(sql)}
                             disabled={!sql.trim() || run.isPending}
                         >
                             {run.isPending ? "Running…" : "Run"}
@@ -282,7 +289,7 @@ export function QueryEditor({
                             {saveLabel ?? "Save query"}
                         </Button>
                     </div>
-                    <ErrorLine error={run.error ?? save.error} />
+                    <ErrorLine error={problem?.message} />
                     {run.data && !run.error && <QueryResult result={run.data} />}
                 </div>
             ) : (
