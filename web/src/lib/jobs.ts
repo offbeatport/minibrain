@@ -16,6 +16,30 @@ export function useInvalidate(slug: string) {
         ]);
 }
 
+export function jobDuration(job: JobInfo): string {
+    if (!job.started_at) {
+        return "—";
+    }
+    const end = job.finished_at ? new Date(job.finished_at) : new Date();
+    const seconds = Math.max(
+        0,
+        Math.round((end.getTime() - new Date(job.started_at).getTime()) / 1000),
+    );
+    if (seconds < 60) {
+        return `${seconds} s`;
+    }
+    const minutes = Math.round(seconds / 60);
+    return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
+}
+
+export function jobSeconds(job: JobInfo): number {
+    if (!job.started_at) {
+        return -1;
+    }
+    const end = job.finished_at ? new Date(job.finished_at).getTime() : Date.now();
+    return (end - new Date(job.started_at).getTime()) / 1000;
+}
+
 export function describeLine(raw: string): LogLineData {
     try {
         const entry = JSON.parse(raw) as Record<string, unknown>;

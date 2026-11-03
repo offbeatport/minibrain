@@ -20,6 +20,8 @@ import { isActiveJob } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { jobDuration, jobSeconds } from "~/lib/jobs";
+import { jobHref } from "~/lib/modelLinks";
 import { exactTime, relativeTime } from "~/lib/time";
 
 const JOBS = ["jobs", "all"] as const;
@@ -50,22 +52,6 @@ const TONES: Record<string, Tone> = {
     succeeded: "success",
     cancelled: "neutral",
 };
-
-function duration(job: JobInfo): string {
-    if (!job.started_at) {
-        return "—";
-    }
-    const end = job.finished_at ? new Date(job.finished_at) : new Date();
-    const seconds = Math.max(
-        0,
-        Math.round((end.getTime() - new Date(job.started_at).getTime()) / 1000),
-    );
-    if (seconds < 60) {
-        return `${seconds} s`;
-    }
-    const minutes = Math.round(seconds / 60);
-    return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
-}
 
 function subject(job: JobInfo): string {
     const name = job.minibrain_name ?? job.model ?? "Install";
@@ -194,8 +180,8 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         id: "duration",
         header: "Took",
-        accessorFn: duration,
-        cell: ({ row }) => <span className="tabular-nums">{duration(row.original)}</span>,
+        accessorFn: jobSeconds,
+        cell: ({ row }) => <span className="tabular-nums">{jobDuration(row.original)}</span>,
     },
     {
         id: "actions",
@@ -205,15 +191,6 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
         cell: ({ row }) => <JobActions job={row.original} />,
     },
 ];
-
-function jobHref(job: JobInfo): string | null {
-    if (job.minibrain) {
-        const page =
-            job.kind === "prepare" ? "/data" : job.kind === "eval" ? "/evaluations" : "/training";
-        return `${page}?minibrain=${encodeURIComponent(job.minibrain)}`;
-    }
-    return job.model ? `/models/base/${encodeURIComponent(job.model)}` : null;
-}
 
 export function MonitorPage() {
     const router = useRouter();

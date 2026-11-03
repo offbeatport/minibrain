@@ -145,6 +145,30 @@ export function useJobs(slug: string) {
     });
 }
 
+export function useTrainingJobs() {
+    return useQuery({
+        queryKey: ["jobs", "training"] as const,
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/jobs", {
+                    params: { query: { kind: ["train", "eval"], limit: 500 } },
+                }),
+            ),
+        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : 15000),
+    });
+}
+
+export function useJob(id: number | null) {
+    return useQuery({
+        queryKey: ["jobs", "detail", id] as const,
+        queryFn: () =>
+            unwrap(api.GET("/api/jobs/{job_id}", { params: { path: { job_id: id ?? 0 } } })),
+        enabled: id !== null,
+        refetchInterval: (query) =>
+            query.state.data && isActiveJob(query.state.data) ? POLL_MS : false,
+    });
+}
+
 export function useKeys() {
     return useQuery({ queryKey: keys.apiKeys, queryFn: () => unwrap(api.GET("/api/keys")) });
 }

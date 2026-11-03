@@ -6,19 +6,22 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
 import { count, dateTime, percent } from "~/lib/format";
+import { jobHref } from "~/lib/modelLinks";
 
 const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         header: "minibrain",
         id: "minibrain",
-        cell: ({ row }) => (
-            <Link
-                className="text-primary"
-                href={`/training?minibrain=${encodeURIComponent(row.original.minibrain ?? "")}`}
-            >
-                {row.original.minibrain_name}
-            </Link>
-        ),
+        cell: ({ row }) => {
+            const href = jobHref(row.original);
+            return href ? (
+                <Link className="text-primary" href={href}>
+                    {row.original.minibrain_name ?? row.original.model}
+                </Link>
+            ) : (
+                (row.original.minibrain_name ?? row.original.model)
+            );
+        },
     },
     {
         header: "Job",

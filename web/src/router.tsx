@@ -20,11 +20,11 @@ import { FeedbackPage, PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { TrainingPage } from "./pages/TrainingPage";
 import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
+import { ModelTrainingPage, TrainingListPage } from "./pages/training/TrainingPages";
 
 const LEGACY_TABS: Record<string, string> = {
     data: "/data",
@@ -113,7 +113,8 @@ const routeTree = rootRoute.addChildren([
             throw redirect({ href: `/data?item=dataset:${encodeURIComponent(params.slug)}` });
         },
     }),
-    scopedPage("/training", TrainingPage),
+    globalPage("/training", TrainingListPage),
+    globalPage("/training/$slug", ModelTrainingPage),
     globalPage("/evaluations", EvaluationsPage),
     scopedPage("/feedback", FeedbackPage),
     createRoute({

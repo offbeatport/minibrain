@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { type JobInfo, type MinibrainDetail, api, unwrap } from "~/api/client";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
-import { ScopedPage } from "~/components/PageHeader";
 import { ErrorLine, PanelSection, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useInvalidate } from "~/lib/jobs";
@@ -160,7 +159,7 @@ function AddTrainingData({
     );
 }
 
-function Training({ slug }: { slug: string }) {
+export function Training({ slug }: { slug: string }) {
     const { data: detail } = useMinibrain(slug);
     const { data: jobs } = useJobs(slug);
     const [prepared, setPrepared] = useState(false);
@@ -194,13 +193,5 @@ function Training({ slug }: { slug: string }) {
                 )}
             </Section>
         </>
-    );
-}
-
-export function TrainingPage() {
-    return (
-        <ScopedPage title="Training" caption="Score prompt-only versions and train new ones.">
-            {(slug) => <Training slug={slug} />}
-        </ScopedPage>
     );
 }
