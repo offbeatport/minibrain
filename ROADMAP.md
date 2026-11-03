@@ -364,6 +364,7 @@ before a run starts:
 - Diff: any two snapshots compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
   rows per label, with samples of each. The model page links each version to the diff against the version before it,
   next to the change in held-out accuracy; a version's scores say whether its data matches the live version's.
+- Feedback: a model's accepted feedback rows merge into every snapshot taken for it (see Feedback loop).
 - Retention: snapshots a version uses are kept; those taken for versions that were deleted are removed with their
   files; of the saved snapshots no version uses, the last N per dataset stay (Settings → Data, 5 by default).
   Infrastructure → Storage shows how much snapshots use.
@@ -509,11 +510,27 @@ once it matches; only the cache budget below removes files.
 
 ### Feedback loop
 
-1. `POST /v1/feedback` with the response id, a rating and an optional corrected output. With request logging off, the
-   call carries the input too. Playground buttons call the same endpoint.
-2. Feedback lands in the review queue; a reviewer accepts the correction or fixes it.
-3. Accepted rows join the next snapshot; the worst failures can join the golden set.
-4. Each minibrain shows feedback since its last version; retraining is one click.
+1. `POST /v1/feedback` with an API key: `model`, `response_id` (the chat completion's `id`), `rating` (`up` or
+   `down`), and optionally `correction` (the right answer, with `down` only) and `comment`. The key must cover the
+   model; base models take no feedback. When this install does not keep request inputs, the call carries `input` too
+   (and optionally `output`, the answer the app got); otherwise the response id is enough. A second call on the same
+   response while it waits for review updates it. The standalone gateway forwards the call to main. Playground thumbs
+   and "Correct it" store the same record through `/api/minibrains/<slug>/feedback`.
+2. Request logs carry each response id. "Request inputs and answers" under Settings → Security (off by default, needs
+   request logs) also keeps the last user message and the answer, for as long as the logs. Feedback is stored per model
+   and version and links to its request log by response id.
+3. Feedback lands in the review queue (the Feedback page): accept the suggested answer (the correction, or the model's
+   own answer for a thumbs-up), fix and accept with another answer, or reject. Disagreement comes first (feedback on
+   the same input, ignoring case and spacing, that suggests different answers), then thumbs-down with no answer, then
+   the rest, newest first. Assignment is "Assign to me"; every review and assignment is audited.
+4. Accepted feedback becomes the model's feedback rows: input and accepted answer, the latest review winning per input.
+   Every snapshot taken for the model (Prepare training data, or a version starting) merges them in: a dataset row
+   with the same trimmed input is replaced, a new input is added, and a row the dataset already agrees with changes
+   nothing. The snapshot records how many rows feedback added or relabelled ("Includes N rows from feedback" on
+   Training); "Save snapshot now" on a dataset leaves feedback out. Feedback rows fall into the derived splits like any
+   other row; sending the worst failures to the golden set waits for golden set authoring.
+5. The model page and the Training page show "Feedback since vN: total (accepted)" and the reviews still waiting;
+   "Train with feedback" trains a new version with the last trained version's recipe.
 
 ## Retrieval
 
@@ -615,7 +632,12 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
     view.
-  - Feedback is a placeholder until the review queue lands.
+  - Feedback is the review queue across models: input, the model's answer, the suggested answer, status (To
+    review, Accepted, Rejected) and model, paged on the server and filtered by model, status and assignee
+    (`?model=<slug>&status=pending&assignee=me`), disagreement first. A row opens its review screen
+    (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
+    right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
+    Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
 - Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
@@ -899,7 +921,8 @@ Everything in the v1 scope below, after M1.
 - [x] `transformers` backend for local mode and tests
 - [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
-- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step
+- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step (response ids on request logs and
+      opt-in request inputs and answers done)
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
@@ -916,8 +939,10 @@ Everything in the v1 scope below, after M1.
 - [ ] Signed offline update bundles (app and base models) with rollback
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
 - [ ] Rebase: rebuild every minibrain on a new base model, compare, promote
-- [ ] Feedback endpoint, thumbs-down / correct in playground and review screens → review queue
-- [ ] Review queue for domain experts: plain language, assignment, reviewer agreement
+- [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
+      in the playground → review queue; accepted rows join the model's next snapshot; "Train with feedback"
+- [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
+      Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
 - [ ] SBOM, AI bill of materials per version, signed images
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
