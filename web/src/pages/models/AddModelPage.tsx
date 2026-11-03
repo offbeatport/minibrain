@@ -2,22 +2,18 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
     BookOpen,
-    Boxes,
     Braces,
     ChevronLeft,
     Database,
-    ExternalLink,
     FlaskConical,
     type LucideIcon,
     PenLine,
-    SquarePen,
     Tags,
 } from "lucide-react";
 import {
     Button,
     Card,
     Field,
-    FieldGroup,
     Input,
     Link,
     Select,
@@ -32,7 +28,8 @@ import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine, Page } from "~/components/Section";
+import { TAGS_HINT } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { BasePicker, type PickerTab } from "./BasePicker";
@@ -419,121 +416,100 @@ export function AddModelPage() {
             </Link>
             <PageHeader
                 title="Add model"
-                caption="Start from a base model; train it on your data whenever you like."
+                caption="Pick a base model and name it. Train it on your data later, from its page."
             />
             <form
                 onSubmit={submit}
                 onKeyDown={shortcut}
-                className="grid max-w-6xl items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_16rem]"
+                className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]"
             >
-                <PanelSections>
-                    <PanelSection
-                        icon={Boxes}
-                        title="Task and base model"
-                        description="Recommendations follow the task."
-                        actions={
-                            <a
-                                href="/discover"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                            >
-                                Discover more models
-                                <ExternalLink className="size-3.5" />
-                            </a>
-                        }
-                    >
-                        <FieldGroup>
-                            <TaskSelect value={task} onChange={setTask} />
-                            <div className="flex flex-col gap-3">
-                                <Field id="base-model" label="Base model">
-                                    <BasePicker
-                                        value={{
-                                            option,
-                                            importText:
-                                                current?.kind === "import" ? current.text : null,
-                                        }}
-                                        catalog={catalog.data}
-                                        models={rows}
-                                        picks={picks}
-                                        open={open}
-                                        onOpenChange={setOpen}
-                                        tab={tab}
-                                        onTabChange={setTab}
-                                        onPick={pick}
-                                        onImport={importPick}
-                                    />
-                                </Field>
-                                {catalog.isLoading && (
-                                    <span className="text-sm text-muted-foreground">
-                                        Loading the catalogue…
-                                    </span>
-                                )}
-                                <ErrorLine error={catalog.error ?? startFrom.error} />
-                                <BaseSummary
-                                    option={option}
-                                    plan={plan}
-                                    catalog={catalog.data}
-                                    need={need}
-                                    accepted={accepted}
-                                    onAccepted={setAccepted}
-                                    onVariant={(variant) => {
-                                        if (option?.entry) {
-                                            setPicked({
-                                                kind: "catalogue",
-                                                id: option.entry.id,
-                                                variant,
-                                            });
-                                            setAccepted(false);
-                                        }
+                <Card className="gap-0 py-0">
+                    <section className="flex flex-col gap-6 p-6">
+                        <h2 className="text-lg font-semibold">Base model</h2>
+                        <TaskSelect value={task} onChange={setTask} />
+                        <div className="flex flex-col gap-3">
+                            <Field id="base-model" label="Model">
+                                <BasePicker
+                                    value={{
+                                        option,
+                                        importText:
+                                            current?.kind === "import" ? current.text : null,
                                     }}
-                                    copy={copy}
-                                    onClearCopy={() => setCopy(null)}
-                                    onPickAnother={() => setOpen(true)}
-                                />
-                            </div>
-                        </FieldGroup>
-                    </PanelSection>
-                    <PanelSection icon={SquarePen} title="Details">
-                        <FieldGroup>
-                            <div className="grid gap-5 sm:grid-cols-2">
-                                <Field
-                                    id="create-name"
-                                    label="Name"
-                                    hint={`Apps call it as ${slugOf(finalName)}.`}
-                                >
-                                    <Input
-                                        id="create-name"
-                                        value={name}
-                                        onChange={(event) => setName(event.target.value)}
-                                        placeholder={suggestedName || "IT ticket classifier"}
-                                    />
-                                </Field>
-                                <Field
-                                    id="create-tags"
-                                    label="Tags (optional)"
-                                    hint="Comma separated."
-                                >
-                                    <Input
-                                        id="create-tags"
-                                        value={tags}
-                                        onChange={(event) => setTags(event.target.value)}
-                                    />
-                                </Field>
-                            </div>
-                            <Field id="create-description" label="Description (optional)">
-                                <Textarea
-                                    id="create-description"
-                                    value={description}
-                                    onChange={(event) => setDescription(event.target.value)}
-                                    rows={2}
-                                    placeholder="Routes incoming tickets to the right queue"
+                                    catalog={catalog.data}
+                                    models={rows}
+                                    picks={picks}
+                                    open={open}
+                                    onOpenChange={setOpen}
+                                    tab={tab}
+                                    onTabChange={setTab}
+                                    onPick={pick}
+                                    onImport={importPick}
                                 />
                             </Field>
-                        </FieldGroup>
-                    </PanelSection>
-                </PanelSections>
-                <aside className="lg:sticky lg:top-6 lg:pt-9">
+                            {catalog.isLoading && (
+                                <span className="text-sm text-muted-foreground">
+                                    Loading the catalogue…
+                                </span>
+                            )}
+                            <ErrorLine error={catalog.error ?? startFrom.error} />
+                            <BaseSummary
+                                option={option}
+                                plan={plan}
+                                catalog={catalog.data}
+                                need={need}
+                                accepted={accepted}
+                                onAccepted={setAccepted}
+                                onVariant={(variant) => {
+                                    if (option?.entry) {
+                                        setPicked({
+                                            kind: "catalogue",
+                                            id: option.entry.id,
+                                            variant,
+                                        });
+                                        setAccepted(false);
+                                    }
+                                }}
+                                copy={copy}
+                                onClearCopy={() => setCopy(null)}
+                                onPickAnother={() => setOpen(true)}
+                            />
+                        </div>
+                    </section>
+                    <section className="flex flex-col gap-6 border-t p-6">
+                        <h2 className="text-lg font-semibold">Details</h2>
+                        <Field
+                            id="create-name"
+                            label="Name"
+                            hint={`Apps call it as ${slugOf(finalName)}.`}
+                        >
+                            <Input
+                                id="create-name"
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder={suggestedName || "IT ticket classifier"}
+                                className="sm:max-w-md"
+                            />
+                        </Field>
+                        <Field id="create-description" label="Description (optional)">
+                            <Textarea
+                                id="create-description"
+                                value={description}
+                                onChange={(event) => setDescription(event.target.value)}
+                                rows={3}
+                                placeholder="Routes incoming tickets to the right queue"
+                            />
+                        </Field>
+                        <Field id="create-tags" label="Tags (optional)" hint={TAGS_HINT}>
+                            <Input
+                                id="create-tags"
+                                value={tags}
+                                onChange={(event) => setTags(event.target.value)}
+                                className="sm:max-w-md"
+                            />
+                        </Field>
+                    </section>
+                </Card>
+                <aside className="lg:sticky lg:top-6">
                     <DiskPanel
                         option={option}
                         plan={plan}

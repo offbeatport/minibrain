@@ -161,12 +161,12 @@ function Trigger({ value }: { value: PickerValue }) {
             <button
                 type="button"
                 id="base-model"
-                className="flex w-full min-w-0 items-start gap-3 rounded-lg border border-input bg-input-background p-3 text-left text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex w-full min-w-0 items-center gap-4 rounded-lg border border-input bg-input-background p-4 text-left text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             >
                 {option ? (
-                    <PublisherLogo publisher={option.publisher} name={option.name} />
+                    <PublisherLogo publisher={option.publisher} name={option.name} size="lg" />
                 ) : (
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
                         <Boxes aria-hidden="true" className="size-4" />
                     </span>
                 )}

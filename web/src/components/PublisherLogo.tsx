@@ -18,6 +18,7 @@ const PROVIDERS: Record<string, ProviderId> = {
 const SIZES = {
     sm: { tile: "size-5", logo: "size-3.5" },
     md: { tile: "size-8", logo: "size-5" },
+    lg: { tile: "size-12", logo: "size-7" },
 };
 
 export function PublisherLogo({
