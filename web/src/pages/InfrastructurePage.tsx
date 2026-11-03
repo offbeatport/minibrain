@@ -1,12 +1,20 @@
 import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Cpu, Gauge, HardDrive, MemoryStick, Network, Server, TriangleAlert } from "lucide-react";
-import { Badge, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import {
+    Badge,
+    DataGrid,
+    Link,
+    TabNav,
+    type TabNavItem,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
-import { SideMenuLayout } from "~/components/SideMenu";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
@@ -360,10 +368,10 @@ function gigabytes(megabytes: number | null | undefined): string {
         : `${(megabytes / 1024).toFixed(1)} GB`;
 }
 
-const SECTIONS = [
-    { label: "Overview", href: "/infrastructure", icon: Gauge },
-    { label: "Machines", href: "/infrastructure/machines", icon: Server },
-    { label: "Storage", href: "/infrastructure/storage", icon: HardDrive },
+const SECTIONS: TabNavItem[] = [
+    { label: "Overview", href: "/infrastructure" },
+    { label: "Machines", href: "/infrastructure/machines" },
+    { label: "Storage", href: "/infrastructure/storage" },
 ];
 
 const LOW_FREE_SHARE = 0.1;
@@ -424,7 +432,7 @@ function Overview({
         <PanelSections>
             <SetupSection info={info} pools={pools} loops={loops} />
             <PanelSection icon={Gauge} title="At a glance">
-                <div className="flex flex-wrap gap-8">
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
                     <Stat
                         label="Machines online"
                         value={`${count(nodes.filter((node) => node.online).length)} of ${count(nodes.length)}`}
@@ -483,71 +491,63 @@ export function InfrastructurePage() {
                 caption="Where minibrain runs and where it keeps its data."
             />
             <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
-            <SideMenuLayout label="Infrastructure pages" items={SECTIONS} active={active}>
-                {active === "/infrastructure" && (
-                    <Overview
-                        info={infrastructure.data}
-                        pools={pools.data ?? []}
-                        loops={data?.loops}
-                        main={main}
-                    />
-                )}
-                {active === "/infrastructure/machines" && (
-                    <PanelSections>
-                        {(pools.data ?? []).map((pool) => (
-                            <PoolSection key={pool.name} pool={pool} main={main} />
-                        ))}
-                        <PanelSection
-                            icon={Cpu}
-                            title="This main process"
-                            description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
-                        >
-                            <div className="flex flex-wrap gap-8">
-                                <Stat
-                                    label="Inference"
-                                    value={
-                                        <span className="font-mono">
-                                            {device?.inference ?? "–"}
-                                        </span>
-                                    }
-                                />
-                                <Stat
-                                    label="Training"
-                                    value={
-                                        <span className="font-mono">{device?.training ?? "–"}</span>
-                                    }
-                                />
-                                <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
-                                <Stat
-                                    label="GPU memory used"
-                                    value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
-                                />
-                                <Stat label="CPU cores" value={count(device?.cpu_count)} />
-                                <Stat
-                                    label="Background loops"
-                                    value={LOOPS[data?.loops ?? "single"]}
-                                />
-                            </div>
-                        </PanelSection>
-                        <PanelSection
-                            icon={MemoryStick}
-                            title="Loaded in memory"
-                            description="Base models and adapters the serving process holds right now."
-                        >
-                            <DataGrid
-                                columns={LOADED_COLUMNS}
-                                rows={data?.loaded ?? []}
-                                empty="Nothing loaded yet; the first request loads the base model."
+            <TabNav label="Infrastructure pages" tabs={SECTIONS} />
+            {active === "/infrastructure" && (
+                <Overview
+                    info={infrastructure.data}
+                    pools={pools.data ?? []}
+                    loops={data?.loops}
+                    main={main}
+                />
+            )}
+            {active === "/infrastructure/machines" && (
+                <PanelSections>
+                    {(pools.data ?? []).map((pool) => (
+                        <PoolSection key={pool.name} pool={pool} main={main} />
+                    ))}
+                    <PanelSection
+                        icon={Cpu}
+                        title="This main process"
+                        description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
+                    >
+                        <div className="flex flex-wrap gap-x-8 gap-y-4">
+                            <Stat
+                                label="Inference"
+                                value={
+                                    <span className="font-mono">{device?.inference ?? "–"}</span>
+                                }
                             />
-                        </PanelSection>
-                    </PanelSections>
-                )}
-                {active === "/infrastructure/storage" && (
-                    <PanelSections>
-                        <StorageSection info={infrastructure.data} />
-                    </PanelSections>
-                )}
-            </SideMenuLayout>
+                            <Stat
+                                label="Training"
+                                value={<span className="font-mono">{device?.training ?? "–"}</span>}
+                            />
+                            <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
+                            <Stat
+                                label="GPU memory used"
+                                value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
+                            />
+                            <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                            <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
+                        </div>
+                    </PanelSection>
+                    <PanelSection
+                        icon={MemoryStick}
+                        title="Loaded in memory"
+                        description="Base models and adapters the serving process holds right now."
+                    >
+                        <DataGrid
+                            columns={LOADED_COLUMNS}
+                            rows={data?.loaded ?? []}
+                            empty="Nothing loaded yet; the first request loads the base model."
+                        />
+                    </PanelSection>
+                </PanelSections>
+            )}
+            {active === "/infrastructure/storage" && (
+                <PanelSections>
+                    <StorageSection info={infrastructure.data} />
+                </PanelSections>
+            )}
         </Page>
     );
 }
