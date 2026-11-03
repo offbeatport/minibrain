@@ -646,6 +646,7 @@ export function DiscoverComparePage() {
     };
     const columns: CompareColumn[] = entries.map((entry, index) => ({
         id: entry.id,
+        label: entry.name,
         header: (
             <ModelHeader
                 entry={entry}
@@ -755,6 +756,7 @@ export function DiscoverComparePage() {
                         className={comparing ? undefined : "max-w-3xl"}
                         columns={columns}
                         sections={sections}
+                        onReorder={(next) => go(next, only)}
                         corner={
                             <DifferencesToggle
                                 only={only}
