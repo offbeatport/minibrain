@@ -1,6 +1,6 @@
 import os
 import secrets
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore, is_artifact_id
+from minibrain.encryption.envelope import HEADER
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read, write
 from minibrain.settings import Settings
@@ -145,6 +146,15 @@ class BucketBlobs:
         key = self.key(artifact_id)
         if self.fs.exists(key):
             self.fs.rm_file(key)
+
+    def ids(self) -> Iterator[str]:
+        for path in sorted(self.fs.find(self.root)):
+            name = str(path).rsplit("/", 1)[-1]
+            if is_artifact_id(name) and str(path).rstrip("/").endswith(f"{name[:2]}/{name}"):
+                yield name
+
+    def head(self, artifact_id: str) -> bytes:
+        return bytes(self.fs.cat_file(self.key(artifact_id), start=0, end=HEADER))
 
 
 def bucket_for(config: StorageConfig, secret: str) -> BucketBlobs | None:

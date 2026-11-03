@@ -50,6 +50,9 @@ from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.feedback import FeedbackError, database_feedback
 from minibrain.data.snapshot import SnapshotError
 from minibrain.data.sources import SourceError
+from minibrain.encryption.envelope import EnvelopeError
+from minibrain.encryption.keys import EncryptionError, ensure_master_key, keys_for
+from minibrain.encryption.providers import KeyUnavailableError
 from minibrain.gateway import routes as gateway
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogBuffer, database_sink
@@ -68,6 +71,7 @@ from minibrain.policy import load as load_policy
 from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
+from minibrain.registry.models import SYSTEM_ACTOR
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
@@ -97,6 +101,9 @@ ERROR_STATUS: dict[type[Exception], int] = {
     PasswordError: 422,
     SignInError: 401,
     SetupTokenError: 403,
+    EncryptionError: 422,
+    KeyUnavailableError: 503,
+    EnvelopeError: 500,
 }
 
 log = logging.getLogger("minibrain")
@@ -179,7 +186,10 @@ def create_app(
     capture()
     migrate(settings.database_url)
     sessions = make_sessions(settings.database_url)
+    keys_for(settings).attach(sessions)
     with sessions() as session:
+        ensure_master_key(session, keys_for(settings), SYSTEM_ACTOR)
+        session.commit()
         backfill(session, settings)
         seed(session)
         sync_declared(session)

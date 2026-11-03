@@ -1,5 +1,7 @@
+import base64
 import json
 import logging
+import os
 import stat
 from collections.abc import Iterator
 from pathlib import Path
@@ -10,6 +12,7 @@ from sqlalchemy import select
 
 from minibrain.connections import vault
 from minibrain.connections.store import context
+from minibrain.encryption import keys, secrets
 from minibrain.registry.models import AuditEvent, Connection
 from minibrain.settings import Settings
 from tests.conftest import Harness
@@ -67,7 +70,7 @@ def everything_said(harness: Harness) -> str:
 def test_secrets_round_trip_under_the_master_key(settings: Settings) -> None:
     settings.home.mkdir(parents=True)
     sealed = vault.seal(settings, PASSWORD, "minibrain.connection.1")
-    assert PASSWORD not in sealed and sealed.startswith(f"{vault.FORMAT}:")
+    assert PASSWORD not in sealed and sealed.startswith(f"{secrets.FORMAT}:")
     assert vault.unseal(settings, sealed, "minibrain.connection.1") == PASSWORD
     assert vault.seal(settings, PASSWORD, "minibrain.connection.1") != sealed
     key = vault.key_path(settings)
@@ -85,14 +88,16 @@ def test_secrets_round_trip_under_the_master_key(settings: Settings) -> None:
 def test_master_key_can_come_from_a_mounted_file(
     settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    settings.home.mkdir(parents=True)
     mounted = tmp_path / "run" / "master.key"
-    monkeypatch.setenv(vault.KEY_ENV, str(mounted))
+    monkeypatch.setenv(keys.KEY_ENV, str(mounted))
     with pytest.raises(vault.VaultError, match="does not exist"):
         vault.seal(settings, PASSWORD, "x")
-    vault.create_key(mounted)
+    mounted.parent.mkdir()
+    mounted.write_text(base64.b64encode(os.urandom(32)).decode() + "\n")
     sealed = vault.seal(settings, PASSWORD, "x")
     assert vault.unseal(settings, sealed, "x") == PASSWORD
-    assert not (settings.home / "secrets" / vault.KEY_FILE).exists()
+    assert not (settings.home / "keys").exists() and not (settings.home / "secrets" / "master.key").exists()
 
 
 def test_secrets_are_write_only_and_replaceable(harness: Harness, caplog: pytest.LogCaptureFixture) -> None:

@@ -35,7 +35,7 @@ from minibrain.data.shared import (
 from minibrain.data.snapshots import cleanup, model_snapshot_now
 from minibrain.data.sources import safe_filename
 from minibrain.models.registry import available_bases, base_readiness
-from minibrain.registry.files import snapshot_dir
+from minibrain.registry.files import snapshot_location
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, Minibrain, now
 from minibrain.registry.service import (
     ConflictError,
@@ -213,5 +213,5 @@ def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]
     current = latest_snapshot(get_minibrain(session, slug))
     if current is None:
         return []
-    examples = snapshot.read_split(snapshot_dir(session, store, current), "golden")
+    examples = snapshot.read_split(snapshot_location(session, store, current), "golden")
     return [ExampleInfo(input=example.input, label=example.label) for example in examples]

@@ -178,6 +178,15 @@ FIELDS: tuple[Field, ...] = (
         "text",
         "",
     ),
+    Field(
+        "encryption",
+        "Encryption at rest",
+        "Where the master key lives that wraps each stored file's own data key. Files written before a change stay "
+        "readable; re-wrap them under Encryption at rest. Off writes new files unencrypted.",
+        "choice",
+        "local",
+        ("local", "off"),
+    ),
 )
 
 CHOICE_LABELS = {
@@ -197,6 +206,7 @@ CHOICE_LABELS = {
     "viewer": "Viewer",
     "builder": "Builder",
     "admin": "Admin",
+    "local": "Local key file",
 } | {key: value[0] for key, value in LICENCES.items()}
 
 BY_NAME = {field.name: field for field in FIELDS}

@@ -11,6 +11,7 @@ from typing import Any, Protocol
 import duckdb
 
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
+from minibrain.encryption.duck import register
 
 READERS = {
     ".csv": "read_csv_auto",
@@ -69,7 +70,7 @@ class Remote(Protocol):
 @dataclass(frozen=True)
 class Table:
     name: str
-    staging: Path | None = None
+    staging: str | None = None
     files: tuple[str, ...] = ()
     reader: str = ""
     fingerprint: str = ""
@@ -121,17 +122,17 @@ def table_name_base(name: str) -> str:
     return base
 
 
-def stage(file_path: Path, staging_path: Path) -> None:
-    reader = READERS[file_path.suffix.lower()]
+def stage(source: str | Path, staging_path: Path) -> None:
+    name = Path(str(source)).name
+    reader = READERS[Path(name).suffix.lower()]
     staging_path.unlink(missing_ok=True)
     try:
         with duckdb.connect(str(staging_path)) as connection:
-            connection.execute(
-                f"CREATE TABLE {SOURCE_TABLE} AS SELECT * FROM {reader}({quote_literal(str(file_path))})"
-            )
+            register(connection)
+            connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS SELECT * FROM {reader}({quote_literal(str(source))})")
     except duckdb.Error as error:
         staging_path.unlink(missing_ok=True)
-        raise SourceError(f"could not read {file_path.name}: {error}") from error
+        raise SourceError(f"could not read {name}: {error}") from error
 
 
 def file_list(files: Sequence[str]) -> str:
@@ -154,12 +155,13 @@ def connect(
 ) -> duckdb.DuckDBPyConnection:
     connection = duckdb.connect(config=offline_config())
     try:
+        register(connection)
         readable: list[str] = []
         directories: list[str] = [str(output) + "/"] if output is not None else []
         for index, table in enumerate(tables):
             attached = f"staged_{index}"
             if table.staging is not None:
-                connection.execute(f"ATTACH {quote_literal(str(table.staging))} AS {attached} (READ_ONLY)")
+                connection.execute(f"ATTACH {quote_literal(table.staging)} AS {attached} (READ_ONLY)")
             readable += table.files
             if table.remote is not None:
                 readable += table.remote.paths

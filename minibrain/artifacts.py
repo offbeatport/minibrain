@@ -4,13 +4,19 @@ import os
 import shutil
 import tarfile
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import BinaryIO, Protocol
+from typing import BinaryIO, Protocol, cast
+
+from minibrain.encryption import duck
+from minibrain.encryption.envelope import HEADER, Sink, is_sealed, read_exact
+from minibrain.encryption.sealed import KeySource, artifact_context, open_reader, seal_stream, sealed_copy
 
 CHUNK = 1 << 20
+STAGED_NAME = "staging.duckdb"
 
 
 class Packing(StrEnum):
@@ -65,13 +71,42 @@ class RemoteBlobs(Protocol):
 
     def delete(self, artifact_id: str) -> None: ...
 
+    def ids(self) -> Iterator[str]: ...
+
+    def head(self, artifact_id: str) -> bytes: ...
+
+
+def staged_context(relative: str) -> bytes:
+    return f"minibrain.staging.{relative.split('/', 1)[0]}".encode()
+
+
+def plain_copy(stream: Readable, sink: Sink) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    size = 0
+    while chunk := stream.read(CHUNK):
+        digest.update(chunk)
+        sink.write(chunk)
+        size += len(chunk)
+    return digest.hexdigest(), size
+
+
+def sealed_file(path: Path) -> bool:
+    with path.open("rb") as stream:
+        return is_sealed(read_exact(stream, HEADER))
+
 
 class ArtifactStore:
-    def __init__(self, root: Path, cache: Path) -> None:
+    def __init__(self, root: Path, cache: Path, keys: KeySource | None = None, staging: Path | None = None) -> None:
         self.root = root
         self.cache = cache
+        self.keys = keys
+        self.staging = staging or root.parent / "staging"
         self.remote: RemoteBlobs | None = None
         self.writes_remote = False
+        self.sizes: dict[str, int] = {}
+
+    def sealing(self) -> bool:
+        return self.keys is not None and self.keys.sealing()
 
     def use(self, remote: RemoteBlobs | None, writes: bool) -> None:
         self.remote = remote
@@ -90,14 +125,15 @@ class ArtifactStore:
 
     def put_stream(self, stream: Readable, expected: str | None = None) -> Stored:
         self.root.mkdir(parents=True, exist_ok=True)
-        digest = hashlib.sha256()
-        size = 0
         with tempfile.NamedTemporaryFile(dir=self.root, delete=False) as temporary:
-            while chunk := stream.read(CHUNK):
-                digest.update(chunk)
-                temporary.write(chunk)
-                size += len(chunk)
-        artifact_id = digest.hexdigest()
+            try:
+                if self.sealing() and self.keys is not None:
+                    artifact_id, size = seal_stream(stream, temporary, self.keys, artifact_context)
+                else:
+                    artifact_id, size = plain_copy(stream, temporary)
+            except BaseException:
+                Path(temporary.name).unlink(missing_ok=True)
+                raise
         if expected is not None and expected != artifact_id:
             Path(temporary.name).unlink(missing_ok=True)
             raise ArtifactError(f"content hashes to {artifact_id}, not {expected}")
@@ -123,12 +159,68 @@ class ArtifactStore:
     def put_dir(self, directory: Path) -> Stored:
         return self.put_stream(io.BytesIO(tar_bytes(directory)))
 
-    def open(self, artifact_id: str) -> BinaryIO:
+    def raw(self, artifact_id: str) -> BinaryIO:
         if self.local(artifact_id):
             return self.path(artifact_id).open("rb")
         if self.remote is not None and self.remote.has(artifact_id):
             return self.remote.open(artifact_id)
         raise ArtifactError(f"artifact {artifact_id} not found")
+
+    def open(self, artifact_id: str) -> BinaryIO:
+        return open_reader(self.raw(artifact_id), self.keys, artifact_context(artifact_id))
+
+    def plain_size(self, artifact_id: str) -> int:
+        if artifact_id not in self.sizes:
+            with self.open(artifact_id) as stream:
+                self.sizes[artifact_id] = stream.seek(0, io.SEEK_END)
+        return self.sizes[artifact_id]
+
+    def url(self, artifact_id: str, name: str) -> str:
+        if not is_artifact_id(artifact_id):
+            raise ArtifactError(f"not an artifact id: {artifact_id}")
+        return duck.artifact_url(self, artifact_id, name)
+
+    def staged_path(self, relative: str) -> Path:
+        target = (self.staging / relative).resolve()
+        if not target.is_relative_to(self.staging.resolve()):
+            raise ArtifactError(f"{relative} is outside the staging folder")
+        return target
+
+    def staged_writer(self, relative: str) -> BinaryIO:
+        target = self.staged_path(relative)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return cast(BinaryIO, duck.SealingFile(target, self.keys, staged_context(relative)))
+
+    def open_staged(self, relative: str) -> BinaryIO:
+        return open_reader(self.staged_path(relative).open("rb"), self.keys, staged_context(relative))
+
+    def staged_size(self, relative: str) -> int:
+        with self.open_staged(relative) as stream:
+            return stream.seek(0, io.SEEK_END)
+
+    def staged_modified(self, relative: str) -> datetime:
+        return datetime.fromtimestamp(self.staged_path(relative).stat().st_mtime, tz=UTC)
+
+    def remove_staged(self, relative: str) -> None:
+        self.staged_path(relative).unlink(missing_ok=True)
+
+    def staged(self, key: str, build: Callable[[Path], None]) -> str:
+        relative = f"{key}/{STAGED_NAME}"
+        final = self.staged_path(relative)
+        if not final.exists():
+            final.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            building = Path(tempfile.mkdtemp(dir=final.parent, prefix=".building-"))
+            try:
+                plain = building / STAGED_NAME
+                build(plain)
+                if self.sealing() and self.keys is not None:
+                    sealed, _ = sealed_copy(plain, building, self.keys, staged_context(relative))
+                    os.replace(sealed, final)
+                else:
+                    os.replace(plain, final)
+            finally:
+                shutil.rmtree(building, ignore_errors=True)
+        return duck.staged_url(self, relative)
 
     def chunks(self, artifact_id: str) -> Iterator[bytes]:
         with self.open(artifact_id) as stream:
@@ -158,16 +250,26 @@ class ArtifactStore:
         self.cache.mkdir(parents=True, exist_ok=True)
         staging = Path(tempfile.mkdtemp(dir=self.cache))
         source = self.fetch(artifact_id, staging / ".download")
-        if packing == Packing.FILE:
+        sealed = sealed_file(source)
+        if packing == Packing.FILE and not sealed:
             if source.parent == staging:
                 os.replace(source, staging / name)
             else:
                 shutil.copyfile(source, staging / name)
+        elif packing == Packing.FILE:
+            with (
+                open_reader(source.open("rb"), self.keys, artifact_context(artifact_id)) as stream,
+                (staging / name).open("wb") as target_file,
+            ):
+                shutil.copyfileobj(stream, target_file, CHUNK)
         else:
-            with tarfile.open(source) as archive:
+            with (
+                open_reader(source.open("rb"), self.keys, artifact_context(artifact_id)) as stream,
+                tarfile.open(fileobj=stream) as archive,
+            ):
                 archive.extractall(staging / "tree", filter="data")
-            if source.parent == staging:
-                source.unlink()
+        if source.parent == staging:
+            source.unlink(missing_ok=True)
         (staging / ".complete").touch()
         try:
             os.replace(staging, target)

@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from minibrain.data.snapshot import read_rows
 from minibrain.gateway.standalone import create_gateway_app
-from minibrain.registry.files import snapshot_dir, store_for
+from minibrain.registry.files import snapshot_location, store_for
 from minibrain.registry.models import AuditEvent, Feedback, RequestLog, Snapshot
 from tests.conftest import FakeBackend, Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
@@ -148,8 +148,8 @@ def snapshot_rows(harness: Harness, snapshot_id: int) -> dict[str, str]:
     with harness.sessions() as session:
         snapshot = session.get(Snapshot, snapshot_id)
         assert snapshot is not None
-        path = snapshot_dir(session, store_for(harness.settings), snapshot)
-    return {text or "": label or "" for text, label in read_rows(Path(path))}
+        location = snapshot_location(session, store_for(harness.settings), snapshot)
+    return {text or "": label or "" for text, label in read_rows(location)}
 
 
 def test_accepted_feedback_joins_the_next_snapshot(harness: Harness) -> None:

@@ -36,7 +36,7 @@ from minibrain.base_models import BASE_MODELS
 from minibrain.data.snapshot import SPLITS, Example, SnapshotError, read_split
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
-from minibrain.registry.files import MissingArtifactError, snapshot_dir, store_for
+from minibrain.registry.files import MissingArtifactError, snapshot_location, store_for
 from minibrain.registry.models import (
     AttemptOutcome,
     AuditEvent,
@@ -165,7 +165,7 @@ def base_card(session: Session, minibrain: Minibrain, version: Version) -> CardB
 
 def snapshot_splits(session: Session, settings: Settings, snapshot: Snapshot) -> dict[str, list[Example]] | None:
     try:
-        path = snapshot_dir(session, store_for(settings), snapshot)
+        path = snapshot_location(session, store_for(settings), snapshot)
         return {name: read_split(path, name) for name in SPLITS}
     except (MissingArtifactError, ArtifactError, SnapshotError, OSError, duckdb.Error):
         return None

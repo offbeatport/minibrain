@@ -20,7 +20,7 @@ from minibrain.models.health import problem_of
 from minibrain.models.registry import model_folder, resolve_spec
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import live_engines
-from minibrain.registry.files import ref, snapshot_dir
+from minibrain.registry.files import ref, snapshot_location
 from minibrain.registry.models import ApiKey, Minibrain, Model, ModelStatus, VersionKind, VersionStatus
 from minibrain.registry.service import NotFoundError, adapter_name
 from minibrain.settings import Settings
@@ -111,7 +111,7 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
     ready = sorted((v for v in minibrain.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
     for version in ready:
-        labels, shots = prompt_context(str(snapshot_dir(session, store, version.snapshot)))
+        labels, shots = prompt_context(snapshot_location(session, store, version.snapshot))
         adapter = None
         if version.kind == VersionKind.LORA and version.adapter_artifact_id is not None:
             adapter = {

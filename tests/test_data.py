@@ -23,7 +23,7 @@ def staging(tmp_path: Path) -> list[Table]:
     source.write_bytes(tickets_csv())
     path = tmp_path / "staging.duckdb"
     stage(source, path)
-    return [Table(name="source", staging=path)]
+    return [Table(name="source", staging=str(path))]
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import asdict
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, UploadFile
@@ -67,6 +66,7 @@ from minibrain.data.shared import (
     table_of,
     tables_of,
 )
+from minibrain.data.snapshot import is_parquet
 from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_snapshot, taken
 from minibrain.data.sources import (
     SourceError,
@@ -85,7 +85,7 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.policy import PolicyError, locked_sources
-from minibrain.registry.files import snapshot_dir
+from minibrain.registry.files import snapshot_location
 from minibrain.registry.models import Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
@@ -513,11 +513,11 @@ def get_snapshot(session: Session, snapshot_id: int) -> Snapshot:
     return found
 
 
-def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) -> Path:
-    path = snapshot_dir(session, store, snapshot)
-    if not path.is_file():
+def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
+    location = snapshot_location(session, store, snapshot)
+    if not is_parquet(location):
         raise ConflictError(f"snapshot {snapshot.hash[:12]} predates Parquet snapshots and cannot be compared")
-    return path
+    return location
 
 
 @router.get("/snapshots/{snapshot_id}", dependencies=[Depends(builder)])

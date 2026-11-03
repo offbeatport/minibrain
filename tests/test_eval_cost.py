@@ -10,7 +10,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.ml import evaluate
 from minibrain.ml.completion import Completion
 from minibrain.ml.context import JobSpec
-from minibrain.registry.files import snapshot_dir, store_for
+from minibrain.registry.files import materialize, store_for
 from minibrain.registry.models import AuditEvent, Snapshot
 from minibrain.registry.prices import DevicePrices, eval_cost
 from tests.conftest import LABELS, Harness, fake_adapter
@@ -51,7 +51,8 @@ def snapshot_path(harness: Harness) -> Path:
     create_with_dataset(harness)
     with harness.sessions() as session:
         snapshot = session.scalars(select(Snapshot)).one()
-        return snapshot_dir(session, store_for(harness.settings), snapshot)
+        assert snapshot.artifact_id is not None
+        return materialize(session, store_for(harness.settings), snapshot.artifact_id)
 
 
 def measured(device_seconds: float, requests: int = 30, pool: str = "local", device: str = "cuda") -> dict[str, Any]:

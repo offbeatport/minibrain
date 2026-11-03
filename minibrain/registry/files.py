@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.encryption.keys import keys_for
 from minibrain.registry.models import Artifact, Snapshot, Version
 from minibrain.settings import Settings
 
@@ -27,7 +28,7 @@ STORES: dict[Path, ArtifactStore] = {}
 def store_for(settings: Settings) -> ArtifactStore:
     root = settings.artifacts_dir()
     if root not in STORES:
-        STORES[root] = ArtifactStore(root, settings.cache_dir())
+        STORES[root] = ArtifactStore(root, settings.cache_dir(), keys_for(settings), settings.home / "staging")
     return STORES[root]
 
 
@@ -66,12 +67,15 @@ def materialize(session: Session, store: ArtifactStore, artifact_id: str) -> Pat
     return store.materialize(found["id"], found["packing"], found["name"])
 
 
-def snapshot_dir(session: Session, store: ArtifactStore, snapshot: Snapshot) -> Path:
+def snapshot_location(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
     if snapshot.artifact_id is not None:
-        return materialize(session, store, snapshot.artifact_id)
+        found = ref(session, snapshot.artifact_id)
+        if found is not None and found["packing"] == Packing.FILE:
+            return store.url(found["id"], found["name"])
+        return str(materialize(session, store, snapshot.artifact_id))
     if snapshot.directory is None:
         raise MissingArtifactError(f"snapshot {snapshot.hash[:12]} has no files")
-    return Path(snapshot.directory)
+    return snapshot.directory
 
 
 def adapter_dir(session: Session, store: ArtifactStore, version: Version) -> Path | None:

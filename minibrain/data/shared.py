@@ -49,13 +49,10 @@ def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
     return next((lowered[name] for name in names if name in lowered), None)
 
 
-def staging_of(settings: Settings, store: ArtifactStore, source: Source) -> Path:
-    key = f"{source.artifact_id}{Path(source.filename).suffix.lower()}"
-    staging = settings.home / "staging" / key / "staging.duckdb"
-    if not staging.exists():
-        staging.parent.mkdir(parents=True, exist_ok=True)
-        stage(store.materialize(str(source.artifact_id), Packing.FILE, source.filename), staging)
-    return staging
+def staging_of(store: ArtifactStore, source: Source) -> str:
+    artifact_id = str(source.artifact_id)
+    key = f"{artifact_id}{Path(source.filename).suffix.lower()}"
+    return store.staged(key, lambda target: stage(store.url(artifact_id, source.filename), target))
 
 
 def folder_scan(source: Source) -> FolderScan:
@@ -100,9 +97,7 @@ def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
             reader=READERS[found.format],
             fingerprint=found.fingerprint,
         )
-    return Table(
-        name=source.table_name, staging=staging_of(settings, store, source), fingerprint=fingerprint(settings, source)
-    )
+    return Table(name=source.table_name, staging=staging_of(store, source), fingerprint=fingerprint(settings, source))
 
 
 def fingerprint(settings: Settings, source: Source) -> str:

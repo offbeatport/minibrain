@@ -3,6 +3,8 @@ from pathlib import Path
 
 import duckdb
 
+from minibrain.encryption.duck import register
+
 SAMPLE_ROWS = 20
 
 
@@ -42,8 +44,9 @@ KEYED = (
 )
 
 
-def compare(before: Path, after: Path) -> Diff:
+def compare(before: Path | str, after: Path | str) -> Diff:
     with duckdb.connect() as connection:
+        register(connection)
         connection.execute("CREATE TEMP TABLE old AS " + KEYED, {"path": str(before)})
         connection.execute("CREATE TEMP TABLE new AS " + KEYED, {"path": str(after)})
         totals = connection.execute(
