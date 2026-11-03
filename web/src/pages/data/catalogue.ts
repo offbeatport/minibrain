@@ -2,8 +2,10 @@ import type { DatasetSummary, SourceSummary } from "~/api/client";
 
 export type SourceKind = SourceSummary["kind"];
 
+export type GroupId = SourceKind | "datasets";
+
 export type ItemRef =
-    | { kind: "group"; id: SourceKind }
+    | { kind: "group"; id: GroupId }
     | { kind: "source"; id: number }
     | { kind: "dataset"; id: string };
 
@@ -13,6 +15,8 @@ export const SOURCE_KINDS: { kind: SourceKind; label: string; noun: string }[] =
     { kind: "s3", label: "S3", noun: "bucket" },
     { kind: "database", label: "Databases", noun: "database" },
 ];
+
+export const DATASETS_GROUP: ItemRef = { kind: "group", id: "datasets" };
 
 export function itemKey(item: ItemRef): string {
     return `${item.kind}:${item.id}`;
@@ -38,6 +42,9 @@ export function parseItem(value: unknown): ItemRef | null {
     if (kind === "source" && /^\d+$/.test(id)) {
         return { kind, id: Number(id) };
     }
+    if (kind === "group" && id === "datasets") {
+        return { kind, id };
+    }
     const group = SOURCE_KINDS.find((entry) => entry.kind === id);
     return kind === "group" && group ? { kind, id: group.kind } : null;
 }
@@ -54,6 +61,7 @@ export function sourceText(source: SourceSummary): string {
     return haystack([
         source.name,
         source.filename,
+        source.table,
         source.description,
         ...source.tags,
         ...source.columns.map((column) => column.name),
@@ -68,7 +76,13 @@ export function datasetText(dataset: DatasetSummary): string {
         ...dataset.tags,
         dataset.mapping.input_column,
         dataset.mapping.label_column,
+        ...dataset.sources.map((source) => source.table),
+        ...dataset.columns.map((column) => column.name),
     ]);
+}
+
+export function usesSource(dataset: DatasetSummary, sourceId: number): boolean {
+    return dataset.sources.some((source) => source.id === sourceId);
 }
 
 export function stem(filename: string): string {

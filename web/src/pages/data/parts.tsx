@@ -87,12 +87,12 @@ function TrailStep({
 }
 
 export function Trail({
-    source,
+    sources,
     datasets,
     models,
     current,
 }: {
-    source: TrailLink;
+    sources: TrailLink[];
     datasets: TrailLink[];
     models: TrailLink[];
     current: "source" | "dataset";
@@ -100,10 +100,10 @@ export function Trail({
     const steps = [
         <TrailStep
             key="source"
-            caption="Source"
-            links={[source]}
-            current={current === "source" ? source.label : undefined}
-            empty=""
+            caption={sources.length === 1 || current === "source" ? "Source" : "Sources"}
+            links={sources}
+            current={current === "source" ? sources[0]?.label : undefined}
+            empty="None yet"
         />,
         <TrailStep
             key="dataset"
@@ -343,12 +343,15 @@ export function LabelBalance({ counts }: { counts: LabelCount[] }) {
                         const share = item.rows / total;
                         return (
                             <tr key={item.label} className="group/bar h-7 hover:bg-secondary">
-                                <th
-                                    scope="row"
-                                    className="w-[32%] truncate pr-3 text-left font-normal"
-                                    title={item.label}
-                                >
-                                    {item.label}
+                                <th scope="row" className="w-[32%] pr-3 text-left font-normal">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="block truncate">{item.label}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-96 break-all">
+                                            {item.label}
+                                        </TooltipContent>
+                                    </Tooltip>
                                 </th>
                                 <td className="pr-3">
                                     <div

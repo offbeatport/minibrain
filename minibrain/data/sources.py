@@ -296,10 +296,15 @@ def label_counts(
     return [(str(label), int(rows)) for label, rows in found]
 
 
+def table_identifier(name: str) -> str:
+    plain = re.fullmatch(r"[a-z_][a-z0-9_]*", name) and name not in reserved_words()
+    return name if plain else quote_identifier(name)
+
+
 def mapping_sql(input_column: str, label_column: str, table: str = SOURCE_TABLE) -> str:
     return (
         f"SELECT CAST({quote_identifier(input_column)} AS VARCHAR) AS input, "
-        f"CAST({quote_identifier(label_column)} AS VARCHAR) AS label FROM {quote_identifier(table)}"
+        f"CAST({quote_identifier(label_column)} AS VARCHAR) AS label FROM {table_identifier(table)}"
     )
 
 

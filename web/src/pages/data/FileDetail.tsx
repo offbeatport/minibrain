@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button, DataGrid, Field, Input } from "obp-ui";
+import { Badge, Button, DataGrid, Link } from "obp-ui";
 import { useState } from "react";
 import {
     type ColumnStats,
@@ -15,8 +15,8 @@ import { useSourceRows, useSourceStats } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
-import { MappingSection } from "../DataPage";
-import { type ItemRef, itemHref, kindLabel, plural, stem } from "./catalogue";
+import { CreateDataset } from "./DatasetDetail";
+import { type ItemRef, itemHref, kindLabel, plural } from "./catalogue";
 import {
     About,
     DeleteAction,
@@ -28,7 +28,6 @@ import {
     useModelNames,
 } from "./parts";
 
-const EMPTY_MAPPING = { input_column: null, label_column: null, sql: null };
 const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
 
 function share(part: number, whole: number): string {
@@ -156,65 +155,48 @@ function Preview({ source }: { source: SourceSummary }) {
     );
 }
 
-function CreateDataset({
-    source,
-    onCreated,
-    onCancel,
-}: {
-    source: SourceSummary;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
-    onCancel: () => void;
-}) {
-    const [name, setName] = useState(stem(source.name) || "New dataset");
-    const sourcePath = { params: { path: { source_id: source.id } } };
+function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
     return (
-        <MappingSection
-            title="New dataset"
-            saveLabel="Create dataset"
-            columns={source.columns.map((column) => column.name)}
-            mapping={EMPTY_MAPPING}
-            extraActions={
-                <Button variant="ghost" size="sm" onClick={onCancel}>
-                    Cancel
-                </Button>
-            }
-            before={
-                <Field id="new-dataset-name" label="Name" className="mb-4 max-w-sm">
-                    <Input
-                        id="new-dataset-name"
-                        value={name}
-                        maxLength={80}
-                        onChange={(event) => setName(event.target.value)}
-                    />
-                </Field>
-            }
-            onSave={async (body) => {
-                const created = await unwrap(
-                    api.POST("/api/datasets", {
-                        body: {
-                            name: name.trim() || stem(source.name),
-                            source_id: source.id,
-                            ...body,
-                        },
-                    }),
-                );
-                await onCreated(created);
-            }}
-            onRun={(sql) =>
-                unwrap(api.POST("/api/sources/{source_id}/query", { ...sourcePath, body: { sql } }))
-            }
-        />
+        <Section
+            title="Used by datasets"
+            caption="Datasets whose query reads this source. A source in use cannot be deleted."
+        >
+            {datasets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No dataset reads it yet.</p>
+            ) : (
+                <ul className="flex flex-col divide-y rounded-lg border">
+                    {datasets.map((dataset) => (
+                        <li key={dataset.slug} className="flex h-9 items-center gap-3 px-3">
+                            <Link
+                                href={itemHref({ kind: "dataset", id: dataset.slug })}
+                                className="min-w-0 truncate text-primary"
+                            >
+                                {dataset.name}
+                            </Link>
+                            <Badge variant="neutral">
+                                {dataset.mode === "sql" ? "SQL" : "Columns"}
+                            </Badge>
+                            <span className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">
+                                {dataset.rows === null ? "–" : plural(dataset.rows, "row")}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </Section>
     );
 }
 
 export function FileDetail({
     source,
+    sources,
     datasets,
     creating,
     onCreating,
     onSelect,
 }: {
     source: SourceSummary;
+    sources: SourceSummary[];
     datasets: DatasetSummary[];
     creating: boolean;
     onCreating: (creating: boolean) => void;
@@ -240,16 +222,20 @@ export function FileDetail({
                     <>
                         {`${kindLabel(source.kind)} · `}
                         <span className="font-mono">{source.filename}</span>
+                        {" · table "}
+                        <span className="font-mono">{source.table}</span>
                         {` · added ${relativeTime(source.created_at)}`}
                     </>
                 }
                 trail={
                     <Trail
                         current="source"
-                        source={{
-                            label: source.name,
-                            href: itemHref({ kind: "source", id: source.id }),
-                        }}
+                        sources={[
+                            {
+                                label: source.name,
+                                href: itemHref({ kind: "source", id: source.id }),
+                            },
+                        ]}
                         datasets={datasets.map((dataset) => ({
                             label: dataset.name,
                             href: itemHref({ kind: "dataset", id: dataset.slug }),
@@ -292,6 +278,7 @@ export function FileDetail({
             {creating && (
                 <CreateDataset
                     source={source}
+                    sources={sources}
                     onCancel={() => onCreating(false)}
                     onCreated={async (dataset) => {
                         await refresh();
@@ -302,6 +289,7 @@ export function FileDetail({
             )}
             <Columns source={source} />
             <Preview source={source} />
+            <Datasets datasets={datasets} />
             <EditDialog
                 item={source}
                 noun="file"

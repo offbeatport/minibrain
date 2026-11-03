@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
+    Field,
+    Input,
     Link,
     Select,
     SelectContent,
@@ -10,12 +12,12 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
-import { keys, useDataset, useDatasetPreview, useModels } from "~/api/queries";
+import { keys, useDataset, useDatasetPreview, useModels, useSources } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
-import { MappingSection, PreviewSection } from "../DataPage";
-import { type ItemRef, itemHref } from "./catalogue";
+import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
+import { DATASETS_GROUP, type ItemRef, itemHref, plural, stem } from "./catalogue";
 import {
     About,
     DeleteAction,
@@ -35,34 +37,117 @@ const SPLITS: [string, string][] = [
     ["shots", "Few-shot"],
 ];
 
+function useDatasetRefresh(slug: string) {
+    const client = useQueryClient();
+    const refresh = useDataRefresh();
+    return async () => {
+        await Promise.all([
+            client.invalidateQueries({ queryKey: keys.dataset(slug) }),
+            client.invalidateQueries({ queryKey: keys.datasetPreview(slug) }),
+            refresh(),
+        ]);
+    };
+}
+
+export function DatasetQuery({
+    dataset,
+    sources,
+}: {
+    dataset: DatasetSummary;
+    sources: SourceSummary[];
+}) {
+    const refresh = useDatasetRefresh(dataset.slug);
+    const path = { params: { path: { slug: dataset.slug } } };
+    return (
+        <QueryEditor
+            mapping={dataset.mapping}
+            mode={dataset.mode}
+            sourceId={dataset.source_id}
+            sources={sources}
+            onSave={(body: MappingBody) =>
+                unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body })).then(refresh)
+            }
+            onRun={(sql) =>
+                unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
+            }
+        />
+    );
+}
+
 export function DatasetMapping({ slug }: { slug: string }) {
     const dataset = useDataset(slug);
-    const client = useQueryClient();
+    const sources = useSources();
     const mapped = Boolean(dataset.data?.mapping.sql);
     const preview = useDatasetPreview(slug, mapped);
-    const path = { params: { path: { slug } } };
-    const refresh = async () => {
-        await client.invalidateQueries({ queryKey: keys.dataset(slug) });
-        await client.invalidateQueries({ queryKey: keys.datasets });
-        await client.invalidateQueries({ queryKey: keys.datasetPreview(slug) });
-    };
     if (!dataset.data) {
         return <ErrorLine error={dataset.error} />;
     }
     return (
         <>
-            <MappingSection
-                columns={dataset.data.columns.map((column) => column.name)}
-                mapping={dataset.data.mapping}
-                onSave={(body) =>
-                    unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body })).then(refresh)
-                }
-                onRun={(sql) =>
-                    unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
-                }
-            />
-            {mapped && <PreviewSection data={preview.data} error={preview.error} />}
+            <DatasetQuery dataset={dataset.data} sources={sources.data ?? []} />
+            {mapped && (
+                <PreviewSection
+                    data={preview.data}
+                    error={preview.error}
+                    loading={preview.isLoading}
+                />
+            )}
         </>
+    );
+}
+
+const EMPTY_MAPPING = { input_column: null, label_column: null, sql: null };
+
+export function CreateDataset({
+    source,
+    sources,
+    onCreated,
+    onCancel,
+}: {
+    source?: SourceSummary;
+    sources: SourceSummary[];
+    onCreated: (dataset: DatasetSummary) => Promise<void>;
+    onCancel: () => void;
+}) {
+    const [name, setName] = useState(source ? stem(source.name) : "");
+    return (
+        <QueryEditor
+            title="New dataset"
+            saveLabel="Create dataset"
+            mapping={EMPTY_MAPPING}
+            mode="columns"
+            sourceId={source?.id}
+            sources={sources}
+            extraActions={
+                <Button variant="ghost" size="sm" onClick={onCancel}>
+                    Cancel
+                </Button>
+            }
+            before={
+                <Field id="new-dataset-name" label="Name" className="mb-4 max-w-sm">
+                    <Input
+                        id="new-dataset-name"
+                        value={name}
+                        maxLength={80}
+                        placeholder="Support tickets by team"
+                        onChange={(event) => setName(event.target.value)}
+                    />
+                </Field>
+            }
+            onSave={async (body) => {
+                const fallback = sources.find((item) => item.id === body.source_id)?.name;
+                const created = await unwrap(
+                    api.POST("/api/datasets", {
+                        body: {
+                            name: name.trim() || stem(fallback ?? "") || "New dataset",
+                            ...body,
+                        },
+                    }),
+                );
+                await onCreated(created);
+            }}
+            onRun={(sql) => unwrap(api.POST("/api/query", { body: { sql } }))}
+        />
     );
 }
 
@@ -94,18 +179,9 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
                 ) : (
                     <ul className="flex flex-col divide-y rounded-lg border">
                         {dataset.models.map((slug) => (
-                            <li
-                                key={slug}
-                                className="flex h-9 items-center justify-between gap-3 px-3"
-                            >
+                            <li key={slug} className="flex h-9 items-center gap-3 px-3">
                                 <Link href={modelHref(slug)} className="truncate text-primary">
                                     {nameOf(slug)}
-                                </Link>
-                                <Link
-                                    href={`/data?minibrain=${encodeURIComponent(slug)}`}
-                                    className="shrink-0 text-sm text-muted-foreground hover:text-foreground"
-                                >
-                                    Snapshot and test set
                                 </Link>
                             </li>
                         ))}
@@ -137,11 +213,11 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
 
 export function DatasetDetail({
     dataset,
-    source,
+    sources,
     onSelect,
 }: {
     dataset: DatasetSummary;
-    source: SourceSummary | undefined;
+    sources: SourceSummary[];
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
@@ -153,7 +229,7 @@ export function DatasetDetail({
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/datasets/{slug}", path)),
         onSuccess: async () => {
-            onSelect({ kind: "group", id: "upload" });
+            onSelect(DATASETS_GROUP);
             await refresh();
         },
     });
@@ -166,16 +242,16 @@ export function DatasetDetail({
                 detail={
                     <>
                         Dataset <span className="font-mono">{dataset.slug}</span>
-                        {` · updated ${relativeTime(dataset.updated_at)}`}
+                        {` · ${dataset.mode === "sql" ? "SQL" : "columns"} · updated ${relativeTime(dataset.updated_at)}`}
                     </>
                 }
                 trail={
                     <Trail
                         current="dataset"
-                        source={{
-                            label: source?.name ?? dataset.sources[0]?.name ?? "–",
-                            href: itemHref({ kind: "source", id: dataset.sources[0]?.id ?? 0 }),
-                        }}
+                        sources={dataset.sources.map((source) => ({
+                            label: source.name,
+                            href: itemHref({ kind: "source", id: source.id }),
+                        }))}
                         datasets={[
                             {
                                 label: dataset.name,
@@ -205,7 +281,7 @@ export function DatasetDetail({
                                     : null
                             }
                             title={`Delete ${dataset.name}?`}
-                            description="The mapping goes; the file it reads from stays."
+                            description="The query goes; the sources it reads stay."
                             onConfirm={() => remove.mutateAsync().catch(() => undefined)}
                         />
                     </>
@@ -213,9 +289,13 @@ export function DatasetDetail({
                 about={<About item={dataset} onEdit={() => setEditing(true)} />}
             />
             <ErrorLine error={remove.error} />
+            {dataset.error && (
+                <p className="text-sm text-destructive">{`The query fails: ${dataset.error}`}</p>
+            )}
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
                 <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
+                <Stat label="Sources" value={count(dataset.sources.length)} />
                 {splits ? (
                     SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
                         <Stat key={key} label={label} value={count(splits[key])} />
@@ -225,7 +305,7 @@ export function DatasetDetail({
                         label="Splits"
                         value={
                             <span className="font-normal text-muted-foreground">
-                                Set when a model builds it
+                                Set when a snapshot is taken
                             </span>
                         }
                     />
@@ -239,7 +319,14 @@ export function DatasetDetail({
                     <LabelBalance counts={preview.data.label_counts} />
                 </Section>
             )}
-            <DatasetMapping slug={dataset.slug} />
+            <DatasetQuery dataset={dataset} sources={sources} />
+            {mapped && (
+                <PreviewSection
+                    data={preview.data}
+                    error={preview.error}
+                    loading={preview.isLoading}
+                />
+            )}
             <UsedBy dataset={dataset} />
             <EditDialog
                 item={dataset}
@@ -251,5 +338,50 @@ export function DatasetDetail({
                 }
             />
         </div>
+    );
+}
+
+export function DatasetsGroup({
+    datasets,
+    onCreate,
+    creating,
+}: {
+    datasets: DatasetSummary[];
+    onCreate: () => void;
+    creating: boolean;
+}) {
+    const models = new Set(datasets.flatMap((dataset) => dataset.models));
+    const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
+    return (
+        <header className="flex flex-col gap-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">Datasets</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Saved queries that turn one or more sources into input and label rows.
+                        Models train on a snapshot of one.
+                    </p>
+                </div>
+                <Button onClick={onCreate} disabled={creating}>
+                    New dataset
+                </Button>
+            </div>
+            <div className="flex flex-wrap gap-x-8 gap-y-3">
+                <Stat label="Datasets" value={count(datasets.length)} />
+                <Stat label="Written in SQL" value={count(sql)} />
+                <Stat label="Models using them" value={count(models.size)} />
+            </div>
+            {datasets.length === 0 && !creating && (
+                <p className="text-sm text-muted-foreground">
+                    No datasets yet. Add a file under Uploads, then pick its input and label
+                    columns, or write SQL across several sources.
+                </p>
+            )}
+            {datasets.length > 0 && !creating && (
+                <p className="text-sm text-muted-foreground">
+                    {`${plural(datasets.length, "dataset")}. Pick one to see its query, preview and the models that use it.`}
+                </p>
+            )}
+        </header>
     );
 }

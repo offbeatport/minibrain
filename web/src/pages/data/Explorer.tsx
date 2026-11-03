@@ -9,6 +9,7 @@ import {
     FileText,
     Folder,
     FolderUp,
+    Layers,
     Table2,
 } from "lucide-react";
 import {
@@ -20,6 +21,9 @@ import {
     EmptyState,
     Link,
     SearchInput,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
     Tree,
     type TreeNode,
     ancestorsOf,
@@ -43,9 +47,10 @@ import { ErrorLine, Stat } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
-import { DatasetDetail } from "./DatasetDetail";
+import { CreateDataset, DatasetDetail, DatasetsGroup } from "./DatasetDetail";
 import { FileDetail } from "./FileDetail";
 import {
+    DATASETS_GROUP,
     type ItemRef,
     SOURCE_KINDS,
     type SourceKind,
@@ -55,6 +60,7 @@ import {
     kindLabel,
     parseItem,
     sourceText,
+    usesSource,
 } from "./catalogue";
 import { useDataRefresh } from "./parts";
 
@@ -63,7 +69,7 @@ const DEFAULT_WIDTH = 288;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 520;
 const WIDTH_STEP = 16;
-const DEFAULT_ITEM: ItemRef = { kind: "group", id: "upload" };
+const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
 const GROUP_ICONS: Record<SourceKind, ReactNode> = {
     upload: <FolderUp />,
@@ -135,13 +141,18 @@ function useTreeWidth() {
 }
 
 function buildTree(sources: SourceSummary[], datasets: DatasetSummary[]): TreeNode[] {
-    const bySource = new Map<number, DatasetSummary[]>();
-    for (const dataset of datasets) {
-        for (const ref of dataset.sources) {
-            bySource.set(ref.id, [...(bySource.get(ref.id) ?? []), dataset]);
-        }
-    }
-    return SOURCE_KINDS.map(({ kind, label }) => {
+    const datasetGroup: TreeNode = {
+        id: itemKey(DATASETS_GROUP),
+        label: "Datasets",
+        icon: <Layers />,
+        meta: datasets.length,
+        children: datasets.map((dataset) => ({
+            id: itemKey({ kind: "dataset", id: dataset.slug }),
+            label: dataset.name,
+            icon: <Table2 />,
+        })),
+    };
+    const sourceGroups = SOURCE_KINDS.map(({ kind, label }) => {
         const members = sources.filter((source) => source.kind === kind);
         return {
             id: itemKey({ kind: "group", id: kind }),
@@ -152,18 +163,15 @@ function buildTree(sources: SourceSummary[], datasets: DatasetSummary[]): TreeNo
                 id: itemKey({ kind: "source", id: source.id }),
                 label: source.name,
                 icon: fileIcon(source.filename),
-                children: (bySource.get(source.id) ?? []).map((dataset) => ({
-                    id: itemKey({ kind: "dataset", id: dataset.slug }),
-                    label: dataset.name,
-                    icon: <Table2 />,
-                })),
             })),
         };
     });
+    return [datasetGroup, ...sourceGroups];
 }
 
 function searchIndex(sources: SourceSummary[], datasets: DatasetSummary[]): Map<string, string> {
     const index = new Map<string, string>();
+    index.set(itemKey(DATASETS_GROUP), "datasets");
     for (const { kind, label } of SOURCE_KINDS) {
         index.set(itemKey({ kind: "group", id: kind }), label.toLowerCase());
     }
@@ -287,7 +295,9 @@ function GroupDetail({
 }) {
     const members = sources.filter((source) => source.kind === kind);
     const ids = new Set(members.map((source) => source.id));
-    const built = datasets.filter((dataset) => dataset.sources.some((ref) => ids.has(ref.id)));
+    const built = datasets.filter((dataset) =>
+        dataset.sources.some((source) => ids.has(source.id)),
+    );
     if (kind !== "upload") {
         return (
             <div className="flex flex-col gap-4">
@@ -328,12 +338,12 @@ function GroupDetail({
                     }
                 >
                     Upload a CSV, TSV, JSON Lines or Parquet file, or add one of the samples. Then
-                    pick the column a model reads and the column it answers with to make a dataset.
+                    make a dataset from it under Datasets.
                 </EmptyState>
             ) : (
                 <p className="text-sm text-muted-foreground">
-                    Pick a file to see its columns and rows, or a dataset to see its mapping and
-                    label balance.
+                    Pick a file to see its columns, rows and the datasets that read it. Each file is
+                    a table in dataset SQL, under the name shown on it.
                 </p>
             )}
         </div>
@@ -364,10 +374,11 @@ export function DataExplorer() {
     });
     const sources = useSources();
     const datasets = useDatasets();
+    const refresh = useDataRefresh();
     const width = useTreeWidth();
     const [query, setQuery] = useState("");
     const [collapsed, setCollapsed] = useState<string[]>([]);
-    const [creatingFor, setCreatingFor] = useState<number | null>(null);
+    const [creatingFor, setCreatingFor] = useState<number | "new" | null>(null);
     const treeBox = useRef<HTMLDivElement>(null);
     const selected = requested ?? DEFAULT_ITEM;
     const selectedKey = itemKey(selected);
@@ -431,12 +442,35 @@ export function DataExplorer() {
     };
 
     const loading = sources.isLoading || datasets.isLoading;
+    const created = async (dataset: DatasetSummary) => {
+        await refresh();
+        setCreatingFor(null);
+        select({ kind: "dataset", id: dataset.slug });
+    };
+
     let detail: ReactNode = null;
     if (!loading) {
-        if (selected.kind === "group") {
+        if (selected.kind === "group" && selected.id === "datasets") {
+            detail = (
+                <div className="flex flex-col gap-6">
+                    <DatasetsGroup
+                        datasets={datasetList}
+                        creating={creatingFor === "new"}
+                        onCreate={() => setCreatingFor("new")}
+                    />
+                    {creatingFor === "new" && (
+                        <CreateDataset
+                            sources={sourceList}
+                            onCancel={() => setCreatingFor(null)}
+                            onCreated={created}
+                        />
+                    )}
+                </div>
+            );
+        } else if (selected.kind === "group") {
             detail = (
                 <GroupDetail
-                    kind={selected.id}
+                    kind={selected.id as SourceKind}
                     sources={sourceList}
                     datasets={datasetList}
                     onUploaded={onUploaded}
@@ -448,9 +482,8 @@ export function DataExplorer() {
                 <FileDetail
                     key={selectedKey}
                     source={source}
-                    datasets={datasetList.filter((dataset) =>
-                        dataset.sources.some((ref) => ref.id === source.id),
-                    )}
+                    sources={sourceList}
+                    datasets={datasetList.filter((dataset) => usesSource(dataset, source.id))}
                     creating={creatingFor === source.id}
                     onCreating={(on) => setCreatingFor(on ? source.id : null)}
                     onSelect={select}
@@ -464,7 +497,7 @@ export function DataExplorer() {
                 <DatasetDetail
                     key={selectedKey}
                     dataset={dataset}
-                    source={sourceList.find((source) => source.id === dataset.sources[0]?.id)}
+                    sources={sourceList}
                     onSelect={select}
                 />
             ) : (
@@ -478,7 +511,7 @@ export function DataExplorer() {
             <div className="px-6 pt-8">
                 <PageHeader
                     title="Data"
-                    caption="Files, the datasets built from them and the models that train on them."
+                    caption="Datasets, the sources their queries read and the models that train on them."
                     actions={<DataActions onUploaded={onUploaded} />}
                 />
                 <ErrorLine error={sources.error ?? datasets.error} />
@@ -513,7 +546,7 @@ export function DataExplorer() {
                             <p className="p-3 text-sm text-muted-foreground">Loading…</p>
                         ) : (
                             <Tree
-                                aria-label="Sources and datasets"
+                                aria-label="Datasets and sources"
                                 nodes={filtered?.nodes ?? nodes}
                                 selectedId={selectedKey}
                                 onSelect={onSelectKey}
@@ -532,15 +565,21 @@ export function DataExplorer() {
                             />
                         )}
                     </div>
-                    <button
-                        type="button"
-                        aria-label="Resize the list"
-                        title="Drag to resize, double-click to reset"
-                        onPointerDown={width.onPointerDown}
-                        onKeyDown={width.onKeyDown}
-                        onDoubleClick={width.reset}
-                        className="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary @3xl:block"
-                    />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label="Resize the list"
+                                onPointerDown={width.onPointerDown}
+                                onKeyDown={width.onKeyDown}
+                                onDoubleClick={width.reset}
+                                className="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary @3xl:block"
+                            />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            Drag to resize, double-click to reset
+                        </TooltipContent>
+                    </Tooltip>
                 </aside>
                 <section
                     aria-label="Details"

@@ -59,7 +59,7 @@ def test_column_mode_generates_the_select_over_the_picked_source(harness: Harnes
     assert mapped["mode"] == "columns"
     assert mapped["source_id"] == other["id"]
     assert mapped["rows"] == 40
-    assert 'FROM "other_tickets"' in mapped["mapping"]["sql"]
+    assert mapped["mapping"]["sql"].endswith("FROM other_tickets")
     assert harness.client.get(f"/api/sources/{tickets['id']}").json()["datasets"] == []
 
 
