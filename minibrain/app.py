@@ -15,6 +15,7 @@ from minibrain.api import (
     compute,
     connections,
     data,
+    dataset_folders,
     install,
     internal,
     internal_gateway,
@@ -192,6 +193,7 @@ def create_app(
     for module in (
         minibrains,
         data,
+        dataset_folders,
         connections,
         models,
         model_cache,

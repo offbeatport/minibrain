@@ -135,6 +135,16 @@ class Connection(Base):
     sources: Mapped[list[Source]] = relationship(back_populates="connection", order_by="Source.name")
 
 
+class DatasetFolder(Base):
+    __tablename__ = "dataset_folders"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("dataset_folders.id"), default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
 class Dataset(Base):
     __tablename__ = "datasets"
     __table_args__ = ({"sqlite_autoincrement": True},)
@@ -143,6 +153,9 @@ class Dataset(Base):
     slug: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
     source_id: Mapped[int | None] = mapped_column(ForeignKey("sources.id"), default=None)
+    folder_id: Mapped[int | None] = mapped_column(
+        ForeignKey("dataset_folders.id", ondelete="SET NULL", name="fk_datasets_folder"), default=None
+    )
     input_column: Mapped[str | None] = mapped_column(default=None)
     label_column: Mapped[str | None] = mapped_column(default=None)
     sql: Mapped[str | None] = mapped_column(default=None)

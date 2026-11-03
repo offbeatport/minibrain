@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from minibrain.models.rules import LicenceUse
 
@@ -194,6 +194,7 @@ class DatasetSummary(BaseModel):
     snapshot: SnapshotInfo | None = None
     changed: ChangeInfo | None = None
     row_limit: int = 0
+    folder_id: int | None = None
     updated_at: datetime
 
 
@@ -203,6 +204,34 @@ class DatasetCreate(BaseModel):
     input_column: str | None = None
     label_column: str | None = None
     sql: str | None = None
+    folder_id: int | None = None
+
+
+FolderName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+class DatasetFolderInfo(BaseModel):
+    id: int
+    name: str
+    parent_id: int | None
+    created_at: datetime
+
+
+class DatasetFolderCreate(BaseModel):
+    name: FolderName
+    parent_id: int | None = None
+
+
+class DatasetFolderRename(BaseModel):
+    name: FolderName
+
+
+class DatasetFolderParent(BaseModel):
+    parent_id: int | None
+
+
+class DatasetFolderChoice(BaseModel):
+    folder_id: int | None
 
 
 class CatalogueUpdate(BaseModel):

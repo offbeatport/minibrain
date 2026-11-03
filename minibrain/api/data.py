@@ -44,6 +44,7 @@ from minibrain.api.schemas import (
 from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.connections.spec import ConnectionProblem
+from minibrain.data.dataset_folders import folder_or_root
 from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
@@ -240,6 +241,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         snapshot=snapshot_info(latest) if latest is not None else None,
         changed=changed,
         row_limit=load_limits(session).row_limit if session is not None else DataLimits().row_limit,
+        folder_id=dataset.folder_id,
         updated_at=dataset.updated_at,
     )
 
@@ -424,7 +426,9 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     source = get_source(session, body.source_id) if body.source_id is not None else None
     if source is None and body.sql is None:
         raise ConflictError("pick a source, or write SQL over the sources")
+    folder = folder_or_root(session, body.folder_id)
     dataset = add_dataset(session, settings, store, body.name, source)
+    dataset.folder_id = folder.id if folder is not None else None
     mapping = MappingUpdate(
         source_id=body.source_id, input_column=body.input_column, label_column=body.label_column, sql=body.sql
     )
