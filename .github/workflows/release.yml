@@ -86,14 +86,7 @@ jobs:
             runner: ubuntu-24.04-arm
     env:
       DOCKER_BUILD_RECORD_UPLOAD: "false"
-      CACHE: ${{ matrix.variant == 'cpu' && format('type=gha,scope=image-cpu-{0}', matrix.arch) || '' }}
     steps:
-      - name: Free disk space for the CUDA image
-        if: matrix.variant == 'cuda'
-        run: |
-          df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
-          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -120,8 +113,6 @@ jobs:
           labels: org.opencontainers.image.version=${{ needs.version.outputs.version }}
           provenance: false
           sbom: false
-          cache-from: ${{ env.CACHE }}
-          cache-to: ${{ env.CACHE && format('{0},mode=max', env.CACHE) || '' }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ needs.version.outputs.publish }}
       - name: Record the digest
         env:
