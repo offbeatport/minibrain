@@ -771,8 +771,12 @@ Fully offline by default. Nothing in the data, labelling, training, serving or g
 
 v1, the evidence regulated buyers ask for first:
 
-- SBOM (CycloneDX) for every image and Python dependency set.
+- SBOM (CycloneDX) for every image and Python dependency set. Built: CI uploads Python (uv export from `uv.lock`)
+  and web (syft from `web/pnpm-lock.yaml`) SBOMs beside the wheel; the image SBOM is a documented syft command
+  against the built image (CI does not build it). Details: `docs/security.md`.
 - AI bill of materials per version: base model weights hash, license, training data snapshot hash, recipe, eval result.
+  Built: a deterministic CycloneDX 1.6 ML-BOM per version (`aibom.json`, Download AI-BOM on the model card) with
+  the adapter's SHA-256, the sources' fingerprints and its own SHA-256, validated against the schema in tests.
 - Signed images and update bundles (cosign), verified offline with a key shipped in the install bundle.
 - Audit log: append-only and hash-chained so tampering shows, exported to the customer's SIEM over syslog. The
   chain has to survive retention: a prune is itself an audited event that carries the hash it cuts at. Built: the
@@ -955,7 +959,8 @@ Everything in the v1 scope below, after M1.
       in the playground → review queue; accepted rows join the model's next snapshot; "Train with feedback"
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
       Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
-- [ ] SBOM, AI bill of materials per version, signed images
+- [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, the image SBOM command
+      and the per-version AI-BOM done; signed images not yet)
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
 - [ ] Hash-chained audit log with SIEM export; encryption at rest (hash chain sealed by the leader, prune anchors,
