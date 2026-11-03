@@ -3463,6 +3463,107 @@
         }
       }
     },
+    "/api/settings/storage": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Read Storage",
+        "operationId": "read_storage_api_settings_storage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Update Storage",
+        "operationId": "update_storage_api_settings_storage_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/storage/test": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Test Storage",
+        "operationId": "test_storage_api_settings_storage_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/infrastructure": {
       "get": {
         "tags": [
@@ -9476,6 +9577,140 @@
         ],
         "title": "Stage"
       },
+      "StorageCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "StorageCheck"
+      },
+      "StorageSettings": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "s3"
+            ],
+            "title": "Kind"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "access_key": {
+            "type": "string",
+            "title": "Access Key"
+          },
+          "secret_set": {
+            "type": "boolean",
+            "title": "Secret Set"
+          },
+          "secret_from_environment": {
+            "type": "boolean",
+            "title": "Secret From Environment"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "endpoint",
+          "bucket",
+          "prefix",
+          "region",
+          "access_key",
+          "secret_set",
+          "secret_from_environment",
+          "location"
+        ],
+        "title": "StorageSettings"
+      },
+      "StorageUpdate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "s3"
+            ],
+            "title": "Kind"
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Endpoint",
+            "default": ""
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Bucket",
+            "default": ""
+          },
+          "prefix": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Prefix",
+            "default": "minibrain"
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Region",
+            "default": ""
+          },
+          "access_key": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Access Key",
+            "default": ""
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "StorageUpdate"
+      },
       "StoreInfo": {
         "properties": {
           "name": {
@@ -9487,7 +9722,8 @@
             "enum": [
               "sqlite",
               "postgres",
-              "folder"
+              "folder",
+              "s3"
             ],
             "title": "Kind"
           },

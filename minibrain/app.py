@@ -40,6 +40,7 @@ from minibrain.models import hub
 from minibrain.models.catalog import seed
 from minibrain.models.health import report_problems
 from minibrain.models.registry import model_folder
+from minibrain.object_store import apply as apply_storage
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
 from minibrain.registry.db import make_sessions, migrate
@@ -150,6 +151,8 @@ def create_app(
     app.state.sessions = sessions
     app.state.leader = leader_for(settings.database_url)
     app.state.store = store_for(settings)
+    with sessions() as session:
+        apply_storage(app.state.store, session, settings)
     app.state.queue = SqlJobQueue(sessions, DomainEffects(settings))
     app.state.queue.grace()
     engines = None

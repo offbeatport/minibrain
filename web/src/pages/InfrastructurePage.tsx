@@ -323,6 +323,7 @@ const STORE_KIND: Record<StoreInfo["kind"], string> = {
     sqlite: "SQLite file",
     postgres: "Postgres",
     folder: "Folder",
+    s3: "S3 bucket",
 };
 
 function diskTone(used: number): string {

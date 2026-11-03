@@ -1176,6 +1176,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Storage */
+        get: operations["read_storage_api_settings_storage_get"];
+        /** Update Storage */
+        put: operations["update_storage_api_settings_storage_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/storage/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Storage */
+        post: operations["test_storage_api_settings_storage_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/infrastructure": {
         parameters: {
             query?: never;
@@ -3147,6 +3182,72 @@ export interface components {
             /** Progress */
             progress?: number | null;
         };
+        /** StorageCheck */
+        StorageCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+        };
+        /** StorageSettings */
+        StorageSettings: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "local" | "s3";
+            /** Endpoint */
+            endpoint: string;
+            /** Bucket */
+            bucket: string;
+            /** Prefix */
+            prefix: string;
+            /** Region */
+            region: string;
+            /** Access Key */
+            access_key: string;
+            /** Secret Set */
+            secret_set: boolean;
+            /** Secret From Environment */
+            secret_from_environment: boolean;
+            /** Location */
+            location: string;
+        };
+        /** StorageUpdate */
+        StorageUpdate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "local" | "s3";
+            /**
+             * Endpoint
+             * @default
+             */
+            endpoint?: string;
+            /**
+             * Bucket
+             * @default
+             */
+            bucket?: string;
+            /**
+             * Prefix
+             * @default minibrain
+             */
+            prefix?: string;
+            /**
+             * Region
+             * @default
+             */
+            region?: string;
+            /**
+             * Access Key
+             * @default
+             */
+            access_key?: string;
+            /** Secret */
+            secret?: string | null;
+        };
         /** StoreInfo */
         StoreInfo: {
             /** Name */
@@ -3155,7 +3256,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "sqlite" | "postgres" | "folder";
+            kind: "sqlite" | "postgres" | "folder" | "s3";
             /** Location */
             location: string;
             /** Used Bytes */
@@ -5887,6 +5988,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemInfo"];
+                };
+            };
+        };
+    };
+    read_storage_api_settings_storage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageSettings"];
+                };
+            };
+        };
+    };
+    update_storage_api_settings_storage_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_storage_api_settings_storage_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

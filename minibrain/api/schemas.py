@@ -439,9 +439,36 @@ class InstallSettings(BaseModel):
     splits: dict[str, int]
 
 
+class StorageSettings(BaseModel):
+    kind: Literal["local", "s3"]
+    endpoint: str
+    bucket: str
+    prefix: str
+    region: str
+    access_key: str
+    secret_set: bool
+    secret_from_environment: bool
+    location: str
+
+
+class StorageUpdate(BaseModel):
+    kind: Literal["local", "s3"]
+    endpoint: str = Field(default="", max_length=2048)
+    bucket: str = Field(default="", max_length=255)
+    prefix: str = Field(default="minibrain", max_length=1024)
+    region: str = Field(default="", max_length=64)
+    access_key: str = Field(default="", max_length=256)
+    secret: str | None = Field(default=None, max_length=1024)
+
+
+class StorageCheck(BaseModel):
+    ok: bool
+    message: str
+
+
 class StoreInfo(BaseModel):
     name: str
-    kind: Literal["sqlite", "postgres", "folder"]
+    kind: Literal["sqlite", "postgres", "folder", "s3"]
     location: str
     used_bytes: int | None
     free_bytes: int | None

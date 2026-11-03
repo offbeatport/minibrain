@@ -5,6 +5,7 @@ import {
     Database,
     Gauge,
     GraduationCap,
+    HardDrive,
     Home,
     Play,
     Rocket,
@@ -53,6 +54,7 @@ export const SETTINGS_PAGES: NavEntry[] = [
     { label: "General", path: "/settings", icon: SlidersHorizontal },
     { label: "Security", path: "/settings/security", icon: ShieldCheck },
     { label: "Data", path: "/settings/data", icon: Table2 },
+    { label: "Storage", path: "/settings/storage", icon: HardDrive },
 ];
 
 export function isSettingsPath(pathname: string): boolean {

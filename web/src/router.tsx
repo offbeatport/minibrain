@@ -31,6 +31,7 @@ import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
 import { DataSettingsPage } from "./pages/settings/DataSettingsPage";
+import { StorageSettingsPage } from "./pages/settings/StorageSettingsPage";
 import { ModelTrainingPage, TrainingListPage } from "./pages/training/TrainingPages";
 
 const LEGACY_TABS: Record<string, (slug: string) => string> = {
@@ -156,6 +157,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", SecurityPage),
     globalPage("/settings/data", DataSettingsPage),
+    globalPage("/settings/storage", StorageSettingsPage),
     globalPage("/proto/logos", LogosPage),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),

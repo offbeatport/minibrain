@@ -52,18 +52,41 @@ def tar_bytes(directory: Path) -> bytes:
     return buffer.getvalue()
 
 
+class RemoteBlobs(Protocol):
+    def describe(self) -> str: ...
+
+    def has(self, artifact_id: str) -> bool: ...
+
+    def upload(self, source: Path, artifact_id: str) -> None: ...
+
+    def download(self, artifact_id: str, target: Path) -> None: ...
+
+    def open(self, artifact_id: str) -> BinaryIO: ...
+
+    def delete(self, artifact_id: str) -> None: ...
+
+
 class ArtifactStore:
     def __init__(self, root: Path, cache: Path) -> None:
         self.root = root
         self.cache = cache
+        self.remote: RemoteBlobs | None = None
+        self.writes_remote = False
+
+    def use(self, remote: RemoteBlobs | None, writes: bool) -> None:
+        self.remote = remote
+        self.writes_remote = remote is not None and writes
 
     def path(self, artifact_id: str) -> Path:
         if not is_artifact_id(artifact_id):
             raise ArtifactError(f"not an artifact id: {artifact_id}")
         return self.root / artifact_id[:2] / artifact_id
 
-    def has(self, artifact_id: str) -> bool:
+    def local(self, artifact_id: str) -> bool:
         return self.path(artifact_id).is_file()
+
+    def has(self, artifact_id: str) -> bool:
+        return self.local(artifact_id) or (self.remote is not None and self.remote.has(artifact_id))
 
     def put_stream(self, stream: Readable, expected: str | None = None) -> Stored:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -78,6 +101,13 @@ class ArtifactStore:
         if expected is not None and expected != artifact_id:
             Path(temporary.name).unlink(missing_ok=True)
             raise ArtifactError(f"content hashes to {artifact_id}, not {expected}")
+        if self.writes_remote and self.remote is not None:
+            try:
+                if not self.remote.has(artifact_id):
+                    self.remote.upload(Path(temporary.name), artifact_id)
+            finally:
+                Path(temporary.name).unlink(missing_ok=True)
+            return Stored(id=artifact_id, size=size)
         target = self.path(artifact_id)
         if target.exists():
             Path(temporary.name).unlink(missing_ok=True)
@@ -94,9 +124,11 @@ class ArtifactStore:
         return self.put_stream(io.BytesIO(tar_bytes(directory)))
 
     def open(self, artifact_id: str) -> BinaryIO:
-        if not self.has(artifact_id):
-            raise ArtifactError(f"artifact {artifact_id} not found")
-        return self.path(artifact_id).open("rb")
+        if self.local(artifact_id):
+            return self.path(artifact_id).open("rb")
+        if self.remote is not None and self.remote.has(artifact_id):
+            return self.remote.open(artifact_id)
+        raise ArtifactError(f"artifact {artifact_id} not found")
 
     def chunks(self, artifact_id: str) -> Iterator[bytes]:
         with self.open(artifact_id) as stream:
@@ -105,7 +137,17 @@ class ArtifactStore:
 
     def delete(self, artifact_id: str) -> None:
         self.path(artifact_id).unlink(missing_ok=True)
+        if self.remote is not None:
+            self.remote.delete(artifact_id)
         shutil.rmtree(self.cache / artifact_id, ignore_errors=True)
+
+    def fetch(self, artifact_id: str, target: Path) -> Path:
+        if self.local(artifact_id):
+            return self.path(artifact_id)
+        if self.remote is None or not self.remote.has(artifact_id):
+            raise ArtifactError(f"artifact {artifact_id} not found")
+        self.remote.download(artifact_id, target)
+        return target
 
     def materialize(self, artifact_id: str, packing: str, name: str) -> Path:
         target = self.cache / artifact_id
@@ -115,11 +157,17 @@ class ArtifactStore:
             return result
         self.cache.mkdir(parents=True, exist_ok=True)
         staging = Path(tempfile.mkdtemp(dir=self.cache))
+        source = self.fetch(artifact_id, staging / ".download")
         if packing == Packing.FILE:
-            shutil.copyfile(self.path(artifact_id), staging / name)
+            if source.parent == staging:
+                os.replace(source, staging / name)
+            else:
+                shutil.copyfile(source, staging / name)
         else:
-            with tarfile.open(self.path(artifact_id)) as archive:
+            with tarfile.open(source) as archive:
                 archive.extractall(staging / "tree", filter="data")
+            if source.parent == staging:
+                source.unlink()
         (staging / ".complete").touch()
         try:
             os.replace(staging, target)
