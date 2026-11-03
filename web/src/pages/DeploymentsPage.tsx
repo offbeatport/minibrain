@@ -14,6 +14,7 @@ import {
 } from "~/api/client";
 import { useMinibrain, useModels } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
+import { FeedbackApi } from "~/components/FeedbackApi";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -98,6 +99,12 @@ function Connect({ slug }: { slug: string }) {
                     />
                 </div>
             </PanelSection>
+            <FeedbackApi
+                baseUrl={baseUrl}
+                model={model}
+                slug={slug}
+                keyValue={created?.secret ?? null}
+            />
             <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />
         </>
     );

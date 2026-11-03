@@ -1,13 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
+import { ChevronLeft, ExternalLink, Files, History, Info, Plug, ThumbsUp } from "lucide-react";
 import { Badge, Button, Card, CardContent, DataGrid, Link, cn } from "obp-ui";
 import { useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
 import { Facts } from "~/components/Facts";
+import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -524,6 +525,13 @@ function CustomModelView({ row }: { row: ModelRow }) {
                     )}
                     empty="No revisions yet: add training data on Training, then train or score a prompt."
                 />
+            </PanelSection>
+            <PanelSection
+                icon={ThumbsUp}
+                title="Feedback"
+                description="Answers marked right or wrong in the playground and through the API."
+            >
+                <FeedbackSince slug={row.key} />
             </PanelSection>
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
         </>

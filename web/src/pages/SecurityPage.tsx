@@ -52,7 +52,7 @@ const GROUPS = [
     {
         icon: KeyRound,
         title: "Request logs and API keys",
-        names: ["request_logs", "log_retention_days", "key_expiry_days"],
+        names: ["request_logs", "request_bodies", "log_retention_days", "key_expiry_days"],
     },
 ];
 

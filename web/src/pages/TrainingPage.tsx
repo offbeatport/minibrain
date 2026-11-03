@@ -5,6 +5,7 @@ import { Button, Field, Link, NumberField } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
 import { type JobInfo, type MinibrainDetail, api, unwrap } from "~/api/client";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
+import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
 import { ErrorLine, PanelSection, Section } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -29,6 +30,7 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     });
     const [maxRows, setMaxRows] = useState<number | null>(Number(preset.rows) || 3000);
     const [epochs, setEpochs] = useState<number | null>(Number(preset.epochs) || 1);
+    const feedbackRows = detail.snapshot?.feedback_rows ?? 0;
     const create = useMutation({
         mutationFn: (body: { kind: "prompt" | "lora"; max_rows?: number; epochs?: number }) =>
             unwrap(
@@ -49,6 +51,8 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
             {detail.snapshot && (
                 <p className="mb-4 text-sm text-muted-foreground tabular-nums">
                     {`${detail.dataset_name ?? "Training data"}: ${count(detail.snapshot.counts.train)} training rows, ${count(detail.snapshot.counts.golden)} in the test set, ${count(detail.snapshot.labels.length)} labels. `}
+                    {feedbackRows > 0 &&
+                        `Includes ${count(feedbackRows)} ${feedbackRows === 1 ? "row" : "rows"} from feedback. `}
                     <Link
                         href={`/data?minibrain=${encodeURIComponent(slug)}`}
                         className="text-primary hover:underline"
@@ -201,6 +205,12 @@ export function Training({ slug }: { slug: string }) {
     return (
         <>
             <CreateVersion detail={detail} focusTrain={prepared} />
+            <Section
+                title="Feedback"
+                caption="Answers marked right or wrong since the last version. Accepted ones join the next training data."
+            >
+                <FeedbackSince slug={slug} />
+            </Section>
             <Section title="Jobs" caption="One job runs at a time; the rest wait in the queue.">
                 {active.length + finished.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No jobs yet.</p>

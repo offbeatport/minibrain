@@ -21,6 +21,11 @@ export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 
 const ACTIONS: Record<string, string> = {
     "audit.prune": "Audit events deleted",
+    "feedback.accept": "Feedback accepted",
+    "feedback.assign": "Feedback assigned",
+    "feedback.fix": "Feedback fixed and accepted",
+    "feedback.reject": "Feedback rejected",
+    "feedback.unassign": "Feedback unassigned",
     "dataset.move": "Dataset moved",
     "dataset_folder.create": "Dataset folder created",
     "dataset_folder.delete": "Dataset folder deleted",
@@ -212,6 +217,9 @@ function listChange(before: unknown[], after: unknown[], policy?: PolicyInfo): s
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "audit.prune": (detail) =>
         `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}`,
+    "feedback.accept": (detail) => `Right answer: ${plainValue(detail.label)}`,
+    "feedback.fix": (detail) => `Fixed to ${plainValue(detail.label)}`,
+    "feedback.reject": () => "Kept out of the training data",
     "model.delete": (detail) =>
         typeof detail.size_bytes === "number" ? `Freed ${bytes(detail.size_bytes)}` : "Deleted",
     "model.evict": (detail) =>

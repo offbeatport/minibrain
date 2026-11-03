@@ -18,6 +18,7 @@ import { ChatBubble } from "obp-ui/chat";
 import { type FormEvent, useState } from "react";
 import { type CompleteResponse, type MinibrainSummary, api, unwrap } from "~/api/client";
 import { useGolden, useMinibrain, useMinibrains, useVersions } from "~/api/queries";
+import { AnswerFeedback } from "~/components/AnswerFeedback";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
 import { asCode, milliseconds } from "~/lib/format";
@@ -63,7 +64,17 @@ function VersionPicker({
     );
 }
 
-function Reply({ reply }: { reply: CompleteResponse }) {
+function Reply({
+    slug,
+    input,
+    reply,
+    labels,
+}: {
+    slug: string;
+    input: string;
+    reply: CompleteResponse;
+    labels: string[];
+}) {
     return (
         <div className="flex flex-col gap-1">
             <ChatBubble role="assistant" text={asCode(reply.output) || "(empty)"} />
@@ -71,6 +82,7 @@ function Reply({ reply }: { reply: CompleteResponse }) {
                 <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}{" "}
                 · {reply.label ? "valid label" : "not a known label"}
             </p>
+            <AnswerFeedback slug={slug} input={input} reply={reply} labels={labels} />
         </div>
     );
 }
@@ -184,7 +196,13 @@ function Playground({ slug }: { slug: string }) {
                         <ChatBubble role="user" text={exchange.text} />
                         <div className="grid gap-3 md:grid-cols-2">
                             {exchange.replies.map((reply) => (
-                                <Reply key={reply.model} reply={reply} />
+                                <Reply
+                                    key={reply.model}
+                                    slug={slug}
+                                    input={exchange.text}
+                                    reply={reply}
+                                    labels={detail?.snapshot?.labels ?? []}
+                                />
                             ))}
                         </div>
                     </CardContent>

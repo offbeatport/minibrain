@@ -17,12 +17,13 @@ import {
 import { DataPage } from "./pages/DataPage";
 import { DeploymentPage, DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
+import { FeedbackPage } from "./pages/FeedbackPage";
 import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
 import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
 import { MonitorPage } from "./pages/MonitorPage";
-import { FeedbackPage, PipelinesPage } from "./pages/PlaceholderPages";
+import { PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
