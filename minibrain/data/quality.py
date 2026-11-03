@@ -18,10 +18,16 @@ def is_blank(value: str | None) -> bool:
     return value is None or not value.strip()
 
 
+def usable_rows(rows: Sequence[tuple[str | None, str | None]]) -> list[tuple[str, str]]:
+    return [(text.strip(), label.strip()) for text, label in rows if text and label and text.strip() and label.strip()]
+
+
+def label_counts(rows: Sequence[tuple[str | None, str | None]]) -> list[tuple[str, int]]:
+    return Counter(label for _, label in usable_rows(rows)).most_common()
+
+
 def assess(rows: Sequence[tuple[str | None, str | None]]) -> Quality:
-    usable = [
-        (text.strip(), label.strip()) for text, label in rows if text and label and text.strip() and label.strip()
-    ]
+    usable = usable_rows(rows)
     per_label = Counter(label for _, label in usable)
     return Quality(
         rows=len(rows),

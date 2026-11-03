@@ -29,6 +29,16 @@ class Column:
 
 
 @dataclass(frozen=True)
+class ColumnSummary:
+    name: str
+    type: str
+    nulls: int
+    distinct: int
+    min: str | None
+    max: str | None
+
+
+@dataclass(frozen=True)
 class QueryResult:
     columns: list[str]
     rows: list[list[Any]]
@@ -75,6 +85,32 @@ def describe(staging_path: Path) -> tuple[list[Column], int]:
         ]
         count = connection.execute(f"SELECT count(*) FROM {SOURCE_TABLE}").fetchone()
     return columns, int(count[0]) if count else 0
+
+
+def summarize(staging_path: Path, sample: int) -> tuple[list[ColumnSummary], int]:
+    with locked_connection(staging_path) as connection:
+        cursor = connection.execute(f"SUMMARIZE (SELECT * FROM {SOURCE_TABLE} LIMIT {int(sample)})")
+        names = [description[0] for description in cursor.description or []]
+        found = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+    sampled = int(found[0]["count"]) if found else 0
+    return [
+        ColumnSummary(
+            name=row["column_name"],
+            type=row["column_type"],
+            nulls=round(sampled * float(row["null_percentage"] or 0) / 100),
+            distinct=int(row["approx_unique"] or 0),
+            min=clip(row["min"]),
+            max=clip(row["max"]),
+        )
+        for row in found
+    ], sampled
+
+
+def clip(value: Any, limit: int = 80) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
 
 def run_query(staging_path: Path, sql: str, limit: int | None) -> QueryResult:

@@ -1,0 +1,128 @@
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, inspect, text
+
+from minibrain.registry.db import MIGRATIONS, make_engine
+from tests.conftest import Harness, tickets_csv
+from tests.test_shared_data import snapshot_hash, upload
+
+
+def migration_config(engine: Engine) -> Config:
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS))
+    config.attributes["engine"] = engine
+    return config
+
+
+def columns_of(engine: Engine, table: str) -> set[str]:
+    return {column["name"] for column in inspect(engine).get_columns(table)}
+
+
+def test_catalogue_migration_adds_nullable_fields_and_keeps_rows(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
+    config = migration_config(engine)
+    command.upgrade(config, "0016")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO artifacts (id, kind, packing, name, size, created_at) "
+                "VALUES ('a1', 'source', 'file', 'tickets.csv', 10, CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO sources (name, filename, artifact_id, size, created_at) "
+                "VALUES ('tickets.csv', 'tickets.csv', 'a1', 10, CURRENT_TIMESTAMP)"
+            )
+        )
+    command.upgrade(config, "0017")
+    for table in ("sources", "datasets"):
+        assert {"description", "tags"} <= columns_of(engine, table)
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT name, description, tags FROM sources")).all() == [
+            ("tickets.csv", None, None)
+        ]
+    command.downgrade(config, "0016")
+    assert "description" not in columns_of(engine, "sources")
+    assert "tags" not in columns_of(engine, "datasets")
+
+
+def test_description_and_tags_round_trip_on_sources_and_datasets(harness: Harness) -> None:
+    source = upload(harness)
+    assert (source["kind"], source["description"], source["tags"]) == ("upload", "", [])
+    changed = harness.client.patch(
+        f"/api/sources/{source['id']}",
+        json={"name": "Support tickets", "description": " Exported from the help desk ", "tags": ["support", " "]},
+    ).json()
+    assert (changed["name"], changed["filename"], changed["description"], changed["tags"]) == (
+        "Support tickets",
+        "tickets.csv",
+        "Exported from the help desk",
+        ["support"],
+    )
+    assert harness.client.get(f"/api/sources/{source['id']}").json()["tags"] == ["support"]
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
+    edited = harness.client.patch(
+        "/api/datasets/tickets", json={"description": "Category per ticket", "tags": ["triage", "en", "triage"]}
+    ).json()
+    assert (edited["slug"], edited["description"], edited["tags"]) == (
+        "tickets",
+        "Category per ticket",
+        ["en", "triage"],
+    )
+    cleared = harness.client.patch("/api/datasets/tickets", json={"description": "", "tags": []}).json()
+    assert (cleared["description"], cleared["tags"], cleared["name"]) == ("", [], "Tickets")
+    assert harness.client.patch("/api/datasets/tickets", json={"name": ""}).status_code == 422
+
+
+def test_dataset_created_with_the_picked_columns(harness: Harness) -> None:
+    source = upload(harness)
+    body = {"name": "Reversed", "source_id": source["id"], "input_column": "category", "label_column": "text"}
+    created = harness.client.post("/api/datasets", json=body).json()
+    assert (created["mapping"]["input_column"], created["mapping"]["label_column"]) == ("category", "text")
+    sql = "SELECT text AS input, category AS label FROM source WHERE category = 'bug'"
+    by_sql = harness.client.post("/api/datasets", json={"name": "Bugs", "source_id": source["id"], "sql": sql}).json()
+    assert (by_sql["mapping"]["sql"], by_sql["mapping"]["input_column"]) == (sql, None)
+    bad = {"name": "Broken", "source_id": source["id"], "input_column": "nope", "label_column": "text"}
+    assert harness.client.post("/api/datasets", json=bad).status_code == 422
+    assert [dataset["slug"] for dataset in harness.client.get("/api/datasets").json()] == ["bugs", "reversed"]
+
+
+def test_column_stats_come_from_a_bounded_sample(harness: Harness) -> None:
+    rows = tickets_csv(30) + b",bug\n"
+    source = harness.client.post("/api/sources", files={"file": ("tickets.csv", rows, "text/csv")}).json()
+    stats = harness.client.get(f"/api/sources/{source['id']}/stats").json()
+    assert (stats["rows"], stats["sampled"]) == (31, 31)
+    by_name = {column["name"]: column for column in stats["columns"]}
+    assert by_name["text"]["nulls"] == 1
+    assert by_name["category"]["type"] == "VARCHAR"
+    assert by_name["category"]["distinct"] == 4
+    assert (by_name["category"]["min"], by_name["category"]["max"]) == ("account", "feature")
+    queried = harness.client.post(
+        f"/api/sources/{source['id']}/query", json={"sql": "SELECT category, count(*) AS n FROM source GROUP BY 1"}
+    ).json()
+    assert queried["columns"] == ["category", "n"] and len(queried["rows"]) == 4
+
+
+def test_preview_counts_rows_per_label(harness: Harness) -> None:
+    source = upload(harness)
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
+    counts = harness.client.get("/api/datasets/tickets/preview").json()["label_counts"]
+    assert counts == [{"label": label, "rows": 50} for label in ("billing", "bug", "account", "feature")]
+
+
+def test_splits_are_known_once_a_model_builds_the_dataset(harness: Harness) -> None:
+    source = upload(harness)
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
+    harness.client.post("/api/minibrains", json={"name": "Triage"})
+    harness.client.put("/api/minibrains/triage/dataset", json={"dataset": "tickets"})
+    assert harness.client.get("/api/datasets/tickets").json()["splits"] is None
+    snapshot_hash(harness, "triage")
+    splits = harness.client.get("/api/datasets/tickets").json()["splits"]
+    assert sum(splits.values()) == 200
+    harness.client.patch("/api/datasets/tickets", json={"description": "still the same rows"})
+    assert harness.client.get("/api/datasets/tickets").json()["splits"] == splits
+    harness.client.put("/api/datasets/tickets/mapping", json={"input_column": "category", "label_column": "text"})
+    assert harness.client.get("/api/datasets/tickets").json()["splits"] is None

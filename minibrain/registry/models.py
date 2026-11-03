@@ -80,6 +80,8 @@ class Source(Base):
     filename: Mapped[str]
     artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
     size: Mapped[int] = mapped_column(BigInteger, default=0)
+    description: Mapped[str | None] = mapped_column(default=None)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     datasets: Mapped[list["Dataset"]] = relationship(back_populates="source")
@@ -95,6 +97,8 @@ class Dataset(Base):
     input_column: Mapped[str | None] = mapped_column(default=None)
     label_column: Mapped[str | None] = mapped_column(default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
+    description: Mapped[str | None] = mapped_column(default=None)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

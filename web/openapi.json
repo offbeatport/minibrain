@@ -735,6 +735,56 @@
           }
         }
       },
+      "patch": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Update Source",
+        "operationId": "update_source_api_sources__source_id__patch",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogueUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "data"
@@ -787,6 +837,100 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/{source_id}/stats": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Source Stats",
+        "operationId": "source_stats_api_sources__source_id__stats_get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/{source_id}/query": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Source Query",
+        "operationId": "source_query_api_sources__source_id__query_post",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -893,6 +1037,56 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Update Dataset",
+        "operationId": "update_dataset_api_datasets__slug__patch",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogueUpdate"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4636,6 +4830,52 @@
         ],
         "title": "CatalogVariantInfo"
       },
+      "CatalogueUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "title": "CatalogueUpdate"
+      },
       "ChatCompletionRequest": {
         "properties": {
           "model": {
@@ -4737,6 +4977,58 @@
           "type"
         ],
         "title": "ColumnInfo"
+      },
+      "ColumnStats": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "nulls": {
+            "type": "integer",
+            "title": "Nulls"
+          },
+          "distinct": {
+            "type": "integer",
+            "title": "Distinct"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "nulls",
+          "distinct",
+          "min",
+          "max"
+        ],
+        "title": "ColumnStats"
       },
       "CompleteBody": {
         "properties": {
@@ -4882,6 +5174,39 @@
           "source_id": {
             "type": "integer",
             "title": "Source Id"
+          },
+          "input_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Column"
+          },
+          "label_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Column"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
           }
         },
         "type": "object",
@@ -4900,6 +5225,17 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
           },
           "source_id": {
             "type": "integer",
@@ -4930,6 +5266,20 @@
             "type": "array",
             "title": "Models"
           },
+          "splits": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Splits"
+          },
           "updated_at": {
             "type": "string",
             "format": "date-time",
@@ -4940,12 +5290,15 @@
         "required": [
           "slug",
           "name",
+          "description",
+          "tags",
           "source_id",
           "source_name",
           "rows",
           "columns",
           "mapping",
           "models",
+          "splits",
           "updated_at"
         ],
         "title": "DatasetSummary"
@@ -6158,6 +6511,24 @@
         ],
         "title": "KeyScopeUpdate"
       },
+      "LabelCount": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "rows"
+        ],
+        "title": "LabelCount"
+      },
       "LoadedModel": {
         "properties": {
           "base_model": {
@@ -7225,6 +7596,13 @@
             "type": "array",
             "title": "Labels"
           },
+          "label_counts": {
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            },
+            "type": "array",
+            "title": "Label Counts"
+          },
           "example": {
             "items": {
               "$ref": "#/components/schemas/ChatMessage"
@@ -7238,6 +7616,7 @@
           "rows",
           "quality",
           "labels",
+          "label_counts",
           "example"
         ],
         "title": "PreviewResponse"
@@ -7470,11 +7849,47 @@
         ],
         "title": "SourceInfo"
       },
+      "SourceStats": {
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "sampled": {
+            "type": "integer",
+            "title": "Sampled"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnStats"
+            },
+            "type": "array",
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "sampled",
+          "columns"
+        ],
+        "title": "SourceStats"
+      },
       "SourceSummary": {
         "properties": {
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "folder",
+              "s3",
+              "database"
+            ],
+            "title": "Kind"
           },
           "name": {
             "type": "string",
@@ -7483,6 +7898,17 @@
           "filename": {
             "type": "string",
             "title": "Filename"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
           },
           "size": {
             "type": "integer",
@@ -7515,8 +7941,11 @@
         "type": "object",
         "required": [
           "id",
+          "kind",
           "name",
           "filename",
+          "description",
+          "tags",
           "size",
           "rows",
           "columns",

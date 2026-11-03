@@ -32,10 +32,16 @@ class MappingInfo(BaseModel):
     sql: str | None
 
 
+SourceKind = Literal["upload", "folder", "s3", "database"]
+
+
 class SourceSummary(BaseModel):
     id: int
+    kind: SourceKind
     name: str
     filename: str
+    description: str
+    tags: list[str]
     size: int
     rows: int
     columns: list[ColumnInfo]
@@ -46,18 +52,45 @@ class SourceSummary(BaseModel):
 class DatasetSummary(BaseModel):
     slug: str
     name: str
+    description: str
+    tags: list[str]
     source_id: int
     source_name: str
     rows: int
     columns: list[ColumnInfo]
     mapping: MappingInfo
     models: list[str]
+    splits: dict[str, int] | None
     updated_at: datetime
 
 
 class DatasetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     source_id: int
+    input_column: str | None = None
+    label_column: str | None = None
+    sql: str | None = None
+
+
+class CatalogueUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=1000)
+    tags: list[str] | None = Field(default=None, max_length=20)
+
+
+class ColumnStats(BaseModel):
+    name: str
+    type: str
+    nulls: int
+    distinct: int
+    min: str | None
+    max: str | None
+
+
+class SourceStats(BaseModel):
+    rows: int
+    sampled: int
+    columns: list[ColumnStats]
 
 
 class DatasetChoice(BaseModel):
@@ -203,10 +236,16 @@ class PreviewRow(BaseModel):
     label: str | None
 
 
+class LabelCount(BaseModel):
+    label: str
+    rows: int
+
+
 class PreviewResponse(BaseModel):
     rows: list[PreviewRow]
     quality: QualityInfo
     labels: list[str]
+    label_counts: list[LabelCount]
     example: list[ChatMessage]
 
 

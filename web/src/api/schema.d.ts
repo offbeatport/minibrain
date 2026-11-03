@@ -244,7 +244,8 @@ export interface paths {
         delete: operations["delete_source_api_sources__source_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Source */
+        patch: operations["update_source_api_sources__source_id__patch"];
         trace?: never;
     };
     "/api/sources/{source_id}/rows": {
@@ -258,6 +259,40 @@ export interface paths {
         get: operations["source_rows_api_sources__source_id__rows_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Source Stats */
+        get: operations["source_stats_api_sources__source_id__stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{source_id}/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Source Query */
+        post: operations["source_query_api_sources__source_id__query_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -297,7 +332,8 @@ export interface paths {
         delete: operations["delete_dataset_api_datasets__slug__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Dataset */
+        patch: operations["update_dataset_api_datasets__slug__patch"];
         trace?: never;
     };
     "/api/datasets/{slug}/mapping": {
@@ -1562,6 +1598,15 @@ export interface components {
             };
             fit: components["schemas"]["FitInfo"];
         };
+        /** CatalogueUpdate */
+        CatalogueUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
         /** ChatCompletionRequest */
         ChatCompletionRequest: {
             /** Model */
@@ -1602,6 +1647,21 @@ export interface components {
             name: string;
             /** Type */
             type: string;
+        };
+        /** ColumnStats */
+        ColumnStats: {
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Nulls */
+            nulls: number;
+            /** Distinct */
+            distinct: number;
+            /** Min */
+            min: string | null;
+            /** Max */
+            max: string | null;
         };
         /** CompleteBody */
         CompleteBody: {
@@ -1656,6 +1716,12 @@ export interface components {
             name: string;
             /** Source Id */
             source_id: number;
+            /** Input Column */
+            input_column?: string | null;
+            /** Label Column */
+            label_column?: string | null;
+            /** Sql */
+            sql?: string | null;
         };
         /** DatasetSummary */
         DatasetSummary: {
@@ -1663,6 +1729,10 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
+            /** Description */
+            description: string;
+            /** Tags */
+            tags: string[];
             /** Source Id */
             source_id: number;
             /** Source Name */
@@ -1674,6 +1744,10 @@ export interface components {
             mapping: components["schemas"]["MappingInfo"];
             /** Models */
             models: string[];
+            /** Splits */
+            splits: {
+                [key: string]: number;
+            } | null;
             /**
              * Updated At
              * Format: date-time
@@ -2092,6 +2166,13 @@ export interface components {
             /** Models */
             models: components["schemas"]["ModelRef"][];
         };
+        /** LabelCount */
+        LabelCount: {
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: number;
+        };
         /** LoadedModel */
         LoadedModel: {
             /** Base Model */
@@ -2443,6 +2524,8 @@ export interface components {
             quality: components["schemas"]["QualityInfo"];
             /** Labels */
             labels: string[];
+            /** Label Counts */
+            label_counts: components["schemas"]["LabelCount"][];
             /** Example */
             example: components["schemas"]["ChatMessage"][];
         };
@@ -2527,14 +2610,32 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** SourceStats */
+        SourceStats: {
+            /** Rows */
+            rows: number;
+            /** Sampled */
+            sampled: number;
+            /** Columns */
+            columns: components["schemas"]["ColumnStats"][];
+        };
         /** SourceSummary */
         SourceSummary: {
             /** Id */
             id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "folder" | "s3" | "database";
             /** Name */
             name: string;
             /** Filename */
             filename: string;
+            /** Description */
+            description: string;
+            /** Tags */
+            tags: string[];
             /** Size */
             size: number;
             /** Rows */
@@ -3354,6 +3455,41 @@ export interface operations {
             };
         };
     };
+    update_source_api_sources__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogueUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     source_rows_api_sources__source_id__rows_get: {
         parameters: {
             query?: never;
@@ -3364,6 +3500,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_stats_api_sources__source_id__stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_query_api_sources__source_id__query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -3486,6 +3688,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dataset_api_datasets__slug__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogueUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetSummary"];
+                };
             };
             /** @description Validation Error */
             422: {
