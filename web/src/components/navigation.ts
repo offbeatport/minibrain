@@ -1,6 +1,7 @@
 import {
     Activity,
     Box,
+    Cable,
     Compass,
     Database,
     Gauge,
@@ -58,6 +59,7 @@ export const SETTINGS_PAGES: NavEntry[] = [
     { label: "Audit log", path: "/settings/audit", icon: ScrollText },
     { label: "Data", path: "/settings/data", icon: Table2 },
     { label: "Storage", path: "/settings/storage", icon: HardDrive },
+    { label: "Connections", path: "/settings/connections", icon: Cable },
     { label: "This install", path: "/settings/install", icon: Info },
 ];
 

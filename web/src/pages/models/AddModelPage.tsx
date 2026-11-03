@@ -109,7 +109,7 @@ const TASKS: {
 type Picked =
     | { kind: "base"; key: string }
     | { kind: "catalogue"; id: string; variant: string }
-    | { kind: "import"; text: string };
+    | { kind: "import"; text: string; connection: number | null };
 
 type Search = {
     base?: string;
@@ -268,7 +268,7 @@ export function AddModelPage() {
     const [accepted, setAccepted] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
     const [tab, setTab] = useState<PickerTab>(
-        params.source === "import" ? "import" : "recommended",
+        params.source === "import" ? "import" : "catalogue",
     );
     const [copy, setCopy] = useState<CopySource | null>(null);
     const [name, setName] = useState("");
@@ -290,6 +290,7 @@ export function AddModelPage() {
         text: option?.entry ? option.entry.id : current?.kind === "import" ? current.text : "",
         variant: option?.variant?.id ?? "",
         accepted,
+        connection: current?.kind === "import" ? current.connection : null,
     });
     const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
     const startFrom = useMutation({
@@ -359,7 +360,7 @@ export function AddModelPage() {
             choose({ kind: "catalogue", id: found.entry.id, variant: fresh.variant?.id ?? "" });
             return;
         }
-        choose({ kind: "import", text: found.text });
+        choose({ kind: "import", text: found.text, connection: found.connection });
     };
     const suggestedName = copy
         ? `${copy.name} copy`

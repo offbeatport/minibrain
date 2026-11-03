@@ -15,6 +15,7 @@ import { useSourceRows, useSourceStats } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
+import { ConnectedFacts } from "./Connected";
 import { CreateDataset } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
 import { type ItemRef, itemHref, kindLabel, plural } from "./catalogue";
@@ -30,6 +31,12 @@ import {
 } from "./parts";
 
 const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
+const CONNECTED = new Set(["s3", "database", "iceberg"]);
+const CONNECTED_LABELS: Record<string, string> = {
+    s3: "S3 path",
+    database: "Database",
+    iceberg: "Iceberg table",
+};
 
 function share(part: number, whole: number): string {
     if (whole === 0) {
@@ -115,7 +122,7 @@ function Columns({ source }: { source: SourceSummary }) {
     const stats = useSourceStats(source.id);
     const sampled = stats.data?.sampled ?? 0;
     const origin =
-        source.kind === "folder" ? "Types read from the files" : "Types from the staged table";
+        source.kind === "upload" ? "Types from the staged table" : "Types read from the source";
     const caption =
         stats.data && stats.data.sampled < stats.data.rows
             ? `${origin}; empty and distinct counts from the first ${count(sampled)} rows.`
@@ -222,7 +229,13 @@ export function FileDetail({
             <ItemHeader
                 title={source.name}
                 detail={
-                    source.kind === "folder" ? (
+                    CONNECTED.has(source.kind) ? (
+                        <>
+                            {`${CONNECTED_LABELS[source.kind] ?? kindLabel(source.kind)} · ${source.connection ?? "no connection"} · table `}
+                            <span className="font-mono">{source.table}</span>
+                            {` · added ${relativeTime(source.created_at)}`}
+                        </>
+                    ) : source.kind === "folder" ? (
                         <>
                             {"Folder · "}
                             <span className="font-mono">{source.path}</span>
@@ -275,9 +288,9 @@ export function FileDetail({
                             }
                             title={`Delete ${source.name}?`}
                             description={
-                                source.kind === "folder"
-                                    ? "minibrain stops reading the folder; its files stay where they are."
-                                    : "The stored copy and its staged table go. This cannot be undone."
+                                source.kind === "upload"
+                                    ? "The stored copy and its staged table go. This cannot be undone."
+                                    : "minibrain stops reading it; the data stays where it is."
                             }
                             onConfirm={() => remove.mutateAsync().catch(() => undefined)}
                         />
@@ -287,13 +300,14 @@ export function FileDetail({
             />
             <ErrorLine error={remove.error} />
             {source.error && <p className="text-sm text-destructive">{source.error}</p>}
+            <ConnectedFacts source={source} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(source.rows)} />
                 <Stat label="Columns" value={count(source.columns.length)} />
-                {source.kind === "folder" && (
+                {(source.kind === "folder" || source.kind === "s3") && (
                     <>
                         <Stat
-                            label="Files"
+                            label={source.kind === "s3" ? "Objects" : "Files"}
                             value={`${count(source.files)} ${FORMAT_LABELS[source.format ?? ""] ?? ""}`}
                         />
                         <Stat
@@ -302,7 +316,9 @@ export function FileDetail({
                         />
                     </>
                 )}
-                <Stat label="Size" value={bytes(source.size)} />
+                {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
+                    <Stat label="Size" value={bytes(source.size)} />
+                )}
                 <Stat label="Datasets" value={count(datasets.length)} />
             </div>
             {creating && (

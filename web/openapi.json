@@ -1811,6 +1811,424 @@
         }
       }
     },
+    "/api/connections": {
+      "get": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Read Connections",
+        "operationId": "read_connections_api_connections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConnectionInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Read Connections Api Connections Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Add Connection",
+        "operationId": "add_connection_api_connections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connections/{connection_id}": {
+      "put": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Change Connection",
+        "operationId": "change_connection_api_connections__connection_id__put",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Connection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Remove Connection",
+        "operationId": "remove_connection_api_connections__connection_id__delete",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Connection Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connections/test": {
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Test Connection",
+        "operationId": "test_connection_api_connections_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionTestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connections/{connection_id}/test": {
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Test Saved Connection",
+        "operationId": "test_saved_connection_api_connections__connection_id__test_post",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Connection Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connections/{connection_id}/tables": {
+      "get": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Connection Tables",
+        "operationId": "connection_tables_api_connections__connection_id__tables_get",
+        "parameters": [
+          {
+            "name": "connection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Connection Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTables"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/extensions": {
+      "get": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Read Extensions",
+        "operationId": "read_extensions_api_extensions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionsInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/s3": {
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Add S3 Source",
+        "operationId": "add_s3_source_api_sources_s3_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/S3SourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/database": {
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Add Database Source",
+        "operationId": "add_database_source_api_sources_database_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatabaseSourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/iceberg": {
+      "post": {
+        "tags": [
+          "connections"
+        ],
+        "summary": "Add Iceberg Source",
+        "operationId": "add_iceberg_source_api_sources_iceberg_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IcebergSourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models": {
       "get": {
         "tags": [
@@ -7150,6 +7568,419 @@
         ],
         "title": "CompleteResponse"
       },
+      "ConnectionBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "postgres",
+              "mysql"
+            ],
+            "title": "Kind"
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Endpoint",
+            "default": ""
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Region",
+            "default": ""
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Bucket",
+            "default": ""
+          },
+          "access_key": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Access Key",
+            "default": ""
+          },
+          "path_style": {
+            "type": "boolean",
+            "title": "Path Style",
+            "default": true
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Host",
+            "default": ""
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "database": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Database",
+            "default": ""
+          },
+          "user": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "User",
+            "default": ""
+          },
+          "ssl_mode": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Ssl Mode",
+            "default": ""
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "ConnectionBody"
+      },
+      "ConnectionCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "ConnectionCheck"
+      },
+      "ConnectionInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "postgres",
+              "mysql"
+            ],
+            "title": "Kind"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "access_key": {
+            "type": "string",
+            "title": "Access Key"
+          },
+          "path_style": {
+            "type": "boolean",
+            "title": "Path Style"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "user": {
+            "type": "string",
+            "title": "User"
+          },
+          "ssl_mode": {
+            "type": "string",
+            "title": "Ssl Mode"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "secret_set": {
+            "type": "boolean",
+            "title": "Secret Set"
+          },
+          "secret_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Source"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionSourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "endpoint",
+          "region",
+          "bucket",
+          "access_key",
+          "path_style",
+          "host",
+          "port",
+          "database",
+          "user",
+          "ssl_mode",
+          "summary",
+          "secret_set",
+          "secret_source",
+          "locked",
+          "problem",
+          "sources",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConnectionInfo"
+      },
+      "ConnectionSourceRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ConnectionSourceRef"
+      },
+      "ConnectionTables": {
+        "properties": {
+          "tables": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tables"
+        ],
+        "title": "ConnectionTables"
+      },
+      "ConnectionTestBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "postgres",
+              "mysql"
+            ],
+            "title": "Kind"
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Endpoint",
+            "default": ""
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Region",
+            "default": ""
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Bucket",
+            "default": ""
+          },
+          "access_key": {
+            "type": "string",
+            "maxLength": 256,
+            "title": "Access Key",
+            "default": ""
+          },
+          "path_style": {
+            "type": "boolean",
+            "title": "Path Style",
+            "default": true
+          },
+          "host": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Host",
+            "default": ""
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 65535.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "database": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Database",
+            "default": ""
+          },
+          "user": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "User",
+            "default": ""
+          },
+          "ssl_mode": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Ssl Mode",
+            "default": ""
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "ConnectionTestBody"
+      },
       "DataSettings": {
         "properties": {
           "row_limit": {
@@ -7280,6 +8111,67 @@
         },
         "type": "object",
         "title": "DataSettingsUpdate"
+      },
+      "DatabaseSourceCreate": {
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "title": "Connection Id"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "change_column": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Column"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "connection_id"
+        ],
+        "title": "DatabaseSourceCreate"
       },
       "DatasetChoice": {
         "properties": {
@@ -7803,6 +8695,77 @@
         ],
         "title": "ExampleInfo"
       },
+      "ExtensionInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "installed": {
+            "type": "boolean",
+            "title": "Installed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "purpose",
+          "installed"
+        ],
+        "title": "ExtensionInfo"
+      },
+      "ExtensionsInfo": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "directory": {
+            "type": "string",
+            "title": "Directory"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command"
+          },
+          "extensions": {
+            "items": {
+              "$ref": "#/components/schemas/ExtensionInfo"
+            },
+            "type": "array",
+            "title": "Extensions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "platform",
+          "directory",
+          "repository",
+          "command",
+          "extensions"
+        ],
+        "title": "ExtensionsInfo"
+      },
       "FailBody": {
         "properties": {
           "token": {
@@ -8163,6 +9126,38 @@
         ],
         "title": "HubAddRequest"
       },
+      "IcebergSourceCreate": {
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "title": "Connection Id"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 6,
+            "title": "Path"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "connection_id",
+          "path"
+        ],
+        "title": "IcebergSourceCreate"
+      },
       "ImportCheck": {
         "properties": {
           "ok": {
@@ -8259,6 +9254,28 @@
               }
             ],
             "title": "Match"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection"
           }
         },
         "type": "object",
@@ -8294,6 +9311,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Location"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
           },
           "variant_id": {
             "anyOf": [
@@ -8383,6 +9411,17 @@
             "type": "string",
             "minLength": 1,
             "title": "Location"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
           }
         },
         "type": "object",
@@ -9479,6 +10518,17 @@
             "maxLength": 4096,
             "minLength": 1,
             "title": "Location"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
           }
         },
         "type": "object",
@@ -10892,6 +11942,56 @@
         ],
         "title": "ReplicaInfo"
       },
+      "S3SourceCreate": {
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "title": "Connection Id"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 6,
+            "title": "Path"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  ".csv",
+                  ".tsv",
+                  ".json",
+                  ".jsonl",
+                  ".parquet"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "connection_id",
+          "path"
+        ],
+        "title": "S3SourceCreate"
+      },
       "SampleInfo": {
         "properties": {
           "file": {
@@ -11177,7 +12277,8 @@
               "upload",
               "folder",
               "s3",
-              "database"
+              "database",
+              "iceberg"
             ],
             "title": "Kind"
           }
@@ -11229,7 +12330,8 @@
               "upload",
               "folder",
               "s3",
-              "database"
+              "database",
+              "iceberg"
             ],
             "title": "Kind"
           },
@@ -11345,6 +12447,72 @@
               }
             ],
             "title": "Error"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "change_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Column"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "fingerprint_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint Detail"
           }
         },
         "type": "object",

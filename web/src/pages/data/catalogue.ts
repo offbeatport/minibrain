@@ -14,6 +14,7 @@ export const SOURCE_KINDS: { kind: SourceKind; label: string; noun: string }[] =
     { kind: "folder", label: "Folders", noun: "folder" },
     { kind: "s3", label: "S3", noun: "bucket" },
     { kind: "database", label: "Databases", noun: "database" },
+    { kind: "iceberg", label: "Iceberg", noun: "table" },
 ];
 
 export const DATASETS_GROUP: ItemRef = { kind: "group", id: "datasets" };
@@ -62,6 +63,9 @@ export function sourceText(source: SourceSummary): string {
         source.name,
         source.filename,
         source.table,
+        source.path,
+        source.query,
+        source.connection,
         source.description,
         ...source.tags,
         ...source.columns.map((column) => column.name),

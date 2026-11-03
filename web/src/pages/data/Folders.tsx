@@ -46,7 +46,7 @@ export const FORMAT_LABELS: Record<string, string> = {
     ".parquet": "Parquet",
 };
 
-function AddFolderDialog({
+export function AddFolderDialog({
     open,
     roots,
     onOpenChange,

@@ -560,6 +560,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Connections */
+        get: operations["read_connections_api_connections_get"];
+        put?: never;
+        /** Add Connection */
+        post: operations["add_connection_api_connections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Connection */
+        put: operations["change_connection_api_connections__connection_id__put"];
+        post?: never;
+        /** Remove Connection */
+        delete: operations["remove_connection_api_connections__connection_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connections/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Connection */
+        post: operations["test_connection_api_connections_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connections/{connection_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Saved Connection */
+        post: operations["test_saved_connection_api_connections__connection_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connections/{connection_id}/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connection Tables */
+        get: operations["connection_tables_api_connections__connection_id__tables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/extensions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Extensions */
+        get: operations["read_extensions_api_extensions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/s3": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add S3 Source */
+        post: operations["add_s3_source_api_sources_s3_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/database": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Database Source */
+        post: operations["add_database_source_api_sources_database_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/iceberg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Iceberg Source */
+        post: operations["add_iceberg_source_api_sources_iceberg_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models": {
         parameters: {
             query?: never;
@@ -2314,6 +2469,199 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
+        /** ConnectionBody */
+        ConnectionBody: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "s3" | "postgres" | "mysql";
+            /**
+             * Endpoint
+             * @default
+             */
+            endpoint?: string;
+            /**
+             * Region
+             * @default
+             */
+            region?: string;
+            /**
+             * Bucket
+             * @default
+             */
+            bucket?: string;
+            /**
+             * Access Key
+             * @default
+             */
+            access_key?: string;
+            /**
+             * Path Style
+             * @default true
+             */
+            path_style?: boolean;
+            /**
+             * Host
+             * @default
+             */
+            host?: string;
+            /** Port */
+            port?: number | null;
+            /**
+             * Database
+             * @default
+             */
+            database?: string;
+            /**
+             * User
+             * @default
+             */
+            user?: string;
+            /**
+             * Ssl Mode
+             * @default
+             */
+            ssl_mode?: string;
+            /** Secret */
+            secret?: string | null;
+        };
+        /** ConnectionCheck */
+        ConnectionCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+        };
+        /** ConnectionInfo */
+        ConnectionInfo: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "s3" | "postgres" | "mysql";
+            /** Endpoint */
+            endpoint: string;
+            /** Region */
+            region: string;
+            /** Bucket */
+            bucket: string;
+            /** Access Key */
+            access_key: string;
+            /** Path Style */
+            path_style: boolean;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number | null;
+            /** Database */
+            database: string;
+            /** User */
+            user: string;
+            /** Ssl Mode */
+            ssl_mode: string;
+            /** Summary */
+            summary: string;
+            /** Secret Set */
+            secret_set: boolean;
+            /** Secret Source */
+            secret_source: string | null;
+            /** Locked */
+            locked: boolean;
+            /** Problem */
+            problem: string | null;
+            /** Sources */
+            sources: components["schemas"]["ConnectionSourceRef"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ConnectionSourceRef */
+        ConnectionSourceRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** ConnectionTables */
+        ConnectionTables: {
+            /** Tables */
+            tables: string[];
+        };
+        /** ConnectionTestBody */
+        ConnectionTestBody: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "s3" | "postgres" | "mysql";
+            /**
+             * Endpoint
+             * @default
+             */
+            endpoint?: string;
+            /**
+             * Region
+             * @default
+             */
+            region?: string;
+            /**
+             * Bucket
+             * @default
+             */
+            bucket?: string;
+            /**
+             * Access Key
+             * @default
+             */
+            access_key?: string;
+            /**
+             * Path Style
+             * @default true
+             */
+            path_style?: boolean;
+            /**
+             * Host
+             * @default
+             */
+            host?: string;
+            /** Port */
+            port?: number | null;
+            /**
+             * Database
+             * @default
+             */
+            database?: string;
+            /**
+             * User
+             * @default
+             */
+            user?: string;
+            /**
+             * Ssl Mode
+             * @default
+             */
+            ssl_mode?: string;
+            /** Secret */
+            secret?: string | null;
+            /** Id */
+            id?: number | null;
+        };
         /** DataSettings */
         DataSettings: {
             /** Row Limit */
@@ -2345,6 +2693,19 @@ export interface components {
             majority_share?: number | null;
             /** Min Label Rows */
             min_label_rows?: number | null;
+        };
+        /** DatabaseSourceCreate */
+        DatabaseSourceCreate: {
+            /** Connection Id */
+            connection_id: number;
+            /** Table */
+            table?: string | null;
+            /** Query */
+            query?: string | null;
+            /** Change Column */
+            change_column?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** DatasetChoice */
         DatasetChoice: {
@@ -2522,6 +2883,30 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** ExtensionInfo */
+        ExtensionInfo: {
+            /** Name */
+            name: string;
+            /** Purpose */
+            purpose: string;
+            /** Installed */
+            installed: boolean;
+        };
+        /** ExtensionsInfo */
+        ExtensionsInfo: {
+            /** Version */
+            version: string;
+            /** Platform */
+            platform: string;
+            /** Directory */
+            directory: string;
+            /** Repository */
+            repository: string | null;
+            /** Command */
+            command: string;
+            /** Extensions */
+            extensions: components["schemas"]["ExtensionInfo"][];
+        };
         /** FailBody */
         FailBody: {
             /** Token */
@@ -2637,6 +3022,15 @@ export interface components {
             /** Repo */
             repo: string;
         };
+        /** IcebergSourceCreate */
+        IcebergSourceCreate: {
+            /** Connection Id */
+            connection_id: number;
+            /** Path */
+            path: string;
+            /** Name */
+            name?: string | null;
+        };
         /** ImportCheck */
         ImportCheck: {
             /** Ok */
@@ -2665,6 +3059,10 @@ export interface components {
             variant_id?: string | null;
             /** Match */
             match?: string | null;
+            /** Connection Id */
+            connection_id?: number | null;
+            /** Connection */
+            connection?: string | null;
         };
         /** ImportRequest */
         ImportRequest: {
@@ -2674,6 +3072,8 @@ export interface components {
             source_type?: ("folder" | "s3") | null;
             /** Location */
             location: string;
+            /** Connection Id */
+            connection_id?: number | null;
             /** Variant Id */
             variant_id?: string | null;
             /**
@@ -2705,6 +3105,8 @@ export interface components {
         InspectRequest: {
             /** Location */
             location: string;
+            /** Connection Id */
+            connection_id?: number | null;
         };
         /** InstallCatalogue */
         InstallCatalogue: {
@@ -3052,6 +3454,8 @@ export interface components {
         LocationRequest: {
             /** Location */
             location: string;
+            /** Connection Id */
+            connection_id?: number | null;
         };
         /** LogBody */
         LogBody: {
@@ -3512,6 +3916,17 @@ export interface components {
              */
             seen_at: string;
         };
+        /** S3SourceCreate */
+        S3SourceCreate: {
+            /** Connection Id */
+            connection_id: number;
+            /** Path */
+            path: string;
+            /** Format */
+            format?: (".csv" | ".tsv" | ".json" | ".jsonl" | ".parquet") | null;
+            /** Name */
+            name?: string | null;
+        };
         /** SampleInfo */
         SampleInfo: {
             /** File */
@@ -3616,7 +4031,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "upload" | "folder" | "s3" | "database";
+            kind: "upload" | "folder" | "s3" | "database" | "iceberg";
         };
         /** SourceStats */
         SourceStats: {
@@ -3635,7 +4050,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "upload" | "folder" | "s3" | "database";
+            kind: "upload" | "folder" | "s3" | "database" | "iceberg";
             /** Name */
             name: string;
             /** Filename */
@@ -3669,6 +4084,18 @@ export interface components {
             modified_at?: string | null;
             /** Error */
             error?: string | null;
+            /** Connection Id */
+            connection_id?: number | null;
+            /** Connection */
+            connection?: string | null;
+            /** Query */
+            query?: string | null;
+            /** Change Column */
+            change_column?: string | null;
+            /** Fingerprint */
+            fingerprint?: string | null;
+            /** Fingerprint Detail */
+            fingerprint_detail?: string | null;
         };
         /** SplitScore */
         SplitScore: {
@@ -5298,6 +5725,337 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_connections_api_connections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionInfo"][];
+                };
+            };
+        };
+    };
+    add_connection_api_connections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_connection_api_connections__connection_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_connection_api_connections__connection_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_connection_api_connections_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectionTestBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_saved_connection_api_connections__connection_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connection_tables_api_connections__connection_id__tables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connection_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTables"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_extensions_api_extensions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtensionsInfo"];
+                };
+            };
+        };
+    };
+    add_s3_source_api_sources_s3_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["S3SourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_database_source_api_sources_database_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatabaseSourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_iceberg_source_api_sources_iceberg_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IcebergSourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
                 };
             };
             /** @description Validation Error */

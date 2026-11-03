@@ -7,6 +7,7 @@ import {
     Field,
     Input,
     Label,
+    Link,
     Select,
     SelectContent,
     SelectItem,
@@ -15,6 +16,7 @@ import {
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import { type CatalogEntry, type CatalogVariantInfo, api, unwrap } from "~/api/client";
+import { useConnections } from "~/api/connectionQueries";
 import { keys, useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
@@ -68,9 +70,16 @@ type Inspection = {
     match?: string | null;
     name?: string | null;
     variant_id?: string | null;
+    connection_id?: number | null;
+    connection?: string | null;
 };
 
-export type SourceState = { text: string; variant: string; accepted: boolean };
+export type SourceState = {
+    text: string;
+    variant: string;
+    accepted: boolean;
+    connection?: number | null;
+};
 
 export type SourcePlan = {
     target: Target;
@@ -90,9 +99,15 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     const target = classify(state.text, entries);
     const location = target.kind === "path" ? target.location : "";
     const path = useDebounced(location, 400);
+    const connection = path.startsWith("s3://") ? (state.connection ?? null) : null;
     const check = useQuery({
-        queryKey: ["models", "inspect", path],
-        queryFn: () => unwrap(api.POST("/api/models/inspect", { body: { location: path } })),
+        queryKey: ["models", "inspect", path, connection],
+        queryFn: () =>
+            unwrap(
+                api.POST("/api/models/inspect", {
+                    body: { location: path, connection_id: connection },
+                }),
+            ),
         enabled: path.length > 1,
         staleTime: 10_000,
     });
@@ -113,6 +128,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
                             description: "",
                             tags: [],
                             variant_id: found?.variant_id ?? null,
+                            connection_id: found?.connection_id ?? connection,
                         },
                     }),
                 );
@@ -190,7 +206,7 @@ const SOURCE_KINDS: { kind: SourceKind; title: string; example: string; body: st
         kind: "s3",
         title: "S3 path",
         example: "s3://bucket/models/qwen3-1.7b",
-        body: "Copied from your bucket into this install. The S3 endpoint must be allowed by the network policy in Security. The bucket is left as it was.",
+        body: "Copied from your bucket into this install with an S3 connection from Settings, Connections: the one for that bucket, or the one picked here. The endpoint must be allowed by the network policy in Security. The bucket is left as it was.",
     },
     {
         kind: "folder",
@@ -385,16 +401,81 @@ export function PathResult({ plan }: { plan: SourcePlan }) {
 
 export type ImportPick =
     | { kind: "catalogue"; entry: CatalogEntry }
-    | { kind: "import"; text: string };
+    | { kind: "import"; text: string; connection: number | null };
+
+function ConnectionChoice({
+    value,
+    found,
+    onChange,
+}: {
+    value: number | null;
+    found: Inspection | undefined;
+    onChange: (value: number | null) => void;
+}) {
+    const connections = useConnections();
+    const options = (connections.data ?? []).filter((item) => item.kind === "s3");
+    if (connections.data && options.length === 0) {
+        return (
+            <p className="text-sm text-muted-foreground">
+                {
+                    "No S3 connections yet, so the server's environment credentials are used. Add one under "
+                }
+                <Link href="/settings/connections" className="text-primary hover:underline">
+                    Settings, Connections
+                </Link>
+                .
+            </p>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-1.5">
+            <label htmlFor="base-connection" className="text-sm font-medium">
+                Connection
+            </label>
+            <Select
+                value={value === null ? "auto" : String(value)}
+                onValueChange={(next) => onChange(next === "auto" || !next ? null : Number(next))}
+            >
+                <SelectTrigger id="base-connection" className="w-full sm:max-w-sm">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="auto" description="The first S3 connection for this bucket">
+                        Matching connection
+                    </SelectItem>
+                    {options.map((item) => (
+                        <SelectItem
+                            key={item.id}
+                            value={String(item.id)}
+                            description={item.summary}
+                        >
+                            {item.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">
+                {found?.connection
+                    ? `Reads with ${found.connection}.`
+                    : "No connection is for this bucket: pick one, or the server's environment credentials are used."}
+            </span>
+        </div>
+    );
+}
 
 export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: ImportPick) => void }) {
     const [text, setText] = useState(looksLikeSource(seed) ? seed.trim() : "");
-    const plan = useSourcePlan({ text, variant: "", accepted: false });
+    const [connection, setConnection] = useState<number | null>(null);
+    const plan = useSourcePlan({ text, variant: "", accepted: false, connection });
     const pick: ImportPick | null =
         plan.target.kind === "catalogue"
             ? { kind: "catalogue", entry: plan.target.entry }
             : plan.target.kind === "path" && plan.found?.ok
-              ? { kind: "import", text: text.trim() }
+              ? {
+                    kind: "import",
+                    text: text.trim(),
+                    connection: plan.found.connection_id ?? connection,
+                }
               : null;
     return (
         <div className="flex flex-col gap-4">
@@ -431,6 +512,9 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                 </div>
             )}
             {plan.target.kind === "hub" && <HubResult repo={plan.target.repo} />}
+            {text.trim().startsWith("s3://") && (
+                <ConnectionChoice value={connection} found={plan.found} onChange={setConnection} />
+            )}
             <PathResult plan={plan} />
             <div>
                 <Button type="button" disabled={!pick} onClick={() => pick && onUse(pick)}>

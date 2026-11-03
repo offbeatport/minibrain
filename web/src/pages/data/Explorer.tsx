@@ -10,6 +10,7 @@ import {
     Folder,
     FolderUp,
     Layers,
+    Snowflake,
     Table2,
 } from "lucide-react";
 import {
@@ -31,7 +32,6 @@ import {
 } from "obp-ui";
 import {
     type CSSProperties,
-    type ChangeEvent,
     type KeyboardEvent,
     type PointerEvent,
     type ReactNode,
@@ -40,16 +40,18 @@ import {
     useRef,
     useState,
 } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
+import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import { useFolderRoots } from "~/api/dataQueries";
 import { useDatasets, useSamples, useSources } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
-import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
+import { type AddKind, AddSourceMenu } from "./AddSource";
+import { AddDatabaseDialog, AddIcebergDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { CreateDataset, DatasetDetail, DatasetsGroup } from "./DatasetDetail";
 import { FileDetail } from "./FileDetail";
-import { FoldersGroup } from "./Folders";
+import { AddFolderDialog, FoldersGroup } from "./Folders";
 import {
     DATASETS_GROUP,
     type ItemRef,
@@ -58,7 +60,6 @@ import {
     datasetText,
     itemHref,
     itemKey,
-    kindLabel,
     parseItem,
     sourceText,
     usesSource,
@@ -77,6 +78,14 @@ const GROUP_ICONS: Record<SourceKind, ReactNode> = {
     folder: <Folder />,
     s3: <Cloud />,
     database: <Database />,
+    iceberg: <Snowflake />,
+};
+
+const SOURCE_ICONS: Partial<Record<SourceKind, ReactNode>> = {
+    folder: <Folder />,
+    s3: <Cloud />,
+    database: <Database />,
+    iceberg: <Snowflake />,
 };
 
 function fileIcon(filename: string): ReactNode {
@@ -163,7 +172,7 @@ function buildTree(sources: SourceSummary[], datasets: DatasetSummary[]): TreeNo
             children: members.map((source) => ({
                 id: itemKey({ kind: "source", id: source.id }),
                 label: source.name,
-                icon: source.kind === "folder" ? <Folder /> : fileIcon(source.filename),
+                icon: SOURCE_ICONS[source.kind] ?? fileIcon(source.filename),
             })),
         };
     });
@@ -188,49 +197,6 @@ function searchIndex(sources: SourceSummary[], datasets: DatasetSummary[]): Map<
 function allBranches(nodes: TreeNode[]): string[] {
     return nodes.flatMap((node) =>
         node.children?.length ? [node.id, ...allBranches(node.children)] : [],
-    );
-}
-
-function UploadButton({
-    label = "Upload file",
-    variant,
-    onUploaded,
-}: {
-    label?: string;
-    variant?: "default" | "outline";
-    onUploaded: (source: SourceSummary) => void;
-}) {
-    const refresh = useDataRefresh();
-    const upload = useMutation({
-        mutationFn: uploadFile,
-        onSuccess: async (source) => {
-            await refresh();
-            onUploaded(source);
-        },
-    });
-    const choose = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            upload.mutate(file);
-        }
-        event.target.value = "";
-    };
-    return (
-        <div className="flex flex-col items-end gap-1">
-            <Button asChild variant={variant}>
-                <label className="cursor-pointer">
-                    {upload.isPending ? "Uploading…" : label}
-                    <input
-                        type="file"
-                        className="sr-only"
-                        accept={DATA_FILE_TYPES}
-                        onChange={choose}
-                        disabled={upload.isPending}
-                    />
-                </label>
-            </Button>
-            <ErrorLine error={upload.error} />
-        </div>
     );
 }
 
@@ -274,11 +240,17 @@ function SampleMenu({ onUploaded }: { onUploaded: (source: SourceSummary) => voi
     );
 }
 
-function DataActions({ onUploaded }: { onUploaded: (source: SourceSummary) => void }) {
+function DataActions({
+    onUploaded,
+    onAdd,
+}: {
+    onUploaded: (source: SourceSummary) => void;
+    onAdd: (kind: AddKind) => void;
+}) {
     return (
         <div className="flex flex-wrap items-start gap-2">
             <SampleMenu onUploaded={onUploaded} />
-            <UploadButton onUploaded={onUploaded} />
+            <AddSourceMenu onUploaded={onUploaded} onAdd={onAdd} />
         </div>
     );
 }
@@ -288,11 +260,13 @@ function GroupDetail({
     sources,
     datasets,
     onUploaded,
+    onAdd,
 }: {
     kind: SourceKind;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
     onUploaded: (source: SourceSummary) => void;
+    onAdd: (kind: AddKind) => void;
 }) {
     const members = sources.filter((source) => source.kind === kind);
     const ids = new Set(members.map((source) => source.id));
@@ -304,12 +278,12 @@ function GroupDetail({
     }
     if (kind !== "upload") {
         return (
-            <div className="flex flex-col gap-4">
-                <h2 className="text-2xl font-semibold">{kindLabel(kind)}</h2>
-                <EmptyState variant="panel" title="Not available yet" className="mx-0 mt-0">
-                    {`Reading ${kind === "database" ? "a database" : "an S3 bucket"} in place comes later. Upload a file or add a folder for now.`}
-                </EmptyState>
-            </div>
+            <ConnectedGroup
+                kind={kind}
+                sources={sources}
+                datasets={datasets}
+                onAdd={() => onAdd(kind)}
+            />
         );
     }
     return (
@@ -337,7 +311,7 @@ function GroupDetail({
                     className="mx-0 mt-0"
                     action={
                         <div className="mt-3 flex justify-center">
-                            <DataActions onUploaded={onUploaded} />
+                            <DataActions onUploaded={onUploaded} onAdd={onAdd} />
                         </div>
                     }
                 >
@@ -383,6 +357,8 @@ export function DataExplorer() {
     const [query, setQuery] = useState("");
     const [collapsed, setCollapsed] = useState<string[]>([]);
     const [creatingFor, setCreatingFor] = useState<number | "new" | null>(null);
+    const [adding, setAdding] = useState<AddKind | null>(null);
+    const roots = useFolderRoots();
     const treeBox = useRef<HTMLDivElement>(null);
     const selected = requested ?? DEFAULT_ITEM;
     const selectedKey = itemKey(selected);
@@ -425,6 +401,14 @@ export function DataExplorer() {
         if (item) {
             select(item);
         }
+    };
+
+    const add = (kind: AddKind) => {
+        if (kind === "folder" && roots.data && roots.data.roots.length === 0) {
+            select({ kind: "group", id: "folder" });
+            return;
+        }
+        setAdding(kind);
     };
 
     const onUploaded = (source: SourceSummary) => {
@@ -478,6 +462,7 @@ export function DataExplorer() {
                     sources={sourceList}
                     datasets={datasetList}
                     onUploaded={onUploaded}
+                    onAdd={add}
                 />
             );
         } else if (selected.kind === "source") {
@@ -516,7 +501,7 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."
-                    actions={<DataActions onUploaded={onUploaded} />}
+                    actions={<DataActions onUploaded={onUploaded} onAdd={add} />}
                 />
                 <ErrorLine error={sources.error ?? datasets.error} />
             </div>
@@ -592,6 +577,27 @@ export function DataExplorer() {
                     {detail}
                 </section>
             </div>
+            <AddFolderDialog
+                open={adding === "folder"}
+                roots={roots.data?.roots ?? []}
+                onOpenChange={(open) => setAdding(open ? "folder" : null)}
+                onAdded={onUploaded}
+            />
+            <AddS3Dialog
+                open={adding === "s3"}
+                onOpenChange={(open) => setAdding(open ? "s3" : null)}
+                onAdded={onUploaded}
+            />
+            <AddDatabaseDialog
+                open={adding === "database"}
+                onOpenChange={(open) => setAdding(open ? "database" : null)}
+                onAdded={onUploaded}
+            />
+            <AddIcebergDialog
+                open={adding === "iceberg"}
+                onOpenChange={(open) => setAdding(open ? "iceberg" : null)}
+                onAdded={onUploaded}
+            />
         </div>
     );
 }
