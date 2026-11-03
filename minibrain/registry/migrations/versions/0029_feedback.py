@@ -18,9 +18,7 @@ def upgrade() -> None:
     op.create_table(
         "feedback",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "minibrain_id", sa.Integer(), sa.ForeignKey("minibrains.id", ondelete="CASCADE"), nullable=False
-        ),
+        sa.Column("minibrain_id", sa.Integer(), sa.ForeignKey("minibrains.id", ondelete="CASCADE"), nullable=False),
         sa.Column("version", sa.Integer(), nullable=True),
         sa.Column("response_id", sa.String(), nullable=True),
         sa.Column("origin", sa.String(), nullable=False),
