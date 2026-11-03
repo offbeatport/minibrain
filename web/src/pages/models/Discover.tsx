@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, Plus, X } from "lucide-react";
+import { ArrowUpDown, ExternalLink, KeyRound, Plus, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -199,8 +199,9 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     if (entry.gated && !on.tokenConfigured) {
         return (
             <div className="flex justify-end">
-                <Button variant="outline" size="xs" onClick={() => on.requirements(entry)}>
-                    How to get access
+                <Button size="xs" onClick={() => on.requirements(entry)}>
+                    <KeyRound />
+                    Get access
                 </Button>
             </div>
         );

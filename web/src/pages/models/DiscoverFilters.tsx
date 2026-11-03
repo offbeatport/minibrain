@@ -181,7 +181,7 @@ function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: num
                 <button
                     type="button"
                     onClick={() => setExpanded(!expanded)}
-                    className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="mt-1 w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                     {expanded ? "Show less" : `Show ${hidden} more`}
                 </button>
@@ -192,8 +192,8 @@ function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: num
 
 function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
     return (
-        <fieldset className="flex flex-col gap-2 px-3 py-3">
-            <legend className="float-left mb-1 text-sm font-semibold">{title}</legend>
+        <fieldset className="flex flex-col px-3 py-3">
+            <legend className="float-left mb-2 text-sm font-semibold">{title}</legend>
             {children}
         </fieldset>
     );
@@ -215,8 +215,8 @@ export function Option({
     return (
         <Label
             className={cn(
-                "flex min-w-0 items-start gap-2 font-normal leading-snug",
-                disabled && "text-muted-foreground",
+                "-mx-1.5 flex min-w-0 items-start gap-2 rounded-md px-1.5 py-1 font-normal leading-snug",
+                disabled ? "text-muted-foreground" : "cursor-pointer hover:bg-secondary",
             )}
         >
             <Checkbox
@@ -307,7 +307,7 @@ export function FilterPanel({
                     </>
                 )}
             </div>
-            <div className="flex flex-col gap-2 px-3 py-3">{toggles}</div>
+            <div className="flex flex-col px-3 py-3">{toggles}</div>
             <Group title="Task">
                 <OptionList items={items("tasks", distinct("tasks"))} />
             </Group>
