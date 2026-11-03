@@ -136,6 +136,8 @@ def check_outbound(url: str) -> None:
 
 
 def extensions(args: argparse.Namespace) -> None:
+    import duckdb
+
     from minibrain.data import extensions as duck
     from minibrain.policy import PolicyError
 
@@ -147,7 +149,10 @@ def extensions(args: argparse.Namespace) -> None:
                 raise SystemExit(f"give --from <folder or mirror URL>, or set {duck.REPOSITORY_ENV}")
             if "://" in source:
                 check_outbound(source)
-            done = duck.install(source, names)
+            wanted = args.names or duck.bundled(source)
+            if not wanted:
+                raise SystemExit(f"{source} has no extensions for DuckDB {duck.engine_version()} on {duck.platform()}")
+            done = duck.install(source, wanted)
             print(f"Installed {', '.join(done)} into {duck.directory()}")
         elif args.action == "download":
             check_outbound(args.source)
@@ -156,7 +161,7 @@ def extensions(args: argparse.Namespace) -> None:
             print(f"Saved {len(saved)} files under {args.to}")
             print(f"Install them on the server with: minibrain extensions install --from {args.to}")
             return
-    except PolicyError as error:
+    except (PolicyError, duckdb.Error) as error:
         raise SystemExit(str(error)) from error
     print(f"DuckDB {duck.engine_version()} on {duck.platform()}, extensions in {duck.directory()}")
     for state in duck.status():

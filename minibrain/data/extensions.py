@@ -151,6 +151,16 @@ def missing(names: Iterable[str]) -> list[str]:
     return [name for name in with_dependencies(names) if name not in installed]
 
 
+def bundled(source: str) -> list[str]:
+    if "://" in source:
+        return list(PURPOSES)
+    folder = Path(source).expanduser()
+    versioned = folder / engine_version() / platform()
+    files = (*folder.glob("*.duckdb_extension"), *versioned.glob("*.duckdb_extension*"))
+    found = {path.name.split(".")[0] for path in files if path.is_file()}
+    return [name for name in PURPOSES if name in found]
+
+
 def install(source: str, names: Sequence[str] = tuple(PURPOSES)) -> list[str]:
     directory().mkdir(parents=True, exist_ok=True)
     done: list[str] = []
