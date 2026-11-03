@@ -15,6 +15,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.app import create_app
+from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
+from minibrain.auth.roles import Role
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest
@@ -22,6 +24,7 @@ from minibrain.settings import Settings
 from minibrain.worker import MainClient, Worker, WorkerConfig
 
 LABELS = ("billing", "bug", "account", "feature")
+ADMIN_EMAIL = "admin@example.com"
 
 
 @dataclass
@@ -36,6 +39,18 @@ class FakeBackend:
 
     def status(self) -> list[dict[str, Any]]:
         return []
+
+
+def sign_in(app: FastAPI, client: TestClient, email: str = ADMIN_EMAIL, role: Role | None = Role.ADMIN) -> TestClient:
+    with app.state.sessions() as session:
+        user = find_local(session, email) or create_local(session, email, email.split("@")[0].title(), Role.VIEWER)
+        user.role = role.value if role is not None else None
+        row, token = start_session(session, user, None, "pytest")
+        session.commit()
+        subject = f"session:{row.token_hash}"
+    client.cookies.set(SESSION_COOKIE, token)
+    client.headers[CSRF_HEADER] = csrf_for(app.state.csrf_key, subject)
+    return client
 
 
 @dataclass
@@ -57,6 +72,10 @@ class Harness:
     @property
     def gateway_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.settings.secret('gateway_token')}"}
+
+    def person(self, role: Role | None, email: str | None = None) -> TestClient:
+        name = email or f"{role.value if role is not None else 'nobody'}@example.com"
+        return sign_in(self.app, TestClient(self.app), name, role)
 
     def flush_logs(self) -> int:
         return self.app.state.request_logs.flush()
@@ -114,4 +133,5 @@ def harness(settings: Settings) -> Iterator[Harness]:
     backend = FakeBackend()
     app = create_app(settings=settings, backend=backend, background=False, config_max_age=0)
     with TestClient(app) as client:
+        sign_in(app, client)
         yield Harness(app=app, client=client, settings=settings, backend=backend, sessions=app.state.sessions)

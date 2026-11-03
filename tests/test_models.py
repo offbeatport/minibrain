@@ -166,7 +166,7 @@ def test_download_appears_in_my_models_and_validates(harness: Harness, hub: Path
     assert harness.worker(kinds=["download"]).run_once()
     detail = harness.client.get("/api/models/base/tiny").json()
     assert detail["availability"]["state"] == "available"
-    assert detail["license_ack_by"] == "Local user"
+    assert detail["license_ack_by"] == "admin@example.com"
     stored = Path(detail["storage_path"])
     assert all(hashlib.sha256((stored / name).read_bytes()).hexdigest() for name in FILES)
     (stored / "model.safetensors").unlink()

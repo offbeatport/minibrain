@@ -21,15 +21,20 @@ until it is, pass the wheel from [GitHub Releases](https://github.com/offbeatpor
 for NVIDIA hosts):
 
 ```sh
-docker run -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
 ```
 
 [`docs/install.md`](docs/install.md) covers every install path, PyTorch backends (CUDA, ROCm, MPS, CPU), the Docker
 image and compose file, air-gapped installs, upgrades and where data lives.
 
-Open http://127.0.0.1:8000. `minibrain serve` starts main (UI, API, gateway) and supervises a job worker and one model
-engine per base model, restarting them if they stop. Data, artifacts and the database live in `~/.minibrain` (set
-`MINIBRAIN_HOME` to move them; `MINIBRAIN_DATABASE_URL` points the metadata at Postgres instead of SQLite).
+On the first start, `minibrain serve` prints a one-time setup link (and opens it in the browser on a desktop) that
+creates the admin account; in Docker, `docker logs minibrain | grep setup` finds it, and `minibrain admin setup-link`
+prints a new one. Automated deploys set `MINIBRAIN_ADMIN_EMAIL` and `MINIBRAIN_ADMIN_PASSWORD_FILE` instead, and single
+sign-on with a group mapped to admin needs no local admin at all ([`docs/install.md`](docs/install.md#first-admin)).
+Then open http://127.0.0.1:8000 and sign in. `minibrain serve` starts main (UI, API, gateway) and supervises a job
+worker and one model engine per base model, restarting them if they stop. Data, artifacts and the database live in
+`~/.minibrain` (set `MINIBRAIN_HOME` to move them; `MINIBRAIN_DATABASE_URL` points the metadata at Postgres instead of
+SQLite).
 
 Other roles, same package:
 
@@ -92,6 +97,10 @@ mise run check       # tests, ruff, pyright, biome, tsc
 mise run build       # dist/minibrain-*.whl with the built UI inside
 mise run api-types   # regenerate the TypeScript client after API changes
 ```
+
+On a fresh `.minibrain/`, the `mise run dev` log prints a setup link on `http://localhost:5173/setup?token=…` that
+creates the first admin; the same path on :8000 redirects there. `minibrain admin setup-link` (with
+`MINIBRAIN_HOME=.minibrain`) prints a new one.
 
 Training runs on CUDA when available, otherwise on CPU: the Metal GPU hangs during LoRA training on Apple Silicon (see
 `docs/findings.md`). Set `MINIBRAIN_TRAIN_DEVICE` to override.

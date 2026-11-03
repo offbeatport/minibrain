@@ -21,13 +21,6 @@ import { ErrorLine } from "~/components/Section";
 
 const MIN_PASSWORD = 12;
 
-const SETUP_REASONS: Record<string, string> = {
-    listen: "minibrain listens on a network address, so everyone who opens it signs in.",
-    remote: "This page came through a proxy or from another machine, so everyone who opens it signs in.",
-    sign_in:
-        "Single sign-on or a sign-in proxy is set up, so everyone who opens minibrain signs in.",
-};
-
 function AuthFrame({
     title,
     description,
@@ -197,8 +190,14 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
     );
 }
 
-export function AdminForm({ submitLabel }: { submitLabel: string }) {
+function tokenFromQuery(): string {
+    const query = typeof window === "undefined" ? "" : window.location.search;
+    return new URLSearchParams(query).get("token")?.trim() ?? "";
+}
+
+function AdminForm({ linkToken }: { linkToken: string }) {
     const setup = useSetup();
+    const [token, setToken] = useState(linkToken);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -206,18 +205,37 @@ export function AdminForm({ submitLabel }: { submitLabel: string }) {
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (password === again) {
-            setup.mutate({ name, email, password });
+            setup.mutate({ token: token.trim(), name, email, password });
         }
     };
     return (
         <form onSubmit={submit}>
             <FieldGroup>
+                {!linkToken && (
+                    <Field
+                        id="setup-token"
+                        label="Setup token"
+                        hint="The part after token= in the setup link."
+                    >
+                        <Input
+                            id="setup-token"
+                            className="font-mono"
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            required
+                            autoFocus
+                        />
+                    </Field>
+                )}
                 <Field id="admin-name" label="Name">
                     <Input
                         id="admin-name"
                         autoComplete="name"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
+                        autoFocus={Boolean(linkToken)}
                     />
                 </Field>
                 <Field id="admin-email" label="Email">
@@ -242,33 +260,33 @@ export function AdminForm({ submitLabel }: { submitLabel: string }) {
                     className="w-fit"
                     disabled={setup.isPending || password !== again}
                 >
-                    {setup.isPending ? "Creating…" : submitLabel}
+                    {setup.isPending ? "Creating…" : "Create admin account"}
                 </Button>
             </FieldGroup>
         </form>
     );
 }
 
-export function SetupPage({ session }: { session: SessionInfo }) {
+export function SetupPage() {
+    const [linkToken] = useState(tokenFromQuery);
     return (
         <AuthFrame
             title="Create the admin account"
-            description={`${SETUP_REASONS[session.reason ?? ""] ?? "Everyone who opens minibrain signs in."} You are the first person here, so you set up the admin.`}
+            description={
+                linkToken
+                    ? "This one-time link sets up the first admin, who then adds everyone else under Settings, Accounts."
+                    : "Paste the setup token from the setup link minibrain printed in its log when it started."
+            }
             footer={
                 <div className="flex flex-col gap-1">
-                    <span>Or create it on the server:</span>
-                    <code className="font-mono">
-                        minibrain admin create --email you@example.com
-                    </code>
+                    <span>Lost the link? Run this on the server for a new one:</span>
+                    <code className="font-mono">minibrain admin setup-link</code>
                 </div>
             }
         >
             <div className="flex flex-col gap-5">
                 <InsecureNotice />
-                {session.methods.oidc && (
-                    <SingleSignOn label={session.methods.oidc} divider="or create a local admin" />
-                )}
-                <AdminForm submitLabel="Create admin account" />
+                <AdminForm linkToken={linkToken} />
             </div>
         </AuthFrame>
     );

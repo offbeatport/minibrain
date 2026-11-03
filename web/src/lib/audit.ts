@@ -25,6 +25,7 @@ const ACTIONS: Record<string, string> = {
     "account.reset": "Password link created",
     "account.update": "Account changed",
     "audit.prune": "Audit events deleted",
+    "auth.setup_link": "Setup link created",
     "auth.sign_in": "Signed in",
     "auth.sign_in_failed": "Sign-in refused",
     "auth.sign_out": "Signed out",
@@ -243,9 +244,11 @@ function listChange(before: unknown[], after: unknown[], policy?: PolicyInfo): s
 
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "account.create": (detail) => `Role ${plainValue(detail.role, undefined, "role")}`,
-    "account.password": () => "With a one-time link",
+    "account.password": (detail) =>
+        detail.via === "command line" ? "On the command line" : "With a one-time link",
     "account.reset": (detail) =>
         `Link expires ${plainValue(detail.link_expires_at, undefined, "link_expires_at")}`,
+    "auth.setup_link": () => "For the first admin; earlier links stop working",
     "auth.sign_in": (detail) => `With ${plainValue(detail.sign_in, undefined, "sign_in")}`,
     "auth.sign_in_failed": (detail) => plainValue(detail.reason),
     "auth.sign_out": () => "Session ended",

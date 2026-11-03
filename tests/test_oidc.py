@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from minibrain.app import create_app
 from minibrain.auth.config import AuthConfigError, load_auth
+from minibrain.auth.first_run import FirstRun, prepare
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
 from tests.conftest import FakeBackend
@@ -49,7 +50,7 @@ class Sso:
 def sso_install(settings: Settings, monkeypatch: pytest.MonkeyPatch, auth: dict) -> Iterator[Sso]:
     settings.home.mkdir(parents=True, exist_ok=True)
     write_config(settings.home, monkeypatch, auth)
-    app = create_app(settings=replace(settings, listen="10.0.0.5"), backend=FakeBackend(), background=False)
+    app = create_app(settings=settings, backend=FakeBackend(), background=False)
     provider = FakeProvider(claims=dict(ADA))
     app.state.oidc.transport = httpx2.MockTransport(provider.handle)
     with TestClient(app):
@@ -78,7 +79,7 @@ def error_of(location: str) -> str:
 def test_single_sign_on_signs_people_in_with_pkce(sso: Sso) -> None:
     browser = sso.browser()
     info = browser.get("/api/auth/session").json()
-    assert (info["methods"]["oidc"], info["accounts"], info["person"]) == ("Keycloak", True, None)
+    assert (info["methods"]["oidc"], info["setup"], info["person"]) == ("Keycloak", False, None)
     started = browser.get("/api/auth/oidc/start", params={"next": "/models"})
     query = parse_qs(urlparse(started.headers["location"]).query)
     assert query["redirect_uri"] == ["https://testserver/api/auth/oidc/callback"]
@@ -173,7 +174,7 @@ def test_a_provider_that_names_another_issuer_is_refused(sso: Sso) -> None:
 
 def test_without_oidc_the_start_route_says_so(settings: Settings) -> None:
     settings.home.mkdir(parents=True)
-    app = create_app(settings=replace(settings, listen="10.0.0.5"), backend=FakeBackend(), background=False)
+    app = create_app(settings=settings, backend=FakeBackend(), background=False)
     with TestClient(app, base_url="https://testserver", follow_redirects=False) as client:
         assert "not set up" in error_of(client.get("/api/auth/oidc/start").headers["location"])
 
@@ -191,3 +192,25 @@ def test_oidc_config_is_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("MINIBRAIN_OIDC_CLIENT_SECRET", "from-env")
     loaded = load_auth().oidc
     assert loaded is not None and loaded.client_secret == "from-env" and loaded.label == "single sign-on"
+
+
+def test_an_sso_group_mapped_to_admin_needs_no_setup_link(sso: Sso) -> None:
+    with sso.app.state.sessions() as session:
+        assert prepare(session, load_auth(), {}) == FirstRun()
+    assert sso.browser().get("/api/auth/session").json()["setup"] is False
+
+
+def test_sso_without_an_admin_group_gets_a_setup_link(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    for sso in sso_install(settings, monkeypatch, {"oidc": OIDC, "roles": {"ml-team": "builder"}}):
+        with sso.app.state.sessions() as session:
+            found = prepare(session, load_auth(), {})
+        assert found.token is not None
+        assert sso.browser().get("/api/auth/session").json()["setup"] is True
+
+
+def test_sso_with_admin_as_the_default_role_needs_no_setup_link(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for sso in sso_install(settings, monkeypatch, {"oidc": OIDC, "default_role": "admin"}):
+        with sso.app.state.sessions() as session:
+            assert prepare(session, load_auth(), {}) == FirstRun()

@@ -3,13 +3,10 @@ from dataclasses import dataclass
 
 from minibrain.auth.roles import Role
 
-LOCAL_USER = "Local user"
-SINGLE_USER = "single_user"
-
 
 @dataclass(frozen=True)
 class Person:
-    id: int | None
+    id: int
     name: str
     email: str | None
     source: str
@@ -18,15 +15,14 @@ class Person:
 
     @property
     def actor(self) -> str:
-        return LOCAL_USER if self.source == SINGLE_USER else self.email or self.name
-
-    @property
-    def signed_in(self) -> bool:
-        return self.source != SINGLE_USER
+        return self.email or self.name
 
 
-LOCAL_PERSON = Person(id=None, name=LOCAL_USER, email=None, source=SINGLE_USER, role=Role.ADMIN)
 CURRENT: ContextVar[Person | None] = ContextVar("person", default=None)
+
+
+class NobodySignedIn(LookupError):
+    pass
 
 
 def current_person() -> Person | None:
@@ -35,9 +31,11 @@ def current_person() -> Person | None:
 
 def current_actor() -> str:
     person = CURRENT.get()
-    return person.actor if person is not None else LOCAL_USER
+    if person is None:
+        raise NobodySignedIn("No one is signed in")
+    return person.actor
 
 
 def current_role() -> Role | None:
     person = CURRENT.get()
-    return person.role if person is not None else Role.ADMIN
+    return person.role if person is not None else None

@@ -592,15 +592,20 @@ keys, and `/v1` stays key-only.
 
 - Sign-in sources, any mix: local accounts, OIDC (authorization code with PKCE; Entra, Okta, ADFS, Keycloak) and
   trusted proxy headers (user, email and groups headers, honoured only from configured proxy addresses).
-- First run: the first person to open the UI creates the admin account, or `minibrain admin create` does it on the
-  command line. Air-gapped installs need no identity provider.
+- Accounts are always on, loopback included; there is no single-user mode. Audit actors are always people; workers,
+  engines and `/v1` keep their tokens and API keys.
+- First admin, any of: a one-time setup link that `minibrain serve` prints on the first start with no accounts (and
+  opens in the browser on a desktop; token from `secrets`, stored as its SHA-256 so it survives restarts until used;
+  `minibrain admin setup-link` prints a new one); `MINIBRAIN_ADMIN_EMAIL` plus `MINIBRAIN_ADMIN_PASSWORD_FILE` for
+  automated deploys, read on the first start only; or single sign-on with a group mapped to admin, which issues no
+  link. Recovery: `minibrain admin create` and `minibrain admin reset-password`. Air-gapped installs need no identity
+  provider.
 - Passwords: PBKDF2-HMAC-SHA256 through `cryptography` (FIPS-approved; not argon2 or scrypt). OIDC through Authlib,
   which uses `cryptography` for its tokens.
-- Sessions: a server-side row per session holding the SHA-256 of its token; an HttpOnly, Secure, SameSite=Lax
-  cookie; idle and absolute lifetimes as policies; a CSRF token on every state-changing `/api` call. Signing out or
-  disabling an account ends its sessions at once.
-- Single-user mode: with accounts off, minibrain stays today's one local user, and only while it listens on
-  loopback. Listening on any other address requires accounts.
+- Sessions: a server-side row per session holding the SHA-256 of its token; an HttpOnly, SameSite=Lax cookie,
+  Secure except on plain HTTP loopback (Safari drops Secure cookies on `http://localhost`); idle and absolute
+  lifetimes as policies; a CSRF token on every state-changing `/api` call. Signing out or disabling an account ends
+  its sessions at once.
 - Roles are install-wide in v1. Per-model and per-team rights arrive with Teams in v2.
 
 | Can | Viewer | Builder | Admin |
@@ -620,9 +625,9 @@ keys, and `/v1` stays key-only.
   an admin for access" until an admin assigns a role.
 - Enforcement is in the backend: one dependency per route states the role it needs, and a test lists every `/api`
   route with its role so a new route cannot ship unguarded. The UI hides what a role cannot do, but never decides.
-- Audit events record the real person and how they signed in (local, OIDC, proxy) instead of the local user. API keys
-  record who created them. Events already record the client address of the connection; a forwarded address will
-  count only from configured proxy addresses.
+- Audit events record the person and how they signed in (local, OIDC, proxy). API keys record who created them. Events
+  already record the client address of the connection; a forwarded address will count only from configured proxy
+  addresses.
 - UI: a sign-in page; Settings → Accounts for admins (people, role, sign-in source, last sign-in, disable, reset a
   local password with a one-time link shown once); the user menu shows the person and Sign out.
 - Tables: `users` (email, name, source, subject, role, disabled, password hash for local accounts, last sign-in) and
@@ -963,8 +968,9 @@ Everything in the v1 scope below, after M1.
       (migration 0033), and a detail with the kept input and answer (Builder and up) and linked feedback
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
-- [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
-      (built; OIDC tested against a fake provider: verify on Entra, Okta, ADFS and Keycloak and behind a real proxy)
+- [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; always on, with the first admin from a
+      one-time setup link, the environment or single sign-on (built; OIDC tested against a fake provider: verify on
+      Entra, Okta, ADFS and Keycloak and behind a real proxy)
 - [x] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [x] FIPS-ready crypto rules enforced in CI: ruff `S324` and `scripts/check_crypto.py`
 - [x] Local install via uv on Linux and macOS

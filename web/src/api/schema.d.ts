@@ -5188,7 +5188,7 @@ export interface components {
         /** PersonInfo */
         PersonInfo: {
             /** Id */
-            id: number | null;
+            id: number;
             /** Name */
             name: string;
             /** Email */
@@ -5608,19 +5608,17 @@ export interface components {
         };
         /** SessionInfo */
         SessionInfo: {
-            /** Accounts */
-            accounts: boolean;
             /** Setup */
             setup: boolean;
             person: components["schemas"]["PersonInfo"] | null;
             /** Csrf Token */
             csrf_token: string | null;
             methods: components["schemas"]["SignInMethods"];
-            /** Reason */
-            reason: ("listen" | "remote" | "sign_in") | null;
         };
         /** SetupBody */
         SetupBody: {
+            /** Token */
+            token: string;
             /** Email */
             email: string;
             /**

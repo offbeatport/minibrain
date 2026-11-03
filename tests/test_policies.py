@@ -42,7 +42,7 @@ def test_defaults_and_ui_changes_are_audited(harness: Harness) -> None:
         assert (event.action, event.target, event.detail) == (
             "policy.update",
             "network",
-            {"from": "open", "to": "allowlist"},
+            {"from": "open", "to": "allowlist", "sign_in": "local"},
         )
     assert harness.client.get("/api/audit").json()["events"][0]["target"] == "network"
 

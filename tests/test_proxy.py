@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -49,15 +49,12 @@ def write_config(home: Path, monkeypatch: pytest.MonkeyPatch, auth: dict, policy
     monkeypatch.setenv("MINIBRAIN_CONFIG", str(path))
 
 
-def proxied_install(
-    settings: Settings, monkeypatch: pytest.MonkeyPatch, auth: dict, listen: str = "127.0.0.1"
-) -> Iterator[Proxied]:
+def proxied_install(settings: Settings, monkeypatch: pytest.MonkeyPatch, auth: dict) -> Iterator[Proxied]:
     settings.home.mkdir(parents=True, exist_ok=True)
     write_config(settings.home, monkeypatch, auth)
-    chosen = replace(settings, listen=listen)
-    app = create_app(settings=chosen, backend=FakeBackend(), background=False, config_max_age=0)
+    app = create_app(settings=settings, backend=FakeBackend(), background=False, config_max_age=0)
     with TestClient(app):
-        yield Proxied(settings=chosen, app=app)
+        yield Proxied(settings=settings, app=app)
 
 
 @pytest.fixture
@@ -114,7 +111,7 @@ def test_a_proxy_without_a_user_header_falls_back_to_sign_in(proxied: Proxied) -
     client = proxied.client()
     assert client.get("/api/minibrains").status_code == 401
     info = client.get("/api/auth/session").json()
-    assert (info["accounts"], info["setup"], info["person"]) == (True, True, None)
+    assert (info["setup"], info["person"]) == (False, None)
 
 
 def test_unmapped_people_get_the_default_role(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:

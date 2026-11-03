@@ -69,7 +69,7 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
         "kind": "lora",
         "status": "ready",
         "created_at": None,
-        "created_by": "Local user",
+        "created_by": "admin@example.com",
     }
     assert card["purpose"] == {"description": "", "task": "classify", "labels": sorted(LABELS)}
     base = card["base_model"]
@@ -114,9 +114,9 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
         "text": "Held-out recall is below 50% for billing (3 of 8).",
         "labels": ["billing"],
     }
-    assert card["use"] == {"intended_use": "", "owner": "Local user"}
+    assert card["use"] == {"intended_use": "", "owner": "admin@example.com"}
     assert [(event["actor"], event["summary"]) for event in card["approvals"]] == [
-        ("Local user", "Deployed v1, replacing v0")
+        ("admin@example.com", "Deployed v1, replacing v0")
     ]
     zero = harness.client.get(f"{CARD}/0/card").json()["card"]
     assert [event["kind"] for event in zero["deployments"]] == ["deployed", "replaced"]

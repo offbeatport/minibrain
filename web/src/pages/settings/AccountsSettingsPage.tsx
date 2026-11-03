@@ -53,7 +53,6 @@ import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
 import { relativeTime } from "~/lib/time";
-import { AdminForm } from "~/pages/auth/AuthPages";
 
 type RoleChoice = Role | "none";
 
@@ -583,28 +582,12 @@ function SignInSources() {
     );
 }
 
-function AccountsOff() {
-    return (
-        <PanelSection
-            icon={Users}
-            title="Accounts are off"
-            description="minibrain runs as one local user while it listens on this machine only. Create an admin account to turn accounts on; after that, everyone signs in."
-        >
-            <div className="max-w-md">
-                <AdminForm submitLabel="Create admin and turn on accounts" />
-            </div>
-        </PanelSection>
-    );
-}
-
 export function AccountsSettingsPage() {
-    const session = useSession();
-    const accounts = session.data?.accounts ?? false;
     return (
         <SettingsLayout title="Accounts">
             <PanelSections>
-                {accounts ? <People /> : <AccountsOff />}
-                {accounts && <SignInSources />}
+                <People />
+                <SignInSources />
             </PanelSections>
         </SettingsLayout>
     );

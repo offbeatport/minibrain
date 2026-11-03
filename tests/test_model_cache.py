@@ -134,7 +134,7 @@ def test_least_recently_used_unused_bases_are_removed_until_under_budget(
     assert not folders["oldest"].exists() and not folders["middle"].exists() and folders["recent"].is_dir()
     events = evictions(harness)
     assert [event.target for event in events] == ["oldest", "middle"]
-    assert {event.actor for event in events} == {"Local user"}
+    assert {event.actor for event in events} == {"admin@example.com"}
     assert events[0].detail["trigger"] == "manual" and events[0].detail["size_bytes"] == SIZE
     assert events[0].detail["used_bytes"] == 3 * SIZE and events[0].detail["last_used_at"]
     assert "removed oldest" in caplog.text and "removed middle" in caplog.text

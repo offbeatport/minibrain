@@ -15,7 +15,7 @@ LEAKED = "sk-live-0123456789abcdef"
 def add_events(harness: Harness, count: int, **fields: Any) -> None:
     with harness.sessions() as session:
         for index in range(count):
-            values = {"actor": "Local user", "action": "key.create", "target": f"mb_{index:04d}", "detail": {}}
+            values = {"actor": "admin@example.com", "action": "key.create", "target": f"mb_{index:04d}", "detail": {}}
             session.add(AuditEvent(**(values | fields)))
         session.commit()
 
@@ -65,13 +65,13 @@ def test_filters_combine_and_facets_count(harness: Harness) -> None:
         "key.create": 2,
         "policy.update": 1,
     }
-    assert {item["value"] for item in facets["actors"]} == {"Local user", "system"}
+    assert {item["value"] for item in facets["actors"]} == {"admin@example.com", "system"}
 
 
 def test_changes_record_the_peer_address_and_open_by_id(harness: Harness) -> None:
     assert harness.client.put("/api/policies/network", json={"value": "allowlist"}).status_code == 200
     event = page(harness)["events"][0]
-    assert (event["action"], event["actor"], event["ip"]) == ("policy.update", "Local user", "testclient")
+    assert (event["action"], event["actor"], event["ip"]) == ("policy.update", "admin@example.com", "testclient")
     forwarded = {"X-Forwarded-For": "203.0.113.9", "X-Real-IP": "203.0.113.9"}
     harness.client.put("/api/policies/network", json={"value": "open"}, headers=forwarded)
     assert page(harness)["events"][0]["ip"] == "testclient"
@@ -133,4 +133,4 @@ def test_retention_prunes_old_events_and_records_the_prune(harness: Harness) -> 
     assert [event["action"] for event in events] == ["audit.prune", "policy.update", "key.create"]
     assert (events[0]["actor"], events[0]["ip"]) == ("system", None)
     assert (events[0]["detail"]["deleted"], events[0]["detail"]["days"]) == (2, 90)
-    assert events[1]["detail"] == {"from": 0, "to": 90}
+    assert events[1]["detail"] == {"from": 0, "to": 90, "sign_in": "local"}

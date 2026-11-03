@@ -12,7 +12,6 @@ export const SOURCE_LABELS: Record<string, string> = {
     local: "Password",
     oidc: "Single sign-on",
     proxy: "Proxy",
-    single_user: "This install",
 };
 
 export function allows(role: Role | null | undefined, needed: Role): boolean {

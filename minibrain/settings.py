@@ -12,7 +12,6 @@ class Settings:
     web_dist: Path
     database: str | None = None
     ui_url: str | None = None
-    listen: str = "127.0.0.1"
 
     @property
     def database_url(self) -> str:
@@ -61,5 +60,4 @@ def load_settings() -> Settings:
         web_dist=web_dist,
         database=os.environ.get("MINIBRAIN_DATABASE_URL") or None,
         ui_url=os.environ.get("MINIBRAIN_UI_URL", "").rstrip("/") or None,
-        listen=os.environ.get("MINIBRAIN_LISTEN", "").strip() or "127.0.0.1",
     )

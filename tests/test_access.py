@@ -1,16 +1,15 @@
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from minibrain.api.access import Guard
-from minibrain.settings import Settings
+from minibrain.auth.roles import Role
 from tests.conftest import Harness
-from tests.test_accounts import Install, csrf, invite, redeem, set_up, start
+from tests.test_accounts import csrf
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
 MISTAKE = {"input": "I was charged twice", "gold": "billing", "output": "bug"}
@@ -181,11 +180,9 @@ def guards_of(route: APIRoute) -> list[str]:
     return [found.call.name for found in route.dependant.dependencies if isinstance(found.call, Guard)]
 
 
-def test_every_api_route_states_its_role(exposed: Install) -> None:
-    app = exposed.client.app
-    assert isinstance(app, FastAPI)
+def test_every_api_route_states_its_role(harness: Harness) -> None:
     found: dict[tuple[str, str], str] = {}
-    for route in api_routes(app.routes):
+    for route in api_routes(harness.app.routes):
         guards = guards_of(route)
         methods = sorted(route.methods or ())
         assert len(guards) == 1, f"{methods} {route.path} needs one access guard, has {guards}"
@@ -199,31 +196,24 @@ def test_every_api_route_states_its_role(exposed: Install) -> None:
 
 @dataclass
 class Team:
-    install: Install
     admin: TestClient
     builder: TestClient
     viewer: TestClient
     nobody: TestClient
 
 
-def team_of(install: Install, admin: TestClient | None = None) -> Team:
-    admin = set_up(install, admin or install.browser())
-    builder = redeem(install, invite(admin, "bea@example.com", "builder"))
-    viewer = redeem(install, invite(admin, "vic@example.com", "viewer"))
-    nobody = redeem(install, invite(admin, "nia@example.com", "viewer"))
-    nia = nobody.get("/api/auth/session").json()["person"]["id"]
-    assert admin.patch(f"/api/accounts/{nia}", json={"role": "none"}, headers=csrf(admin)).status_code == 200
-    return Team(install=install, admin=admin, builder=builder, viewer=viewer, nobody=nobody)
+def team_of(harness: Harness) -> Team:
+    return Team(
+        admin=harness.client,
+        builder=harness.person(Role.BUILDER),
+        viewer=harness.person(Role.VIEWER),
+        nobody=harness.person(None),
+    )
 
 
 @pytest.fixture
-def exposed(settings: Settings) -> Iterator[Install]:
-    yield from start(settings, "10.0.0.5")
-
-
-@pytest.fixture
-def team(exposed: Install) -> Team:
-    return team_of(exposed)
+def team(harness: Harness) -> Team:
+    return team_of(harness)
 
 
 def status(client: TestClient, method: str, path: str, body: Any = None) -> int:
@@ -281,7 +271,7 @@ def test_people_without_a_role_see_nothing(team: Team) -> None:
     refused = nobody.get("/api/minibrains")
     assert refused.status_code == 403 and "Ask an admin" in refused.json()["detail"]
     person = nobody.get("/api/auth/session").json()["person"]
-    assert (person["email"], person["role"]) == ("nia@example.com", None)
+    assert (person["email"], person["role"]) == ("nobody@example.com", None)
     assert status(nobody, "POST", "/api/auth/logout") == 204
 
 
@@ -297,9 +287,7 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish_with_mistakes(harness)
-    harness.app.state.settings = replace(harness.settings, listen="10.0.0.5")
-    install = Install(client=harness.client, sessions=harness.sessions, settings=harness.app.state.settings)
-    people = team_of(install, TestClient(harness.app, base_url="https://testserver"))
+    people = team_of(harness)
     path = f"/api/minibrains/{SLUG}/versions"
     assert [version["mistakes"] for version in people.admin.get(path).json()] == [[MISTAKE]]
     assert [version["mistakes"] for version in people.builder.get(path).json()] == [[MISTAKE]]

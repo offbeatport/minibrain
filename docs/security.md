@@ -27,14 +27,17 @@ People sign in to the UI and `/api`; apps call `/v1` with API keys only, and wor
 | OIDC | Authorization code with PKCE (S256) through Authlib; the ID token is checked with joserfc (issuer, audience, expiry, nonce, signature from the provider's JWKS; RSA, RSA-PSS or ECDSA only) | The issuer must match discovery; state, nonce and verifier sit in a signed, HttpOnly cookie for 10 minutes |
 | Proxy headers | `X-Forwarded-User`, `-Email`, `-Groups` (names configurable) | Honoured only from `auth.proxy.addresses`; the same headers from anywhere else are ignored |
 
-- Sessions: a random 256-bit token in an HttpOnly, SameSite=Lax cookie (Secure unless the page is plain HTTP on
-  loopback); the database keeps only its SHA-256. Idle and absolute lifetimes are the `session_idle_minutes` (30)
-  and `session_hours` (12) policies. Signing out, a new password or turning an account off ends sessions at once.
+- Accounts are always on: everyone who opens the UI or calls `/api` signs in, on loopback too. Audit events name
+  the person; workers, engines and `/v1` keep their tokens and API keys.
+- Sessions: a random 256-bit token in an HttpOnly, SameSite=Lax cookie; the database keeps only its SHA-256. Idle
+  and absolute lifetimes are the `session_idle_minutes` (30) and `session_hours` (12) policies. Signing out, a new
+  password or turning an account off ends sessions at once.
+- The cookie is Secure when the request is HTTPS, a configured proxy says it was (`X-Forwarded-Proto`), or the
+  browser's `Origin` is HTTPS. Plain HTTP on loopback (`localhost`, `127.0.0.1`, `::1`) gets no Secure flag, since
+  Safari drops Secure cookies on `http://localhost`. Plain HTTP on any other address gets it, so the browser keeps
+  no session there, and the sign-in page says to use TLS or localhost.
 - CSRF: every state-changing `/api` call from a signed-in person carries `X-CSRF-Token`, an HMAC-SHA256 of the
   session (or proxy identity) under a per-install key.
-- Single-user mode: with no accounts, no OIDC and no proxy configured, minibrain is one local user only while it
-  listens on loopback, the connection is local and no proxy forwarded it. Otherwise the first visitor creates the
-  admin, or `minibrain admin create` does.
 - Forwarded client addresses (`X-Forwarded-For`, `X-Forwarded-Proto`) count only from `auth.proxy.addresses`;
   uvicorn's own proxy-header handling is off.
 - Roles: Viewer, Builder and Admin, enforced by one guard per `/api` route; `tests/test_access.py` lists every route
@@ -57,6 +60,48 @@ auth:
     label: Keycloak
     groups_claim: groups
 ```
+
+### First admin
+
+| Way | For | How |
+|---|---|---|
+| Setup link | The default, native and Docker | The first start with no accounts prints a one-time link that creates the admin |
+| Environment | Automated deploys | `MINIBRAIN_ADMIN_EMAIL` and `MINIBRAIN_ADMIN_PASSWORD_FILE` create the admin on the first start |
+| Single sign-on | OIDC or proxy headers | A group mapped to admin in `minibrain.yaml`; no local admin and no setup link |
+| Command line | Recovery | `minibrain admin create` adds an admin; `minibrain admin reset-password` sets a new password |
+
+Setup link:
+
+- `minibrain serve` prints it once main listens, to standard output, so it lands in the terminal or the container
+  log: `http://127.0.0.1:8000/setup?token=…`. On a desktop terminal it also opens it in the browser; not in Docker,
+  CI, over SSH or without a TTY, and never with `--no-browser`.
+- The token is 256 random bits from `secrets`. The database keeps only its SHA-256 (in `app_settings`), so the link
+  survives restarts until it is used. It works once, and creating the admin any other way voids it. Later starts
+  print a reminder instead of the link, since minibrain cannot show it again.
+- Lost it: `minibrain admin setup-link` prints a new link and voids the old one; `--url https://minibrain.corp`
+  names the address people use. In Docker: `docker logs minibrain | grep setup`, or
+  `docker exec minibrain minibrain admin setup-link`.
+- The link names the address main listens on (`127.0.0.1:8000` unless `--host` or `--port` change it). Opening
+  minibrain at another address, keep the path and the token. The page asks for the token when the link lacks it.
+
+Environment, for automated deploys:
+
+- `MINIBRAIN_ADMIN_EMAIL` with `MINIBRAIN_ADMIN_PASSWORD_FILE`, a file such as a Docker or Kubernetes secret that
+  holds the password (a trailing newline is dropped). Read on the first start only, and ignored once any account
+  exists, so changing them later changes nothing.
+- A plain `MINIBRAIN_ADMIN_PASSWORD` works too, but logs a warning recommending the file: environment variables show
+  in `docker inspect` and process listings. minibrain never logs the password.
+- A missing or unreadable password file, a password under 12 characters or a malformed email stops the start with
+  the reason.
+
+Single sign-on only: with `auth.oidc` or `auth.proxy` set and `auth.roles` mapping a group to admin (or
+`auth.default_role: admin`), no local admin is needed. minibrain issues no setup link; the first page is sign-in, and
+whoever signs in from the admin group is an admin. `minibrain admin create` still adds a local admin, such as a
+break-glass account. With single sign-on but no admin group, the setup link is issued as usual.
+
+Recovery: `minibrain admin reset-password --email you@example.com` sets a new password for a local account, clears
+a lockout and ends its sessions; `minibrain admin create --email you@example.com` adds another admin. Both ask for the
+password, or read it with `--password-stdin`, and record `command line` as the actor in the audit log.
 
 ## Trust zones and ports
 

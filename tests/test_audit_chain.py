@@ -67,7 +67,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
     first = events[0]
     fields = {
         "action": "key.create",
-        "actor": "Local user",
+        "actor": "admin@example.com",
         "at": first.at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "detail": {"name": "Support", "token": "[redacted]"},
         "ip": None,
@@ -75,7 +75,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
         "seq": 1,
         "target": "mb_0000",
     }
-    assert canonical(fields).startswith(b'{"action":"key.create","actor":"Local user","at":"')
+    assert canonical(fields).startswith(b'{"action":"key.create","actor":"admin@example.com","at":"')
     assert digest(fields) == first.hash
     with harness.sessions() as session:
         assert (head_of(session).seq, head_of(session).hash) == (3, events[-1].hash)
@@ -102,7 +102,7 @@ def test_existing_events_are_chained_on_the_first_seal(tmp_path: Path) -> None:
             connection.execute(
                 text(
                     "INSERT INTO audit_events (at, actor, action, target, detail) "
-                    "VALUES (CURRENT_TIMESTAMP, 'Local user', 'key.create', :target, '{}')"
+                    "VALUES (CURRENT_TIMESTAMP, 'admin@example.com', 'key.create', :target, '{}')"
                 ),
                 {"target": target},
             )
@@ -173,7 +173,7 @@ def test_events_chained_past_the_head_are_not_trusted(harness: Harness) -> None:
     add_events(harness, 2)
     newest = sealed(harness)[-1]
     with harness.sessions() as session:
-        forged = AuditEvent(actor="Local user", action="key.revoke", target="mb_0001", detail={})
+        forged = AuditEvent(actor="admin@example.com", action="key.revoke", target="mb_0001", detail={})
         session.add(forged)
         session.flush()
         forged.at = newest.at
@@ -181,7 +181,7 @@ def test_events_chained_past_the_head_are_not_trusted(harness: Harness) -> None:
             "seq": 3,
             "prev_hash": newest.hash,
             "at": newest.at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "actor": "Local user",
+            "actor": "admin@example.com",
             "ip": None,
             "action": "key.revoke",
             "target": "mb_0001",
@@ -199,7 +199,7 @@ def test_a_prune_anchors_the_chain_where_it_cuts(harness: Harness) -> None:
     with harness.sessions() as session:
         for event in session.scalars(select(AuditEvent).where(AuditEvent.target != "mb_0003")):
             event.at = now() - timedelta(days=100)
-        session.add(AuditEvent(actor="Local user", action="key.create", target="unsealed", detail={}))
+        session.add(AuditEvent(actor="admin@example.com", action="key.create", target="unsealed", detail={}))
         session.commit()
         assert seal(session, limit=4) == 4
         cut_hash = session.scalars(select(AuditEvent.hash).where(AuditEvent.seq == 3)).one()

@@ -12,7 +12,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, csrf_matches
 from minibrain.auth.addresses import ip_of
 from minibrain.auth.config import ProxyConfig
-from minibrain.auth.gate import FORWARDED_HEADERS, Identity, RequestFacts, identify
+from minibrain.auth.gate import Identity, RequestFacts, identify
 from minibrain.auth.identity import CURRENT, Person, current_role
 from minibrain.auth.roles import LABELS, Role, allows
 from minibrain.registry.models import SIGNED_IN
@@ -67,17 +67,11 @@ class TrustedProxy:
 def facts_of(scope: Scope) -> RequestFacts:
     headers = Headers(scope=scope)
     cookies = cookie_parser(headers.get("cookie", ""))
-    server = scope.get("server")
-    client = scope.get("client")
     return RequestFacts(
         path=scope["path"],
         method=scope["method"],
         token=cookies.get(SESSION_COOKIE) or None,
         csrf=headers.get(CSRF_HEADER),
-        server=server[0] if server else None,
-        client=client[0] if client else None,
-        user_agent=headers.get("user-agent"),
-        forwarded=any(name in headers for name in FORWARDED_HEADERS),
         via_proxy=bool(scope.get(VIA_PROXY)),
         headers={name.decode("latin-1").lower(): value.decode("latin-1") for name, value in scope["headers"]},
     )
@@ -85,10 +79,8 @@ def facts_of(scope: Scope) -> RequestFacts:
 
 def resolve(state: Any, facts: RequestFacts) -> Identity:
     with state.sessions() as session:
-        found = identify(session, state.settings.listen, state.accounts_on, facts, state.auth)
+        found = identify(session, facts, state.auth)
         session.commit()
-    if found.users:
-        state.accounts_on = True
     return found
 
 
@@ -100,7 +92,7 @@ def refusal(found: Identity, facts: RequestFacts, key: bytes) -> tuple[int, str]
     if found.person is None:
         return 401, SIGN_IN_NEEDED
     unsafe = facts.method not in SAFE_METHODS
-    if unsafe and found.csrf_subject is not None and not csrf_matches(key, found.csrf_subject, facts.csrf):
+    if unsafe and (found.csrf_subject is None or not csrf_matches(key, found.csrf_subject, facts.csrf)):
         return 403, CSRF_MISSING
     return None
 
@@ -122,7 +114,7 @@ class Identify:
             return
         scope.setdefault("state", {})["identity"] = found
         person = found.person
-        signed_in = (person.actor, person.source) if person is not None and person.signed_in else None
+        signed_in = (person.actor, person.source) if person is not None else None
         person_token = CURRENT.set(person)
         signed_token = SIGNED_IN.set(signed_in)
         try:

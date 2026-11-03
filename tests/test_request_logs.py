@@ -1,4 +1,3 @@
-from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,7 +11,6 @@ from minibrain.registry.db import make_engine
 from minibrain.registry.models import ApiKey, Minibrain, RequestLog, now
 from tests.conftest import Harness
 from tests.test_access import team_of
-from tests.test_accounts import Install
 from tests.test_data_catalogue import columns_of, migration_config
 from tests.test_feedback import chat, send
 from tests.test_flow import SLUG, add_key
@@ -164,9 +162,7 @@ def test_bodies_need_the_builder_role_and_feedback_is_linked(harness: Harness) -
     assert (rows[response_id]["feedback_down"], rows[response_id]["feedback_up"]) == (1, 0)
     assert (rows[unrated]["feedback_down"], rows[unrated]["feedback_up"]) == (0, 0)
     request_id = rows[response_id]["id"]
-    harness.app.state.settings = replace(harness.settings, listen="10.0.0.5")
-    install = Install(client=harness.client, sessions=harness.sessions, settings=harness.app.state.settings)
-    people = team_of(install, TestClient(harness.app, base_url="https://testserver"))
+    people = team_of(harness)
     path = f"/api/requests/{request_id}"
     full = people.builder.get(path)
     assert full.status_code == 200 and secret not in full.text

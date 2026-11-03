@@ -234,6 +234,11 @@ def redeem_reset(session: Session, token: str, password: str) -> User:
     expired = user is None or user.reset_expires_at is None or user.reset_expires_at <= now()
     if user is None or expired or user.disabled:
         raise AccountError("This link has expired or was already used. Ask an admin for a new one.")
+    set_password(session, user, password)
+    return user
+
+
+def set_password(session: Session, user: User, password: str) -> None:
     check_strength(password)
     user.password_hash = hash_password(password)
     user.reset_hash = None
@@ -242,7 +247,6 @@ def redeem_reset(session: Session, token: str, password: str) -> User:
     user.locked_until = None
     user.updated_at = now()
     end_sessions(session, user)
-    return user
 
 
 def role_for(session: Session, user: User, config: AuthConfig) -> tuple[Role | None, bool]:

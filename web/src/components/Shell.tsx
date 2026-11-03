@@ -1,4 +1,4 @@
-import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
+import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, LogOut, Settings, SunMoon } from "lucide-react";
 import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
 import {
@@ -20,6 +20,7 @@ import { NoAccessPage, SetPasswordPage, SetupPage, SignInPage } from "~/pages/au
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
 
 export const SET_PASSWORD_PATH = "/reset-password";
+const SETUP_PATH = "/setup";
 
 function KitLink({ href, onClick, ...rest }: UILinkProps) {
     const router = useRouter();
@@ -102,22 +103,19 @@ function Account() {
     const session = useSession();
     const signOut = useSignOut();
     const person = session.data?.person;
-    const signedIn = person != null && person.source !== "single_user";
-    const signsOut = signedIn && person.source !== "proxy";
-    const name = person?.name ?? "Local user";
-    const sub = signedIn
-        ? (person.email ?? (person.role ? ROLE_LABELS[person.role] : "No role"))
-        : "This install";
+    const signsOut = person != null && person.source !== "proxy";
+    const name = person?.name ?? "";
+    const sub = person?.email ?? (person?.role ? ROLE_LABELS[person.role] : "No role");
     const items: AccountMenuItem[] = [
         { icon: <Settings />, label: "Settings", href: "/settings" },
         { kind: "theme", icon: <SunMoon />, label: "Theme" },
-        ...(signsOut || !signedIn
+        ...(signsOut
             ? [
                   {
                       icon: <LogOut />,
                       label: "Sign out",
                       separatorBefore: true,
-                      disabled: !signsOut || signOut.isPending,
+                      disabled: signOut.isPending,
                       onSelect: () => signOut.mutate(),
                   },
               ]
@@ -142,8 +140,11 @@ function Gate({ pathname, children }: { pathname: string; children: ReactNode })
         return null;
     }
     const info = session.data;
-    if (info?.accounts && !info.person) {
-        return info.setup ? <SetupPage session={info} /> : <SignInPage session={info} />;
+    if (info && !info.person) {
+        return info.setup ? <SetupPage /> : <SignInPage session={info} />;
+    }
+    if (info?.person && pathname === SETUP_PATH) {
+        return <Navigate to="/" replace />;
     }
     if (info?.person && info.person.role == null) {
         return <NoAccessPage session={info} />;

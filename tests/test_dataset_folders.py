@@ -34,7 +34,9 @@ def placement(harness: Harness) -> dict[str, int | None]:
 
 def audited(harness: Harness, prefix: str) -> list[tuple[str, dict[str, Any]]]:
     events = harness.client.get("/api/audit").json()["events"]
-    return [(event["action"], event["detail"]) for event in reversed(events) if event["action"].startswith(prefix)]
+    found = [event for event in reversed(events) if event["action"].startswith(prefix)]
+    assert all(event["detail"].pop("sign_in") == "local" for event in found)
+    return [(event["action"], event["detail"]) for event in found]
 
 
 def test_folders_are_created_renamed_moved_and_audited(harness: Harness) -> None:

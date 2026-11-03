@@ -31,13 +31,15 @@ release (no image is on GHCR until the first one).
 ## Run with Docker
 
 ```sh
-docker run -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
 ```
 
-Open http://127.0.0.1:8000. That is the CPU image: it runs wherever Docker does, Docker Desktop on macOS (Apple silicon
-and Intel) and Windows included. Training on CPU suits models up to about 0.5B. Everything minibrain writes stays in the `minibrain-data` volume. With no accounts configured, the first visitor
-creates the admin account, so keep the port on `127.0.0.1` until you have (see
-[Security → Accounts and sign-in](security.md#accounts-and-sign-in)).
+On its first start it prints a one-time setup link, `http://127.0.0.1:8000/setup?token=…`: open it to create the admin
+account. Run in the background (`-d`), read it with `docker logs minibrain | grep setup`; lost, print a new one with
+`docker exec minibrain minibrain admin setup-link`. That is the CPU image: it runs wherever Docker does, Docker Desktop
+on macOS (Apple silicon and Intel) and Windows included. Training on CPU suits models up to about 0.5B. Everything
+minibrain writes stays in the `minibrain-data` volume. Every way to create the first admin, automated deploys
+included: [First admin](#first-admin).
 
 Images for linux/amd64 and linux/arm64, built from the release wheel:
 
@@ -81,7 +83,9 @@ Then install the local file the same way.
 uvx --python 3.12 minibrain serve
 ```
 
-Open http://127.0.0.1:8000. uvx keeps the environment in its cache, so later starts are fast. With an extra:
+On the first start it prints a one-time setup link and opens it in the browser: create the admin account there
+([First admin](#first-admin)). Later, open http://127.0.0.1:8000 and sign in. uvx keeps the environment in its cache,
+so later starts are fast. With an extra:
 
 ```sh
 uvx --python 3.12 --from 'minibrain[postgres]' minibrain serve
@@ -224,8 +228,8 @@ docker run -d --name minibrain --restart unless-stopped --stop-timeout 30 \
   ghcr.io/offbeatport/minibrain:cuda
 ```
 
-With no accounts configured, the first visitor creates the admin account: publish the port on `127.0.0.1`, as above,
-until you have, or put it behind a reverse proxy ([Security → Accounts and sign-in](security.md#accounts-and-sign-in)).
+The setup link for the first admin is in the container log: `docker logs minibrain | grep setup`
+([First admin](#first-admin)).
 
 - The container runs as user `minibrain` (uid 1000), not root.
 - `/data` is `MINIBRAIN_HOME` and a volume. A bind mount must be writable by uid 1000:
@@ -269,6 +273,7 @@ Often added with `-e`:
 | `MINIBRAIN_MODELS_S3_URL`, `AWS_*` | Models from an S3-compatible bucket |
 | `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror. Also set `MINIBRAIN_OFFLINE=0` and `HF_HUB_OFFLINE=0`, and allow the host in Settings → Security |
 | `MINIBRAIN_TRAIN_DEVICE` | Force `cuda` or `cpu` for training |
+| `MINIBRAIN_ADMIN_EMAIL`, `MINIBRAIN_ADMIN_PASSWORD_FILE` | Create the first admin on the first start, with the password in a mounted secret file ([First admin](#first-admin)) |
 
 ### DuckDB extensions
 
@@ -293,7 +298,7 @@ GPUs reserved, the port on `127.0.0.1`, data in the `minibrain-data` volume and 
 
 ```sh
 docker compose up -d
-docker compose logs -f
+docker compose logs minibrain | grep setup
 ```
 
 Put overrides in a `.env` file next to it: `MINIBRAIN_DATABASE_URL`, `MINIBRAIN_MODELS_DIR` (the host folder for
@@ -307,6 +312,61 @@ release image.
 
 The image serves with the `transformers` engine. To use SGLang, build an image `FROM` this one that installs SGLang into
 its own virtual environment and sets `MINIBRAIN_SGLANG_PYTHON` to that environment's Python. Not verified yet.
+
+## First admin
+
+Everyone signs in, on loopback too. On the first start with no accounts, `minibrain serve` prints a one-time setup link
+to its log; it opens it in the browser too when it runs in a desktop terminal (`--no-browser` stops that):
+
+```text
+  minibrain has no admin account yet. Create it with this one-time setup link:
+
+    http://127.0.0.1:8000/setup?token=…
+```
+
+| Install | Find the link | A new link, voiding the old one |
+|---|---|---|
+| Native | The terminal that runs `minibrain serve` | `minibrain admin setup-link` |
+| Docker | `docker logs minibrain \| grep setup` | `docker exec minibrain minibrain admin setup-link` |
+| Compose | `docker compose logs minibrain \| grep setup` | `docker compose exec minibrain minibrain admin setup-link` |
+
+The link works once and survives restarts until it is used. It names the address main listens on; opening minibrain
+at another address or port, keep the path and the token, or pass `--url` to `minibrain admin setup-link`.
+
+Automated deploys create the admin from the environment instead: `MINIBRAIN_ADMIN_EMAIL` and
+`MINIBRAIN_ADMIN_PASSWORD_FILE`, a file that holds the password, such as a Docker or Kubernetes secret. Both are read on
+the first start only and ignored once any account exists. `MINIBRAIN_ADMIN_PASSWORD` with the password itself works,
+with a warning in the log. With compose, add this to `compose.yaml`, with the password in `admin_password.txt` next to
+it:
+
+```yaml
+services:
+  minibrain:
+    environment:
+      MINIBRAIN_ADMIN_EMAIL: admin@example.com
+      MINIBRAIN_ADMIN_PASSWORD_FILE: /run/secrets/minibrain_admin_password
+    secrets:
+      - minibrain_admin_password
+
+secrets:
+  minibrain_admin_password:
+    file: ./admin_password.txt
+```
+
+With `docker run`, mount the file read-only; it must be readable by uid 1000, the container's user:
+
+```sh
+docker run -d --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data \
+  -e MINIBRAIN_ADMIN_EMAIL=admin@example.com \
+  -e MINIBRAIN_ADMIN_PASSWORD_FILE=/run/secrets/admin_password \
+  -v "$PWD/admin_password.txt:/run/secrets/admin_password:ro" \
+  ghcr.io/offbeatport/minibrain
+```
+
+On Kubernetes, mount a Secret as a volume and point `MINIBRAIN_ADMIN_PASSWORD_FILE` at the file. With single sign-on
+and a group mapped to admin, no local admin is needed and no setup link is issued. Forgotten password:
+`minibrain admin reset-password --email admin@example.com`. Details: [Security → First
+admin](security.md#first-admin).
 
 ## Offline and air-gapped
 

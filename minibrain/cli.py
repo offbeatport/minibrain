@@ -6,6 +6,8 @@ import signal
 import socket
 import sys
 import threading
+import time
+import webbrowser
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -16,9 +18,14 @@ import uvicorn
 from minibrain.supervise import Supervisor
 
 COMMAND_LINE = "command line"
+DEFAULT_URL = "http://127.0.0.1:8000"
+STARTUP_FAILURE = 3
+RULE = "-" * 78
 
 if TYPE_CHECKING:
+    from minibrain.auth.first_run import FirstRun
     from minibrain.registry.audit_chain import ChainReport
+    from minibrain.settings import Settings
 
 
 def local_url(host: str, port: int) -> str:
@@ -29,25 +36,80 @@ def local_url(host: str, port: int) -> str:
     return f"http://{'127.0.0.1' if unspecified else host}:{port}"
 
 
-def serve(host: str, port: int, with_worker: bool) -> None:
+def setup_banner(link: str, note: str = "Lost it? minibrain admin setup-link prints a new one.") -> str:
+    lines = ["minibrain has no admin account yet. Create it with this one-time setup link:", "", f"  {link}", "", note]
+    return "\n".join(["", RULE, *(f"  {line}" if line else "" for line in lines), RULE, ""])
+
+
+def desktop_session() -> bool:
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+    if any(os.environ.get(name) for name in ("CI", "SSH_CONNECTION", "SSH_TTY", "container")):
+        return False
+    if Path("/.dockerenv").exists():
+        return False
+    if sys.platform.startswith("linux"):
+        return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    return True
+
+
+def first_start(settings: "Settings") -> "FirstRun":
+    from minibrain.auth.config import load_auth
+    from minibrain.auth.first_run import FirstRunError, prepare
+    from minibrain.registry.db import make_sessions, migrate
+
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        try:
+            return prepare(session, load_auth(), os.environ)
+        except FirstRunError as error:
+            raise SystemExit(str(error)) from error
+
+
+def announce(server: uvicorn.Server, found: "FirstRun", base: str, browser: bool) -> None:
+    from minibrain.auth.first_run import ADMIN_EMAIL_ENV, setup_link
+
+    while not server.started:
+        time.sleep(0.1)
+    if found.token is not None:
+        link = setup_link(base, found.token)
+        print(setup_banner(link), flush=True)
+        if browser:
+            webbrowser.open(link)
+    elif found.waiting:
+        note = "Open the setup link printed when it first started, or run minibrain admin setup-link for a new one."
+        print(f"\n{RULE}\n  minibrain has no admin account yet. {note}\n{RULE}\n", flush=True)
+    elif found.admin is not None:
+        print(f"Created the admin account {found.admin} from {ADMIN_EMAIL_ENV}.", flush=True)
+
+
+def serve(host: str, port: int, with_worker: bool, browser: bool) -> None:
     from minibrain.settings import load_settings
     from minibrain.worker import LOCAL_KINDS
 
     settings = load_settings()
     api_url = local_url(host, port)
     os.environ["MINIBRAIN_MAIN_URL"] = api_url
-    os.environ["MINIBRAIN_LISTEN"] = host
+    found = first_start(settings)
     env = os.environ | {"MINIBRAIN_WORKER_TOKEN": settings.secret("worker_token")}
     command = [sys.executable, "-m", "minibrain.cli", "worker", "--api-url", api_url, "--parent", str(os.getpid())]
     command += ["--kinds", *LOCAL_KINDS]
     worker = Supervisor("worker", command, env) if with_worker else None
     if worker is not None:
         worker.start()
+    config = uvicorn.Config("minibrain.app:create_app", factory=True, host=host, port=port, proxy_headers=False)
+    server = uvicorn.Server(config)
+    opens = browser and desktop_session()
+    threading.Thread(target=announce, args=(server, found, settings.ui_url or api_url, opens), daemon=True).start()
     try:
-        uvicorn.run("minibrain.app:create_app", factory=True, host=host, port=port, proxy_headers=False)
+        server.run()
+    except KeyboardInterrupt:
+        pass
     finally:
         if worker is not None:
             worker.shutdown()
+    if not server.started:
+        raise SystemExit(STARTUP_FAILURE)
 
 
 def watch_parent(parent: int | None, stop: threading.Event, on_orphan: Callable[[], None] | None = None) -> None:
@@ -227,20 +289,27 @@ def read_new_password(from_stdin: bool) -> str:
     return first
 
 
-def admin(args: argparse.Namespace) -> None:
-    from minibrain.auth.accounts import AccountError, create_local
+def checked_password(from_stdin: bool) -> str:
     from minibrain.auth.passwords import PasswordError, check_strength
+
+    password = read_new_password(from_stdin)
+    try:
+        check_strength(password)
+    except PasswordError as error:
+        raise SystemExit(str(error)) from error
+    return password
+
+
+def admin_create(args: argparse.Namespace) -> None:
+    from minibrain.auth.accounts import AccountError, create_local
+    from minibrain.auth.first_run import clear_setup_token
     from minibrain.auth.roles import Role
     from minibrain.registry.db import make_sessions, migrate
     from minibrain.registry.models import AuditEvent
     from minibrain.registry.service import ConflictError
     from minibrain.settings import load_settings
 
-    password = read_new_password(args.password_stdin)
-    try:
-        check_strength(password)
-    except PasswordError as error:
-        raise SystemExit(str(error)) from error
+    password = checked_password(args.password_stdin)
     settings = load_settings()
     migrate(settings.database_url)
     with make_sessions(settings.database_url)() as session:
@@ -248,10 +317,69 @@ def admin(args: argparse.Namespace) -> None:
             user = create_local(session, args.email, args.name, Role.ADMIN, password)
         except (AccountError, ConflictError) as error:
             raise SystemExit(str(error)) from error
-        detail = {"name": user.name, "role": Role.ADMIN.value, "source": "local", "via": "command line"}
+        detail = {"name": user.name, "role": Role.ADMIN.value, "source": "local", "via": COMMAND_LINE}
         session.add(AuditEvent(actor=COMMAND_LINE, action="account.create", target=user.subject, detail=detail))
+        clear_setup_token(session)
         session.commit()
     print(f"Created the admin account {user.subject}. Sign in with it in the minibrain UI.")
+
+
+def admin_reset_password(args: argparse.Namespace) -> None:
+    from minibrain.auth.accounts import AccountError, find_local, normal_email, set_password
+    from minibrain.registry.db import make_sessions, migrate
+    from minibrain.registry.models import AuditEvent
+    from minibrain.settings import load_settings
+
+    try:
+        email = normal_email(args.email)
+    except AccountError as error:
+        raise SystemExit(str(error)) from error
+    settings = load_settings()
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        user = find_local(session, email)
+        if user is None:
+            raise SystemExit(f"{email} has no local account. minibrain admin create adds one.")
+        set_password(session, user, checked_password(args.password_stdin))
+        detail = {"via": COMMAND_LINE}
+        session.add(AuditEvent(actor=COMMAND_LINE, action="account.password", target=user.subject, detail=detail))
+        session.commit()
+        disabled = user.disabled
+    print(f"Set a new password for {email} and ended its sessions. Sign in with it in the minibrain UI.")
+    if disabled:
+        print("The account is turned off: another admin turns it back on under Settings, Accounts.")
+
+
+def admin_setup_link(args: argparse.Namespace) -> None:
+    from minibrain.auth.accounts import users_exist
+    from minibrain.auth.config import load_auth
+    from minibrain.auth.first_run import issue_setup_token, setup_link, sso_admin
+    from minibrain.registry.db import make_sessions, migrate
+    from minibrain.settings import load_settings
+
+    settings = load_settings()
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        if users_exist(session):
+            raise SystemExit("This install already has accounts. Sign in, or run minibrain admin reset-password.")
+        if sso_admin(session, load_auth()):
+            raise SystemExit(
+                "minibrain.yaml maps a single sign-on group to admin, so sign in with single sign-on."
+                " minibrain admin create adds a local admin."
+            )
+        token = issue_setup_token(session, COMMAND_LINE)
+        session.commit()
+    base = args.url or settings.ui_url or DEFAULT_URL
+    print(setup_banner(setup_link(base, token), "Earlier setup links no longer work."))
+
+
+def admin(args: argparse.Namespace) -> None:
+    if args.action == "create":
+        admin_create(args)
+    elif args.action == "reset-password":
+        admin_reset_password(args)
+    else:
+        admin_setup_link(args)
 
 
 def openapi(output: Path | None) -> None:
@@ -271,6 +399,9 @@ def main() -> None:
     serve_command.add_argument("--host", default="127.0.0.1")
     serve_command.add_argument("--port", type=int, default=8000)
     serve_command.add_argument("--no-worker", action="store_true")
+    serve_command.add_argument(
+        "--no-browser", action="store_true", help="do not open the setup link in a browser on first start"
+    )
     worker_command = commands.add_parser("worker", help="run a worker against a main process")
     worker_command.add_argument("--api-url", default="http://127.0.0.1:8000")
     worker_command.add_argument("--kinds", nargs="*", default=None)
@@ -318,11 +449,20 @@ def main() -> None:
     create_command.add_argument("--email", required=True)
     create_command.add_argument("--name", default="")
     create_command.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
+    reset_command = admin_actions.add_parser(
+        "reset-password", help="set a new password for a local account, unlock it and end its sessions"
+    )
+    reset_command.add_argument("--email", required=True)
+    reset_command.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
+    link_command = admin_actions.add_parser(
+        "setup-link", help="print a new one-time link that creates the first admin; earlier links stop working"
+    )
+    link_command.add_argument("--url", default=None, help=f"address people open minibrain at (default {DEFAULT_URL})")
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
     if args.command == "serve":
-        serve(args.host, args.port, not args.no_worker)
+        serve(args.host, args.port, not args.no_worker, not args.no_browser)
     elif args.command == "worker":
         worker(args.api_url, args.kinds, args.gpus, args.parent, args.pool)
     elif args.command == "gateway":

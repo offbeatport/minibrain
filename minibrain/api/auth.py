@@ -1,5 +1,4 @@
-from typing import Literal
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
@@ -28,7 +27,7 @@ from minibrain.auth.accounts import (
 )
 from minibrain.auth.addresses import loopback_name
 from minibrain.auth.config import AuthConfig
-from minibrain.auth.gate import Identity
+from minibrain.auth.first_run import SETUP_LINK, redeem_setup_token, setup_open
 from minibrain.auth.identity import Person
 from minibrain.auth.oidc import PENDING_COOKIE, PENDING_PATH, PENDING_SECONDS, OidcClient, OidcError, seal, unseal
 from minibrain.auth.roles import Role
@@ -40,7 +39,7 @@ FAILED_ACTOR_LENGTH = 200
 
 
 class PersonInfo(BaseModel):
-    id: int | None
+    id: int
     name: str
     email: str | None
     source: str
@@ -55,12 +54,10 @@ class SignInMethods(BaseModel):
 
 
 class SessionInfo(BaseModel):
-    accounts: bool
     setup: bool
     person: PersonInfo | None
     csrf_token: str | None
     methods: SignInMethods
-    reason: Literal["listen", "remote", "sign_in"] | None
 
 
 class SignInBody(BaseModel):
@@ -69,6 +66,7 @@ class SignInBody(BaseModel):
 
 
 class SetupBody(BaseModel):
+    token: str = Field(max_length=200)
     email: str
     name: str = ""
     password: str
@@ -97,20 +95,20 @@ def methods_of(request: Request) -> SignInMethods:
     return SignInMethods(proxy=config.proxy is not None, oidc=config.oidc.label if config.oidc else None)
 
 
-def session_info(request: Request, found: Identity, person: Person | None, csrf_subject: str | None) -> SessionInfo:
+def session_info(request: Request, setup: bool, person: Person | None, csrf_subject: str | None) -> SessionInfo:
     key: bytes = request.app.state.csrf_key
     return SessionInfo(
-        accounts=found.accounts,
-        setup=not found.users,
+        setup=setup,
         person=person_info(person),
         csrf_token=csrf_for(key, csrf_subject) if csrf_subject else None,
         methods=methods_of(request),
-        reason=found.reason,
     )
 
 
 def secure_cookie(request: Request) -> bool:
-    return request.url.scheme == "https" or not loopback_name(request.url.hostname)
+    if request.url.scheme == "https" or urlparse(request.headers.get("origin", "")).scheme == "https":
+        return True
+    return not loopback_name(request.url.hostname)
 
 
 def set_session_cookie(request: Request, response: Response, token: str, seconds: int) -> None:
@@ -134,8 +132,8 @@ def signed_in_info(request: Request, response: Response, session: SessionDep, us
     audit_sign_in(session, user, row)
     session.commit()
     set_session_cookie(request, response, token, int(lifetimes(session).absolute.total_seconds()))
-    signed = Identity(person=person_for(session, user, request.app.state.auth), accounts=True, users=True)
-    return session_info(request, signed, signed.person, f"session:{row.token_hash}")
+    person = person_for(session, user, request.app.state.auth)
+    return session_info(request, False, person, f"session:{row.token_hash}")
 
 
 def audit_sign_in(session: SessionDep, user: User, row: LoginSession) -> None:
@@ -145,8 +143,9 @@ def audit_sign_in(session: SessionDep, user: User, row: LoginSession) -> None:
 
 
 @router.get("/session", dependencies=[Depends(public)])
-def current_session(request: Request, found: IdentityDep) -> SessionInfo:
-    return session_info(request, found, found.person, found.csrf_subject)
+def current_session(request: Request, session: SessionDep, found: IdentityDep) -> SessionInfo:
+    setup = found.person is None and setup_open(session, request.app.state.auth)
+    return session_info(request, setup, found.person, found.csrf_subject)
 
 
 @router.post("/login", dependencies=[Depends(public)])
@@ -168,7 +167,7 @@ def logout(request: Request, response: Response, session: SessionDep, found: Ide
     person = found.person
     if token:
         end_session(session, token)
-    if person is not None and person.signed_in:
+    if person is not None:
         session.add(AuditEvent(actor=person.actor, action="auth.sign_out", target=person.actor, detail={}))
     session.commit()
     clear_session_cookie(request, response)
@@ -177,9 +176,10 @@ def logout(request: Request, response: Response, session: SessionDep, found: Ide
 @router.post("/setup", dependencies=[Depends(public)])
 def setup(body: SetupBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     claim_first_admin(session)
+    redeem_setup_token(session, body.token)
     user = create_local(session, body.email, body.name, Role.ADMIN, body.password)
     person = person_of(user)
-    detail = {"name": user.name, "role": Role.ADMIN.value, "source": LOCAL, "first_admin": True}
+    detail = {"name": user.name, "role": Role.ADMIN.value, "source": LOCAL, "first_admin": True, "via": SETUP_LINK}
     session.add(AuditEvent(actor=person.actor, action="account.create", target=person.actor, detail=detail))
     commit_first_admin(session)
     return signed_in_info(request, response, session, user)

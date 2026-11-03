@@ -118,10 +118,10 @@ def test_review_actions_change_status_and_are_audited(harness: Harness) -> None:
     refused = review(harness, unsure, "accept")
     assert refused.status_code == 422 and "right answer" in refused.json()["detail"]
     fixed = review(harness, unsure, "accept", "bug").json()
-    assert (fixed["status"], fixed["label"], fixed["reviewed_by"]) == ("accepted", "bug", "Local user")
+    assert (fixed["status"], fixed["label"], fixed["reviewed_by"]) == ("accepted", "bug", "admin@example.com")
     assert review(harness, liked, "reject").json()["status"] == "rejected"
     assigned = harness.client.post(f"/api/feedback/{corrected['id']}/assign", json={"mine": True}).json()
-    assert assigned["assignee"] == "Local user"
+    assert assigned["assignee"] == "admin@example.com"
     mine = harness.client.get("/api/feedback", params={"assignee": "me"}).json()
     assert [item["id"] for item in mine["items"]] == [corrected["id"]]
     accepted = harness.client.get("/api/feedback", params={"status": "accepted"}).json()
@@ -135,7 +135,13 @@ def test_review_actions_change_status_and_are_audited(harness: Harness) -> None:
             ("feedback.reject", f"{SLUG}/feedback/{liked['id']}"),
             ("feedback.assign", f"{SLUG}/feedback/{corrected['id']}"),
         ]
-        assert events[1].detail == {"name": "Support Triage", "from": "pending", "status": "accepted", "label": "bug"}
+        assert events[1].detail == {
+            "name": "Support Triage",
+            "from": "pending",
+            "status": "accepted",
+            "label": "bug",
+            "sign_in": "local",
+        }
 
 
 def snapshot_rows(harness: Harness, snapshot_id: int) -> dict[str, str]:
