@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { Boxes, ChevronDown } from "lucide-react";
 import {
     Badge,
     CheckboxSelect,
@@ -159,45 +159,85 @@ function fitMatches(fit: FitLevel, chosen: string[]): boolean {
 
 type PickerValue = { option: BaseOption | null; importText: string | null };
 
+function descriptionOf(option: BaseOption): string | null {
+    return option.entry?.description || option.custom?.description || option.note || null;
+}
+
 function Trigger({ value }: { value: PickerValue }) {
     const { option, importText } = value;
     const state = option ? (installState(option) ?? DOWNLOAD) : null;
+    const facts = option
+        ? [
+              option.kind === "custom" ? null : option.publisher,
+              option.params ? `${option.params} parameters` : null,
+              option.size ? bytes(option.size) : null,
+              option.licence ? LICENCE_TEXT[option.licence] : null,
+          ].filter(Boolean)
+        : [];
+    const description = option ? descriptionOf(option) : null;
+    const fit = option && option.kind !== "local" ? FIT_HINT[option.fit] : null;
     return (
         <DialogTrigger asChild>
             <button
                 type="button"
                 id="base-model"
-                className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-input-background px-2.5 text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex w-full min-w-0 items-start gap-3 rounded-lg border border-input bg-input-background p-3 text-left text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             >
                 {option ? (
-                    <>
-                        <PublisherLogo publisher={option.publisher} name={option.name} size="sm" />
-                        <span className="truncate font-medium">{option.name}</span>
-                        <span className="hidden truncate text-muted-foreground tabular-nums sm:inline">
-                            {[option.params, option.size ? bytes(option.size) : null]
-                                .filter(Boolean)
-                                .join(" · ")}
-                        </span>
-                        {state && (
-                            <Badge variant={state.variant} className="ml-auto shrink-0">
-                                {state.text}
-                            </Badge>
-                        )}
-                    </>
-                ) : importText ? (
-                    <>
-                        <span className="truncate font-mono">{importText}</span>
-                        <Badge variant="neutral" className="ml-auto shrink-0">
-                            Import
-                        </Badge>
-                    </>
+                    <PublisherLogo publisher={option.publisher} name={option.name} />
                 ) : (
-                    <span className="text-muted-foreground">Choose a base model</span>
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
+                        <Boxes aria-hidden="true" className="size-4" />
+                    </span>
                 )}
-                <ChevronDown
-                    aria-hidden="true"
-                    className={`size-4 shrink-0 text-muted-foreground ${option || importText ? "" : "ml-auto"}`}
-                />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    {option ? (
+                        <>
+                            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="min-w-0 break-words text-base font-semibold">
+                                    {option.name}
+                                </span>
+                                {state && (
+                                    <Badge variant={state.variant} className="shrink-0">
+                                        {state.text}
+                                    </Badge>
+                                )}
+                            </span>
+                            <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-muted-foreground tabular-nums">
+                                <span className="truncate">{facts.join(" · ")}</span>
+                                {fit && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
+                            </span>
+                            {description && (
+                                <span className="line-clamp-2 text-foreground">{description}</span>
+                            )}
+                        </>
+                    ) : importText ? (
+                        <>
+                            <span className="flex min-w-0 items-center gap-2">
+                                <span className="truncate font-mono">{importText}</span>
+                                <Badge variant="neutral" className="shrink-0">
+                                    Import
+                                </Badge>
+                            </span>
+                            <span className="text-muted-foreground">
+                                Copied into this install when you add the model.
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="text-base font-semibold">Choose a base model</span>
+                            <span className="text-muted-foreground">
+                                Recommended, from the catalogue, one of yours, or an import.
+                            </span>
+                        </>
+                    )}
+                </span>
+                <span className="flex shrink-0 items-center gap-1 self-center text-primary">
+                    <span className="hidden sm:inline">
+                        {option || importText ? "Change" : "Choose"}
+                    </span>
+                    <ChevronDown aria-hidden="true" className="size-4" />
+                </span>
             </button>
         </DialogTrigger>
     );

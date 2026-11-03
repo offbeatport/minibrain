@@ -4,10 +4,8 @@ import {
     BookOpen,
     Boxes,
     Braces,
-    Check,
     ChevronDown,
     ChevronLeft,
-    Copy,
     Database,
     ExternalLink,
     FlaskConical,
@@ -18,7 +16,6 @@ import {
 } from "lucide-react";
 import {
     Button,
-    Card,
     Field,
     FieldGroup,
     Input,
@@ -34,13 +31,11 @@ import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
-import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { modelsHref } from "~/lib/modelsSearch";
-import { bytes } from "~/lib/time";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
-import { BaseSummary, type CopySource, type DiskNeed, diskBlocks, diskNeed } from "./BaseSummary";
+import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
 import {
     type BaseOption,
     type TaskKey,
@@ -185,116 +180,6 @@ function slugOf(name: string): string {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
     return slug.slice(0, 48).replace(/-+$/, "") || "minibrain";
-}
-
-function downloadText(option: BaseOption | null, need: DiskNeed): string {
-    if (!option) {
-        return "Pick a base model";
-    }
-    if (need) {
-        return `${bytes(need.size)} ${need.verb}`;
-    }
-    return option.added?.availability.state === "missing"
-        ? "On this install, files missing"
-        : "No download, already on this install";
-}
-
-function CopyRequest({ code }: { code: string }) {
-    const [copied, setCopied] = useState(false);
-    const copy = () =>
-        navigator.clipboard?.writeText(code).then(
-            () => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-            },
-            () => setCopied(false),
-        );
-    return (
-        <Button type="button" variant="outline" size="sm" className="w-fit" onClick={copy}>
-            {copied ? <Check /> : <Copy />}
-            {copied ? "Copied" : "Copy a sample request"}
-        </Button>
-    );
-}
-
-function Summary({
-    option,
-    importText,
-    need,
-    task,
-    model,
-    dataset,
-}: {
-    option: BaseOption | null;
-    importText: string | null;
-    need: DiskNeed;
-    task: TaskKey;
-    model: string;
-    dataset: string | null;
-}) {
-    const origin = typeof window === "undefined" ? "" : window.location.origin;
-    const code = [
-        `curl ${origin}/v1/chat/completions \\`,
-        `  -H "Authorization: Bearer $MINIBRAIN_KEY" \\`,
-        `  -H "Content-Type: application/json" \\`,
-        `  -d '{"model": "${model}", "messages": [{"role": "user", "content": "Hello"}]}'`,
-    ].join("\n");
-    const taskLabel = TASKS.find((item) => item.key === task)?.label ?? task;
-    return (
-        <Card className="gap-4 px-5">
-            <h2 className="text-base font-semibold">What you get</h2>
-            <dl className="flex flex-col gap-3 text-sm">
-                <div className="flex flex-col gap-1">
-                    <dt className="text-muted-foreground">Base model</dt>
-                    <dd className="flex items-center gap-2">
-                        {option ? (
-                            <>
-                                <PublisherLogo
-                                    publisher={option.publisher ?? option.name}
-                                    name={option.name}
-                                    size="sm"
-                                />
-                                <span className="min-w-0 truncate font-medium">{option.name}</span>
-                            </>
-                        ) : (
-                            <span className="truncate font-mono">{importText ?? "None yet"}</span>
-                        )}
-                    </dd>
-                    <dd className="text-muted-foreground tabular-nums">
-                        {importText && !option
-                            ? "Imported when you add it"
-                            : downloadText(option, need)}
-                    </dd>
-                </div>
-                <div className="flex flex-col gap-1">
-                    <dt className="text-muted-foreground">Task</dt>
-                    <dd>{taskLabel}</dd>
-                </div>
-                <div className="flex flex-col gap-1">
-                    <dt className="text-muted-foreground">Training data</dt>
-                    <dd>{dataset ?? "Added after you create it, on its Training page"}</dd>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <dt className="text-muted-foreground">Call it as</dt>
-                    <dd className="font-mono">{model}</dd>
-                    <dd>
-                        <CopyRequest code={code} />
-                    </dd>
-                    <dd className="text-muted-foreground">
-                        Until it is trained, it answers with its base model.
-                    </dd>
-                </div>
-            </dl>
-            <div className="flex flex-col gap-1.5 border-t pt-4 text-sm">
-                <span className="text-muted-foreground">After you add it</span>
-                <ol className="flex list-decimal flex-col gap-1 pl-5">
-                    <li>Train it on your data</li>
-                    <li>Compare it with prompting alone</li>
-                    <li>Deploy the better version</li>
-                </ol>
-            </div>
-        </Card>
-    );
 }
 
 function trainingHref(slug: string, copy: CopySource | null): string {
@@ -465,7 +350,6 @@ export function AddModelPage() {
             submit(event);
         }
     };
-    const datasetLabel = dataset ? (copy?.datasetName ?? dataset) : null;
     return (
         <Page>
             <Link
@@ -479,11 +363,7 @@ export function AddModelPage() {
                 title="Add model"
                 caption="Start from a base model; train it on your data whenever you like."
             />
-            <form
-                onSubmit={submit}
-                onKeyDown={shortcut}
-                className="grid max-w-6xl items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
-            >
+            <form onSubmit={submit} onKeyDown={shortcut} className="flex max-w-4xl flex-col gap-6">
                 <PanelSections>
                     <PanelSection
                         icon={Boxes}
@@ -602,21 +482,8 @@ export function AddModelPage() {
                         </FieldGroup>
                     </PanelSection>
                 </PanelSections>
-                <aside className="lg:sticky lg:top-6 lg:pt-2">
-                    <Summary
-                        option={option}
-                        importText={current?.kind === "import" ? current.text : null}
-                        need={need}
-                        task={task}
-                        model={slugOf(finalName)}
-                        dataset={datasetLabel}
-                    />
-                </aside>
-                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3 lg:col-span-2">
+                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3">
                     <ErrorLine error={add.error} />
-                    <span className="mr-auto hidden text-sm text-muted-foreground sm:inline">
-                        Ctrl or ⌘ + Enter to add
-                    </span>
                     <Button
                         type="button"
                         variant="outline"
