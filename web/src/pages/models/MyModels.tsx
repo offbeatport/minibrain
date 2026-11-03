@@ -10,6 +10,7 @@ import {
     Pencil,
     PowerOff,
     Rocket,
+    RotateCcw,
     Trash2,
 } from "lucide-react";
 import {
@@ -34,9 +35,19 @@ import {
     TooltipTrigger,
     cn,
 } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { type ModelRow, api, succeed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
+import {
+    type ColumnWidths,
+    LeadingResizer,
+    type ResizableColumn,
+    SortButton,
+    type SortDirection,
+    ariaSort,
+    useColumnWidths,
+    widthVariables,
+} from "~/components/ListColumns";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
@@ -56,7 +67,6 @@ import {
     type Entry,
     STATE_LABELS,
     STATE_RANK,
-    byState,
     entriesOf,
     failingEntry,
     stateOfEntry,
@@ -685,35 +695,111 @@ function requestTotal(entry: Entry): number {
     return (usageOf(entry)?.daily ?? []).reduce((sum, value) => sum + value, 0);
 }
 
-const SORTS: Record<string, { label: string; compare: (left: Entry, right: Entry) => number }> = {
-    status: { label: "Status", compare: byState },
+type SortKey = "status" | "name" | "version" | "updated" | "requests";
+type Sort = { key: SortKey; direction: SortDirection };
+type SortValue = string | number | null;
+
+const SORTS: Record<
+    SortKey,
+    {
+        initial: SortDirection;
+        labels: Record<SortDirection, string>;
+        value: (entry: Entry) => SortValue;
+    }
+> = {
+    status: {
+        initial: "asc",
+        labels: { asc: "Status", desc: "Status, reversed" },
+        value: (entry) => STATE_RANK.indexOf(stateOfEntry(entry)),
+    },
     name: {
-        label: "Name",
-        compare: (left, right) =>
-            left.model.name.localeCompare(right.model.name) ||
-            (right.version?.number ?? 0) - (left.version?.number ?? 0),
+        initial: "asc",
+        labels: { asc: "Name, A to Z", desc: "Name, Z to A" },
+        value: (entry) => entry.model.name,
+    },
+    version: {
+        initial: "desc",
+        labels: { desc: "Newest version", asc: "Oldest version" },
+        value: (entry) => entry.version?.number ?? null,
     },
     updated: {
-        label: "Recently updated",
-        compare: (left, right) => right.model.updated_at.localeCompare(left.model.updated_at),
+        initial: "desc",
+        labels: { desc: "Recently updated", asc: "Least recently updated" },
+        value: (entry) => entry.model.updated_at,
     },
     requests: {
-        label: "Most requests",
-        compare: (left, right) => requestTotal(right) - requestTotal(left),
+        initial: "desc",
+        labels: { desc: "Most requests", asc: "Fewest requests" },
+        value: requestTotal,
     },
 };
 
-function SortSelect({ value, onSort }: { value: string; onSort: (value: string) => void }) {
+const DEFAULT_SORT: Sort = { key: "status", direction: "asc" };
+
+function isSortKey(value: string): value is SortKey {
+    return Object.hasOwn(SORTS, value);
+}
+
+function parseSort(value: string | undefined): Sort {
+    const key = (value ?? "").replace(/^-/, "");
+    if (!isSortKey(key)) {
+        return DEFAULT_SORT;
+    }
+    return { key, direction: value?.startsWith("-") ? "desc" : "asc" };
+}
+
+function sortValue({ key, direction }: Sort): string {
+    return direction === "desc" ? `-${key}` : key;
+}
+
+function opposite(direction: SortDirection): SortDirection {
+    return direction === "asc" ? "desc" : "asc";
+}
+
+const SORT_OPTIONS = (Object.keys(SORTS) as SortKey[]).flatMap((key) =>
+    [SORTS[key].initial, opposite(SORTS[key].initial)].map((direction) => ({
+        value: sortValue({ key, direction }),
+        label: SORTS[key].labels[direction],
+    })),
+);
+
+function byName(left: Entry, right: Entry): number {
     return (
-        <Select value={value} onValueChange={(next) => onSort(String(next))}>
+        left.model.name.localeCompare(right.model.name) ||
+        (right.version?.number ?? 0) - (left.version?.number ?? 0)
+    );
+}
+
+function compareValues(left: string | number, right: string | number): number {
+    return typeof left === "string" && typeof right === "string"
+        ? left.localeCompare(right)
+        : Number(left) - Number(right);
+}
+
+function sorter({ key, direction }: Sort) {
+    const { value } = SORTS[key];
+    const sign = direction === "asc" ? 1 : -1;
+    return (left: Entry, right: Entry) => {
+        const a = value(left);
+        const b = value(right);
+        if (a === null || b === null) {
+            return Number(a === null) - Number(b === null) || byName(left, right);
+        }
+        return sign * compareValues(a, b) || byName(left, right);
+    };
+}
+
+function SortSelect({ value, onSort }: { value: Sort; onSort: (sort: Sort) => void }) {
+    return (
+        <Select value={sortValue(value)} onValueChange={(next) => onSort(parseSort(String(next)))}>
             <SelectTrigger aria-label="Sort models" className="w-auto min-w-44">
                 <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
                 <SelectValue className="flex-1 text-left" />
             </SelectTrigger>
             <SelectContent>
-                {Object.entries(SORTS).map(([key, sort]) => (
-                    <SelectItem key={key} value={key}>
-                        {sort.label}
+                {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                     </SelectItem>
                 ))}
             </SelectContent>
@@ -721,8 +807,20 @@ function SortSelect({ value, onSort }: { value: string; onSort: (value: string) 
     );
 }
 
+type ColumnId = "version" | "status" | "requests";
+
+const COLUMNS: (ResizableColumn & { id: ColumnId; sort: SortKey })[] = [
+    { id: "version", label: "Version", sort: "version", min: 64, max: 320 },
+    { id: "status", label: "Status", sort: "status", min: 96, max: 480 },
+    { id: "requests", label: "Requests, 7 days", sort: "requests", min: 144, max: 480 },
+];
+
+const WIDTHS_KEY = "minibrain.models.columns";
+
 const LIST_GRID =
-    "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(5rem,auto)_minmax(10rem,auto)_minmax(9rem,auto)_auto]";
+    "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 md:grid-cols-[auto_minmax(12rem,1fr)_var(--col-version,minmax(5rem,auto))_var(--col-status,minmax(10rem,auto))_var(--col-requests,minmax(9rem,auto))_auto]";
+
+const CLIPPED = "-mx-1 max-w-[calc(100%+0.5rem)] overflow-x-clip px-1";
 
 const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
 
@@ -731,11 +829,13 @@ function ModelListRow({
     on,
     selected,
     onSelect,
+    widths,
 }: {
     entry: Entry;
     on: Handlers;
     selected: boolean;
     onSelect: (selected: boolean) => void;
+    widths: ColumnWidths;
 }) {
     const { model } = entry;
     return (
@@ -776,14 +876,22 @@ function ModelListRow({
                     </span>
                 </div>
             </div>
-            <div className="hidden md:block">
+            <div className="hidden min-w-0 truncate md:block">
                 <VersionCell entry={entry} />
             </div>
-            <div className="relative z-10 hidden w-fit md:block">
+            <div
+                className={cn(
+                    "relative z-10 hidden w-fit md:block",
+                    widths.status !== undefined && CLIPPED,
+                )}
+            >
                 <StatusCell entry={entry} />
             </div>
-            <div className="hidden md:block">
-                <Requests usage={usageOf(entry)} />
+            <div className="relative z-10 hidden min-w-0 md:block">
+                <Requests
+                    usage={usageOf(entry)}
+                    live={entry.model.deployment.state !== "not_deployed"}
+                />
             </div>
             <div className="relative z-10">
                 <RowActions entry={entry} on={on} />
@@ -792,24 +900,52 @@ function ModelListRow({
     );
 }
 
+function ResetWidths({ onReset }: { onReset: () => void }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Reset column widths"
+                    className="hidden md:inline-flex"
+                    onClick={onReset}
+                >
+                    <RotateCcw />
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reset column widths</TooltipContent>
+        </Tooltip>
+    );
+}
+
 function ModelList({
     entries,
     on,
     selected,
     onSelected,
+    sort,
+    onSort,
     empty,
 }: {
     entries: Entry[];
     on: Handlers;
     selected: string[];
     onSelected: (ids: string[]) => void;
+    sort: Sort;
+    onSort: (key: SortKey) => void;
     empty: ReactNode;
 }) {
+    const sizing = useColumnWidths(WIDTHS_KEY, COLUMNS);
     const ids = entries.map((entry) => entry.key);
     const count = ids.filter((id) => selected.includes(id)).length;
     const all = count === 0 ? false : count === ids.length ? true : "indeterminate";
+    const directionOf = (key: SortKey) => (sort.key === key ? sort.direction : null);
     return (
-        <div className={cn(LIST_GRID, "overflow-hidden rounded-lg border bg-card")}>
+        <div
+            className={cn(LIST_GRID, "overflow-x-auto rounded-lg border bg-card")}
+            style={widthVariables(sizing.widths, "--col-") as CSSProperties}
+        >
             <div
                 className={cn(
                     ROW_GRID,
@@ -828,11 +964,37 @@ function ModelList({
                         )
                     }
                 />
-                <span>Model</span>
-                <span className="hidden md:block">Version</span>
-                <span className="hidden md:block">Status</span>
-                <span className="hidden md:block">Requests, 7 days</span>
-                <span className="sr-only">Actions</span>
+                <div aria-sort={ariaSort(directionOf("name"))} className="flex min-w-0">
+                    <SortButton
+                        label="Model"
+                        direction={directionOf("name")}
+                        onSort={() => onSort("name")}
+                    />
+                </div>
+                {COLUMNS.map((column) => (
+                    <div
+                        key={column.id}
+                        aria-sort={ariaSort(directionOf(column.sort))}
+                        className="relative hidden min-w-0 items-center self-stretch md:flex"
+                    >
+                        <SortButton
+                            label={column.label}
+                            direction={directionOf(column.sort)}
+                            onSort={() => onSort(column.sort)}
+                        />
+                        <LeadingResizer
+                            column={column}
+                            onResize={(width) => sizing.resize(column, width)}
+                            onReset={() => sizing.reset(column)}
+                        />
+                    </div>
+                ))}
+                <div className="flex justify-end">
+                    {Object.keys(sizing.widths).length > 0 && (
+                        <ResetWidths onReset={sizing.resetAll} />
+                    )}
+                    <span className="sr-only">Actions</span>
+                </div>
             </div>
             {entries.length === 0 ? (
                 <div className="col-span-full px-4 py-8">{empty}</div>
@@ -851,6 +1013,7 @@ function ModelList({
                                         : selected.filter((id) => id !== entry.key),
                                 )
                             }
+                            widths={sizing.widths}
                         />
                     ))}
                 </ul>
@@ -1090,8 +1253,18 @@ export function MyModels({
     );
     const rows = models.data ?? [];
     const entries = entriesOf(rows);
-    const sort = SORTS[search.sort ?? ""] ? (search.sort ?? "status") : "status";
-    const visible = entries.filter((entry) => matches(entry, search)).sort(SORTS[sort].compare);
+    const sort = parseSort(search.sort);
+    const setSort = (next: Sort) => {
+        const value = sortValue(next);
+        update({ sort: value === sortValue(DEFAULT_SORT) ? "" : value });
+    };
+    const toggleSort = (key: SortKey) =>
+        setSort(
+            sort.key === key
+                ? { key, direction: opposite(sort.direction) }
+                : { key, direction: SORTS[key].initial },
+        );
+    const visible = entries.filter((entry) => matches(entry, search)).sort(sorter(sort));
     const facetCount = (facet: Facet, test: (entry: Entry) => boolean) =>
         entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
     const filtering = Boolean(search.q || search.state);
@@ -1143,10 +1316,7 @@ export function MyModels({
                             value={picked(search.state)}
                             onValueChange={(states) => update({ state: states.join(",") })}
                         />
-                        <SortSelect
-                            value={sort}
-                            onSort={(next) => update({ sort: next === "status" ? "" : next })}
-                        />
+                        <SortSelect value={sort} onSort={setSort} />
                     </div>
                 </div>
             )}
@@ -1165,6 +1335,8 @@ export function MyModels({
                     on={on}
                     selected={selected}
                     onSelected={setSelected}
+                    sort={sort}
+                    onSort={toggleSort}
                     empty={noMatch}
                 />
             )}

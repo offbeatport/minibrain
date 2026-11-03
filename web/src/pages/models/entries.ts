@@ -82,18 +82,6 @@ export function stateOfEntry(entry: Entry): EntryState {
     return moving ? "progress" : "idle";
 }
 
-export function byState(left: Entry, right: Entry): number {
-    const rank = STATE_RANK.indexOf(stateOfEntry(left)) - STATE_RANK.indexOf(stateOfEntry(right));
-    if (rank !== 0) {
-        return rank;
-    }
-    const name = left.model.name.localeCompare(right.model.name);
-    if (name !== 0) {
-        return name;
-    }
-    return (right.version?.number ?? 0) - (left.version?.number ?? 0);
-}
-
 export const KIND_LABELS: Record<string, string> = {
     lora: "Trained",
     prompt: "Prompt-only",
