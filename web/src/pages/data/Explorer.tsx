@@ -137,7 +137,9 @@ function useTreeWidth() {
 function buildTree(sources: SourceSummary[], datasets: DatasetSummary[]): TreeNode[] {
     const bySource = new Map<number, DatasetSummary[]>();
     for (const dataset of datasets) {
-        bySource.set(dataset.source_id, [...(bySource.get(dataset.source_id) ?? []), dataset]);
+        for (const ref of dataset.sources) {
+            bySource.set(ref.id, [...(bySource.get(ref.id) ?? []), dataset]);
+        }
     }
     return SOURCE_KINDS.map(({ kind, label }) => {
         const members = sources.filter((source) => source.kind === kind);
@@ -285,7 +287,7 @@ function GroupDetail({
 }) {
     const members = sources.filter((source) => source.kind === kind);
     const ids = new Set(members.map((source) => source.id));
-    const built = datasets.filter((dataset) => ids.has(dataset.source_id));
+    const built = datasets.filter((dataset) => dataset.sources.some((ref) => ids.has(ref.id)));
     if (kind !== "upload") {
         return (
             <div className="flex flex-col gap-4">
@@ -446,7 +448,9 @@ export function DataExplorer() {
                 <FileDetail
                     key={selectedKey}
                     source={source}
-                    datasets={datasetList.filter((dataset) => dataset.source_id === source.id)}
+                    datasets={datasetList.filter((dataset) =>
+                        dataset.sources.some((ref) => ref.id === source.id),
+                    )}
                     creating={creatingFor === source.id}
                     onCreating={(on) => setCreatingFor(on ? source.id : null)}
                     onSelect={select}
@@ -460,7 +464,7 @@ export function DataExplorer() {
                 <DatasetDetail
                     key={selectedKey}
                     dataset={dataset}
-                    source={sourceList.find((source) => source.id === dataset.source_id)}
+                    source={sourceList.find((source) => source.id === dataset.sources[0]?.id)}
                     onSelect={select}
                 />
             ) : (

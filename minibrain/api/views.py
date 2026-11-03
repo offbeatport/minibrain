@@ -16,7 +16,7 @@ from minibrain.api.schemas import (
     SplitScore,
     VersionInfo,
 )
-from minibrain.data.shared import staging_of
+from minibrain.data.shared import table_of
 from minibrain.data.sources import describe
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
@@ -36,10 +36,11 @@ from minibrain.settings import Settings
 
 
 def source_info(settings: Settings, minibrain: Minibrain) -> SourceInfo | None:
-    if minibrain.dataset is None:
+    dataset = minibrain.dataset
+    source = None if dataset is None else dataset.source or next(iter(dataset.sources), None)
+    if source is None:
         return None
-    source = minibrain.dataset.source
-    columns, rows = describe(staging_of(settings, store_for(settings), source))
+    columns, rows = describe(table_of(settings, store_for(settings), source))
     return SourceInfo(
         file=source.filename,
         columns=[ColumnInfo(name=column.name, type=column.type) for column in columns],

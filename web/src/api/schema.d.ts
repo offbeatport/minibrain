@@ -333,6 +333,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Any Query */
+        post: operations["any_query_api_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets": {
         parameters: {
             query?: never;
@@ -1749,7 +1766,7 @@ export interface components {
             /** Name */
             name: string;
             /** Source Id */
-            source_id: number;
+            source_id?: number | null;
             /** Input Column */
             input_column?: string | null;
             /** Label Column */
@@ -1767,14 +1784,21 @@ export interface components {
             description: string;
             /** Tags */
             tags: string[];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "columns" | "sql";
             /** Source Id */
-            source_id: number;
-            /** Source Name */
-            source_name: string;
+            source_id: number | null;
+            /** Sources */
+            sources: components["schemas"]["SourceRef"][];
             /** Rows */
-            rows: number;
+            rows: number | null;
             /** Columns */
             columns: components["schemas"]["ColumnInfo"][];
+            /** Error */
+            error: string | null;
             mapping: components["schemas"]["MappingInfo"];
             /** Models */
             models: string[];
@@ -2267,6 +2291,8 @@ export interface components {
         };
         /** MappingUpdate */
         MappingUpdate: {
+            /** Source Id */
+            source_id?: number | null;
             /** Input Column */
             input_column?: string | null;
             /** Label Column */
@@ -2661,6 +2687,20 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** SourceRef */
+        SourceRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Table */
+            table: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "folder" | "s3" | "database";
+        };
         /** SourceStats */
         SourceStats: {
             /** Rows */
@@ -2683,6 +2723,8 @@ export interface components {
             name: string;
             /** Filename */
             filename: string;
+            /** Table */
+            table: string;
             /** Description */
             description: string;
             /** Tags */
@@ -3661,6 +3703,39 @@ export interface operations {
             path: {
                 source_id: number;
             };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    any_query_api_query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody: {

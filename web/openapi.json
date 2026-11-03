@@ -1022,6 +1022,47 @@
         }
       }
     },
+    "/api/query": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Any Query",
+        "operationId": "any_query_api_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/datasets": {
       "get": {
         "tags": [
@@ -5242,7 +5283,14 @@
             "title": "Name"
           },
           "source_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Id"
           },
           "input_column": {
@@ -5281,8 +5329,7 @@
         },
         "type": "object",
         "required": [
-          "name",
-          "source_id"
+          "name"
         ],
         "title": "DatasetCreate"
       },
@@ -5307,16 +5354,41 @@
             "type": "array",
             "title": "Tags"
           },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "columns",
+              "sql"
+            ],
+            "title": "Mode"
+          },
           "source_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Id"
           },
-          "source_name": {
-            "type": "string",
-            "title": "Source Name"
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
           },
           "rows": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Rows"
           },
           "columns": {
@@ -5325,6 +5397,17 @@
             },
             "type": "array",
             "title": "Columns"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           },
           "mapping": {
             "$ref": "#/components/schemas/MappingInfo"
@@ -5362,10 +5445,12 @@
           "name",
           "description",
           "tags",
+          "mode",
           "source_id",
-          "source_name",
+          "sources",
           "rows",
           "columns",
+          "error",
           "mapping",
           "models",
           "splits",
@@ -6767,6 +6852,17 @@
       },
       "MappingUpdate": {
         "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
           "input_column": {
             "anyOf": [
               {
@@ -7962,6 +8058,40 @@
         ],
         "title": "SourceInfo"
       },
+      "SourceRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "table": {
+            "type": "string",
+            "title": "Table"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "folder",
+              "s3",
+              "database"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "table",
+          "kind"
+        ],
+        "title": "SourceRef"
+      },
       "SourceStats": {
         "properties": {
           "rows": {
@@ -8012,6 +8142,10 @@
             "type": "string",
             "title": "Filename"
           },
+          "table": {
+            "type": "string",
+            "title": "Table"
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -8057,6 +8191,7 @@
           "kind",
           "name",
           "filename",
+          "table",
           "description",
           "tags",
           "size",

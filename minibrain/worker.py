@@ -279,7 +279,12 @@ class Worker:
         if claim["kind"] in (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC):
             return params | spec
         if claim["kind"] == JobKind.PREPARE:
-            spec |= {"source": self.material(params["source"]), "sql": params["sql"], "out": str(attempt_dir / "out")}
+            spec |= {
+                "source": self.material(params["source"]),
+                "table": params.get("table"),
+                "sql": params["sql"],
+                "out": str(attempt_dir / "out"),
+            }
         else:
             spec |= {key: params[key] for key in ("slug", "number", "base_model", "base_spec") if key in params}
             spec["snapshot"] = self.material(params["snapshot"])

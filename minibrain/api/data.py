@@ -1,7 +1,9 @@
-from pathlib import Path
+from collections.abc import Sequence
+from functools import lru_cache
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
@@ -19,25 +21,36 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     SampleInfo,
+    SourceRef,
     SourceStats,
     SourceSummary,
 )
 from minibrain.api.views import mapping_info
 from minibrain.artifacts import ArtifactStore
-from minibrain.data import quality
 from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     add_dataset,
     add_source,
+    aliases_for,
     dataset_sql,
+    dataset_tables,
     get_dataset,
     get_source,
-    staging_of,
+    sources_in,
+    table_of,
+    tables_of,
 )
 from minibrain.data.sources import (
+    SourceError,
+    Table,
+    assess,
+    count_rows,
     describe,
+    label_counts,
     labelled_rows,
     mapping_sql,
+    output_columns,
+    require_mapping,
     run_query,
     safe_filename,
     summarize,
@@ -57,23 +70,39 @@ STATS_SAMPLE = 10_000
 LABEL_COUNTS = 200
 
 
-def columns_of(staging: Path) -> tuple[list[ColumnInfo], int]:
-    columns, rows = describe(staging)
-    return [ColumnInfo(name=column.name, type=column.type) for column in columns], rows
+Aliases = tuple[tuple[str, str], ...]
+
+
+@lru_cache(maxsize=512)
+def cached_shape(tables: tuple[Table, ...], aliases: Aliases, sql: str) -> tuple[tuple[ColumnInfo, ...], int]:
+    columns = output_columns(tables, sql, dict(aliases))
+    rows = count_rows(tables, sql, dict(aliases))
+    return tuple(ColumnInfo(name=column.name, type=column.type) for column in columns), rows
+
+
+@lru_cache(maxsize=512)
+def cached_describe(table: Table) -> tuple[tuple[ColumnInfo, ...], int]:
+    columns, rows = describe(table)
+    return tuple(ColumnInfo(name=column.name, type=column.type) for column in columns), rows
+
+
+def source_ref(source: Source) -> SourceRef:
+    return SourceRef(id=source.id, name=source.name, table=source.table_name, kind="upload")
 
 
 def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> SourceSummary:
-    columns, rows = columns_of(staging_of(settings, store, source))
+    columns, rows = cached_describe(table_of(settings, store, source))
     return SourceSummary(
         id=source.id,
         kind="upload",
         name=source.name,
         filename=source.filename,
+        table=source.table_name,
         description=source.description or "",
         tags=source.tags or [],
         size=source.size,
         rows=rows,
-        columns=columns,
+        columns=list(columns),
         datasets=[dataset.slug for dataset in source.datasets],
         created_at=source.created_at,
     )
@@ -90,17 +119,33 @@ def known_splits(dataset: Dataset) -> dict[str, int] | None:
     return dict(newest.counts) if newest else None
 
 
+def dataset_shape(
+    settings: Settings, store: ArtifactStore, dataset: Dataset
+) -> tuple[list[ColumnInfo], int | None, str | None]:
+    if not dataset.sql or not dataset.sources:
+        return [], None, None
+    try:
+        tables, aliases = dataset_tables(settings, store, dataset)
+        columns, rows = cached_shape(tuple(tables), tuple(aliases.items()), dataset.sql)
+    except SourceError as error:
+        return [], None, str(error)
+    return list(columns), rows, None
+
+
 def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) -> DatasetSummary:
-    columns, rows = columns_of(staging_of(settings, store, dataset.source))
+    columns, rows, problem = dataset_shape(settings, store, dataset)
+    columns_mode = bool(dataset.input_column and dataset.label_column) or not dataset.sql
     return DatasetSummary(
         slug=dataset.slug,
         name=dataset.name,
         description=dataset.description or "",
         tags=dataset.tags or [],
+        mode="columns" if columns_mode else "sql",
         source_id=dataset.source_id,
-        source_name=dataset.source.name,
+        sources=[source_ref(source) for source in dataset.sources],
         rows=rows,
         columns=columns,
+        error=problem,
         mapping=mapping_info(dataset),
         models=[minibrain.slug for minibrain in dataset.minibrains],
         splits=known_splits(dataset),
@@ -121,15 +166,37 @@ def describe_item(item: Source | Dataset, body: CatalogueUpdate) -> None:
         item.tags = clean_tags(body.tags) or None
 
 
-def apply_mapping(staging: Path, dataset: Dataset, body: MappingUpdate) -> None:
+def column_source(session: Session, dataset: Dataset, body: MappingUpdate) -> Source:
+    if body.source_id is not None:
+        return get_source(session, body.source_id)
+    current = dataset.source or (dataset.sources[0] if dataset.sources else None)
+    if current is None:
+        raise ConflictError("pick the source the columns come from")
+    return current
+
+
+def check_mapping(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> None:
+    require_mapping(output_columns(tables, sql, aliases))
+    run_query(tables, sql, 1, aliases)
+
+
+def apply_mapping(
+    session: Session, settings: Settings, store: ArtifactStore, dataset: Dataset, body: MappingUpdate
+) -> None:
     if body.sql is not None:
-        run_query(staging, body.sql, 1)
+        sources = sources_in(session, body.sql, dataset.sources)
+        check_mapping(tables_of(settings, store, sources), aliases_for(sources), body.sql)
         dataset.sql = body.sql
+        dataset.sources = sources
+        dataset.source = sources[0] if len(sources) == 1 else None
         dataset.input_column = None
         dataset.label_column = None
     elif body.input_column and body.label_column:
-        sql = mapping_sql(body.input_column, body.label_column)
-        run_query(staging, sql, 1)
+        source = column_source(session, dataset, body)
+        sql = mapping_sql(body.input_column, body.label_column, source.table_name)
+        check_mapping([table_of(settings, store, source)], {}, sql)
+        dataset.source = source
+        dataset.sources = [source]
         dataset.input_column = body.input_column
         dataset.label_column = body.label_column
         dataset.sql = sql
@@ -138,23 +205,28 @@ def apply_mapping(staging: Path, dataset: Dataset, body: MappingUpdate) -> None:
     dataset.updated_at = now()
 
 
-def query_rows(staging: Path, sql: str) -> QueryResponse:
-    result = run_query(staging, sql, QUERY_ROWS)
+def query_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> QueryResponse:
+    result = run_query(tables, sql, QUERY_ROWS, aliases)
     return QueryResponse(columns=result.columns, rows=[[to_text(value) for value in row] for row in result.rows])
 
 
-def preview_of(staging: Path, sql: str) -> PreviewResponse:
-    rows = labelled_rows(staging, sql)
-    assessed = quality.assess(rows)
-    labels = sorted({label.strip() for _, label in rows if label and label.strip()})
+def preview_of(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> PreviewResponse:
+    quality = assess(tables, sql, aliases)
+    rows = labelled_rows(tables, sql, aliases, PREVIEW_ROWS)
+    counts = label_counts(tables, sql, LABEL_COUNTS, aliases)
     first = next((text for text, label in rows if text and label), "")
     return PreviewResponse(
-        rows=[PreviewRow(input=text, label=label) for text, label in rows[:PREVIEW_ROWS]],
-        quality=QualityInfo.model_validate(assessed, from_attributes=True),
-        labels=labels[:LABEL_COUNTS],
-        label_counts=[LabelCount(label=label, rows=size) for label, size in quality.label_counts(rows)[:LABEL_COUNTS]],
+        rows=[PreviewRow(input=text, label=label) for text, label in rows],
+        quality=QualityInfo.model_validate(quality, from_attributes=True),
+        labels=sorted(label for label, _ in counts),
+        label_counts=[LabelCount(label=label, rows=size) for label, size in counts],
         example=[ChatMessage.model_validate(message) for message in trained_messages(first)],
     )
+
+
+def dataset_preview_of(settings: Settings, store: ArtifactStore, dataset: Dataset) -> PreviewResponse:
+    tables, aliases = dataset_tables(settings, store, dataset)
+    return preview_of(tables, aliases, dataset_sql(dataset))
 
 
 @router.get("/sources")
@@ -201,16 +273,16 @@ def update_source(
 
 @router.get("/sources/{source_id}/rows")
 def source_rows(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
-    staging = staging_of(settings, store, get_source(session, source_id))
-    return query_rows(staging, SOURCE_ROWS)
+    source = get_source(session, source_id)
+    return query_rows([table_of(settings, store, source)], SOURCE_ROWS, aliases_for([source]))
 
 
 @router.get("/sources/{source_id}/stats")
 def source_stats(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceStats:
-    staging = staging_of(settings, store, get_source(session, source_id))
-    summaries, sampled = summarize(staging, STATS_SAMPLE)
+    table = table_of(settings, store, get_source(session, source_id))
+    summaries, sampled = summarize(table, STATS_SAMPLE)
     return SourceStats(
-        rows=describe(staging)[1],
+        rows=cached_describe(table)[1],
         sampled=sampled,
         columns=[ColumnStats.model_validate(summary, from_attributes=True) for summary in summaries],
     )
@@ -220,7 +292,15 @@ def source_stats(source_id: int, session: SessionDep, settings: SettingsDep, sto
 def source_query(
     source_id: int, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryResponse:
-    return query_rows(staging_of(settings, store, get_source(session, source_id)), body.sql)
+    source = get_source(session, source_id)
+    sources = sources_in(session, body.sql, [source])
+    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for([source]))
+
+
+@router.post("/query")
+def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
+    sources = sources_in(session, body.sql)
+    return query_rows(tables_of(settings, store, sources), body.sql)
 
 
 @router.delete("/sources/{source_id}", status_code=204)
@@ -241,10 +321,15 @@ def list_datasets(session: SessionDep, settings: SettingsDep, store: StoreDep) -
 
 @router.post("/datasets", status_code=201)
 def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
-    dataset = add_dataset(session, settings, store, body.name, get_source(session, body.source_id))
-    mapping = MappingUpdate(input_column=body.input_column, label_column=body.label_column, sql=body.sql)
+    source = get_source(session, body.source_id) if body.source_id is not None else None
+    if source is None and body.sql is None:
+        raise ConflictError("pick a source, or write SQL over the sources")
+    dataset = add_dataset(session, settings, store, body.name, source)
+    mapping = MappingUpdate(
+        source_id=body.source_id, input_column=body.input_column, label_column=body.label_column, sql=body.sql
+    )
     if mapping.sql is not None or (mapping.input_column and mapping.label_column):
-        apply_mapping(staging_of(settings, store, dataset.source), dataset, mapping)
+        apply_mapping(session, settings, store, dataset, mapping)
     session.commit()
     return dataset_summary(settings, store, dataset)
 
@@ -269,22 +354,23 @@ def update_dataset_mapping(
     slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> DatasetSummary:
     dataset = get_dataset(session, slug)
-    apply_mapping(staging_of(settings, store, dataset.source), dataset, body)
+    apply_mapping(session, settings, store, dataset, body)
     session.commit()
     return dataset_summary(settings, store, dataset)
 
 
 @router.get("/datasets/{slug}/preview")
 def dataset_preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
-    dataset = get_dataset(session, slug)
-    return preview_of(staging_of(settings, store, dataset.source), dataset_sql(dataset))
+    return dataset_preview_of(settings, store, get_dataset(session, slug))
 
 
 @router.post("/datasets/{slug}/query")
 def dataset_query(
     slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryResponse:
-    return query_rows(staging_of(settings, store, get_dataset(session, slug).source), body.sql)
+    dataset = get_dataset(session, slug)
+    sources = sources_in(session, body.sql, dataset.sources)
+    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
 @router.delete("/datasets/{slug}", status_code=204)

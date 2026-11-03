@@ -110,7 +110,7 @@ def test_preview_counts_rows_per_label(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     counts = harness.client.get("/api/datasets/tickets/preview").json()["label_counts"]
-    assert counts == [{"label": label, "rows": 50} for label in ("billing", "bug", "account", "feature")]
+    assert counts == [{"label": label, "rows": 50} for label in ("account", "billing", "bug", "feature")]
 
 
 def test_splits_are_known_once_a_model_builds_the_dataset(harness: Harness) -> None:

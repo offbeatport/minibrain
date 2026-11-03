@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.api.data import apply_mapping, preview_of, query_rows
+from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
@@ -24,7 +24,15 @@ from minibrain.api.schemas import (
 from minibrain.api.views import detail, job_info, summary
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import snapshot
-from minibrain.data.shared import attach_upload, dataset_of, dataset_sql, get_dataset, staging_of
+from minibrain.data.shared import (
+    aliases_for,
+    attach_upload,
+    dataset_of,
+    dataset_sql,
+    get_dataset,
+    sources_in,
+    tables_of,
+)
 from minibrain.data.sources import safe_filename
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import prepare_params
@@ -166,8 +174,7 @@ def update_mapping(
     slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    dataset = dataset_of(minibrain)
-    apply_mapping(staging_of(settings, store, dataset.source), dataset, body)
+    apply_mapping(session, settings, store, dataset_of(minibrain), body)
     session.commit()
     return detail(settings, minibrain)
 
@@ -175,13 +182,13 @@ def update_mapping(
 @router.post("/{slug}/query")
 def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     dataset = dataset_of(get_minibrain(session, slug))
-    return query_rows(staging_of(settings, store, dataset.source), body.sql)
+    sources = sources_in(session, body.sql, dataset.sources)
+    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
 @router.get("/{slug}/preview")
 def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
-    dataset = dataset_of(get_minibrain(session, slug))
-    return preview_of(staging_of(settings, store, dataset.source), dataset_sql(dataset))
+    return dataset_preview_of(settings, store, dataset_of(get_minibrain(session, slug)))
 
 
 @router.post("/{slug}/snapshots", status_code=202)

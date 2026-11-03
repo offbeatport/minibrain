@@ -6,14 +6,18 @@ from minibrain.models.registry import resolve_spec
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
 from minibrain.registry.models import Dataset, Version
+from minibrain.registry.service import ConflictError
 from minibrain.settings import Settings
 
 
 def prepare_params(session: Session, dataset: Dataset, sql: str) -> dict[str, Any]:
-    source = ref(session, dataset.source.artifact_id)
+    if len(dataset.sources) != 1:
+        raise ConflictError("this dataset reads several sources; save a snapshot of it from the Data page instead")
+    table = dataset.sources[0]
+    source = ref(session, table.artifact_id)
     if source is None:
         raise MissingArtifactError("upload a data file first")
-    return {"source": source, "sql": sql}
+    return {"source": source, "table": table.table_name, "sql": sql}
 
 
 def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:

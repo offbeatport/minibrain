@@ -45,11 +45,19 @@ class SampleInfo(BaseModel):
     credit: str
 
 
+class SourceRef(BaseModel):
+    id: int
+    name: str
+    table: str
+    kind: SourceKind
+
+
 class SourceSummary(BaseModel):
     id: int
     kind: SourceKind
     name: str
     filename: str
+    table: str
     description: str
     tags: list[str]
     size: int
@@ -64,10 +72,12 @@ class DatasetSummary(BaseModel):
     name: str
     description: str
     tags: list[str]
-    source_id: int
-    source_name: str
-    rows: int
+    mode: Literal["columns", "sql"]
+    source_id: int | None
+    sources: list[SourceRef]
+    rows: int | None
     columns: list[ColumnInfo]
+    error: str | None
     mapping: MappingInfo
     models: list[str]
     splits: dict[str, int] | None
@@ -76,7 +86,7 @@ class DatasetSummary(BaseModel):
 
 class DatasetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    source_id: int
+    source_id: int | None = None
     input_column: str | None = None
     label_column: str | None = None
     sql: str | None = None
@@ -108,6 +118,7 @@ class DatasetChoice(BaseModel):
 
 
 class MappingUpdate(BaseModel):
+    source_id: int | None = None
     input_column: str | None = None
     label_column: str | None = None
     sql: str | None = None

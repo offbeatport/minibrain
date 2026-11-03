@@ -111,7 +111,9 @@ function sampleDataset(
         (source) => source.filename === file && source.tags.includes(SAMPLE_TAG),
     );
     const ids = new Set(matching.map((source) => source.id));
-    const dataset = datasets.find((item) => ids.has(item.source_id) && item.mapping.sql);
+    const dataset = datasets.find(
+        (item) => item.sources.some((ref) => ids.has(ref.id)) && item.mapping.sql,
+    );
     return { dataset, sourceId: matching[0]?.id };
 }
 

@@ -153,7 +153,7 @@ export function DatasetDetail({
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/datasets/{slug}", path)),
         onSuccess: async () => {
-            onSelect({ kind: "source", id: dataset.source_id });
+            onSelect({ kind: "group", id: "upload" });
             await refresh();
         },
     });
@@ -173,8 +173,8 @@ export function DatasetDetail({
                     <Trail
                         current="dataset"
                         source={{
-                            label: source?.name ?? dataset.source_name,
-                            href: itemHref({ kind: "source", id: dataset.source_id }),
+                            label: source?.name ?? dataset.sources[0]?.name ?? "–",
+                            href: itemHref({ kind: "source", id: dataset.sources[0]?.id ?? 0 }),
                         }}
                         datasets={[
                             {

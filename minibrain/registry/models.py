@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, ForeignKey, Index, UniqueConstraint, false
+from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
@@ -72,6 +72,14 @@ class Artifact(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
 
+dataset_sources = Table(
+    "dataset_sources",
+    Base.metadata,
+    Column("dataset_id", ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True),
+    Column("source_id", ForeignKey("sources.id"), primary_key=True),
+)
+
+
 class Source(Base):
     __tablename__ = "sources"
     __table_args__ = ({"sqlite_autoincrement": True},)
@@ -79,13 +87,16 @@ class Source(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     filename: Mapped[str]
+    table_name: Mapped[str] = mapped_column(unique=True)
     artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
     size: Mapped[int] = mapped_column(BigInteger, default=0)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    datasets: Mapped[list["Dataset"]] = relationship(back_populates="source")
+    datasets: Mapped[list["Dataset"]] = relationship(
+        secondary=dataset_sources, back_populates="sources", order_by="Dataset.name"
+    )
 
 
 class Dataset(Base):
@@ -95,7 +106,7 @@ class Dataset(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
-    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"))
+    source_id: Mapped[int | None] = mapped_column(ForeignKey("sources.id"), default=None)
     input_column: Mapped[str | None] = mapped_column(default=None)
     label_column: Mapped[str | None] = mapped_column(default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
@@ -104,7 +115,10 @@ class Dataset(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    source: Mapped[Source] = relationship(back_populates="datasets")
+    source: Mapped[Source | None] = relationship()
+    sources: Mapped[list[Source]] = relationship(
+        secondary=dataset_sources, back_populates="datasets", order_by="Source.name"
+    )
     minibrains: Mapped[list["Minibrain"]] = relationship(back_populates="dataset")
 
 
