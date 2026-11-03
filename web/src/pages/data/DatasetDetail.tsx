@@ -16,6 +16,7 @@ import { keys, useDataset, useDatasetPreview, useModels, useSources } from "~/ap
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
+import { ChecksSection } from "./Checks";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
 import { ChangeNotice, RowLimitNotice, SaveSnapshot, SnapshotsSection } from "./Snapshots";
 import { DATASETS_GROUP, type ItemRef, itemHref, plural, stem } from "./catalogue";
@@ -321,6 +322,7 @@ export function DatasetDetail({
                     />
                 )}
             </div>
+            <ChecksSection snapshot={dataset.snapshot} dataset={dataset.slug} />
             {mapped && preview.data && (
                 <Section
                     title="Label balance"

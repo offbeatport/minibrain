@@ -7,9 +7,10 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.data.checks import blocking, run_checks
 from minibrain.data.limits import load_limits
 from minibrain.data.shared import dataset_of, dataset_sql, dataset_tables, fingerprint
-from minibrain.data.snapshot import MIN_ROWS, SPLITS, SnapshotError, clean, labels_of, read_rows, split
+from minibrain.data.snapshot import MIN_ROWS, SPLITS, Example, SnapshotError, clean, labels_of, read_rows, split
 from minibrain.data.sources import copy_rows
 from minibrain.registry.files import ArtifactKind, store_file, store_for
 from minibrain.registry.models import Artifact, Dataset, Minibrain, Snapshot, Version, now
@@ -33,13 +34,15 @@ def over_limit(limit: int) -> str:
     )
 
 
-def split_summary(rows: list[tuple[str | None, str | None]]) -> tuple[dict[str, int], list[str]]:
+def split_summary(
+    rows: list[tuple[str | None, str | None]],
+) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
     examples = clean(rows)
     try:
         splits = split(examples)
     except SnapshotError:
-        return {}, sorted({example.label for example in examples})
-    return {name: len(splits[name]) for name in SPLITS}, labels_of(splits)
+        return {}, sorted({example.label for example in examples}), None
+    return {name: len(splits[name]) for name in SPLITS}, labels_of(splits), splits
 
 
 def find_snapshot(session: Session, dataset: Dataset, digest: str) -> Snapshot | None:
@@ -47,7 +50,8 @@ def find_snapshot(session: Session, dataset: Dataset, digest: str) -> Snapshot |
 
 
 def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved: bool) -> Snapshot:
-    limit = load_limits(session).row_limit
+    limits = load_limits(session)
+    limit = limits.row_limit
     sql = dataset_sql(dataset)
     tables, aliases = dataset_tables(settings, store_for(settings), dataset)
     prints = {table.name: table.fingerprint for table in tables}
@@ -59,7 +63,12 @@ def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved:
             raise ConflictError(over_limit(limit))
         if rows == 0:
             raise ConflictError("The query returns no rows, so there is nothing to snapshot.")
-        counts, labels = split_summary(read_rows(target))
+        rows_read = read_rows(target)
+        counts, labels, splits = split_summary(rows_read)
+        findings = run_checks(rows_read, splits, limits.checks())
+        stop = blocking(findings)
+        if stop is not None:
+            raise ConflictError(f"{stop.title}: {stop.detail}")
         artifact = store_file(session, store_for(settings), target, ArtifactKind.SNAPSHOT)
     moment = now()
     found = find_snapshot(session, dataset, artifact.id)
@@ -76,6 +85,7 @@ def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved:
         )
         session.add(found)
     found.fingerprints = prints
+    found.checks = [finding.as_dict() for finding in findings]
     found.sql = sql
     found.saved = found.saved or saved
     found.taken_at = moment

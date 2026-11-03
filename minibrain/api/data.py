@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from dataclasses import asdict
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from minibrain.api.schemas import (
     CatalogueUpdate,
     ChangeInfo,
     ChatMessage,
+    CheckName,
     ColumnInfo,
     ColumnStats,
     DatasetCreate,
@@ -19,6 +21,7 @@ from minibrain.api.schemas import (
     DataSettings,
     DataSettingsUpdate,
     DiffRow,
+    DismissRequest,
     FolderCreate,
     FolderRoots,
     LabelCount,
@@ -511,7 +514,21 @@ def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: 
 
 
 def data_settings(limits: DataLimits) -> DataSettings:
-    return DataSettings(row_limit=limits.row_limit, keep_snapshots=limits.keep_snapshots)
+    return DataSettings.model_validate(asdict(limits) | {"checks_off": list(limits.checks_off)})
+
+
+@router.put("/datasets/{slug}/checks/{check}/dismissal", status_code=204)
+def dismiss_check(slug: str, check: CheckName, body: DismissRequest, session: SessionDep) -> None:
+    dataset = get_dataset(session, slug)
+    dataset.dismissed = (dataset.dismissed or {}) | {check: body.signature}
+    session.commit()
+
+
+@router.delete("/datasets/{slug}/checks/{check}/dismissal", status_code=204)
+def restore_check(slug: str, check: CheckName, session: SessionDep) -> None:
+    dataset = get_dataset(session, slug)
+    dataset.dismissed = {name: value for name, value in (dataset.dismissed or {}).items() if name != check} or None
+    session.commit()
 
 
 @router.get("/settings/data")

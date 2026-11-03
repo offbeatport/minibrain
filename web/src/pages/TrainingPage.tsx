@@ -9,7 +9,9 @@ import { JobPanel } from "~/components/JobPanel";
 import { ErrorLine, PanelSection, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useInvalidate } from "~/lib/jobs";
+import { ModelChecks } from "./data/Checks";
 import { TrainingData } from "./data/TrainingData";
+import { ModelDataNotice } from "./data/versionData";
 
 const FINISHED_SHOWN = 5;
 
@@ -52,6 +54,8 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                     </Link>
                 </p>
             )}
+            <ModelDataNotice slug={slug} />
+            <ModelChecks slug={slug} />
             <div className="flex flex-wrap items-end gap-6">
                 <Button variant="outline" onClick={() => create.mutate({ kind: "prompt" })}>
                     Score prompt-only version

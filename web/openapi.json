@@ -1639,6 +1639,118 @@
         }
       }
     },
+    "/api/datasets/{slug}/checks/{check}/dismissal": {
+      "put": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Dismiss Check",
+        "operationId": "dismiss_check_api_datasets__slug__checks__check__dismissal_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "check",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "duplicates",
+                "conflicts",
+                "balance",
+                "leakage",
+                "length",
+                "personal_data"
+              ],
+              "type": "string",
+              "title": "Check"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Restore Check",
+        "operationId": "restore_check_api_datasets__slug__checks__check__dismissal_delete",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "check",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "duplicates",
+                "conflicts",
+                "balance",
+                "leakage",
+                "length",
+                "personal_data"
+              ],
+              "type": "string",
+              "title": "Check"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/data": {
       "get": {
         "tags": [
@@ -5746,6 +5858,64 @@
         ],
         "title": "ChatMessage"
       },
+      "CheckInfo": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warning",
+              "blocked",
+              "off",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Examples"
+          },
+          "signature": {
+            "type": "string",
+            "title": "Signature"
+          },
+          "dismissed": {
+            "type": "boolean",
+            "title": "Dismissed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check",
+          "status",
+          "title",
+          "detail",
+          "count",
+          "examples",
+          "signature",
+          "dismissed"
+        ],
+        "title": "CheckInfo"
+      },
       "ClaimRequest": {
         "properties": {
           "worker": {
@@ -5959,6 +6129,35 @@
             "maximum": 1000.0,
             "minimum": 0.0,
             "title": "Keep Snapshots"
+          },
+          "checks_off": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "duplicates",
+                "conflicts",
+                "balance",
+                "leakage",
+                "length",
+                "personal_data"
+              ]
+            },
+            "type": "array",
+            "title": "Checks Off"
+          },
+          "majority_share": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Majority Share",
+            "default": 0.9
+          },
+          "min_label_rows": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Min Label Rows",
+            "default": 10
           }
         },
         "type": "object",
@@ -5995,6 +6194,54 @@
               }
             ],
             "title": "Keep Snapshots"
+          },
+          "checks_off": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "duplicates",
+                    "conflicts",
+                    "balance",
+                    "leakage",
+                    "length",
+                    "personal_data"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks Off"
+          },
+          "majority_share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Majority Share"
+          },
+          "min_label_rows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Label Rows"
           }
         },
         "type": "object",
@@ -6349,6 +6596,21 @@
           "label"
         ],
         "title": "DiffRow"
+      },
+      "DismissRequest": {
+        "properties": {
+          "signature": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Signature"
+          }
+        },
+        "type": "object",
+        "required": [
+          "signature"
+        ],
+        "title": "DismissRequest"
       },
       "DownloadRequest": {
         "properties": {
@@ -9219,6 +9481,13 @@
               }
             ],
             "title": "Taken At"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckInfo"
+            },
+            "type": "array",
+            "title": "Checks"
           }
         },
         "type": "object",

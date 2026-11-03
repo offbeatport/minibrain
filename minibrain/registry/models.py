@@ -117,6 +117,7 @@ class Dataset(Base):
     sql: Mapped[str | None] = mapped_column(default=None)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
+    dismissed: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
@@ -179,6 +180,7 @@ class Snapshot(Base):
     fingerprints: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
     saved: Mapped[bool] = mapped_column(default=False, server_default=false())
+    checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 

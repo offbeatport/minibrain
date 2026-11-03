@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.schemas import (
     AttemptInfo,
     ChangeInfo,
+    CheckInfo,
     ColumnInfo,
     JobDetail,
     JobInfo,
@@ -69,7 +70,16 @@ def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
         versions=sorted(f"{version.minibrain.slug}@{version.number}" for version in snapshot.versions),
         created_at=snapshot.created_at,
         taken_at=snapshot.taken_at,
+        checks=check_infos(snapshot),
     )
+
+
+def check_infos(snapshot: Snapshot) -> list[CheckInfo]:
+    dismissed = (snapshot.dataset.dismissed if snapshot.dataset is not None else None) or {}
+    return [
+        CheckInfo.model_validate(item | {"dismissed": dismissed.get(str(item["check"])) == item["signature"]})
+        for item in snapshot.checks or []
+    ]
 
 
 def change_info(changes: Changes | None) -> ChangeInfo | None:

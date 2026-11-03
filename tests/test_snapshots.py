@@ -90,9 +90,10 @@ def test_splits_are_derived_from_the_parquet_file(harness: Harness) -> None:
 
 def test_the_row_limit_refuses_large_snapshots_with_a_way_out(harness: Harness) -> None:
     dataset_with_model(harness)
-    assert harness.client.get("/api/settings/data").json() == {"row_limit": 200_000, "keep_snapshots": 5}
+    current = harness.client.get("/api/settings/data").json()
+    assert (current["row_limit"], current["keep_snapshots"]) == (200_000, 5)
     changed = harness.client.put("/api/settings/data", json={"row_limit": 150}).json()
-    assert changed == {"row_limit": 150, "keep_snapshots": 5}
+    assert (changed["row_limit"], changed["keep_snapshots"]) == (150, 5)
     assert harness.client.get("/api/datasets/tickets").json()["row_limit"] == 150
     refused = harness.client.post("/api/datasets/tickets/snapshots")
     assert refused.status_code == 409

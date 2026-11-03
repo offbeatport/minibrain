@@ -83,6 +83,17 @@ class FolderRoots(BaseModel):
     locked: bool
 
 
+class CheckInfo(BaseModel):
+    check: str
+    status: Literal["ok", "warning", "blocked", "off", "skipped"]
+    title: str
+    detail: str
+    count: int
+    examples: list[str]
+    signature: str
+    dismissed: bool
+
+
 class SnapshotInfo(BaseModel):
     id: int
     hash: str
@@ -95,6 +106,11 @@ class SnapshotInfo(BaseModel):
     versions: list[str]
     created_at: datetime
     taken_at: datetime | None
+    checks: list[CheckInfo] = Field(default_factory=list)
+
+
+class DismissRequest(BaseModel):
+    signature: str = Field(min_length=1, max_length=64)
 
 
 class LabelShiftInfo(BaseModel):
@@ -193,14 +209,23 @@ class MappingUpdate(BaseModel):
     sql: str | None = None
 
 
+CheckName = Literal["duplicates", "conflicts", "balance", "leakage", "length", "personal_data"]
+
+
 class DataSettings(BaseModel):
     row_limit: int = Field(ge=100, le=50_000_000)
     keep_snapshots: int = Field(ge=0, le=1000)
+    checks_off: list[CheckName] = Field(default_factory=list)
+    majority_share: float = Field(default=0.9, ge=0.5, le=1.0)
+    min_label_rows: int = Field(default=10, ge=1, le=100_000)
 
 
 class DataSettingsUpdate(BaseModel):
     row_limit: int | None = Field(default=None, ge=100, le=50_000_000)
     keep_snapshots: int | None = Field(default=None, ge=0, le=1000)
+    checks_off: list[CheckName] | None = None
+    majority_share: float | None = Field(default=None, ge=0.5, le=1.0)
+    min_label_rows: int | None = Field(default=None, ge=1, le=100_000)
 
 
 class SnapshotUsage(BaseModel):

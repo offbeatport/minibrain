@@ -524,6 +524,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{slug}/checks/{check}/dismissal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Dismiss Check */
+        put: operations["dismiss_check_api_datasets__slug__checks__check__dismissal_put"];
+        post?: never;
+        /** Restore Check */
+        delete: operations["restore_check_api_datasets__slug__checks__check__dismissal_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/data": {
         parameters: {
             query?: never;
@@ -1926,6 +1944,28 @@ export interface components {
             /** Content */
             content: string;
         };
+        /** CheckInfo */
+        CheckInfo: {
+            /** Check */
+            check: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "blocked" | "off" | "skipped";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Count */
+            count: number;
+            /** Examples */
+            examples: string[];
+            /** Signature */
+            signature: string;
+            /** Dismissed */
+            dismissed: boolean;
+        };
         /** ClaimRequest */
         ClaimRequest: {
             worker: components["schemas"]["WorkerBody"];
@@ -2005,6 +2045,18 @@ export interface components {
             row_limit: number;
             /** Keep Snapshots */
             keep_snapshots: number;
+            /** Checks Off */
+            checks_off?: ("duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data")[];
+            /**
+             * Majority Share
+             * @default 0.9
+             */
+            majority_share?: number;
+            /**
+             * Min Label Rows
+             * @default 10
+             */
+            min_label_rows?: number;
         };
         /** DataSettingsUpdate */
         DataSettingsUpdate: {
@@ -2012,6 +2064,12 @@ export interface components {
             row_limit?: number | null;
             /** Keep Snapshots */
             keep_snapshots?: number | null;
+            /** Checks Off */
+            checks_off?: ("duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data")[] | null;
+            /** Majority Share */
+            majority_share?: number | null;
+            /** Min Label Rows */
+            min_label_rows?: number | null;
         };
         /** DatasetChoice */
         DatasetChoice: {
@@ -2114,6 +2172,11 @@ export interface components {
             input: string;
             /** Label */
             label: string;
+        };
+        /** DismissRequest */
+        DismissRequest: {
+            /** Signature */
+            signature: string;
         };
         /** DownloadRequest */
         DownloadRequest: {
@@ -3065,6 +3128,8 @@ export interface components {
             created_at: string;
             /** Taken At */
             taken_at: string | null;
+            /** Checks */
+            checks?: components["schemas"]["CheckInfo"][];
         };
         /** SnapshotUsage */
         SnapshotUsage: {
@@ -4666,6 +4731,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SnapshotDiff"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_check_api_datasets__slug__checks__check__dismissal_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                check: "duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_check_api_datasets__slug__checks__check__dismissal_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                check: "duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -302,6 +302,20 @@ Generated Q&A (`generate_qa`):
 Empty fields, exact and near duplicates (MinHash), token length vs `max_seq_len`, label imbalance, train/eval leakage,
 PII counts.
 
+Snapshot checks, run on every snapshot and stored with it; the report shows on the dataset and on the Training page
+before a run starts:
+
+- Hard stops, always on: no row with both an input and a label, or a single label. These refuse the snapshot, and so
+  the run.
+- Warnings, each with an on/off switch under Settings → Data, never block: repeated inputs; the same input with
+  different labels; label balance (one label above a share, 90% by default, or labels under a row count, 10 by
+  default, both editable); train/test leakage (a test or held-out input also in training once case, spacing and
+  punctuation are ignored); empty inputs and inputs past the training example's length (estimated at four characters
+  a token); personal data found by local patterns: email addresses, phone numbers, card numbers (Luhn-checked) and
+  IBANs (mod-97-checked). The report says plainly that the patterns can miss names and addresses.
+- "Dismiss for this dataset" stores the check and a signature of its result on the dataset; the warning shows again
+  when a later snapshot's result for that check differs.
+
 ### PII
 
 1. Presidio scans during the quality step.
@@ -566,8 +580,8 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
   (`group:datasets`, `group:upload`, `source:12`, `dataset:<slug>`, plus `&compare=<id>~<id>` for a snapshot diff) is
   the permalink; `/data/datasets/<slug>` redirects to it.
-- Settings → Data: snapshot row limit and how many saved snapshots stay per dataset. Settings → Storage: where
-  artifacts live.
+- Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
+  their limits. Settings → Storage: where artifacts live.
 
 | Need | obp-ui |
 |---|---|
@@ -731,7 +745,8 @@ Everything in the v1 scope below, after M1.
       done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
 - [x] Preview of 5–10 examples
-- [ ] Quality score and PII report
+- [ ] Quality score and PII report (snapshot checks with pattern-based PII done; Presidio and near duplicates
+      not yet)
 - [x] Content-hashed Parquet snapshots copied at training time, derived splits, row limit, diff, retention
 - [x] Artifact store on a local folder or an S3-compatible bucket
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
