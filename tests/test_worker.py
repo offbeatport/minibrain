@@ -8,7 +8,7 @@ from minibrain import worker as worker_module
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
-FAKE = {"prepare": "minibrain.data.prepare", "train": "tests.fake_job", "eval": "tests.fake_job"}
+FAKE = {"train": "tests.fake_job", "eval": "tests.fake_job"}
 
 
 def queued_training(harness: Harness) -> None:

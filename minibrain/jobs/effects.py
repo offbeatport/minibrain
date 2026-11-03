@@ -12,14 +12,11 @@ from minibrain.registry.models import (
     Job,
     JobKind,
     JobStatus,
-    Minibrain,
     Model,
     ModelStatus,
-    Snapshot,
     VersionStatus,
     now,
 )
-from minibrain.registry.service import latest_snapshot
 from minibrain.settings import Settings
 
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
@@ -30,9 +27,7 @@ class DomainEffects:
         self.settings = settings
 
     def on_success(self, session: Session, job: Job) -> None:
-        if job.kind == JobKind.PREPARE:
-            self.snapshot_built(session, job)
-        elif job.kind == JobKind.TRAIN:
+        if job.kind == JobKind.TRAIN:
             self.trained(session, job)
         elif job.kind == JobKind.EVAL:
             self.evaluated(job)
@@ -103,25 +98,6 @@ class DomainEffects:
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()
-
-    def snapshot_built(self, session: Session, job: Job) -> None:
-        minibrain = session.get(Minibrain, job.minibrain_id) if job.minibrain_id is not None else None
-        result = job.result or {}
-        artifact = job.outputs.get("snapshot")
-        if minibrain is None or artifact is None:
-            raise MissingArtifactError(f"prepare job {job.id} returned no snapshot")
-        current = latest_snapshot(minibrain)
-        if current is not None and current.hash == result.get("hash"):
-            return
-        session.add(
-            Snapshot(
-                minibrain=minibrain,
-                hash=str(result["hash"]),
-                artifact_id=artifact,
-                counts=dict(result["counts"]),
-                labels=list(result["labels"]),
-            )
-        )
 
     def trained(self, session: Session, job: Job) -> None:
         version = job.version

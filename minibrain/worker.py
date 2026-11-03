@@ -24,7 +24,6 @@ from minibrain.registry.models import JobKind
 from minibrain.versions import JOB_PROTOCOL
 
 MODULES: dict[str, str] = {
-    JobKind.PREPARE: "minibrain.data.prepare",
     JobKind.TRAIN: "minibrain.ml.train",
     JobKind.EVAL: "minibrain.ml.evaluate",
     JobKind.DOWNLOAD: "minibrain.models.download",
@@ -34,7 +33,7 @@ MODULES: dict[str, str] = {
     JobKind.REPAIR: "minibrain.models.repair",
 }
 PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, JobKind.VERIFY, JobKind.REPAIR)
-REMOTE_KINDS = [JobKind.PREPARE, JobKind.TRAIN, JobKind.EVAL]
+REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
@@ -284,16 +283,8 @@ class Worker:
         spec: dict[str, Any] = {"result": str(attempt_dir / "result.json")}
         if claim["kind"] in PASSTHROUGH_KINDS:
             return params | spec
-        if claim["kind"] == JobKind.PREPARE:
-            spec |= {
-                "source": self.material(params["source"]),
-                "table": params.get("table"),
-                "sql": params["sql"],
-                "out": str(attempt_dir / "out"),
-            }
-        else:
-            spec |= {key: params[key] for key in ("slug", "number", "base_model", "base_spec") if key in params}
-            spec["snapshot"] = self.material(params["snapshot"])
+        spec |= {key: params[key] for key in ("slug", "number", "base_model", "base_spec") if key in params}
+        spec["snapshot"] = self.material(params["snapshot"])
         if claim["kind"] == JobKind.TRAIN:
             spec |= {
                 "recipe": params["recipe"],
@@ -305,7 +296,7 @@ class Worker:
         return spec
 
     def outputs(self, kind: str, attempt_dir: Path) -> dict[str, str]:
-        names: dict[str, str] = {JobKind.PREPARE: "snapshot", JobKind.TRAIN: "adapter"}
+        names: dict[str, str] = {JobKind.TRAIN: "adapter"}
         if kind not in names:
             return {}
         stored = self.store.put_dir(attempt_dir / "out")
