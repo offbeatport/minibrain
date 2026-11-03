@@ -1228,6 +1228,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Install */
+        get: operations["install_api_system_install_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diagnostics */
+        get: operations["diagnostics_api_system_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system": {
         parameters: {
             query?: never;
@@ -2514,6 +2548,106 @@ export interface components {
             /** Location */
             location: string;
         };
+        /** InstallCatalogue */
+        InstallCatalogue: {
+            /** Snapshot */
+            snapshot: string | null;
+            /** Bundled Snapshot */
+            bundled_snapshot: string;
+            /** Source */
+            source: string;
+            /** Entries */
+            entries: number;
+            /** Synced At */
+            synced_at: string | null;
+            /** Models */
+            models: number;
+            /** Models Verified At */
+            models_verified_at: string | null;
+        };
+        /** InstallCompute */
+        InstallCompute: {
+            /** Pools */
+            pools: number;
+            /** Machines */
+            machines: number;
+            /** Machines Online */
+            machines_online: number;
+            /** Workers Online */
+            workers_online: number;
+            /** Engines Online */
+            engines_online: number;
+        };
+        /** InstallEndpoint */
+        InstallEndpoint: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Allowed */
+            allowed: boolean;
+            /** By Policy */
+            by_policy: boolean;
+        };
+        /** InstallInfo */
+        InstallInfo: {
+            software: components["schemas"]["InstallSoftware"];
+            places: components["schemas"]["InstallPlaces"];
+            catalogue: components["schemas"]["InstallCatalogue"];
+            compute: components["schemas"]["InstallCompute"];
+            network: components["schemas"]["InstallNetwork"];
+        };
+        /** InstallNetwork */
+        InstallNetwork: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "open" | "allowlist" | "offline";
+            /** Locked */
+            locked: boolean;
+            /** Source */
+            source: string;
+            /** Allowed Hosts */
+            allowed_hosts: string[];
+            /** Endpoints */
+            endpoints: components["schemas"]["InstallEndpoint"][];
+        };
+        /** InstallPlaces */
+        InstallPlaces: {
+            /** Host */
+            host: string;
+            /** Home */
+            home: string;
+            /**
+             * Database Kind
+             * @enum {string}
+             */
+            database_kind: "sqlite" | "postgres";
+            /** Database Location */
+            database_location: string;
+            /** Database Bytes */
+            database_bytes: number | null;
+            /**
+             * Storage Kind
+             * @enum {string}
+             */
+            storage_kind: "local" | "s3";
+            /** Storage Location */
+            storage_location: string;
+            /** Storage Bucket */
+            storage_bucket: string | null;
+            /** Storage Endpoint */
+            storage_endpoint: string | null;
+            /** Web Path */
+            web_path: string;
+            /** Web Url */
+            web_url: string | null;
+            /** Web Built At */
+            web_built_at: string | null;
+            /** Web Bundle */
+            web_bundle: string | null;
+        };
         /** InstallSettings */
         InstallSettings: {
             /** Recipe */
@@ -2524,6 +2658,25 @@ export interface components {
             splits: {
                 [key: string]: number;
             };
+        };
+        /** InstallSoftware */
+        InstallSoftware: {
+            /** Minibrain */
+            minibrain: string;
+            /** Commit */
+            commit: string | null;
+            /** Python */
+            python: string;
+            /** Duckdb */
+            duckdb: string | null;
+            /** Torch */
+            torch: string | null;
+            /** Transformers */
+            transformers: string | null;
+            /** System */
+            system: string;
+            /** Arch */
+            arch: string;
         };
         /** JobDetail */
         JobDetail: {
@@ -6274,6 +6427,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_api_system_install_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallInfo"];
+                };
+            };
+        };
+    };
+    diagnostics_api_system_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
                 };
             };
         };

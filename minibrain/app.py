@@ -14,6 +14,7 @@ from minibrain.api import (
     catalog,
     compute,
     data,
+    install,
     internal,
     internal_gateway,
     jobs,
@@ -45,6 +46,7 @@ from minibrain.models.registry import model_folder
 from minibrain.object_store import apply as apply_storage
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
+from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -142,6 +144,7 @@ def create_app(
     config_max_age: float = 1.0,
 ) -> FastAPI:
     settings = settings or load_settings()
+    capture()
     migrate(settings.database_url)
     sessions = make_sessions(settings.database_url)
     with sessions() as session:
@@ -183,6 +186,7 @@ def create_app(
         versions,
         keys,
         jobs,
+        install,
         system,
         gateway,
         internal,

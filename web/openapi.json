@@ -3852,6 +3852,44 @@
         }
       }
     },
+    "/api/system/install": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Install",
+        "operationId": "install_api_system_install_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/diagnostics": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Diagnostics",
+        "operationId": "diagnostics_api_system_diagnostics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {}
+            }
+          }
+        }
+      }
+    },
     "/api/system": {
       "get": {
         "tags": [
@@ -7758,6 +7796,329 @@
         ],
         "title": "InspectRequest"
       },
+      "InstallCatalogue": {
+        "properties": {
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          },
+          "bundled_snapshot": {
+            "type": "string",
+            "title": "Bundled Snapshot"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "models": {
+            "type": "integer",
+            "title": "Models"
+          },
+          "models_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models Verified At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot",
+          "bundled_snapshot",
+          "source",
+          "entries",
+          "synced_at",
+          "models",
+          "models_verified_at"
+        ],
+        "title": "InstallCatalogue"
+      },
+      "InstallCompute": {
+        "properties": {
+          "pools": {
+            "type": "integer",
+            "title": "Pools"
+          },
+          "machines": {
+            "type": "integer",
+            "title": "Machines"
+          },
+          "machines_online": {
+            "type": "integer",
+            "title": "Machines Online"
+          },
+          "workers_online": {
+            "type": "integer",
+            "title": "Workers Online"
+          },
+          "engines_online": {
+            "type": "integer",
+            "title": "Engines Online"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pools",
+          "machines",
+          "machines_online",
+          "workers_online",
+          "engines_online"
+        ],
+        "title": "InstallCompute"
+      },
+      "InstallEndpoint": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "by_policy": {
+            "type": "boolean",
+            "title": "By Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "allowed",
+          "by_policy"
+        ],
+        "title": "InstallEndpoint"
+      },
+      "InstallInfo": {
+        "properties": {
+          "software": {
+            "$ref": "#/components/schemas/InstallSoftware"
+          },
+          "places": {
+            "$ref": "#/components/schemas/InstallPlaces"
+          },
+          "catalogue": {
+            "$ref": "#/components/schemas/InstallCatalogue"
+          },
+          "compute": {
+            "$ref": "#/components/schemas/InstallCompute"
+          },
+          "network": {
+            "$ref": "#/components/schemas/InstallNetwork"
+          }
+        },
+        "type": "object",
+        "required": [
+          "software",
+          "places",
+          "catalogue",
+          "compute",
+          "network"
+        ],
+        "title": "InstallInfo"
+      },
+      "InstallNetwork": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "open",
+              "allowlist",
+              "offline"
+            ],
+            "title": "Mode"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "allowed_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Hosts"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/InstallEndpoint"
+            },
+            "type": "array",
+            "title": "Endpoints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "locked",
+          "source",
+          "allowed_hosts",
+          "endpoints"
+        ],
+        "title": "InstallNetwork"
+      },
+      "InstallPlaces": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "home": {
+            "type": "string",
+            "title": "Home"
+          },
+          "database_kind": {
+            "type": "string",
+            "enum": [
+              "sqlite",
+              "postgres"
+            ],
+            "title": "Database Kind"
+          },
+          "database_location": {
+            "type": "string",
+            "title": "Database Location"
+          },
+          "database_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Bytes"
+          },
+          "storage_kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "s3"
+            ],
+            "title": "Storage Kind"
+          },
+          "storage_location": {
+            "type": "string",
+            "title": "Storage Location"
+          },
+          "storage_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Bucket"
+          },
+          "storage_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Endpoint"
+          },
+          "web_path": {
+            "type": "string",
+            "title": "Web Path"
+          },
+          "web_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Url"
+          },
+          "web_built_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Built At"
+          },
+          "web_bundle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Bundle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "home",
+          "database_kind",
+          "database_location",
+          "database_bytes",
+          "storage_kind",
+          "storage_location",
+          "storage_bucket",
+          "storage_endpoint",
+          "web_path",
+          "web_url",
+          "web_built_at",
+          "web_bundle"
+        ],
+        "title": "InstallPlaces"
+      },
       "InstallSettings": {
         "properties": {
           "recipe": {
@@ -7779,6 +8140,82 @@
           "splits"
         ],
         "title": "InstallSettings"
+      },
+      "InstallSoftware": {
+        "properties": {
+          "minibrain": {
+            "type": "string",
+            "title": "Minibrain"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "python": {
+            "type": "string",
+            "title": "Python"
+          },
+          "duckdb": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duckdb"
+          },
+          "torch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torch"
+          },
+          "transformers": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transformers"
+          },
+          "system": {
+            "type": "string",
+            "title": "System"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "minibrain",
+          "commit",
+          "python",
+          "duckdb",
+          "torch",
+          "transformers",
+          "system",
+          "arch"
+        ],
+        "title": "InstallSoftware"
       },
       "JobDetail": {
         "properties": {
