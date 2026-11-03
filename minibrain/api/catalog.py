@@ -29,6 +29,7 @@ from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sy
 from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
 from minibrain.models.registry import models_dir, start_download
+from minibrain.models.rules import licence_use
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import Pool, find_pool, pools
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
@@ -104,6 +105,7 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         license_name=entry.license_name,
         license_summary=entry.license_summary,
         license_url=entry.license_url,
+        license_use=licence_use(entry.license),
         gated=entry.gated,
         recommended=entry.recommended,
         recommendation=entry.recommendation,

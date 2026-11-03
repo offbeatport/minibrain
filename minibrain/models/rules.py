@@ -1,3 +1,5 @@
+from typing import Literal
+
 PUBLISHERS = {
     "Qwen": "Qwen",
     "google": "Google",
@@ -68,6 +70,29 @@ LICENCES = {
         "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
     ),
 }
+
+LicenceUse = Literal["commercial", "restricted", "non-commercial", "unknown"]
+
+LICENCE_USE: dict[str, LicenceUse] = {
+    "apache-2.0": "commercial",
+    "mit": "commercial",
+    "llama3.1": "restricted",
+    "llama3.2": "restricted",
+    "llama3.3": "restricted",
+    "gemma": "restricted",
+    "qwen": "restricted",
+    "deepseek": "restricted",
+    "nvidia-open-model-license": "restricted",
+}
+
+
+def licence_use(licence: str) -> LicenceUse:
+    if licence in LICENCE_USE:
+        return LICENCE_USE[licence]
+    if licence.startswith("cc-by-nc"):
+        return "non-commercial"
+    return "unknown"
+
 
 LICENCE_OVERRIDES = {
     "deepseek-ai/DeepSeek-V3": "deepseek",

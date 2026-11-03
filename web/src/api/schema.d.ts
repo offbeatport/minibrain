@@ -1464,6 +1464,11 @@ export interface components {
             license_summary: string;
             /** License Url */
             license_url: string;
+            /**
+             * License Use
+             * @enum {string}
+             */
+            license_use: "commercial" | "restricted" | "non-commercial" | "unknown";
             /** Gated */
             gated: boolean;
             /** Recommended */

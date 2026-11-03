@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from minibrain.models.rules import LicenceUse
+
 
 class MinibrainCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
@@ -507,6 +509,7 @@ class CatalogEntry(BaseModel):
     license_name: str
     license_summary: str
     license_url: str
+    license_use: LicenceUse
     gated: bool
     recommended: bool
     recommendation: str | None

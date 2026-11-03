@@ -56,6 +56,16 @@ def test_publisher_and_licence_rules_reject_outsiders() -> None:
     assert "cc-by-nc-4.0" not in build.LICENCES
 
 
+def test_every_reviewed_licence_says_what_it_allows() -> None:
+    from minibrain.models.rules import LICENCE_USE, LICENCES, licence_use
+
+    assert set(LICENCE_USE) == set(LICENCES)
+    assert licence_use("apache-2.0") == "commercial"
+    assert licence_use("llama3.1") == "restricted"
+    assert licence_use("cc-by-nc-4.0") == "non-commercial"
+    assert licence_use("qwen-research") == "unknown"
+
+
 def test_reseeding_drops_variants_that_left_the_snapshot(harness) -> None:
     from minibrain.models.catalog import upsert
     from minibrain.registry.models import CatalogModel, CatalogVariant

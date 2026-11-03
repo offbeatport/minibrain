@@ -4305,6 +4305,16 @@
             "type": "string",
             "title": "License Url"
           },
+          "license_use": {
+            "type": "string",
+            "enum": [
+              "commercial",
+              "restricted",
+              "non-commercial",
+              "unknown"
+            ],
+            "title": "License Use"
+          },
           "gated": {
             "type": "boolean",
             "title": "Gated"
@@ -4394,6 +4404,7 @@
           "license_name",
           "license_summary",
           "license_url",
+          "license_use",
           "gated",
           "recommended",
           "recommendation",

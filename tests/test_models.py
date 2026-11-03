@@ -134,6 +134,7 @@ def test_bundled_catalogue_is_seeded_once_and_real(harness: Harness) -> None:
     assert qwen["files"] >= 5 and qwen["size_bytes"] > 1_000_000_000
     llama = next(entry for entry in entries if entry["id"] == "llama-3.1-8b-instruct")
     assert llama["gated"] is True and llama["variants"][0]["size_bytes"] < 20_000_000_000
+    assert (entries[0]["license_use"], llama["license_use"]) == ("commercial", "restricted")
     with harness.sessions() as session:
         assert seed(session) is False
     assert bundled()["snapshot"]
