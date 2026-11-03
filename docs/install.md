@@ -5,6 +5,7 @@ commands below use 3.12, which the Docker image runs.
 
 | Way | For |
 |---|---|
+| [Installer](#installer) | One command: the latest release with uv, or the Docker image (`--docker`) |
 | [Run with Docker](#run-with-docker) | Trying it on any machine with Docker, and production on Linux with NVIDIA GPUs |
 | [Install from GitHub Releases](#install-from-github-releases) | The released wheel with uv, pipx or pip |
 | [`uvx`](#uvx) | Trying it without installing anything |
@@ -12,10 +13,11 @@ commands below use 3.12, which the Docker image runs.
 | [`pip` in a virtual environment](#pip-in-a-virtual-environment) | Machines without uv |
 
 Releases are on [GitHub Releases](https://github.com/offbeatport/minibrain/releases) (wheel, sdist, SBOMs,
-`SHA256SUMS`) and in GHCR (`ghcr.io/offbeatport/minibrain`); how they are made: [`releasing.md`](releasing.md).
-minibrain is not on PyPI yet, so wherever a command below installs `minibrain`, pass the release wheel's URL instead
-(see [Install from GitHub Releases](#install-from-github-releases)). Before the first release, build the wheel from
-this repo with `mise run build` (or `uv build --wheel`; both need Node with pnpm) and pass the file:
+`SHA256SUMS`, the installer and a Sigstore bundle per file) and in GHCR (`ghcr.io/offbeatport/minibrain`); how they
+are made: [`releasing.md`](releasing.md). minibrain is not on PyPI yet, so wherever a command below installs
+`minibrain`, pass the release wheel's URL instead (see [Install from GitHub Releases](#install-from-github-releases)).
+Before the first release, build the wheel from this repo with `mise run build` (or `uv build --wheel`; both need Node
+with pnpm) and pass the file:
 
 ```sh
 uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve
@@ -25,8 +27,45 @@ pip install dist/minibrain-0.0.0-py3-none-any.whl
 
 Verified: `uvx` and `minibrain serve` on macOS (Apple silicon) and on Linux (Debian, CPU torch); the CPU image; the
 CUDA image built for amd64 and arm64 and started without a GPU; the release workflow's dry run (wheel, sdist and all
-four images built). Not verified yet: native Windows, the CUDA image on a machine with an NVIDIA GPU, and a tagged
-release (no image is on GHCR until the first one).
+four images built); the installer on macOS (Apple silicon) and in clean Debian 13 and Ubuntu 24.04 containers (arm64),
+against a dry run's files served from a local folder. Not verified yet: native Windows, the CUDA image on a machine
+with an NVIDIA GPU, and a tagged release (no image is on GHCR until the first one), so the installer's default
+download and the signature checks against a real release.
+
+## Installer
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh
+```
+
+On Linux (x86_64 or arm64, glibc) and macOS (Apple silicon), it:
+
+1. Installs uv with uv's own installer if it is missing; `--no-install-uv` stops with instructions instead.
+2. Downloads `SHA256SUMS` and the wheel of the latest GitHub Release. With cosign installed, it checks the signature
+   on `SHA256SUMS` first ([Verify a release](#verify-a-release)); it always checks the wheel's SHA-256.
+3. Runs `uv tool install --python 3.12` on the wheel. On Linux it sets `UV_TORCH_BACKEND=auto` unless you set it: the
+   CUDA build of torch when an NVIDIA driver is installed, otherwise the small CPU build. macOS gets the Metal build.
+4. Prints the next step: `minibrain serve`, which prints the one-time setup link for the first admin.
+
+| Option | Does |
+|---|---|
+| `MINIBRAIN_VERSION=0.1.0`, `--version 0.1.0` | Installs that release instead of the latest |
+| `--docker` | Pulls the image instead (`cuda` when `nvidia-smi` sees a GPU, else CPU; `--cpu` or `--cuda` to choose), checks its signature when cosign is installed and prints the `docker run` command |
+| `MINIBRAIN_RELEASE_BASE=<url>` | Takes the files from a folder that holds one release (a mirror, or `file:///path`) instead of GitHub |
+| `MINIBRAIN_IMAGE=<repository>` | Pulls the `--docker` image from a mirror |
+| `UV_TORCH_BACKEND` | Another PyTorch build ([PyTorch backends](#pytorch-backends)) |
+
+Options go after `sh -s --`:
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh -s -- --docker
+curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | MINIBRAIN_VERSION=0.1.0 sh
+```
+
+Each release also carries the `install.sh` it was made with, signed like its other files:
+`curl -LsSf https://github.com/offbeatport/minibrain/releases/download/v0.1.0/install.sh | MINIBRAIN_VERSION=0.1.0 sh`.
+To read it before it runs, download it and run `sh install.sh`. Run it again to upgrade; `uv tool uninstall minibrain`
+removes minibrain. On Windows, run it in WSL or use Docker Desktop.
 
 ## Run with Docker
 
@@ -49,9 +88,17 @@ Images for linux/amd64 and linux/arm64, built from the release wheel:
 | `cuda`, `<version>-cuda` (`0.1.0-cuda`) | NVIDIA CUDA 13.2 (Ubuntu 24.04), about 7 GB. Linux hosts with NVIDIA GPUs |
 
 `latest` and `cuda` move with each stable release; pre-releases (`0.2.0rc1`) get only their version tags. Pin a
-version in production, or its digest (`docker inspect --format '{{index .RepoDigests 0}}' <image>` after a pull). The
-images are not signed yet. For NVIDIA GPUs, the full `docker run` is under [Docker → Run](#run) and the compose file
-under [Compose](#compose).
+version in production, or its digest (`docker inspect --format '{{index .RepoDigests 0}}' <image>` after a pull).
+Every image is signed and carries its SBOM: [Verify a release](#verify-a-release).
+
+On a Linux host with NVIDIA GPUs, a driver for CUDA 13.2 and the NVIDIA Container Toolkit, run the CUDA image:
+
+```sh
+docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain:cuda
+docker logs minibrain | grep setup
+```
+
+The production `docker run` is under [Docker → Run](#run) and the compose file under [Compose](#compose).
 
 ## Install from GitHub Releases
 
@@ -75,7 +122,100 @@ curl -fsSLO https://github.com/offbeatport/minibrain/releases/download/v0.1.0/SH
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-Then install the local file the same way.
+Then install the local file the same way. `SHA256SUMS` proves the download matches the release; its signature proves
+the release came from this repository's workflow (below).
+
+## Verify a release
+
+Every release file has a Sigstore bundle next to it (`<file>.sigstore.json`), and every image a signature and SBOM
+attestations in GHCR. All are signed keyless by the release workflow at the tag, with a short-lived certificate
+recorded in Sigstore's public transparency log
+([Releasing → Signing and provenance](releasing.md#signing-and-provenance)). A valid signature names:
+
+| Flag | Value |
+|---|---|
+| `--certificate-identity` | `https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0` (the release's tag) |
+| `--certificate-oidc-issuer` | `https://token.actions.githubusercontent.com` |
+
+The commands use [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 (tested with 3.1.4) and
+release 0.1.0.
+
+### Files
+
+```sh
+BASE=https://github.com/offbeatport/minibrain/releases/download/v0.1.0
+curl -fsSL -O "$BASE/SHA256SUMS" -O "$BASE/SHA256SUMS.sigstore.json" -O "$BASE/minibrain-0.1.0-py3-none-any.whl"
+cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+The signed `SHA256SUMS` covers every file of the release; on macOS, `shasum -a 256 --check --ignore-missing
+SHA256SUMS`. Each file's own bundle checks it directly: `cosign verify-blob --bundle
+minibrain-0.1.0-py3-none-any.whl.sigstore.json <same flags> minibrain-0.1.0-py3-none-any.whl`.
+
+### Images
+
+```sh
+cosign verify \
+  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/offbeatport/minibrain:0.1.0
+cosign verify-attestation --type cyclonedx \
+  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/offbeatport/minibrain:0.1.0 > /dev/null
+```
+
+- Each index (`0.1.0`, `0.1.0-cuda`) and each per-architecture image is signed, so verifying the digest you run
+  works too: `ghcr.io/offbeatport/minibrain@sha256:…`.
+- `latest` and `cuda` move between releases: match any release tag with
+  `--certificate-identity-regexp '^https://github\.com/offbeatport/minibrain/\.github/workflows/release\.yml@refs/tags/v'`
+  in place of `--certificate-identity`.
+- The SBOM attestations: the Python and web SBOMs on each index, the image's own SBOM (operating system packages
+  included) on each per-architecture image. The same SBOMs are release files.
+
+### Provenance
+
+GitHub's attestations record the commit and the workflow run that built each file and image (SLSA build provenance):
+
+```sh
+gh attestation verify minibrain-0.1.0-py3-none-any.whl --repo offbeatport/minibrain
+gh attestation verify oci://ghcr.io/offbeatport/minibrain:0.1.0 --repo offbeatport/minibrain
+```
+
+### Offline
+
+Nothing above needs a network lookup once the verifier has Sigstore's trusted root: each bundle carries the
+signature, the certificate, the transparency log's inclusion proof and a signed timestamp. On a connected machine,
+fetch the trusted root with cosign, which checks it against the TUF root built into cosign:
+
+```sh
+cosign initialize
+cp ~/.sigstore/root/tuf-repo-cdn.sigstore.dev/targets/trusted_root.json .
+```
+
+Do not take `trusted_root.json` from the same place as the files: a forged release would bring a forged root. Carry
+it across with the files and their bundles, then add `--trusted-root` to any command above:
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.sigstore.json --trusted-root trusted_root.json \
+  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+```
+
+Images: save the image with its signatures and attestations on the connected machine, verify the saved copy on the
+other side, then load it into the internal registry, where `cosign verify --trusted-root trusted_root.json` works too:
+
+```sh
+cosign save --dir minibrain-0.1.0 ghcr.io/offbeatport/minibrain:0.1.0
+cosign verify --local-image --trusted-root trusted_root.json \
+  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com minibrain-0.1.0
+cosign load --dir minibrain-0.1.0 registry.internal/minibrain:0.1.0
+```
+
+`docker load` cannot read the saved folder. For a Docker host without a registry, verify the image on the connected
+machine and move it with `docker save` ([The app](#the-app)).
 
 ## uvx
 
@@ -375,8 +515,9 @@ across on disk.
 
 ### The app
 
-Docker: pull the image on the connected machine, save it, and load it on the target. Pull with
-`--platform linux/arm64` when the target's architecture differs.
+Docker: pull the image on the connected machine, verify it ([Verify a release](#verify-a-release)), save it, and
+load it on the target. Pull with `--platform linux/arm64` when the target's architecture differs. With an internal
+registry, `cosign save` and `cosign load` carry the signatures across too ([Offline](#offline)).
 
 ```sh
 docker pull ghcr.io/offbeatport/minibrain:0.1.0-cuda
@@ -385,7 +526,8 @@ docker load -i minibrain-0.1.0-cuda.tar.gz
 ```
 
 Native: collect the wheels on a connected machine with the same OS, CPU architecture and Python 3.12 as the target,
-in a checkout of the release tag, with the release wheel downloaded next to it.
+in a checkout of the release tag, with the release wheel downloaded next to it. Carry the wheel's `.sigstore.json`
+and a trusted root along to check it on the target ([Offline](#offline)).
 
 ```sh
 uv export --frozen --no-dev --no-emit-project --extra postgres -o requirements.txt
@@ -440,6 +582,7 @@ Database migrations run when main starts. To go back to an older version, restor
 
 | Install | Upgrade |
 |---|---|
+| Installer | Run it again; `MINIBRAIN_VERSION=<version>` pins one |
 | `uvx` | `uvx --refresh --python 3.12 minibrain serve`, or pin one with `uvx --python 3.12 minibrain@<version> serve` |
 | `uv tool` | `uv tool upgrade minibrain` |
 | `pip` | `pip install --upgrade minibrain` |

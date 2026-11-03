@@ -8,7 +8,16 @@ Plan: [`ROADMAP.md`](ROADMAP.md).
 
 ## Run it
 
-minibrain is a Python package with the web UI built in, so running it needs no Node:
+minibrain is a Python package with the web UI built in, so running it needs no Node. The installer puts the latest
+release on Linux or macOS (Apple silicon) with uv, checking its checksum and, when cosign is installed, its signature;
+`sh -s -- --docker` pulls the Docker image instead:
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh
+minibrain serve
+```
+
+Or run it straight from the package with uv:
 
 ```sh
 uvx --python 3.12 minibrain serve
@@ -17,12 +26,16 @@ uvx --python 3.12 minibrain serve
 `uv tool install minibrain` or `pip install minibrain`, then `minibrain serve`, work too. minibrain is not on PyPI yet:
 until it is, pass the wheel from [GitHub Releases](https://github.com/offbeatport/minibrain/releases) instead of
 `minibrain`, or, before the first release, build it from this repo (see Develop) and run it with
-`uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`. With Docker (CPU; the `cuda` tag is
-for NVIDIA hosts):
+`uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`. With Docker, the CPU image, or the
+CUDA one on a Linux host with NVIDIA GPUs:
 
 ```sh
 docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain:cuda
 ```
+
+Every release file and image is signed keyless with Sigstore; the checks, online and offline, are in
+[`docs/install.md`](docs/install.md#verify-a-release).
 
 [`docs/install.md`](docs/install.md) covers every install path, PyTorch backends (CUDA, ROCm, MPS, CPU), the Docker
 image and compose file, air-gapped installs, upgrades and where data lives.

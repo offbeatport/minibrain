@@ -787,19 +787,23 @@ Fully offline by default. Nothing in the data, labelling, training, serving or g
   a missing extension names it and the install command.
 - Air-gap test in CI: the M1 flow runs in a container with networking disabled.
 - Updates: signed bundles for the app and for new base models, carried across the gap by disk. Verified offline before
-  install; the previous version stays installed for rollback.
+  install; the previous version stays installed for rollback. Bundles reuse the release's blob signing: one
+  `.sigstore.json` per bundle, checked offline with Sigstore's trusted root.
 
 ## Security and accreditation
 
 v1, the evidence regulated buyers ask for first:
 
 - SBOM (CycloneDX) for every image and Python dependency set. Built: CI uploads Python (uv export from `uv.lock`)
-  and web (syft from `web/pnpm-lock.yaml`) SBOMs beside the wheel; the image SBOM is a documented syft command
-  against the built image (CI does not build it). Details: `docs/security.md`.
+  and web (syft from `web/pnpm-lock.yaml`) SBOMs beside the wheel; each release adds an SBOM per image (syft against
+  the image it pushes), attached to the release and attested on the image. Details: `docs/security.md`.
 - AI bill of materials per version: base model weights hash, license, training data snapshot hash, recipe, eval result.
   Built: a deterministic CycloneDX 1.6 ML-BOM per version (`aibom.json`, Download AI-BOM on the model card) with
   the adapter's SHA-256, the sources' fingerprints and its own SHA-256, validated against the schema in tests.
-- Signed images and update bundles (cosign), verified offline with a key shipped in the install bundle.
+- Signed images and update bundles (cosign), verified offline. Built for releases: keyless Sigstore signing from the
+  release workflow (OIDC identity, Rekor; no long-lived key), a `.sigstore.json` bundle per release file, signatures
+  on every image digest, SBOM attestations and SLSA provenance (`actions/attest`). Offline checks use the bundle and
+  Sigstore's trusted root carried across, not a shipped key. Update bundles not yet. Details: `docs/releasing.md`.
 - Audit log: append-only and hash-chained so tampering shows, exported to the customer's SIEM over syslog. The
   chain has to survive retention: a prune is itself an audited event that carries the hash it cuts at. Built: the
   leader seals each event with a sequence number, the previous hash and the SHA-256 of its canonical form (so
@@ -845,8 +849,10 @@ outbound calls.
 - Wheel and sdist, once both pass: `uv build` with the built UI inside both, uploaded as the `minibrain-wheel` and
   `minibrain-sdist` artifacts.
 - Releases: a `v*` tag runs `.github/workflows/release.yml`, which calls this workflow (`workflow_call`), builds the
-  CPU and CUDA images for amd64 and arm64 from its wheel, and publishes them to GHCR and the wheel, sdist, SBOMs and
-  `SHA256SUMS` to GitHub Releases; `workflow_dispatch` is a dry run. Details: `docs/releasing.md`.
+  CPU and CUDA images for amd64 and arm64 from its wheel, signs and attests everything keyless with cosign, and
+  publishes the images to GHCR and the wheel, sdist, SBOMs, `install.sh`, `SHA256SUMS` and their Sigstore bundles to
+  GitHub Releases; `workflow_dispatch` is a dry run. Details: `docs/releasing.md`.
+- ShellCheck on `install.sh` and `scripts/*.sh`.
 - `mise run check` runs the same checks locally; change both together.
 - Third-party actions pinned to full commit SHAs; uv, Node and pnpm versions fixed; uv and pnpm caches on.
 
@@ -985,17 +991,22 @@ Everything in the v1 scope below, after M1.
       and CUDA images for amd64 and arm64 on GHCR, the images installing that same wheel; dry run passed, no tag
       pushed yet. PyPI not yet: Trusted Publishing steps in `docs/releasing.md`; no private index)
 - [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install.md`
+- [x] `curl … | sh` installer (`install.sh`): the release wheel with uv and the right torch backend, checked against
+      `SHA256SUMS` and, with cosign, its signature; `--docker` pulls the image (tested on macOS, Debian 13 and
+      Ubuntu 24.04 against dry-run files; not yet against a tagged release)
 - [x] Python 3.13: allowed in `requires-python`; CI tests 3.12 and 3.13
 - [ ] Offline install bundle; air-gap CI test
-- [ ] Signed offline update bundles (app and base models) with rollback
+- [ ] Signed offline update bundles (app and base models) with rollback (release files are signed with cosign
+      now; bundles will reuse that signing)
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
 - [ ] Rebase: rebuild every minibrain on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
       in the playground → review queue; accepted rows join the model's next snapshot; "Train with feedback"
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
       Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
-- [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, the image SBOM command
-      and the per-version AI-BOM done; signed images not yet)
+- [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, image SBOMs per release,
+      the per-version AI-BOM, and keyless cosign signatures, SBOM attestations and SLSA provenance on every image and
+      release file built; signing first runs for real on the first tag)
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
 - [ ] Hash-chained audit log with SIEM export; encryption at rest (hash chain sealed by the leader, prune anchors,

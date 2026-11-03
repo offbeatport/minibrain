@@ -205,9 +205,11 @@ writes the same two into `sbom/`.
 
 ### Docker image
 
-CI does not build the image (the CUDA one is about 7 GB). Its Python packages are the `--no-dev --extra postgres`
-subset of `minibrain-python.cdx.json`, except torch, which comes from the PyTorch index as the CUDA or CPU build. For
-the whole image, operating system packages included, run syft against the built image:
+Each release carries one SBOM per image, `minibrain-image-{cpu,cuda}-{amd64,arm64}.cdx.json`: the release workflow
+loads the image it pushes into Docker and runs syft on it, with the settings below, and attests the SBOM on that
+image in GHCR. CI does not build the image (the CUDA one is about 7 GB). Its Python packages are the
+`--no-dev --extra postgres` subset of `minibrain-python.cdx.json`, except torch, which comes from the PyTorch index as
+the CUDA or CPU build. For a local build, operating system packages included, run syft against the built image:
 
 ```sh
 SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \
@@ -222,6 +224,13 @@ SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \
   crates compiled into Python wheels, and the files those packages own with their SHA-256), 3 MB, under a minute.
   Two Debian packages carry licence IDs newer than CycloneDX 1.6's SPDX list (`SMAIL-GPL`, `Artistic-dist`), so a
   strict schema check flags those two entries.
+
+### Signed releases
+
+Every release file and image is signed keyless through Sigstore by the release workflow at its tag, and the SBOMs
+and SLSA build provenance are attested on the images. No signing key exists to leak. Verifying, online or air-gapped
+with the bundles and Sigstore's trusted root: [Install → Verify a release](install.md#verify-a-release); how it is
+made: [Releasing → Signing and provenance](releasing.md#signing-and-provenance).
 
 ### AI bill of materials (AI-BOM)
 
