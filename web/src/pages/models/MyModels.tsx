@@ -858,12 +858,13 @@ function ModelListRow({
                     onClick={() => onSelect(!selected)}
                 />
             )}
-            <Checkbox
-                className="relative z-10"
-                aria-label={`Select ${model.name}${entry.version ? ` v${entry.version.number}` : ""}`}
-                checked={selected}
-                onCheckedChange={(value) => onSelect(value === true)}
-            />
+            <label className="relative z-10 -my-3 -ml-4 flex cursor-pointer items-center self-stretch py-3 pr-2 pl-4">
+                <Checkbox
+                    aria-label={`Select ${model.name}${entry.version ? ` v${entry.version.number}` : ""}`}
+                    checked={selected}
+                    onCheckedChange={(value) => onSelect(value === true)}
+                />
+            </label>
             <div className="flex min-w-0 items-center gap-3">
                 <PublisherLogo publisher={model.publisher} name={model.name} />
                 <div className="flex min-w-0 flex-col">
@@ -968,18 +969,20 @@ function ModelList({
                     "h-9 border-b bg-secondary text-sm font-medium text-muted-foreground",
                 )}
             >
-                <Checkbox
-                    aria-label="Select all models"
-                    checked={all}
-                    disabled={ids.length === 0}
-                    onCheckedChange={(value) =>
-                        onSelected(
-                            value === true
-                                ? [...new Set([...selected, ...ids])]
-                                : selected.filter((id) => !ids.includes(id)),
-                        )
-                    }
-                />
+                <label className="-ml-4 flex cursor-pointer items-center self-stretch pr-2 pl-4">
+                    <Checkbox
+                        aria-label="Select all models"
+                        checked={all}
+                        disabled={ids.length === 0}
+                        onCheckedChange={(value) =>
+                            onSelected(
+                                value === true
+                                    ? [...new Set([...selected, ...ids])]
+                                    : selected.filter((id) => !ids.includes(id)),
+                            )
+                        }
+                    />
+                </label>
                 <div aria-sort={ariaSort(directionOf("name"))} className="flex min-w-0">
                     <SortButton
                         label="Model"

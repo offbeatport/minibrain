@@ -41,6 +41,12 @@
                 "noExplicitAny": "warn"
             },
             "a11y": {
+                "noLabelWithoutControl": {
+                    "level": "error",
+                    "options": {
+                        "inputComponents": ["Checkbox"]
+                    }
+                },
                 "useValidAriaRole": {
                     "level": "error",
                     "options": {
