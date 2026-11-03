@@ -56,13 +56,13 @@ const FIT_LABELS: Record<FitInfo["level"], string> = {
     insufficient: "Insufficient memory",
     unknown: "Compatibility not checked",
 };
-const FIT_TONES: Record<FitInfo["level"], Tone> = {
+export const FIT_TONES: Record<FitInfo["level"], Tone> = {
     fits: "success",
     limited: "warning",
     insufficient: "destructive",
     unknown: "neutral",
 };
-function fitLabel(fit: FitInfo): string {
+export function fitLabel(fit: FitInfo): string {
     const enoughMemory = fit.available_bytes !== null && fit.needed_bytes <= fit.available_bytes;
     return fit.level === "insufficient" && enoughMemory
         ? "Not supported here"
@@ -343,7 +343,7 @@ export function discoverHref(entry: CatalogEntry, pool?: string): string {
     return `/discover/${encodeURIComponent(entry.id)}${query}`;
 }
 
-export const COMPARE_MAX = 4;
+export const COMPARE_MAX = 6;
 
 export function compareHref(ids: string[], pool?: string, onlyDifferences = false): string {
     const parts = [`ids=${ids.map(encodeURIComponent).join(",")}`];
