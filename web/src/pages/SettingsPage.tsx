@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BookMarked, GraduationCap, Palette, Split } from "lucide-react";
-import { Button, Label, Switch } from "obp-ui";
+import { Button, SettingsGroup, SettingsRow, Switch } from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useCatalog, useInstallSettings } from "~/api/queries";
-import { ErrorLine, PanelSection, PanelSections, Stat } from "~/components/Section";
+import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ThemeChoice } from "~/components/ThemeChoice";
 import { count } from "~/lib/format";
@@ -44,39 +44,51 @@ function ModelCatalogue() {
     });
     const data = catalog.data;
     const syncing = data?.sync_job && ["queued", "running"].includes(data.sync_job.status);
+    const checked = data?.synced_at
+        ? `Checked for updates ${relativeTime(data.synced_at)}`
+        : "Using the catalogue bundled with this release";
     return (
         <PanelSection icon={BookMarked} title="Model catalogue">
-            <div className="flex flex-col gap-3 text-sm">
-                <div className="flex flex-wrap items-center gap-3">
-                    <span>
-                        {data?.synced_at
-                            ? `Checked for updates ${relativeTime(data.synced_at)}`
-                            : "Using the catalogue bundled with this release"}
-                        {data?.sync_job?.status === "failed" ? "; the last check failed" : ""}
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sync.mutate()}
-                        disabled={data?.online === false || Boolean(syncing) || sync.isPending}
-                    >
-                        {syncing ? "Checking…" : "Check for updates"}
-                    </Button>
-                </div>
-                <Label htmlFor="daily-sync" className="flex items-center gap-2 font-normal">
-                    <Switch
-                        id="daily-sync"
-                        checked={dailyOn ?? settings.data?.daily_sync ?? false}
-                        onCheckedChange={(checked) => {
-                            setDailyOn(checked);
-                            daily.mutate(checked);
-                        }}
-                        disabled={data?.offline_forced}
-                    />
-                    Check every day
-                </Label>
-                <ErrorLine error={sync.error ?? daily.error} />
-            </div>
+            <SettingsGroup>
+                <SettingsRow
+                    label="Catalogue updates"
+                    description={`${checked}${data?.sync_job?.status === "failed" ? "; the last check failed" : ""}.`}
+                    error={errorMessage(sync.error)}
+                    control={
+                        <Button
+                            variant="outline"
+                            onClick={() => sync.mutate()}
+                            disabled={data?.online === false || Boolean(syncing) || sync.isPending}
+                        >
+                            {syncing ? "Checking…" : "Check for updates"}
+                        </Button>
+                    }
+                />
+                <SettingsRow
+                    id="daily-sync"
+                    toggle
+                    disabled={data?.offline_forced}
+                    label="Check every day"
+                    description={
+                        data?.offline_forced
+                            ? "Off while this install cannot reach the model hub."
+                            : "Looks for a newer catalogue once a day."
+                    }
+                    error={errorMessage(daily.error)}
+                    control={
+                        <Switch
+                            id="daily-sync"
+                            checked={dailyOn ?? settings.data?.daily_sync ?? false}
+                            disabled={data?.offline_forced}
+                            readOnly={daily.isPending}
+                            onCheckedChange={(next) => {
+                                setDailyOn(next);
+                                daily.mutate(next);
+                            }}
+                        />
+                    }
+                />
+            </SettingsGroup>
         </PanelSection>
     );
 }

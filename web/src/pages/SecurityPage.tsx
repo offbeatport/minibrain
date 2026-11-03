@@ -13,6 +13,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    SettingsGroup,
+    SettingsRow,
     Switch,
     Tooltip,
     TooltipContent,
@@ -21,7 +23,8 @@ import {
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { NumberSettingRow } from "~/components/NumberSettingRow";
+import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 
@@ -87,6 +90,8 @@ function LockedBadge({ policy }: { policy: PolicyInfo }) {
     );
 }
 
+const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
+
 const LIST_PLACEHOLDERS: Record<string, string> = {
     allowed_hosts: "hf-mirror.internal, s3.internal",
     data_folders: "/srv/exports, /mnt/shared/datasets",
@@ -125,109 +130,184 @@ function useChange(name: string) {
     });
 }
 
-function TextControl({
-    policy,
-    onSave,
-    pending,
-}: {
-    policy: PolicyInfo;
-    onSave: (value: unknown) => void;
-    pending: boolean;
-}) {
+function policyId(policy: PolicyInfo): string {
+    return `policy-${policy.name.replaceAll("_", "-")}`;
+}
+
+function TextRow({ policy }: { policy: PolicyInfo }) {
+    const change = useChange(policy.name);
+    const id = policyId(policy);
     const current =
         policy.kind === "list" ? asList(policy.value).join(", ") : String(policy.value ?? "");
     const [draft, setDraft] = useState<string | null>(null);
     const value = draft ?? current;
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        onSave(policy.kind === "int" ? Number(value) : value);
-        setDraft(null);
+        change.mutate(value, { onSuccess: () => setDraft(null) });
     };
     return (
-        <form onSubmit={submit} className="flex items-center gap-2">
-            <Input
-                aria-label={policy.label}
-                type={policy.kind === "int" ? "number" : "text"}
-                min={policy.kind === "int" ? 0 : undefined}
-                value={value}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={LIST_PLACEHOLDERS[policy.name]}
-                className={policy.kind === "int" ? "w-24 tabular-nums" : "w-72"}
+        <form onSubmit={submit}>
+            <SettingsRow
+                id={id}
+                wide
+                label={policy.label}
+                description={policy.description}
+                error={errorMessage(change.error)}
+                control={
+                    <>
+                        <Input
+                            id={id}
+                            value={value}
+                            aria-describedby={`${id}-description`}
+                            onChange={(event) => setDraft(event.target.value)}
+                            placeholder={LIST_PLACEHOLDERS[policy.name]}
+                        />
+                        {draft !== null && draft !== current && (
+                            <Button type="submit" disabled={change.isPending}>
+                                Save
+                            </Button>
+                        )}
+                    </>
+                }
             />
-            {draft !== null && draft !== current && (
-                <Button type="submit" size="sm" disabled={pending}>
-                    Save
-                </Button>
-            )}
         </form>
     );
 }
 
-function Control({ policy }: { policy: PolicyInfo }) {
+function NumberRow({ policy }: { policy: PolicyInfo }) {
     const change = useChange(policy.name);
-    const save = (value: unknown) => change.mutate(value);
-    if (policy.locked) {
-        return (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-                <span className="text-sm">{display(policy, policy.value)}</span>
-                <LockedBadge policy={policy} />
-            </div>
+    return (
+        <NumberSettingRow
+            id={policyId(policy)}
+            label={policy.label}
+            description={policy.description}
+            value={typeof policy.value === "number" ? policy.value : undefined}
+            min={0}
+            format={WHOLE}
+            pending={change.isPending}
+            error={change.error}
+            onSave={(next, saved) => change.mutate(next, { onSuccess: saved })}
+        />
+    );
+}
+
+function SwitchRow({ policy }: { policy: PolicyInfo }) {
+    const change = useChange(policy.name);
+    const id = policyId(policy);
+    return (
+        <SettingsRow
+            id={id}
+            toggle
+            label={policy.label}
+            description={policy.description}
+            error={errorMessage(change.error)}
+            control={
+                <Switch
+                    id={id}
+                    checked={policy.value === true}
+                    readOnly={change.isPending}
+                    onCheckedChange={(checked) => change.mutate(checked)}
+                />
+            }
+        />
+    );
+}
+
+function ChoiceRow({ policy }: { policy: PolicyInfo }) {
+    const change = useChange(policy.name);
+    const id = policyId(policy);
+    return (
+        <SettingsRow
+            id={id}
+            label={policy.label}
+            description={policy.description}
+            error={errorMessage(change.error)}
+            control={
+                <Select
+                    value={String(policy.value)}
+                    onValueChange={(next) => change.mutate(String(next))}
+                >
+                    <SelectTrigger id={id} aria-describedby={`${id}-description`} className="w-60">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {policy.choices.map((choice) => (
+                            <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            }
+        />
+    );
+}
+
+function ChoiceListRow({ policy }: { policy: PolicyInfo }) {
+    const change = useChange(policy.name);
+    const chosen = new Set(asList(policy.value));
+    const toggle = (item: string, on: boolean) =>
+        change.mutate(
+            policy.choices
+                .map((choice) => choice.value)
+                .filter((value) => (value === item ? on : chosen.has(value))),
         );
-    }
-    let control = <TextControl policy={policy} onSave={save} pending={change.isPending} />;
-    if (policy.kind === "bool") {
-        control = (
-            <Switch
-                aria-label={policy.label}
-                checked={policy.value === true}
-                disabled={change.isPending}
-                onCheckedChange={(checked) => save(checked)}
-            />
-        );
-    } else if (policy.kind === "choice") {
-        control = (
-            <Select value={String(policy.value)} onValueChange={(next) => save(String(next))}>
-                <SelectTrigger aria-label={policy.label} className="w-60">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {policy.choices.map((choice) => (
-                        <SelectItem key={choice.value} value={choice.value}>
-                            {choice.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        );
-    } else if (policy.kind === "list" && policy.choices.length > 0) {
-        const chosen = new Set(asList(policy.value));
-        const toggle = (item: string, on: boolean) =>
-            save(
-                policy.choices
-                    .map((choice) => choice.value)
-                    .filter((value) => (value === item ? on : chosen.has(value))),
-            );
-        control = (
-            <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+    return (
+        <SettingsRow
+            label={policy.label}
+            description={policy.description}
+            error={errorMessage(change.error)}
+            control={null}
+        >
+            <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 pb-2.5 sm:grid-cols-2">
                 {policy.choices.map((choice) => (
                     <Label key={choice.value} className="flex items-center gap-2 font-normal">
                         <Checkbox
                             checked={chosen.has(choice.value)}
-                            disabled={change.isPending}
+                            readOnly={change.isPending}
                             onCheckedChange={(checked) => toggle(choice.value, checked === true)}
                         />
                         {choice.label}
                     </Label>
                 ))}
             </div>
-        );
-    }
-    return (
-        <div className="flex flex-col items-end gap-1">
-            {control}
-            <ErrorLine error={change.error} />
-        </div>
+        </SettingsRow>
     );
+}
+
+function LockedRow({ policy }: { policy: PolicyInfo }) {
+    return (
+        <SettingsRow
+            label={policy.label}
+            description={policy.description}
+            disabled
+            control={
+                <>
+                    <span className="text-sm">{display(policy, policy.value)}</span>
+                    <LockedBadge policy={policy} />
+                </>
+            }
+        />
+    );
+}
+
+function PolicyRow({ policy }: { policy: PolicyInfo }) {
+    if (policy.locked) {
+        return <LockedRow policy={policy} />;
+    }
+    if (policy.kind === "bool") {
+        return <SwitchRow policy={policy} />;
+    }
+    if (policy.kind === "int") {
+        return <NumberRow policy={policy} />;
+    }
+    if (policy.kind === "choice") {
+        return <ChoiceRow policy={policy} />;
+    }
+    if (policy.choices.length > 0) {
+        return <ChoiceListRow policy={policy} />;
+    }
+    return <TextRow policy={policy} />;
 }
 
 function LicenceList({ policy }: { policy: PolicyInfo }) {
@@ -270,21 +350,19 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
     const change = useChange(mode.name);
     const anyLicence = mode.value === "all";
     return (
-        <div className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                <Label
-                    htmlFor="licence-any"
-                    className="flex min-w-0 max-w-md flex-1 basis-48 flex-col items-start gap-0.5 font-normal"
-                >
-                    <span className="font-medium">Allow any licence</span>
-                    <span className="text-sm text-muted-foreground">
-                        {anyLicence
-                            ? "Includes non-commercial and custom terms we have not reviewed. Check each model's licence yourself."
-                            : "Only the licences ticked below, each reviewed for commercial use."}
-                    </span>
-                </Label>
-                <div className="flex shrink-0 items-center gap-2">
-                    {mode.locked && <LockedBadge policy={mode} />}
+        <SettingsRow
+            id="licence-any"
+            toggle
+            disabled={mode.locked}
+            label="Allow any licence"
+            description={
+                anyLicence
+                    ? "Includes non-commercial and custom terms we have not reviewed. Check each model's licence yourself."
+                    : "Only the licences ticked below, each reviewed for commercial use."
+            }
+            error={errorMessage(change.error)}
+            control={
+                <>
                     <Switch
                         id="licence-any"
                         checked={anyLicence}
@@ -292,23 +370,16 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
                         readOnly={change.isPending}
                         onCheckedChange={(checked) => change.mutate(checked ? "all" : "selected")}
                     />
+                    {mode.locked && <LockedBadge policy={mode} />}
+                </>
+            }
+        >
+            {!anyLicence && list && (
+                <div className="pb-2.5">
+                    <LicenceList policy={list} />
                 </div>
-            </div>
-            {!anyLicence && list && <LicenceList policy={list} />}
-            <ErrorLine error={change.error} />
-        </div>
-    );
-}
-
-function PolicyRow({ policy }: { policy: PolicyInfo }) {
-    return (
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0">
-            <div className="min-w-0 max-w-md">
-                <div className="text-sm font-medium">{policy.label}</div>
-                <p className="text-sm text-muted-foreground">{policy.description}</p>
-            </div>
-            <Control policy={policy} />
-        </div>
+            )}
+        </SettingsRow>
     );
 }
 
@@ -391,7 +462,7 @@ export function SecurityPage() {
                 {policies.data &&
                     GROUPS.map((group) => (
                         <PanelSection key={group.title} icon={group.icon} title={group.title}>
-                            <div className="divide-y">
+                            <SettingsGroup>
                                 {group.names.map((name) => {
                                     const policy = byName.get(name);
                                     if (!policy) {
@@ -407,7 +478,7 @@ export function SecurityPage() {
                                         <PolicyRow key={name} policy={policy} />
                                     );
                                 })}
-                            </div>
+                            </SettingsGroup>
                         </PanelSection>
                     ))}
                 <PanelSection icon={History} title="Audit log" bare>

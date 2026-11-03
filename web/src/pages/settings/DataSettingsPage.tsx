@@ -1,14 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, ListChecks, Rows3 } from "lucide-react";
-import { Button, Field, Input, Label, Switch } from "obp-ui";
-import { type FormEvent, useState } from "react";
+import { SettingsGroup, SettingsRow, Switch } from "obp-ui";
+import { type ComponentProps, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { type DataSettings, dataKeys, useDataSettings } from "~/api/dataQueries";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { NumberSettingRow } from "~/components/NumberSettingRow";
+import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { count } from "~/lib/format";
 
 type NumberKey = "row_limit" | "keep_snapshots" | "min_label_rows";
+
+const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
+const PERCENT: Intl.NumberFormatOptions = { style: "percent", maximumFractionDigits: 0 };
 type CheckName = NonNullable<DataSettings["checks_off"]>[number];
 
 const CHECKS: { name: CheckName; label: string; description: string }[] = [
@@ -60,57 +64,58 @@ function useSaveSettings() {
     });
 }
 
-export function NumberSetting({
+function NumberSetting({
     id,
-    label,
-    hint,
-    value,
     field,
-    min,
-}: {
-    id: string;
-    label: string;
-    hint: string;
-    value: number | undefined;
+    value,
+    ...props
+}: Omit<
+    ComponentProps<typeof NumberSettingRow>,
+    "pending" | "error" | "onSave" | "value" | "format"
+> & {
     field: NumberKey;
-    min: number;
+    value: number | undefined;
 }) {
     const save = useSaveSettings();
-    const [draft, setDraft] = useState<string | null>(null);
-    const shown = draft ?? (value === undefined ? "" : String(value));
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        save.mutate({ [field]: Number(shown) }, { onSuccess: () => setDraft(null) });
-    };
     return (
-        <form onSubmit={submit} className="flex flex-col gap-1">
-            <Field id={id} label={label} hint={hint}>
-                <div className="flex items-center gap-2">
-                    <Input
-                        id={id}
-                        type="number"
-                        min={min}
-                        inputMode="numeric"
-                        className="w-40 tabular-nums"
-                        value={shown}
-                        onChange={(event) => setDraft(event.target.value)}
-                    />
-                    {draft !== null && draft !== String(value) && (
-                        <Button type="submit" size="sm" disabled={save.isPending || !draft}>
-                            Save
-                        </Button>
-                    )}
-                </div>
-            </Field>
-            <ErrorLine error={save.error} />
-        </form>
+        <NumberSettingRow
+            id={id}
+            value={value}
+            format={WHOLE}
+            pending={save.isPending}
+            error={save.error}
+            onSave={(next, saved) => save.mutate({ [field]: next }, { onSuccess: saved })}
+            {...props}
+        />
     );
 }
 
-function CheckSwitches({ data }: { data: DataSettings }) {
+function MajorityShare({ value }: { value: number | undefined }) {
     const save = useSaveSettings();
-    const off = new Set(data.checks_off ?? []);
+    return (
+        <NumberSettingRow
+            id="majority-share"
+            label="Warn when one label holds more than"
+            description="Default 90%."
+            value={value}
+            min={0.5}
+            max={1}
+            step={0.01}
+            largeStep={0.1}
+            format={PERCENT}
+            pending={save.isPending}
+            error={save.error}
+            onSave={(next, saved) => save.mutate({ majority_share: next }, { onSuccess: saved })}
+        />
+    );
+}
+
+function ChecksSettings({ data }: { data: DataSettings | undefined }) {
+    const save = useSaveSettings();
+    const [changed, setChanged] = useState<CheckName | null>(null);
+    const off = new Set(data?.checks_off ?? []);
     const toggle = (name: CheckName, on: boolean) => {
+        setChanged(name);
         const next = new Set(off);
         if (on) {
             next.delete(name);
@@ -120,96 +125,43 @@ function CheckSwitches({ data }: { data: DataSettings }) {
         save.mutate({ checks_off: [...next] });
     };
     return (
-        <div className="flex flex-col gap-1">
-            <ul className="flex flex-col divide-y">
-                {CHECKS.map((check) => (
-                    <li
-                        key={check.name}
-                        className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                    >
-                        <Label
-                            htmlFor={`check-${check.name}`}
-                            className="flex flex-col items-start gap-0.5 font-normal"
-                        >
-                            <span className="font-medium">{check.label}</span>
-                            <span className="text-sm text-muted-foreground">
-                                {check.description}
-                            </span>
-                        </Label>
-                        <Switch
-                            id={`check-${check.name}`}
-                            checked={!off.has(check.name)}
-                            disabled={save.isPending}
-                            onCheckedChange={(checked) => toggle(check.name, checked)}
-                        />
-                    </li>
-                ))}
-            </ul>
-            <ErrorLine error={save.error} />
-        </div>
-    );
-}
-
-function MajorityShare({ value }: { value: number | undefined }) {
-    const save = useSaveSettings();
-    const [draft, setDraft] = useState<string | null>(null);
-    const current = value === undefined ? "" : String(Math.round(value * 100));
-    const shown = draft ?? current;
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        save.mutate({ majority_share: Number(shown) / 100 }, { onSuccess: () => setDraft(null) });
-    };
-    return (
-        <form onSubmit={submit} className="flex flex-col gap-1">
-            <Field
-                id="majority-share"
-                label="Warn when one label holds more than (%)"
-                hint="Default 90."
-            >
-                <div className="flex items-center gap-2">
-                    <Input
-                        id="majority-share"
-                        type="number"
-                        min={50}
-                        max={100}
-                        inputMode="numeric"
-                        className="w-40 tabular-nums"
-                        value={shown}
-                        onChange={(event) => setDraft(event.target.value)}
-                    />
-                    {draft !== null && draft !== current && (
-                        <Button type="submit" size="sm" disabled={save.isPending || !draft}>
-                            Save
-                        </Button>
-                    )}
-                </div>
-            </Field>
-            <ErrorLine error={save.error} />
-        </form>
-    );
-}
-
-function ChecksSettings({ data }: { data: DataSettings | undefined }) {
-    return (
         <PanelSection
             icon={ListChecks}
             title="Snapshot checks"
             description="Run on every snapshot. Warnings never block training; an empty dataset or a single label always does."
         >
-            <div className="flex flex-col gap-6">
-                {data && <CheckSwitches data={data} />}
-                <div className="flex flex-wrap gap-6 border-t pt-5">
-                    <MajorityShare value={data?.majority_share} />
-                    <NumberSetting
-                        id="min-label-rows"
-                        label="Warn when a label has fewer rows than"
-                        hint="Default 10."
-                        value={data?.min_label_rows}
-                        field="min_label_rows"
-                        min={1}
+            <SettingsGroup>
+                {CHECKS.map((check) => (
+                    <SettingsRow
+                        key={check.name}
+                        id={`check-${check.name}`}
+                        toggle
+                        label={check.label}
+                        description={check.description}
+                        error={changed === check.name ? errorMessage(save.error) : undefined}
+                        control={
+                            <Switch
+                                id={`check-${check.name}`}
+                                checked={!off.has(check.name)}
+                                disabled={!data}
+                                readOnly={save.isPending}
+                                onCheckedChange={(checked) => toggle(check.name, checked)}
+                            />
+                        }
                     />
-                </div>
-            </div>
+                ))}
+                <MajorityShare value={data?.majority_share} />
+                <NumberSetting
+                    id="min-label-rows"
+                    label="Warn when a label has fewer rows than"
+                    description="Default 10."
+                    value={data?.min_label_rows}
+                    field="min_label_rows"
+                    min={1}
+                    max={100_000}
+                    unit="rows"
+                />
+            </SettingsGroup>
         </PanelSection>
     );
 }
@@ -226,28 +178,38 @@ export function DataSettingsPage() {
                     title="Snapshot size"
                     description="Training copies a dataset's rows into a snapshot. Larger datasets are refused with a hint to filter or sample in the query."
                 >
-                    <NumberSetting
-                        id="row-limit"
-                        label="Most rows in one snapshot"
-                        hint={`Default ${count(200_000)}.`}
-                        value={data?.row_limit}
-                        field="row_limit"
-                        min={100}
-                    />
+                    <SettingsGroup>
+                        <NumberSetting
+                            id="row-limit"
+                            label="Most rows in one snapshot"
+                            description={`Default ${count(200_000)}.`}
+                            value={data?.row_limit}
+                            field="row_limit"
+                            min={100}
+                            max={50_000_000}
+                            step={1000}
+                            largeStep={10_000}
+                            unit="rows"
+                            groupClassName="w-36"
+                        />
+                    </SettingsGroup>
                 </PanelSection>
                 <PanelSection
                     icon={Archive}
                     title="Snapshot retention"
                     description="Snapshots a version uses are always kept, and those of deleted versions are removed. This sets how many saved snapshots no version uses stay per dataset."
                 >
-                    <NumberSetting
-                        id="keep-snapshots"
-                        label="Keep the last saved snapshots per dataset"
-                        hint="Default 5. Older ones are removed with their files."
-                        value={data?.keep_snapshots}
-                        field="keep_snapshots"
-                        min={0}
-                    />
+                    <SettingsGroup>
+                        <NumberSetting
+                            id="keep-snapshots"
+                            label="Keep the last saved snapshots per dataset"
+                            description="Default 5. Older ones are removed with their files."
+                            value={data?.keep_snapshots}
+                            field="keep_snapshots"
+                            min={0}
+                            max={1000}
+                        />
+                    </SettingsGroup>
                 </PanelSection>
                 <ChecksSettings data={data} />
             </PanelSections>

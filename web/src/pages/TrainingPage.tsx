@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { Database } from "lucide-react";
-import { Button, Field, Input, Link } from "obp-ui";
+import { Button, Field, Link, NumberField } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
 import { type JobInfo, type MinibrainDetail, api, unwrap } from "~/api/client";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
@@ -27,8 +27,8 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     const preset = useRouterState({
         select: (state) => state.location.search as { rows?: unknown; epochs?: unknown },
     });
-    const [maxRows, setMaxRows] = useState(String(preset.rows ?? "3000"));
-    const [epochs, setEpochs] = useState(String(preset.epochs ?? "1"));
+    const [maxRows, setMaxRows] = useState<number | null>(Number(preset.rows) || 3000);
+    const [epochs, setEpochs] = useState<number | null>(Number(preset.epochs) || 1);
     const create = useMutation({
         mutationFn: (body: { kind: "prompt" | "lora"; max_rows?: number; epochs?: number }) =>
             unwrap(
@@ -36,8 +36,11 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
             ),
         onSuccess: invalidate,
     });
-    const train = () =>
-        create.mutate({ kind: "lora", max_rows: Number(maxRows), epochs: Number(epochs) });
+    const train = () => {
+        if (maxRows !== null && epochs !== null) {
+            create.mutate({ kind: "lora", max_rows: maxRows, epochs });
+        }
+    };
     return (
         <Section
             title="New version"
@@ -62,24 +65,33 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                 </Button>
                 <div className="flex flex-wrap items-end gap-2">
                     <Field id="max-rows" label="Training rows">
-                        <Input
+                        <NumberField
                             id="max-rows"
-                            className="w-28 tabular-nums"
-                            inputMode="numeric"
                             value={maxRows}
-                            onChange={(event) => setMaxRows(event.target.value)}
+                            onValueChange={setMaxRows}
+                            min={10}
+                            step={100}
+                            largeStep={1000}
+                            format={{ maximumFractionDigits: 0 }}
                         />
                     </Field>
                     <Field id="epochs" label="Epochs">
-                        <Input
+                        <NumberField
                             id="epochs"
-                            className="w-20 tabular-nums"
-                            inputMode="decimal"
                             value={epochs}
-                            onChange={(event) => setEpochs(event.target.value)}
+                            onValueChange={setEpochs}
+                            min={0.1}
+                            max={10}
+                            step={1}
+                            smallStep={0.1}
+                            format={{ maximumFractionDigits: 2 }}
                         />
                     </Field>
-                    <Button ref={trainButton} onClick={train} disabled={create.isPending}>
+                    <Button
+                        ref={trainButton}
+                        onClick={train}
+                        disabled={create.isPending || maxRows === null || epochs === null}
+                    >
                         Train new version
                     </Button>
                 </div>

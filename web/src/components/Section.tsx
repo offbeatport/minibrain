@@ -91,15 +91,19 @@ export function Stat({ label, value }: { label: string; value: ReactNode }) {
     );
 }
 
-export function ErrorLine({ error }: { error: unknown }) {
+export function errorMessage(error: unknown): string | undefined {
     if (!error) {
+        return undefined;
+    }
+    return error instanceof Error ? error.message : String(error);
+}
+
+export function ErrorLine({ error }: { error: unknown }) {
+    const message = errorMessage(error);
+    if (!message) {
         return null;
     }
-    return (
-        <p className="text-sm text-destructive">
-            {error instanceof Error ? error.message : String(error)}
-        </p>
-    );
+    return <p className="text-sm text-destructive">{message}</p>;
 }
 
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {

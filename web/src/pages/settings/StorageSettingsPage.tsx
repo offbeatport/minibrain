@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HardDrive } from "lucide-react";
-import { Button, Field, FieldGroup, Input, Label, Link, RadioGroup, RadioGroupItem } from "obp-ui";
+import {
+    Button,
+    Input,
+    Label,
+    Link,
+    RadioGroup,
+    RadioGroupItem,
+    SettingsGroup,
+    SettingsRow,
+} from "obp-ui";
 import { type FormEvent, useEffect, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
@@ -59,18 +68,24 @@ function TextField({
     onChange: (value: string) => void;
 }) {
     return (
-        <Field id={id} label={label} hint={hint}>
-            <Input
-                id={id}
-                type={type}
-                value={value}
-                placeholder={placeholder}
-                autoComplete="off"
-                spellCheck={false}
-                className={mono ? "font-mono" : undefined}
-                onChange={(event) => onChange(event.target.value)}
-            />
-        </Field>
+        <SettingsRow
+            id={id}
+            wide
+            label={label}
+            description={hint}
+            control={
+                <Input
+                    id={id}
+                    type={type}
+                    value={value}
+                    placeholder={placeholder}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={mono ? "font-mono" : undefined}
+                    onChange={(event) => onChange(event.target.value)}
+                />
+            }
+        />
     );
 }
 
@@ -122,7 +137,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                 </Label>
             </RadioGroup>
             {s3 && (
-                <FieldGroup className="max-w-xl">
+                <SettingsGroup className="mt-0 border-t">
                     <TextField
                         id="s3-endpoint"
                         label="Endpoint"
@@ -132,24 +147,22 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                         mono
                         onChange={(endpoint) => set({ endpoint })}
                     />
-                    <div className="grid gap-5 sm:grid-cols-2">
-                        <TextField
-                            id="s3-bucket"
-                            label="Bucket"
-                            value={draft.bucket}
-                            placeholder="ml-artifacts"
-                            mono
-                            onChange={(bucket) => set({ bucket })}
-                        />
-                        <TextField
-                            id="s3-prefix"
-                            label="Prefix"
-                            hint="A folder inside the bucket."
-                            value={draft.prefix}
-                            mono
-                            onChange={(prefix) => set({ prefix })}
-                        />
-                    </div>
+                    <TextField
+                        id="s3-bucket"
+                        label="Bucket"
+                        value={draft.bucket}
+                        placeholder="ml-artifacts"
+                        mono
+                        onChange={(bucket) => set({ bucket })}
+                    />
+                    <TextField
+                        id="s3-prefix"
+                        label="Prefix"
+                        hint="A folder inside the bucket."
+                        value={draft.prefix}
+                        mono
+                        onChange={(prefix) => set({ prefix })}
+                    />
                     <TextField
                         id="s3-region"
                         label="Region"
@@ -179,7 +192,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                         placeholder={settings.secret_set ? "Saved; leave empty to keep it" : ""}
                         onChange={(secret) => set({ secret })}
                     />
-                </FieldGroup>
+                </SettingsGroup>
             )}
             <div className="flex flex-wrap items-center gap-2">
                 {s3 && (
