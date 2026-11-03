@@ -1,4 +1,4 @@
-import { Button, Checkbox, Label } from "obp-ui";
+import { Button, Checkbox, Label, cn } from "obp-ui";
 import { Fragment, type ReactNode, useState } from "react";
 import type { CatalogEntry, CatalogVariantInfo, FitInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -213,25 +213,33 @@ function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
     );
 }
 
-function Option({
+export function Option({
     checked,
     onChange,
     count,
+    disabled,
     children,
 }: {
     checked: boolean | "indeterminate";
     onChange: (checked: boolean) => void;
     count?: number;
+    disabled?: boolean;
     children: ReactNode;
 }) {
     return (
-        <Label className="flex min-w-0 items-start gap-2 font-normal leading-snug">
+        <Label
+            className={cn(
+                "flex min-w-0 items-start gap-2 font-normal leading-snug",
+                disabled && "text-muted-foreground",
+            )}
+        >
             <Checkbox
                 checked={checked}
+                disabled={disabled}
                 onCheckedChange={(next) => onChange(next === true)}
                 className="mt-px"
             />
-            <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1">{children}</span>
             {count !== undefined && (
                 <span className="text-sm text-muted-foreground tabular-nums">{count}</span>
             )}
@@ -380,7 +388,7 @@ export function FilterPanel({
                     </>
                 )}
             </div>
-            <div className="flex flex-col gap-3 px-3 py-3">{toggles}</div>
+            <div className="flex flex-col gap-2 px-3 py-3">{toggles}</div>
             <Group title="Task">
                 <OptionList items={items("tasks", distinct("tasks"))} />
             </Group>

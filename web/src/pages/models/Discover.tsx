@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, Plus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Info, Plus } from "lucide-react";
 import {
     Badge,
     Button,
@@ -12,7 +12,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Label,
     Link,
     SearchInput,
     Select,
@@ -21,7 +20,6 @@ import {
     SelectTrigger,
     SelectValue,
     Skeleton,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -39,6 +37,7 @@ import {
     CLEARED,
     FIT_ORDER,
     FilterPanel,
+    Option,
     activeFilters,
     bestFit,
     fitsPatch,
@@ -505,77 +504,46 @@ function fitHint(catalog: CatalogResponse): string {
     return `Shows models that fit, or fit with limited headroom, on ${phrase}: ${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}.`;
 }
 
-function memoryCaption(catalog: CatalogResponse): string {
-    if (!catalog.hardware.known) {
-        return "Memory unknown, so fit isn't checked.";
-    }
-    return `${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}`;
-}
+const FITTING: FitInfo["level"][] = ["fits", "limited"];
 
-function FitsSwitch({
+function FitsOption({
     catalog,
     checked,
+    count,
     onChecked,
     onPool,
 }: {
     catalog: CatalogResponse;
     checked: boolean;
+    count: number;
     onChecked: (checked: boolean) => void;
     onPool: (pool: string) => void;
 }) {
-    const switchId = useId();
-    const hintId = useId();
     const known = catalog.hardware.known;
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-                <Label
-                    htmlFor={switchId}
-                    className={cn("font-normal", !known && "text-muted-foreground")}
-                >
-                    {`Fits ${poolPhrase(catalog)}`}
-                </Label>
-                <Switch
-                    id={switchId}
-                    checked={known && checked}
-                    disabled={!known}
-                    onCheckedChange={onChecked}
-                    aria-describedby={hintId}
-                />
-            </div>
+        <>
+            <Option
+                checked={known && checked}
+                disabled={!known}
+                onChange={onChecked}
+                count={known ? count : undefined}
+            >
+                {`Fits ${poolPhrase(catalog)}`}
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label="About hardware fit"
+                            className="flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <Info className="size-3.5" />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-72">{fitHint(catalog)}</TooltipContent>
+                </Tooltip>
+            </Option>
             <PoolSelect catalog={catalog} onPool={onPool} />
-            <p className="text-sm text-muted-foreground">{memoryCaption(catalog)}</p>
-            <span id={hintId} className="sr-only">
-                {fitHint(catalog)}
-            </span>
-        </div>
-    );
-}
-
-function LatestSwitch({
-    checked,
-    onChecked,
-}: {
-    checked: boolean;
-    onChecked: (checked: boolean) => void;
-}) {
-    const switchId = useId();
-    const hintId = useId();
-    return (
-        <div className="flex items-center justify-between gap-2">
-            <Label htmlFor={switchId} className="font-normal">
-                Latest generation only
-            </Label>
-            <Switch
-                id={switchId}
-                checked={checked}
-                onCheckedChange={onChecked}
-                aria-describedby={hintId}
-            />
-            <span id={hintId} className="sr-only">
-                Hides models that have a newer version in the catalogue.
-            </span>
-        </div>
+        </>
     );
 }
 
@@ -739,16 +707,30 @@ export function Discover({
     const select = (ids: string[]) => update({ selected: ids.join(",") });
     const toggles = (
         <>
-            <FitsSwitch
+            <FitsOption
                 catalog={data}
                 checked={filters.fit.length > 0}
+                count={
+                    data.entries.filter(
+                        (entry) =>
+                            matches(entry, filters, "fit") &&
+                            FITTING.includes(bestFit(entry).fit.level),
+                    ).length
+                }
                 onChecked={(checked) => update(fitsPatch(checked))}
                 onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
             />
-            <LatestSwitch
+            <Option
                 checked={latestOnly(filters)}
-                onChecked={(checked) => update(latestPatch(checked))}
-            />
+                onChange={(checked) => update(latestPatch(checked))}
+                count={
+                    data.entries.filter(
+                        (entry) => matches(entry, filters, "latest") && !entry.superseded_by,
+                    ).length
+                }
+            >
+                Latest generation only
+            </Option>
         </>
     );
     const panel = (
