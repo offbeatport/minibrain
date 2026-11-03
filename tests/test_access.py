@@ -21,6 +21,8 @@ ROUTE_ROLES = {
     ("POST", "/api/auth/logout"): "signed_in",
     ("POST", "/api/auth/setup"): "public",
     ("POST", "/api/auth/reset"): "public",
+    ("GET", "/api/auth/oidc/start"): "public",
+    ("GET", "/api/auth/oidc/callback"): "public",
     ("GET", "/api/accounts"): "admin",
     ("POST", "/api/accounts"): "admin",
     ("PATCH", "/api/accounts/{account_id}"): "admin",

@@ -20,7 +20,7 @@ from minibrain.auth.identity import LOCAL_PERSON, Person
 from minibrain.registry.models import AuditEvent, now
 
 FORWARDED_HEADERS = ("forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip")
-Reason = Literal["listen", "remote"]
+Reason = Literal["listen", "remote", "sign_in"]
 PROXY_SIGN_IN_GAP = timedelta(minutes=30)
 
 
@@ -85,6 +85,12 @@ def proxy_identity(session: Session, config: AuthConfig, facts: RequestFacts) ->
     return Identity(person=person, accounts=True, users=True, csrf_subject=f"proxy:{user.id}")
 
 
+def reason_of(listen: str, config: AuthConfig) -> Reason:
+    if not loopback_name(listen):
+        return "listen"
+    return "sign_in" if config.external else "remote"
+
+
 def identify(session: Session, listen: str, accounts_known: bool, facts: RequestFacts, config: AuthConfig) -> Identity:
     proxied = proxy_identity(session, config, facts)
     if proxied is not None:
@@ -97,5 +103,5 @@ def identify(session: Session, listen: str, accounts_known: bool, facts: Request
     users = accounts_known or users_exist(session)
     if not users and not config.external and reached_locally(listen, facts):
         return Identity(person=LOCAL_PERSON, accounts=False, users=False)
-    reason: Reason | None = None if users else ("listen" if not loopback_name(listen) else "remote")
+    reason = None if users else reason_of(listen, config)
     return Identity(person=None, accounts=True, users=users, reason=reason)

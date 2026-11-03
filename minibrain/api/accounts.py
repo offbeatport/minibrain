@@ -61,6 +61,7 @@ class AccountsInfo(BaseModel):
     default_role: RoleChoice
     default_role_locked: bool
     proxy_addresses: list[str]
+    oidc_issuer: str | None
 
 
 class AccountCreate(BaseModel):
@@ -152,6 +153,7 @@ def accounts(session: SessionDep, config: AuthDep) -> AccountsInfo:
         default_role=policy.value(session, "default_role"),
         default_role_locked="default_role" in policy.locked_sources(),
         proxy_addresses=[str(network) for network in proxy.networks] if proxy else [],
+        oidc_issuer=config.oidc.issuer if config.oidc else None,
     )
 
 

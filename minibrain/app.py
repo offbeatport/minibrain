@@ -39,6 +39,7 @@ from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
 from minibrain.auth.accounts import AccountError, SignInError, ensure_csrf_key
 from minibrain.auth.config import load_auth
+from minibrain.auth.oidc import OidcClient
 from minibrain.auth.passwords import PasswordError
 from minibrain.base_models import BaseModelSpec
 from minibrain.connections.spec import ConnectionProblem
@@ -187,6 +188,7 @@ def create_app(
     app.state.sessions = sessions
     app.state.csrf_key = csrf_key
     app.state.auth = load_auth()
+    app.state.oidc = OidcClient(app.state.auth.oidc) if app.state.auth.oidc else None
     app.state.accounts_on = False
     app.state.leader = leader_for(settings.database_url)
     app.state.store = store_for(settings)

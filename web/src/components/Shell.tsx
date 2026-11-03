@@ -143,7 +143,7 @@ function Gate({ pathname, children }: { pathname: string; children: ReactNode })
     }
     const info = session.data;
     if (info?.accounts && !info.person) {
-        return info.setup ? <SetupPage session={info} /> : <SignInPage />;
+        return info.setup ? <SetupPage session={info} /> : <SignInPage session={info} />;
     }
     if (info?.person && info.person.role == null) {
         return <NoAccessPage session={info} />;

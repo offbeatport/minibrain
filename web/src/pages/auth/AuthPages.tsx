@@ -24,6 +24,8 @@ const MIN_PASSWORD = 12;
 const SETUP_REASONS: Record<string, string> = {
     listen: "minibrain listens on a network address, so everyone who opens it signs in.",
     remote: "This page came through a proxy or from another machine, so everyone who opens it signs in.",
+    sign_in:
+        "Single sign-on or a sign-in proxy is set up, so everyone who opens minibrain signs in.",
 };
 
 function AuthFrame({
@@ -111,8 +113,40 @@ function PasswordFields({
     );
 }
 
-export function SignInPage() {
+function ssoHref(): string {
+    const here =
+        typeof window === "undefined" ? "/" : window.location.pathname + window.location.search;
+    const next = here.startsWith("/reset-password")
+        ? "/"
+        : here.replace(/[?&]sign_in_error=[^&]*/, "");
+    return `/api/auth/oidc/start?next=${encodeURIComponent(next || "/")}`;
+}
+
+function ssoError(): string | null {
+    const query = typeof window === "undefined" ? "" : window.location.search;
+    return new URLSearchParams(query).get("sign_in_error");
+}
+
+function SingleSignOn({ label, divider }: { label: string; divider: string }) {
+    const error = ssoError();
+    return (
+        <div className="flex flex-col gap-4">
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button asChild>
+                <a href={ssoHref()}>{`Sign in with ${label}`}</a>
+            </Button>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                {divider}
+                <span className="h-px flex-1 bg-border" />
+            </div>
+        </div>
+    );
+}
+
+export function SignInPage({ session }: { session?: SessionInfo }) {
     const signIn = useSignIn();
+    const sso = session?.methods.oidc;
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const submit = (event: FormEvent) => {
@@ -127,6 +161,7 @@ export function SignInPage() {
             <form onSubmit={submit}>
                 <FieldGroup>
                     <InsecureNotice />
+                    {sso && <SingleSignOn label={sso} divider="or with a password" />}
                     <Field id="email" label="Email">
                         <Input
                             id="email"
@@ -135,7 +170,7 @@ export function SignInPage() {
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}
                             required
-                            autoFocus
+                            autoFocus={!sso}
                         />
                     </Field>
                     <Field id="password" label="Password">
@@ -149,7 +184,11 @@ export function SignInPage() {
                         />
                     </Field>
                     <ErrorLine error={signIn.error} />
-                    <Button type="submit" disabled={signIn.isPending}>
+                    <Button
+                        type="submit"
+                        variant={sso ? "outline" : "default"}
+                        disabled={signIn.isPending}
+                    >
                         {signIn.isPending ? "Signing in…" : "Sign in"}
                     </Button>
                 </FieldGroup>
@@ -226,6 +265,9 @@ export function SetupPage({ session }: { session: SessionInfo }) {
         >
             <div className="flex flex-col gap-5">
                 <InsecureNotice />
+                {session.methods.oidc && (
+                    <SingleSignOn label={session.methods.oidc} divider="or create a local admin" />
+                )}
                 <AdminForm submitLabel="Create admin account" />
             </div>
         </AuthFrame>

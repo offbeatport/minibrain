@@ -1,6 +1,8 @@
 import ipaddress
+import os
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 from minibrain.auth.addresses import ip_of
 from minibrain.auth.roles import Role, highest, role_of
@@ -11,10 +13,23 @@ USER_HEADER = "x-forwarded-user"
 EMAIL_HEADER = "x-forwarded-email"
 GROUPS_HEADER = "x-forwarded-groups"
 NAME_HEADER = "x-forwarded-preferred-username"
+OIDC_CREDENTIAL_ENV = "MINIBRAIN_OIDC_CLIENT_SECRET"
 
 
 class AuthConfigError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class OidcConfig:
+    issuer: str
+    client_id: str
+    client_secret: str | None = None
+    label: str = "single sign-on"
+    scopes: tuple[str, ...] = ("openid", "email", "profile")
+    groups_claim: str = "groups"
+    redirect_url: str | None = None
+    ca_bundle: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,10 +49,11 @@ class ProxyConfig:
 class AuthConfig:
     roles: dict[str, Role] = field(default_factory=dict)
     proxy: ProxyConfig | None = None
+    oidc: OidcConfig | None = None
 
     @property
     def external(self) -> bool:
-        return self.proxy is not None
+        return self.proxy is not None or self.oidc is not None
 
     def mapped_role(self, groups: list[str]) -> Role | None:
         wanted = {group.strip().lower() for group in groups}
@@ -93,6 +109,39 @@ def roles_of(section: Any) -> dict[str, Role]:
     return found
 
 
+def text_of(section: dict[str, Any], key: str) -> str | None:
+    value = section.get(key)
+    return str(value).strip() or None if value is not None else None
+
+
+def oidc_of(section: Any) -> OidcConfig | None:
+    if not section:
+        return None
+    if not isinstance(section, dict):
+        raise AuthConfigError("auth.oidc must be a mapping with issuer and client_id")
+    issuer = text_of(section, "issuer")
+    client_id = text_of(section, "client_id")
+    if not issuer or urlparse(issuer).scheme not in ("https", "http") or not client_id:
+        raise AuthConfigError("auth.oidc needs an issuer URL and a client_id")
+    scopes = section.get("scopes") or ["openid", "email", "profile"]
+    if not isinstance(scopes, list) or "openid" not in scopes:
+        raise AuthConfigError("auth.oidc.scopes is a list that includes openid")
+    return OidcConfig(
+        issuer=issuer,
+        client_id=client_id,
+        client_secret=os.environ.get(OIDC_CREDENTIAL_ENV, "").strip() or text_of(section, "client_secret"),
+        label=text_of(section, "label") or "single sign-on",
+        scopes=tuple(str(scope) for scope in scopes),
+        groups_claim=text_of(section, "groups_claim") or "groups",
+        redirect_url=text_of(section, "redirect_url"),
+        ca_bundle=text_of(section, "ca_bundle"),
+    )
+
+
 def load_auth() -> AuthConfig:
     section = config_section("auth")
-    return AuthConfig(roles=roles_of(section.get("roles")), proxy=proxy_of(section.get("proxy")))
+    return AuthConfig(
+        roles=roles_of(section.get("roles")),
+        proxy=proxy_of(section.get("proxy")),
+        oidc=oidc_of(section.get("oidc")),
+    )

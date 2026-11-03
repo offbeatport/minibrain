@@ -519,6 +519,19 @@ function SignInSources() {
                     control={<Badge variant="success">On</Badge>}
                 />
                 <SettingsRow
+                    label="Single sign-on"
+                    description={
+                        info?.oidc_issuer
+                            ? `OpenID Connect with ${info.oidc_issuer}, authorization code with PKCE.`
+                            : "Add auth.oidc with an issuer and client_id to sign people in with Entra, Okta, ADFS or Keycloak."
+                    }
+                    control={
+                        <Badge variant={methods?.oidc ? "success" : "neutral"}>
+                            {methods?.oidc ? "On" : "Off"}
+                        </Badge>
+                    }
+                />
+                <SettingsRow
                     label="Reverse proxy"
                     description={
                         info?.proxy_addresses.length
