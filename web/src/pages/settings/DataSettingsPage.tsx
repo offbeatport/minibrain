@@ -159,7 +159,6 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                     field="min_label_rows"
                     min={1}
                     max={100_000}
-                    unit="rows"
                 />
             </SettingsGroup>
         </PanelSection>
@@ -189,7 +188,6 @@ export function DataSettingsPage() {
                             max={50_000_000}
                             step={1000}
                             largeStep={10_000}
-                            unit="rows"
                             groupClassName="w-36"
                         />
                     </SettingsGroup>
