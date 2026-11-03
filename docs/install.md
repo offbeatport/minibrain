@@ -145,6 +145,8 @@ The build runs the UI build and `uv build` in builder stages, installs the wheel
 the DuckDB extensions for the image's platform. Build on the architecture you deploy, or use
 `docker buildx build --platform linux/amd64`.
 
+A CycloneDX SBOM of the built image comes from syft: [Security → Docker image](security.md#docker-image).
+
 ### Run
 
 The host needs an NVIDIA driver that supports CUDA 13.2 (`nvidia-smi` shows CUDA Version 13.2 or higher) and the

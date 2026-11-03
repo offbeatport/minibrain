@@ -4482,6 +4482,50 @@
         }
       }
     },
+    "/api/minibrains/{slug}/versions/{number}/aibom.json": {
+      "get": {
+        "tags": [
+          "model cards"
+        ],
+        "summary": "Aibom Json",
+        "operationId": "aibom_json_api_minibrains__slug__versions__number__aibom_json_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/feedback": {
       "get": {
         "tags": [

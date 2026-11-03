@@ -24,6 +24,14 @@ env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain" }
 description = "Wheel with the built UI inside, in dist/"
 run = "uv build --wheel"
 
+[tasks.sbom]
+description = "CycloneDX SBOMs of the Python and web dependency sets in sbom/, as CI makes them; the web one needs syft"
+run = [
+    "uv export --quiet --frozen --no-dev --all-extras --format cyclonedx1.5 --preview-features sbom-export -o sbom/minibrain-python.cdx.json",
+    "syft scan file:web/pnpm-lock.yaml --quiet --source-name minibrain-web -o cyclonedx-json@1.6=sbom/minibrain-web.cdx.json",
+]
+env = { SYFT_CHECK_FOR_APP_UPDATE = "false" }
+
 [tasks.api-types]
 description = "Regenerate the TypeScript API client from FastAPI"
 run = "pnpm --dir web gen:api"

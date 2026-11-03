@@ -28,6 +28,10 @@ export function modelCardDownloadHref(slug: string, number: number, format: "md"
     return `/api/minibrains/${encodeURIComponent(slug)}/versions/${number}/card.${format}`;
 }
 
+export function modelAibomHref(slug: string, number: number): string {
+    return `/api/minibrains/${encodeURIComponent(slug)}/versions/${number}/aibom.json`;
+}
+
 export function jobHref(job: JobInfo): string | null {
     if (job.minibrain) {
         return job.kind === "prepare" ? modelDataHref(job.minibrain) : `/training?job=${job.id}`;

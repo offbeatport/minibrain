@@ -98,3 +98,73 @@ address and nowhere else; the network policy does not apply to it, as it does no
   Audit log shows the error and how many events wait. Turning export on for the first time sends the whole retained
   log, oldest first.
 
+## Bills of materials
+
+### Software (SBOM)
+
+Every CI run uploads a `minibrain-sbom` artifact beside the wheel with two CycloneDX JSON files. `mise run sbom`
+writes the same two into `sbom/`.
+
+| File | Format | Made by | Covers |
+|---|---|---|---|
+| `minibrain-python.cdx.json` | CycloneDX 1.5 | `uv export --format cyclonedx1.5` from `uv.lock` | The wheel's dependencies with every extra (`postgres`, `mlx`, `llamacpp`), no dev group: version, purl, the SHA-256 of every sdist and wheel, platform markers and the dependency graph |
+| `minibrain-web.cdx.json` | CycloneDX 1.6 | syft from `web/pnpm-lock.yaml` | Every package in the lockfile, by name, version and purl. syft does not tell dev dependencies apart in pnpm lockfiles, so the build tools (Vite, TypeScript, Biome) are listed too; the built UI ships only what `dependencies` pulls in |
+
+- Both read only the lockfile: no install, no registry lookups. `uv export --frozen` never resolves; uv marks the
+  CycloneDX export experimental (`--preview-features sbom-export`), so the format can change with uv, which CI pins.
+- syft's network features (remote licence lookups for npm, Python, Go and Maven) are off by default and stay off.
+  Its update check is on by default; `SYFT_CHECK_FOR_APP_UPDATE=false` turns it off, in CI and in `mise run sbom`.
+- CI downloads syft by release version and checks the archive's SHA-256 (`SYFT_VERSION` and `SYFT_SHA256` in
+  `.github/workflows/ci.yml`).
+
+### Docker image
+
+CI does not build the image (the CUDA one is about 7 GB). Its Python packages are the `--no-dev --extra postgres`
+subset of `minibrain-python.cdx.json`; for the whole image, operating system packages included, run syft against the
+built image:
+
+```sh
+SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \
+  syft scan docker:minibrain:cuda --source-name minibrain --source-version "$(git rev-parse HEAD)" \
+  -o cyclonedx-json@1.6=minibrain-cuda.cdx.json
+```
+
+- `docker:` reads the image from the local Docker daemon; nothing is pulled. On a machine without Docker, scan the
+  saved image instead: `docker save minibrain:cuda -o minibrain-cuda.tar`, then
+  `syft scan docker-archive:minibrain-cuda.tar`.
+- `SYFT_FILE_METADATA_DIGESTS=sha256` keeps file digests to SHA-256; syft adds SHA-1 by default.
+- Measured on the CPU image (syft 1.54.1): about 4,100 components (88 Debian packages, 97 Python packages, the Rust
+  crates compiled into Python wheels, and the files those packages own with their SHA-256), 3 MB, under a minute.
+  Two Debian packages carry licence IDs newer than CycloneDX 1.6's SPDX list (`SMAIL-GPL`, `Artistic-dist`), so a
+  strict schema check flags those two entries.
+
+### AI bill of materials (AI-BOM)
+
+Every version has a CycloneDX 1.6 ML-BOM: `GET /api/minibrains/{slug}/versions/{n}/aibom.json`, or **Download
+AI-BOM** on the model card page (`{slug}-v{n}-aibom.cdx.json`, `application/vnd.cyclonedx+json`). It is built from
+the same data as the model card, without the deployment history, so deploying or undeploying a version does not
+change it.
+
+| Part | CycloneDX | Holds |
+|---|---|---|
+| The version | `metadata.component`, `machine-learning-model` | Name, number, kind, status, who created it; the recipe (`minibrain:recipe:*`), training and evaluation runs (`minibrain:training:*`, `minibrain:evaluation:*`) as properties; a `model-card` reference to `card.json` |
+| Model card | `metadata.component.modelCard` | Task, architecture (LoRA adapter on the base, or the base with the task prompt and few-shot examples), the snapshot as its dataset, the labels; held-out and test accuracy, macro F1, invalid-answer rate, per-label precision, recall, F1 and support, latency p50 and p95 (`quantitativeAnalysis.performanceMetrics`, sliced by split and label); intended use and every derived and written limit (`considerations`) |
+| Base model | component, `machine-learning-model` | Repository and revision, `pkg:huggingface` purl, the licence (SPDX ID where one exists, else its name and URL), the content hash as SHA-256, whether it was recorded when training started, who accepted the licence |
+| Adapter | component, `file` (LoRA versions only) | The adapter archive's artifact ID, which is the SHA-256 of the tar, its size |
+| Training snapshot | component, `data` | The snapshot hash as SHA-256, rows per split, when it was taken, the SQL, every data check and its result, personal data findings as `sensitiveData` |
+| Sources | component, `data`, one per table | Table, source kind and fingerprint; uploads also carry the file's SHA-256 as a hash. Folder and remote fingerprints are SHA-256 over a listing or the source's state, so they stay a property |
+| Dependencies | `dependencies` | The version on the base, the adapter and the snapshot; the adapter on the base; the snapshot on its sources |
+
+The output is deterministic: the same version gives the same bytes. `metadata.timestamp` is the newest of the
+version's creation, its training and evaluation finish times, the base model's licence acceptance and the last card
+edit. `metadata.properties` carries `minibrain:aibom:sha256`, the SHA-256 of the canonical BOM: the BOM without
+`serialNumber` and `metadata.properties`, as JSON with keys sorted, no whitespace and non-ASCII characters kept (the
+model card's canonical form). `serialNumber` is a version 8 UUID made from the first 16 bytes of that digest, so it
+changes whenever the content does. Check a download with:
+
+```sh
+python3 -c 'import hashlib,json,sys; b=json.load(open(sys.argv[1])); b.pop("serialNumber"); p=b["metadata"].pop("properties"); s=json.dumps(b,sort_keys=True,separators=(",",":"),ensure_ascii=False); print(hashlib.sha256(s.encode()).hexdigest(), p[0]["value"])' support-triage-v1-aibom.cdx.json
+```
+
+Both printed values match for an unchanged file. `tests/test_aibom.py` validates prompt-only and trained versions
+against the CycloneDX 1.6 JSON schema, vendored in `tests/cyclonedx/` (Apache 2.0) so the test needs no network.

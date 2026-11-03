@@ -23,7 +23,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
 import { percent } from "~/lib/format";
-import { modelCardDownloadHref } from "~/lib/modelLinks";
+import { modelAibomHref, modelCardDownloadHref } from "~/lib/modelLinks";
 import {
     ApprovalsSection,
     BaseSection,
@@ -222,6 +222,11 @@ function Downloads({ target }: { target: Target }) {
             <Button variant="outline" asChild>
                 <a href={modelCardDownloadHref(target.slug, target.number, "json")} download>
                     Download JSON
+                </a>
+            </Button>
+            <Button variant="outline" asChild>
+                <a href={modelAibomHref(target.slug, target.number)} download>
+                    Download AI-BOM
                 </a>
             </Button>
         </>

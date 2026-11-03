@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Response
 from sqlalchemy.orm import Session
 
+from minibrain.api.aibom import MEDIA_TYPE, adapter_of, build_aibom, edited_at, export_aibom
 from minibrain.api.card_builder import build_card
 from minibrain.api.card_export import card_data, digest, export_json, export_markdown
 from minibrain.api.card_schemas import ModelCard, ModelCardEdit, ModelCardExport
@@ -11,6 +12,7 @@ from minibrain.api.policies import LOCAL_USER
 from minibrain.registry.models import AuditEvent, Minibrain, Version
 from minibrain.registry.service import get_minibrain, get_version
 from minibrain.settings import Settings
+from minibrain.versions import library_version
 
 router = APIRouter(prefix="/api/minibrains", tags=["model cards"])
 
@@ -62,6 +64,16 @@ def card_markdown(slug: str, number: int, session: SessionDep, settings: Setting
     card = card_of(session, settings, minibrain, get_version(minibrain, number))
     body = export_markdown(card, digest(card_data(card)))
     return download(body, "text/markdown; charset=utf-8", f"{slug}-v{number}-model-card.md")
+
+
+@router.get("/{slug}/versions/{number}/aibom.json", response_class=Response)
+def aibom_json(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
+    minibrain = get_minibrain(session, slug)
+    version = get_version(minibrain, number)
+    card = card_of(session, settings, minibrain, version)
+    edited = edited_at(session, card.version.id)
+    bom = build_aibom(card, adapter_of(session, version), edited, library_version("minibrain") or "unknown")
+    return download(export_aibom(bom), MEDIA_TYPE, f"{slug}-v{number}-aibom.cdx.json")
 
 
 @router.put("/{slug}/versions/{number}/card")

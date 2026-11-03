@@ -14,6 +14,8 @@ concurrency:
 env:
   UV_VERSION: "0.13.5"
   NODE_VERSION: "24"
+  SYFT_VERSION: "1.54.1"
+  SYFT_SHA256: "c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47"
 
 jobs:
   python:
@@ -103,4 +105,30 @@ jobs:
         with:
           name: minibrain-wheel
           path: dist/*.whl
+          if-no-files-found: error
+      - name: Python SBOM from uv.lock
+        run: >-
+          uv export --quiet --frozen --no-dev --all-extras --format cyclonedx1.5 --preview-features sbom-export
+          -o sbom/minibrain-python.cdx.json
+      - name: Install syft
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/syft.tar.gz" \
+            "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          echo "${SYFT_SHA256}  ${RUNNER_TEMP}/syft.tar.gz" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/syft.tar.gz" -C "${RUNNER_TEMP}" syft
+      - name: Web SBOM from pnpm-lock.yaml
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: "false"
+        run: >-
+          "${RUNNER_TEMP}/syft" scan file:web/pnpm-lock.yaml --quiet
+          --source-name minibrain-web --source-version "${GITHUB_SHA}"
+          -o cyclonedx-json@1.6=sbom/minibrain-web.cdx.json
+      - name: Check the SBOMs list the dependencies
+        run: |
+          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.5" and (.components | length) > 50' sbom/minibrain-python.cdx.json
+          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6" and (.components | length) > 50' sbom/minibrain-web.cdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: minibrain-sbom
+          path: sbom/*.cdx.json
           if-no-files-found: error

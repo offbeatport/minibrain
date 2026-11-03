@@ -57,6 +57,7 @@ dev = [
     "flask-cors>=6.0.5",
     "hatchling>=1.33.0",
     "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
     "moto[s3]>=5.2.5",
     "openai",
     "pyright",
