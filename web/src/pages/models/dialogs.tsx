@@ -88,7 +88,7 @@ export function EditModelDialog({
     });
     return (
         <Dialog open={row !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -164,7 +164,7 @@ export function ConfirmAction({
     const blocked = Boolean(confirmation?.acknowledge) && !acknowledged;
     return (
         <Dialog open={confirmation !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{confirmation?.title}</DialogTitle>
                     <DialogDescription asChild>
@@ -221,7 +221,7 @@ export function TestBaseDialog({
     }, [row, test.reset]);
     return (
         <Dialog open={row !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Test {row?.name}</DialogTitle>
                     <DialogDescription>

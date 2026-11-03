@@ -149,7 +149,7 @@ function KeyDialog({
     const creating = editing?.mode !== "edit";
     return (
         <Dialog open={editing !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg">
+            <DialogContent>
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
