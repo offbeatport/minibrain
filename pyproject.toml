@@ -3,7 +3,7 @@ name = "minibrain"
 version = "0.0.0"
 description = "Private platform for small, task-specific models"
 license = "Apache-2.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "accelerate",
     "alembic>=1.20.1",

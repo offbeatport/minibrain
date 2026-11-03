@@ -1,5 +1,6 @@
 import io
 import logging
+import platform
 import zipfile
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def test_install_overview_reports_versions_places_and_network(harness: Harness) 
     assert harness.client.put("/api/policies/allowed_hosts", json={"value": "huggingface.co"}).status_code == 200
     found = harness.client.get("/api/system/install").json()
     software = found["software"]
-    assert software["python"].startswith("3.12") and software["duckdb"] and software["arch"]
+    assert software["python"] == platform.python_version() and software["duckdb"] and software["arch"]
     places = found["places"]
     assert places["home"] == str(harness.settings.home)
     assert places["database_kind"] == "sqlite" and places["database_bytes"] > 0
