@@ -51,10 +51,10 @@ import {
 import { cancelJob, useModelsRefresh } from "./dialogs";
 
 const FIT_LABELS: Record<FitInfo["level"], string> = {
-    fits: "Estimated fit",
-    limited: "Limited headroom",
-    insufficient: "Insufficient memory",
-    unknown: "Compatibility not checked",
+    fits: "Fits",
+    limited: "Tight",
+    insufficient: "Too big",
+    unknown: "Not checked",
 };
 export const FIT_TONES: Record<FitInfo["level"], Tone> = {
     fits: "success",
@@ -77,7 +77,16 @@ export function Fit({ fit }: { fit: FitInfo }) {
                     <StatusText tone={FIT_TONES[fit.level]}>{fitLabel(fit)}</StatusText>
                 </button>
             </TooltipTrigger>
-            <TooltipContent className="max-w-80">{fit.basis}</TooltipContent>
+            <TooltipContent className="max-w-80">
+                <span className="flex flex-col gap-0.5">
+                    {fit.available_bytes !== null && (
+                        <span className="tabular-nums">
+                            {`Needs ${bytes(fit.needed_bytes)} of ${bytes(fit.available_bytes)}`}
+                        </span>
+                    )}
+                    <span>{fit.basis}</span>
+                </span>
+            </TooltipContent>
         </Tooltip>
     );
 }
@@ -431,7 +440,10 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
         },
         {
             id: "fit",
-            header: "Hardware fit",
+            header: "Fits here",
+            meta: {
+                info: "Estimated from the best-fitting variant's memory needs and this machine's memory.",
+            },
             accessorFn: (entry) => FIT_ORDER.indexOf(bestFit(entry).fit.level),
             cell: ({ row }) => <Fit fit={bestFit(row.original).fit} />,
         },
