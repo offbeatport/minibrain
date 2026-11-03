@@ -32,6 +32,12 @@ class VersionStatus(StrEnum):
     FAILED = "failed"
 
 
+class FeedbackStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
 class JobKind(StrEnum):
     PREPARE = "prepare"
     TRAIN = "train"
@@ -227,6 +233,7 @@ class Snapshot(Base):
     checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    feedback_rows: Mapped[int] = mapped_column(default=0, server_default="0")
 
     minibrain: Mapped[Minibrain | None] = relationship(back_populates="snapshots", foreign_keys=[minibrain_id])
     dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
@@ -378,7 +385,11 @@ class KeyScope(Base):
 
 class RequestLog(Base):
     __tablename__ = "request_logs"
-    __table_args__ = (Index("ix_request_logs_minibrain", "minibrain_id", "id"), {"sqlite_autoincrement": True})
+    __table_args__ = (
+        Index("ix_request_logs_minibrain", "minibrain_id", "id"),
+        Index("ix_request_logs_response", "response_id"),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     at: Mapped[datetime] = mapped_column(UtcDateTime)
@@ -390,6 +401,42 @@ class RequestLog(Base):
     latency_ms: Mapped[float]
     prompt_tokens: Mapped[int] = mapped_column(default=0)
     completion_tokens: Mapped[int] = mapped_column(default=0)
+    response_id: Mapped[str | None] = mapped_column(default=None)
+    input: Mapped[str | None] = mapped_column(default=None)
+    output: Mapped[str | None] = mapped_column(default=None)
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+    __table_args__ = (
+        Index("ix_feedback_queue", "priority", "id"),
+        Index("ix_feedback_input", "minibrain_id", "input_key"),
+        Index("ix_feedback_response", "response_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
+    version: Mapped[int | None] = mapped_column(default=None)
+    response_id: Mapped[str | None] = mapped_column(default=None)
+    origin: Mapped[str]
+    key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"), default=None)
+    rating: Mapped[str]
+    input: Mapped[str]
+    input_key: Mapped[str]
+    output: Mapped[str | None] = mapped_column(default=None)
+    correction: Mapped[str | None] = mapped_column(default=None)
+    comment: Mapped[str | None] = mapped_column(default=None)
+    status: Mapped[str] = mapped_column(default=FeedbackStatus.PENDING)
+    label: Mapped[str | None] = mapped_column(default=None)
+    priority: Mapped[int] = mapped_column(default=1)
+    assignee: Mapped[str | None] = mapped_column(default=None)
+    reviewed_by: Mapped[str | None] = mapped_column(default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    minibrain: Mapped[Minibrain] = relationship()
 
 
 class CatalogModel(Base):
