@@ -1,5 +1,5 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { ChevronLeft } from "lucide-react";
 import {
     Button,
@@ -12,14 +12,21 @@ import {
     DialogHeader,
     DialogTitle,
     Link,
+    SearchInput,
     SearchList,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
 import { useMemo, useState } from "react";
 import type { JobInfo, MinibrainSummary } from "~/api/client";
-import { useJob, useMinibrains, useTrainingJobs } from "~/api/queries";
+import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
+import { isActiveJob, useJob, useMinibrains } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
@@ -33,7 +40,9 @@ import { Training } from "../TrainingPage";
 import { Updated } from "../models/MyModels";
 
 const PATH = "/training";
-const KEYS = ["model", "status", "job"] as const;
+const KEYS = ["model", "status", "job", "q", "since"] as const;
+const TRAINING_KINDS = ["train", "eval"];
+const ANY_TIME = "any";
 
 const KIND_NAMES: Record<string, string> = {
     train: "Training",
@@ -86,7 +95,7 @@ function Progress({ job }: { job: JobInfo }) {
 }
 
 function jobColumns(href: (job: JobInfo) => string): ColumnDef<JobInfo, unknown>[] {
-    return [
+    const columns: ColumnDef<JobInfo, unknown>[] = [
         {
             id: "model",
             header: "Model",
@@ -158,6 +167,15 @@ function jobColumns(href: (job: JobInfo) => string): ColumnDef<JobInfo, unknown>
             ),
         },
     ];
+    return columns.map((column) => ({ ...column, enableSorting: column.id === "id" }));
+}
+
+function sortingFor(order: JobOrder): SortingState {
+    return [{ id: "id", desc: order === "newest" }];
+}
+
+function orderFrom(sorting: SortingState): JobOrder {
+    return sorting[0]?.desc === false ? "oldest" : "newest";
 }
 
 function jobCaption(job: JobInfo): string {
@@ -264,18 +282,22 @@ function jobId(value: string | undefined): number | null {
 
 export function TrainingListPage() {
     const { search, update } = useListSearch(PATH, KEYS);
-    const jobs = useTrainingJobs();
     const minibrains = useMinibrains();
     const [picking, setPicking] = useState(false);
+    const [order, setOrder] = useState<JobOrder>("newest");
     const models = splitList(search.model);
     const statuses = splitList(search.status);
-    const all = jobs.data ?? [];
-    const visible = all.filter(
-        (job) =>
-            (models.length === 0 || models.includes(job.minibrain ?? "")) &&
-            (statuses.length === 0 || statuses.includes(job.status)),
-    );
-    const filtering = models.length + statuses.length > 0;
+    const filter = {
+        kind: TRAINING_KINDS,
+        minibrain: models,
+        status: statuses,
+        q: search.q,
+        since: search.since,
+        order,
+    };
+    const jobs = useJobList(filter);
+    const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
+    const filtering = models.length + statuses.length > 0 || Boolean(search.q || search.since);
     const columns = useMemo(
         () => jobColumns((job) => listHref(PATH, { ...search, job: String(job.id) })),
         [search],
@@ -283,14 +305,14 @@ export function TrainingListPage() {
     const modelOptions = (minibrains.data ?? []).map((item) => ({
         value: item.slug,
         label: item.name,
-        count: all.filter((job) => job.minibrain === item.slug).length,
+        count: facets.data?.minibrains[item.slug] ?? 0,
     }));
     const statusOptions = JOB_STATUSES.map((status) => ({
         value: status,
         label: jobStatusLabel(status),
-        count: all.filter((job) => job.status === status).length,
+        count: facets.data?.statuses[status] ?? 0,
     }));
-    const clear = () => update({ model: "", status: "" });
+    const clear = () => update({ model: "", status: "", q: "", since: "" });
     return (
         <Page wide>
             <PageHeader
@@ -299,6 +321,13 @@ export function TrainingListPage() {
                 actions={<Button onClick={() => setPicking(true)}>Train a model</Button>}
             />
             <div className="flex flex-wrap items-center gap-2">
+                <SearchInput
+                    aria-label="Search jobs"
+                    placeholder="Search by model or job ID"
+                    value={search.q ?? ""}
+                    onValueChange={(q) => update({ q })}
+                    className="w-full min-w-48 max-w-xs flex-1"
+                />
                 <CheckboxSelect
                     label="Model"
                     allLabel="All models"
@@ -315,6 +344,24 @@ export function TrainingListPage() {
                     value={statuses}
                     onValueChange={(next) => update({ status: next.join(",") })}
                 />
+                <Select
+                    value={search.since ?? ANY_TIME}
+                    onValueChange={(next) =>
+                        update({ since: next === ANY_TIME ? "" : String(next) })
+                    }
+                >
+                    <SelectTrigger aria-label="Created" className="w-auto min-w-36">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ANY_TIME}>Any time</SelectItem>
+                        {SINCE_CHOICES.map((choice) => (
+                            <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 {filtering && (
                     <Button variant="ghost" onClick={clear}>
                         Clear filters
@@ -324,11 +371,18 @@ export function TrainingListPage() {
             <ErrorLine error={jobs.error} />
             <DataGrid
                 columns={columns}
-                rows={visible}
+                rows={jobs.rows}
+                getRowId={(job) => String(job.id)}
                 loading={jobs.isLoading}
                 storageKey="minibrain.training.columns"
                 columnPicker
                 hiddenColumns={["id", "attempt"]}
+                sorting={sortingFor(order)}
+                onSortingChange={(next) => setOrder(orderFrom(next))}
+                hasMore={jobs.hasMore}
+                loadingMore={jobs.loadingMore}
+                onLoadMore={jobs.loadMore}
+                total={jobs.total}
                 onOpen={(job) => update({ job: String(job.id) })}
                 rowLabel={(job) =>
                     `${job.minibrain_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`

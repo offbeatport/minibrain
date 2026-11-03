@@ -1143,6 +1143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Facets */
+        get: operations["job_facets_api_jobs_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -2731,6 +2748,19 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** JobFacets */
+        JobFacets: {
+            /** Total */
+            total: number;
+            /** Statuses */
+            statuses: {
+                [key: string]: number;
+            };
+            /** Minibrains */
+            minibrains: {
+                [key: string]: number;
+            };
+        };
         /** JobInfo */
         JobInfo: {
             /** Id */
@@ -2773,6 +2803,15 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+        };
+        /** JobPage */
+        JobPage: {
+            /** Items */
+            items: components["schemas"]["JobInfo"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
         };
         /** KeyCreate */
         KeyCreate: {
@@ -6247,10 +6286,16 @@ export interface operations {
     list_jobs_api_jobs_get: {
         parameters: {
             query?: {
-                minibrain?: string | null;
-                status?: string | null;
-                kind?: string[] | null;
                 limit?: number;
+                cursor?: string | null;
+                order?: "newest" | "oldest";
+                minibrain?: string[] | null;
+                kind?: string[] | null;
+                status?: string[] | null;
+                id?: number[] | null;
+                q?: string;
+                since?: string | null;
+                until?: string | null;
             };
             header?: never;
             path?: never;
@@ -6264,7 +6309,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JobInfo"][];
+                    "application/json": components["schemas"]["JobPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_facets_api_jobs_facets_get: {
+        parameters: {
+            query?: {
+                minibrain?: string[] | null;
+                kind?: string[] | null;
+                status?: string[] | null;
+                id?: number[] | null;
+                q?: string;
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobFacets"];
                 };
             };
             /** @description Validation Error */

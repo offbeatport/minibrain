@@ -17,7 +17,7 @@ def queued_training(harness: Harness) -> None:
 
 
 def train_job(harness: Harness) -> dict:
-    job_id = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()[0]["id"]
+    job_id = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()["items"][0]["id"]
     return harness.client.get(f"/api/jobs/{job_id}").json()
 
 

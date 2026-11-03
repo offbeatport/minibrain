@@ -212,7 +212,7 @@ def test_checksum_mismatch_is_retried_not_trusted(harness: Harness, hub: Path) -
     (hub / REPO / "resolve" / REVISION / "model.safetensors").write_bytes(b"tampered" * 875)
     download_tiny(harness)
     harness.worker(kinds=["download"]).run_once()
-    job = harness.client.get("/api/jobs?kind=download").json()[0]
+    job = harness.client.get("/api/jobs?kind=download").json()["items"][0]
     assert job["status"] == "queued" and "failed validation" in (job["error"] or "")
     assert rows(harness)["tiny"]["availability"]["state"] == "downloading"
 

@@ -76,7 +76,7 @@ def test_snapshot_is_taken_from_the_dataset_without_a_job(harness: Harness) -> N
     assert (again["hash"], again["id"]) == (snapshot["hash"], snapshot["id"])
     golden = harness.client.get(f"/api/minibrains/{SLUG}/golden").json()
     assert len(golden) == 20
-    assert harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=prepare").json() == []
+    assert harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=prepare").json()["items"] == []
 
 
 def test_scored_versions_go_live_only_when_deployed(harness: Harness) -> None:
@@ -182,7 +182,7 @@ def test_playground_parses_label(harness: Harness) -> None:
 def test_cancel_queued_job_and_delete_guard(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "lora")
-    job = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()[0]
+    job = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()["items"][0]
     assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 409
     assert harness.client.post(f"/api/jobs/{job['id']}/cancel").json()["status"] == "cancelled"
     assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "failed"
@@ -202,7 +202,7 @@ def test_recent_jobs_span_minibrains(harness: Harness) -> None:
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
     harness.client.post("/api/minibrains", json={"name": "Other"})
-    jobs = harness.client.get("/api/jobs?limit=5").json()
+    jobs = harness.client.get("/api/jobs?limit=5").json()["items"]
     assert {(job["minibrain"], job["minibrain_name"]) for job in jobs} == {(SLUG, "Support Triage")}
     summaries = {item["slug"]: item for item in harness.client.get("/api/minibrains").json()}
     assert summaries[SLUG]["current_accuracy"] == 0.4

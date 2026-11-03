@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
     Button,
     DataGrid,
@@ -16,6 +16,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { type JobInfo, api, unwrap } from "~/api/client";
+import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
@@ -24,7 +25,6 @@ import { jobDuration, jobSeconds } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { exactTime, relativeTime } from "~/lib/time";
 
-const JOBS = ["jobs", "all"] as const;
 const ALL = "all";
 
 const STATES: { key: string; label: string }[] = [
@@ -134,7 +134,7 @@ function JobActions({ job }: { job: JobInfo }) {
     );
 }
 
-const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
+const ALL_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         id: "job",
         header: "Job",
@@ -192,24 +192,31 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     },
 ];
 
+const COLUMNS = ALL_COLUMNS.map((column) => ({ ...column, enableSorting: column.id === "id" }));
+
+function sortingFor(order: JobOrder): SortingState {
+    return [{ id: "id", desc: order === "newest" }];
+}
+
 export function MonitorPage() {
     const router = useRouter();
     const [state, setState] = useState(ALL);
     const [kind, setKind] = useState(ALL);
-    const jobs = useQuery({
-        queryKey: JOBS,
-        queryFn: () => unwrap(api.GET("/api/jobs", { params: { query: { limit: 500 } } })),
-        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? 3000 : 15000),
-    });
-    const all = jobs.data ?? [];
-    const ofKind = all.filter((job) => kind === ALL || job.kind === kind);
-    const visible = ofKind.filter((job) => state === ALL || job.status === state);
+    const [order, setOrder] = useState<JobOrder>("newest");
+    const filter = {
+        kind: kind === ALL ? [] : [kind],
+        status: state === ALL ? [] : [state],
+        order,
+    };
+    const jobs = useJobList(filter);
+    const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
+    const counts = facets.data?.statuses ?? {};
     const tabs = STATES.map((item) => ({
         ...item,
         badge:
             item.key === ALL
-                ? ofKind.length
-                : ofKind.filter((job) => job.status === item.key).length,
+                ? Object.values(counts).reduce((sum, value) => sum + value, 0)
+                : (counts[item.key] ?? 0),
     }));
     return (
         <Page wide>
@@ -234,28 +241,30 @@ export function MonitorPage() {
                 </Select>
             </div>
             <ErrorLine error={jobs.error} />
-            {jobs.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading jobs…</p>
-            ) : (
-                <DataGrid
-                    columns={COLUMNS}
-                    rows={visible}
-                    storageKey="minibrain.jobs.columns"
-                    columnPicker
-                    hiddenColumns={["id", "attempt"]}
-                    onOpen={(job) => {
-                        const href = jobHref(job);
-                        if (href) {
-                            router.history.push(href);
-                        }
-                    }}
-                    rowLabel={(job) =>
-                        `${KINDS[job.kind] ?? job.kind} job ${job.id}, ${job.status}`
+            <DataGrid
+                columns={COLUMNS}
+                rows={jobs.rows}
+                getRowId={(job) => String(job.id)}
+                loading={jobs.isLoading}
+                storageKey="minibrain.jobs.columns"
+                columnPicker
+                hiddenColumns={["id", "attempt"]}
+                sorting={sortingFor(order)}
+                onSortingChange={(next) => setOrder(next[0]?.desc === false ? "oldest" : "newest")}
+                hasMore={jobs.hasMore}
+                loadingMore={jobs.loadingMore}
+                onLoadMore={jobs.loadMore}
+                total={jobs.total}
+                onOpen={(job) => {
+                    const href = jobHref(job);
+                    if (href) {
+                        router.history.push(href);
                     }
-                    empty={<p className="text-muted-foreground">No jobs match.</p>}
-                    minWidth="min-w-[760px]"
-                />
-            )}
+                }}
+                rowLabel={(job) => `${KINDS[job.kind] ?? job.kind} job ${job.id}, ${job.status}`}
+                empty={<p className="text-muted-foreground">No jobs match.</p>}
+                minWidth="min-w-[760px]"
+            />
         </Page>
     );
 }

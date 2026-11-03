@@ -256,6 +256,18 @@ class JobInfo(BaseModel):
     finished_at: datetime | None
 
 
+class JobPage(BaseModel):
+    items: list[JobInfo]
+    next_cursor: str | None
+    total: int
+
+
+class JobFacets(BaseModel):
+    total: int
+    statuses: dict[str, int]
+    minibrains: dict[str, int]
+
+
 class AttemptInfo(BaseModel):
     number: int
     worker: str

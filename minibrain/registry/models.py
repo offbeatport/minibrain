@@ -233,6 +233,8 @@ class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
         Index("ix_jobs_claim", "status", "priority", "id"),
+        Index("ix_jobs_kind", "kind", "id"),
+        Index("ix_jobs_minibrain", "minibrain_id", "id"),
         Index(
             "uq_jobs_active_key",
             "idempotency_key",

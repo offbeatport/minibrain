@@ -140,21 +140,11 @@ export function useVersions(slug: string) {
 export function useJobs(slug: string) {
     return useQuery({
         queryKey: keys.jobs(slug),
-        queryFn: () => unwrap(api.GET("/api/jobs", { params: { query: { minibrain: slug } } })),
-        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
-    });
-}
-
-export function useTrainingJobs() {
-    return useQuery({
-        queryKey: ["jobs", "training"] as const,
         queryFn: () =>
-            unwrap(
-                api.GET("/api/jobs", {
-                    params: { query: { kind: ["train", "eval"], limit: 500 } },
-                }),
+            unwrap(api.GET("/api/jobs", { params: { query: { minibrain: [slug] } } })).then(
+                (page) => page.items,
             ),
-        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : 15000),
+        refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
     });
 }
 
@@ -176,7 +166,10 @@ export function useKeys() {
 export function useRecentJobs(limit = 15) {
     return useQuery({
         queryKey: ["jobs", limit] as const,
-        queryFn: () => unwrap(api.GET("/api/jobs", { params: { query: { limit } } })),
+        queryFn: () =>
+            unwrap(api.GET("/api/jobs", { params: { query: { limit } } })).then(
+                (page) => page.items,
+            ),
         refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
     });
 }

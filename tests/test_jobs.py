@@ -128,7 +128,7 @@ def test_duplicate_complete_is_rejected_and_harmless(harness: Harness) -> None:
     body = {"token": claim["token"], "result": {"summary": {}}, "outputs": {"adapter": adapter}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 409
-    evals = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=eval").json()
+    evals = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=eval").json()["items"]
     assert len(evals) == 1
 
 
@@ -244,8 +244,8 @@ def test_jobs_filter_by_several_kinds(harness: Harness) -> None:
     adapter = harness.upload(b"not really a tar", "adapter", "tar", "adapter")
     body = {"token": claim["token"], "result": {"summary": {}}, "outputs": {"adapter": adapter}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
-    kinds = [item["kind"] for item in harness.client.get("/api/jobs?kind=train&kind=eval").json()]
+    kinds = [item["kind"] for item in harness.client.get("/api/jobs?kind=train&kind=eval").json()["items"]]
     assert kinds == ["eval", "train"]
-    everything = {item["kind"] for item in harness.client.get("/api/jobs").json()}
+    everything = {item["kind"] for item in harness.client.get("/api/jobs").json()["items"]}
     assert everything == {"train", "eval"}
-    assert [item["kind"] for item in harness.client.get("/api/jobs?kind=train").json()] == ["train"]
+    assert [item["kind"] for item in harness.client.get("/api/jobs?kind=train").json()["items"]] == ["train"]
