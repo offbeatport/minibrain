@@ -1,7 +1,7 @@
 import { Button, Link } from "obp-ui";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { PathResult, type SourcePlan, VariantLicence } from "./BaseSource";
@@ -70,7 +70,7 @@ function DiskLine({
                 </span>
             );
         }
-        return <StatusText tone="success">No download, already on this install</StatusText>;
+        return null;
     }
     if (!need) {
         return null;
@@ -79,7 +79,7 @@ function DiskLine({
     const size = large ? `${gigabytes(need.size)} GB` : bytes(need.size);
     const share = large ? gigabytes(need.size) : bytes(need.size);
     if (need.free === null) {
-        return <StatusText tone="neutral">{`${size} ${need.verb}`}</StatusText>;
+        return null;
     }
     const free = gigabytes(need.free);
     if (need.size > need.free) {
@@ -90,11 +90,12 @@ function DiskLine({
         );
     }
     const left = need.free - need.size;
-    const tone: Tone = left < LOW_SPACE ? "warning" : "neutral";
+    if (left >= LOW_SPACE) {
+        return null;
+    }
     return (
-        <StatusText tone={tone} className="whitespace-normal tabular-nums">
-            {`${size} ${need.verb}, uses ${share} of ${free} GB free`}
-            {left < LOW_SPACE ? `; only ${gigabytes(left)} GB left after it` : ""}
+        <StatusText tone="warning" className="whitespace-normal tabular-nums">
+            {`${size} ${need.verb}, uses ${share} of ${free} GB free; only ${gigabytes(left)} GB left after it`}
         </StatusText>
     );
 }
@@ -243,7 +244,8 @@ export function BaseSummary({
             <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
             {variant?.format === "gguf" && (
                 <StatusText tone="warning" className="whitespace-normal">
-                    GGUF: serves, but cannot be fine-tuned. Pick a safetensors variant to train.
+                    Compressed format: it serves but can't be trained. Pick Full precision to train
+                    it.
                 </StatusText>
             )}
             {option?.kind === "catalogue" && (

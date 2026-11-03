@@ -42,14 +42,14 @@ def list_minibrains(session: Session) -> list[Minibrain]:
 def get_minibrain(session: Session, slug: str) -> Minibrain:
     minibrain = session.scalar(select(Minibrain).where(Minibrain.slug == slug))
     if minibrain is None:
-        raise NotFoundError(f"minibrain {slug} not found")
+        raise NotFoundError(f"no model called {slug}")
     return minibrain
 
 
 def create_minibrain(session: Session, name: str, task: str, base_model: str) -> Minibrain:
     slug = slugify(name)
     if session.scalar(select(Minibrain).where(Minibrain.slug == slug)) is not None:
-        raise ConflictError(f"a minibrain called {slug} already exists")
+        raise ConflictError(f"a model called {slug} already exists")
     minibrain = Minibrain(slug=slug, name=name.strip(), task=task, base_model=base_model)
     session.add(minibrain)
     session.commit()

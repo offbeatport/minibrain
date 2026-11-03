@@ -4,7 +4,6 @@ import {
     BookOpen,
     Boxes,
     Braces,
-    ChevronDown,
     ChevronLeft,
     Database,
     ExternalLink,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import {
     Button,
+    Card,
     Field,
     FieldGroup,
     Input,
@@ -26,6 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
     Textarea,
+    cn,
 } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
@@ -33,9 +34,10 @@ import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { modelsHref } from "~/lib/modelsSearch";
+import { bytes } from "~/lib/time";
 import { BasePicker, type PickerTab } from "./BasePicker";
-import { type ImportPick, useSourcePlan } from "./BaseSource";
-import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import { type ImportPick, type SourcePlan, formatLabel, useSourcePlan } from "./BaseSource";
+import { BaseSummary, type CopySource, type DiskNeed, diskBlocks, diskNeed } from "./BaseSummary";
 import { useCacheCheck } from "./ModelCache";
 import {
     type BaseOption,
@@ -183,6 +185,64 @@ function slugOf(name: string): string {
     return slug.slice(0, 48).replace(/-+$/, "") || "minibrain";
 }
 
+const LOW_SPACE = 5 * 1024 ** 3;
+
+function DiskPanel({
+    option,
+    plan,
+    need,
+    free,
+}: {
+    option: BaseOption | null;
+    plan: SourcePlan;
+    need: DiskNeed;
+    free: number | null | undefined;
+}) {
+    const variant = plan.variant ?? option?.variant ?? null;
+    const known = free !== null && free !== undefined;
+    const after = need && known ? free - need.size : null;
+    const download = need
+        ? `${bytes(need.size)}${need.verb === "import" ? " to import" : ""}`
+        : option
+          ? "None, already on this install"
+          : "Pick a base model";
+    const disk = !known
+        ? "Unknown"
+        : after === null
+          ? `${bytes(free)} free`
+          : after < 0
+            ? `${bytes(free)} free, not enough`
+            : `${bytes(free)} free, ${bytes(after)} after`;
+    return (
+        <Card className="gap-3 px-5 text-sm">
+            <dl className="flex flex-col gap-3">
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-muted-foreground">Format</dt>
+                    <dd>
+                        {variant ? formatLabel(variant) : option ? "As installed" : "Not chosen"}
+                    </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-muted-foreground">Download</dt>
+                    <dd className="tabular-nums">{download}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-muted-foreground">Disk</dt>
+                    <dd
+                        className={cn(
+                            "tabular-nums",
+                            after !== null && after < 0 && "text-destructive",
+                            after !== null && after >= 0 && after < LOW_SPACE && "text-warning",
+                        )}
+                    >
+                        {disk}
+                    </dd>
+                </div>
+            </dl>
+        </Card>
+    );
+}
+
 function trainingHref(slug: string, copy: CopySource | null): string {
     const path = `/training/${encodeURIComponent(slug)}`;
     if (!copy?.recipe) {
@@ -214,7 +274,6 @@ export function AddModelPage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
-    const [more, setMore] = useState(false);
     const [dataset, setDataset] = useState(
         params.dataset === undefined ? "" : String(params.dataset),
     );
@@ -365,7 +424,11 @@ export function AddModelPage() {
                 title="Add model"
                 caption="Start from a base model; train it on your data whenever you like."
             />
-            <form onSubmit={submit} onKeyDown={shortcut} className="flex max-w-4xl flex-col gap-6">
+            <form
+                onSubmit={submit}
+                onKeyDown={shortcut}
+                className="grid max-w-6xl items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_16rem]"
+            >
                 <PanelSections>
                     <PanelSection
                         icon={Boxes}
@@ -436,55 +499,52 @@ export function AddModelPage() {
                     </PanelSection>
                     <PanelSection icon={SquarePen} title="Details">
                         <FieldGroup>
-                            <Field
-                                id="create-name"
-                                label="Name"
-                                hint={`Apps call it as ${slugOf(finalName)}.`}
-                            >
-                                <Input
+                            <div className="grid gap-5 sm:grid-cols-2">
+                                <Field
                                     id="create-name"
-                                    value={name}
-                                    onChange={(event) => setName(event.target.value)}
-                                    placeholder={suggestedName || "IT ticket classifier"}
-                                    className="sm:max-w-sm"
+                                    label="Name"
+                                    hint={`Apps call it as ${slugOf(finalName)}.`}
+                                >
+                                    <Input
+                                        id="create-name"
+                                        value={name}
+                                        onChange={(event) => setName(event.target.value)}
+                                        placeholder={suggestedName || "IT ticket classifier"}
+                                    />
+                                </Field>
+                                <Field
+                                    id="create-tags"
+                                    label="Tags (optional)"
+                                    hint="Comma separated."
+                                >
+                                    <Input
+                                        id="create-tags"
+                                        value={tags}
+                                        onChange={(event) => setTags(event.target.value)}
+                                    />
+                                </Field>
+                            </div>
+                            <Field id="create-description" label="Description (optional)">
+                                <Textarea
+                                    id="create-description"
+                                    value={description}
+                                    onChange={(event) => setDescription(event.target.value)}
+                                    rows={2}
+                                    placeholder="Routes incoming tickets to the right queue"
                                 />
                             </Field>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="w-fit"
-                                aria-expanded={more}
-                                onClick={() => setMore(!more)}
-                            >
-                                <ChevronDown className={more ? "rotate-180" : undefined} />
-                                {more ? "Fewer details" : "Add a description and tags"}
-                            </Button>
-                            {more && (
-                                <>
-                                    <Field id="create-description" label="Description">
-                                        <Textarea
-                                            id="create-description"
-                                            value={description}
-                                            onChange={(event) => setDescription(event.target.value)}
-                                            rows={2}
-                                            placeholder="Routes incoming tickets to the right queue"
-                                        />
-                                    </Field>
-                                    <Field id="create-tags" label="Tags" hint="Comma separated.">
-                                        <Input
-                                            id="create-tags"
-                                            value={tags}
-                                            onChange={(event) => setTags(event.target.value)}
-                                            className="sm:max-w-sm"
-                                        />
-                                    </Field>
-                                </>
-                            )}
                         </FieldGroup>
                     </PanelSection>
                 </PanelSections>
-                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3">
+                <aside className="lg:sticky lg:top-6 lg:pt-9">
+                    <DiskPanel
+                        option={option}
+                        plan={plan}
+                        need={need}
+                        free={catalog.data?.store_free_bytes}
+                    />
+                </aside>
+                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3 lg:col-span-2">
                     <ErrorLine error={add.error} />
                     <Button
                         type="button"
