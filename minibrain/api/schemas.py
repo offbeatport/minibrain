@@ -61,10 +61,26 @@ class SourceSummary(BaseModel):
     description: str
     tags: list[str]
     size: int
-    rows: int
+    rows: int | None
     columns: list[ColumnInfo]
     datasets: list[str]
     created_at: datetime
+    path: str | None = None
+    format: str | None = None
+    files: int | None = None
+    modified_at: datetime | None = None
+    error: str | None = None
+
+
+class FolderCreate(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    name: str | None = Field(default=None, max_length=120)
+    format: Literal[".csv", ".tsv", ".json", ".jsonl", ".parquet"] | None = None
+
+
+class FolderRoots(BaseModel):
+    roots: list[str]
+    locked: bool
 
 
 class DatasetSummary(BaseModel):

@@ -16,6 +16,7 @@ import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
 import { CreateDataset } from "./DatasetDetail";
+import { FORMAT_LABELS } from "./Folders";
 import { type ItemRef, itemHref, kindLabel, plural } from "./catalogue";
 import {
     About,
@@ -113,10 +114,12 @@ function rowColumns(result: QueryResponse): ColumnDef<(string | null)[], unknown
 function Columns({ source }: { source: SourceSummary }) {
     const stats = useSourceStats(source.id);
     const sampled = stats.data?.sampled ?? 0;
+    const origin =
+        source.kind === "folder" ? "Types read from the files" : "Types from the staged table";
     const caption =
         stats.data && stats.data.sampled < stats.data.rows
-            ? `Types from the staged table; empty and distinct counts from the first ${count(sampled)} rows.`
-            : "Types from the staged table; empty and distinct counts over every row.";
+            ? `${origin}; empty and distinct counts from the first ${count(sampled)} rows.`
+            : `${origin}; empty and distinct counts over every row.`;
     return (
         <Section title="Columns" caption={caption} flush>
             <ErrorLine error={stats.error} />
@@ -219,13 +222,23 @@ export function FileDetail({
             <ItemHeader
                 title={source.name}
                 detail={
-                    <>
-                        {`${kindLabel(source.kind)} · `}
-                        <span className="font-mono">{source.filename}</span>
-                        {" · table "}
-                        <span className="font-mono">{source.table}</span>
-                        {` · added ${relativeTime(source.created_at)}`}
-                    </>
+                    source.kind === "folder" ? (
+                        <>
+                            {"Folder · "}
+                            <span className="font-mono">{source.path}</span>
+                            {" · table "}
+                            <span className="font-mono">{source.table}</span>
+                            {` · added ${relativeTime(source.created_at)}`}
+                        </>
+                    ) : (
+                        <>
+                            {`${kindLabel(source.kind)} · `}
+                            <span className="font-mono">{source.filename}</span>
+                            {" · table "}
+                            <span className="font-mono">{source.table}</span>
+                            {` · added ${relativeTime(source.created_at)}`}
+                        </>
+                    )
                 }
                 trail={
                     <Trail
@@ -261,7 +274,11 @@ export function FileDetail({
                                     : null
                             }
                             title={`Delete ${source.name}?`}
-                            description="The stored copy and its staged table go. This cannot be undone."
+                            description={
+                                source.kind === "folder"
+                                    ? "minibrain stops reading the folder; its files stay where they are."
+                                    : "The stored copy and its staged table go. This cannot be undone."
+                            }
                             onConfirm={() => remove.mutateAsync().catch(() => undefined)}
                         />
                     </>
@@ -269,9 +286,22 @@ export function FileDetail({
                 about={<About item={source} onEdit={() => setEditing(true)} />}
             />
             <ErrorLine error={remove.error} />
+            {source.error && <p className="text-sm text-destructive">{source.error}</p>}
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(source.rows)} />
                 <Stat label="Columns" value={count(source.columns.length)} />
+                {source.kind === "folder" && (
+                    <>
+                        <Stat
+                            label="Files"
+                            value={`${count(source.files)} ${FORMAT_LABELS[source.format ?? ""] ?? ""}`}
+                        />
+                        <Stat
+                            label="Last change"
+                            value={source.modified_at ? relativeTime(source.modified_at) : "–"}
+                        />
+                    </>
+                )}
                 <Stat label="Size" value={bytes(source.size)} />
                 <Stat label="Datasets" value={count(datasets.length)} />
             </div>

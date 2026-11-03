@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from functools import lru_cache
+from typing import Any
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import select
@@ -13,6 +14,8 @@ from minibrain.api.schemas import (
     ColumnStats,
     DatasetCreate,
     DatasetSummary,
+    FolderCreate,
+    FolderRoots,
     LabelCount,
     MappingUpdate,
     PreviewResponse,
@@ -21,19 +24,24 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     SampleInfo,
+    SourceKind,
     SourceRef,
     SourceStats,
     SourceSummary,
 )
 from minibrain.api.views import mapping_info
 from minibrain.artifacts import ArtifactStore
+from minibrain.data.folders import allowed_roots
 from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
+    FOLDER,
     add_dataset,
+    add_folder,
     add_source,
     aliases_for,
     dataset_sql,
     dataset_tables,
+    folder_scan,
     get_dataset,
     get_source,
     sources_in,
@@ -56,6 +64,7 @@ from minibrain.data.sources import (
     summarize,
     to_text,
 )
+from minibrain.policy import locked_sources
 from minibrain.registry.models import Dataset, Source, now
 from minibrain.registry.service import ConflictError
 from minibrain.settings import Settings
@@ -86,25 +95,52 @@ def cached_describe(table: Table) -> tuple[tuple[ColumnInfo, ...], int]:
     return tuple(ColumnInfo(name=column.name, type=column.type) for column in columns), rows
 
 
+def source_kind(source: Source) -> SourceKind:
+    return "folder" if source.kind == FOLDER else "upload"
+
+
 def source_ref(source: Source) -> SourceRef:
-    return SourceRef(id=source.id, name=source.name, table=source.table_name, kind="upload")
+    return SourceRef(id=source.id, name=source.name, table=source.table_name, kind=source_kind(source))
+
+
+def folder_fields(source: Source) -> dict[str, Any]:
+    if source.kind != FOLDER:
+        return {}
+    try:
+        found = folder_scan(source)
+    except SourceError as error:
+        return {"path": source.path, "format": source.format, "error": str(error)}
+    return {
+        "path": source.path,
+        "format": source.format,
+        "files": len(found.files),
+        "modified_at": found.modified_at,
+        "size": found.size,
+    }
 
 
 def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> SourceSummary:
-    columns, rows = cached_describe(table_of(settings, store, source))
+    fields: dict[str, Any] = {"size": source.size} | folder_fields(source)
+    columns: tuple[ColumnInfo, ...] = ()
+    rows: int | None = None
+    if not fields.get("error"):
+        try:
+            columns, rows = cached_describe(table_of(settings, store, source))
+        except SourceError as error:
+            fields["error"] = str(error)
     return SourceSummary(
         id=source.id,
-        kind="upload",
+        kind=source_kind(source),
         name=source.name,
         filename=source.filename,
         table=source.table_name,
         description=source.description or "",
         tags=source.tags or [],
-        size=source.size,
         rows=rows,
         columns=list(columns),
         datasets=[dataset.slug for dataset in source.datasets],
         created_at=source.created_at,
+        **fields,
     )
 
 
@@ -238,6 +274,19 @@ def list_sources(session: SessionDep, settings: SettingsDep, store: StoreDep) ->
 @router.post("/sources", status_code=201)
 def upload_source(file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
     source = add_source(session, store, safe_filename(file.filename or ""), file.file)
+    summary = source_summary(settings, store, source)
+    session.commit()
+    return summary
+
+
+@router.get("/data/folders")
+def folder_roots(session: SessionDep) -> FolderRoots:
+    return FolderRoots(roots=[str(root) for root in allowed_roots(session)], locked="data_folders" in locked_sources())
+
+
+@router.post("/sources/folders", status_code=201)
+def add_folder_source(body: FolderCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
+    source = add_folder(session, body.path, body.name, body.format)
     summary = source_summary(settings, store, source)
     session.commit()
     return summary

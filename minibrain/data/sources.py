@@ -52,7 +52,9 @@ class QueryResult:
 @dataclass(frozen=True)
 class Table:
     name: str
-    staging: Path
+    staging: Path | None = None
+    files: tuple[str, ...] = ()
+    reader: str = ""
     fingerprint: str = ""
 
 
@@ -114,13 +116,30 @@ def stage(file_path: Path, staging_path: Path) -> None:
         raise SourceError(f"could not read {file_path.name}: {error}") from error
 
 
+def file_list(files: Sequence[str]) -> str:
+    return "[" + ", ".join(quote_literal(file) for file in files) + "]"
+
+
+def table_relation(table: Table, attached: str) -> str:
+    if table.staging is not None:
+        return f"SELECT * FROM {attached}.{SOURCE_TABLE}"
+    if not table.files:
+        raise SourceError(f"{table.name} has no files to read")
+    return f"SELECT * FROM {table.reader}({file_list(table.files)}, union_by_name = true)"
+
+
 def connect(tables: Sequence[Table], aliases: dict[str, str] | None = None) -> duckdb.DuckDBPyConnection:
     connection = duckdb.connect()
     try:
+        readable: list[str] = []
         for index, table in enumerate(tables):
             attached = f"staged_{index}"
-            connection.execute(f"ATTACH {quote_literal(str(table.staging))} AS {attached} (READ_ONLY)")
-            connection.execute(f"CREATE VIEW {quote_identifier(table.name)} AS SELECT * FROM {attached}.{SOURCE_TABLE}")
+            if table.staging is not None:
+                connection.execute(f"ATTACH {quote_literal(str(table.staging))} AS {attached} (READ_ONLY)")
+            readable += table.files
+            connection.execute(f"CREATE VIEW {quote_identifier(table.name)} AS {table_relation(table, attached)}")
+        if readable:
+            connection.execute(f"SET allowed_paths = {file_list(readable)}")
         names = {table.name for table in tables}
         for alias, target in (aliases or {}).items():
             if target in names and alias not in names:

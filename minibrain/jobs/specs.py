@@ -14,6 +14,8 @@ def prepare_params(session: Session, dataset: Dataset, sql: str) -> dict[str, An
     if len(dataset.sources) != 1:
         raise ConflictError("this dataset reads several sources; save a snapshot of it from the Data page instead")
     table = dataset.sources[0]
+    if table.artifact_id is None:
+        raise ConflictError("this dataset reads a folder; save a snapshot of it from the Data page instead")
     source = ref(session, table.artifact_id)
     if source is None:
         raise MissingArtifactError("upload a data file first")

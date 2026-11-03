@@ -3,10 +3,12 @@ from pathlib import Path
 from typing import BinaryIO
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
 from minibrain.data.sources import (
+    READERS,
     SOURCE_TABLE,
     SourceError,
     Table,
@@ -23,6 +25,7 @@ from minibrain.settings import Settings
 
 INPUT_NAMES = ("input", "text", "message", "question", "query", "prompt", "utterance", "body", "content")
 LABEL_NAMES = ("label", "category", "intent", "class", "target", "topic", "tag")
+FOLDER = "folder"
 
 
 def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
@@ -39,12 +42,29 @@ def staging_of(settings: Settings, store: ArtifactStore, source: Source) -> Path
     return staging
 
 
+def folder_scan(source: Source) -> FolderScan:
+    session = object_session(source)
+    if session is None or source.path is None:
+        raise SourceError(f"{source.name} has no folder")
+    if not inside(Path(source.path), allowed_roots(session)):
+        raise SourceError(f"{source.path} is no longer in the folders minibrain may read (Settings, Security)")
+    return scan(Path(source.path), source.format or detect_format(Path(source.path)))
+
+
 def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
+    if source.kind == FOLDER:
+        found = folder_scan(source)
+        return Table(
+            name=source.table_name,
+            files=tuple(item.path for item in found.files),
+            reader=READERS[found.format],
+            fingerprint=found.fingerprint,
+        )
     return Table(name=source.table_name, staging=staging_of(settings, store, source), fingerprint=fingerprint(source))
 
 
 def fingerprint(source: Source) -> str:
-    return str(source.artifact_id)
+    return folder_scan(source).fingerprint if source.kind == FOLDER else str(source.artifact_id)
 
 
 def tables_of(settings: Settings, store: ArtifactStore, sources: Sequence[Source]) -> list[Table]:
@@ -75,6 +95,27 @@ def add_source(session: Session, store: ArtifactStore, filename: str, stream: Bi
         table_name=free_table_name(session, filename),
         artifact_id=artifact.id,
         size=stored.size,
+    )
+    session.add(source)
+    session.flush()
+    return source
+
+
+def add_folder(session: Session, path: str, name: str | None, format: str | None) -> Source:
+    root = check_folder(session, path)
+    chosen = format or detect_format(root)
+    if chosen not in READERS:
+        raise SourceError("pick CSV, TSV, JSON, JSON Lines or Parquet")
+    found = scan(root, chosen)
+    label = (name or "").strip() or root.name or str(root)
+    source = Source(
+        name=label,
+        filename=root.name or str(root),
+        table_name=free_table_name(session, label),
+        kind=FOLDER,
+        path=str(root),
+        format=chosen,
+        size=found.size,
     )
     session.add(source)
     session.flush()

@@ -88,7 +88,10 @@ class Source(Base):
     name: Mapped[str]
     filename: Mapped[str]
     table_name: Mapped[str] = mapped_column(unique=True)
-    artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
+    kind: Mapped[str] = mapped_column(default="upload", server_default="upload")
+    path: Mapped[str | None] = mapped_column(default=None)
+    format: Mapped[str | None] = mapped_column(default=None)
+    artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
     size: Mapped[int] = mapped_column(BigInteger, default=0)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)

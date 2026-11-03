@@ -88,6 +88,13 @@ FIELDS: tuple[Field, ...] = (
         "bool",
         True,
     ),
+    Field(
+        "data_folders",
+        "Folder sources",
+        "Folders on this server that folder sources may read, with everything under them. Leave empty to allow none.",
+        "list",
+        [],
+    ),
     Field("log_retention_days", "Log retention (days)", "Request logs older than this are deleted.", "int", 30),
     Field(
         "key_expiry_days",

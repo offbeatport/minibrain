@@ -49,6 +49,7 @@ import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { CreateDataset, DatasetDetail, DatasetsGroup } from "./DatasetDetail";
 import { FileDetail } from "./FileDetail";
+import { FoldersGroup } from "./Folders";
 import {
     DATASETS_GROUP,
     type ItemRef,
@@ -162,7 +163,7 @@ function buildTree(sources: SourceSummary[], datasets: DatasetSummary[]): TreeNo
             children: members.map((source) => ({
                 id: itemKey({ kind: "source", id: source.id }),
                 label: source.name,
-                icon: fileIcon(source.filename),
+                icon: source.kind === "folder" ? <Folder /> : fileIcon(source.filename),
             })),
         };
     });
@@ -298,12 +299,15 @@ function GroupDetail({
     const built = datasets.filter((dataset) =>
         dataset.sources.some((source) => ids.has(source.id)),
     );
+    if (kind === "folder") {
+        return <FoldersGroup sources={sources} datasets={datasets} onAdded={onUploaded} />;
+    }
     if (kind !== "upload") {
         return (
             <div className="flex flex-col gap-4">
                 <h2 className="text-2xl font-semibold">{kindLabel(kind)}</h2>
                 <EmptyState variant="panel" title="Not available yet" className="mx-0 mt-0">
-                    {`Reading ${kind === "database" ? "a database" : kind === "s3" ? "an S3 bucket" : "a folder"} in place comes later. Upload a CSV, TSV, JSON Lines or Parquet file for now.`}
+                    {`Reading ${kind === "database" ? "a database" : "an S3 bucket"} in place comes later. Upload a file or add a folder for now.`}
                 </EmptyState>
             </div>
         );
@@ -362,7 +366,7 @@ function Missing({ item }: { item: ItemRef }) {
                 </Button>
             }
         >
-            {`No ${item.kind === "dataset" ? "dataset" : "file"} matches this link. It may have been deleted.`}
+            {`No ${item.kind === "dataset" ? "dataset" : "source"} matches this link. It may have been deleted.`}
         </EmptyState>
     );
 }

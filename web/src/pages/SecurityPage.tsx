@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Box, Globe, History, KeyRound } from "lucide-react";
+import { Box, FolderLock, Globe, History, KeyRound } from "lucide-react";
 import {
     Badge,
     Button,
@@ -43,6 +43,11 @@ const GROUPS = [
         names: ["model_sources", "licence_mode", "safetensors_only"],
     },
     {
+        icon: FolderLock,
+        title: "Data",
+        names: ["data_folders"],
+    },
+    {
         icon: KeyRound,
         title: "Request logs and API keys",
         names: ["request_logs", "log_retention_days", "key_expiry_days"],
@@ -53,6 +58,11 @@ const SOURCE_LABEL: Record<string, string> = {
     "config file": "Set by config file",
     environment: "Set by environment",
     "built in": "Always on",
+};
+
+const LIST_PLACEHOLDERS: Record<string, string> = {
+    allowed_hosts: "hf-mirror.internal, s3.internal",
+    data_folders: "/srv/exports, /mnt/shared/datasets",
 };
 
 function asList(value: unknown): string[] {
@@ -114,7 +124,7 @@ function TextControl({
                 min={policy.kind === "int" ? 0 : undefined}
                 value={value}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder={policy.kind === "list" ? "hf-mirror.internal, s3.internal" : undefined}
+                placeholder={LIST_PLACEHOLDERS[policy.name]}
                 className={policy.kind === "int" ? "w-24 tabular-nums" : "w-72"}
             />
             {draft !== null && draft !== current && (

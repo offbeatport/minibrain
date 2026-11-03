@@ -229,6 +229,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Folder Roots */
+        get: operations["folder_roots_api_data_folders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Folder Source */
+        post: operations["add_folder_source_api_sources_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/samples": {
         parameters: {
             query?: never;
@@ -1937,6 +1971,22 @@ export interface components {
             /** Basis */
             basis: string;
         };
+        /** FolderCreate */
+        FolderCreate: {
+            /** Path */
+            path: string;
+            /** Name */
+            name?: string | null;
+            /** Format */
+            format?: (".csv" | ".tsv" | ".json" | ".jsonl" | ".parquet") | null;
+        };
+        /** FolderRoots */
+        FolderRoots: {
+            /** Roots */
+            roots: string[];
+            /** Locked */
+            locked: boolean;
+        };
         /** GpuInfo */
         GpuInfo: {
             /** Name */
@@ -2732,7 +2782,7 @@ export interface components {
             /** Size */
             size: number;
             /** Rows */
-            rows: number;
+            rows: number | null;
             /** Columns */
             columns: components["schemas"]["ColumnInfo"][];
             /** Datasets */
@@ -2742,6 +2792,16 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Path */
+            path?: string | null;
+            /** Format */
+            format?: string | null;
+            /** Files */
+            files?: number | null;
+            /** Modified At */
+            modified_at?: string | null;
+            /** Error */
+            error?: string | null;
         };
         /** SplitScore */
         SplitScore: {
@@ -3465,6 +3525,59 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_upload_source_api_sources_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    folder_roots_api_data_folders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderRoots"];
+                };
+            };
+        };
+    };
+    add_folder_source_api_sources_folders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderCreate"];
             };
         };
         responses: {
