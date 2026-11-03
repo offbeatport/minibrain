@@ -1,10 +1,9 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
     BookOpen,
     Boxes,
     Braces,
-    Check,
     ChevronLeft,
     Database,
     ExternalLink,
@@ -21,7 +20,6 @@ import {
     Input,
     Label,
     Link,
-    SearchInput,
     Select,
     SelectContent,
     SelectItem,
@@ -29,38 +27,70 @@ import {
     SelectValue,
     Switch,
     Textarea,
-    cn,
 } from "obp-ui";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
-import { useBases, useCatalog, useModels } from "~/api/queries";
+import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
-import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
-import { StatusText, type Tone } from "~/components/models/StatusText";
 import { modelsHref } from "~/lib/modelsSearch";
-import { bytes } from "~/lib/time";
 import { TrainingData } from "../data/TrainingData";
-import { SourceField, type SourceState, useSourcePlan } from "./BaseSource";
-import { bestFit } from "./DiscoverFilters";
+import { BasePicker, type PickerTab } from "./BasePicker";
+import { type ImportPick, useSourcePlan } from "./BaseSource";
+import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import {
+    type BaseOption,
+    type TaskKey,
+    baseOptionFor,
+    catalogueOption,
+    recommend,
+} from "./baseOptions";
 import { splitTags, useModelsRefresh } from "./dialogs";
 
-type BaseSource = "installed" | "fetch";
-
-const TASKS: { key: string; label: string; hint: string; ready: boolean; icon: LucideIcon }[] = [
-    { key: "classify", label: "Classify", hint: "Text → one label", ready: true, icon: Tags },
-    { key: "extract", label: "Extract", hint: "Text → fields", ready: false, icon: Braces },
+const TASKS: {
+    key: TaskKey;
+    label: string;
+    noun: string;
+    hint: string;
+    ready: boolean;
+    icon: LucideIcon;
+}[] = [
+    {
+        key: "classify",
+        label: "Classify",
+        noun: "classification",
+        hint: "Text → one label",
+        ready: true,
+        icon: Tags,
+    },
+    {
+        key: "extract",
+        label: "Extract",
+        noun: "extraction",
+        hint: "Text → fields",
+        ready: false,
+        icon: Braces,
+    },
     {
         key: "rewrite",
         label: "Rewrite",
+        noun: "rewriting",
         hint: "Text → text in your style",
         ready: false,
         icon: PenLine,
     },
-    { key: "sql", label: "Text-to-SQL", hint: "Question → SQL", ready: false, icon: Database },
+    {
+        key: "sql",
+        label: "Text-to-SQL",
+        noun: "text-to-SQL",
+        hint: "Question → SQL",
+        ready: false,
+        icon: Database,
+    },
     {
         key: "distill",
         label: "Distill",
+        noun: "distillation",
         hint: "Copy a larger model",
         ready: false,
         icon: FlaskConical,
@@ -68,187 +98,46 @@ const TASKS: { key: string; label: string; hint: string; ready: boolean; icon: L
     {
         key: "answer",
         label: "Answer",
+        noun: "answering questions",
         hint: "Questions over documents",
         ready: false,
         icon: BookOpen,
     },
 ];
 
-const FIT: Record<string, { text: string; tone: Tone }> = {
-    fits: { text: "Fits this machine", tone: "success" },
-    limited: { text: "Limited headroom", tone: "warning" },
-    insufficient: { text: "Won't fit", tone: "destructive" },
-    unknown: { text: "Fit not checked", tone: "neutral" },
+type Picked =
+    | { kind: "base"; key: string }
+    | { kind: "catalogue"; id: string; variant: string }
+    | { kind: "import"; text: string };
+
+type Search = {
+    base?: string;
+    source?: string;
+    model?: string;
+    variant?: string;
+    dataset?: string;
 };
 
-function Choice({
-    name,
-    value,
-    checked,
-    onChange,
-    children,
-    className,
-}: {
-    name: string;
-    value: string;
-    checked: boolean;
-    onChange: () => void;
-    children: ReactNode;
-    className?: string;
-}) {
-    return (
-        <label
-            className={cn(
-                "relative flex cursor-pointer rounded-lg border has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-1 has-focus-visible:ring-offset-background",
-                checked
-                    ? "border-primary bg-accent text-accent-foreground"
-                    : "bg-card hover:bg-secondary",
-                className,
-            )}
-        >
-            <input
-                type="radio"
-                name={name}
-                value={value}
-                checked={checked}
-                onChange={onChange}
-                className="sr-only"
-            />
-            {children}
-            {checked && (
-                <Check
-                    aria-hidden="true"
-                    className="absolute top-2.5 right-2.5 size-4 text-primary"
-                />
-            )}
-        </label>
-    );
-}
-
-type BaseChoice = {
-    key: string;
-    name: string;
-    publisher: string | null | undefined;
-    size: number | null | undefined;
-    onDisk: boolean;
-    gguf: boolean;
-    entry: CatalogEntry | undefined;
-};
-
-function baseChoices(keys: string[], rows: ModelRow[], entries: CatalogEntry[]): BaseChoice[] {
-    return keys.map((key) => {
-        const row = rows.find((item) => item.kind === "base" && item.key === key);
-        const entry =
-            entries.find((item) => item.added.some((added) => added.key === key)) ??
-            entries.find((item) => item.id === key);
-        const variantId = entry?.added.find((added) => added.key === key)?.variant_id;
-        const variant = entry?.variants.find((item) => item.id === variantId);
+function initialPick(params: Search): Picked | null {
+    if (params.model) {
         return {
-            key,
-            name: row?.name ?? entry?.name ?? key,
-            publisher: row?.publisher ?? entry?.provider,
-            size: row?.size_bytes ?? entry?.variants[0]?.size_bytes,
-            onDisk: row?.availability.state === "available",
-            gguf: variant?.format === "gguf",
-            entry,
+            kind: "catalogue",
+            id: String(params.model),
+            variant: params.variant ? String(params.variant) : "",
         };
-    });
-}
-
-function BaseCard({
-    choice,
-    checked,
-    onChange,
-}: { choice: BaseChoice; checked: boolean; onChange: () => void }) {
-    const fit = choice.entry ? FIT[bestFit(choice.entry).fit.level] : undefined;
-    const facts = [
-        choice.entry ? `${choice.entry.params_b.toFixed(1)}B parameters` : null,
-        choice.size ? bytes(choice.size) : null,
-    ].filter(Boolean);
-    return (
-        <Choice
-            name="base"
-            value={choice.key}
-            checked={checked}
-            onChange={onChange}
-            className="gap-3 p-3 pr-9"
-        >
-            <PublisherLogo publisher={choice.publisher} name={choice.name} />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate font-semibold">{choice.name}</span>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {facts.join(" · ")}
-                </span>
-                <span className="flex flex-wrap items-center gap-x-3 text-sm">
-                    <span className="text-muted-foreground">
-                        {choice.onDisk ? "On this install" : "Downloads on first training"}
-                    </span>
-                    {fit && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
-                </span>
-                {choice.gguf && (
-                    <span className="text-sm text-muted-foreground">
-                        GGUF: serves, but cannot be fine-tuned
-                    </span>
-                )}
-                {choice.entry?.license_name && (
-                    <span className="truncate text-sm text-muted-foreground">
-                        {choice.entry.license_name}
-                    </span>
-                )}
-            </span>
-        </Choice>
-    );
-}
-
-function BaseChooser({ value, onChange }: { value: string; onChange: (key: string) => void }) {
-    const bases = useBases();
-    const models = useModels();
-    const catalog = useCatalog();
-    const [query, setQuery] = useState("");
-    const choices = baseChoices(bases.data ?? [], models.data ?? [], catalog.data?.entries ?? []);
-    const text = query.trim().toLowerCase();
-    const shown = text
-        ? choices.filter((choice) =>
-              `${choice.name} ${choice.key} ${choice.publisher ?? ""}`.toLowerCase().includes(text),
-          )
-        : choices;
-    if (bases.isLoading) {
-        return <p className="text-sm text-muted-foreground">Loading base models…</p>;
     }
-    return (
-        <div className="flex flex-col gap-3">
-            {choices.length > 6 && (
-                <SearchInput
-                    aria-label="Search base models"
-                    placeholder="Search base models"
-                    value={query}
-                    onValueChange={setQuery}
-                    className="w-full max-w-xs"
-                />
-            )}
-            <fieldset className="grid gap-2 sm:grid-cols-2">
-                <legend className="sr-only">Base model</legend>
-                {shown.map((choice) => (
-                    <BaseCard
-                        key={choice.key}
-                        choice={choice}
-                        checked={value === choice.key}
-                        onChange={() => onChange(choice.key)}
-                    />
-                ))}
-            </fieldset>
-            {shown.length === 0 && (
-                <p className="text-sm text-muted-foreground">No base model matches.</p>
-            )}
-        </div>
-    );
+    return params.base ? { kind: "base", key: String(params.base) } : null;
 }
 
-function TaskSelect({ value, onChange }: { value: string; onChange: (task: string) => void }) {
+function taskOf(value: string): TaskKey {
+    return TASKS.find((task) => task.key === value)?.key ?? "classify";
+}
+
+function TaskSelect({ value, onChange }: { value: TaskKey; onChange: (task: TaskKey) => void }) {
     return (
         <Field id="create-task" label="Task">
-            <Select value={value} onValueChange={(next) => onChange(String(next ?? "classify"))}>
-                <SelectTrigger id="create-task" className="w-full">
+            <Select value={value} onValueChange={(next) => onChange(taskOf(String(next ?? "")))}>
+                <SelectTrigger id="create-task" className="w-full sm:max-w-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,60 +161,143 @@ function TaskSelect({ value, onChange }: { value: string; onChange: (task: strin
     );
 }
 
+function chosenOption(
+    current: Picked | null,
+    entries: CatalogEntry[],
+    rows: ModelRow[],
+): BaseOption | null {
+    if (current?.kind === "base") {
+        return baseOptionFor(current.key, entries, rows);
+    }
+    if (current?.kind === "catalogue") {
+        const entry = entries.find((item) => item.id === current.id);
+        return entry ? catalogueOption(entry, current.variant || undefined) : null;
+    }
+    return null;
+}
+
+function trainingHref(slug: string, copy: CopySource): string {
+    const path = `/training/${encodeURIComponent(slug)}`;
+    if (!copy.recipe) {
+        return path;
+    }
+    const query = new URLSearchParams({
+        rows: String(copy.recipe.rows),
+        epochs: String(copy.recipe.epochs),
+    });
+    return `${path}?${query.toString()}`;
+}
+
 export function AddModelPage() {
     const router = useRouter();
+    const client = useQueryClient();
     const refresh = useModelsRefresh();
-    const params = useRouterState({
-        select: (state) =>
-            state.location.search as {
-                base?: string;
-                source?: string;
-                model?: string;
-                variant?: string;
-                dataset?: string;
-            },
-    });
-    const bases = useBases();
+    const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useModels();
-    const [source, setSource] = useState<BaseSource>(
-        params.model || params.source === "import" ? "fetch" : "installed",
+    const catalog = useCatalog();
+    const [task, setTask] = useState<TaskKey>("classify");
+    const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
+    const [accepted, setAccepted] = useState(false);
+    const [open, setOpen] = useState(params.source === "import");
+    const [tab, setTab] = useState<PickerTab>(
+        params.source === "import" ? "import" : "recommended",
     );
-    const [chosen, setChosen] = useState(params.base ?? "");
-    const [sourceState, setSourceState] = useState<SourceState>({
-        text: params.model ?? "",
-        variant: params.variant ?? "",
-        accepted: false,
-    });
-    const plan = useSourcePlan(sourceState);
-    const pickedRepo =
-        plan.target.kind === "catalogue" && sourceState.text === plan.target.entry.id
-            ? plan.target.entry.repo
-            : null;
-    useEffect(() => {
-        if (pickedRepo) {
-            setSourceState((current) => ({ ...current, text: pickedRepo }));
-        }
-    }, [pickedRepo]);
+    const [copy, setCopy] = useState<CopySource | null>(null);
     const [name, setName] = useState("");
-    const [task, setTask] = useState("classify");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
     const presetDataset = params.dataset === undefined ? "" : String(params.dataset);
     const [withData, setWithData] = useState(presetDataset !== "");
     const [dataset, setDataset] = useState(presetDataset);
-    const catalog = useCatalog();
-    const recommended = (bases.data ?? []).find((key) =>
-        catalog.data?.entries.some((entry) => entry.recommended && entry.id === key),
-    );
-    const baseKey = chosen || recommended || bases.data?.[0] || "";
-    const installedName =
-        models.data?.find((row) => row.kind === "base" && row.key === baseKey)?.name ??
-        catalog.data?.entries.find((entry) => entry.id === baseKey)?.name ??
-        baseKey;
-    const suggestedName = (source === "installed" ? installedName : plan.name) ?? "";
+    const entries = catalog.data?.entries ?? [];
+    const rows = models.data ?? [];
+    const picks = recommend(entries, rows, task);
+    const top = picks.here[0] ?? picks.unchecked[0] ?? picks.more[0];
+    const fallback: Picked | null = top?.entry
+        ? { kind: "catalogue", id: top.entry.id, variant: top.variant?.id ?? "" }
+        : null;
+    const current = picked ?? fallback;
+    const option = chosenOption(current, entries, rows);
+    const plan = useSourcePlan({
+        text: option?.entry ? option.entry.id : current?.kind === "import" ? current.text : "",
+        variant: option?.variant?.id ?? "",
+        accepted,
+    });
+    const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
+    const startFrom = useMutation({
+        mutationFn: async (row: ModelRow) => {
+            const path = { params: { path: { slug: row.key } } };
+            const [detail, versions] = await Promise.all([
+                client.fetchQuery({
+                    queryKey: keys.minibrain(row.key),
+                    queryFn: () => unwrap(api.GET("/api/minibrains/{slug}", path)),
+                }),
+                client.fetchQuery({
+                    queryKey: keys.versions(row.key),
+                    queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/versions", path)),
+                }),
+            ]);
+            return { detail, versions };
+        },
+        onSuccess: ({ detail, versions }) => {
+            const trainedVersions = versions
+                .filter((version) => version.kind === "lora" && version.status === "ready")
+                .sort((a, b) => b.number - a.number);
+            const trained =
+                trainedVersions.find((version) => version.current) ?? trainedVersions[0];
+            setTask(taskOf(detail.task));
+            choose({ kind: "base", key: detail.base_model });
+            if (detail.dataset) {
+                setWithData(true);
+                setDataset(detail.dataset);
+            }
+            setCopy({
+                slug: detail.slug,
+                name: detail.name,
+                datasetName: detail.dataset ? (detail.dataset_name ?? detail.dataset) : null,
+                recipe: trained
+                    ? {
+                          rows: Number(trained.recipe.max_rows ?? 3000),
+                          epochs: Number(trained.recipe.epochs ?? 1),
+                          version: trained.number,
+                      }
+                    : null,
+            });
+        },
+    });
+    const choose = (next: Picked) => {
+        setPicked(next);
+        setAccepted(false);
+        setOpen(false);
+    };
+    const pick = (chosen: BaseOption) => {
+        if (chosen.kind === "custom" && chosen.custom) {
+            startFrom.mutate(chosen.custom);
+            return;
+        }
+        setCopy(null);
+        choose(
+            chosen.entry
+                ? { kind: "catalogue", id: chosen.entry.id, variant: chosen.variant?.id ?? "" }
+                : { kind: "base", key: chosen.baseKey ?? "" },
+        );
+    };
+    const importPick = (found: ImportPick) => {
+        setCopy(null);
+        if (found.kind === "catalogue") {
+            const fresh = catalogueOption(found.entry);
+            choose({ kind: "catalogue", id: found.entry.id, variant: fresh.variant?.id ?? "" });
+            return;
+        }
+        choose({ kind: "import", text: found.text });
+    };
+    const suggestedName = copy
+        ? `${copy.name} copy`
+        : (option?.name ?? (current?.kind === "import" ? plan.name : undefined) ?? "");
     const add = useMutation({
         mutationFn: async () => {
-            const baseModel = source === "installed" ? baseKey : await plan.run();
+            const baseModel =
+                option?.kind === "local" && option.baseKey ? option.baseKey : await plan.run();
             const created = await unwrap(
                 api.POST("/api/minibrains", {
                     body: {
@@ -333,7 +305,7 @@ export function AddModelPage() {
                         description: description.trim(),
                         tags: splitTags(tags),
                         base_model: baseModel || null,
-                        task: "classify",
+                        task,
                     },
                 }),
             );
@@ -349,10 +321,15 @@ export function AddModelPage() {
         },
         onSuccess: async (created) => {
             await refresh();
-            router.history.push(`/models/custom/${encodeURIComponent(created.slug)}`);
+            router.history.push(
+                copy
+                    ? trainingHref(created.slug, copy)
+                    : `/models/custom/${encodeURIComponent(created.slug)}`,
+            );
         },
     });
-    const baseReady = source === "installed" ? Boolean(baseKey) : plan.ready;
+    const baseReady =
+        (option?.kind === "local" ? Boolean(option.baseKey) : plan.ready) && !diskBlocks(need);
     const dataReady = !withData || dataset !== "";
     const ready = baseReady && dataReady && (name.trim() || suggestedName).length > 0;
     const submit = (event: FormEvent) => {
@@ -361,6 +338,7 @@ export function AddModelPage() {
             add.mutate();
         }
     };
+    const taskNoun = TASKS.find((item) => item.key === task)?.noun ?? "classification";
     return (
         <Page>
             <Link
@@ -378,7 +356,8 @@ export function AddModelPage() {
                 <PanelSections>
                     <PanelSection
                         icon={Boxes}
-                        title="Base model"
+                        title="Task and base model"
+                        description="Recommendations follow the task."
                         actions={
                             <a
                                 href="/discover"
@@ -390,42 +369,57 @@ export function AddModelPage() {
                                 <ExternalLink className="size-3.5" />
                             </a>
                         }
-                        bare
                     >
-                        <div className="flex flex-col gap-4">
-                            <fieldset className="flex flex-wrap gap-2">
-                                <legend className="sr-only">Where the base model is</legend>
-                                <Choice
-                                    name="base-source"
-                                    value="installed"
-                                    checked={source === "installed"}
-                                    onChange={() => setSource("installed")}
-                                    className="h-9 items-center px-3 pr-9 text-sm"
-                                >
-                                    On this install
-                                </Choice>
-                                <Choice
-                                    name="base-source"
-                                    value="fetch"
-                                    checked={source === "fetch"}
-                                    onChange={() => setSource("fetch")}
-                                    className="h-9 items-center px-3 pr-9 text-sm"
-                                >
-                                    Download or import
-                                </Choice>
-                            </fieldset>
-                            {source === "installed" ? (
-                                <BaseChooser value={baseKey} onChange={setChosen} />
-                            ) : (
-                                <SourceField
-                                    state={sourceState}
-                                    onState={(patch) =>
-                                        setSourceState((current) => ({ ...current, ...patch }))
-                                    }
+                        <FieldGroup>
+                            <TaskSelect value={task} onChange={setTask} />
+                            <div className="flex flex-col gap-3">
+                                <Field id="base-model" label="Base model">
+                                    <BasePicker
+                                        value={{
+                                            option,
+                                            importText:
+                                                current?.kind === "import" ? current.text : null,
+                                        }}
+                                        catalog={catalog.data}
+                                        models={rows}
+                                        picks={picks}
+                                        taskNoun={taskNoun}
+                                        open={open}
+                                        onOpenChange={setOpen}
+                                        tab={tab}
+                                        onTabChange={setTab}
+                                        onPick={pick}
+                                        onImport={importPick}
+                                    />
+                                </Field>
+                                {catalog.isLoading && (
+                                    <span className="text-sm text-muted-foreground">
+                                        Loading the catalogue…
+                                    </span>
+                                )}
+                                <ErrorLine error={catalog.error ?? startFrom.error} />
+                                <BaseSummary
+                                    option={option}
                                     plan={plan}
+                                    catalog={catalog.data}
+                                    need={need}
+                                    accepted={accepted}
+                                    onAccepted={setAccepted}
+                                    onVariant={(variant) => {
+                                        if (option?.entry) {
+                                            setPicked({
+                                                kind: "catalogue",
+                                                id: option.entry.id,
+                                                variant,
+                                            });
+                                            setAccepted(false);
+                                        }
+                                    }}
+                                    copy={copy}
+                                    onClearCopy={() => setCopy(null)}
                                 />
-                            )}
-                        </div>
+                            </div>
+                        </FieldGroup>
                     </PanelSection>
                     <PanelSection icon={SquarePen} title="Details">
                         <FieldGroup>
@@ -438,7 +432,17 @@ export function AddModelPage() {
                                         placeholder={suggestedName || "IT ticket classifier"}
                                     />
                                 </Field>
-                                <TaskSelect value={task} onChange={setTask} />
+                                <Field
+                                    id="create-tags"
+                                    label="Tags (optional)"
+                                    hint="Comma separated."
+                                >
+                                    <Input
+                                        id="create-tags"
+                                        value={tags}
+                                        onChange={(event) => setTags(event.target.value)}
+                                    />
+                                </Field>
                             </div>
                             <Field id="create-description" label="Description (optional)">
                                 <Textarea
@@ -447,13 +451,6 @@ export function AddModelPage() {
                                     onChange={(event) => setDescription(event.target.value)}
                                     rows={2}
                                     placeholder="Routes incoming tickets to the right queue"
-                                />
-                            </Field>
-                            <Field id="create-tags" label="Tags (optional)" hint="Comma separated.">
-                                <Input
-                                    id="create-tags"
-                                    value={tags}
-                                    onChange={(event) => setTags(event.target.value)}
                                 />
                             </Field>
                         </FieldGroup>
@@ -465,7 +462,9 @@ export function AddModelPage() {
                                     <Label htmlFor="with-data">Add training data now</Label>
                                     <span className="text-sm text-muted-foreground">
                                         {withData
-                                            ? "Upload a file, use a dataset or start from sample data."
+                                            ? copy?.datasetName
+                                                ? `Copied from ${copy.name}. Upload a file or use another dataset to change it.`
+                                                : "Upload a file, use a dataset or start from sample data."
                                             : "You can add it later on the Training page. Until it is trained, the model serves its base model."}
                                     </span>
                                 </div>

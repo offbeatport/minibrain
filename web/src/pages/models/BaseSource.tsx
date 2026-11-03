@@ -1,31 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Info } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import {
     Button,
     Checkbox,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    Field,
+    InfoTip,
     Input,
     Label,
-    SearchInput,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import { type CatalogEntry, type CatalogVariantInfo, api, unwrap } from "~/api/client";
 import { keys, useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import { bestFit } from "./DiscoverFilters";
 
@@ -176,141 +169,70 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     };
 }
 
-const FIT: Record<string, { text: string; tone: Tone }> = {
-    fits: { text: "Fits this machine", tone: "success" },
-    limited: { text: "Limited headroom", tone: "warning" },
-    insufficient: { text: "Won't fit", tone: "destructive" },
-    unknown: { text: "Fit not checked", tone: "neutral" },
+const FIT_TEXT: Record<string, string> = {
+    fits: "Runs here",
+    limited: "Tight fit",
+    insufficient: "Needs more compute",
+    unknown: "Fit not checked",
 };
 
 const SOURCE_HELP =
     "A Hugging Face model id or link (downloaded), an s3:// path, or an absolute folder path on the minibrain server (imported). Files must be in Hugging Face format: config.json, tokenizer files and .safetensors weights.";
 
-function CataloguePicker({
-    open,
-    onOpenChange,
-    onPick,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onPick: (entry: CatalogEntry) => void;
-}) {
-    const catalog = useCatalog();
-    const [query, setQuery] = useState("");
-    const text = query.trim().toLowerCase();
-    const entries = (catalog.data?.entries ?? []).filter((entry) =>
-        `${entry.name} ${entry.provider} ${entry.repo}`.toLowerCase().includes(text),
-    );
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Catalogue</DialogTitle>
-                    <DialogDescription>
-                        Models minibrain can download, with fit for this machine.
-                    </DialogDescription>
-                </DialogHeader>
-                <SearchInput
-                    aria-label="Search the catalogue"
-                    placeholder="Search the catalogue"
-                    value={query}
-                    onValueChange={setQuery}
-                />
-                <ul className="flex flex-col divide-y rounded-md border">
-                    {entries.map((entry) => {
-                        const fit = FIT[bestFit(entry).fit.level];
-                        return (
-                            <li key={entry.id}>
-                                <button
-                                    type="button"
-                                    onClick={() => onPick(entry)}
-                                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none"
-                                >
-                                    <PublisherLogo
-                                        publisher={entry.provider}
-                                        name={entry.name}
-                                        size="sm"
-                                    />
-                                    <span className="flex min-w-0 flex-1 flex-col">
-                                        <span className="truncate font-semibold">{entry.name}</span>
-                                        <span className="truncate text-sm text-muted-foreground">
-                                            {`${entry.params_b.toFixed(1)}B · ${entry.license_name}`}
-                                        </span>
-                                    </span>
-                                    {fit && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
-                                </button>
-                            </li>
-                        );
-                    })}
-                    {entries.length === 0 && (
-                        <li className="px-3 py-4 text-sm text-muted-foreground">
-                            No catalogue model matches.
-                        </li>
-                    )}
-                </ul>
-            </DialogContent>
-        </Dialog>
-    );
+export function looksLikeSource(text: string): boolean {
+    return text.trim().includes("/");
 }
 
-function CatalogueResult({
+export function VariantLicence({
     plan,
-    state,
-    onState,
+    accepted,
+    onAccepted,
+    onVariant,
 }: {
     plan: SourcePlan;
-    state: SourceState;
-    onState: (patch: Partial<SourceState>) => void;
+    accepted: boolean;
+    onAccepted: (accepted: boolean) => void;
+    onVariant: (variant: string) => void;
 }) {
     if (plan.target.kind !== "catalogue" || !plan.variant) {
         return null;
     }
     const { entry } = plan.target;
-    const fit = FIT[plan.variant.fit.level];
     return (
-        <div className="flex flex-col gap-3 rounded-md border bg-card px-3 py-3 text-sm">
-            <div className="flex items-center gap-3">
-                <PublisherLogo publisher={entry.provider} name={entry.name} />
-                <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-semibold">{entry.name}</span>
-                    <span className="text-muted-foreground">
-                        {`${entry.provider} · ${entry.params_b.toFixed(1)}B parameters · ${bytes(plan.variant.size_bytes)}`}
-                    </span>
-                </span>
-                {fit && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
-            </div>
+        <>
             {entry.variants.length > 1 && (
-                <Select
-                    value={plan.variant.id}
-                    onValueChange={(value) => onState({ variant: String(value ?? "") })}
-                >
-                    <SelectTrigger aria-label="Variant" className="w-full max-w-sm">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {entry.variants.map((variant) => (
-                            <SelectItem
-                                key={variant.id}
-                                value={variant.id}
-                                description={`${bytes(variant.size_bytes)} · ${FIT[variant.fit.level]?.text ?? ""}${variant.format === "gguf" ? " · serves only" : ""}`}
-                            >
-                                {variant.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <Field id="base-variant" label="Variant">
+                    <Select
+                        value={plan.variant.id}
+                        onValueChange={(value) => onVariant(String(value ?? ""))}
+                    >
+                        <SelectTrigger id="base-variant" className="w-full sm:max-w-sm">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {entry.variants.map((variant) => (
+                                <SelectItem
+                                    key={variant.id}
+                                    value={variant.id}
+                                    description={`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}${variant.format === "gguf" ? " · serves only, cannot be fine-tuned" : ""}`}
+                                >
+                                    {variant.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
             )}
-            {plan.installedKey ? (
-                <StatusText tone="success">
-                    Already on this install; nothing to download.
+            {!plan.installedKey && plan.blocked && (
+                <StatusText tone="warning" className="whitespace-normal">
+                    {plan.blocked}
                 </StatusText>
-            ) : plan.blocked ? (
-                <StatusText tone="warning">{plan.blocked}</StatusText>
-            ) : (
+            )}
+            {!plan.installedKey && !plan.blocked && (
                 <Label className="flex items-start gap-2 font-normal">
                     <Checkbox
-                        checked={state.accepted}
-                        onCheckedChange={(value) => onState({ accepted: value === true })}
+                        checked={accepted}
+                        onCheckedChange={(value) => onAccepted(value === true)}
                         className="mt-px"
                     />
                     <span>
@@ -327,7 +249,7 @@ function CatalogueResult({
                     </span>
                 </Label>
             )}
-        </div>
+        </>
     );
 }
 
@@ -340,14 +262,14 @@ function HubResult({ repo }: { repo: string }) {
     });
     if (!catalog.data?.hub_add_allowed) {
         return (
-            <StatusText tone="warning">
+            <StatusText tone="warning" className="whitespace-normal">
                 Not in the catalogue, and the Model sources policy allows catalogue models only.
             </StatusText>
         );
     }
     return (
-        <div className="flex flex-col gap-2 rounded-md border bg-card px-3 py-3 text-sm">
-            <span>{`${repo} is not in the catalogue. minibrain can read its details from Hugging Face.`}</span>
+        <div className="flex flex-col gap-2 rounded-md border px-3 py-3 text-sm">
+            <span>{`${repo} is not in the catalogue. minibrain can read its details from Hugging Face and add it.`}</span>
             <div>
                 <Button
                     type="button"
@@ -364,7 +286,7 @@ function HubResult({ repo }: { repo: string }) {
     );
 }
 
-function PathResult({ plan }: { plan: SourcePlan }) {
+export function PathResult({ plan }: { plan: SourcePlan }) {
     if (plan.target.kind !== "path" || plan.target.location.length < 2) {
         return null;
     }
@@ -374,13 +296,15 @@ function PathResult({ plan }: { plan: SourcePlan }) {
     const { found } = plan;
     if (!found.ok) {
         return (
-            <StatusText tone="destructive">{found.problem ?? "Cannot read this path"}</StatusText>
+            <StatusText tone="destructive" className="whitespace-normal">
+                {found.problem ?? "Cannot read this path"}
+            </StatusText>
         );
     }
     const where = found.source_type === "s3" ? "S3" : "Folder";
     return (
-        <div className="flex flex-col gap-0.5 rounded-md border bg-card px-3 py-2 text-sm">
-            <StatusText tone="success">
+        <div className="flex flex-col gap-0.5 text-sm">
+            <StatusText tone="success" className="whitespace-normal">
                 {`${where} · ${found.architecture || "unknown architecture"} · ${found.files} files · ${bytes(found.size_bytes)}`}
             </StatusText>
             <span className="text-muted-foreground">
@@ -392,64 +316,63 @@ function PathResult({ plan }: { plan: SourcePlan }) {
     );
 }
 
-export function SourceField({
-    state,
-    onState,
-    plan,
-}: {
-    state: SourceState;
-    onState: (patch: Partial<SourceState>) => void;
-    plan: SourcePlan;
-}) {
-    const [picking, setPicking] = useState(false);
+export type ImportPick =
+    | { kind: "catalogue"; entry: CatalogEntry }
+    | { kind: "import"; text: string };
+
+export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: ImportPick) => void }) {
+    const [text, setText] = useState(looksLikeSource(seed) ? seed.trim() : "");
+    const plan = useSourcePlan({ text, variant: "", accepted: false });
+    const pick: ImportPick | null =
+        plan.target.kind === "catalogue"
+            ? { kind: "catalogue", entry: plan.target.entry }
+            : plan.target.kind === "path" && plan.found?.ok
+              ? { kind: "import", text: text.trim() }
+              : null;
     return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
                 <span className="flex items-center gap-1.5">
                     <label htmlFor="base-source" className="text-sm font-medium">
                         Hugging Face model, S3 path or folder
                     </label>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                aria-label="What can I add?"
-                                className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                            >
-                                <Info className="size-4" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-80 whitespace-normal">
-                            {SOURCE_HELP}
-                        </TooltipContent>
-                    </Tooltip>
+                    <InfoTip label="What can I add?">{SOURCE_HELP}</InfoTip>
                 </span>
-                <div className="flex flex-wrap gap-2">
-                    <Input
-                        id="base-source"
-                        value={state.text}
-                        onChange={(event) =>
-                            onState({ text: event.target.value, variant: "", accepted: false })
+                <Input
+                    id="base-source"
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter" && pick) {
+                            event.preventDefault();
+                            onUse(pick);
                         }
-                        placeholder="Qwen/Qwen3-1.7B, s3://bucket/models/x or /srv/models/x"
-                        className="min-w-64 flex-1 font-mono"
-                    />
-                    <Button type="button" variant="outline" onClick={() => setPicking(true)}>
-                        Browse the catalogue
-                    </Button>
-                </div>
+                    }}
+                    placeholder="Qwen/Qwen3-1.7B, s3://bucket/models/x or /srv/models/x"
+                    className="font-mono"
+                />
             </div>
-            <CatalogueResult plan={plan} state={state} onState={onState} />
+            {plan.target.kind === "catalogue" && (
+                <div className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                    <PublisherLogo
+                        publisher={plan.target.entry.provider}
+                        name={plan.target.entry.name}
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-semibold">{plan.target.entry.name}</span>
+                        <span className="truncate text-muted-foreground">
+                            In the catalogue; it downloads from Hugging Face.
+                        </span>
+                    </span>
+                </div>
+            )}
             {plan.target.kind === "hub" && <HubResult repo={plan.target.repo} />}
             <PathResult plan={plan} />
-            <CataloguePicker
-                open={picking}
-                onOpenChange={setPicking}
-                onPick={(entry) => {
-                    onState({ text: entry.repo, variant: "", accepted: false });
-                    setPicking(false);
-                }}
-            />
+            <div>
+                <Button type="button" disabled={!pick} onClick={() => pick && onUse(pick)}>
+                    {pick?.kind === "import" ? "Import this model" : "Use this model"}
+                </Button>
+            </div>
         </div>
     );
 }

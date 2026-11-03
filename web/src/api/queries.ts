@@ -243,13 +243,6 @@ export function useBaseModel(key: string) {
     });
 }
 
-export function useBases() {
-    return useQuery({
-        queryKey: ["minibrains", "bases"],
-        queryFn: () => unwrap(api.GET("/api/minibrains/bases")),
-    });
-}
-
 export function useModelSources() {
     return useQuery({
         queryKey: ["models", "sources"],
