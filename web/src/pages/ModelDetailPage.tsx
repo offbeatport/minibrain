@@ -13,6 +13,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { percent } from "~/lib/format";
+import { deploymentPageHref, evaluationsHref, modelDataHref, trainingHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes, exactTime } from "~/lib/time";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
@@ -322,7 +323,6 @@ function CustomModelView({ row }: { row: ModelRow }) {
     const jobs = useJobs(row.key);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const router = useRouter();
-    const scoped = (path: string) => `${path}?minibrain=${encodeURIComponent(row.key)}`;
     const active = (jobs.data ?? []).filter(isActiveJob);
     return (
         <>
@@ -334,24 +334,26 @@ function CustomModelView({ row }: { row: ModelRow }) {
                     <>
                         <Button
                             variant="outline"
-                            onClick={() => router.history.push(scoped("/data"))}
+                            onClick={() => router.history.push(modelDataHref(row.key))}
                         >
                             Data
                         </Button>
                         <Button
                             variant="outline"
-                            onClick={() => router.history.push(scoped("/training"))}
+                            onClick={() => router.history.push(trainingHref(row.key))}
                         >
                             Train
                         </Button>
                         <Button
                             variant="outline"
-                            onClick={() => router.history.push(scoped("/evaluations"))}
+                            onClick={() => router.history.push(evaluationsHref(row.key))}
                         >
                             Review results
                         </Button>
                         {row.deployment.state !== "not_deployed" && (
-                            <Button onClick={() => router.history.push(scoped("/deployments"))}>
+                            <Button
+                                onClick={() => router.history.push(deploymentPageHref(row.key))}
+                            >
                                 Use API
                             </Button>
                         )}

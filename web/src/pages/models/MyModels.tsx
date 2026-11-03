@@ -54,6 +54,13 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import {
+    deploymentPageHref,
+    evaluationsHref,
+    modelDataHref,
+    playgroundHref,
+    trainingHref,
+} from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { GetStarted } from "./GetStarted";
@@ -106,11 +113,15 @@ export function detailHref(row: ModelRow): string {
     return `/models/${row.kind}/${encodeURIComponent(row.key)}`;
 }
 
+const MODEL_PAGES: Record<string, (slug: string) => string> = {
+    "/deployments": deploymentPageHref,
+    "/training": trainingHref,
+    "/evaluations": evaluationsHref,
+    "/playground": playgroundHref,
+};
+
 function scoped(path: string, row: ModelRow): string {
-    if (path === "/deployments") {
-        return `/deployments/${encodeURIComponent(row.key)}`;
-    }
-    return `${path}?minibrain=${encodeURIComponent(row.key)}`;
+    return (MODEL_PAGES[path] ?? modelDataHref)(row.key);
 }
 
 function jobHref(row: ModelRow): string {

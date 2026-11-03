@@ -1,9 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import {
     Button,
     Card,
     CardContent,
+    EmptyState,
     Field,
+    Link,
     Select,
     SelectContent,
     SelectItem,
@@ -13,13 +16,16 @@ import {
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
 import { type FormEvent, useState } from "react";
-import { type CompleteResponse, api, unwrap } from "~/api/client";
-import { useGolden, useMinibrain, useVersions } from "~/api/queries";
-import { ScopedPage } from "~/components/PageHeader";
-import { ErrorLine, Section } from "~/components/Section";
+import { type CompleteResponse, type MinibrainSummary, api, unwrap } from "~/api/client";
+import { useGolden, useMinibrain, useMinibrains, useVersions } from "~/api/queries";
+import { PageHeader } from "~/components/PageHeader";
+import { ErrorLine, Page, Section } from "~/components/Section";
 import { asCode, milliseconds } from "~/lib/format";
+import { useSearchParam } from "~/lib/listSearch";
+import { playgroundHref, trainingHref } from "~/lib/modelLinks";
 
 const NONE = "none";
+const STORAGE_KEY = "minibrain.playground.model";
 
 type Exchange = { id: number; text: string; replies: CompleteResponse[] };
 
@@ -111,7 +117,11 @@ function Playground({ slug }: { slug: string }) {
         return (
             <>
                 <p className="text-sm text-muted-foreground">
-                    No version is ready yet. Score or train one on the Training page.
+                    No version is ready yet. Score or train one on{" "}
+                    <Link href={trainingHref(slug)} className="text-primary hover:underline">
+                        Training
+                    </Link>
+                    .
                 </p>
             </>
         );
@@ -184,13 +194,86 @@ function Playground({ slug }: { slug: string }) {
     );
 }
 
-export function PlaygroundPage() {
+function rememberedModel(): string | null {
+    try {
+        return window.localStorage.getItem(STORAGE_KEY);
+    } catch {
+        return null;
+    }
+}
+
+function rememberModel(slug: string): void {
+    try {
+        window.localStorage.setItem(STORAGE_KEY, slug);
+    } catch {
+        return;
+    }
+}
+
+function chooseModel(requested: string | null, minibrains: MinibrainSummary[]): string | null {
+    const known = new Set(minibrains.map((item) => item.slug));
+    const candidates = [requested, rememberedModel(), minibrains[0]?.slug];
+    return candidates.find((slug): slug is string => Boolean(slug && known.has(slug))) ?? null;
+}
+
+function ModelPicker({
+    slug,
+    minibrains,
+    onSelect,
+}: {
+    slug: string;
+    minibrains: MinibrainSummary[];
+    onSelect: (slug: string) => void;
+}) {
     return (
-        <ScopedPage
-            title="Playground"
-            caption="Try a version on your own inputs, or compare two side by side."
-        >
-            {(slug) => <Playground key={slug} slug={slug} />}
-        </ScopedPage>
+        <Select value={slug} onValueChange={(next) => onSelect(String(next ?? slug))}>
+            <SelectTrigger className="w-56" aria-label="Model">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {minibrains.map((item) => (
+                    <SelectItem key={item.slug} value={item.slug}>
+                        {item.name}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+export function PlaygroundPage() {
+    const router = useRouter();
+    const requested = useSearchParam("model");
+    const { data, isLoading } = useMinibrains();
+    const minibrains = data ?? [];
+    const slug = data ? chooseModel(requested, minibrains) : null;
+    const select = (next: string) => {
+        rememberModel(next);
+        router.history.replace(playgroundHref(next));
+    };
+    return (
+        <Page>
+            <PageHeader
+                title="Playground"
+                caption="Try a version on your own inputs, or compare two side by side."
+                actions={
+                    slug && <ModelPicker slug={slug} minibrains={minibrains} onSelect={select} />
+                }
+            />
+            {!isLoading && !slug && (
+                <EmptyState
+                    variant="panel"
+                    title="No custom models yet"
+                    action={
+                        <Button asChild>
+                            <Link href="/models/new">Create one</Link>
+                        </Button>
+                    }
+                >
+                    Create a custom model first, then try it here.
+                </EmptyState>
+            )}
+            {slug && <Playground key={slug} slug={slug} />}
+        </Page>
     );
 }

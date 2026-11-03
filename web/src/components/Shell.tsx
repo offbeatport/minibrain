@@ -11,9 +11,8 @@ import {
     SectionLabel,
 } from "obp-ui/shell";
 import { type MouseEvent, useEffect } from "react";
-import { type NavEntry, SECTIONS, SETTINGS_PAGES, isSettingsPath } from "~/components/navigation";
+import { SECTIONS, SETTINGS_PAGES, isSettingsPath } from "~/components/navigation";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
-import { readMinibrainParam, rememberedMinibrain } from "~/lib/selection";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
 
@@ -37,13 +36,7 @@ function KitLink({ href, onClick, ...rest }: UILinkProps) {
     return <a href={href} onClick={follow} {...rest} />;
 }
 
-function hrefFor(entry: NavEntry, minibrain: string | null): string {
-    return entry.scoped && minibrain
-        ? `${entry.path}?minibrain=${encodeURIComponent(minibrain)}`
-        : entry.path;
-}
-
-function Navigation({ pathname, minibrain }: { pathname: string; minibrain: string | null }) {
+function Navigation({ pathname }: { pathname: string }) {
     return (
         <>
             {SECTIONS.map((section) => (
@@ -58,7 +51,7 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
                             key={entry.path}
                             icon={entry.icon}
                             label={entry.label}
-                            href={hrefFor(entry, minibrain)}
+                            href={entry.path}
                             active={
                                 pathname === entry.path || pathname.startsWith(`${entry.path}/`)
                             }
@@ -104,9 +97,6 @@ export function Shell() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const href = useRouterState({ select: (state) => state.location.href });
-    const requested = useRouterState({
-        select: (state) => readMinibrainParam(state.location.search),
-    });
     const settings = isSettingsPath(pathname);
     useEffect(() => {
         if (!settings) {
@@ -131,7 +121,7 @@ export function Shell() {
             {settings ? (
                 <SettingsNavigation pathname={pathname} />
             ) : (
-                <Navigation pathname={pathname} minibrain={requested ?? rememberedMinibrain()} />
+                <Navigation pathname={pathname} />
             )}
         </Rail>
     );

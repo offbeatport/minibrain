@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
@@ -32,13 +31,14 @@ import {
     useGolden,
     useJobs,
     useMinibrain,
+    useMinibrains,
     usePreview,
 } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
-import { ScopedPage } from "~/components/PageHeader";
-import { ErrorLine, Section, Stat } from "~/components/Section";
+import { PageHeader } from "~/components/PageHeader";
+import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
-import { readMinibrainParam } from "~/lib/selection";
+import { useSearchParam } from "~/lib/listSearch";
 import { DataExplorer } from "./data/Explorer";
 import { itemHref } from "./data/catalogue";
 
@@ -516,20 +516,25 @@ export function DataSections({ slug }: { slug: string }) {
     );
 }
 
-function ModelData() {
+function ModelData({ slug }: { slug: string }) {
+    const minibrains = useMinibrains();
+    const model = minibrains.data?.find((item) => item.slug === slug);
     return (
-        <ScopedPage
-            title="Data"
-            caption="The dataset this model trains on, its mapping and its snapshot."
-        >
-            {(slug) => <DataSections key={slug} slug={slug} />}
-        </ScopedPage>
+        <Page>
+            <PageHeader
+                title="Data"
+                caption={`The dataset ${model?.name ?? "this model"} trains on, its mapping and its snapshot.`}
+            />
+            <ErrorLine error={minibrains.error} />
+            {minibrains.data && !model && (
+                <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
+            )}
+            {model && <DataSections key={slug} slug={slug} />}
+        </Page>
     );
 }
 
 export function DataPage() {
-    const requested = useRouterState({
-        select: (state) => readMinibrainParam(state.location.search),
-    });
-    return requested ? <ModelData /> : <DataExplorer />;
+    const requested = useSearchParam("minibrain");
+    return requested ? <ModelData slug={requested} /> : <DataExplorer />;
 }

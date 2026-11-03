@@ -7,7 +7,13 @@ import {
     redirect,
 } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
-import { readMinibrainParam } from "./lib/selection";
+import { hrefWith } from "./lib/listSearch";
+import {
+    deploymentPageHref,
+    evaluationsHref,
+    modelDataHref,
+    playgroundHref,
+} from "./lib/modelLinks";
 import { DataPage } from "./pages/DataPage";
 import { DeploymentPage, DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
@@ -26,35 +32,41 @@ import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { LogosPage } from "./pages/proto/LogosPage";
 import { ModelTrainingPage, TrainingListPage } from "./pages/training/TrainingPages";
 
-const LEGACY_TABS: Record<string, string> = {
-    data: "/data",
-    versions: "/evaluations",
-    playground: "/playground",
-    endpoint: "/deployments",
+const LEGACY_TABS: Record<string, (slug: string) => string> = {
+    data: modelDataHref,
+    versions: evaluationsHref,
+    playground: playgroundHref,
+    endpoint: deploymentPageHref,
 };
 
 const rootRoute = createRootRoute({ component: Shell });
-
-function validateMinibrain(search: Record<string, unknown>): { minibrain?: string } {
-    const minibrain = readMinibrainParam(search);
-    return minibrain ? { minibrain } : {};
-}
 
 function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
 }
 
-function scopedPage(path: string, component: RouteComponent): AnyRoute {
+function unscopedPage(path: string, component: RouteComponent, keepModel = true): AnyRoute {
     return createRoute({
         getParentRoute: () => rootRoute,
         path,
+        beforeLoad: ({ location }) => {
+            const params = new URLSearchParams(location.searchStr);
+            const minibrain = params.get("minibrain");
+            if (minibrain === null) {
+                return;
+            }
+            params.delete("minibrain");
+            if (keepModel && minibrain && !params.has("model")) {
+                params.set("model", minibrain);
+            }
+            throw redirect({ href: hrefWith(path, params) });
+        },
         component,
-        validateSearch: validateMinibrain,
     });
 }
 
 function legacyHref(slug: string, tab: string): string {
-    return `${LEGACY_TABS[tab] ?? "/data"}?minibrain=${encodeURIComponent(slug)}`;
+    return (LEGACY_TABS[tab] ?? modelDataHref)(slug);
 }
 
 const legacyTabRoute = createRoute({
@@ -104,7 +116,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/new", AddModelPage),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
-    scopedPage("/playground", PlaygroundPage),
+    unscopedPage("/playground", PlaygroundPage),
     globalPage("/data", DataPage),
     createRoute({
         getParentRoute: () => rootRoute,
@@ -113,17 +125,17 @@ const routeTree = rootRoute.addChildren([
             throw redirect({ href: `/data?item=dataset:${encodeURIComponent(params.slug)}` });
         },
     }),
-    globalPage("/training", TrainingListPage),
+    unscopedPage("/training", TrainingListPage),
     globalPage("/training/$slug", ModelTrainingPage),
-    globalPage("/evaluations", EvaluationsPage),
-    scopedPage("/feedback", FeedbackPage),
+    unscopedPage("/evaluations", EvaluationsPage),
+    unscopedPage("/feedback", FeedbackPage, false),
     createRoute({
         getParentRoute: () => rootRoute,
         path: "/deployments",
-        validateSearch: validateMinibrain,
-        beforeLoad: ({ search }) => {
-            if (search.minibrain) {
-                throw redirect({ href: `/deployments/${encodeURIComponent(search.minibrain)}` });
+        beforeLoad: ({ location }) => {
+            const minibrain = new URLSearchParams(location.searchStr).get("minibrain");
+            if (minibrain) {
+                throw redirect({ href: deploymentPageHref(minibrain) });
             }
         },
         component: DeploymentsPage,

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { IconComponent } from "obp-ui/shell";
 
-export type NavEntry = { label: string; path: string; icon: IconComponent; scoped?: boolean };
+export type NavEntry = { label: string; path: string; icon: IconComponent };
 
 export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
@@ -25,16 +25,16 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
         items: [
             { label: "Models", path: "/models", icon: Box },
             { label: "Discover", path: "/discover", icon: Compass },
-            { label: "Playground", path: "/playground", icon: Play, scoped: true },
+            { label: "Playground", path: "/playground", icon: Play },
         ],
     },
     {
         label: "Create",
         items: [
             { label: "Data", path: "/data", icon: Database },
-            { label: "Training", path: "/training", icon: GraduationCap, scoped: true },
-            { label: "Evaluations", path: "/evaluations", icon: Gauge, scoped: true },
-            { label: "Feedback", path: "/feedback", icon: ThumbsUp, scoped: true },
+            { label: "Training", path: "/training", icon: GraduationCap },
+            { label: "Evaluations", path: "/evaluations", icon: Gauge },
+            { label: "Feedback", path: "/feedback", icon: ThumbsUp },
         ],
     },
     {
