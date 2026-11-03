@@ -29,7 +29,7 @@ import {
     searchText,
 } from "./baseOptions";
 
-export type PickerTab = "recommended" | "catalogue" | "mine" | "import";
+export type PickerTab = "catalogue" | "mine" | "import";
 
 const FIT_HINT: Record<FitLevel, { text: string; tone: Tone }> = {
     fits: { text: "Runs here", tone: "success" },
@@ -57,7 +57,7 @@ const USE_FILTERS = [
     { value: "unknown", label: "Not reviewed" },
 ];
 
-type Row = { group: string; option: BaseOption };
+type Row = { group: string; option: BaseOption; recommended?: boolean };
 
 type InstallState = { text: string; variant: "success" | "info" | "warning" | "neutral" };
 
@@ -84,58 +84,42 @@ function Availability({ option }: { option: BaseOption }) {
     ) : null;
 }
 
-function OptionRow({ option }: { option: BaseOption }) {
+function OptionRow({ option, recommended }: { option: BaseOption; recommended?: boolean }) {
     const fit = FIT_HINT[option.fit];
     const facts = [
         option.kind === "custom" ? null : option.publisher,
         option.params ? `${option.params} parameters` : null,
         option.licence ? LICENCE_TEXT[option.licence] : null,
     ].filter(Boolean);
+    const description = descriptionOf(option);
     return (
-        <>
+        <span className="flex w-full min-w-0 items-start gap-3 py-1.5">
             <PublisherLogo publisher={option.publisher} name={option.name} />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate font-semibold">{option.name}</span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-base font-semibold">{option.name}</span>
+                    {recommended && <Badge variant="info">Recommended</Badge>}
+                </span>
                 {facts.length > 0 && (
                     <span className="truncate text-muted-foreground">{facts.join(" · ")}</span>
                 )}
-                {option.note && (
-                    <span className="truncate text-muted-foreground">{option.note}</span>
+                {description && (
+                    <span className="line-clamp-1 text-muted-foreground">{description}</span>
                 )}
             </span>
-            <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                 <Availability option={option} />
                 {option.kind !== "local" && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
             </span>
-        </>
+        </span>
     );
 }
 
-function CompactRow({ option }: { option: BaseOption }) {
-    const fit = FIT_HINT[option.fit];
-    const facts = [
-        option.publisher,
-        option.params,
-        option.licence ? LICENCE_TEXT[option.licence] : null,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-    return (
-        <>
-            <PublisherLogo publisher={option.publisher} name={option.name} size="sm" />
-            <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                <span className="truncate font-semibold">{option.name}</span>
-                <span className="hidden truncate text-muted-foreground sm:inline">{facts}</span>
-            </span>
-            {option.kind !== "local" && (
-                <StatusText tone={fit.tone} className="hidden sm:inline-flex">
-                    {fit.text}
-                </StatusText>
-            )}
-            <Availability option={option} />
-        </>
-    );
+function descriptionOf(option: BaseOption): string | null {
+    return option.entry?.description || option.custom?.description || option.note || null;
 }
+
+const FIT_RANK: Record<FitLevel, number> = { fits: 0, limited: 1, unknown: 2, insufficient: 3 };
 
 function rows(group: string, options: BaseOption[]): Row[] {
     return options.map((option) => ({ group, option }));
@@ -158,10 +142,6 @@ function fitMatches(fit: FitLevel, chosen: string[]): boolean {
 }
 
 type PickerValue = { option: BaseOption | null; importText: string | null };
-
-function descriptionOf(option: BaseOption): string | null {
-    return option.entry?.description || option.custom?.description || option.note || null;
-}
 
 function Trigger({ value }: { value: PickerValue }) {
     const { option, importText } = value;
@@ -280,26 +260,19 @@ export function BasePicker({
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
     const custom = customOptions(entries, models);
     const imported = localBases(entries, models);
-    const listed = new Set(
-        [...picks.here, ...picks.more, ...picks.unchecked].map((pick) => pick.key),
-    );
-    const recommended: TabbedSearchListGroup<Row>[] = [
-        groupOf(
-            "recent",
-            "Recently used",
-            picks.recent.filter((pick) => !listed.has(pick.key)),
-        ),
-        groupOf("here", "Runs on this machine", picks.here),
-        groupOf("more", "Needs more compute: train or serve it on a GPU pool", picks.more),
-        groupOf("unchecked", "Suggested; fit not checked yet", picks.unchecked),
-    ].filter((group) => group.items.length > 0);
+    const suggested = [...picks.here, ...picks.unchecked].slice(0, 3).map((pick) => pick.key);
+    const ordered = [...catalogue].sort((left, right) => {
+        const a = suggested.indexOf(left.key);
+        const b = suggested.indexOf(right.key);
+        if (a !== b) {
+            return (a === -1 ? suggested.length : a) - (b === -1 ? suggested.length : b);
+        }
+        return (
+            FIT_RANK[left.fit] - FIT_RANK[right.fit] ||
+            (right.entry?.popularity ?? 0) - (left.entry?.popularity ?? 0)
+        );
+    });
     const tabs: TabbedSearchListTab<Row>[] = [
-        {
-            value: "recommended",
-            label: "Recommended",
-            groups: recommended,
-            empty: "No catalogue model suits this task yet.",
-        },
         {
             value: "catalogue",
             label: "Catalogue",
@@ -343,18 +316,23 @@ export function BasePicker({
                     />
                 </div>
             ),
-            groups: [groupOf("catalogue", undefined, catalogue)],
+            groups: [
+                {
+                    key: "catalogue",
+                    items: ordered.map((option) => ({
+                        group: "catalogue",
+                        option,
+                        recommended: suggested.includes(option.key),
+                    })),
+                },
+            ],
             empty: "No catalogue model matches these filters.",
         },
         {
             value: "mine",
             label: "My models",
             groups: [
-                groupOf(
-                    "custom",
-                    "Start from a custom model: copies its base, training data and settings",
-                    custom,
-                ),
+                groupOf("custom", "Your models: adds a copy with its data and settings", custom),
                 groupOf("imported", "Imported base models", imported),
             ].filter((group) => group.items.length > 0),
             empty: "No custom or imported models yet.",
@@ -379,13 +357,9 @@ export function BasePicker({
                     onTabChange={(next) => onTabChange(next as PickerTab)}
                     itemKey={(row) => row.option.key}
                     itemText={(row) => searchText(row.option)}
-                    renderItem={(row) =>
-                        row.group === "recent" ? (
-                            <CompactRow option={row.option} />
-                        ) : (
-                            <OptionRow option={row.option} />
-                        )
-                    }
+                    renderItem={(row) => (
+                        <OptionRow option={row.option} recommended={row.recommended} />
+                    )}
                     currentKey={value.option?.key}
                     onPick={(row) => onPick(row.option)}
                     label="Search base models"
