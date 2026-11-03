@@ -584,7 +584,9 @@ once it matches; only the cache budget below removes files.
 
 ### Accounts and roles
 
-Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` stays key-only.
+Built, with the details in `docs/security.md`; OIDC is tested against an in-process fake provider and proxy headers
+against test clients, not yet against Entra, Okta, ADFS, Keycloak or a real proxy. People sign in; apps keep using API
+keys, and `/v1` stays key-only.
 
 - Sign-in sources, any mix: local accounts, OIDC (authorization code with PKCE; Entra, Okta, ADFS, Keycloak) and
   trusted proxy headers (user, email and groups headers, honoured only from configured proxy addresses).
@@ -946,7 +948,8 @@ Everything in the v1 scope below, after M1.
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only
-- [ ] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
+      (built; OIDC tested against a fake provider: verify on Entra, Okta, ADFS and Keycloak and behind a real proxy)
+- [x] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [x] FIPS-ready crypto rules enforced in CI: ruff `S324` and `scripts/check_crypto.py`
 - [x] Local install via uv on Linux and macOS
 - [ ] Local install via uv on Windows (documented in `docs/install.md`; not verified yet)

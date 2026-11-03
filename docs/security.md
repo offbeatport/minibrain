@@ -17,6 +17,47 @@ log with who, before and after.
 | Audit log retention | Days, 0 keeps every event (default) | Hourly prune on the leader, cut at a chain anchor (below) |
 | SIEM export | Off (default), TLS, TCP or UDP; host, port (0 is 6514 for TLS, 514 otherwise), CA bundle path | Syslog forwarder on the leader (below) |
 
+## Accounts and sign-in
+
+People sign in to the UI and `/api`; apps call `/v1` with API keys only, and workers and engines keep their tokens.
+
+| Source | How | Notes |
+|---|---|---|
+| Local accounts | Email and password; an admin adds people with a one-time set-password link (24 hours), or `minibrain admin create` on the server | PBKDF2-HMAC-SHA256, 600,000 iterations, 16-byte salt, through `cryptography`; 10 failures lock the account for 15 minutes |
+| OIDC | Authorization code with PKCE (S256) through Authlib; the ID token is checked with joserfc (issuer, audience, expiry, nonce, signature from the provider's JWKS; RSA, RSA-PSS or ECDSA only) | The issuer must match discovery; state, nonce and verifier sit in a signed, HttpOnly cookie for 10 minutes |
+| Proxy headers | `X-Forwarded-User`, `-Email`, `-Groups` (names configurable) | Honoured only from `auth.proxy.addresses`; the same headers from anywhere else are ignored |
+
+- Sessions: a random 256-bit token in an HttpOnly, SameSite=Lax cookie (Secure unless the page is plain HTTP on
+  loopback); the database keeps only its SHA-256. Idle and absolute lifetimes are the `session_idle_minutes` (30)
+  and `session_hours` (12) policies. Signing out, a new password or turning an account off ends sessions at once.
+- CSRF: every state-changing `/api` call from a signed-in person carries `X-CSRF-Token`, an HMAC-SHA256 of the
+  session (or proxy identity) under a per-install key.
+- Single-user mode: with no accounts, no OIDC and no proxy configured, minibrain is one local user only while it
+  listens on loopback, the connection is local and no proxy forwarded it. Otherwise the first visitor creates the
+  admin, or `minibrain admin create` does.
+- Forwarded client addresses (`X-Forwarded-For`, `X-Forwarded-Proto`) count only from `auth.proxy.addresses`;
+  uvicorn's own proxy-header handling is off.
+- Roles: Viewer, Builder and Admin, enforced by one guard per `/api` route; `tests/test_access.py` lists every route
+  with its role. Viewers get versions, jobs and model details without data rows.
+- The OIDC provider is called directly by main (discovery, JWKS, token); the network policy does not apply to it,
+  since an admin configured it. `auth.oidc.ca_bundle` trusts an internal CA.
+
+```yaml
+auth:
+  default_role: none                  # none, viewer, builder or admin for people with no mapped group
+  roles:                              # identity provider group -> role; locked in Settings > Accounts
+    minibrain-admins: admin
+    ml-team: builder
+  proxy:
+    addresses: [10.0.0.10/32]         # only these may send identity headers
+  oidc:
+    issuer: https://keycloak.corp/realms/corp
+    client_id: minibrain
+    client_secret: ...                # or MINIBRAIN_OIDC_CLIENT_SECRET; omit for a public client
+    label: Keycloak
+    groups_claim: groups
+```
+
 ## Trust zones and ports
 
 | Zone | Holds | Accepts connections from | Ports |
