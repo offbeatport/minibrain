@@ -694,6 +694,73 @@
         }
       }
     },
+    "/api/samples": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "List Samples",
+        "operationId": "list_samples_api_samples_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SampleInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Samples Api Samples Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/samples/{file}": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Add Sample Source",
+        "operationId": "add_sample_source_api_samples__file__post",
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sources/{source_id}": {
       "get": {
         "tags": [
@@ -7787,6 +7854,49 @@
           "seen_at"
         ],
         "title": "ReplicaInfo"
+      },
+      "SampleInfo": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "labels": {
+            "type": "integer",
+            "title": "Labels"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "credit": {
+            "type": "string",
+            "title": "Credit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "name",
+          "format",
+          "rows",
+          "labels",
+          "description",
+          "credit"
+        ],
+        "title": "SampleInfo"
       },
       "SnapshotInfo": {
         "properties": {

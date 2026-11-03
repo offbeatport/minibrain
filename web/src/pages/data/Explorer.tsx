@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
+    ChevronDown,
     Cloud,
     Database,
     FileBraces,
@@ -12,6 +13,10 @@ import {
 } from "lucide-react";
 import {
     Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     EmptyState,
     Link,
     SearchInput,
@@ -31,8 +36,8 @@ import {
     useRef,
     useState,
 } from "react";
-import { type DatasetSummary, type SourceSummary, uploadFile } from "~/api/client";
-import { useDatasets, useSources } from "~/api/queries";
+import { type DatasetSummary, type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
+import { useDatasets, useSamples, useSources } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
@@ -218,6 +223,55 @@ function UploadButton({
     );
 }
 
+function SampleMenu({ onUploaded }: { onUploaded: (source: SourceSummary) => void }) {
+    const samples = useSamples();
+    const refresh = useDataRefresh();
+    const add = useMutation({
+        mutationFn: (file: string) =>
+            unwrap(api.POST("/api/samples/{file}", { params: { path: { file } } })),
+        onSuccess: async (source) => {
+            await refresh();
+            onUploaded(source);
+        },
+    });
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" disabled={add.isPending}>
+                        {add.isPending ? "Adding…" : "Add sample data"}
+                        <ChevronDown />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                    {(samples.data ?? []).map((sample) => (
+                        <DropdownMenuItem
+                            key={sample.file}
+                            onSelect={() => add.mutate(sample.file)}
+                            className="flex-col items-start gap-0.5"
+                        >
+                            <span className="font-medium">{sample.name}</span>
+                            <span className="text-sm text-muted-foreground tabular-nums">
+                                {`${sample.format} · ${count(sample.rows)} rows · ${count(sample.labels)} labels`}
+                            </span>
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <ErrorLine error={add.error ?? samples.error} />
+        </div>
+    );
+}
+
+function DataActions({ onUploaded }: { onUploaded: (source: SourceSummary) => void }) {
+    return (
+        <div className="flex flex-wrap items-start gap-2">
+            <SampleMenu onUploaded={onUploaded} />
+            <UploadButton onUploaded={onUploaded} />
+        </div>
+    );
+}
+
 function GroupDetail({
     kind,
     sources,
@@ -267,12 +321,12 @@ function GroupDetail({
                     className="mx-0 mt-0"
                     action={
                         <div className="mt-3 flex justify-center">
-                            <UploadButton onUploaded={onUploaded} />
+                            <DataActions onUploaded={onUploaded} />
                         </div>
                     }
                 >
-                    Upload a CSV, TSV, JSON Lines or Parquet file. Then pick the column a model
-                    reads and the column it answers with to make a dataset.
+                    Upload a CSV, TSV, JSON Lines or Parquet file, or add one of the samples. Then
+                    pick the column a model reads and the column it answers with to make a dataset.
                 </EmptyState>
             ) : (
                 <p className="text-sm text-muted-foreground">
@@ -421,7 +475,7 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Files, the datasets built from them and the models that train on them."
-                    actions={<UploadButton onUploaded={onUploaded} />}
+                    actions={<DataActions onUploaded={onUploaded} />}
                 />
                 <ErrorLine error={sources.error ?? datasets.error} />
             </div>

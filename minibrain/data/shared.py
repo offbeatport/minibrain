@@ -21,7 +21,8 @@ def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
 
 
 def staging_of(settings: Settings, store: ArtifactStore, source: Source) -> Path:
-    staging = settings.home / "sources" / str(source.id) / "staging.duckdb"
+    key = f"{source.artifact_id}{Path(source.filename).suffix.lower()}"
+    staging = settings.home / "staging" / key / "staging.duckdb"
     if not staging.exists():
         staging.parent.mkdir(parents=True, exist_ok=True)
         stage(store.materialize(source.artifact_id, Packing.FILE, source.filename), staging)

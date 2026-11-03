@@ -126,3 +126,28 @@ def test_splits_are_known_once_a_model_builds_the_dataset(harness: Harness) -> N
     assert harness.client.get("/api/datasets/tickets").json()["splits"] == splits
     harness.client.put("/api/datasets/tickets/mapping", json={"input_column": "category", "label_column": "text"})
     assert harness.client.get("/api/datasets/tickets").json()["splits"] is None
+
+
+def test_samples_are_listed_and_can_be_added_again_after_a_delete(harness: Harness) -> None:
+    samples = harness.client.get("/api/samples").json()
+    assert [sample["file"] for sample in samples] == ["travel_intents.jsonl", "banking77.csv", "clinc150.parquet"]
+    first = harness.client.post("/api/samples/banking77.csv").json()
+    assert first["filename"] == "banking77.csv"
+    assert first["tags"] == ["sample"]
+    assert first["rows"] == 13_083
+    assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
+    again = harness.client.post("/api/samples/banking77.csv").json()
+    assert again["id"] > first["id"]
+    assert again["rows"] == 13_083
+
+
+def test_unknown_sample_is_not_found(harness: Harness) -> None:
+    assert harness.client.post("/api/samples/other.csv").status_code == 404
+
+
+def test_a_new_file_never_reads_a_deleted_file_staging(harness: Harness) -> None:
+    first = upload(harness)
+    assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
+    second = harness.client.post("/api/samples/travel_intents.jsonl").json()
+    assert second["rows"] == 750
+    assert {column["name"] for column in second["columns"]} != {column["name"] for column in first["columns"]}

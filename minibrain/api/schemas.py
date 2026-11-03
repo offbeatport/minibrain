@@ -35,6 +35,16 @@ class MappingInfo(BaseModel):
 SourceKind = Literal["upload", "folder", "s3", "database"]
 
 
+class SampleInfo(BaseModel):
+    file: str
+    name: str
+    format: str
+    rows: int
+    labels: int
+    description: str
+    credit: str
+
+
 class SourceSummary(BaseModel):
     id: int
     kind: SourceKind

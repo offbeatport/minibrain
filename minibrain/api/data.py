@@ -18,12 +18,14 @@ from minibrain.api.schemas import (
     QualityInfo,
     QueryRequest,
     QueryResponse,
+    SampleInfo,
     SourceStats,
     SourceSummary,
 )
 from minibrain.api.views import mapping_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.data import quality
+from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     add_dataset,
     add_source,
@@ -164,6 +166,19 @@ def list_sources(session: SessionDep, settings: SettingsDep, store: StoreDep) ->
 @router.post("/sources", status_code=201)
 def upload_source(file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
     source = add_source(session, store, safe_filename(file.filename or ""), file.file)
+    summary = source_summary(settings, store, source)
+    session.commit()
+    return summary
+
+
+@router.get("/samples")
+def list_samples() -> list[SampleInfo]:
+    return [SampleInfo(**vars(sample)) for sample in SAMPLES]
+
+
+@router.post("/samples/{file}", status_code=201)
+def add_sample_source(file: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
+    source = add_sample(session, store, file)
     summary = source_summary(settings, store, source)
     session.commit()
     return summary

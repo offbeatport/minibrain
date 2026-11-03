@@ -75,6 +75,14 @@ export function useDatasets() {
     return useQuery({ queryKey: keys.datasets, queryFn: () => unwrap(api.GET("/api/datasets")) });
 }
 
+export function useSamples() {
+    return useQuery({
+        queryKey: ["samples"],
+        queryFn: () => unwrap(api.GET("/api/samples")),
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
 export function useSources() {
     return useQuery({ queryKey: keys.sources, queryFn: () => unwrap(api.GET("/api/sources")) });
 }
