@@ -106,38 +106,64 @@ function Trend({ usage }: { usage: ModelUsage }) {
     );
 }
 
+const FLOOR = 31.5;
+const CEILING = 4;
+const IDLE_WEEK = [0, 0, 0, 0, 0, 0, 0];
+
 function Sparkline({ values }: { values: number[] }) {
     const peak = Math.max(...values, 1);
     const step = 100 / Math.max(values.length - 1, 1);
-    const points = values.map((value, index) => `${index * step},${32 - (value / peak) * 28}`);
+    const heights = values.map((value) => FLOOR - (value / peak) * (FLOOR - CEILING));
+    const points = heights.map((height, index) => `${index * step},${height}`);
+    const today = heights.at(-1) ?? FLOOR;
     return (
-        <svg
-            aria-hidden="true"
-            viewBox="0 0 100 32"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 size-full"
-        >
-            <path d={`M0,32 L${points.join(" L")} L100,32 Z`} className="fill-primary/15" />
-            <path
-                d={`M${points.join(" L")}`}
-                vectorEffect="non-scaling-stroke"
-                strokeWidth={1}
-                className="fill-none stroke-primary"
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0">
+            <svg
+                aria-hidden="true"
+                viewBox="0 0 100 32"
+                preserveAspectRatio="none"
+                className="size-full"
+            >
+                <path d={`M0,32 L${points.join(" L")} L100,32 Z`} className="fill-primary/15" />
+                <path
+                    d={`M${points.join(" L")}`}
+                    vectorEffect="non-scaling-stroke"
+                    strokeWidth={1}
+                    className="fill-none stroke-primary"
+                />
+            </svg>
+            <span
+                className="absolute -right-0.75 size-1.5 rounded-full bg-primary"
+                style={{ top: `${today - 3}px` }}
             />
-        </svg>
+        </span>
     );
 }
 
-export function Requests({ usage }: { usage: ModelUsage | null | undefined }) {
+export function Requests({
+    usage,
+    live = false,
+}: {
+    usage: ModelUsage | null | undefined;
+    live?: boolean;
+}) {
     if (!usage) {
-        return <span className="text-muted-foreground">Never used</span>;
+        if (!live) {
+            return <span className="text-muted-foreground">Never used</span>;
+        }
+        return (
+            <span className="relative flex h-8 w-full max-w-36 items-center">
+                <Sparkline values={IDLE_WEEK} />
+                <span className="relative px-1 text-muted-foreground">Never used</span>
+            </span>
+        );
     }
     const days =
         usage.days?.length === usage.daily.length ? usage.days : recentDays(usage.daily.length);
     const used = usage.daily.some((value) => value > 0);
     return (
         <span className="relative flex h-8 w-full max-w-36 items-center">
-            {used && <Sparkline values={usage.daily} />}
+            {(used || live) && <Sparkline values={usage.daily} />}
             <Tooltip>
                 <TooltipTrigger asChild>
                     <span className="relative inline-flex w-fit items-baseline gap-2 rounded-sm px-1 tabular-nums">

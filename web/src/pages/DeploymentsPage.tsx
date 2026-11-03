@@ -201,7 +201,12 @@ const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
         id: "requests",
         header: "Requests, 7 days",
         accessorFn: (row) => row.usage?.total ?? 0,
-        cell: ({ row }) => <Requests usage={row.original.usage} />,
+        cell: ({ row }) => (
+            <Requests
+                usage={row.original.usage}
+                live={row.original.deployment.state !== "not_deployed"}
+            />
+        ),
     },
     {
         id: "used",
