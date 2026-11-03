@@ -19,7 +19,9 @@ export function HealthStatus({ health }: { health: Health }) {
         <Tooltip>
             <TooltipTrigger asChild>
                 <button type="button" className="rounded-sm text-left">
-                    <StatusText tone="destructive">{health.label}</StatusText>
+                    <StatusText tone={health.state === "evicted" ? "neutral" : "destructive"}>
+                        {health.label}
+                    </StatusText>
                 </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-sm whitespace-normal">{health.detail}</TooltipContent>

@@ -22,6 +22,7 @@ import {
     Checkbox,
     CheckboxSelect,
     DropdownMenu,
+    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -92,6 +93,7 @@ const AVAILABILITY_LABELS: Record<string, string> = {
     importing: "Importing",
     missing: "Missing files",
     not_downloaded: "Not downloaded",
+    evicted: "Removed to free space",
 };
 const AVAILABILITY_TONES: Record<string, Tone> = {
     available: "success",
@@ -99,6 +101,7 @@ const AVAILABILITY_TONES: Record<string, Tone> = {
     importing: "info",
     missing: "destructive",
     not_downloaded: "neutral",
+    evicted: "neutral",
 };
 const ACTIVITY_TONES: Record<string, Tone> = {
     running: "info",
@@ -467,6 +470,15 @@ function cancelTransferConfirmation(row: ModelRow, on: Handlers): Confirmation {
     };
 }
 
+function setPinned(row: ModelRow, pinned: boolean) {
+    return unwrap(
+        api.POST("/api/models/base/{key}/pin", {
+            params: { path: { key: row.key } },
+            body: { pinned },
+        }),
+    );
+}
+
 function TrainItem({
     label,
     blocked,
@@ -571,6 +583,14 @@ function ActionItems({ entry, on }: { entry: Entry; on: Handlers }) {
                     <Rocket />
                     Deploy
                 </DropdownMenuItem>
+            )}
+            {row.kind === "base" && row.availability.state === "available" && (
+                <DropdownMenuCheckboxItem
+                    checked={row.pinned ?? false}
+                    onCheckedChange={(pinned) => setPinned(row, pinned).then(on.refresh)}
+                >
+                    Keep on disk
+                </DropdownMenuCheckboxItem>
             )}
             {verifiable && (
                 <DropdownMenuItem

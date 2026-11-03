@@ -14,6 +14,7 @@ from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
 from minibrain.gateway.routes import run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
+from minibrain.models.cache import touch
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, VersionKind
@@ -113,6 +114,8 @@ def complete(
     if route is None:
         raise ConflictError("no ready version to run; score or train one first")
     completion = run(backend, config, route, [{"role": "user", "content": body.text}], body.max_tokens)
+    touch(session, minibrain.base_model)
+    session.commit()
     return CompleteResponse(
         model=f"{route.slug}@{route.version}",
         output=completion.text,

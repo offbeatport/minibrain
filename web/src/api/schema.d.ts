@@ -749,6 +749,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/base/{key}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin Base */
+        post: operations["pin_base_api_models_base__key__pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/base/{key}/deploy": {
         parameters: {
             query?: never;
@@ -777,6 +794,75 @@ export interface paths {
         put?: never;
         /** Test Base */
         post: operations["test_base_api_models_base__key__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/model-cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Cache Settings */
+        get: operations["read_cache_settings_api_settings_model_cache_get"];
+        /** Update Cache Settings */
+        put: operations["update_cache_settings_api_settings_model_cache_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Cache */
+        get: operations["model_cache_api_models_cache_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/cache/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Download */
+        post: operations["estimate_download_api_models_cache_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/cache/free": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Free Up Space */
+        post: operations["free_up_space_api_models_cache_free_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1781,7 +1867,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "available" | "downloading" | "importing" | "missing" | "not_downloaded" | "none";
+            state: "available" | "downloading" | "importing" | "missing" | "not_downloaded" | "evicted" | "none";
             /** Progress */
             progress?: number | null;
             /** Job Id */
@@ -1858,6 +1944,13 @@ export interface components {
             health?: components["schemas"]["Health"] | null;
             /** Catalog Id */
             catalog_id?: string | null;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned?: boolean;
+            /** Last Used At */
+            last_used_at?: string | null;
             /** Source */
             source: string;
             /** Repo */
@@ -1895,6 +1988,8 @@ export interface components {
              * @default false
              */
             relocated?: boolean;
+            /** Evicted At */
+            evicted_at?: string | null;
         };
         /** BaseWeights */
         BaseWeights: {
@@ -1914,6 +2009,52 @@ export interface components {
         Body_upload_source_api_sources_post: {
             /** File */
             file: string;
+        };
+        /** CacheEstimateRequest */
+        CacheEstimateRequest: {
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** CachePlanInfo */
+        CachePlanInfo: {
+            /** Enabled */
+            enabled: boolean;
+            /** Budget Bytes */
+            budget_bytes: number;
+            /** Used Bytes */
+            used_bytes: number;
+            /** Incoming Bytes */
+            incoming_bytes: number;
+            /** Freed Bytes */
+            freed_bytes: number;
+            /** After Bytes */
+            after_bytes: number;
+            /** Over */
+            over: boolean;
+            /** Still Over */
+            still_over: boolean;
+            /** Evict */
+            evict: components["schemas"]["CachedBaseInfo"][];
+        };
+        /** CachedBaseInfo */
+        CachedBaseInfo: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Last Used At
+             * Format: date-time
+             */
+            last_used_at: string;
+            /** Pinned */
+            pinned: boolean;
+            /** Kept */
+            kept: string[];
+            /** Evictable */
+            evictable: boolean;
         };
         /** CatalogEntry */
         CatalogEntry: {
@@ -2464,7 +2605,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "corrupt" | "missing" | "download_failed" | "no_space" | "needs_access" | "source_gone" | "cant_run" | "no_memory" | "base_changed" | "base_unusable";
+            state: "corrupt" | "missing" | "download_failed" | "no_space" | "needs_access" | "source_gone" | "cant_run" | "no_memory" | "base_changed" | "base_unusable" | "evicted";
             /** Label */
             label: string;
             /** Detail */
@@ -2480,7 +2621,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain";
+            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain" | "download_again";
             /** Label */
             label: string;
         };
@@ -3073,6 +3214,29 @@ export interface components {
             /** Output */
             output: string;
         };
+        /** ModelCacheInfo */
+        ModelCacheInfo: {
+            /** Enabled */
+            enabled: boolean;
+            /** Budget Gb */
+            budget_gb: number;
+            /** Budget Bytes */
+            budget_bytes: number;
+            /** Used Bytes */
+            used_bytes: number;
+            /** Evictable Bytes */
+            evictable_bytes: number;
+            /** Bases */
+            bases: components["schemas"]["CachedBaseInfo"][];
+            plan: components["schemas"]["CachePlanInfo"];
+        };
+        /** ModelCacheSettings */
+        ModelCacheSettings: {
+            /** Enabled */
+            enabled: boolean;
+            /** Budget Gb */
+            budget_gb: number;
+        };
         /** ModelFile */
         ModelFile: {
             /** Path */
@@ -3162,6 +3326,13 @@ export interface components {
             health?: components["schemas"]["Health"] | null;
             /** Catalog Id */
             catalog_id?: string | null;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned?: boolean;
+            /** Last Used At */
+            last_used_at?: string | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -3209,6 +3380,11 @@ export interface components {
             versions?: {
                 [key: string]: string;
             };
+        };
+        /** PinRequest */
+        PinRequest: {
+            /** Pinned */
+            pinned: boolean;
         };
         /** PolicyChoice */
         PolicyChoice: {
@@ -5532,6 +5708,41 @@ export interface operations {
             };
         };
     };
+    pin_base_api_models_base__key__pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     deploy_base_api_models_base__key__deploy_post: {
         parameters: {
             query?: never;
@@ -5598,6 +5809,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_cache_settings_api_settings_model_cache_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCacheSettings"];
+                };
+            };
+        };
+    };
+    update_cache_settings_api_settings_model_cache_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCacheSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCacheSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_cache_api_models_cache_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCacheInfo"];
+                };
+            };
+        };
+    };
+    estimate_download_api_models_cache_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CacheEstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CachePlanInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    free_up_space_api_models_cache_free_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CachePlanInfo"];
                 };
             };
         };

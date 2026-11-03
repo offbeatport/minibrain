@@ -21,10 +21,12 @@ from minibrain.api.schemas import (
     ModelFile,
     ModelRow,
     ModelUpdate,
+    PinRequest,
     TestRequest,
     TestResponse,
 )
 from minibrain.ml.context import FinalError
+from minibrain.models.cache import touch
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
 from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import (
@@ -118,6 +120,7 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         verified_at=model.verified_at,
         content_hash=content_hash(model.files),
         relocated=model.path is not None,
+        evicted_at=model.evicted_at,
     )
 
 
@@ -262,6 +265,18 @@ def retry_base(key: str, request: Request, session: SessionDep, settings: Settin
     return detail_of(session, settings, request, model)
 
 
+@router.post("/base/{key}/pin")
+def pin_base(
+    key: str, body: PinRequest, request: Request, session: SessionDep, settings: SettingsDep
+) -> BaseModelDetail:
+    model = get_model(session, key)
+    if model.pinned != body.pinned:
+        model.pinned = body.pinned
+        audit(session, "model.pin" if body.pinned else "model.unpin", model)
+        session.commit()
+    return detail_of(session, settings, request, model)
+
+
 @router.post("/base/{key}/deploy")
 def deploy_base(
     key: str, body: DeployRequest, request: Request, session: SessionDep, settings: SettingsDep
@@ -285,6 +300,8 @@ def test_base(
     if model.status != ModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; test it once its files are available")
     require_usable(session, settings, model.id)
+    touch(session, model.id)
+    session.commit()
     spec = resolve_spec(session, settings, key)
     started = time.monotonic()
     try:

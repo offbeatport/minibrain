@@ -386,8 +386,8 @@ before a run starts:
 
 Every install (download, import) saves a SHA-256 list of its files: the hub's LFS hashes where published, a local hash
 otherwise. It is stored on the model and as `minibrain-model.json` in its folder. The base's content hash is the
-SHA-256 of that list. Nothing is ever deleted automatically: a repair writes to `.part` files and replaces a file only
-once it matches.
+SHA-256 of that list. Health handling never deletes anything: a repair writes to `.part` files and replaces a file only
+once it matches; only the cache budget below removes files.
 
 | Failure | Detected by | State | Primary action |
 |---|---|---|---|
@@ -412,6 +412,26 @@ once it matches.
   its external folder.
 - UI: the state is the Models list status cell, the primary action is the row button, the rest are in the row menu.
   The model page's Files section lists each file with size and hash state, the last verified time and "Verify files".
+
+### Base model cache
+
+- Settings → Storage: "Base model cache budget", off by default, a size in GB. It covers bases in the model folder
+  (downloaded or imported); a base pointed to an outside folder is neither counted nor removed.
+- Over the budget, the least recently used bases that are unused and not pinned are removed until under it. Runs
+  after a download, import or restore finishes, hourly on the leader, and on demand ("Free up space now").
+- Never removed: the base of any custom model, a base whose content hash any version was trained on, a deployed base,
+  one with a running job, one an engine has loaded, a pinned one ("Keep on disk", on the model page and in the row
+  menu), and one used or added in the last hour (so a fresh download never removes itself).
+- `last_used_at` moves when a base is added or restored, an engine reports it loaded, a training or scoring job is
+  queued on it, or it is tested; at most every five minutes.
+- A removed base keeps its row, file list, licence acceptance and keys, with status `evicted`: "Removed to free space"
+  with Download again (the repair job from the hub at the pinned revision, when online and Model sources allow it)
+  or Re-import (the repair job from a folder or S3 path), both checked against the saved SHA-256 list.
+- Before a download or import, Add model estimates the cache after it; when that is over the budget it names the bases
+  that would be removed and how much they free, and asks to continue. Download again shows the same estimate.
+- Infrastructure → Storage shows usage against the budget, what can be removed, what goes at the next check, and every
+  base in removal order with why it is kept. Each eviction writes `model.evict` (size, last use, budget, usage,
+  trigger) to the audit log and a line to the server log; pin changes write `model.pin` and `model.unpin`.
 
 ## Eval and promote
 
@@ -594,7 +614,7 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   (`group:datasets`, `group:upload`, `source:12`, `dataset:<slug>`, plus `&compare=<id>~<id>` for a snapshot diff) is
   the permalink; `/data/datasets/<slug>` redirects to it.
 - Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
-  their limits. Settings → Storage: where artifacts live.
+  their limits. Settings → Storage: where artifacts live, and the base model cache budget.
 
 | Need | obp-ui |
 |---|---|
@@ -768,6 +788,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Base model registry, default recipe, chat template parity tests
 - [x] Base model health: saved SHA-256 file list, verify, repair, re-import, relocate, failure states with one action
       each, adapters pinned to their base's content hash
+- [x] Base model cache budget: least recently used unused bases removed after downloads, hourly and on demand; pins,
+      estimate before a download, Download again or Re-import, `model.evict` audit
 - [x] Eval vs base, side-by-side review, deploy any version at any step, rollback
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face

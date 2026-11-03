@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
-import { Badge, Button, Card, CardContent, DataGrid, Link } from "obp-ui";
+import { Badge, Button, Card, CardContent, DataGrid, Link, cn } from "obp-ui";
 import { useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
@@ -19,6 +19,7 @@ import { deploymentPageHref, evaluationsHref, modelDataHref, trainingHref } from
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
+import { KeepOnDisk } from "./models/ModelCache";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
     ConfirmAction,
@@ -84,10 +85,18 @@ function HealthNotice({
         return null;
     }
     const actions = health.actions.filter(shown);
+    const removed = health.state === "evicted";
     return (
-        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive-soft p-3 text-sm">
+        <div
+            className={cn(
+                "flex flex-wrap items-start justify-between gap-3 rounded-md border p-3 text-sm",
+                removed
+                    ? "border-info/40 bg-info-soft"
+                    : "border-destructive/40 bg-destructive-soft",
+            )}
+        >
             <div className="flex min-w-0 max-w-3xl flex-col gap-1">
-                <StatusText tone="destructive" className="font-semibold">
+                <StatusText tone={removed ? "info" : "destructive"} className="font-semibold">
                     {health.label}
                 </StatusText>
                 <p>{health.detail}</p>
@@ -308,6 +317,15 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                 ),
                             ],
                             ["Size", `${bytes(model.size_bytes)} in ${model.files.length} files`],
+                            [
+                                "Last used",
+                                model.last_used_at ? (
+                                    <Updated key="used" value={model.last_used_at} />
+                                ) : (
+                                    "—"
+                                ),
+                            ],
+                            ["Pinned", <KeepOnDisk key="pinned" model={model} />],
                             [
                                 "Content hash",
                                 model.content_hash ? (

@@ -521,7 +521,7 @@ class InfrastructureInfo(BaseModel):
     snapshots: SnapshotUsage | None = None
 
 
-AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]
+AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "evicted", "none"]
 ActivityState = Literal["running", "queued", "failed", "ready", "needs_examples", "idle"]
 DeploymentState = Literal["running", "starting", "unhealthy", "not_deployed"]
 
@@ -575,6 +575,7 @@ HealthState = Literal[
     "no_memory",
     "base_changed",
     "base_unusable",
+    "evicted",
 ]
 HealthActionKind = Literal[
     "repair",
@@ -589,6 +590,7 @@ HealthActionKind = Literal[
     "verify",
     "open_base",
     "retrain",
+    "download_again",
 ]
 
 
@@ -646,6 +648,8 @@ class ModelRow(BaseModel):
     key_count: int = 0
     health: Health | None = None
     catalog_id: str | None = None
+    pinned: bool = False
+    last_used_at: datetime | None = None
 
 
 FileState = Literal["ok", "corrupt", "missing", "wrong_size", "unchecked"]
@@ -676,6 +680,7 @@ class BaseModelDetail(ModelRow):
     verified_at: datetime | None = None
     content_hash: str | None = None
     relocated: bool = False
+    evicted_at: datetime | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -716,6 +721,10 @@ class ImportCheck(BaseModel):
 
 class DeployRequest(BaseModel):
     deployed: bool
+
+
+class PinRequest(BaseModel):
+    pinned: bool
 
 
 class TestRequest(BaseModel):

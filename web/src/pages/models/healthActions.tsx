@@ -19,6 +19,7 @@ import type { HealthAction } from "~/components/models/HealthStatus";
 import { trainingHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { AccessSteps } from "./Discover";
+import { DownloadAgainText } from "./ModelCache";
 import type { Confirmation } from "./dialogs";
 
 type Dialogs = "reimport" | "relocate" | "get_access";
@@ -51,6 +52,14 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
                 </p>
             ),
             confirmLabel: "Repair",
+            run: () => unwrap(api.POST("/api/models/base/{key}/repair", target(row))),
+        };
+    }
+    if (action.kind === "download_again") {
+        return {
+            title: `Download ${row.name} again?`,
+            description: <DownloadAgainText name={row.name} size={row.size_bytes} />,
+            confirmLabel: "Download again",
             run: () => unwrap(api.POST("/api/models/base/{key}/repair", target(row))),
         };
     }

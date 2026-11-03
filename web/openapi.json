@@ -2341,6 +2341,58 @@
         }
       }
     },
+    "/api/models/base/{key}/pin": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Pin Base",
+        "operationId": "pin_base_api_models_base__key__pin_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/base/{key}/deploy": {
       "post": {
         "tags": [
@@ -2438,6 +2490,149 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/model-cache": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Read Cache Settings",
+        "operationId": "read_cache_settings_api_settings_model_cache_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCacheSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Update Cache Settings",
+        "operationId": "update_cache_settings_api_settings_model_cache_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCacheSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCacheSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/cache": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Model Cache",
+        "operationId": "model_cache_api_models_cache_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCacheInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/cache/estimate": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Estimate Download",
+        "operationId": "estimate_download_api_models_cache_estimate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CacheEstimateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachePlanInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/cache/free": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Free Up Space",
+        "operationId": "free_up_space_api_models_cache_free_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CachePlanInfo"
                 }
               }
             }
@@ -5549,6 +5744,7 @@
               "importing",
               "missing",
               "not_downloaded",
+              "evicted",
               "none"
             ],
             "title": "State"
@@ -5802,6 +5998,23 @@
             ],
             "title": "Catalog Id"
           },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned",
+            "default": false
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -5952,6 +6165,18 @@
             "type": "boolean",
             "title": "Relocated",
             "default": false
+          },
+          "evicted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evicted At"
           }
         },
         "type": "object",
@@ -6037,6 +6262,123 @@
           "file"
         ],
         "title": "Body_upload_source_api_sources_post"
+      },
+      "CacheEstimateRequest": {
+        "properties": {
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "size_bytes"
+        ],
+        "title": "CacheEstimateRequest"
+      },
+      "CachePlanInfo": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "budget_bytes": {
+            "type": "integer",
+            "title": "Budget Bytes"
+          },
+          "used_bytes": {
+            "type": "integer",
+            "title": "Used Bytes"
+          },
+          "incoming_bytes": {
+            "type": "integer",
+            "title": "Incoming Bytes"
+          },
+          "freed_bytes": {
+            "type": "integer",
+            "title": "Freed Bytes"
+          },
+          "after_bytes": {
+            "type": "integer",
+            "title": "After Bytes"
+          },
+          "over": {
+            "type": "boolean",
+            "title": "Over"
+          },
+          "still_over": {
+            "type": "boolean",
+            "title": "Still Over"
+          },
+          "evict": {
+            "items": {
+              "$ref": "#/components/schemas/CachedBaseInfo"
+            },
+            "type": "array",
+            "title": "Evict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "budget_bytes",
+          "used_bytes",
+          "incoming_bytes",
+          "freed_bytes",
+          "after_bytes",
+          "over",
+          "still_over",
+          "evict"
+        ],
+        "title": "CachePlanInfo"
+      },
+      "CachedBaseInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Used At"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "kept": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kept"
+          },
+          "evictable": {
+            "type": "boolean",
+            "title": "Evictable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "size_bytes",
+          "last_used_at",
+          "pinned",
+          "kept",
+          "evictable"
+        ],
+        "title": "CachedBaseInfo"
       },
       "CatalogEntry": {
         "properties": {
@@ -7720,7 +8062,8 @@
               "cant_run",
               "no_memory",
               "base_changed",
-              "base_unusable"
+              "base_unusable",
+              "evicted"
             ],
             "title": "State"
           },
@@ -7772,7 +8115,8 @@
               "try_again",
               "verify",
               "open_base",
-              "retrain"
+              "retrain",
+              "download_again"
             ],
             "title": "Kind"
           },
@@ -9638,6 +9982,71 @@
         ],
         "title": "Mistake"
       },
+      "ModelCacheInfo": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "budget_gb": {
+            "type": "number",
+            "title": "Budget Gb"
+          },
+          "budget_bytes": {
+            "type": "integer",
+            "title": "Budget Bytes"
+          },
+          "used_bytes": {
+            "type": "integer",
+            "title": "Used Bytes"
+          },
+          "evictable_bytes": {
+            "type": "integer",
+            "title": "Evictable Bytes"
+          },
+          "bases": {
+            "items": {
+              "$ref": "#/components/schemas/CachedBaseInfo"
+            },
+            "type": "array",
+            "title": "Bases"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/CachePlanInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "budget_gb",
+          "budget_bytes",
+          "used_bytes",
+          "evictable_bytes",
+          "bases",
+          "plan"
+        ],
+        "title": "ModelCacheInfo"
+      },
+      "ModelCacheSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "budget_gb": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Budget Gb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "budget_gb"
+        ],
+        "title": "ModelCacheSettings"
+      },
       "ModelFile": {
         "properties": {
           "path": {
@@ -9903,6 +10312,23 @@
               }
             ],
             "title": "Catalog Id"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned",
+            "default": false
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
           }
         },
         "type": "object",
@@ -10086,6 +10512,19 @@
           "engines"
         ],
         "title": "NodeInfo"
+      },
+      "PinRequest": {
+        "properties": {
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pinned"
+        ],
+        "title": "PinRequest"
       },
       "PolicyChoice": {
         "properties": {

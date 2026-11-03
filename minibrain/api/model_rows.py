@@ -25,6 +25,7 @@ from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
 from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
+from minibrain.models.sources import HUB
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     CatalogVariant,
@@ -363,7 +364,27 @@ def base_availability(model: Model, job: Job | None, settings: Settings) -> Avai
         return Availability(state=state, progress=progress, job_id=job.id if job else None)
     if model.status == ModelStatus.AVAILABLE:
         return Availability(state="available" if files_present(settings, model) else "missing")
+    if model.status == ModelStatus.EVICTED:
+        return restoring_availability(job)
     return Availability(state="not_downloaded", job_id=job.id if job else None)
+
+
+def restoring(job: Job | None) -> bool:
+    return job is not None and job.kind == JobKind.REPAIR and job.status in ACTIVE_JOB_STATUSES
+
+
+def restoring_availability(job: Job | None) -> Availability:
+    if job is None or not restoring(job):
+        return Availability(state="evicted")
+    state: AvailabilityState = "downloading" if job.params.get("source") == HUB else "importing"
+    return Availability(state=state, progress=running_progress(job), job_id=job.id)
+
+
+def restored_label(activity: Activity, job: Job | None) -> Activity:
+    if job is None or not restoring(job):
+        return activity
+    verb = "Downloading again" if job.params.get("source") == HUB else "Re-importing"
+    return activity.model_copy(update={"label": activity.label.replace("Repairing", verb)})
 
 
 def base_activity(job: Job | None) -> Activity:
@@ -383,6 +404,9 @@ def base_row(
     context: HealthContext | None = None,
 ) -> ModelRow:
     availability = base_availability(model, job, settings)
+    activity = base_activity(job)
+    if model.status == ModelStatus.EVICTED:
+        activity = restored_label(activity, job)
     problem = base_health(model, job, context or HealthContext(settings=settings, hub_ok=False))
     variant = model.variant
     latest = variant.latest_revision if variant is not None else None
@@ -396,7 +420,7 @@ def base_row(
         tags=list(model.tags or []),
         base_model=None,
         availability=availability,
-        activity=base_activity(job),
+        activity=activity,
         deployment=deployment("", model.deployed, health(model.id) if model.deployed else None, []),
         updated_at=updated,
         can_test=availability.state == "available" and problem is None,
@@ -411,6 +435,8 @@ def base_row(
         revision=model.revision,
         health=problem,
         catalog_id=model.catalog_id,
+        pinned=model.pinned,
+        last_used_at=model.last_used_at or model.created_at,
     )
 
 

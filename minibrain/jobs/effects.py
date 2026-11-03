@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from sqlalchemy.orm import Session
 
 from minibrain.jobs.queue import enqueue
@@ -22,9 +24,14 @@ from minibrain.settings import Settings
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
 
+def nothing() -> None:
+    return None
+
+
 class DomainEffects:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, installed: Callable[[], None] = nothing) -> None:
         self.settings = settings
+        self.installed = installed
 
     def on_success(self, session: Session, job: Job) -> None:
         if job.kind == JobKind.TRAIN:
@@ -81,7 +88,10 @@ class DomainEffects:
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.verified_at = now()
+        model.last_used_at = now()
+        model.evicted_at = None
         set_health(model, None)
+        self.installed()
 
     def verified(self, session: Session, job: Job) -> None:
         model = session.get(Model, job.model_id) if job.model_id else None
@@ -94,10 +104,15 @@ class DomainEffects:
         model = session.get(Model, job.model_id) if job.model_id else None
         if model is None:
             return
+        restored = model.status == ModelStatus.EVICTED
         apply_repair(model, list((job.result or {}).get("files", [])))
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()
+        if restored:
+            model.last_used_at = now()
+            model.evicted_at = None
+            self.installed()
 
     def trained(self, session: Session, job: Job) -> None:
         version = job.version

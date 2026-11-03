@@ -49,6 +49,7 @@ class ModelStatus(StrEnum):
     AVAILABLE = "available"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    EVICTED = "evicted"
 
 
 class JobStatus(StrEnum):
@@ -440,6 +441,9 @@ class Model(Base):
     health: Mapped[str | None] = mapped_column(default=None)
     health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
+    pinned: Mapped[bool] = mapped_column(default=False, server_default=false())
+    evicted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

@@ -56,7 +56,7 @@ export function entryHealth(entry: Entry): Health | null {
 
 function modelError(model: ModelRow): boolean {
     return (
-        Boolean(model.health) ||
+        (Boolean(model.health) && model.health?.state !== "evicted") ||
         model.activity.state === "failed" ||
         model.availability.state === "missing" ||
         model.deployment.state === "unhealthy"

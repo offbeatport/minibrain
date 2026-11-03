@@ -36,6 +36,7 @@ import { modelsHref } from "~/lib/modelsSearch";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import { useCacheCheck } from "./ModelCache";
 import {
     type BaseOption,
     type TaskKey,
@@ -198,6 +199,7 @@ export function AddModelPage() {
     const router = useRouter();
     const client = useQueryClient();
     const refresh = useModelsRefresh();
+    const cacheCheck = useCacheCheck();
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useModels();
     const catalog = useCatalog();
@@ -342,7 +344,7 @@ export function AddModelPage() {
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (ready && !add.isPending) {
-            add.mutate();
+            cacheCheck.check(need?.size, option?.name ?? plan.name ?? "It", () => add.mutate());
         }
     };
     const shortcut = (event: KeyboardEvent<HTMLFormElement>) => {
@@ -496,6 +498,7 @@ export function AddModelPage() {
                     </Button>
                 </div>
             </form>
+            {cacheCheck.dialog}
         </Page>
     );
 }

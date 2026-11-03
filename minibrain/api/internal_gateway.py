@@ -11,6 +11,7 @@ from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
+from minibrain.models.cache import touch
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.registry import resolve_spec
@@ -67,6 +68,7 @@ def register_engine(body: EngineBody, session: SessionDep) -> None:
         record_load_failure(session, body.base_model, body.code, body.error, body.host)
     elif body.state == "ready":
         record_loaded(session, body.base_model)
+        touch(session, body.base_model)
     session.commit()
 
 

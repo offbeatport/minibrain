@@ -28,6 +28,7 @@ import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
+import { ModelCacheSection } from "./models/ModelCache";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
 type PoolInfo = components["schemas"]["PoolInfo"];
@@ -617,6 +618,7 @@ export function InfrastructurePage() {
             {active === "/infrastructure/storage" && (
                 <PanelSections>
                     <StorageSection info={infrastructure.data} />
+                    <ModelCacheSection />
                     <SnapshotUsageSection info={infrastructure.data} />
                 </PanelSections>
             )}

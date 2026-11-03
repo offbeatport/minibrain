@@ -2,6 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from minibrain.models.cache import touch
 from minibrain.models.registry import resolve_spec
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
@@ -17,6 +18,7 @@ def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:
 
 
 def base_spec(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
+    touch(session, version.minibrain.base_model)
     return resolve_spec(session, settings, version.minibrain.base_model).as_dict()
 
 

@@ -78,10 +78,12 @@ function trainableVariant(entry: CatalogEntry): CatalogVariantInfo {
     return byFit(trainable) ?? byFit(entry.variants) ?? entry.variants[0];
 }
 
+const GONE = new Set(["not_downloaded", "evicted"]);
+
 function onInstall(entry: CatalogEntry): AddedInfo | undefined {
     return (
         entry.added.find((added) => added.availability.state === "available") ??
-        entry.added.find((added) => added.availability.state !== "not_downloaded")
+        entry.added.find((added) => !GONE.has(added.availability.state))
     );
 }
 
@@ -92,7 +94,7 @@ export function catalogueOption(entry: CatalogEntry, variantId?: string): BaseOp
     const variant =
         entry.variants.find((item) => item.id === (variantId ?? added?.variant_id)) ??
         trainableVariant(entry);
-    const present = added && added.availability.state !== "not_downloaded" ? added : null;
+    const present = added && !GONE.has(added.availability.state) ? added : null;
     return {
         key: `entry:${entry.id}`,
         kind: "catalogue",
@@ -155,7 +157,12 @@ export function baseOptionFor(
 
 export function localBases(entries: CatalogEntry[], rows: ModelRow[]): BaseOption[] {
     const linked = new Set(entries.flatMap((entry) => entry.added.map((added) => added.key)));
-    return rows.filter((row) => row.kind === "base" && !linked.has(row.key)).map(localOption);
+    return rows
+        .filter(
+            (row) =>
+                row.kind === "base" && !linked.has(row.key) && !GONE.has(row.availability.state),
+        )
+        .map(localOption);
 }
 
 export function customOptions(entries: CatalogEntry[], rows: ModelRow[]): BaseOption[] {
