@@ -1950,6 +1950,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Requests */
+        get: operations["list_requests_api_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Request Facets */
+        get: operations["request_facets_api_requests_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Request Summary */
+        get: operations["request_summary_api_requests_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Request */
+        get: operations["read_request_api_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/install": {
         parameters: {
             query?: never;
@@ -4748,6 +4816,8 @@ export interface components {
             input?: string | null;
             /** Output */
             output?: string | null;
+            /** Finish Reason */
+            finish_reason?: string | null;
             /**
              * Recorded
              * @default true
@@ -5294,6 +5364,191 @@ export interface components {
              * Format: date-time
              */
             seen_at: string;
+        };
+        /** RequestDetail */
+        RequestDetail: {
+            /** Id */
+            id: number;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Model */
+            model: string;
+            /** Model Key */
+            model_key: string;
+            /** Model Name */
+            model_name: string;
+            /** Custom */
+            custom: boolean;
+            /** Version */
+            version: number | null;
+            /** Key Id */
+            key_id: number | null;
+            /** Key Name */
+            key_name: string | null;
+            /** Status */
+            status: number;
+            /**
+             * Status Class
+             * @enum {string}
+             */
+            status_class: "ok" | "client_error" | "server_error";
+            /** Latency Ms */
+            latency_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Finish Reason */
+            finish_reason: string | null;
+            /** Response Id */
+            response_id: string | null;
+            /** Feedback Up */
+            feedback_up: number;
+            /** Feedback Down */
+            feedback_down: number;
+            /**
+             * Body
+             * @enum {string}
+             */
+            body: "kept" | "hidden" | "not_kept";
+            /** Input */
+            input: string | null;
+            /** Output */
+            output: string | null;
+            /** Feedback */
+            feedback: components["schemas"]["RequestFeedback"][];
+        };
+        /** RequestFacet */
+        RequestFacet: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /** RequestFacets */
+        RequestFacets: {
+            /** Total */
+            total: number;
+            /** Statuses */
+            statuses: {
+                [key: string]: number;
+            };
+            /** Models */
+            models: components["schemas"]["RequestFacet"][];
+            /** Versions */
+            versions: components["schemas"]["RequestFacet"][];
+            /** Keys */
+            keys: components["schemas"]["RequestFacet"][];
+        };
+        /** RequestFeedback */
+        RequestFeedback: {
+            /** Id */
+            id: number;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "rejected";
+            /** Origin */
+            origin: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Correction */
+            correction: string | null;
+            /** Comment */
+            comment: string | null;
+        };
+        /** RequestPage */
+        RequestPage: {
+            /** Items */
+            items: components["schemas"]["RequestRow"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
+        /** RequestRow */
+        RequestRow: {
+            /** Id */
+            id: number;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Model */
+            model: string;
+            /** Model Key */
+            model_key: string;
+            /** Model Name */
+            model_name: string;
+            /** Custom */
+            custom: boolean;
+            /** Version */
+            version: number | null;
+            /** Key Id */
+            key_id: number | null;
+            /** Key Name */
+            key_name: string | null;
+            /** Status */
+            status: number;
+            /**
+             * Status Class
+             * @enum {string}
+             */
+            status_class: "ok" | "client_error" | "server_error";
+            /** Latency Ms */
+            latency_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Finish Reason */
+            finish_reason: string | null;
+            /** Response Id */
+            response_id: string | null;
+            /** Feedback Up */
+            feedback_up: number;
+            /** Feedback Down */
+            feedback_down: number;
+        };
+        /** RequestSummary */
+        RequestSummary: {
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Logging */
+            logging: boolean;
+            /** Bodies */
+            bodies: boolean;
+            /** Retention Days */
+            retention_days: number;
+            /** Last At */
+            last_at: string | null;
         };
         /** ResetBody */
         ResetBody: {
@@ -10046,6 +10301,151 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_requests_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                after?: string | null;
+                model?: string[] | null;
+                version?: string[] | null;
+                key?: string[] | null;
+                status?: ("ok" | "client_error" | "server_error")[] | null;
+                q?: string;
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_facets_api_requests_facets_get: {
+        parameters: {
+            query?: {
+                model?: string[] | null;
+                version?: string[] | null;
+                key?: string[] | null;
+                status?: ("ok" | "client_error" | "server_error")[] | null;
+                q?: string;
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestFacets"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_summary_api_requests_summary_get: {
+        parameters: {
+            query?: {
+                model?: string[] | null;
+                version?: string[] | null;
+                key?: string[] | null;
+                status?: ("ok" | "client_error" | "server_error")[] | null;
+                q?: string;
+                since?: string | null;
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_request_api_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestDetail"];
+                };
             };
             /** @description Validation Error */
             422: {

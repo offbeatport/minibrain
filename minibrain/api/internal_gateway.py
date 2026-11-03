@@ -45,6 +45,7 @@ class LogBody(BaseModel):
     response_id: str | None = None
     input: str | None = None
     output: str | None = None
+    finish_reason: str | None = None
     recorded: bool = True
 
 

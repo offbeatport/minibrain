@@ -30,6 +30,7 @@ from minibrain.api import (
     models,
     ops,
     policies,
+    request_logs,
     system,
     versions,
 )
@@ -235,6 +236,7 @@ def create_app(
         feedback,
         keys,
         jobs,
+        request_logs,
         install,
         system,
         gateway,

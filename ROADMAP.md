@@ -646,6 +646,14 @@ keys, and `/v1` stays key-only.
     (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
     right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
     Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
+- Monitor has two tabs: Jobs (`/monitor`) and Requests (`/monitor/requests`), every `/v1` call as it arrives. Requests
+  is the kit's `DataGrid`, paged on the server by request id: time, model@version, key, status, latency, tokens in and
+  out, finish reason, response id and a feedback mark. New rows join the top every 3 seconds (Pause stops that) and
+  leave a scrolled reader in place. Model, version, key, status (OK, 4xx, 5xx), a response id search and a time range
+  (`?model=&version=<slug>@<n>&key=&status=&q=&range=`) filter the list and the summary above it: requests, error
+  rate, p50 / p95 latency, tokens in and out. A row opens its detail (`?request=<id>`): the metadata, the key's name,
+  the kept input and answer for Builders and Admins (Viewers see that it needs the Builder role; admins see where to
+  turn it on) and the feedback on its response id. With request logs off, the empty state says where to turn them on.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
 - Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
@@ -945,6 +953,8 @@ Everything in the v1 scope below, after M1.
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
 - [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step (`response_format`, response ids on
       request logs and opt-in request inputs and answers done)
+- [x] Monitor → Requests: live `/v1` request log, server-paged, with filters and a summary, finish reasons recorded
+      (migration 0033), and a detail with the kept input and answer (Builder and up) and linked feedback
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; single-user mode on loopback only

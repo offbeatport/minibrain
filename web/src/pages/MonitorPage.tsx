@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
     Button,
@@ -10,6 +10,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    TabNav,
+    type TabNavItem,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -24,9 +26,17 @@ import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusTe
 import { useCan } from "~/lib/access";
 import { jobDuration, jobSeconds } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
+import { REQUESTS_PATH } from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
+import { LiveControl, RequestsTab } from "./monitor/RequestsTab";
 
 const ALL = "all";
+const JOBS_PATH = "/monitor";
+
+const TABS: TabNavItem[] = [
+    { label: "Jobs", href: JOBS_PATH },
+    { label: "Requests", href: REQUESTS_PATH },
+];
 
 const STATES: { key: string; label: string }[] = [
     { key: ALL, label: "All" },
@@ -200,7 +210,7 @@ function sortingFor(order: JobOrder): SortingState {
     return [{ id: "id", desc: order === "newest" }];
 }
 
-export function MonitorPage() {
+function JobsTab() {
     const router = useRouter();
     const [state, setState] = useState(ALL);
     const [kind, setKind] = useState(ALL);
@@ -221,11 +231,7 @@ export function MonitorPage() {
                 : (counts[item.key] ?? 0),
     }));
     return (
-        <Page wide>
-            <PageHeader
-                title="Monitor"
-                caption="Background jobs across every model: data builds, training, scoring and downloads."
-            />
+        <>
             <div className="flex flex-wrap items-center gap-2">
                 <SegmentedTabs tabs={tabs} active={state} onSelect={setState} />
                 <Select value={kind} onValueChange={(next) => setKind(String(next))}>
@@ -267,6 +273,34 @@ export function MonitorPage() {
                 empty={<p className="text-muted-foreground">No jobs match.</p>}
                 minWidth="min-w-[760px]"
             />
+        </>
+    );
+}
+
+export function MonitorPage() {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const requests = pathname === REQUESTS_PATH;
+    const [paused, setPaused] = useState(false);
+    return (
+        <Page wide>
+            <PageHeader
+                title="Monitor"
+                caption={
+                    requests
+                        ? "Calls to the /v1 API as they arrive: model, key, status, latency and tokens."
+                        : "Background jobs across every model: data builds, training, scoring and downloads."
+                }
+                actions={
+                    requests ? (
+                        <LiveControl
+                            paused={paused}
+                            onToggle={() => setPaused((value) => !value)}
+                        />
+                    ) : undefined
+                }
+            />
+            <TabNav label="Monitor pages" tabs={TABS} />
+            {requests ? <RequestsTab paused={paused} /> : <JobsTab />}
         </Page>
     );
 }

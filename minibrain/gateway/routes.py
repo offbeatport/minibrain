@@ -339,6 +339,7 @@ def chat_completions(
                 response_id=identifier if answered else None,
                 input=last_user_text(body.messages) if answered and config.request_bodies else None,
                 output=completion.text if completion and answered and config.request_bodies else None,
+                finish_reason=finish_reason(completion) if completion and answered else None,
                 recorded=config.request_logs,
             )
         )

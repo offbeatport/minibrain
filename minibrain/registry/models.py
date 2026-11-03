@@ -392,6 +392,8 @@ class RequestLog(Base):
     __table_args__ = (
         Index("ix_request_logs_minibrain", "minibrain_id", "id"),
         Index("ix_request_logs_response", "response_id"),
+        Index("ix_request_logs_at", "at"),
+        Index("ix_request_logs_key", "key_id", "id"),
         {"sqlite_autoincrement": True},
     )
 
@@ -408,6 +410,7 @@ class RequestLog(Base):
     response_id: Mapped[str | None] = mapped_column(default=None)
     input: Mapped[str | None] = mapped_column(default=None)
     output: Mapped[str | None] = mapped_column(default=None)
+    finish_reason: Mapped[str | None] = mapped_column(default=None)
 
 
 class Feedback(Base):

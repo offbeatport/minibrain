@@ -6175,6 +6175,569 @@
         }
       }
     },
+    "/api/requests": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "List Requests",
+        "operationId": "list_requests_api_requests_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{1,18}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{1,18}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "ok",
+                      "client_error",
+                      "server_error"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/facets": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Request Facets",
+        "operationId": "request_facets_api_requests_facets_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "ok",
+                      "client_error",
+                      "server_error"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestFacets"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/summary": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Request Summary",
+        "operationId": "request_summary_api_requests_summary_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "ok",
+                      "client_error",
+                      "server_error"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Read Request",
+        "operationId": "read_request_api_requests__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/install": {
       "get": {
         "tags": [
@@ -14925,6 +15488,17 @@
             ],
             "title": "Output"
           },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
           "recorded": {
             "type": "boolean",
             "title": "Recorded",
@@ -16645,6 +17219,586 @@
           "seen_at"
         ],
         "title": "ReplicaInfo"
+      },
+      "RequestDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Name"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "status_class": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "client_error",
+              "server_error"
+            ],
+            "title": "Status Class"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "response_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Id"
+          },
+          "feedback_up": {
+            "type": "integer",
+            "title": "Feedback Up"
+          },
+          "feedback_down": {
+            "type": "integer",
+            "title": "Feedback Down"
+          },
+          "body": {
+            "type": "string",
+            "enum": [
+              "kept",
+              "hidden",
+              "not_kept"
+            ],
+            "title": "Body"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "feedback": {
+            "items": {
+              "$ref": "#/components/schemas/RequestFeedback"
+            },
+            "type": "array",
+            "title": "Feedback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "model",
+          "model_key",
+          "model_name",
+          "custom",
+          "version",
+          "key_id",
+          "key_name",
+          "status",
+          "status_class",
+          "latency_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "finish_reason",
+          "response_id",
+          "feedback_up",
+          "feedback_down",
+          "body",
+          "input",
+          "output",
+          "feedback"
+        ],
+        "title": "RequestDetail"
+      },
+      "RequestFacet": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label",
+          "count"
+        ],
+        "title": "RequestFacet"
+      },
+      "RequestFacets": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "statuses": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Statuses"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/RequestFacet"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/RequestFacet"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/RequestFacet"
+            },
+            "type": "array",
+            "title": "Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "statuses",
+          "models",
+          "versions",
+          "keys"
+        ],
+        "title": "RequestFacets"
+      },
+      "RequestFeedback": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Rating"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "correction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rating",
+          "status",
+          "origin",
+          "created_at",
+          "correction",
+          "comment"
+        ],
+        "title": "RequestFeedback"
+      },
+      "RequestPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequestRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "total"
+        ],
+        "title": "RequestPage"
+      },
+      "RequestRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Name"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "status_class": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "client_error",
+              "server_error"
+            ],
+            "title": "Status Class"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "response_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Id"
+          },
+          "feedback_up": {
+            "type": "integer",
+            "title": "Feedback Up"
+          },
+          "feedback_down": {
+            "type": "integer",
+            "title": "Feedback Down"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "model",
+          "model_key",
+          "model_name",
+          "custom",
+          "version",
+          "key_id",
+          "key_name",
+          "status",
+          "status_class",
+          "latency_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "finish_reason",
+          "response_id",
+          "feedback_up",
+          "feedback_down"
+        ],
+        "title": "RequestRow"
+      },
+      "RequestSummary": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "logging": {
+            "type": "boolean",
+            "title": "Logging"
+          },
+          "bodies": {
+            "type": "boolean",
+            "title": "Bodies"
+          },
+          "retention_days": {
+            "type": "integer",
+            "title": "Retention Days"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "logging",
+          "bodies",
+          "retention_days",
+          "last_at"
+        ],
+        "title": "RequestSummary"
       },
       "ResetBody": {
         "properties": {
