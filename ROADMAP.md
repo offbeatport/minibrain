@@ -66,7 +66,7 @@ mapping comes down to a few fields.
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
 | Version | Prompt-only (model + system prompt + few-shot examples) or trained (snapshot hash + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
-| Snapshot | Final examples as content-hashed Parquet + JSONL, fixed train/eval split |
+| Snapshot | A dataset's rows copied to content-hashed Parquet when a run starts; splits are derived from it |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
 | Task type | Classify, Extract, Rewrite, Text-to-SQL or Distill; sets shape, schema, metric, recipe |
@@ -199,23 +199,38 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 
 Data is shared across models:
 
-- A **source** is a file, folder, bucket or database query, stored once (content-addressed) and staged for queries.
-- A **dataset** is a source plus a mapping (input and label columns, or SQL). Datasets are shared; each custom model
-  points at one, and several models can use the same dataset to compare fairly.
-- **Snapshots** stay per model and are built from its dataset. Builds are deterministic and content-addressed, so models
-  on the same dataset get identical splits and share storage; each version records the snapshot it used.
+- A **source** is something minibrain reads: an upload (stored once, content-addressed, staged into DuckDB) or a
+  folder on the server (read in place). S3, database and Iceberg sources come later. Each source is a table in
+  dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
+  `support_tickets_2`); renaming the source keeps the table name, so saved SQL keeps working.
+- A **dataset** stands on its own: one saved DuckDB query that returns `input` and `label`, plus any extra columns,
+  over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
+  SQL mode joins, unions, filters and cleans across sources. A dataset over one source can still say `FROM source`.
+  Each custom model points at one dataset, and several models can use the same dataset to compare fairly.
+- A **snapshot** is a full copy of a dataset's rows, never a reference (see Snapshots). Each version records the
+  snapshot it trained and scored on.
 - Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
   model gets a new dataset. A dataset or source still in use cannot be deleted.
-- Catalogue: sources and datasets carry a name, an optional description and tags. Search covers names, column names,
-  descriptions and tags. Column stats (type, empty share, approximate distinct count, range for non-text types) come
-  from a bounded sample of the staged table (`SUMMARIZE` over the first 10,000 rows); the preview counts rows per
-  label; a dataset shows its train / held-out / test / few-shot split once a model has built it from the current
-  mapping.
+- Catalogue: sources and datasets carry a name, an optional description and tags. Search covers names, table names,
+  column names, descriptions and tags. Column stats (type, empty share, approximate distinct count, range for non-text
+  types) come from a bounded sample (`SUMMARIZE` over the first 10,000 rows); the preview runs the query live, shows
+  its first 20 rows and counts rows per label across the whole result; a dataset shows its train / held-out / test /
+  few-shot split while its last snapshot still matches its data and query.
+- User SQL is parsed first (`json_serialize_sql`): exactly one SELECT, whose table names pick the sources to expose.
+  It then runs in an in-memory DuckDB with external access off and the configuration locked: uploads are attached
+  read-only, a folder is a view over its listed files and `allowed_paths` names exactly those files, and a query
+  stops after 30 seconds.
 
 ### Sources
 
-- v1: Postgres, Parquet, S3, files, queried in place by DuckDB: `ATTACH '…' AS src (TYPE postgres, READ_ONLY)`,
-  `read_parquet('s3://…')`, `read_csv`, `read_json`. No state to manage.
+- Uploads: CSV, TSV, JSON, JSON Lines or Parquet, staged into a DuckDB file keyed by content hash.
+- Folders: a directory on the server, read in place as one table: every file of one format (CSV, TSV, JSON, JSON
+  Lines or Parquet) under it, hidden files and symlinks skipped, joined by column name (`union_by_name`), at most
+  10,000 files. Only folders inside the Folder sources policy (Settings → Security, lockable from config or
+  `MINIBRAIN_POLICY_DATA_FOLDERS`) can be added, and a folder taken off that list stops being readable. Each folder
+  shows its file count, size and last change.
+- Later: Postgres, S3 and Iceberg queried in place by DuckDB: `ATTACH '…' AS src (TYPE postgres, READ_ONLY)`,
+  `read_parquet('s3://…')`.
 - Materialize into the minibrain's DuckDB file only when previews get slow or the source must not be hit repeatedly.
 - dlt arrives with the first API source (Zendesk, Jira, Confluence), loading into the same DuckDB file. Its incremental
   state is what v2 "retrain on new data" runs on.
@@ -300,9 +315,37 @@ PII counts.
 
 ### Snapshots
 
-- Final examples written as content-hashed Parquet + JSONL with a fixed train/eval split, referenced by a version.
-- Raw source copies are optional; the snapshot is not.
+- Taken when a version starts (training or scoring), by Prepare training data on the Training page, or with "Save
+  snapshot now" on a dataset. Taking one runs the dataset's query once in the main process, sorts the rows
+  (`ORDER BY ALL`) and writes them to Parquet; the file's SHA-256 is the snapshot id and its artifact id, so identical
+  rows are stored once and a re-take of unchanged data reuses the same snapshot.
+- Row limit: 200,000 rows by default (Settings → Data). A larger result is refused with a message to filter or sample
+  in the query (`USING SAMPLE reservoir(… ROWS) REPEATABLE (7)`) or raise the limit; the bound is what keeps taking a
+  snapshot quick enough to run in the request.
+- Splits are derived from the snapshot alone and deterministically (empty and repeated inputs dropped, seeded shuffle),
+  so training, evaluation and the gateway's prompt-only context read only the snapshot. Fewer than 100 usable rows
+  block training and scoring, not saving.
+- Data changed: every source has a cheap fingerprint (an upload's content hash; for a folder, a hash of its file
+  list with sizes and modification times). A snapshot records its sources' fingerprints and the query; a dataset and a
+  model say when either changed since their last snapshot.
+- Diff: any two snapshots compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
+  rows per label, with samples of each. The model page links each version to the diff against the version before it,
+  next to the change in held-out accuracy; a version's scores say whether its data matches the live version's.
+- Retention: snapshots a version uses are kept; those taken for versions that were deleted are removed with their
+  files; of the saved snapshots no version uses, the last N per dataset stay (Settings → Data, 5 by default).
+  Infrastructure → Storage shows how much snapshots use.
 - `HF_DATASETS_CACHE` points at the job directory and is deleted when the job ends.
+
+### Artifact storage
+
+- One location per install, set in Settings → Storage: a local folder under `MINIBRAIN_HOME` (default) or an
+  S3-compatible bucket (AWS, MinIO, Ceph) by endpoint, bucket, prefix, region and keys. It is an `ArtifactStore`
+  backend over s3fs, so uploads, snapshots, adapters and logs all follow it, and workers and engines keep pulling
+  artifacts through main.
+- minibrain connects only to the endpoint set there, with explicit keys (no instance-metadata lookups). The secret key
+  is kept in a 0600 file under `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection"
+  writes, reads back and removes a probe object; saving S3 runs the same check. Artifacts already stored stay readable
+  after switching either way.
 
 ## Training
 
@@ -515,12 +558,16 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   admin-only once accounts exist). Security: the policies, locked when set by config, and their recent changes.
   Accounts (admin) once accounts exist.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
-- Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left grouping sources by kind (Uploads,
-  Folders, S3, Databases), each file with the datasets built from it underneath; the selected item's detail on the
-  right. A file shows its columns, stats and first rows, and creates a dataset by picking input and label columns; a
-  dataset shows its mapping, label balance, splits, the models that use it, and "Train a model". Every item shows its
-  source → dataset → models trail. `/data?item=<kind>:<id>` (`group:upload`, `source:12`, `dataset:<slug>`) is the
-  permalink; `/data/datasets/<slug>` redirects to it, and `/data?minibrain=<slug>` stays the per-model data page.
+- Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with Datasets first, then sources by
+  kind (Uploads, Folders, S3, Databases); the selected item's detail on the right. A source shows its table name,
+  columns, stats, first rows and the datasets that read it; a folder also shows its file count, size and last change.
+  A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
+  preview, label balance, splits, its snapshots (tick two to compare), the models that use it, "Save snapshot now"
+  and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
+  (`group:datasets`, `group:upload`, `source:12`, `dataset:<slug>`, plus `&compare=<id>~<id>` for a snapshot diff) is
+  the permalink; `/data/datasets/<slug>` redirects to it.
+- Settings → Data: snapshot row limit and how many saved snapshots stay per dataset. Settings → Storage: where
+  artifacts live.
 
 | Need | obp-ui |
 |---|---|
@@ -679,12 +726,14 @@ Everything in the v1 scope below, after M1.
 - [ ] `response_format` with `json_schema`
 - [ ] Cost and latency in eval
 - [ ] `minibrain.yaml` and `minibrain run`
-- [ ] Sources: Postgres, Parquet, S3, files via DuckDB scanners
-- [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor
+- [ ] Sources: Postgres, Parquet, S3, files via DuckDB scanners (uploads and server folders done)
+- [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor (column picker and SQL over several sources
+      done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
 - [x] Preview of 5–10 examples
 - [ ] Quality score and PII report
-- [x] Content-hashed snapshots with train/eval split
+- [x] Content-hashed Parquet snapshots copied at training time, derived splits, row limit, diff, retention
+- [x] Artifact store on a local folder or an S3-compatible bucket
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
@@ -734,7 +783,7 @@ Everything in the v1 scope below, after M1.
 - dlt API connectors: Zendesk, Jira, Confluence, Salesforce, HubSpot
 - One-click retrain on new data (dlt incremental)
 - Automatic retrain when feedback since the last version crosses a threshold
-- Version diff (data and scores)
+- Version diff (scores; the data diff is done)
 - Notifications bell in the top bar: failed jobs, results ready to review, models that need examples, missing
   files
 - Batch jobs (Run → Batch jobs): run a version over a file, snapshot or SQL query in the background, on the job
