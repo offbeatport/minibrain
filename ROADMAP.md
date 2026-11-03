@@ -453,7 +453,7 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, Theme, Sign out). Data,
   Deployments and Monitor cover every model; Playground, Training, Evaluations and Feedback carry a model picker, and
   the choice lives in the URL (`?minibrain=<slug>`).
-- Settings replaces the sidebar with its own: Back to app (the last page outside Settings, else Home), then its sections.
+- Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
   General: You (appearance; profile once accounts exist) and This install (paths, base models, recipe, splits;
   admin-only once accounts exist). Security: the policies, locked when set by config, and their recent changes.
   Accounts (admin) once accounts exist.

@@ -76,7 +76,7 @@ function SettingsNavigation({ pathname }: { pathname: string }) {
         <>
             <NavItem
                 icon={ArrowLeft}
-                label="Back to app"
+                label="Back"
                 href={appPageToReturnTo()}
                 active={false}
                 iconStyle="plain"
