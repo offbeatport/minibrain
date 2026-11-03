@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.api import (
     audit,
+    cards,
     catalog,
     compute,
     connections,
@@ -202,6 +203,7 @@ def create_app(
         policies,
         audit,
         versions,
+        cards,
         keys,
         jobs,
         install,

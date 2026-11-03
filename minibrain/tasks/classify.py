@@ -1,4 +1,5 @@
 import statistics
+from collections import Counter
 from collections.abc import Sequence
 
 from minibrain.data.snapshot import Example
@@ -48,6 +49,36 @@ def label_f1(label: str, pairs: list[tuple[str, str | None]]) -> float:
     return 2 * true_positive / denominator if denominator else 0.0
 
 
+def ratio(part: int, whole: int) -> float | None:
+    return part / whole if whole else None
+
+
+def label_scores(labels: Sequence[str], pairs: list[tuple[str, str | None]]) -> list[dict]:
+    found: list[dict] = []
+    for label in sorted(set(labels) | {gold for gold, _ in pairs}):
+        support = sum(gold == label for gold, _ in pairs)
+        predicted = sum(guess == label for _, guess in pairs)
+        correct = sum(gold == label and guess == label for gold, guess in pairs)
+        found.append(
+            {
+                "label": label,
+                "support": support,
+                "predicted": predicted,
+                "correct": correct,
+                "precision": ratio(correct, predicted),
+                "recall": ratio(correct, support),
+                "f1": ratio(2 * correct, support + predicted),
+            }
+        )
+    return found
+
+
+def confusion(pairs: list[tuple[str, str | None]]) -> list[dict]:
+    counts = Counter((gold, guess) for gold, guess in pairs if gold != guess)
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0][0], item[0][1] or ""))
+    return [{"gold": gold, "predicted": guess, "count": count} for (gold, guess), count in ordered]
+
+
 def score(examples: Sequence[Example], outputs: Sequence[str], labels: Sequence[str]) -> dict:
     predicted = [parse_label(output, labels) for output in outputs]
     pairs = [(example.label, label) for example, label in zip(examples, predicted, strict=True)]
@@ -63,6 +94,8 @@ def score(examples: Sequence[Example], outputs: Sequence[str], labels: Sequence[
         "macro_f1": statistics.mean(label_f1(label, pairs) for label in seen) if seen else 0.0,
         "invalid_rate": sum(label is None for label in predicted) / len(predicted) if predicted else 0.0,
         "mistakes": mistakes[:20],
+        "labels": label_scores(labels, pairs),
+        "confusion": confusion(pairs),
     }
 
 

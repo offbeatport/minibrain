@@ -20,6 +20,14 @@ export function deploymentPageHref(slug: string): string {
     return `/deployments/${encodeURIComponent(slug)}`;
 }
 
+export function modelCardHref(slug: string, number: number): string {
+    return `/models/custom/${encodeURIComponent(slug)}/versions/${number}/card`;
+}
+
+export function modelCardDownloadHref(slug: string, number: number, format: "md" | "json"): string {
+    return `/api/minibrains/${encodeURIComponent(slug)}/versions/${number}/card.${format}`;
+}
+
 export function jobHref(job: JobInfo): string | null {
     if (job.minibrain) {
         return job.kind === "prepare" ? modelDataHref(job.minibrain) : `/training?job=${job.id}`;

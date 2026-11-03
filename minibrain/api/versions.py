@@ -1,4 +1,7 @@
+from typing import Any
+
 from fastapi import APIRouter, Request
+from sqlalchemy.orm import Session
 
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
 from minibrain.api.policies import LOCAL_USER
@@ -17,7 +20,7 @@ from minibrain.jobs.specs import eval_params, train_params
 from minibrain.models.cache import touch
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, VersionKind
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, VersionKind
 from minibrain.registry.service import (
     ConflictError,
     create_version,
@@ -28,6 +31,11 @@ from minibrain.registry.service import (
 from minibrain.tasks.classify import parse_label
 
 router = APIRouter(prefix="/api", tags=["versions"])
+
+
+def audit_version(session: Session, minibrain: Minibrain, number: int, action: str, **detail: Any) -> None:
+    target = f"{minibrain.slug}@{number}"
+    session.add(AuditEvent(actor=LOCAL_USER, action=action, target=target, detail={"name": minibrain.name, **detail}))
 
 
 @router.get("/minibrains/{slug}/versions")
@@ -54,6 +62,15 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
     require_splits(snapshot_for_model(session, settings, minibrain, saved=False))
     version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})
+    audit_version(
+        session,
+        minibrain,
+        number=version.number,
+        action="version.create",
+        kind=str(kind),
+        snapshot=version.snapshot.hash,
+        recipe=dict(version.recipe),
+    )
     if kind == VersionKind.LORA:
         version.base_hash = base_hash(session, minibrain.base_model)
         params = train_params(session, settings, version)
@@ -98,7 +115,12 @@ def promote_version(slug: str, number: int, session: SessionDep, settings: Setti
     )
     if mismatch is not None:
         raise ConflictError(mismatch)
+    previous, was_deployed = minibrain.current_version, minibrain.deployed
     promote(minibrain, version)
+    if (previous, was_deployed) != (number, True):
+        audit_version(
+            session, minibrain, number=number, action="version.promote", previous=previous, was_deployed=was_deployed
+        )
     session.commit()
     return detail(settings, minibrain)
 

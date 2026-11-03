@@ -30,17 +30,22 @@ const ACTIONS: Record<string, string> = {
     "key.revoke": "API key revoked",
     "key.update": "API key changed",
     "model.delete": "Model deleted",
+    "model.deploy": "Model deployed",
     "model.evict": "Model files removed",
     "model.pin": "Model pinned",
     "model.reimport": "Model re-imported",
     "model.relocate": "Model moved",
     "model.repair": "Model repaired",
+    "model.undeploy": "Model undeployed",
     "model.unpin": "Model unpinned",
     "model.verify": "Model files checked",
     "policy.update": "Policy changed",
     "settings.model_cache": "Model cache changed",
     "storage.update": "Storage changed",
+    "version.card": "Model card edited",
+    "version.create": "Version created",
     "version.delete": "Version deleted",
+    "version.promote": "Version deployed",
 };
 
 const KEY_LABELS: Record<string, string> = {
@@ -49,9 +54,11 @@ const KEY_LABELS: Record<string, string> = {
     deleted: "Events deleted",
     files: "Files",
     from: "Before",
+    intended_use: "Intended use",
     job: "Job",
     kept: "Files kept at",
     kind: "Kind",
+    known_limits: "Known limits",
     last_used_at: "Last used",
     models: "Models",
     name: "Name",
@@ -148,7 +155,9 @@ export function targetLabel(event: AuditEvent, policies: Map<string, PolicyInfo>
     if (event.action === "settings.model_cache") {
         return "Model cache";
     }
-    return typeof detail.name === "string" && detail.name ? detail.name : event.target;
+    const name = typeof detail.name === "string" && detail.name ? detail.name : event.target;
+    const version = event.action.startsWith("version.") ? event.target.split("@")[1] : undefined;
+    return version && name !== event.target ? `${name} v${version}` : name;
 }
 
 export type Change = { field: string; before: string; after: string };
@@ -213,7 +222,12 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "model.relocate": (detail) => `${plainValue(detail.from)} → ${plainValue(detail.to)}`,
     "model.repair": (detail) => `From ${plainValue(detail.source)}`,
     "model.verify": (detail) => `${plainValue(detail.files)} files`,
+    "version.create": (detail) => VERSION_KINDS[String(detail.kind)] ?? "Version",
     "version.delete": (detail) => VERSION_KINDS[String(detail.kind)] ?? "Version",
+    "version.promote": (detail) =>
+        typeof detail.previous === "number" && detail.was_deployed
+            ? `Replaced v${detail.previous}`
+            : "Put live",
 };
 
 export function summaryOf(event: AuditEvent, policies: Map<string, PolicyInfo>): string {

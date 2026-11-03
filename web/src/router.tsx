@@ -29,6 +29,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
+import { ModelCardPage } from "./pages/models/ModelCardPage";
 import { LogosPage } from "./pages/proto/LogosPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -121,6 +122,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/new", AddModelPage),
     globalPage("/models/base/$key", BaseModelPage),
     globalPage("/models/custom/$slug", CustomModelPage),
+    globalPage("/models/custom/$slug/versions/$number/card", ModelCardPage),
     unscopedPage("/playground", PlaygroundPage),
     globalPage("/data", DataPage),
     createRoute({

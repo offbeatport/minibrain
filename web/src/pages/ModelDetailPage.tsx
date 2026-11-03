@@ -15,7 +15,13 @@ import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Secti
 import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus";
 import { StatusText } from "~/components/models/StatusText";
 import { percent } from "~/lib/format";
-import { deploymentPageHref, evaluationsHref, modelDataHref, trainingHref } from "~/lib/modelLinks";
+import {
+    deploymentPageHref,
+    evaluationsHref,
+    modelCardHref,
+    modelDataHref,
+    trainingHref,
+} from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
@@ -500,12 +506,22 @@ function CustomModelView({ row }: { row: ModelRow }) {
             <PanelSection
                 icon={History}
                 title="Revisions"
-                description="Each training or scoring run creates a revision; one is deployed at a time."
+                description="Each training or scoring run creates a revision; one is deployed at a time. Open one for its model card."
                 bare
             >
                 <DataGrid
                     columns={withDataColumns(VERSION_COLUMNS, versions.data ?? [])}
                     rows={versions.data ?? []}
+                    getRowId={(version) => String(version.number)}
+                    onOpen={(version) =>
+                        router.history.push(modelCardHref(row.key, version.number))
+                    }
+                    rowLabel={(version) => `Model card for v${version.number}`}
+                    rowActions={(version) => (
+                        <Button variant="outline" size="xs" asChild>
+                            <Link href={modelCardHref(row.key, version.number)}>Model card</Link>
+                        </Button>
+                    )}
                     empty="No revisions yet: add training data on Training, then train or score a prompt."
                 />
             </PanelSection>

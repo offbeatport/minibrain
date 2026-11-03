@@ -4263,6 +4263,204 @@
         }
       }
     },
+    "/api/minibrains/{slug}/versions/{number}/card": {
+      "get": {
+        "tags": [
+          "model cards"
+        ],
+        "summary": "Read Card",
+        "operationId": "read_card_api_minibrains__slug__versions__number__card_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCardExport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "model cards"
+        ],
+        "summary": "Edit Card",
+        "operationId": "edit_card_api_minibrains__slug__versions__number__card_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCardEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCardExport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/versions/{number}/card.json": {
+      "get": {
+        "tags": [
+          "model cards"
+        ],
+        "summary": "Card Json",
+        "operationId": "card_json_api_minibrains__slug__versions__number__card_json_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/versions/{number}/card.md": {
+      "get": {
+        "tags": [
+          "model cards"
+        ],
+        "summary": "Card Markdown",
+        "operationId": "card_markdown_api_minibrains__slug__versions__number__card_md_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/keys": {
       "get": {
         "tags": [
@@ -7050,6 +7248,1133 @@
           "evictable"
         ],
         "title": "CachedBaseInfo"
+      },
+      "CardBaseModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "content_hash_recorded": {
+            "type": "boolean",
+            "title": "Content Hash Recorded"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence"
+          },
+          "licence_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Name"
+          },
+          "licence_use": {
+            "type": "string",
+            "enum": [
+              "commercial",
+              "restricted",
+              "non-commercial",
+              "unknown"
+            ],
+            "title": "Licence Use"
+          },
+          "licence_accepted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Accepted By"
+          },
+          "licence_accepted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Accepted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "publisher",
+          "repo",
+          "revision",
+          "content_hash",
+          "content_hash_recorded",
+          "licence",
+          "licence_name",
+          "licence_use",
+          "licence_accepted_by",
+          "licence_accepted_at"
+        ],
+        "title": "CardBaseModel"
+      },
+      "CardCheck": {
+        "properties": {
+          "check": {
+            "type": "string",
+            "title": "Check"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check",
+          "status",
+          "title",
+          "detail",
+          "count"
+        ],
+        "title": "CardCheck"
+      },
+      "CardComparison": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "same_data": {
+            "type": "boolean",
+            "title": "Same Data"
+          },
+          "held_out_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Out Accuracy"
+          },
+          "held_out_macro_f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Out Macro F1"
+          },
+          "test_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Accuracy"
+          },
+          "latency_p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P50 Ms"
+          },
+          "accuracy_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "kind",
+          "same_data",
+          "held_out_accuracy",
+          "held_out_macro_f1",
+          "test_accuracy",
+          "latency_p50_ms",
+          "accuracy_change"
+        ],
+        "title": "CardComparison"
+      },
+      "CardConfusion": {
+        "properties": {
+          "expected": {
+            "type": "string",
+            "title": "Expected"
+          },
+          "predicted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicted"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected",
+          "predicted",
+          "count"
+        ],
+        "title": "CardConfusion"
+      },
+      "CardData": {
+        "properties": {
+          "dataset_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Slug"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "snapshot_hash": {
+            "type": "string",
+            "title": "Snapshot Hash"
+          },
+          "snapshot_rows": {
+            "type": "integer",
+            "title": "Snapshot Rows"
+          },
+          "snapshot_taken_at": {
+            "type": "string",
+            "title": "Snapshot Taken At"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "splits": {
+            "$ref": "#/components/schemas/CardSplits"
+          },
+          "label_balance": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CardLabelRows"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Balance"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CardSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CardCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "personal_data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_slug",
+          "dataset_name",
+          "snapshot_hash",
+          "snapshot_rows",
+          "snapshot_taken_at",
+          "query",
+          "splits",
+          "label_balance",
+          "sources",
+          "checks",
+          "personal_data"
+        ],
+        "title": "CardData"
+      },
+      "CardEvaluation": {
+        "properties": {
+          "scored": {
+            "type": "boolean",
+            "title": "Scored"
+          },
+          "held_out": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P50 Ms"
+          },
+          "latency_p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency P95 Ms"
+          },
+          "per_label": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CardLabelScore"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Label"
+          },
+          "confusion": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CardConfusion"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confusion"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prompt_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "scored",
+          "held_out",
+          "test_set",
+          "latency_p50_ms",
+          "latency_p95_ms",
+          "per_label",
+          "confusion",
+          "run",
+          "prompt_only",
+          "previous"
+        ],
+        "title": "CardEvaluation"
+      },
+      "CardEvent": {
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "title": "Audit Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "deployed",
+              "replaced",
+              "undeployed"
+            ],
+            "title": "Kind"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "at",
+          "actor",
+          "action",
+          "kind",
+          "summary"
+        ],
+        "title": "CardEvent"
+      },
+      "CardLabelRows": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share"
+          },
+          "train": {
+            "type": "integer",
+            "title": "Train"
+          },
+          "held_out": {
+            "type": "integer",
+            "title": "Held Out"
+          },
+          "test": {
+            "type": "integer",
+            "title": "Test"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "rows",
+          "share",
+          "train",
+          "held_out",
+          "test"
+        ],
+        "title": "CardLabelRows"
+      },
+      "CardLabelScore": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "support": {
+            "type": "integer",
+            "title": "Support"
+          },
+          "predicted": {
+            "type": "integer",
+            "title": "Predicted"
+          },
+          "correct": {
+            "type": "integer",
+            "title": "Correct"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision"
+          },
+          "recall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recall"
+          },
+          "f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "support",
+          "predicted",
+          "correct",
+          "precision",
+          "recall",
+          "f1"
+        ],
+        "title": "CardLabelScore"
+      },
+      "CardLimit": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "CardLimit"
+      },
+      "CardLimits": {
+        "properties": {
+          "derived": {
+            "items": {
+              "$ref": "#/components/schemas/CardLimit"
+            },
+            "type": "array",
+            "title": "Derived"
+          },
+          "known_limits": {
+            "type": "string",
+            "title": "Known Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "derived",
+          "known_limits"
+        ],
+        "title": "CardLimits"
+      },
+      "CardPurpose": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description",
+          "task",
+          "labels"
+        ],
+        "title": "CardPurpose"
+      },
+      "CardRecipe": {
+        "properties": {
+          "max_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Rows"
+          },
+          "epochs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epochs"
+          },
+          "batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Size"
+          },
+          "grad_accum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Accum"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha"
+          },
+          "learning_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_rows",
+          "epochs",
+          "batch_size",
+          "grad_accum",
+          "rank",
+          "alpha",
+          "learning_rate"
+        ],
+        "title": "CardRecipe"
+      },
+      "CardRun": {
+        "properties": {
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "started_at",
+          "finished_at",
+          "duration_seconds",
+          "device",
+          "machine"
+        ],
+        "title": "CardRun"
+      },
+      "CardScore": {
+        "properties": {
+          "examples": {
+            "type": "integer",
+            "title": "Examples"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          },
+          "macro_f1": {
+            "type": "number",
+            "title": "Macro F1"
+          },
+          "invalid_rate": {
+            "type": "number",
+            "title": "Invalid Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "examples",
+          "accuracy",
+          "macro_f1",
+          "invalid_rate"
+        ],
+        "title": "CardScore"
+      },
+      "CardSource": {
+        "properties": {
+          "table": {
+            "type": "string",
+            "title": "Table"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "fingerprint": {
+            "type": "string",
+            "title": "Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "table",
+          "name",
+          "kind",
+          "fingerprint"
+        ],
+        "title": "CardSource"
+      },
+      "CardSplits": {
+        "properties": {
+          "train": {
+            "type": "integer",
+            "title": "Train"
+          },
+          "held_out": {
+            "type": "integer",
+            "title": "Held Out"
+          },
+          "test": {
+            "type": "integer",
+            "title": "Test"
+          },
+          "few_shot": {
+            "type": "integer",
+            "title": "Few Shot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "train",
+          "held_out",
+          "test",
+          "few_shot"
+        ],
+        "title": "CardSplits"
+      },
+      "CardTraining": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "recipe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardRecipe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "examples": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Examples"
+          },
+          "few_shot_examples": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Few Shot Examples"
+          },
+          "train_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Loss"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "recipe",
+          "examples",
+          "few_shot_examples",
+          "train_loss",
+          "run"
+        ],
+        "title": "CardTraining"
+      },
+      "CardUse": {
+        "properties": {
+          "intended_use": {
+            "type": "string",
+            "title": "Intended Use"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intended_use",
+          "owner"
+        ],
+        "title": "CardUse"
+      },
+      "CardVersion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "number",
+          "kind",
+          "status",
+          "created_at",
+          "created_by"
+        ],
+        "title": "CardVersion"
       },
       "CatalogEntry": {
         "properties": {
@@ -11488,6 +12813,124 @@
           "budget_gb"
         ],
         "title": "ModelCacheSettings"
+      },
+      "ModelCard": {
+        "properties": {
+          "schema_name": {
+            "type": "string",
+            "title": "Schema Name",
+            "default": "minibrain.model_card"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "version": {
+            "$ref": "#/components/schemas/CardVersion"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/CardPurpose"
+          },
+          "base_model": {
+            "$ref": "#/components/schemas/CardBaseModel"
+          },
+          "training_data": {
+            "$ref": "#/components/schemas/CardData"
+          },
+          "training": {
+            "$ref": "#/components/schemas/CardTraining"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/CardEvaluation"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CardLimits"
+          },
+          "use": {
+            "$ref": "#/components/schemas/CardUse"
+          },
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/CardEvent"
+            },
+            "type": "array",
+            "title": "Approvals"
+          },
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/CardEvent"
+            },
+            "type": "array",
+            "title": "Deployments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "purpose",
+          "base_model",
+          "training_data",
+          "training",
+          "evaluation",
+          "limits",
+          "use",
+          "approvals",
+          "deployments"
+        ],
+        "title": "ModelCard"
+      },
+      "ModelCardEdit": {
+        "properties": {
+          "intended_use": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intended Use"
+          },
+          "known_limits": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Limits"
+          }
+        },
+        "type": "object",
+        "title": "ModelCardEdit"
+      },
+      "ModelCardExport": {
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/ModelCard"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "canonical_form": {
+            "type": "string",
+            "title": "Canonical Form",
+            "default": "SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card",
+          "sha256"
+        ],
+        "title": "ModelCardExport"
       },
       "ModelFile": {
         "properties": {

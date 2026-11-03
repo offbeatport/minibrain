@@ -127,6 +127,10 @@ SAMPLE_DESCRIPTION = "Sample: sort travel support messages into intents such as 
 @router.post("/{slug}/deploy")
 def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
+    if minibrain.deployed != body.deployed:
+        action = "model.deploy" if body.deployed else "model.undeploy"
+        facts = {"name": minibrain.name, "version": minibrain.current_version}
+        session.add(AuditEvent(actor=LOCAL_USER, action=action, target=minibrain.slug, detail=facts))
     minibrain.deployed = body.deployed
     minibrain.updated_at = now()
     session.commit()

@@ -922,7 +922,7 @@ Everything in the v1 scope below, after M1.
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
 - [ ] Hash-chained audit log with SIEM export; encryption at rest
-- [ ] Model card and validation report per version
+- [x] Model card and validation report per version: in-app page, Markdown and JSON with a SHA-256 of the canonical card, editable intended use and known limits (audited)
 - [ ] Reference hardware configs
 
 ## v2

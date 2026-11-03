@@ -25,6 +25,7 @@ import {
 } from "~/components/StatusBadge";
 import { count, milliseconds, percent } from "~/lib/format";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
+import { modelCardHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { DataVersus } from "./data/versionData";
 import { Updated } from "./models/MyModels";
@@ -234,6 +235,9 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                     <Link href={`/models/custom/${encodeURIComponent(model.key)}`}>
                         Model details
                     </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                    <Link href={modelCardHref(model.key, version.number)}>Model card</Link>
                 </Button>
                 {deployable(version) && (
                     <Button

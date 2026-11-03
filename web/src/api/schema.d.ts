@@ -1385,6 +1385,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/{slug}/versions/{number}/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Card */
+        get: operations["read_card_api_minibrains__slug__versions__number__card_get"];
+        /** Edit Card */
+        put: operations["edit_card_api_minibrains__slug__versions__number__card_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/versions/{number}/card.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Card Json */
+        get: operations["card_json_api_minibrains__slug__versions__number__card_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/versions/{number}/card.md": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Card Markdown */
+        get: operations["card_markdown_api_minibrains__slug__versions__number__card_md_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/keys": {
         parameters: {
             query?: never;
@@ -2280,6 +2332,297 @@ export interface components {
             kept: string[];
             /** Evictable */
             evictable: boolean;
+        };
+        /** CardBaseModel */
+        CardBaseModel: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Publisher */
+            publisher: string | null;
+            /** Repo */
+            repo: string | null;
+            /** Revision */
+            revision: string | null;
+            /** Content Hash */
+            content_hash: string | null;
+            /** Content Hash Recorded */
+            content_hash_recorded: boolean;
+            /** Licence */
+            licence: string | null;
+            /** Licence Name */
+            licence_name: string | null;
+            /**
+             * Licence Use
+             * @enum {string}
+             */
+            licence_use: "commercial" | "restricted" | "non-commercial" | "unknown";
+            /** Licence Accepted By */
+            licence_accepted_by: string | null;
+            /** Licence Accepted At */
+            licence_accepted_at: string | null;
+        };
+        /** CardCheck */
+        CardCheck: {
+            /** Check */
+            check: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Count */
+            count: number;
+        };
+        /** CardComparison */
+        CardComparison: {
+            /** Number */
+            number: number;
+            /** Kind */
+            kind: string;
+            /** Same Data */
+            same_data: boolean;
+            /** Held Out Accuracy */
+            held_out_accuracy: number | null;
+            /** Held Out Macro F1 */
+            held_out_macro_f1: number | null;
+            /** Test Accuracy */
+            test_accuracy: number | null;
+            /** Latency P50 Ms */
+            latency_p50_ms: number | null;
+            /** Accuracy Change */
+            accuracy_change: number | null;
+        };
+        /** CardConfusion */
+        CardConfusion: {
+            /** Expected */
+            expected: string;
+            /** Predicted */
+            predicted: string | null;
+            /** Count */
+            count: number;
+        };
+        /** CardData */
+        CardData: {
+            /** Dataset Slug */
+            dataset_slug: string | null;
+            /** Dataset Name */
+            dataset_name: string | null;
+            /** Snapshot Hash */
+            snapshot_hash: string;
+            /** Snapshot Rows */
+            snapshot_rows: number;
+            /** Snapshot Taken At */
+            snapshot_taken_at: string;
+            /** Query */
+            query: string | null;
+            splits: components["schemas"]["CardSplits"];
+            /** Label Balance */
+            label_balance: components["schemas"]["CardLabelRows"][] | null;
+            /** Sources */
+            sources: components["schemas"]["CardSource"][];
+            /** Checks */
+            checks: components["schemas"]["CardCheck"][];
+            personal_data: components["schemas"]["CardCheck"] | null;
+        };
+        /** CardEvaluation */
+        CardEvaluation: {
+            /** Scored */
+            scored: boolean;
+            held_out: components["schemas"]["CardScore"] | null;
+            test_set: components["schemas"]["CardScore"] | null;
+            /** Latency P50 Ms */
+            latency_p50_ms: number | null;
+            /** Latency P95 Ms */
+            latency_p95_ms: number | null;
+            /** Per Label */
+            per_label: components["schemas"]["CardLabelScore"][] | null;
+            /** Confusion */
+            confusion: components["schemas"]["CardConfusion"][] | null;
+            run: components["schemas"]["CardRun"] | null;
+            prompt_only: components["schemas"]["CardComparison"] | null;
+            previous: components["schemas"]["CardComparison"] | null;
+        };
+        /** CardEvent */
+        CardEvent: {
+            /** Audit Id */
+            audit_id: number;
+            /** At */
+            at: string;
+            /** Actor */
+            actor: string;
+            /** Action */
+            action: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "deployed" | "replaced" | "undeployed";
+            /** Summary */
+            summary: string;
+        };
+        /** CardLabelRows */
+        CardLabelRows: {
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: number;
+            /** Share */
+            share: number;
+            /** Train */
+            train: number;
+            /** Held Out */
+            held_out: number;
+            /** Test */
+            test: number;
+        };
+        /** CardLabelScore */
+        CardLabelScore: {
+            /** Label */
+            label: string;
+            /** Support */
+            support: number;
+            /** Predicted */
+            predicted: number;
+            /** Correct */
+            correct: number;
+            /** Precision */
+            precision: number | null;
+            /** Recall */
+            recall: number | null;
+            /** F1 */
+            f1: number | null;
+        };
+        /** CardLimit */
+        CardLimit: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+            /** Labels */
+            labels?: string[];
+        };
+        /** CardLimits */
+        CardLimits: {
+            /** Derived */
+            derived: components["schemas"]["CardLimit"][];
+            /** Known Limits */
+            known_limits: string;
+        };
+        /** CardPurpose */
+        CardPurpose: {
+            /** Description */
+            description: string;
+            /** Task */
+            task: string;
+            /** Labels */
+            labels: string[];
+        };
+        /** CardRecipe */
+        CardRecipe: {
+            /** Max Rows */
+            max_rows: number | null;
+            /** Epochs */
+            epochs: number | null;
+            /** Batch Size */
+            batch_size: number | null;
+            /** Grad Accum */
+            grad_accum: number | null;
+            /** Rank */
+            rank: number | null;
+            /** Alpha */
+            alpha: number | null;
+            /** Learning Rate */
+            learning_rate: number | null;
+        };
+        /** CardRun */
+        CardRun: {
+            /** Job Id */
+            job_id: number;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Duration Seconds */
+            duration_seconds: number | null;
+            /** Device */
+            device: string | null;
+            /** Machine */
+            machine: string | null;
+        };
+        /** CardScore */
+        CardScore: {
+            /** Examples */
+            examples: number;
+            /** Accuracy */
+            accuracy: number;
+            /** Macro F1 */
+            macro_f1: number;
+            /** Invalid Rate */
+            invalid_rate: number;
+        };
+        /** CardSource */
+        CardSource: {
+            /** Table */
+            table: string;
+            /** Name */
+            name: string | null;
+            /** Kind */
+            kind: string | null;
+            /** Fingerprint */
+            fingerprint: string;
+        };
+        /** CardSplits */
+        CardSplits: {
+            /** Train */
+            train: number;
+            /** Held Out */
+            held_out: number;
+            /** Test */
+            test: number;
+            /** Few Shot */
+            few_shot: number;
+        };
+        /** CardTraining */
+        CardTraining: {
+            /** Method */
+            method: string;
+            recipe: components["schemas"]["CardRecipe"] | null;
+            /** Examples */
+            examples: number | null;
+            /** Few Shot Examples */
+            few_shot_examples: number | null;
+            /** Train Loss */
+            train_loss: number | null;
+            run: components["schemas"]["CardRun"] | null;
+        };
+        /** CardUse */
+        CardUse: {
+            /** Intended Use */
+            intended_use: string;
+            /** Owner */
+            owner: string;
+        };
+        /** CardVersion */
+        CardVersion: {
+            /** Id */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
         };
         /** CatalogEntry */
         CatalogEntry: {
@@ -3750,6 +4093,49 @@ export interface components {
             enabled: boolean;
             /** Budget Gb */
             budget_gb: number;
+        };
+        /** ModelCard */
+        ModelCard: {
+            /**
+             * Schema Name
+             * @default minibrain.model_card
+             */
+            schema_name?: string;
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version?: number;
+            version: components["schemas"]["CardVersion"];
+            purpose: components["schemas"]["CardPurpose"];
+            base_model: components["schemas"]["CardBaseModel"];
+            training_data: components["schemas"]["CardData"];
+            training: components["schemas"]["CardTraining"];
+            evaluation: components["schemas"]["CardEvaluation"];
+            limits: components["schemas"]["CardLimits"];
+            use: components["schemas"]["CardUse"];
+            /** Approvals */
+            approvals: components["schemas"]["CardEvent"][];
+            /** Deployments */
+            deployments: components["schemas"]["CardEvent"][];
+        };
+        /** ModelCardEdit */
+        ModelCardEdit: {
+            /** Intended Use */
+            intended_use?: string | null;
+            /** Known Limits */
+            known_limits?: string | null;
+        };
+        /** ModelCardExport */
+        ModelCardExport: {
+            card: components["schemas"]["ModelCard"];
+            /** Sha256 */
+            sha256: string;
+            /**
+             * Canonical Form
+             * @default SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it
+             */
+            canonical_form?: string;
         };
         /** ModelFile */
         ModelFile: {
@@ -7548,6 +7934,134 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CompleteResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_card_api_minibrains__slug__versions__number__card_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCardExport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_card_api_minibrains__slug__versions__number__card_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCardEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCardExport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    card_json_api_minibrains__slug__versions__number__card_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    card_markdown_api_minibrains__slug__versions__number__card_md_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
