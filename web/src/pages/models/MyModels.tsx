@@ -12,6 +12,7 @@ import {
     Rocket,
     RotateCcw,
     Trash2,
+    X,
 } from "lucide-react";
 import {
     Badge,
@@ -828,12 +829,14 @@ function ModelListRow({
     entry,
     on,
     selected,
+    selecting,
     onSelect,
     widths,
 }: {
     entry: Entry;
     on: Handlers;
     selected: boolean;
+    selecting: boolean;
     onSelect: (selected: boolean) => void;
     widths: ColumnWidths;
 }) {
@@ -846,6 +849,15 @@ function ModelListRow({
                 "relative py-3 hover:bg-secondary has-[a:focus-visible]:bg-secondary data-[state=selected]:bg-accent/60",
             )}
         >
+            {selecting && (
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="absolute inset-0 z-[5] cursor-pointer"
+                    onClick={() => onSelect(!selected)}
+                />
+            )}
             <Checkbox
                 className="relative z-10"
                 aria-label={`Select ${model.name}${entry.version ? ` v${entry.version.number}` : ""}`}
@@ -890,7 +902,11 @@ function ModelListRow({
             <div className="relative z-10 hidden min-w-0 md:block">
                 <Requests
                     usage={usageOf(entry)}
-                    live={entry.model.deployment.state !== "not_deployed"}
+                    live={
+                        entry.version
+                            ? entry.version.live
+                            : entry.model.deployment.state !== "not_deployed"
+                    }
                 />
             </div>
             <div className="relative z-10">
@@ -1006,6 +1022,7 @@ function ModelList({
                             entry={entry}
                             on={on}
                             selected={selected.includes(entry.key)}
+                            selecting={selected.length > 0}
                             onSelect={(on) =>
                                 onSelected(
                                     on
@@ -1153,46 +1170,67 @@ function BulkBar({
     return (
         <div className="flex min-h-8 flex-wrap items-center gap-2">
             <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
-            <Button
-                variant="outline"
-                size="sm"
-                disabled={!canDeploy || act.isPending}
-                title={
-                    canDeploy
-                        ? undefined
-                        : "Pick rows that are ready and not live, at most one per model"
-                }
-                onClick={() => act.mutate(deploySelected)}
-            >
-                <Rocket />
-                Deploy
-            </Button>
-            <Button
-                variant="outline"
-                size="sm"
-                disabled={!canUndeploy || act.isPending}
-                onClick={() => act.mutate(undeploySelected)}
-            >
-                <PowerOff />
-                Undeploy
-            </Button>
-            <Button
-                variant="destructive"
-                size="sm"
-                disabled={act.isPending}
-                onClick={() =>
-                    onConfirm(
-                        bulkDeleteConfirmation(chosen, () => deleteSelected(chosen).then(onDone)),
-                    )
-                }
-            >
-                <Trash2 />
-                Delete
-            </Button>
-            <ErrorLine error={act.error} />
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={onClear}>
+            <Button variant="outline" size="sm" onClick={onClear}>
+                <X />
                 Clear selection
             </Button>
+            <ErrorLine error={act.error} />
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+                {canDeploy ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!canDeploy || act.isPending}
+                        onClick={() => act.mutate(deploySelected)}
+                    >
+                        <Rocket />
+                        Deploy
+                    </Button>
+                ) : (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!canDeploy || act.isPending}
+                                    onClick={() => act.mutate(deploySelected)}
+                                >
+                                    <Rocket />
+                                    Deploy
+                                </Button>
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            Pick rows that are ready and not live, at most one per model.
+                        </TooltipContent>
+                    </Tooltip>
+                )}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!canUndeploy || act.isPending}
+                    onClick={() => act.mutate(undeploySelected)}
+                >
+                    <PowerOff />
+                    Undeploy
+                </Button>
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={act.isPending}
+                    onClick={() =>
+                        onConfirm(
+                            bulkDeleteConfirmation(chosen, () =>
+                                deleteSelected(chosen).then(onDone),
+                            ),
+                        )
+                    }
+                >
+                    <Trash2 />
+                    Delete
+                </Button>
+            </div>
         </div>
     );
 }

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, Plus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Plus, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -578,17 +578,20 @@ function SelectionBar({
     return (
         <div className={cn("flex flex-wrap items-center gap-2", className)}>
             <span className="text-sm font-medium tabular-nums">{`${count} selected`}</span>
-            <Button
-                disabled={hint !== null}
-                onClick={onCompare}
-                aria-describedby={hint ? hintId : undefined}
-            >
-                Compare
-            </Button>
-            {hint && <span id={hintId}>{hint}</span>}
-            <Button variant="ghost" className="ml-auto" onClick={onClear}>
+            <Button variant="outline" onClick={onClear}>
+                <X />
                 Clear selection
             </Button>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+                {hint && <span id={hintId}>{hint}</span>}
+                <Button
+                    disabled={hint !== null}
+                    onClick={onCompare}
+                    aria-describedby={hint ? hintId : undefined}
+                >
+                    Compare
+                </Button>
+            </div>
         </div>
     );
 }
