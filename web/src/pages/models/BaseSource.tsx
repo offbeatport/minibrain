@@ -4,7 +4,6 @@ import {
     Badge,
     Button,
     Checkbox,
-    Field,
     Input,
     Label,
     Link,
@@ -186,7 +185,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     };
 }
 
-const FIT_TEXT: Record<string, string> = {
+export const FIT_TEXT: Record<string, string> = {
     fits: "Runs here",
     limited: "Tight fit",
     insufficient: "Needs more compute",
@@ -270,12 +269,10 @@ export function VariantLicence({
     plan,
     accepted,
     onAccepted,
-    onVariant,
 }: {
     plan: SourcePlan;
     accepted: boolean;
     onAccepted: (accepted: boolean) => void;
-    onVariant: (variant: string) => void;
 }) {
     if (plan.target.kind !== "catalogue" || !plan.variant) {
         return null;
@@ -283,29 +280,6 @@ export function VariantLicence({
     const { entry } = plan.target;
     return (
         <>
-            {entry.variants.length > 1 && (
-                <Field id="base-variant" label="Format">
-                    <Select
-                        value={plan.variant.id}
-                        onValueChange={(value) => onVariant(String(value ?? ""))}
-                    >
-                        <SelectTrigger id="base-variant" className="w-full sm:max-w-sm">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {entry.variants.map((variant) => (
-                                <SelectItem
-                                    key={variant.id}
-                                    value={variant.id}
-                                    description={`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
-                                >
-                                    {formatLabel(variant)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </Field>
-            )}
             {!plan.installedKey && plan.blocked && (
                 <StatusText tone="warning" className="whitespace-normal">
                     {plan.blocked}

@@ -219,7 +219,6 @@ export function BaseSummary({
     need,
     accepted,
     onAccepted,
-    onVariant,
     copy,
     onClearCopy,
     onPickAnother,
@@ -230,7 +229,6 @@ export function BaseSummary({
     need: DiskNeed;
     accepted: boolean;
     onAccepted: (accepted: boolean) => void;
-    onVariant: (variant: string) => void;
     copy: CopySource | null;
     onClearCopy: () => void;
     onPickAnother: () => void;
@@ -249,12 +247,7 @@ export function BaseSummary({
                 </StatusText>
             )}
             {option?.kind === "catalogue" && (
-                <VariantLicence
-                    plan={plan}
-                    accepted={accepted}
-                    onAccepted={onAccepted}
-                    onVariant={onVariant}
-                />
+                <VariantLicence plan={plan} accepted={accepted} onAccepted={onAccepted} />
             )}
             {fit === "insufficient" && option && variant && catalog && (
                 <ComputeHelp option={{ ...option, variant }} catalog={catalog} />

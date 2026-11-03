@@ -8,11 +8,18 @@ import {
     FlaskConical,
     type LucideIcon,
     PenLine,
+    Plus,
     Tags,
+    X,
 } from "lucide-react";
 import {
     Button,
     Card,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
     Field,
     Input,
     Link,
@@ -33,7 +40,13 @@ import { TAGS_HINT } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { BasePicker, type PickerTab } from "./BasePicker";
-import { type ImportPick, type SourcePlan, formatLabel, useSourcePlan } from "./BaseSource";
+import {
+    FIT_TEXT,
+    type ImportPick,
+    type SourcePlan,
+    formatLabel,
+    useSourcePlan,
+} from "./BaseSource";
 import { BaseSummary, type CopySource, type DiskNeed, diskBlocks, diskNeed } from "./BaseSummary";
 import { useCacheCheck } from "./ModelCache";
 import {
@@ -184,16 +197,64 @@ function slugOf(name: string): string {
 
 const LOW_SPACE = 5 * 1024 ** 3;
 
+function FormatChange({
+    plan,
+    onVariant,
+}: {
+    plan: SourcePlan;
+    onVariant: (variant: string) => void;
+}) {
+    if (
+        plan.target.kind !== "catalogue" ||
+        !plan.variant ||
+        plan.target.entry.variants.length < 2
+    ) {
+        return null;
+    }
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button type="button" variant="link" size="sm" className="h-auto w-fit px-0">
+                    Change format
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuRadioGroup
+                    value={plan.variant.id}
+                    onValueChange={(value) => onVariant(String(value))}
+                >
+                    {plan.target.entry.variants.map((variant) => (
+                        <DropdownMenuRadioItem
+                            key={variant.id}
+                            value={variant.id}
+                            className="items-start"
+                        >
+                            <span className="flex flex-col gap-0.5">
+                                <span>{formatLabel(variant)}</span>
+                                <span className="text-sm text-muted-foreground tabular-nums">
+                                    {`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
+                                </span>
+                            </span>
+                        </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function DiskPanel({
     option,
     plan,
     need,
     free,
+    onVariant,
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
     need: DiskNeed;
     free: number | null | undefined;
+    onVariant: (variant: string) => void;
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
     const known = free !== null && free !== undefined;
@@ -217,6 +278,9 @@ function DiskPanel({
                     <dt className="text-muted-foreground">Format</dt>
                     <dd>
                         {variant ? formatLabel(variant) : option ? "As installed" : "Not chosen"}
+                    </dd>
+                    <dd>
+                        <FormatChange plan={plan} onVariant={onVariant} />
                     </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -393,6 +457,12 @@ export function AddModelPage() {
     const baseReady =
         (option?.kind === "local" ? Boolean(option.baseKey) : plan.ready) && !diskBlocks(need);
     const finalName = name.trim() || suggestedName;
+    const changeVariant = (variant: string) => {
+        if (option?.entry) {
+            setPicked({ kind: "catalogue", id: option.entry.id, variant });
+            setAccepted(false);
+        }
+    };
     const ready = baseReady && finalName.length > 0;
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -423,91 +493,74 @@ export function AddModelPage() {
                 onKeyDown={shortcut}
                 className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]"
             >
-                <Card className="gap-0 py-0">
-                    <section className="flex flex-col gap-6 p-6">
-                        <h2 className="text-lg font-semibold">Base model</h2>
-                        <TaskSelect value={task} onChange={setTask} />
-                        <div className="flex flex-col gap-3">
-                            <Field id="base-model" label="Model">
-                                <BasePicker
-                                    value={{
-                                        option,
-                                        importText:
-                                            current?.kind === "import" ? current.text : null,
-                                    }}
-                                    catalog={catalog.data}
-                                    models={rows}
-                                    picks={picks}
-                                    open={open}
-                                    onOpenChange={setOpen}
-                                    tab={tab}
-                                    onTabChange={setTab}
-                                    onPick={pick}
-                                    onImport={importPick}
-                                />
-                            </Field>
-                            {catalog.isLoading && (
-                                <span className="text-sm text-muted-foreground">
-                                    Loading the catalogue…
-                                </span>
-                            )}
-                            <ErrorLine error={catalog.error ?? startFrom.error} />
-                            <BaseSummary
-                                option={option}
-                                plan={plan}
-                                catalog={catalog.data}
-                                need={need}
-                                accepted={accepted}
-                                onAccepted={setAccepted}
-                                onVariant={(variant) => {
-                                    if (option?.entry) {
-                                        setPicked({
-                                            kind: "catalogue",
-                                            id: option.entry.id,
-                                            variant,
-                                        });
-                                        setAccepted(false);
-                                    }
+                <Card className="gap-6 p-6">
+                    <TaskSelect value={task} onChange={setTask} />
+                    <div className="flex flex-col gap-3">
+                        <Field id="base-model" label="Model">
+                            <BasePicker
+                                value={{
+                                    option,
+                                    importText: current?.kind === "import" ? current.text : null,
                                 }}
-                                copy={copy}
-                                onClearCopy={() => setCopy(null)}
-                                onPickAnother={() => setOpen(true)}
+                                catalog={catalog.data}
+                                models={rows}
+                                picks={picks}
+                                open={open}
+                                onOpenChange={setOpen}
+                                tab={tab}
+                                onTabChange={setTab}
+                                onPick={pick}
+                                onImport={importPick}
                             />
-                        </div>
-                    </section>
-                    <section className="flex flex-col gap-6 border-t p-6">
-                        <h2 className="text-lg font-semibold">Details</h2>
-                        <Field
+                        </Field>
+                        {catalog.isLoading && (
+                            <span className="text-sm text-muted-foreground">
+                                Loading the catalogue…
+                            </span>
+                        )}
+                        <ErrorLine error={catalog.error ?? startFrom.error} />
+                        <BaseSummary
+                            option={option}
+                            plan={plan}
+                            catalog={catalog.data}
+                            need={need}
+                            accepted={accepted}
+                            onAccepted={setAccepted}
+                            copy={copy}
+                            onClearCopy={() => setCopy(null)}
+                            onPickAnother={() => setOpen(true)}
+                        />
+                    </div>
+                    <Field
+                        id="create-name"
+                        label="Name"
+                        hint={`Apps call it as ${slugOf(finalName)}.`}
+                    >
+                        <Input
                             id="create-name"
-                            label="Name"
-                            hint={`Apps call it as ${slugOf(finalName)}.`}
-                        >
-                            <Input
-                                id="create-name"
-                                value={name}
-                                onChange={(event) => setName(event.target.value)}
-                                placeholder={suggestedName || "IT ticket classifier"}
-                                className="sm:max-w-md"
-                            />
-                        </Field>
-                        <Field id="create-description" label="Description (optional)">
-                            <Textarea
-                                id="create-description"
-                                value={description}
-                                onChange={(event) => setDescription(event.target.value)}
-                                rows={3}
-                                placeholder="Routes incoming tickets to the right queue"
-                            />
-                        </Field>
-                        <Field id="create-tags" label="Tags (optional)" hint={TAGS_HINT}>
-                            <Input
-                                id="create-tags"
-                                value={tags}
-                                onChange={(event) => setTags(event.target.value)}
-                                className="sm:max-w-md"
-                            />
-                        </Field>
-                    </section>
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder={suggestedName || "IT ticket classifier"}
+                            className="sm:max-w-md"
+                        />
+                    </Field>
+                    <Field id="create-description" label="Description (optional)">
+                        <Textarea
+                            id="create-description"
+                            value={description}
+                            onChange={(event) => setDescription(event.target.value)}
+                            rows={3}
+                            placeholder="Routes incoming tickets to the right queue"
+                        />
+                    </Field>
+                    <Field id="create-tags" label="Tags (optional)" hint={TAGS_HINT}>
+                        <Input
+                            id="create-tags"
+                            value={tags}
+                            onChange={(event) => setTags(event.target.value)}
+                            className="sm:max-w-md"
+                        />
+                    </Field>
                 </Card>
                 <aside className="lg:sticky lg:top-6">
                     <DiskPanel
@@ -515,6 +568,7 @@ export function AddModelPage() {
                         plan={plan}
                         need={need}
                         free={catalog.data?.store_free_bytes}
+                        onVariant={changeVariant}
                     />
                 </aside>
                 <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3 lg:col-span-2">
@@ -524,9 +578,11 @@ export function AddModelPage() {
                         variant="outline"
                         onClick={() => router.history.push(modelsHref())}
                     >
+                        <X />
                         Cancel
                     </Button>
                     <Button type="submit" disabled={!ready || add.isPending}>
+                        <Plus />
                         {add.isPending ? "Adding…" : "Add model"}
                     </Button>
                 </div>
