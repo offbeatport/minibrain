@@ -15,6 +15,8 @@ import uvicorn
 
 from minibrain.supervise import Supervisor
 
+COMMAND_LINE = "command line"
+
 if TYPE_CHECKING:
     from minibrain.registry.audit_chain import ChainReport
 
@@ -34,6 +36,7 @@ def serve(host: str, port: int, with_worker: bool) -> None:
     settings = load_settings()
     api_url = local_url(host, port)
     os.environ["MINIBRAIN_MAIN_URL"] = api_url
+    os.environ["MINIBRAIN_LISTEN"] = host
     env = os.environ | {"MINIBRAIN_WORKER_TOKEN": settings.secret("worker_token")}
     command = [sys.executable, "-m", "minibrain.cli", "worker", "--api-url", api_url, "--parent", str(os.getpid())]
     command += ["--kinds", *LOCAL_KINDS]
@@ -213,6 +216,44 @@ def audit(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def read_new_password(from_stdin: bool) -> str:
+    import getpass
+
+    if from_stdin:
+        return sys.stdin.readline().rstrip("\n")
+    first = getpass.getpass("Password (at least 12 characters): ")
+    if getpass.getpass("Password again: ") != first:
+        raise SystemExit("The passwords do not match")
+    return first
+
+
+def admin(args: argparse.Namespace) -> None:
+    from minibrain.auth.accounts import AccountError, create_local
+    from minibrain.auth.passwords import PasswordError, check_strength
+    from minibrain.auth.roles import Role
+    from minibrain.registry.db import make_sessions, migrate
+    from minibrain.registry.models import AuditEvent
+    from minibrain.registry.service import ConflictError
+    from minibrain.settings import load_settings
+
+    password = read_new_password(args.password_stdin)
+    try:
+        check_strength(password)
+    except PasswordError as error:
+        raise SystemExit(str(error)) from error
+    settings = load_settings()
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        try:
+            user = create_local(session, args.email, args.name, Role.ADMIN, password)
+        except (AccountError, ConflictError) as error:
+            raise SystemExit(str(error)) from error
+        detail = {"name": user.name, "role": Role.ADMIN.value, "source": "local", "via": "command line"}
+        session.add(AuditEvent(actor=COMMAND_LINE, action="account.create", target=user.subject, detail=detail))
+        session.commit()
+    print(f"Created the admin account {user.subject}. Sign in with it in the minibrain UI.")
+
+
 def openapi(output: Path | None) -> None:
     from minibrain.app import create_app
 
@@ -271,6 +312,12 @@ def main() -> None:
     verify_command = audit_actions.add_parser("verify", help="walk the chain and report the first break")
     verify_command.add_argument("--file", type=Path, default=None, help="a full JSONL export instead of the database")
     verify_command.add_argument("--json", action="store_true", help="print the report as JSON")
+    admin_command = commands.add_parser("admin", help="manage admin accounts")
+    admin_actions = admin_command.add_subparsers(dest="action", required=True)
+    create_command = admin_actions.add_parser("create", help="create an admin account with a password")
+    create_command.add_argument("--email", required=True)
+    create_command.add_argument("--name", default="")
+    create_command.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -286,6 +333,8 @@ def main() -> None:
         extensions(args)
     elif args.command == "audit":
         audit(args)
+    elif args.command == "admin":
+        admin(args)
     else:
         openapi(args.output)
 

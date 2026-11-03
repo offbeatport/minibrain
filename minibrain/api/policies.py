@@ -4,10 +4,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from minibrain.api.deps import SessionDep
+from minibrain.auth.identity import current_actor
 from minibrain.policy import describe, update
 
 router = APIRouter(prefix="/api", tags=["security"])
-LOCAL_USER = "Local user"
 
 
 class PolicyChoice(BaseModel):
@@ -39,6 +39,6 @@ def policies(session: SessionDep) -> list[PolicyInfo]:
 
 @router.put("/policies/{name}")
 def change_policy(name: str, body: PolicyUpdate, session: SessionDep) -> list[PolicyInfo]:
-    update(session, name, body.value, LOCAL_USER)
+    update(session, name, body.value, current_actor())
     session.commit()
     return [PolicyInfo(**item) for item in describe(session)]

@@ -22,6 +22,7 @@ from minibrain.api.schemas import (
     PoolChoice,
 )
 from minibrain.api.views import job_info
+from minibrain.auth.identity import current_actor
 from minibrain.jobs.queue import enqueue
 from minibrain.leader import Leader
 from minibrain.models import hub
@@ -39,7 +40,6 @@ from minibrain.settings import Settings
 from minibrain.storage import free_bytes
 
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
-LOCAL_USER = "Local user"
 SYNC_INTERVAL_SECONDS = 24 * 3600
 SCHEDULE_CHECK_SECONDS = 3600.0
 
@@ -179,7 +179,7 @@ def download(
             f"{entry.name} is gated. Accept its licence at {hub.endpoint()}/{variant.repo} "
             "and set HF_TOKEN on the minibrain server, then retry."
         )
-    model = start_download(session, settings, entry, variant, LOCAL_USER)
+    model = start_download(session, settings, entry, variant, current_actor())
     session.commit()
     return row_of(session, settings, request, model)
 

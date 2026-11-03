@@ -7,7 +7,6 @@ from sqlalchemy import func, make_url, select
 from sqlalchemy.orm import Session
 
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     DeviceInfo,
     InfrastructureInfo,
@@ -21,6 +20,7 @@ from minibrain.api.schemas import (
     SystemInfo,
 )
 from minibrain.artifacts import ArtifactStore
+from minibrain.auth.identity import current_actor
 from minibrain.data.limits import load_limits
 from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
@@ -164,7 +164,7 @@ def read_storage(session: SessionDep, settings: SettingsDep, store: StoreDep) ->
 @router.put("/settings/storage")
 def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> StorageSettings:
     try:
-        save_storage(session, settings, storage_update(body), body.secret, LOCAL_USER)
+        save_storage(session, settings, storage_update(body), body.secret, current_actor())
     except StorageError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     session.commit()

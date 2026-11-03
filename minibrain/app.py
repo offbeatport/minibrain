@@ -10,7 +10,9 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.api import (
+    accounts,
     audit,
+    auth,
     cards,
     catalog,
     compute,
@@ -31,9 +33,12 @@ from minibrain.api import (
     system,
     versions,
 )
+from minibrain.api.access import Identify
 from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
 from minibrain.artifacts import ArtifactError
+from minibrain.auth.accounts import AccountError, SignInError, ensure_csrf_key
+from minibrain.auth.passwords import PasswordError
 from minibrain.base_models import BaseModelSpec
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
@@ -84,6 +89,9 @@ ERROR_STATUS: dict[type[Exception], int] = {
     PolicyError: 403,
     LockedError: 409,
     ConnectionProblem: 422,
+    AccountError: 422,
+    PasswordError: 422,
+    SignInError: 401,
 }
 
 log = logging.getLogger("minibrain")
@@ -170,11 +178,14 @@ def create_app(
         backfill(session, settings)
         seed(session)
         sync_declared(session)
+        csrf_key = ensure_csrf_key(session)
         session.commit()
         report_problems(session, lambda model: model_folder(settings, model))
     app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.sessions = sessions
+    app.state.csrf_key = csrf_key
+    app.state.accounts_on = False
     app.state.leader = leader_for(settings.database_url)
     app.state.store = store_for(settings)
     with sessions() as session:
@@ -200,7 +211,10 @@ def create_app(
         app.add_exception_handler(error, domain_error)
     app.add_exception_handler(gateway.OpenAIError, gateway.openai_error)
     app.add_middleware(PeerAddress)
+    app.add_middleware(Identify)
     for module in (
+        auth,
+        accounts,
         minibrains,
         data,
         dataset_folders,

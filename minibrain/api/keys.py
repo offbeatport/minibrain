@@ -3,9 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.deps import SessionDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate, ModelRef
 from minibrain.api.views import key_info
+from minibrain.auth.identity import current_actor
 from minibrain.registry.models import ApiKey, AuditEvent, Minibrain, Model
 from minibrain.registry.service import NotFoundError, create_key, get_minibrain, set_scopes
 
@@ -36,7 +36,7 @@ def get_key(session: Session, key_id: int) -> ApiKey:
 def audit(session: Session, action: str, key: ApiKey) -> None:
     models = [model.key for model in key_info(session, key).models]
     session.add(
-        AuditEvent(actor=LOCAL_USER, action=action, target=key.prefix, detail={"name": key.name, "models": models})
+        AuditEvent(actor=current_actor(), action=action, target=key.prefix, detail={"name": key.name, "models": models})
     )
 
 
@@ -49,6 +49,7 @@ def list_keys(session: SessionDep) -> list[KeyInfo]:
 def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     minibrains, model_ids = resolve(session, body.models)
     key, secret = create_key(session, body.name, minibrains, model_ids)
+    key.created_by = current_actor()
     audit(session, "key.create", key)
     session.commit()
     return KeyCreated(secret=secret, **key_info(session, key).model_dump())

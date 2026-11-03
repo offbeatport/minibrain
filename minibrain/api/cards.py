@@ -8,7 +8,7 @@ from minibrain.api.card_builder import build_card
 from minibrain.api.card_export import card_data, digest, export_json, export_markdown
 from minibrain.api.card_schemas import ModelCard, ModelCardEdit, ModelCardExport
 from minibrain.api.deps import SessionDep, SettingsDep
-from minibrain.api.policies import LOCAL_USER
+from minibrain.auth.identity import current_actor
 from minibrain.registry.models import AuditEvent, Minibrain, Version
 from minibrain.registry.service import get_minibrain, get_version
 from minibrain.settings import Settings
@@ -20,7 +20,7 @@ EDITABLE = ("intended_use", "known_limits")
 
 
 def card_of(session: Session, settings: Settings, minibrain: Minibrain, version: Version) -> ModelCard:
-    return build_card(session, settings, minibrain, version, LOCAL_USER)
+    return build_card(session, settings, minibrain, version, current_actor())
 
 
 def exported(card: ModelCard) -> ModelCardExport:
@@ -91,6 +91,6 @@ def edit_card(
             "from": {field: before for field, (before, _) in changed.items()},
             "to": {field: after for field, (_, after) in changed.items()},
         }
-        session.add(AuditEvent(actor=LOCAL_USER, action="version.card", target=f"{slug}@{number}", detail=detail))
+        session.add(AuditEvent(actor=current_actor(), action="version.card", target=f"{slug}@{number}", detail=detail))
     session.commit()
     return exported(card_of(session, settings, minibrain, version))

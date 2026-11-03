@@ -3,12 +3,13 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, false
+from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
 
 PEER_ADDRESS: ContextVar[str | None] = ContextVar("peer_address", default=None)
+SIGNED_IN: ContextVar[tuple[str, str] | None] = ContextVar("signed_in", default=None)
 SYSTEM_ACTOR = "system"
 
 
@@ -366,6 +367,7 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    created_by: Mapped[str | None] = mapped_column(default=None)
 
     scopes: Mapped[list["KeyScope"]] = relationship(
         back_populates="key", cascade="all, delete-orphan", order_by="KeyScope.id"
@@ -565,6 +567,14 @@ class AuditEvent(Base):
     hash: Mapped[str | None] = mapped_column(default=None)
 
 
+@event.listens_for(AuditEvent, "before_insert")
+def stamp_sign_in(_mapper: Any, _connection: Any, target: AuditEvent) -> None:
+    signed_in = SIGNED_IN.get()
+    detail = dict(target.detail or {})
+    if signed_in is not None and target.actor == signed_in[0] and "sign_in" not in detail:
+        target.detail = {**detail, "sign_in": signed_in[1]}
+
+
 class AuditChain(Base):
     __tablename__ = "audit_chain"
 
@@ -574,6 +584,51 @@ class AuditChain(Base):
     forwarded_seq: Mapped[int] = mapped_column(BigInteger, default=0)
     forwarded_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     forward_error: Mapped[str | None] = mapped_column(default=None)
+
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("source", "subject", name="uq_users_source_subject"),
+        Index("ix_users_email", "email"),
+        Index("ix_users_reset_hash", "reset_hash", unique=True),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str | None] = mapped_column(default=None)
+    name: Mapped[str]
+    source: Mapped[str]
+    subject: Mapped[str]
+    role: Mapped[str | None] = mapped_column(default=None)
+    groups: Mapped[list[str]] = mapped_column(JSON, default=list)
+    disabled: Mapped[bool] = mapped_column(default=False)
+    password_hash: Mapped[str | None] = mapped_column(default=None)
+    reset_hash: Mapped[str | None] = mapped_column(default=None)
+    reset_expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    failed_sign_ins: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    last_sign_in_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    sessions: Mapped[list["LoginSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class LoginSession(Base):
+    __tablename__ = "sessions"
+    __table_args__ = (Index("ix_sessions_user", "user_id"), {"sqlite_autoincrement": True})
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    ip: Mapped[str | None] = mapped_column(default=None)
+    user_agent: Mapped[str | None] = mapped_column(default=None)
+
+    user: Mapped[User] = relationship(back_populates="sessions")
 
 
 class Node(Base):

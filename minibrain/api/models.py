@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep, get_local_node
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
@@ -25,6 +24,7 @@ from minibrain.api.schemas import (
     TestRequest,
     TestResponse,
 )
+from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
 from minibrain.models.cache import touch
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
@@ -198,7 +198,7 @@ def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
     drop_orphan_keys(session)
     session.add(
         AuditEvent(
-            actor=LOCAL_USER,
+            actor=current_actor(),
             action="model.delete",
             target=model.id,
             detail={"name": model.name, "kind": "base", "size_bytes": model.size_bytes}
@@ -211,7 +211,9 @@ def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
 
 
 def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
-    session.add(AuditEvent(actor=LOCAL_USER, action=action, target=model.id, detail={"name": model.name, **detail}))
+    session.add(
+        AuditEvent(actor=current_actor(), action=action, target=model.id, detail={"name": model.name, **detail})
+    )
 
 
 @router.post("/base/{key}/verify", status_code=202)

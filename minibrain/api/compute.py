@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field, StringConstraints
 
 from minibrain.api.deps import LocalNodeDep, SessionDep
-from minibrain.api.policies import LOCAL_USER
+from minibrain.auth.identity import current_actor
 from minibrain.registry.compute import Pool, pools
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, save_prices
@@ -137,6 +137,6 @@ def update_prices(body: DevicePricesUpdate, session: SessionDep, node: LocalNode
     saved = save_prices(session, body.currency, body.hourly)
     if saved != before:
         detail = {"from": before.as_dict(), "to": saved.as_dict()}
-        session.add(AuditEvent(actor=LOCAL_USER, action="settings.prices", target=KEY, detail=detail))
+        session.add(AuditEvent(actor=current_actor(), action="settings.prices", target=KEY, detail=detail))
     session.commit()
     return prices_info(pools(session, node), saved)

@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.data import source_summary
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     ConnectionBody,
     ConnectionCheck,
@@ -22,6 +21,7 @@ from minibrain.api.schemas import (
     SourceSummary,
 )
 from minibrain.artifacts import ArtifactStore
+from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionConfig, ConnectionProblem, clean, clean_name, config_from
 from minibrain.connections.store import (
     Resolved,
@@ -92,7 +92,7 @@ def read_connections(session: SessionDep, settings: SettingsDep) -> list[Connect
 
 @router.post("/connections", status_code=201)
 def add_connection(body: ConnectionBody, session: SessionDep, settings: SettingsDep) -> ConnectionInfo:
-    connection = create_connection(session, settings, body.name, body_config(body), body.secret, LOCAL_USER)
+    connection = create_connection(session, settings, body.name, body_config(body), body.secret, current_actor())
     session.commit()
     return connection_info(session, settings, connection)
 
@@ -102,14 +102,14 @@ def change_connection(
     connection_id: int, body: ConnectionBody, session: SessionDep, settings: SettingsDep
 ) -> ConnectionInfo:
     connection = get_connection(session, connection_id)
-    update_connection(session, settings, connection, body.name, body_config(body), body.secret, LOCAL_USER)
+    update_connection(session, settings, connection, body.name, body_config(body), body.secret, current_actor())
     session.commit()
     return connection_info(session, settings, connection)
 
 
 @router.delete("/connections/{connection_id}", status_code=204)
 def remove_connection(connection_id: int, session: SessionDep) -> None:
-    delete_connection(session, get_connection(session, connection_id), LOCAL_USER)
+    delete_connection(session, get_connection(session, connection_id), current_actor())
     session.commit()
 
 

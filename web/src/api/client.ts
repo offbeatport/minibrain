@@ -32,7 +32,54 @@ export type CatalogVariantInfo = Schemas["CatalogVariantInfo"];
 export type HardwareInfo = Schemas["HardwareInfo"];
 export type FitInfo = Schemas["FitInfo"];
 
+export const CSRF_HEADER = "X-CSRF-Token";
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const signedOutListeners = new Set<() => void>();
+let csrfToken: string | null = null;
+
+export function setCsrfToken(token: string | null): void {
+    csrfToken = token;
+}
+
+export function onSignedOut(listener: () => void): () => void {
+    signedOutListeners.add(listener);
+    return () => signedOutListeners.delete(listener);
+}
+
+function guarded(method: string, headers: Headers): Headers {
+    if (csrfToken && !SAFE_METHODS.has(method.toUpperCase())) {
+        headers.set(CSRF_HEADER, csrfToken);
+    }
+    return headers;
+}
+
+function noticeSignedOut(response: Response): Response {
+    if (response.status === 401) {
+        for (const listener of signedOutListeners) {
+            listener();
+        }
+    }
+    return response;
+}
+
+export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const method = init.method ?? "GET";
+    const headers = guarded(method, new Headers(init.headers));
+    return noticeSignedOut(await fetch(url, { ...init, headers }));
+}
+
 export const api = createClient<paths>();
+
+api.use({
+    onRequest({ request }) {
+        guarded(request.method, request.headers);
+        return request;
+    },
+    onResponse({ response }) {
+        return noticeSignedOut(response);
+    },
+});
 
 type Failure = { detail?: unknown };
 type Outcome<T> = { data?: T; error?: unknown; response: Response };
@@ -66,7 +113,7 @@ export async function succeed(request: Promise<Outcome<unknown>>): Promise<void>
 export async function uploadSource(slug: string, file: File): Promise<MinibrainDetail> {
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch(`/api/minibrains/${encodeURIComponent(slug)}/source`, {
+    const response = await apiFetch(`/api/minibrains/${encodeURIComponent(slug)}/source`, {
         method: "POST",
         body: form,
     });
@@ -80,7 +127,7 @@ export async function uploadSource(slug: string, file: File): Promise<MinibrainD
 export async function uploadFile(file: File): Promise<SourceSummary> {
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch("/api/sources", { method: "POST", body: form });
+    const response = await apiFetch("/api/sources", { method: "POST", body: form });
     const body: unknown = await response.json();
     if (!response.ok) {
         throw new Error(describeError(body, response.status));

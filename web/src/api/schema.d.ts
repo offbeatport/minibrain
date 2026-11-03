@@ -4,6 +4,143 @@
  */
 
 export interface paths {
+    "/api/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current Session */
+        get: operations["current_session_api_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup */
+        post: operations["setup_api_auth_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset */
+        post: operations["reset_api_auth_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounts */
+        get: operations["accounts_api_accounts_get"];
+        put?: never;
+        /** Add Account */
+        post: operations["add_account_api_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Account */
+        patch: operations["update_account_api_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/password-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Password */
+        post: operations["reset_password_api_accounts__account_id__password_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains": {
         parameters: {
             query?: never;
@@ -2244,6 +2381,62 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountCreate */
+        AccountCreate: {
+            /** Email */
+            email: string;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            role: components["schemas"]["Role"];
+        };
+        /** AccountInfo */
+        AccountInfo: {
+            /** Id */
+            id: number;
+            /** Email */
+            email: string | null;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+            role: components["schemas"]["Role"] | null;
+            /** Role Locked */
+            role_locked: boolean;
+            /** Groups */
+            groups: string[];
+            /** Disabled */
+            disabled: boolean;
+            /** Password Set */
+            password_set: boolean;
+            /** Link Pending */
+            link_pending: boolean;
+            /** Sessions */
+            sessions: number;
+            /** Last Sign In At */
+            last_sign_in_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AccountUpdate */
+        AccountUpdate: {
+            /** Role */
+            role?: ("viewer" | "builder" | "admin" | "none") | null;
+            /** Disabled */
+            disabled?: boolean | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** AccountsInfo */
+        AccountsInfo: {
+            /** People */
+            people: components["schemas"]["AccountInfo"][];
+        };
         /** Activity */
         Activity: {
             /**
@@ -4864,6 +5057,31 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** PasswordLink */
+        PasswordLink: {
+            account: components["schemas"]["AccountInfo"];
+            /** Path */
+            path: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** PersonInfo */
+        PersonInfo: {
+            /** Id */
+            id: number | null;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string | null;
+            /** Source */
+            source: string;
+            role: components["schemas"]["Role"] | null;
+            /** Role Locked */
+            role_locked: boolean;
+        };
         /** PinRequest */
         PinRequest: {
             /** Pinned */
@@ -5030,6 +5248,13 @@ export interface components {
              */
             seen_at: string;
         };
+        /** ResetBody */
+        ResetBody: {
+            /** Token */
+            token: string;
+            /** Password */
+            password: string;
+        };
         /** ReviewRequest */
         ReviewRequest: {
             /**
@@ -5040,6 +5265,11 @@ export interface components {
             /** Label */
             label?: string | null;
         };
+        /**
+         * Role
+         * @enum {string}
+         */
+        Role: "viewer" | "builder" | "admin";
         /** S3SourceCreate */
         S3SourceCreate: {
             /** Connection Id */
@@ -5068,6 +5298,31 @@ export interface components {
             /** Credit */
             credit: string;
         };
+        /** SessionInfo */
+        SessionInfo: {
+            /** Accounts */
+            accounts: boolean;
+            /** Setup */
+            setup: boolean;
+            person: components["schemas"]["PersonInfo"] | null;
+            /** Csrf Token */
+            csrf_token: string | null;
+            methods: components["schemas"]["SignInMethods"];
+            /** Reason */
+            reason: ("listen" | "remote") | null;
+        };
+        /** SetupBody */
+        SetupBody: {
+            /** Email */
+            email: string;
+            /**
+             * Name
+             * @default
+             */
+            name?: string;
+            /** Password */
+            password: string;
+        };
         /** SiemInfo */
         SiemInfo: {
             /** Target */
@@ -5080,6 +5335,28 @@ export interface components {
             error: string | null;
             /** Waiting */
             waiting: number;
+        };
+        /** SignInBody */
+        SignInBody: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** SignInMethods */
+        SignInMethods: {
+            /**
+             * Local
+             * @default true
+             */
+            local?: boolean;
+            /** Oidc */
+            oidc?: string | null;
+            /**
+             * Proxy
+             * @default false
+             */
+            proxy?: boolean;
         };
         /** SnapshotDiff */
         SnapshotDiff: {
@@ -5557,6 +5834,262 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    current_session_api_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+        };
+    };
+    login_api_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setup_api_auth_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_auth_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accounts_api_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountsInfo"];
+                };
+            };
+        };
+    };
+    add_account_api_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordLink"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_account_api_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_accounts__account_id__password_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordLink"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_all_api_minibrains_get: {
         parameters: {
             query?: never;

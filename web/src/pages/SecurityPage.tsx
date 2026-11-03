@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Box, FolderLock, Globe, KeyRound, type LucideIcon, ScrollText } from "lucide-react";
+import { Box, FolderLock, Globe, KeyRound, LogIn, type LucideIcon, ScrollText } from "lucide-react";
 import {
     Badge,
     Button,
@@ -50,6 +50,12 @@ const GROUPS: Group[] = [
         icon: FolderLock,
         title: "Data",
         names: ["data_folders"],
+    },
+    {
+        icon: LogIn,
+        title: "Sign-in",
+        names: ["session_idle_minutes", "session_hours"],
+        description: "Applies when accounts are on.",
     },
     {
         icon: KeyRound,

@@ -20,7 +20,14 @@ export const AUDIT_KEYS = [
 export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 
 const ACTIONS: Record<string, string> = {
+    "account.create": "Account created",
+    "account.password": "Password set",
+    "account.reset": "Password link created",
+    "account.update": "Account changed",
     "audit.prune": "Audit events deleted",
+    "auth.sign_in": "Signed in",
+    "auth.sign_in_failed": "Sign-in refused",
+    "auth.sign_out": "Signed out",
     "feedback.accept": "Feedback accepted",
     "feedback.assign": "Feedback assigned",
     "feedback.fix": "Feedback fixed and accepted",
@@ -59,7 +66,9 @@ const KEY_LABELS: Record<string, string> = {
     cut_seq: "Cut at seq",
     days: "Retention",
     deleted: "Events deleted",
+    disabled: "Turned off",
     files: "Files",
+    first_admin: "First admin",
     from: "Before",
     intended_use: "Intended use",
     job: "Job",
@@ -67,9 +76,12 @@ const KEY_LABELS: Record<string, string> = {
     kind: "Kind",
     known_limits: "Known limits",
     last_used_at: "Last used",
+    link_expires_at: "Link expires",
     models: "Models",
     name: "Name",
     older_than: "Older than",
+    role: "Role",
+    sign_in: "Signed in with",
     size_bytes: "Size",
     source: "Source",
     status: "Status",
@@ -86,6 +98,13 @@ const CHANGED_FIELDS: Record<string, string> = {
 };
 
 const STORAGE_KINDS: Record<string, string> = { local: "Local folder", s3: "S3-compatible bucket" };
+const SIGN_INS: Record<string, string> = {
+    local: "Password",
+    oidc: "Single sign-on",
+    proxy: "Proxy",
+};
+const ROLES: Record<string, string> = { viewer: "Viewer", builder: "Builder", admin: "Admin" };
+const NAMED_VALUES: Record<string, Record<string, string>> = { sign_in: SIGN_INS, role: ROLES };
 const VERSION_KINDS: Record<string, string> = { lora: "LoRA version", prompt: "Prompt version" };
 
 function sentence(text: string): string {
@@ -137,6 +156,9 @@ export function plainValue(value: unknown, policy?: PolicyInfo, key = ""): strin
             .join("; ");
     }
     const text = String(value);
+    if (NAMED_VALUES[key]?.[text]) {
+        return NAMED_VALUES[key][text];
+    }
     if (key.endsWith("_at") || key === "older_than") {
         return exactTime(text);
     }
@@ -220,6 +242,13 @@ function listChange(before: unknown[], after: unknown[], policy?: PolicyInfo): s
 }
 
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
+    "account.create": (detail) => `Role ${plainValue(detail.role, undefined, "role")}`,
+    "account.password": () => "With a one-time link",
+    "account.reset": (detail) =>
+        `Link expires ${plainValue(detail.link_expires_at, undefined, "link_expires_at")}`,
+    "auth.sign_in": (detail) => `With ${plainValue(detail.sign_in, undefined, "sign_in")}`,
+    "auth.sign_in_failed": (detail) => plainValue(detail.reason),
+    "auth.sign_out": () => "Session ended",
     "audit.prune": (detail) =>
         `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}${
             typeof detail.cut_seq === "number" ? `, up to seq ${plainValue(detail.cut_seq)}` : ""
@@ -269,7 +298,7 @@ export function summaryOf(event: AuditEvent, policies: Map<string, PolicyInfo>):
             .join("; ");
     }
     return Object.entries(detail)
-        .filter(([name]) => name !== "name")
+        .filter(([name]) => name !== "name" && name !== "sign_in")
         .slice(0, 3)
         .map(([name, value]) => `${keyLabel(name)}: ${plainValue(value, undefined, name)}`)
         .join("; ");

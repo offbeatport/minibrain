@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     DatasetChoice,
     DeployRequest,
@@ -21,6 +20,7 @@ from minibrain.api.schemas import (
     QueryResponse,
 )
 from minibrain.api.views import detail, summary
+from minibrain.auth.identity import current_actor
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import snapshot
 from minibrain.data.shared import (
@@ -106,7 +106,7 @@ def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
         raise ConflictError("cancel the running jobs first")
     session.add(
         AuditEvent(
-            actor=LOCAL_USER,
+            actor=current_actor(),
             action="model.delete",
             target=minibrain.slug,
             detail={"name": minibrain.name, "kind": "custom", "versions": len(minibrain.versions)},
@@ -130,7 +130,7 @@ def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: Settin
     if minibrain.deployed != body.deployed:
         action = "model.deploy" if body.deployed else "model.undeploy"
         facts = {"name": minibrain.name, "version": minibrain.current_version}
-        session.add(AuditEvent(actor=LOCAL_USER, action=action, target=minibrain.slug, detail=facts))
+        session.add(AuditEvent(actor=current_actor(), action=action, target=minibrain.slug, detail=facts))
     minibrain.deployed = body.deployed
     minibrain.updated_at = now()
     session.commit()

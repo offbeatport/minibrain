@@ -10,17 +10,16 @@ import {
     Rail,
     SectionLabel,
 } from "obp-ui/shell";
-import { type MouseEvent, useEffect } from "react";
+import { type MouseEvent, type ReactNode, useEffect } from "react";
+import { useSession, useSignOut } from "~/api/authQueries";
 import { SECTIONS, SETTINGS_PAGES, isSettingsPath } from "~/components/navigation";
+import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
+import { NoAccessPage, SetPasswordPage, SetupPage, SignInPage } from "~/pages/auth/AuthPages";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
 
-const ACCOUNT_ITEMS: AccountMenuItem[] = [
-    { icon: <Settings />, label: "Settings", href: "/settings" },
-    { kind: "theme", icon: <SunMoon />, label: "Theme" },
-    { icon: <LogOut />, label: "Sign out", separatorBefore: true, disabled: true },
-];
+export const SET_PASSWORD_PATH = "/reset-password";
 
 function KitLink({ href, onClick, ...rest }: UILinkProps) {
     const router = useRouter();
@@ -93,6 +92,54 @@ function SettingsNavigation({ pathname }: { pathname: string }) {
     );
 }
 
+function Account() {
+    const session = useSession();
+    const signOut = useSignOut();
+    const person = session.data?.person;
+    const signedIn = person != null && person.source !== "single_user";
+    const name = person?.name ?? "Local user";
+    const sub = signedIn
+        ? (person.email ?? (person.role ? ROLE_LABELS[person.role] : "No role"))
+        : "This install";
+    const items: AccountMenuItem[] = [
+        { icon: <Settings />, label: "Settings", href: "/settings" },
+        { kind: "theme", icon: <SunMoon />, label: "Theme" },
+        {
+            icon: <LogOut />,
+            label: "Sign out",
+            separatorBefore: true,
+            disabled: !signedIn || signOut.isPending,
+            onSelect: () => signOut.mutate(),
+        },
+    ];
+    return (
+        <AccountMenu
+            trigger={<AccountButton initial={initialOf(name)} name={name} sub={sub} />}
+            items={items}
+            spacing="comfortable"
+        />
+    );
+}
+
+function Gate({ pathname, children }: { pathname: string; children: ReactNode }) {
+    const router = useRouter();
+    const session = useSession();
+    if (pathname === SET_PASSWORD_PATH) {
+        return <SetPasswordPage onDone={() => router.history.push("/")} />;
+    }
+    if (session.isPending) {
+        return null;
+    }
+    const info = session.data;
+    if (info?.accounts && !info.person) {
+        return info.setup ? <SetupPage session={info} /> : <SignInPage />;
+    }
+    if (info?.person && info.person.role == null) {
+        return <NoAccessPage session={info} />;
+    }
+    return children;
+}
+
 export function Shell() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -110,13 +157,7 @@ export function Shell() {
             brandLabel="Home"
             toggleIcon="panel"
             togglePlacement="header"
-            footer={
-                <AccountMenu
-                    trigger={<AccountButton initial="L" name="Local user" sub="This install" />}
-                    items={ACCOUNT_ITEMS}
-                    spacing="comfortable"
-                />
-            }
+            footer={<Account />}
         >
             {settings ? (
                 <SettingsNavigation pathname={pathname} />
@@ -133,9 +174,11 @@ export function Shell() {
             paths={{ home: () => "/", settings: () => "/settings" }}
         >
             <ToastProvider>
-                <AppShell rail={rail}>
-                    <Outlet />
-                </AppShell>
+                <Gate pathname={pathname}>
+                    <AppShell rail={rail}>
+                        <Outlet />
+                    </AppShell>
+                </Gate>
             </ToastProvider>
         </UIProvider>
     );

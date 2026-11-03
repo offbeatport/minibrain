@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.data import dataset_summary
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     DatasetFolderChoice,
     DatasetFolderCreate,
@@ -14,6 +13,7 @@ from minibrain.api.schemas import (
     DatasetFolderRename,
     DatasetSummary,
 )
+from minibrain.auth.identity import current_actor
 from minibrain.data.dataset_folders import (
     create_folder,
     delete_folder,
@@ -36,7 +36,7 @@ def folder_info(folder: DatasetFolder) -> DatasetFolderInfo:
 
 
 def audit(session: Session, action: str, target: str, detail: dict[str, Any]) -> None:
-    session.add(AuditEvent(actor=LOCAL_USER, action=action, target=target, detail=detail))
+    session.add(AuditEvent(actor=current_actor(), action=action, target=target, detail=detail))
 
 
 def folder_target(folder: DatasetFolder) -> str:

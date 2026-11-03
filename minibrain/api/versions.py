@@ -4,7 +4,6 @@ from fastapi import APIRouter, Request
 from sqlalchemy.orm import Session
 
 from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
-from minibrain.api.policies import LOCAL_USER
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
@@ -13,6 +12,7 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.api.views import detail, version_info
+from minibrain.auth.identity import current_actor
 from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
 from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
@@ -36,7 +36,9 @@ router = APIRouter(prefix="/api", tags=["versions"])
 
 def audit_version(session: Session, minibrain: Minibrain, number: int, action: str, **detail: Any) -> None:
     target = f"{minibrain.slug}@{number}"
-    session.add(AuditEvent(actor=LOCAL_USER, action=action, target=target, detail={"name": minibrain.name, **detail}))
+    session.add(
+        AuditEvent(actor=current_actor(), action=action, target=target, detail={"name": minibrain.name, **detail})
+    )
 
 
 @router.get("/minibrains/{slug}/versions")
@@ -96,7 +98,7 @@ def delete_version(slug: str, number: int, session: SessionDep, settings: Settin
         minibrain.current_version = None
     session.add(
         AuditEvent(
-            actor=LOCAL_USER,
+            actor=current_actor(),
             action="version.delete",
             target=f"{slug}@{number}",
             detail={"name": minibrain.name, "kind": version.kind, "status": version.status},

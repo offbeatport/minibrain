@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from minibrain.api.deps import SessionDep, SettingsDep
-from minibrain.api.policies import LOCAL_USER
+from minibrain.auth.identity import current_actor
 from minibrain.models.cache import (
     KEY,
     CachedBase,
@@ -106,7 +106,7 @@ def update_cache_settings(body: ModelCacheSettings, session: SessionDep) -> Mode
     saved = save_settings(session, body.model_dump())
     if saved != before:
         detail = {"from": settings_info(before).model_dump(), "to": settings_info(saved).model_dump()}
-        session.add(AuditEvent(actor=LOCAL_USER, action="settings.model_cache", target=KEY, detail=detail))
+        session.add(AuditEvent(actor=current_actor(), action="settings.model_cache", target=KEY, detail=detail))
     session.commit()
     return settings_info(saved)
 
@@ -133,4 +133,4 @@ def estimate_download(body: CacheEstimateRequest, session: SessionDep) -> CacheP
 
 @router.post("/models/cache/free")
 def free_up_space(session: SessionDep, settings: SettingsDep) -> CachePlanInfo:
-    return plan_info(evict(session, settings, "manual", LOCAL_USER))
+    return plan_info(evict(session, settings, "manual", current_actor()))

@@ -32,6 +32,7 @@ import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { ModelCardPage } from "./pages/models/ModelCardPage";
 import { LogosPage } from "./pages/proto/LogosPage";
+import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
 import { DataSettingsPage } from "./pages/settings/DataSettingsPage";
@@ -162,6 +163,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/monitor", MonitorPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", SecurityPage),
+    globalPage("/settings/accounts", AccountsSettingsPage),
     globalPage("/settings/audit", AuditLogPage),
     globalPage("/settings/data", DataSettingsPage),
     globalPage("/settings/storage", StorageSettingsPage),

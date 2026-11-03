@@ -32,6 +32,7 @@ class Field:
     choices: tuple[str, ...] = ()
     editable: bool = True
     maximum: int | None = None
+    minimum: int = 0
 
 
 FIELDS: tuple[Field, ...] = (
@@ -120,6 +121,23 @@ FIELDS: tuple[Field, ...] = (
         0,
     ),
     Field(
+        "session_idle_minutes",
+        "Sign-in idle timeout (minutes)",
+        "People are signed out after this long without using minibrain. 0 keeps them signed in until the session "
+        "lifetime ends.",
+        "int",
+        30,
+    ),
+    Field(
+        "session_hours",
+        "Session lifetime (hours)",
+        "People sign in again after this long, however active they are.",
+        "int",
+        12,
+        maximum=24 * 90,
+        minimum=1,
+    ),
+    Field(
         "siem_protocol",
         "SIEM export",
         "Send every audit event, in order, to your SIEM as RFC 5424 syslog. TLS checks the SIEM's certificate; "
@@ -195,8 +213,12 @@ def coerce(field: Field, value: Any) -> Any:
         return bool(value)
     if field.kind == "int":
         number = int(value)
-        if number < 0:
-            raise PolicyError(f"{field.label} cannot be negative")
+        if number < field.minimum:
+            raise PolicyError(
+                f"{field.label} cannot be less than {field.minimum}"
+                if field.minimum
+                else f"{field.label} cannot be negative"
+            )
         if field.maximum is not None and number > field.maximum:
             raise PolicyError(f"{field.label} cannot be more than {field.maximum}")
         return number
@@ -271,6 +293,13 @@ class Policy:
     def add_from_hub(self) -> None:
         if self["model_sources"] != "any":
             raise PolicyError("Model sources policy does not allow adding models from Hugging Face")
+
+
+def value(session: Session, name: str) -> Any:
+    locked = locked_sources()
+    if name in locked:
+        return locked[name][1]
+    return read(session, PREFIX + name, BY_NAME[name].default)
 
 
 def load(session: Session) -> Policy:

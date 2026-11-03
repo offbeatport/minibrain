@@ -8,7 +8,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from minibrain.api.deps import SessionDep
-from minibrain.api.policies import LOCAL_USER
+from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
 from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, Submission, suggestion
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Minibrain
@@ -146,7 +146,7 @@ class FeedbackFilter:
             where.append(Feedback.minibrain_id.in_(select(Minibrain.id).where(Minibrain.slug.in_(self.minibrains))))
         if self.statuses and skip != "status":
             where.append(Feedback.status.in_(self.statuses))
-        people = [LOCAL_USER if name == ME else name for name in self.assignees if name != NOBODY]
+        people = [current_actor() if name == ME else name for name in self.assignees if name != NOBODY]
         chosen = [Feedback.assignee.in_(people)] if people else []
         if NOBODY in self.assignees:
             chosen.append(Feedback.assignee.is_(None))
@@ -262,14 +262,16 @@ def read_feedback(feedback_id: int, session: SessionDep) -> FeedbackDetail:
 
 @router.post("/feedback/{feedback_id}/review")
 def review_feedback(feedback_id: int, body: ReviewRequest, session: SessionDep) -> FeedbackDetail:
-    item = store.review(session, get_feedback(session, feedback_id), body.decision == "accept", body.label, LOCAL_USER)
+    item = store.review(
+        session, get_feedback(session, feedback_id), body.decision == "accept", body.label, current_actor()
+    )
     session.commit()
     return feedback_detail(session, item)
 
 
 @router.post("/feedback/{feedback_id}/assign")
 def assign_feedback(feedback_id: int, body: AssignRequest, session: SessionDep) -> FeedbackDetail:
-    item = store.assign(session, get_feedback(session, feedback_id), body.mine, LOCAL_USER)
+    item = store.assign(session, get_feedback(session, feedback_id), body.mine, current_actor())
     session.commit()
     return feedback_detail(session, item)
 
