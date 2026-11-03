@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
+    ArrowUpDown,
     CircleX,
     Eye,
     FlaskConical,
@@ -13,24 +13,28 @@ import {
     Trash2,
 } from "lucide-react";
 import {
+    Badge,
     Button,
+    Checkbox,
     CheckboxSelect,
-    DataGrid,
-    DataGridDetail,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Label,
     Link,
     SearchInput,
-    Switch,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { type ModelRow, api, succeed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -50,7 +54,6 @@ import {
 } from "./dialogs";
 import {
     type Entry,
-    KIND_LABELS,
     STATE_LABELS,
     STATE_RANK,
     byState,
@@ -531,7 +534,12 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
-                <Button variant="outline" size="xs" onClick={primary.run}>
+                <Button
+                    variant="outline"
+                    size="xs"
+                    className="hidden md:inline-flex"
+                    onClick={primary.run}
+                >
                     {primary.label}
                 </Button>
             )}
@@ -639,180 +647,216 @@ function StatusCell({ entry }: { entry: Entry }) {
     return <span className="text-muted-foreground">Not deployed</span>;
 }
 
-function ModelName({ entry }: { entry: Entry }) {
-    const { model } = entry;
-    return (
-        <div className="flex w-80 items-center gap-2.5">
-            <PublisherLogo publisher={model.publisher} name={model.name} size="sm" />
-            <div className="flex min-w-0 flex-col">
-                <Link href={detailHref(model)} className="truncate font-semibold text-foreground">
-                    {model.name}
-                </Link>
-                {model.description && (
-                    <DataGridDetail
-                        className="line-clamp-2 whitespace-normal text-sm text-muted-foreground"
-                        title={model.description}
-                    >
-                        {model.description}
-                    </DataGridDetail>
-                )}
-            </div>
-        </div>
-    );
-}
-
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-function versionLabel(entry: Entry): string {
-    if (entry.version) {
-        return `v${entry.version.number}`;
+function summary(entry: Entry): string {
+    const { model } = entry;
+    if (model.description) {
+        return model.description;
     }
-    return entry.model.kind === "base" ? (entry.model.revision?.slice(0, 7) ?? "—") : "—";
+    if (model.kind === "base") {
+        return model.size_bytes ? `Base model · ${bytes(model.size_bytes)}` : "Base model";
+    }
+    return `On ${model.base_model}`;
+}
+
+function VersionCell({ entry }: { entry: Entry }) {
+    const { model, version } = entry;
+    if (version) {
+        const score = version.accuracy === null ? "" : ` · ${Math.round(version.accuracy * 100)}%`;
+        return (
+            <span className="tabular-nums">
+                {`v${version.number}`}
+                <span className="text-muted-foreground">{score}</span>
+            </span>
+        );
+    }
+    if (model.kind === "base" && model.revision) {
+        return (
+            <span className="font-mono text-muted-foreground" title={model.revision}>
+                {model.revision.slice(0, 7)}
+            </span>
+        );
+    }
+    return muted("—");
 }
 
 function requestTotal(entry: Entry): number {
     return (usageOf(entry)?.daily ?? []).reduce((sum, value) => sum + value, 0);
 }
 
-function lastUsed(entry: Entry): string {
-    return usageOf(entry)?.last_at ?? "";
+const SORTS: Record<string, { label: string; compare: (left: Entry, right: Entry) => number }> = {
+    status: { label: "Status", compare: byState },
+    name: {
+        label: "Name",
+        compare: (left, right) =>
+            left.model.name.localeCompare(right.model.name) ||
+            (right.version?.number ?? 0) - (left.version?.number ?? 0),
+    },
+    updated: {
+        label: "Recently updated",
+        compare: (left, right) => right.model.updated_at.localeCompare(left.model.updated_at),
+    },
+    requests: {
+        label: "Most requests",
+        compare: (left, right) => requestTotal(right) - requestTotal(left),
+    },
+};
+
+function SortSelect({ value, onSort }: { value: string; onSort: (value: string) => void }) {
+    return (
+        <Select value={value} onValueChange={(next) => onSort(String(next))}>
+            <SelectTrigger aria-label="Sort models" className="w-auto min-w-44">
+                <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
+                <SelectValue className="flex-1 text-left" />
+            </SelectTrigger>
+            <SelectContent>
+                {Object.entries(SORTS).map(([key, sort]) => (
+                    <SelectItem key={key} value={key}>
+                        {sort.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
 }
 
-function modelOrder(entry: Entry): string {
-    const number = String(1_000_000 - (entry.version?.number ?? 0)).padStart(7, "0");
-    return `${entry.model.name.toLowerCase()} ${number}`;
-}
+const LIST_GRID =
+    "grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(5rem,auto)_minmax(10rem,auto)_minmax(9rem,auto)_auto]";
 
-const HIDDEN_COLUMNS = ["type", "base", "kind", "used", "size", "tags", "updated"];
-function columns(on: Handlers): ColumnDef<Entry, unknown>[] {
-    return [
-        {
-            id: "model",
-            header: "Model",
-            enableHiding: false,
-            accessorFn: modelOrder,
-            cell: ({ row }) => <ModelName entry={row.original} />,
-        },
-        {
-            id: "type",
-            header: "Type",
-            accessorFn: (entry) => entry.model.kind,
-            cell: ({ row }) => (row.original.model.kind === "custom" ? "Custom" : "Base"),
-        },
-        {
-            id: "base",
-            header: "Base model",
-            accessorFn: (entry) => entry.model.base_model ?? "",
-            cell: ({ row }) =>
-                row.original.model.base_model ? (
-                    <span className="font-mono">{row.original.model.base_model}</span>
-                ) : (
-                    muted("—")
-                ),
-        },
-        {
-            id: "version",
-            header: "Version",
-            accessorFn: (entry) => entry.version?.number ?? -1,
-            cell: ({ row }) =>
-                row.original.version ? (
-                    <span className="tabular-nums">{versionLabel(row.original)}</span>
-                ) : row.original.model.kind === "base" && row.original.model.revision ? (
+const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
+
+function ModelListRow({
+    entry,
+    on,
+    selected,
+    onSelect,
+}: {
+    entry: Entry;
+    on: Handlers;
+    selected: boolean;
+    onSelect: (selected: boolean) => void;
+}) {
+    const { model } = entry;
+    return (
+        <li
+            data-state={selected ? "selected" : undefined}
+            className={cn(
+                ROW_GRID,
+                "relative py-3 hover:bg-secondary has-[a:focus-visible]:bg-secondary data-[state=selected]:bg-accent/60",
+            )}
+        >
+            <Checkbox
+                className="relative z-10"
+                aria-label={`Select ${model.name}${entry.version ? ` v${entry.version.number}` : ""}`}
+                checked={selected}
+                onCheckedChange={(value) => onSelect(value === true)}
+            />
+            <div className="flex min-w-0 items-center gap-3">
+                <PublisherLogo publisher={model.publisher} name={model.name} />
+                <div className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 items-center gap-2">
+                        <Link
+                            href={detailHref(model)}
+                            className="truncate font-semibold text-foreground outline-none after:absolute after:inset-0 after:content-['']"
+                        >
+                            {model.name}
+                        </Link>
+                        {model.kind === "base" && (
+                            <Badge variant="outline" className="shrink-0">
+                                Base
+                            </Badge>
+                        )}
+                    </span>
                     <span
-                        className="font-mono text-muted-foreground"
-                        title={row.original.model.revision}
+                        className="line-clamp-2 text-sm text-muted-foreground"
+                        title={summary(entry)}
                     >
-                        {versionLabel(row.original)}
+                        {summary(entry)}
                     </span>
-                ) : (
-                    muted("—")
-                ),
-        },
-        {
-            id: "kind",
-            header: "Kind",
-            accessorFn: (entry) =>
-                entry.version ? (KIND_LABELS[entry.version.kind] ?? entry.version.kind) : "",
-            cell: ({ row }) =>
-                row.original.version
-                    ? (KIND_LABELS[row.original.version.kind] ?? row.original.version.kind)
-                    : muted("—"),
-        },
-        {
-            id: "score",
-            header: "Score",
-            accessorFn: (entry) => entry.version?.accuracy ?? -1,
-            cell: ({ row }) =>
-                row.original.version?.accuracy === null ||
-                row.original.version?.accuracy === undefined ? (
-                    muted("—")
-                ) : (
-                    <span className="tabular-nums">{`${Math.round(row.original.version.accuracy * 100)}%`}</span>
-                ),
-        },
-        {
-            id: "status",
-            header: "Status",
-            accessorFn: (entry) => STATE_RANK.indexOf(stateOfEntry(entry)),
-            cell: ({ row }) => <StatusCell entry={row.original} />,
-        },
-        {
-            id: "requests",
-            header: "Requests, 7 days",
-            accessorFn: requestTotal,
-            cell: ({ row }) => <Requests usage={usageOf(row.original)} />,
-        },
-        {
-            id: "used",
-            header: "Last used",
-            accessorFn: lastUsed,
-            cell: ({ row }) => {
-                const at = lastUsed(row.original);
-                return at ? <span title={exactTime(at)}>{relativeTime(at)}</span> : muted("Never");
-            },
-        },
-        {
-            id: "size",
-            header: "Size",
-            accessorFn: (entry) => entry.model.size_bytes ?? 0,
-            cell: ({ row }) =>
-                row.original.model.size_bytes ? (
-                    <span className="tabular-nums">{bytes(row.original.model.size_bytes)}</span>
-                ) : (
-                    muted("—")
-                ),
-        },
-        {
-            id: "tags",
-            header: "Tags",
-            accessorFn: (entry) => entry.model.tags.join(", "),
-            cell: ({ row }) =>
-                row.original.model.tags.length ? (
-                    <span className="block max-w-48 truncate">
-                        {row.original.model.tags.join(", ")}
-                    </span>
-                ) : (
-                    muted("—")
-                ),
-        },
-        {
-            id: "updated",
-            header: "Updated",
-            accessorFn: (entry) => entry.model.updated_at,
-            cell: ({ row }) => (
-                <span title={exactTime(row.original.model.updated_at)}>
-                    {relativeTime(row.original.model.updated_at)}
-                </span>
-            ),
-        },
-        {
-            id: "actions",
-            header: () => <span className="sr-only">Actions</span>,
-            enableSorting: false,
-            enableHiding: false,
-            cell: ({ row }) => <RowActions entry={row.original} on={on} />,
-        },
-    ];
+                </div>
+            </div>
+            <div className="hidden md:block">
+                <VersionCell entry={entry} />
+            </div>
+            <div className="relative z-10 hidden w-fit md:block">
+                <StatusCell entry={entry} />
+            </div>
+            <div className="hidden md:block">
+                <Requests usage={usageOf(entry)} />
+            </div>
+            <div className="relative z-10">
+                <RowActions entry={entry} on={on} />
+            </div>
+        </li>
+    );
+}
+
+function ModelList({
+    entries,
+    on,
+    selected,
+    onSelected,
+    empty,
+}: {
+    entries: Entry[];
+    on: Handlers;
+    selected: string[];
+    onSelected: (ids: string[]) => void;
+    empty: ReactNode;
+}) {
+    const ids = entries.map((entry) => entry.key);
+    const count = ids.filter((id) => selected.includes(id)).length;
+    const all = count === 0 ? false : count === ids.length ? true : "indeterminate";
+    return (
+        <div className={cn(LIST_GRID, "overflow-hidden rounded-lg border bg-card")}>
+            <div
+                className={cn(
+                    ROW_GRID,
+                    "h-9 border-b bg-secondary text-sm font-medium text-muted-foreground",
+                )}
+            >
+                <Checkbox
+                    aria-label="Select all models"
+                    checked={all}
+                    disabled={ids.length === 0}
+                    onCheckedChange={(value) =>
+                        onSelected(
+                            value === true
+                                ? [...new Set([...selected, ...ids])]
+                                : selected.filter((id) => !ids.includes(id)),
+                        )
+                    }
+                />
+                <span>Model</span>
+                <span className="hidden md:block">Version</span>
+                <span className="hidden md:block">Status</span>
+                <span className="hidden md:block">Requests, 7 days</span>
+                <span className="sr-only">Actions</span>
+            </div>
+            {entries.length === 0 ? (
+                <div className="col-span-full px-4 py-8">{empty}</div>
+            ) : (
+                <ul className="col-span-full grid grid-cols-subgrid divide-y">
+                    {entries.map((entry) => (
+                        <ModelListRow
+                            key={entry.key}
+                            entry={entry}
+                            on={on}
+                            selected={selected.includes(entry.key)}
+                            onSelect={(on) =>
+                                onSelected(
+                                    on
+                                        ? [...selected, entry.key]
+                                        : selected.filter((id) => id !== entry.key),
+                                )
+                            }
+                        />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 type Facet = "type" | "state";
@@ -830,9 +874,6 @@ function picked(value: string | undefined): string[] {
 function matches(entry: Entry, search: ModelsSearch, skip?: Facet): boolean {
     const text = (search.q ?? "").trim().toLowerCase();
     if (text && !searchable(entry).includes(text)) {
-        return false;
-    }
-    if (skip !== "type" && entry.model.kind === "base" && search.bases !== "yes") {
         return false;
     }
     const states = picked(search.state);
@@ -1047,10 +1088,10 @@ export function MyModels({
         }),
         [router, refresh],
     );
-    const tableColumns = useMemo(() => columns(on), [on]);
     const rows = models.data ?? [];
     const entries = entriesOf(rows);
-    const visible = entries.filter((entry) => matches(entry, search)).sort(byState);
+    const sort = SORTS[search.sort ?? ""] ? (search.sort ?? "status") : "status";
+    const visible = entries.filter((entry) => matches(entry, search)).sort(SORTS[sort].compare);
     const facetCount = (facet: Facet, test: (entry: Entry) => boolean) =>
         entries.filter((entry) => matches(entry, search, facet) && test(entry)).length;
     const filtering = Boolean(search.q || search.state);
@@ -1061,7 +1102,6 @@ export function MyModels({
         label: STATE_LABELS[state],
         count: facetCount("state", (entry) => stateOfEntry(entry) === state),
     }));
-    const baseCount = entries.filter((entry) => entry.model.kind === "base").length;
     const noMatch = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No models match these filters.</p>
@@ -1103,15 +1143,10 @@ export function MyModels({
                             value={picked(search.state)}
                             onValueChange={(states) => update({ state: states.join(",") })}
                         />
-                        <Label className="flex items-center gap-2 font-normal text-muted-foreground">
-                            <Switch
-                                checked={search.bases === "yes"}
-                                onCheckedChange={(checked) =>
-                                    update({ bases: checked ? "yes" : "" })
-                                }
-                            />
-                            {`Show base models (${baseCount})`}
-                        </Label>
+                        <SortSelect
+                            value={sort}
+                            onSort={(next) => update({ sort: next === "status" ? "" : next })}
+                        />
                     </div>
                 </div>
             )}
@@ -1125,21 +1160,12 @@ export function MyModels({
                     </Button>
                 </div>
             ) : (
-                <DataGrid
-                    columns={tableColumns}
-                    rows={visible}
-                    storageKey="minibrain.models.columns"
-                    columnPicker
-                    hiddenColumns={HIDDEN_COLUMNS}
-                    getRowId={(entry) => entry.key}
-                    selectedIds={selected}
-                    onSelectedIdsChange={setSelected}
-                    onOpen={(entry) => on.open(detailHref(entry.model))}
-                    rowLabel={(entry) =>
-                        `${entry.model.name}${entry.version ? ` v${entry.version.number}` : ""}, ${entry.model.kind} model, ${STATE_LABELS[stateOfEntry(entry)]}`
-                    }
+                <ModelList
+                    entries={visible}
+                    on={on}
+                    selected={selected}
+                    onSelected={setSelected}
                     empty={noMatch}
-                    minWidth="min-w-[880px]"
                 />
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />

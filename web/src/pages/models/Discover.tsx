@@ -261,7 +261,7 @@ function SortSelect({ value, onSort }: { value: string; onSort: (value: string) 
         <Select value={value} onValueChange={(next) => onSort(String(next))}>
             <SelectTrigger aria-label="Sort models" className="w-auto min-w-44">
                 <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
-                <SelectValue />
+                <SelectValue className="flex-1 text-left" />
             </SelectTrigger>
             <SelectContent>
                 {Object.entries(SORTS).map(([key, sort]) => (
