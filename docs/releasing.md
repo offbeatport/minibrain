@@ -118,6 +118,11 @@ image jobs free no space and need no larger runners. Each one prints `df -h /` a
 | CPU | 3 minutes | 2.5 minutes |
 | CUDA | 6 minutes | 4 minutes |
 
+The image SBOM comes after the build in the same job: loading the image into Docker (all cached) and scanning it
+with syft take about 30 seconds each for a CPU image and 1.5 minutes each for a CUDA one, and each SBOM is about
+3 MB (about 4,200 components, 1,230 to 1,280 of them packages). The CUDA amd64 job ends with 62 GB free, measured on
+the dry run with signing ([run 41738301352](https://github.com/offbeatport/minibrain/actions/runs/41738301352)).
+
 The whole run takes about 15 minutes, half of it CI. The images use no exported layer cache:
 
 - The slow stages never run: the wheel arrives built, so the UI and wheel stages are skipped, and within a job
