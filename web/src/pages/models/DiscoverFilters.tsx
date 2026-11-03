@@ -1,4 +1,3 @@
-import { X } from "lucide-react";
 import { Button, Checkbox, Label } from "obp-ui";
 import { Fragment, type ReactNode, useState } from "react";
 import type { CatalogEntry, CatalogVariantInfo, FitInfo } from "~/api/client";
@@ -12,13 +11,6 @@ const YES = "yes";
 
 export const FIT_ORDER: FitInfo["level"][] = ["fits", "limited", "unknown", "insufficient"];
 
-const FIT_OPTIONS: Record<FitInfo["level"], string> = {
-    fits: "Fits",
-    limited: "Limited headroom",
-    insufficient: "Won't fit",
-    unknown: "Not checked",
-};
-
 export function bestFit(entry: CatalogEntry): CatalogVariantInfo {
     return [...entry.variants].sort(
         (a, b) => FIT_ORDER.indexOf(a.fit.level) - FIT_ORDER.indexOf(b.fit.level),
@@ -30,14 +22,27 @@ const ACCESS = [
     { value: NEEDS_ACCESS, label: "Needs access" },
 ];
 
-const TIERS = [
+export const TIERS = [
     { value: "S", label: "S · up to 4B" },
     { value: "M", label: "M · 7–14B" },
     { value: "L", label: "L · 24–35B" },
     { value: "XL", label: "XL · 70B+, multi-GPU" },
 ];
 
-type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "licences" | "latest";
+export type LicenceUse = CatalogEntry["license_use"];
+
+const LICENCE_USES: { value: LicenceUse; label: string }[] = [
+    { value: "commercial", label: "Commercial use allowed" },
+    { value: "restricted", label: "Commercial use with conditions" },
+    { value: "non-commercial", label: "Non-commercial only" },
+    { value: "unknown", label: "Check the terms" },
+];
+
+export function licenceUseLabel(use: LicenceUse): string {
+    return LICENCE_USES.find((item) => item.value === use)?.label ?? use;
+}
+
+type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "uses" | "licences" | "latest";
 
 export type Filters = Record<Facet, string[]> & { q: string };
 
@@ -47,13 +52,16 @@ const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
     tasks: "task",
     tiers: "tier",
     fit: "fit",
+    uses: "use",
     licences: "licence",
     latest: "latest",
 };
 
 const FACETS = Object.keys(FACET_KEYS) as Facet[];
+const LICENCE_FACETS: Facet[] = ["uses", "licences"];
+const PANEL_FACETS: Facet[] = ["tasks", "tiers", "uses", "licences", "publishers", "access"];
 
-function licenceOf(entry: CatalogEntry): string {
+export function licenceOf(entry: CatalogEntry): string {
     return entry.license_name || entry.license;
 }
 
@@ -63,6 +71,7 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
     tasks: (entry) => entry.capabilities,
     tiers: (entry) => [entry.tier],
     fit: (entry) => [bestFit(entry).fit.level],
+    uses: (entry) => [entry.license_use],
     licences: (entry) => [licenceOf(entry)],
     latest: (entry) => (entry.superseded_by ? [] : [YES]),
 };
@@ -70,8 +79,6 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
 const LABELS: Partial<Record<Facet, Record<string, string>>> = {
     access: Object.fromEntries(ACCESS.map((item) => [item.value, item.label])),
     tiers: Object.fromEntries(TIERS.map((item) => [item.value, item.label])),
-    fit: FIT_OPTIONS,
-    latest: { [YES]: "Latest generation only" },
 };
 
 function labelOf(facet: Facet, value: string): string {
@@ -101,9 +108,24 @@ export function readFilters(search: ModelsSearch, fitsKnown: boolean): Filters {
         tasks: list(search.task),
         tiers: list(search.tier),
         fit: fitsKnown ? readFit(search) : [],
+        uses: list(search.use),
         licences: list(search.licence),
         latest: list(search.latest),
     };
+}
+
+function facetHit(entry: CatalogEntry, filters: Filters, facet: Facet): boolean {
+    return (
+        filters[facet].length === 0 ||
+        FACET_VALUES[facet](entry).some((value) => filters[facet].includes(value))
+    );
+}
+
+function licenceHit(entry: CatalogEntry, filters: Filters): boolean {
+    if (filters.uses.length === 0 && filters.licences.length === 0) {
+        return true;
+    }
+    return filters.uses.includes(entry.license_use) || filters.licences.includes(licenceOf(entry));
 }
 
 export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): boolean {
@@ -111,28 +133,18 @@ export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): bo
     if (filters.q && !text.toLowerCase().includes(filters.q)) {
         return false;
     }
-    return FACETS.every(
-        (facet) =>
-            facet === skip ||
-            filters[facet].length === 0 ||
-            FACET_VALUES[facet](entry).some((value) => filters[facet].includes(value)),
+    const skipLicence = skip !== undefined && LICENCE_FACETS.includes(skip);
+    return (
+        FACETS.every(
+            (facet) =>
+                facet === skip || LICENCE_FACETS.includes(facet) || facetHit(entry, filters, facet),
+        ) &&
+        (skipLicence || licenceHit(entry, filters))
     );
 }
 
-type Chip = { facet: Facet; value: string; label: string };
-
-export function chipsOf(filters: Filters): Chip[] {
-    const chips: Chip[] = [];
-    for (const facet of FACETS) {
-        for (const value of filters[facet]) {
-            chips.push({ facet, value, label: labelOf(facet, value) });
-        }
-    }
-    return chips;
-}
-
 export function activeFilters(filters: Filters): number {
-    return chipsOf(filters).length;
+    return PANEL_FACETS.reduce((sum, facet) => sum + filters[facet].length, 0);
 }
 
 const FILTERS_CLEARED: ModelsSearch = {
@@ -140,63 +152,32 @@ const FILTERS_CLEARED: ModelsSearch = {
     provider: "",
     task: "",
     tier: "",
+    licence: "",
+    use: "",
+};
+
+export const CLEARED: ModelsSearch = {
+    ...FILTERS_CLEARED,
+    q: "",
     fits: "",
     fit: "",
-    licence: "",
     latest: "",
 };
 
-export const CLEARED: ModelsSearch = { ...FILTERS_CLEARED, q: "" };
+export function fitsPatch(on: boolean): ModelsSearch {
+    return { fit: "", fits: on ? "true" : "" };
+}
+
+export function latestPatch(on: boolean): ModelsSearch {
+    return { latest: on ? YES : "" };
+}
+
+export function latestOnly(filters: Filters): boolean {
+    return filters.latest.includes(YES);
+}
 
 function encode(facet: Facet, values: string[]): ModelsSearch {
-    const patch: ModelsSearch = { [FACET_KEYS[facet]]: values.join(",") };
-    if (facet === "fit") {
-        patch.fits = "";
-    }
-    return patch;
-}
-
-function removal(chip: Chip, filters: Filters): ModelsSearch {
-    return encode(
-        chip.facet,
-        filters[chip.facet].filter((value) => value !== chip.value),
-    );
-}
-
-export function FilterChips({
-    filters,
-    update,
-}: {
-    filters: Filters;
-    update: (patch: ModelsSearch) => void;
-}) {
-    const chips = chipsOf(filters);
-    if (chips.length === 0) {
-        return null;
-    }
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            {chips.map((chip) => (
-                <span
-                    key={`${chip.facet}:${chip.value}`}
-                    className="inline-flex h-7 items-center gap-1 rounded-md border bg-card pr-1 pl-2 text-sm"
-                >
-                    {chip.label}
-                    <button
-                        type="button"
-                        aria-label={`Remove filter ${chip.label}`}
-                        className="flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-                        onClick={() => update(removal(chip, filters))}
-                    >
-                        <X className="size-3.5" />
-                    </button>
-                </span>
-            ))}
-            <Button variant="ghost" size="sm" onClick={() => update(FILTERS_CLEARED)}>
-                Clear all
-            </Button>
-        </div>
-    );
+    return { [FACET_KEYS[facet]]: values.join(",") };
 }
 
 const SHOWN = 5;
@@ -238,20 +219,17 @@ function Option({
     checked,
     onChange,
     count,
-    disabled,
     children,
 }: {
-    checked: boolean;
+    checked: boolean | "indeterminate";
     onChange: (checked: boolean) => void;
     count?: number;
-    disabled?: boolean;
     children: ReactNode;
 }) {
     return (
         <Label className="flex min-w-0 items-start gap-2 font-normal leading-snug">
             <Checkbox
                 checked={checked}
-                disabled={disabled}
                 onCheckedChange={(next) => onChange(next === true)}
                 className="mt-px"
             />
@@ -263,20 +241,95 @@ function Option({
     );
 }
 
-export function FilterPanel({
+function LicenceOptions({
     entries,
     filters,
     update,
-    fitsKnown,
-    fitsHint,
-    pool,
+    count,
 }: {
     entries: CatalogEntry[];
     filters: Filters;
     update: (patch: ModelsSearch) => void;
-    fitsKnown: boolean;
-    fitsHint: string;
-    pool: ReactNode;
+    count: (facet: Facet, value: string) => number;
+}) {
+    const uses = new Map(entries.map((entry) => [licenceOf(entry), entry.license_use]));
+    const namesOf = (use: LicenceUse) =>
+        [...uses]
+            .filter(([, found]) => found === use)
+            .map(([name]) => name)
+            .sort();
+    const groups = LICENCE_USES.filter(
+        (group) => group.value !== "unknown" || namesOf("unknown").length > 0,
+    );
+    const save = (picked: string[], names: string[]) =>
+        update({ use: picked.join(","), licence: [...new Set(names)].join(",") });
+    const toggleGroup = (use: LicenceUse, checked: boolean) => {
+        const names = namesOf(use);
+        const others = filters.uses.filter((value) => value !== use);
+        save(
+            checked ? [...others, use] : others,
+            filters.licences.filter((name) => !names.includes(name)),
+        );
+    };
+    const toggleName = (use: LicenceUse, name: string, checked: boolean) => {
+        const names = namesOf(use);
+        const current = filters.uses.includes(use)
+            ? [...filters.licences, ...names]
+            : filters.licences;
+        const next = checked ? [...current, name] : current.filter((item) => item !== name);
+        const others = filters.uses.filter((value) => value !== use);
+        const whole = names.length > 0 && names.every((item) => next.includes(item));
+        save(
+            whole ? [...others, use] : others,
+            whole ? next.filter((item) => !names.includes(item)) : next,
+        );
+    };
+    return groups.map((group) => {
+        const names = namesOf(group.value);
+        const grouped = filters.uses.includes(group.value);
+        const picked = names.filter((name) => grouped || filters.licences.includes(name));
+        const state =
+            grouped || (names.length > 0 && picked.length === names.length)
+                ? true
+                : picked.length > 0
+                  ? "indeterminate"
+                  : false;
+        return (
+            <Fragment key={group.value}>
+                <Option
+                    checked={state}
+                    onChange={(checked) => toggleGroup(group.value, checked)}
+                    count={count("uses", group.value)}
+                >
+                    {group.label}
+                </Option>
+                {names.length > 0 && (
+                    <div className="flex flex-col gap-2 pl-6">
+                        {names.map((name) => (
+                            <Option
+                                key={name}
+                                checked={picked.includes(name)}
+                                onChange={(checked) => toggleName(group.value, name, checked)}
+                                count={count("licences", name)}
+                            >
+                                <span className="line-clamp-2 break-words">{name}</span>
+                            </Option>
+                        ))}
+                    </div>
+                )}
+            </Fragment>
+        );
+    });
+}
+
+export function FilterPanel({
+    entries,
+    filters,
+    update,
+}: {
+    entries: CatalogEntry[];
+    filters: Filters;
+    update: (patch: ModelsSearch) => void;
 }) {
     const count = (facet: Facet, value: string) =>
         entries.filter(
@@ -306,36 +359,27 @@ export function FilterPanel({
         }));
     const distinct = (facet: Facet) =>
         [...new Set(entries.flatMap((entry) => FACET_VALUES[facet](entry)))].sort();
+    const active = activeFilters(filters);
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
-            <div className="flex h-10 items-center justify-between px-3">
+            <div className="flex h-10 items-center gap-2 px-3">
                 <span className="text-sm font-semibold">Filters</span>
-                {activeFilters(filters) > 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => update(FILTERS_CLEARED)}>
-                        Clear
-                    </Button>
+                {active > 0 && (
+                    <>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                            {`${active} active`}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-auto"
+                            onClick={() => update(FILTERS_CLEARED)}
+                        >
+                            Clear all
+                        </Button>
+                    </>
                 )}
             </div>
-            <Group title="Hardware fit">
-                {pool}
-                <p className="text-sm text-muted-foreground">{fitsHint}</p>
-                {fitsKnown &&
-                    FIT_ORDER.filter((level) => level !== "unknown").map((level) =>
-                        option("fit", level),
-                    )}
-            </Group>
-            <Group title="Generation">{option("latest", YES)}</Group>
-            <Group title="Download">{ACCESS.map((item) => option("access", item.value))}</Group>
-            <Group title="Publisher">
-                <OptionList
-                    items={items("publishers", distinct("publishers"), (publisher) => (
-                        <>
-                            <PublisherLogo publisher={publisher} name={publisher} size="sm" />
-                            <span className="line-clamp-2 break-words">{publisher}</span>
-                        </>
-                    ))}
-                />
-            </Group>
             <Group title="Task">
                 <OptionList items={items("tasks", distinct("tasks"))} />
             </Group>
@@ -348,12 +392,19 @@ export function FilterPanel({
                 />
             </Group>
             <Group title="Licence">
+                <LicenceOptions entries={entries} filters={filters} update={update} count={count} />
+            </Group>
+            <Group title="Publisher">
                 <OptionList
-                    items={items("licences", distinct("licences"), (licence) => (
-                        <span className="line-clamp-2 break-words">{licence}</span>
+                    items={items("publishers", distinct("publishers"), (publisher) => (
+                        <>
+                            <PublisherLogo publisher={publisher} name={publisher} size="sm" />
+                            <span className="line-clamp-2 break-words">{publisher}</span>
+                        </>
                     ))}
                 />
             </Group>
+            <Group title="Access">{ACCESS.map((item) => option("access", item.value))}</Group>
         </div>
     );
 }

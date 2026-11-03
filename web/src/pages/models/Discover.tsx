@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ExternalLink, Plus } from "lucide-react";
 import {
     Badge,
     Button,
@@ -12,7 +12,11 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    Label,
     Link,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
     SearchInput,
     Select,
     SelectContent,
@@ -20,11 +24,13 @@ import {
     SelectTrigger,
     SelectValue,
     Skeleton,
+    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import { type CatalogEntry, type CatalogResponse, type FitInfo, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -35,10 +41,13 @@ import { bytes } from "~/lib/time";
 import {
     CLEARED,
     FIT_ORDER,
-    FilterChips,
     FilterPanel,
     activeFilters,
     bestFit,
+    fitsPatch,
+    latestOnly,
+    latestPatch,
+    licenceUseLabel,
     matches,
     readFilters,
 } from "./DiscoverFilters";
@@ -199,7 +208,12 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             </div>
         );
     }
-    const label = "Add model";
+    const label = (
+        <>
+            <Plus />
+            Add model
+        </>
+    );
     return (
         <div className="flex justify-end gap-1">
             {on.online ? (
@@ -222,6 +236,37 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             )}
         </div>
     );
+}
+
+function AddedStatus({ entry }: { entry: CatalogEntry }) {
+    const states = entry.added.map((added) => added.availability);
+    const moving = states.find((state) => ["downloading", "importing"].includes(state.state));
+    if (moving) {
+        const progress = moving.progress;
+        return (
+            <StatusText tone="info" className="text-sm tabular-nums">
+                {moving.state === "importing" ? "Importing" : "Downloading"}
+                {progress !== null && progress !== undefined
+                    ? ` · ${Math.round(progress * 100)}%`
+                    : "…"}
+            </StatusText>
+        );
+    }
+    if (states.some((state) => state.state === "available")) {
+        return (
+            <StatusText tone="success" className="text-sm">
+                Added
+            </StatusText>
+        );
+    }
+    if (states.some((state) => state.state === "not_downloaded")) {
+        return (
+            <StatusText tone="destructive" className="text-sm">
+                Download failed
+            </StatusText>
+        );
+    }
+    return null;
 }
 
 function recommendedOrder(entry: CatalogEntry): number[] {
@@ -259,7 +304,7 @@ const SORTS: Record<
 function SortSelect({ value, onSort }: { value: string; onSort: (value: string) => void }) {
     return (
         <Select value={value} onValueChange={(next) => onSort(String(next))}>
-            <SelectTrigger aria-label="Sort models" className="w-auto min-w-44">
+            <SelectTrigger aria-label="Sort models" className="w-44">
                 <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
                 <SelectValue className="flex-1 text-left" />
             </SelectTrigger>
@@ -300,6 +345,19 @@ export function discoverHref(entry: CatalogEntry, pool?: string): string {
     return `/discover/${encodeURIComponent(entry.id)}${query}`;
 }
 
+export const COMPARE_MAX = 4;
+
+export function compareHref(ids: string[], pool?: string, onlyDifferences = false): string {
+    const parts = [`ids=${ids.map(encodeURIComponent).join(",")}`];
+    if (onlyDifferences) {
+        parts.push("only=differences");
+    }
+    if (pool) {
+        parts.push(`pool=${encodeURIComponent(pool)}`);
+    }
+    return `/discover/compare?${parts.join("&")}`;
+}
+
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
 const HIDDEN_COLUMNS = [
@@ -313,7 +371,7 @@ const HIDDEN_COLUMNS = [
     "repo",
 ];
 
-function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
+function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
     return [
         {
             id: "model",
@@ -334,6 +392,7 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
                                 <Badge variant="outline">Recommended</Badge>
                             )}
                         </span>
+                        <AddedStatus entry={row.original} />
                         <DataGridDetail
                             className="line-clamp-2 whitespace-normal text-sm text-muted-foreground"
                             title={row.original.description}
@@ -381,7 +440,10 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             header: "Licence",
             accessorFn: (entry) => entry.license_name,
             cell: ({ row }) => (
-                <span className="block max-w-28 truncate" title={row.original.license_name}>
+                <span
+                    className="block max-w-28 truncate"
+                    title={`${row.original.license_name} · ${licenceUseLabel(row.original.license_use)}`}
+                >
                     {row.original.license_name}
                 </span>
             ),
@@ -405,13 +467,6 @@ function columns(on: Actions, names: Map<string, string>): ColumnDef<CatalogEntr
             accessorFn: (entry) => entry.repo,
             cell: ({ row }) => <span className="font-mono">{row.original.repo}</span>,
         },
-        {
-            id: "action",
-            header: () => <span className="sr-only">Action</span>,
-            enableSorting: false,
-            enableHiding: false,
-            cell: ({ row }) => <EntryAction entry={row.original} on={on} />,
-        },
     ];
 }
 
@@ -427,7 +482,7 @@ function PoolSelect({
     }
     return (
         <Select value={catalog.pool} onValueChange={(next) => onPool(String(next))}>
-            <SelectTrigger aria-label="Compute pool" size="sm" className="w-full">
+            <SelectTrigger aria-label="Compute pool" className="w-full">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -445,7 +500,149 @@ export function poolPhrase(catalog: CatalogResponse): string {
     return catalog.pool === "local" ? "this machine" : `pool ${catalog.pool}`;
 }
 
-const SKELETON_GROUPS = ["fit", "use", "download", "publisher"];
+function fitHint(catalog: CatalogResponse): string {
+    const phrase = poolPhrase(catalog);
+    if (!catalog.hardware.known) {
+        return `Unavailable: the memory of ${phrase} is unknown, so fit is not checked.`;
+    }
+    return `Shows models that fit, or fit with limited headroom, on ${phrase}: ${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}.`;
+}
+
+function FitsSwitch({
+    catalog,
+    checked,
+    onChecked,
+    onPool,
+}: {
+    catalog: CatalogResponse;
+    checked: boolean;
+    onChecked: (checked: boolean) => void;
+    onPool: (pool: string) => void;
+}) {
+    const hintId = useId();
+    const known = catalog.hardware.known;
+    const phrase = poolPhrase(catalog);
+    const hint = fitHint(catalog);
+    const label = (
+        <Label
+            className={cn(
+                "flex h-8 items-center gap-2 font-normal",
+                !known && "text-muted-foreground",
+            )}
+        >
+            <Switch
+                checked={known && checked}
+                disabled={!known}
+                onCheckedChange={onChecked}
+                aria-label={`Fits ${phrase}`}
+                aria-describedby={hintId}
+            />
+            Fits
+        </Label>
+    );
+    return (
+        <div className="flex items-center">
+            {known ? (
+                label
+            ) : (
+                <Tooltip>
+                    <TooltipTrigger asChild>{label}</TooltipTrigger>
+                    <TooltipContent className="max-w-72">{hint}</TooltipContent>
+                </Tooltip>
+            )}
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        className="gap-1 px-1 font-normal"
+                        aria-label={`Hardware for fit: ${phrase}`}
+                    >
+                        {phrase}
+                        <ChevronDown className="text-muted-foreground" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="flex flex-col gap-3">
+                    <p className="text-sm font-semibold">Hardware fit</p>
+                    <PoolSelect catalog={catalog} onPool={onPool} />
+                    <p className="text-sm text-muted-foreground">{hint}</p>
+                </PopoverContent>
+            </Popover>
+            <span id={hintId} className="sr-only">
+                {hint}
+            </span>
+        </div>
+    );
+}
+
+function LatestSwitch({
+    checked,
+    onChecked,
+}: {
+    checked: boolean;
+    onChecked: (checked: boolean) => void;
+}) {
+    const hintId = useId();
+    return (
+        <Label className="flex h-8 items-center gap-2 font-normal">
+            <Switch checked={checked} onCheckedChange={onChecked} aria-describedby={hintId} />
+            Latest only
+            <span id={hintId} className="sr-only">
+                Hides models that have a newer version in the catalogue.
+            </span>
+        </Label>
+    );
+}
+
+function compareHint(count: number): ReactNode {
+    if (count < 2) {
+        return (
+            <span className="text-sm text-muted-foreground">
+                Select at least 2 models to compare.
+            </span>
+        );
+    }
+    if (count > COMPARE_MAX) {
+        return (
+            <StatusText tone="warning" className="text-sm whitespace-normal">
+                {`Compare takes up to ${COMPARE_MAX} models; deselect ${count - COMPARE_MAX}.`}
+            </StatusText>
+        );
+    }
+    return null;
+}
+
+function SelectionBar({
+    count,
+    onCompare,
+    onClear,
+    className,
+}: {
+    count: number;
+    onCompare: () => void;
+    onClear: () => void;
+    className?: string;
+}) {
+    const hintId = useId();
+    const hint = compareHint(count);
+    return (
+        <div className={cn("flex flex-wrap items-center gap-2", className)}>
+            <span className="text-sm font-medium tabular-nums">{`${count} selected`}</span>
+            <Button
+                disabled={hint !== null}
+                onClick={onCompare}
+                aria-describedby={hint ? hintId : undefined}
+            >
+                Compare
+            </Button>
+            {hint && <span id={hintId}>{hint}</span>}
+            <Button variant="ghost" className="ml-auto" onClick={onClear}>
+                Clear selection
+            </Button>
+        </div>
+    );
+}
+
+const SKELETON_GROUPS = ["task", "size", "licence", "publisher", "access"];
 
 function DiscoverSkeleton({
     columns,
@@ -459,7 +656,7 @@ function DiscoverSkeleton({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-start gap-4">
-                <aside className="hidden w-52 shrink-0 min-[1400px]:block">
+                <aside className="hidden w-56 shrink-0 min-[1400px]:block">
                     <div className="flex flex-col divide-y rounded-md border bg-card">
                         {SKELETON_GROUPS.map((group) => (
                             <div key={group} className="flex flex-col gap-2.5 px-3 py-3">
@@ -479,10 +676,11 @@ function DiscoverSkeleton({
                             onValueChange={(q) => update({ q })}
                             className="w-64"
                         />
-                        <Skeleton className="h-8 w-44" />
-                        <span className="text-sm text-muted-foreground">
-                            Loading the catalogue…
-                        </span>
+                        <Skeleton className="h-8 w-28 min-[1400px]:hidden" />
+                        <Skeleton className="h-8 w-40" />
+                        <Skeleton className="h-8 w-28" />
+                        <span className="w-32 text-sm text-muted-foreground">Loading…</span>
+                        <Skeleton className="ml-auto h-8 w-44" />
                     </div>
                     <DataGrid
                         columns={columns}
@@ -497,6 +695,10 @@ function DiscoverSkeleton({
             </div>
         </div>
     );
+}
+
+function idList(value: string | undefined): string[] {
+    return value ? value.split(",").filter(Boolean) : [];
 }
 
 export function Discover({
@@ -528,7 +730,8 @@ export function Discover({
         () => new Map((data?.entries ?? []).map((entry) => [entry.id, entry.name])),
         [data?.entries],
     );
-    const tableColumns = useMemo(() => columns(on, names), [on, names]);
+    const tableColumns = useMemo(() => columns(names), [names]);
+    const selected = useMemo(() => idList(search.selected), [search.selected]);
     if (catalog.isLoading) {
         return <DiscoverSkeleton columns={tableColumns} search={search} update={update} />;
     }
@@ -548,29 +751,13 @@ export function Discover({
     const visible = data.entries.filter((entry) => matches(entry, filters));
     visible.sort(SORTS[sort].compare);
     const active = activeFilters(filters);
-    const panel = (
-        <FilterPanel
-            entries={data.entries}
-            filters={filters}
-            update={update}
-            fitsKnown={data.hardware.known}
-            fitsHint={
-                data.hardware.known
-                    ? `For ${poolPhrase(data)}: ${bytes(data.hardware.memory_bytes)} ${data.hardware.memory_label}`
-                    : `Not checked: the memory of ${poolPhrase(data)} is unknown.`
-            }
-            pool={
-                <PoolSelect
-                    catalog={data}
-                    onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
-                />
-            }
-        />
-    );
+    const selecting = selected.length > 0;
+    const select = (ids: string[]) => update({ selected: ids.join(",") });
+    const panel = <FilterPanel entries={data.entries} filters={filters} update={update} />;
     const empty: ReactNode = (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No supported models match these filters.</p>
-            {(active > 0 || filters.q) && (
+            {(active > 0 || filters.q || filters.fit.length > 0 || latestOnly(filters)) && (
                 <Button variant="outline" size="sm" onClick={() => update(CLEARED)}>
                     Clear filters
                 </Button>
@@ -598,53 +785,81 @@ export function Discover({
                     {panel}
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <SearchInput
-                            aria-label="Search supported models"
-                            placeholder="Search supported models"
-                            value={search.q ?? ""}
-                            onValueChange={(q) => update({ q })}
-                            className="w-64"
-                        />
-                        <Button
-                            variant="outline"
-                            className="min-[1400px]:hidden"
-                            onClick={() => setFiltersOpen(true)}
+                    <div className="grid">
+                        <div
+                            className={cn(
+                                "col-start-1 row-start-1 flex flex-wrap items-center gap-2",
+                                selecting && "invisible",
+                            )}
                         >
-                            {active > 0 ? `Filters (${active})` : "Filters"}
-                        </Button>
-                        <span className="text-sm text-muted-foreground tabular-nums">
-                            {`${visible.length} of ${data.entries.length} models`}
-                        </span>
-                        <div className="ml-auto">
-                            <SortSelect
-                                value={sort}
-                                onSort={(next) =>
-                                    update({ sort: next === "recommended" ? "" : next })
-                                }
+                            <SearchInput
+                                aria-label="Search supported models"
+                                placeholder="Search supported models"
+                                value={search.q ?? ""}
+                                onValueChange={(q) => update({ q })}
+                                className="w-64"
                             />
+                            <Button
+                                variant="outline"
+                                className="w-28 min-[1400px]:hidden"
+                                onClick={() => setFiltersOpen(true)}
+                            >
+                                {active > 0 ? `Filters (${active})` : "Filters"}
+                            </Button>
+                            <FitsSwitch
+                                catalog={data}
+                                checked={filters.fit.length > 0}
+                                onChecked={(checked) => update(fitsPatch(checked))}
+                                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
+                            />
+                            <LatestSwitch
+                                checked={latestOnly(filters)}
+                                onChecked={(checked) => update(latestPatch(checked))}
+                            />
+                            <span className="w-32 text-sm text-muted-foreground tabular-nums">
+                                {`${visible.length} of ${data.entries.length} models`}
+                            </span>
+                            <div className="ml-auto">
+                                <SortSelect
+                                    value={sort}
+                                    onSort={(next) =>
+                                        update({ sort: next === "recommended" ? "" : next })
+                                    }
+                                />
+                            </div>
                         </div>
+                        <SelectionBar
+                            className={cn("col-start-1 row-start-1", !selecting && "invisible")}
+                            count={selected.length}
+                            onCompare={() =>
+                                router.history.push(compareHref(selected, search.pool))
+                            }
+                            onClear={() => select([])}
+                        />
                     </div>
-                    <FilterChips filters={filters} update={update} />
-                    {needsAccess && (
-                        <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-                            <p className="text-sm font-semibold">
-                                These models need access from their publisher first
-                            </p>
-                            <AccessSteps catalog={data} />
-                        </div>
-                    )}
                     <DataGrid
                         columns={tableColumns}
                         rows={visible}
+                        getRowId={(entry) => entry.id}
                         storageKey="minibrain.discover.columns"
                         onOpen={(entry) => router.history.push(discoverHref(entry, search.pool))}
                         columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
+                        selectedIds={selected}
+                        onSelectedIdsChange={select}
+                        rowActions={(entry) => <EntryAction entry={entry} on={on} />}
                         empty={empty}
                         minWidth="min-w-[840px]"
                     />
+                    {needsAccess && (
+                        <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
+                            <p className="text-sm font-semibold">
+                                Models that need access from their publisher first
+                            </p>
+                            <AccessSteps catalog={data} />
+                        </div>
+                    )}
                     <p className="text-sm text-muted-foreground">
                         Models run on your infrastructure. Offline?{" "}
                         <button

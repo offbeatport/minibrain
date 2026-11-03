@@ -17,7 +17,9 @@ const KEYS = [
     "fit",
     "support",
     "licence",
+    "use",
     "latest",
+    "selected",
     "sort",
 ] as const;
 
@@ -39,7 +41,9 @@ const PAGE_KEYS: Record<ModelsPath, readonly ModelsSearchKey[]> = {
         "pool",
         "support",
         "licence",
+        "use",
         "latest",
+        "selected",
         "sort",
     ],
 };
@@ -84,8 +88,9 @@ export function modelsHref(): string {
     return `/models${remembered("/models")}`;
 }
 
-export function discoverListHref(): string {
-    return `/discover${remembered("/discover")}`;
+export function discoverListHref(patch: ModelsSearch = {}): string {
+    const saved = Object.fromEntries(new URLSearchParams(remembered("/discover")));
+    return `/discover${searchString(readModelsSearch({ ...saved, ...patch }, "/discover"))}`;
 }
 
 function remembered(path: ModelsPath): string {
