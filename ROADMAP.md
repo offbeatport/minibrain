@@ -450,9 +450,21 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
 
 - obp-ui, operator-console style.
 - Sidebar: Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations, Feedback) · Run
-  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, Theme, Sign out). Data,
-  Deployments and Monitor cover every model; Playground, Training, Evaluations and Feedback carry a model picker, and
-  the choice lives in the URL (`?minibrain=<slug>`).
+  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, Theme, Sign out). Sidebar
+  links are plain paths; no page carries a model into another.
+- Training, Evaluations and Feedback cover every model, like Deployments and Monitor. Training and Evaluations are the
+  kit's `DataGrid` with model and status filters kept in the URL: `?model=<slug>,<slug>&status=<status>,<status>`.
+  - Training lists training and scoring jobs: model, version, job, status, progress, started, duration. A row opens
+    the job's log (`?job=<id>`). "Train a model" picks a model and opens `/training/<slug>`: its training data,
+    prepare step, new version (score a prompt or train) and recent jobs.
+  - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
+    status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
+    view.
+  - Feedback is a placeholder until the review queue lands.
+- Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
+  in the browser.
+- Old links redirect: `?minibrain=<slug>` on Training, Evaluations and Playground becomes `?model=<slug>`;
+  `/deployments?minibrain=<slug>` goes to `/deployments/<slug>`; `/m/<slug>/<tab>` goes to the matching page.
 - Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
   General: You (appearance; profile once accounts exist) and This install (paths, base models, recipe, splits;
   admin-only once accounts exist). Security: the policies, locked when set by config, and their recent changes.
