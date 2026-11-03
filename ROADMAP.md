@@ -463,6 +463,20 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   - Feedback is a placeholder until the review queue lands.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
+- Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
+  `TabbedSearchList` in a dialog): one search over four tabs.
+  - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
+    for the task (capability, size tier, the catalogue's tested default; superseded models left out), then
+    popularity. Being downloaded is not a ranking factor.
+  - Catalogue: every entry, with size, fit and licence-use filters. My models: start from a custom model (same base,
+    its training data, and its trained version's rows and epochs, carried to the Training page as `?rows=&epochs=`),
+    or an imported base. Import: a Hugging Face id or link, an `s3://` path or a folder.
+  - Each option shows publisher, parameters, licence use, "On this install" or the download size, and a fit hint.
+  - Under the picker: the download against free space on the model files disk (blocked when it does not fit), the
+    variant and licence, and for a base that needs more compute, the pools it fits and how to join a GPU machine to a
+    pool. It can always be downloaded now and run later.
+  - `?model=<catalogue id>&variant=` and `?base=<key>` preselect the base, `?dataset=` the training data, and
+    `?source=import` opens Import.
 - Old links redirect: `?minibrain=<slug>` on Training, Evaluations and Playground becomes `?model=<slug>`;
   `/deployments?minibrain=<slug>` goes to `/deployments/<slug>`; `/m/<slug>/<tab>` goes to the matching page.
 - Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
