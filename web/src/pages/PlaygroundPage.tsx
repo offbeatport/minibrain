@@ -1,6 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import {
     Button,
+    Card,
+    CardContent,
     Field,
     Select,
     SelectContent,
@@ -167,17 +169,16 @@ function Playground({ slug }: { slug: string }) {
                 </form>
             </Section>
             {history.map((exchange) => (
-                <div
-                    key={exchange.id}
-                    className="flex flex-col gap-2 rounded-lg border bg-card p-4"
-                >
-                    <ChatBubble role="user" text={exchange.text} />
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {exchange.replies.map((reply) => (
-                            <Reply key={reply.model} reply={reply} />
-                        ))}
-                    </div>
-                </div>
+                <Card key={exchange.id}>
+                    <CardContent className="flex flex-col gap-2">
+                        <ChatBubble role="user" text={exchange.text} />
+                        <div className="grid gap-3 md:grid-cols-2">
+                            {exchange.replies.map((reply) => (
+                                <Reply key={reply.model} reply={reply} />
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
             ))}
         </>
     );

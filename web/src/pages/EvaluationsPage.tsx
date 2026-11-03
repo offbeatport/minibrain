@@ -125,6 +125,7 @@ function Evaluations({ slug }: { slug: string }) {
     return (
         <>
             <Section
+                flush
                 title="Versions"
                 caption="Every version is scored on the same test set and held-out rows. Promotion is blocked when a version scores below the current one on held-out rows."
             >
@@ -136,6 +137,7 @@ function Evaluations({ slug }: { slug: string }) {
             </Section>
             {shown && shown.mistakes.length > 0 && (
                 <Section
+                    flush
                     title={`Mistakes in v${shown.number}`}
                     caption="Up to 20 held-out rows it got wrong."
                 >

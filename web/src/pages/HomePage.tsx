@@ -75,7 +75,7 @@ export function HomePage() {
                 </div>
             </Section>
             {minibrains?.length === 0 && <GetStarted />}
-            <Section title="Recent jobs">
+            <Section title="Recent jobs" flush>
                 <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
             </Section>
         </Page>

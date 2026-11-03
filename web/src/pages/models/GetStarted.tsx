@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Button } from "obp-ui";
+import { Button, Card, CardContent, CardFooter } from "obp-ui";
 import { api, unwrap } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { useModelsRefresh } from "./dialogs";
@@ -37,21 +37,23 @@ export function GetStarted({
         },
     });
     return (
-        <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-            <ol className="grid gap-4 md:grid-cols-3">
-                {STEPS.map((step, index) => (
-                    <li key={step.title} className="flex gap-3">
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md border text-sm font-semibold tabular-nums">
-                            {index + 1}
-                        </span>
-                        <span className="flex flex-col gap-0.5">
-                            <span className="font-semibold">{step.title}</span>
-                            <span className="text-sm text-muted-foreground">{step.body}</span>
-                        </span>
-                    </li>
-                ))}
-            </ol>
-            <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+        <Card>
+            <CardContent>
+                <ol className="grid gap-4 md:grid-cols-3">
+                    {STEPS.map((step, index) => (
+                        <li key={step.title} className="flex gap-3">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-md border text-sm font-semibold tabular-nums">
+                                {index + 1}
+                            </span>
+                            <span className="flex flex-col gap-0.5">
+                                <span className="font-semibold">{step.title}</span>
+                                <span className="text-sm text-muted-foreground">{step.body}</span>
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            </CardContent>
+            <CardFooter className="flex-wrap gap-2 border-t">
                 <Button onClick={() => sample.mutate()} disabled={sample.isPending}>
                     {sample.isPending ? "Creating sample…" : "Try it with sample data"}
                 </Button>
@@ -64,8 +66,12 @@ export function GetStarted({
                 <span className="text-sm text-muted-foreground">
                     The sample sorts travel support messages into intents.
                 </span>
-            </div>
-            <ErrorLine error={sample.error} />
-        </div>
+            </CardFooter>
+            {sample.error && (
+                <CardContent>
+                    <ErrorLine error={sample.error} />
+                </CardContent>
+            )}
+        </Card>
     );
 }

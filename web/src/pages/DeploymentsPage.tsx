@@ -335,7 +335,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
         },
     ];
     return (
-        <PanelSection icon={History} title="Versions">
+        <PanelSection icon={History} title="Versions" bare>
             <div className="flex flex-col gap-2">
                 <DataGrid
                     columns={columns}

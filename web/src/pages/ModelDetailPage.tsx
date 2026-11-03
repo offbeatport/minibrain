@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Files, History, Info, Plug } from "lucide-react";
-import { Badge, Button, DataGrid, Link } from "obp-ui";
+import { Badge, Button, Card, CardContent, DataGrid, Link } from "obp-ui";
 import { useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
@@ -38,28 +38,30 @@ function BackLink() {
 
 function StatusStrip({ row }: { row: ModelRow }) {
     return (
-        <div className="grid grid-cols-2 gap-4 rounded-md border bg-card px-4 py-3 text-sm sm:grid-cols-5">
-            <div>
-                <p className="text-muted-foreground">Type</p>
-                <p>{row.kind === "base" ? "Base" : "Custom"}</p>
-            </div>
-            <div>
-                <p className="text-muted-foreground">Availability</p>
-                <Availability row={row} />
-            </div>
-            <div>
-                <p className="text-muted-foreground">Latest activity</p>
-                <Activity row={row} />
-            </div>
-            <div>
-                <p className="text-muted-foreground">Deployment</p>
-                <Deployment row={row} />
-            </div>
-            <div>
-                <p className="text-muted-foreground">Updated</p>
-                <Updated value={row.updated_at} />
-            </div>
-        </div>
+        <Card>
+            <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
+                <div>
+                    <p className="text-muted-foreground">Type</p>
+                    <p>{row.kind === "base" ? "Base" : "Custom"}</p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Availability</p>
+                    <Availability row={row} />
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Latest activity</p>
+                    <Activity row={row} />
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Deployment</p>
+                    <Deployment row={row} />
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Updated</p>
+                    <Updated value={row.updated_at} />
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -252,6 +254,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                     icon={Files}
                     title="Files"
                     description="Checked on download or import; each is re-checked by size when listed."
+                    bare
                 >
                     <DataGrid columns={FILE_COLUMNS} rows={model.files} empty="No files yet." />
                 </PanelSection>
@@ -366,6 +369,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 icon={History}
                 title="Revisions"
                 description="Each training or scoring run creates a revision; one is deployed at a time."
+                bare
             >
                 <DataGrid
                     columns={VERSION_COLUMNS}

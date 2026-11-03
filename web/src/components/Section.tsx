@@ -1,29 +1,37 @@
 import type { LucideIcon } from "lucide-react";
-import { cn } from "obp-ui";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle, cn } from "obp-ui";
 import type { ReactNode } from "react";
+
+const FLUSH_GRID =
+    "px-0 [--data-grid-surface:var(--card)] [&_[data-slot=data-grid]]:rounded-none [&_[data-slot=data-grid]]:border-0";
+
+const CARD_GRID =
+    "[--data-grid-surface:var(--card)] [&_[data-slot=data-grid]]:rounded-xl [&_[data-slot=data-grid]]:bg-card";
 
 export function Section({
     title,
     caption,
     actions,
+    flush = false,
     children,
 }: {
     title: string;
     caption?: ReactNode;
     actions?: ReactNode;
+    flush?: boolean;
     children: ReactNode;
 }) {
     return (
-        <section className="rounded-lg border bg-card">
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5">
-                <div className="min-w-0">
-                    <h2 className="text-base font-semibold">{title}</h2>
-                    {caption && <p className="text-sm text-muted-foreground">{caption}</p>}
-                </div>
-                {actions && <div className="flex items-center gap-2">{actions}</div>}
-            </header>
-            <div className="p-4">{children}</div>
-        </section>
+        <Card className={cn(flush && "gap-0 overflow-clip pb-0")}>
+            <CardHeader className={cn(flush && "border-b")}>
+                <CardTitle>
+                    <h2>{title}</h2>
+                </CardTitle>
+                {caption && <CardDescription>{caption}</CardDescription>}
+                {actions && <CardAction className="flex items-center gap-2">{actions}</CardAction>}
+            </CardHeader>
+            <CardContent className={cn(flush && FLUSH_GRID)}>{children}</CardContent>
+        </Card>
     );
 }
 
@@ -43,7 +51,7 @@ export function PanelSection({
     children: ReactNode;
 }) {
     return (
-        <section className="flex flex-col gap-2">
+        <section className={cn("flex flex-col gap-2", bare && CARD_GRID)}>
             <header className="flex flex-wrap items-end justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -59,7 +67,13 @@ export function PanelSection({
                 </div>
                 {actions && <div className="flex items-center gap-2">{actions}</div>}
             </header>
-            {bare ? children : <div className="rounded-lg border bg-card p-4">{children}</div>}
+            {bare ? (
+                children
+            ) : (
+                <Card>
+                    <CardContent>{children}</CardContent>
+                </Card>
+            )}
         </section>
     );
 }

@@ -377,7 +377,7 @@ export function SecurityPage() {
                             </div>
                         </PanelSection>
                     ))}
-                <PanelSection icon={History} title="Audit log">
+                <PanelSection icon={History} title="Audit log" bare>
                     <ErrorLine error={audit.error} />
                     <DataGrid
                         columns={auditColumns(byName)}
