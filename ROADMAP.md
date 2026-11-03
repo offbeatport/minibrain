@@ -665,8 +665,10 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   action, target and a details summary. Search, action, actor and a date range (`?q=&action=&actor=&from=&to=`, local
   days) stay in the URL; paging is server-side by event id (`?before=<id>`, `?after=<id>`), so history size does not
   matter. A row opens the full event as fields with before and after values (`?event=<id>`). Export downloads CSV or
-  JSONL of the current filter from `/api/audit/export`. Retention is the `audit_retention_days` policy: keep forever
-  by default; the hourly purge deletes older events and records an `audit.prune` event.
+  JSONL of the current filter from `/api/audit/export`, with each event's `seq`, `prev_hash` and `hash`. Retention
+  is the `audit_retention_days` policy: keep forever by default; the hourly purge deletes older sealed events up to a
+  chain anchor and records an `audit.prune` event with the `seq` and hash it cuts at. Integrity shows whether the hash
+  chain verifies, or its first break, and whether SIEM export (set under Security) is keeping up, with Verify again.
 - Settings → This install, read only: minibrain version and build commit, Python, DuckDB, PyTorch, Transformers, OS
   and architecture; home, database (location and size), artifact storage (folder, or bucket and endpoint; never
   credentials) and the web build; catalogue version and when catalogue and model files were last checked; pools,
@@ -773,7 +775,11 @@ v1, the evidence regulated buyers ask for first:
 - AI bill of materials per version: base model weights hash, license, training data snapshot hash, recipe, eval result.
 - Signed images and update bundles (cosign), verified offline with a key shipped in the install bundle.
 - Audit log: append-only and hash-chained so tampering shows, exported to the customer's SIEM over syslog. The
-  chain has to survive retention: a prune is itself an audited event that carries the hash it cuts at.
+  chain has to survive retention: a prune is itself an audited event that carries the hash it cuts at. Built: the
+  leader seals each event with a sequence number, the previous hash and the SHA-256 of its canonical form (so
+  out-of-order commits on Postgres just seal later); `minibrain audit verify`, `GET /api/audit/chain` and the Audit log
+  page report the first break; SIEM export is RFC 5424 over TLS, TCP or UDP with a stored cursor. Format, canonical
+  form and guarantees: `docs/security.md`.
 - Encryption at rest for snapshots, staging files and adapters.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
@@ -952,7 +958,9 @@ Everything in the v1 scope below, after M1.
 - [ ] SBOM, AI bill of materials per version, signed images
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
-- [ ] Hash-chained audit log with SIEM export; encryption at rest
+- [ ] Hash-chained audit log with SIEM export; encryption at rest (hash chain sealed by the leader, prune anchors,
+      verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP done; encryption at
+      rest not yet)
 - [x] Model card and validation report per version: in-app page, Markdown and JSON with a SHA-256 of the canonical card, editable intended use and known limits (audited)
 - [ ] Reference hardware configs
 
