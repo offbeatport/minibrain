@@ -352,7 +352,7 @@ export function SecurityPage() {
     });
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
-        <SettingsLayout>
+        <SettingsLayout title="Security">
             <ErrorLine error={policies.error} />
             <PanelSections>
                 {policies.data &&

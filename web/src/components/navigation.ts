@@ -9,7 +9,8 @@ import {
     Play,
     Rocket,
     Server,
-    Settings,
+    ShieldCheck,
+    SlidersHorizontal,
     ThumbsUp,
     Workflow,
 } from "lucide-react";
@@ -47,10 +48,17 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
     },
 ];
 
-const SETTINGS_ENTRY: NavEntry = { label: "Settings", path: "/settings", icon: Settings };
+export const SETTINGS_PAGES: NavEntry[] = [
+    { label: "General", path: "/settings", icon: SlidersHorizontal },
+    { label: "Security", path: "/settings/security", icon: ShieldCheck },
+];
+
+export function isSettingsPath(pathname: string): boolean {
+    return pathname === "/settings" || pathname.startsWith("/settings/");
+}
 
 export function navEntryFor(pathname: string): NavEntry | undefined {
-    const entries = [...SECTIONS.flatMap((section) => section.items), SETTINGS_ENTRY];
+    const entries = [...SECTIONS.flatMap((section) => section.items), ...SETTINGS_PAGES];
     const matching = entries.filter(
         (entry) =>
             pathname === entry.path ||

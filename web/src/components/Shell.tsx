@@ -1,5 +1,5 @@
 import { Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { LogOut, Settings, SunMoon } from "lucide-react";
+import { ArrowLeft, LogOut, Settings, SunMoon } from "lucide-react";
 import { type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
@@ -10,9 +10,12 @@ import {
     Rail,
     SectionLabel,
 } from "obp-ui/shell";
-import type { MouseEvent } from "react";
-import { type NavEntry, SECTIONS } from "~/components/navigation";
+import { type MouseEvent, useEffect } from "react";
+import { type NavEntry, SECTIONS, SETTINGS_PAGES, isSettingsPath } from "~/components/navigation";
+import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
 import { readMinibrainParam, rememberedMinibrain } from "~/lib/selection";
+
+const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
 
 const ACCOUNT_ITEMS: AccountMenuItem[] = [
     { icon: <Settings />, label: "Settings", href: "/settings" },
@@ -46,10 +49,7 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
             {SECTIONS.map((section) => (
                 <div key={section.label ?? section.items[0].path} className="flex flex-col">
                     {section.label && (
-                        <SectionLabel
-                            tone="subtle"
-                            className="pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45"
-                        >
+                        <SectionLabel tone="subtle" className={SECTION_LABEL}>
                             {section.label}
                         </SectionLabel>
                     )}
@@ -71,12 +71,48 @@ function Navigation({ pathname, minibrain }: { pathname: string; minibrain: stri
     );
 }
 
+function SettingsNavigation({ pathname }: { pathname: string }) {
+    return (
+        <>
+            <NavItem
+                icon={ArrowLeft}
+                label="Back to app"
+                href={appPageToReturnTo()}
+                active={false}
+                iconStyle="plain"
+            />
+            <div className="flex flex-col">
+                <SectionLabel tone="subtle" className={SECTION_LABEL}>
+                    Settings
+                </SectionLabel>
+                {SETTINGS_PAGES.map((entry) => (
+                    <NavItem
+                        key={entry.path}
+                        icon={entry.icon}
+                        label={entry.label}
+                        href={entry.path}
+                        active={pathname === entry.path}
+                        iconStyle="plain"
+                    />
+                ))}
+            </div>
+        </>
+    );
+}
+
 export function Shell() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const href = useRouterState({ select: (state) => state.location.href });
     const requested = useRouterState({
         select: (state) => readMinibrainParam(state.location.search),
     });
+    const settings = isSettingsPath(pathname);
+    useEffect(() => {
+        if (!settings) {
+            rememberAppPage(href);
+        }
+    }, [settings, href]);
     const rail = (
         <Rail
             brand={<span className="text-base font-semibold">minibrain</span>}
@@ -92,7 +128,11 @@ export function Shell() {
                 />
             }
         >
-            <Navigation pathname={pathname} minibrain={requested ?? rememberedMinibrain()} />
+            {settings ? (
+                <SettingsNavigation pathname={pathname} />
+            ) : (
+                <Navigation pathname={pathname} minibrain={requested ?? rememberedMinibrain()} />
+            )}
         </Rail>
     );
     return (

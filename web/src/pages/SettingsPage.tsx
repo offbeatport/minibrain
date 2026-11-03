@@ -84,7 +84,7 @@ function ModelCatalogue() {
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     return (
-        <SettingsLayout>
+        <SettingsLayout title="General">
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />
