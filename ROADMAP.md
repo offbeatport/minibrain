@@ -206,6 +206,11 @@ Data is shared across models:
   on the same dataset get identical splits and share storage; each version records the snapshot it used.
 - Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
   model gets a new dataset. A dataset or source still in use cannot be deleted.
+- Catalogue: sources and datasets carry a name, an optional description and tags. Search covers names, column names,
+  descriptions and tags. Column stats (type, empty share, approximate distinct count, range for non-text types) come
+  from a bounded sample of the staged table (`SUMMARIZE` over the first 10,000 rows); the preview counts rows per
+  label; a dataset shows its train / held-out / test / few-shot split once a model has built it from the current
+  mapping.
 
 ### Sources
 
@@ -453,6 +458,12 @@ Planned for v1, not built. People sign in; apps keep using API keys, and `/v1` s
   admin-only once accounts exist). Security: the policies, locked when set by config, and their recent changes.
   Accounts (admin) once accounts exist.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
+- Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left grouping sources by kind (Uploads,
+  Folders, S3, Databases), each file with the datasets built from it underneath; the selected item's detail on the
+  right. A file shows its columns, stats and first rows, and creates a dataset by picking input and label columns; a
+  dataset shows its mapping, label balance, splits, the models that use it, and "Train a model". Every item shows its
+  source → dataset → models trail. `/data?item=<kind>:<id>` (`group:upload`, `source:12`, `dataset:<slug>`) is the
+  permalink; `/data/datasets/<slug>` redirects to it, and `/data?minibrain=<slug>` stays the per-model data page.
 
 | Need | obp-ui |
 |---|---|

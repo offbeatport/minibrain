@@ -20,6 +20,8 @@ export const keys = {
     dataset: (slug: string) => ["datasets", slug] as const,
     datasetPreview: (slug: string) => ["datasets", slug, "preview"] as const,
     sources: ["sources"] as const,
+    sourceRows: (id: number) => ["sources", id, "rows"] as const,
+    sourceStats: (id: number) => ["sources", id, "stats"] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -75,6 +77,24 @@ export function useDatasets() {
 
 export function useSources() {
     return useQuery({ queryKey: keys.sources, queryFn: () => unwrap(api.GET("/api/sources")) });
+}
+
+const sourcePath = (id: number) => ({ params: { path: { source_id: id } } });
+
+export function useSourceRows(id: number) {
+    return useQuery({
+        queryKey: keys.sourceRows(id),
+        queryFn: () => unwrap(api.GET("/api/sources/{source_id}/rows", sourcePath(id))),
+        retry: false,
+    });
+}
+
+export function useSourceStats(id: number) {
+    return useQuery({
+        queryKey: keys.sourceStats(id),
+        queryFn: () => unwrap(api.GET("/api/sources/{source_id}/stats", sourcePath(id))),
+        retry: false,
+    });
 }
 
 export function useDataset(slug: string) {

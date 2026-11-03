@@ -41,7 +41,7 @@ import { StatusText, type Tone } from "~/components/models/StatusText";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
-import { DatasetMapping } from "../DataLibrary";
+import { DatasetMapping } from "../data/DatasetDetail";
 import { SourceField, type SourceState, useSourcePlan } from "./BaseSource";
 import { bestFit } from "./DiscoverFilters";
 import { splitTags, useModelsRefresh } from "./dialogs";
@@ -407,6 +407,7 @@ export function AddModelPage() {
                 source?: string;
                 model?: string;
                 variant?: string;
+                dataset?: string;
             },
     });
     const bases = useBases();
@@ -434,9 +435,10 @@ export function AddModelPage() {
     const [task, setTask] = useState("classify");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
-    const [withData, setWithData] = useState(false);
-    const [dataSource, setDataSource] = useState<DataSource>("upload");
-    const [dataset, setDataset] = useState("");
+    const presetDataset = params.dataset === undefined ? "" : String(params.dataset);
+    const [withData, setWithData] = useState(presetDataset !== "");
+    const [dataSource, setDataSource] = useState<DataSource>(presetDataset ? "dataset" : "upload");
+    const [dataset, setDataset] = useState(presetDataset);
     const catalog = useCatalog();
     const recommended = (bases.data ?? []).find((key) =>
         catalog.data?.entries.some((entry) => entry.recommended && entry.id === key),

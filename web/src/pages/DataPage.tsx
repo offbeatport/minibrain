@@ -14,7 +14,7 @@ import {
     Textarea,
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
-import { type ChangeEvent, useCallback, useEffect, useState } from "react";
+import { type ChangeEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import {
     type ExampleInfo,
     type MappingInfo,
@@ -39,7 +39,8 @@ import { ScopedPage } from "~/components/PageHeader";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
 import { readMinibrainParam } from "~/lib/selection";
-import { DataLibrary } from "./DataLibrary";
+import { DataExplorer } from "./data/Explorer";
+import { itemHref } from "./data/catalogue";
 
 type Row = { input: string | null; label: string | null };
 
@@ -183,11 +184,19 @@ export function MappingSection({
     mapping,
     onSave,
     onRun,
+    title = "Mapping",
+    saveLabel,
+    before,
+    extraActions,
 }: {
     columns: string[];
     mapping: MappingInfo;
     onSave: (body: MappingBody) => Promise<unknown>;
     onRun: (sql: string) => Promise<QueryResponse>;
+    title?: string;
+    saveLabel?: string;
+    before?: ReactNode;
+    extraActions?: ReactNode;
 }) {
     const [input, setInput] = useState(mapping.input_column ?? "");
     const [label, setLabel] = useState(mapping.label_column ?? "");
@@ -202,14 +211,18 @@ export function MappingSection({
     const run = useMutation({ mutationFn: onRun });
     return (
         <Section
-            title="Mapping"
+            title={title}
             caption="Pick the column the model reads and the column it should answer with, or write SQL over the table source."
             actions={
-                <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)}>
-                    {editing ? "Use columns" : "Edit SQL"}
-                </Button>
+                <>
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)}>
+                        {editing ? "Use columns" : "Edit SQL"}
+                    </Button>
+                    {extraActions}
+                </>
             }
         >
+            {before}
             {editing ? (
                 <div className="flex flex-col gap-2">
                     <Textarea
@@ -230,7 +243,7 @@ export function MappingSection({
                             Run
                         </Button>
                         <Button size="sm" onClick={() => save.mutate({ sql })}>
-                            Save SQL
+                            {saveLabel ?? "Save SQL"}
                         </Button>
                     </div>
                     <ErrorLine error={run.error ?? save.error} />
@@ -260,7 +273,7 @@ export function MappingSection({
                                 save.mutate({ input_column: input, label_column: label })
                             }
                         >
-                            Save mapping
+                            {saveLabel ?? "Save mapping"}
                         </Button>
                     </div>
                     <ErrorLine error={save.error} />
@@ -458,7 +471,7 @@ function DatasetPicker({ detail }: { detail: MinibrainDetail }) {
                 </Select>
                 {detail.dataset && (
                     <Link
-                        href={`/data/datasets/${encodeURIComponent(detail.dataset)}`}
+                        href={itemHref({ kind: "dataset", id: detail.dataset })}
                         className="text-sm text-primary hover:underline"
                     >
                         Open dataset
@@ -518,5 +531,5 @@ export function DataPage() {
     const requested = useRouterState({
         select: (state) => readMinibrainParam(state.location.search),
     });
-    return requested ? <ModelData /> : <DataLibrary />;
+    return requested ? <ModelData /> : <DataExplorer />;
 }

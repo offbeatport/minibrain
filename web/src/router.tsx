@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { readMinibrainParam } from "./lib/selection";
-import { DatasetPage } from "./pages/DataLibrary";
 import { DataPage } from "./pages/DataPage";
 import { DeploymentPage, DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
@@ -107,7 +106,13 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/custom/$slug", CustomModelPage),
     scopedPage("/playground", PlaygroundPage),
     globalPage("/data", DataPage),
-    globalPage("/data/datasets/$slug", DatasetPage),
+    createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/data/datasets/$slug",
+        beforeLoad: ({ params }) => {
+            throw redirect({ href: `/data?item=dataset:${encodeURIComponent(params.slug)}` });
+        },
+    }),
     scopedPage("/training", TrainingPage),
     scopedPage("/evaluations", EvaluationsPage),
     scopedPage("/feedback", FeedbackPage),
