@@ -142,12 +142,14 @@ export function Trail({
 
 export function ItemHeader({
     title,
+    icon,
     detail,
     trail,
     actions,
     about,
 }: {
-    title: string;
+    title: ReactNode;
+    icon?: ReactNode;
     detail?: ReactNode;
     trail?: ReactNode;
     actions?: ReactNode;
@@ -158,7 +160,14 @@ export function ItemHeader({
             {trail}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="truncate text-2xl font-semibold">{title}</h2>
+                    <h2 className="flex min-w-0 items-center gap-2 text-2xl font-semibold">
+                        {icon && (
+                            <span aria-hidden="true" className="shrink-0 [&>svg]:size-5">
+                                {icon}
+                            </span>
+                        )}
+                        <span className="truncate">{title}</span>
+                    </h2>
                     {detail && <p className="text-sm text-muted-foreground">{detail}</p>}
                 </div>
                 {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

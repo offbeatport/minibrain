@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge, Button, DataGrid, Link } from "obp-ui";
+import { Badge, Button, DataGrid, FileName, FileTypeIcon, Link } from "obp-ui";
 import { useState } from "react";
 import {
     type ColumnStats,
@@ -227,7 +227,12 @@ export function FileDetail({
     return (
         <div className="flex flex-col gap-6">
             <ItemHeader
-                title={source.name}
+                title={source.kind === "upload" ? <FileName name={source.name} /> : source.name}
+                icon={
+                    source.kind === "upload" ? (
+                        <FileTypeIcon name={source.filename || source.name} />
+                    ) : undefined
+                }
                 detail={
                     CONNECTED.has(source.kind) ? (
                         <>

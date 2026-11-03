@@ -4,7 +4,7 @@ import type { DatasetSummary, SourceSummary } from "~/api/client";
 import { Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
-import { type AddKind, AddSourceMenu } from "./AddSource";
+import { type AddKind, AddSourceMenu, type SourceAdder } from "./AddSource";
 import {
     type ItemRef,
     SOURCE_KINDS,
@@ -46,13 +46,13 @@ const KIND_COLUMNS: ColumnDef<KindRow, unknown>[] = [
 export function SourcesOverview({
     sources,
     datasets,
-    onUploaded,
+    adder,
     onAdd,
     onSelect,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    onUploaded: (source: SourceSummary) => void;
+    adder: SourceAdder;
     onAdd: (kind: AddKind) => void;
     onSelect: (item: ItemRef) => void;
 }) {
@@ -67,7 +67,7 @@ export function SourcesOverview({
                 members.some((source) => usesSource(dataset, source.id)),
             ).length,
         };
-    }).filter((row) => row.sources > 0);
+    });
     const reading = datasets.filter((dataset) => dataset.sources.length > 0).length;
     const stored = sources
         .filter((source) => source.kind === "upload")
@@ -88,12 +88,12 @@ export function SourcesOverview({
                     className="mx-0 mt-0"
                     action={
                         <div className="mt-3 flex justify-center">
-                            <AddSourceMenu onUploaded={onUploaded} onAdd={onAdd} />
+                            <AddSourceMenu adder={adder} onAdd={onAdd} />
                         </div>
                     }
                 >
-                    Upload a CSV, TSV, JSON Lines or Parquet file, connect a folder, an S3 bucket or
-                    a database, or start from sample data.
+                    Upload a CSV, TSV, JSON or Parquet file, connect a folder, an S3 bucket or a
+                    database, or start from sample data.
                 </EmptyState>
             ) : (
                 <>

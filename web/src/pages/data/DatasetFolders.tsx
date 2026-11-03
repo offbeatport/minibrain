@@ -149,7 +149,7 @@ export function PathLinks({ index, folderId }: { index: FolderIndex; folderId: n
     );
 }
 
-function NameDialog({
+export function NameDialog({
     open,
     title,
     description,
@@ -261,7 +261,7 @@ export function NewFolderDialog({
     );
 }
 
-function RenameFolderDialog({
+export function RenameFolderDialog({
     open,
     folder,
     index,
@@ -485,7 +485,7 @@ export function FolderContents({
     );
 }
 
-function removalText(index: FolderIndex, folder: DatasetFolder): string {
+export function removalText(index: FolderIndex, folder: DatasetFolder): string {
     const folders = index.folders.get(folder.id) ?? [];
     const datasets = index.datasets.get(folder.id) ?? [];
     if (folders.length + datasets.length === 0) {

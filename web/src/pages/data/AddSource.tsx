@@ -8,38 +8,38 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    FileTypeIcon,
 } from "obp-ui";
-import { type ChangeEvent, useRef } from "react";
+import { type ChangeEvent, type ReactNode, useRef } from "react";
 import { type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
 import { useSamples } from "~/api/queries";
-import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
+import type { SourceKind } from "./catalogue";
+import { KindIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
 export type AddKind = "folder" | "s3" | "database" | "iceberg";
 
-const CHOICES: { kind: AddKind; label: string; detail: string }[] = [
-    { kind: "folder", label: "Connect a folder", detail: "Files on this server, read in place" },
-    { kind: "s3", label: "S3 path", detail: "Objects in a bucket, read in place" },
-    {
-        kind: "database",
-        label: "Database table or query",
-        detail: "PostgreSQL or MySQL, read-only",
-    },
-    { kind: "iceberg", label: "Iceberg table", detail: "A table on S3, at its current snapshot" },
+export const SOURCE_CHOICES: { kind: SourceKind; label: string; detail: string }[] = [
+    { kind: "upload", label: "Upload a file", detail: "CSV, TSV, JSON, Parquet" },
+    { kind: "folder", label: "Connect a folder", detail: "Files on this server" },
+    { kind: "s3", label: "S3 path", detail: "Objects in a bucket" },
+    { kind: "database", label: "Database table or query", detail: "PostgreSQL or MySQL" },
+    { kind: "iceberg", label: "Iceberg table", detail: "A table on S3" },
 ];
 
-export function AddSourceMenu({
-    onUploaded,
-    onAdd,
-}: {
-    onUploaded: (source: SourceSummary) => void;
-    onAdd: (kind: AddKind) => void;
-}) {
+export type SourceAdder = {
+    choose: () => void;
+    addSample: (file: string) => void;
+    pending: "upload" | "sample" | null;
+    error: unknown;
+    picker: ReactNode;
+};
+
+export function useSourceAdder(onUploaded: (source: SourceSummary) => void): SourceAdder {
     const refresh = useDataRefresh();
     const input = useRef<HTMLInputElement>(null);
-    const samples = useSamples();
     const added = async (source: SourceSummary) => {
         await refresh();
         onUploaded(source);
@@ -50,7 +50,6 @@ export function AddSourceMenu({
             unwrap(api.POST("/api/samples/{file}", { params: { path: { file } } })),
         onSuccess: added,
     });
-    const busy = upload.isPending || sample.isPending;
     const choose = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -58,59 +57,12 @@ export function AddSourceMenu({
         }
         event.target.value = "";
     };
-    return (
-        <div className="flex flex-col items-end gap-1">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button disabled={busy}>
-                        {upload.isPending
-                            ? "Uploading…"
-                            : sample.isPending
-                              ? "Adding…"
-                              : "Add source"}
-                        <ChevronDown />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuItem
-                        onSelect={() => input.current?.click()}
-                        className="flex-col items-start gap-0.5"
-                    >
-                        <span className="font-medium">Upload a file</span>
-                        <span className="text-sm text-muted-foreground">
-                            CSV, TSV, JSON Lines or Parquet, copied in
-                        </span>
-                    </DropdownMenuItem>
-                    {CHOICES.map((choice) => (
-                        <DropdownMenuItem
-                            key={choice.kind}
-                            onSelect={() => onAdd(choice.kind)}
-                            className="flex-col items-start gap-0.5"
-                        >
-                            <span className="font-medium">{choice.label}</span>
-                            <span className="text-sm text-muted-foreground">{choice.detail}</span>
-                        </DropdownMenuItem>
-                    ))}
-                    {(samples.data ?? []).length > 0 && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Sample data</DropdownMenuLabel>
-                            {(samples.data ?? []).map((item) => (
-                                <DropdownMenuItem
-                                    key={item.file}
-                                    onSelect={() => sample.mutate(item.file)}
-                                    className="flex-col items-start gap-0.5"
-                                >
-                                    <span className="font-medium">{item.name}</span>
-                                    <span className="text-sm text-muted-foreground tabular-nums">
-                                        {`${item.format} · ${count(item.rows)} rows · ${count(item.labels)} labels`}
-                                    </span>
-                                </DropdownMenuItem>
-                            ))}
-                        </>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
+    return {
+        choose: () => input.current?.click(),
+        addSample: (file) => sample.mutate(file),
+        pending: upload.isPending ? "upload" : sample.isPending ? "sample" : null,
+        error: upload.error ?? sample.error,
+        picker: (
             <input
                 ref={input}
                 type="file"
@@ -121,7 +73,78 @@ export function AddSourceMenu({
                 onChange={choose}
                 disabled={upload.isPending}
             />
-            <ErrorLine error={upload.error ?? sample.error ?? samples.error} />
-        </div>
+        ),
+    };
+}
+
+export function addSourceKind(adder: SourceAdder, onAdd: (kind: AddKind) => void) {
+    return (kind: SourceKind) => (kind === "upload" ? adder.choose() : onAdd(kind));
+}
+
+export function AddSourceMenu({
+    adder,
+    onAdd,
+}: {
+    adder: SourceAdder;
+    onAdd: (kind: AddKind) => void;
+}) {
+    const samples = useSamples();
+    const pick = addSourceKind(adder, onAdd);
+    const label =
+        adder.pending === "upload"
+            ? "Uploading…"
+            : adder.pending === "sample"
+              ? "Adding…"
+              : "Add source";
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button disabled={adder.pending !== null}>
+                    {label}
+                    <ChevronDown />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+                {SOURCE_CHOICES.map((choice) => (
+                    <DropdownMenuItem
+                        key={choice.kind}
+                        onSelect={() => pick(choice.kind)}
+                        className="items-start"
+                    >
+                        <KindIcon kind={choice.kind} className="mt-0.5" />
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="font-medium">{choice.label}</span>
+                            <span className="text-sm text-muted-foreground">{choice.detail}</span>
+                        </span>
+                    </DropdownMenuItem>
+                ))}
+                {(samples.data ?? []).length > 0 && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Sample data</DropdownMenuLabel>
+                        {(samples.data ?? []).map((item) => (
+                            <DropdownMenuItem
+                                key={item.file}
+                                onSelect={() => adder.addSample(item.file)}
+                                className="items-start"
+                            >
+                                <FileTypeIcon name={item.file} className="mt-0.5" />
+                                <span className="flex min-w-0 flex-col gap-0.5">
+                                    <span className="font-medium">{item.name}</span>
+                                    <span className="text-sm text-muted-foreground tabular-nums">
+                                        {`${item.format} · ${count(item.rows)} rows · ${count(item.labels)} labels`}
+                                    </span>
+                                </span>
+                            </DropdownMenuItem>
+                        ))}
+                    </>
+                )}
+                {samples.error ? (
+                    <p className="px-2.5 py-1.5 text-sm text-destructive">
+                        Sample data could not be listed.
+                    </p>
+                ) : null}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

@@ -1,20 +1,23 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
-    Cloud,
-    Database,
-    FileBraces,
-    FileSpreadsheet,
-    FileText,
+    ArrowRight,
     Folder,
-    FolderUp,
+    FolderInput,
+    FolderPlus,
+    Grid2x2Plus,
     Import,
     Layers,
-    Snowflake,
+    Pencil,
     Table2,
+    Trash2,
 } from "lucide-react";
 import {
     Button,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
     EmptyState,
+    FileName,
+    FileTypeIcon,
     Link,
     SearchInput,
     Tooltip,
@@ -22,6 +25,7 @@ import {
     TooltipTrigger,
     Tree,
     type TreeNode,
+    TreeRowMenu,
     ancestorsOf,
     filterTree,
 } from "obp-ui";
@@ -42,13 +46,21 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
-import { type AddKind, AddSourceMenu } from "./AddSource";
+import {
+    type AddKind,
+    AddSourceMenu,
+    SOURCE_CHOICES,
+    type SourceAdder,
+    addSourceKind,
+    useSourceAdder,
+} from "./AddSource";
 import { AddDatabaseDialog, AddIcebergDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { CreateDataset, DatasetDetail } from "./DatasetDetail";
 import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFolders";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
 import { SourcesOverview } from "./Sources";
+import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
     DATASETS_GROUP,
     type FolderIndex,
@@ -66,6 +78,7 @@ import {
     sourceText,
     usesSource,
 } from "./catalogue";
+import { KindIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
 const WIDTH_KEY = "minibrain.data.treeWidth";
@@ -75,30 +88,17 @@ const MAX_WIDTH = 520;
 const WIDTH_STEP = 16;
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
-const GROUP_ICONS: Record<SourceKind, ReactNode> = {
-    upload: <FolderUp />,
-    folder: <Folder />,
-    s3: <Cloud />,
-    database: <Database />,
-    iceberg: <Snowflake />,
-};
-
-const SOURCE_ICONS: Partial<Record<SourceKind, ReactNode>> = {
-    folder: <Folder />,
-    s3: <Cloud />,
-    database: <Database />,
-    iceberg: <Snowflake />,
-};
-
-function fileIcon(filename: string): ReactNode {
-    const lower = filename.toLowerCase();
-    if (lower.endsWith(".csv") || lower.endsWith(".tsv")) {
-        return <FileSpreadsheet />;
+function sourceNode(source: SourceSummary): TreeNode {
+    const id = itemKey({ kind: "source", id: source.id });
+    if (source.kind !== "upload") {
+        return { id, label: source.name, icon: <KindIcon kind={source.kind} /> };
     }
-    if (/\.(json|jsonl|ndjson)$/.test(lower)) {
-        return <FileBraces />;
-    }
-    return <FileText />;
+    return {
+        id,
+        label: <FileName name={source.name} />,
+        textValue: source.name,
+        icon: <FileTypeIcon name={source.filename || source.name} />,
+    };
 }
 
 function clampWidth(width: number): number {
@@ -184,24 +184,15 @@ function buildTree(
         droppable: true,
         children: folderNodes(index, null),
     };
-    const sourceGroups = SOURCE_KINDS.flatMap(({ kind, label }) => {
+    const sourceGroups = SOURCE_KINDS.map(({ kind, label }) => {
         const members = sources.filter((source) => source.kind === kind);
-        if (members.length === 0) {
-            return [];
-        }
-        return [
-            {
-                id: itemKey({ kind: "group", id: kind }),
-                label,
-                icon: GROUP_ICONS[kind],
-                meta: members.length,
-                children: members.map((source) => ({
-                    id: itemKey({ kind: "source", id: source.id }),
-                    label: source.name,
-                    icon: SOURCE_ICONS[source.kind] ?? fileIcon(source.filename),
-                })),
-            },
-        ];
+        return {
+            id: itemKey({ kind: "group", id: kind }),
+            label,
+            icon: <KindIcon kind={kind} />,
+            meta: members.length,
+            children: members.map(sourceNode),
+        };
     });
     const sourcesGroup: TreeNode = {
         id: itemKey(SOURCES_GROUP),
@@ -246,12 +237,14 @@ function GroupDetail({
     kind,
     sources,
     datasets,
+    adder,
     onUploaded,
     onAdd,
 }: {
     kind: SourceKind;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
+    adder: SourceAdder;
     onUploaded: (source: SourceSummary) => void;
     onAdd: (kind: AddKind) => void;
 }) {
@@ -298,12 +291,12 @@ function GroupDetail({
                     className="mx-0 mt-0"
                     action={
                         <div className="mt-3 flex justify-center">
-                            <AddSourceMenu onUploaded={onUploaded} onAdd={onAdd} />
+                            <AddSourceMenu adder={adder} onAdd={onAdd} />
                         </div>
                     }
                 >
-                    Upload a CSV, TSV, JSON Lines or Parquet file, or add one of the samples. Then
-                    make a dataset from it under Datasets.
+                    Upload a CSV, TSV, JSON or Parquet file, or add one of the samples. Then make a
+                    dataset from it under Datasets.
                 </EmptyState>
             ) : (
                 <p className="text-sm text-muted-foreground">
@@ -312,6 +305,18 @@ function GroupDetail({
                 </p>
             )}
         </div>
+    );
+}
+
+function DeleteItem({ blocked, onSelect }: { blocked: string | null; onSelect: () => void }) {
+    return (
+        <DropdownMenuItem variant="destructive" disabled={blocked !== null} onSelect={onSelect}>
+            <Trash2 />
+            Delete
+            {blocked && (
+                <span className="ml-auto pl-3 text-sm text-muted-foreground">{blocked}</span>
+            )}
+        </DropdownMenuItem>
     );
 }
 
@@ -353,14 +358,7 @@ export function DataExplorer() {
     const sourceList = useMemo(() => sources.data ?? [], [sources.data]);
     const datasetList = useMemo(() => datasets.data ?? [], [datasets.data]);
     const folderList = useMemo(() => folders.data ?? [], [folders.data]);
-    const wanted = requested ?? DEFAULT_ITEM;
-    const emptyGroup =
-        !loading &&
-        wanted.kind === "group" &&
-        wanted.id !== "datasets" &&
-        wanted.id !== "sources" &&
-        !sourceList.some((source) => source.kind === wanted.id);
-    const selected = emptyGroup ? SOURCES_GROUP : wanted;
+    const selected = requested ?? DEFAULT_ITEM;
     const selectedKey = itemKey(selected);
     const index = useMemo(() => folderIndex(folderList, datasetList), [folderList, datasetList]);
     const nodes = useMemo(
@@ -386,12 +384,6 @@ export function DataExplorer() {
               ([id, value]) => !id.startsWith("group:") && value.includes(text),
           ).length
         : 0;
-
-    useEffect(() => {
-        if (emptyGroup) {
-            router.history.replace(itemHref(SOURCES_GROUP));
-        }
-    }, [emptyGroup, router]);
 
     useEffect(() => {
         const above = ancestorsOf(nodes, selectedKey);
@@ -442,6 +434,172 @@ export function DataExplorer() {
         setCreatingFor(source.id);
     };
 
+    const adder = useSourceAdder(onUploaded);
+    const addKind = addSourceKind(adder, add);
+    const [action, setAction] = useState<TreeAction | null>(null);
+    const remove = useRemoveItem(selected, select);
+
+    const focusTreeRow = () => {
+        window.requestAnimationFrame(() =>
+            treeBox.current?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"]')?.focus(),
+        );
+    };
+
+    const createIn = (item: ItemRef, key: number | string) => {
+        select(item);
+        setCreatingFor(key);
+    };
+
+    const menuFor = (node: TreeNode): ReactNode => {
+        const item = parseItem(node.id);
+        if (!item) {
+            return null;
+        }
+        const name = node.textValue ?? (typeof node.label === "string" ? node.label : node.id);
+        const label = `Actions for ${name}`;
+        const open = (
+            <DropdownMenuItem onSelect={() => select(item)}>
+                <ArrowRight />
+                Open
+            </DropdownMenuItem>
+        );
+        if (item.kind === "group" && item.id === "datasets") {
+            return (
+                <TreeRowMenu label={label}>
+                    <DropdownMenuItem onSelect={() => createIn(DATASETS_GROUP, "new")}>
+                        <Grid2x2Plus />
+                        New dataset
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() => setAction({ kind: "new-folder", parentId: null })}
+                    >
+                        <FolderPlus />
+                        New folder
+                    </DropdownMenuItem>
+                </TreeRowMenu>
+            );
+        }
+        if (item.kind === "group") {
+            const choices =
+                item.id === "sources"
+                    ? SOURCE_CHOICES
+                    : SOURCE_CHOICES.filter((choice) => choice.kind === item.id);
+            return (
+                <TreeRowMenu label={label}>
+                    {choices.map((choice) => (
+                        <DropdownMenuItem key={choice.kind} onSelect={() => addKind(choice.kind)}>
+                            <KindIcon kind={choice.kind} />
+                            {choice.label}
+                        </DropdownMenuItem>
+                    ))}
+                </TreeRowMenu>
+            );
+        }
+        if (item.kind === "folder") {
+            const folder = index.byId.get(item.id);
+            if (!folder) {
+                return null;
+            }
+            return (
+                <TreeRowMenu label={label}>
+                    <DropdownMenuItem onSelect={() => createIn(item, itemKey(item))}>
+                        <Grid2x2Plus />
+                        New dataset
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() => setAction({ kind: "new-folder", parentId: folder.id })}
+                    >
+                        <FolderPlus />
+                        New folder
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setAction({ kind: "rename-folder", folder })}>
+                        <Pencil />
+                        Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() =>
+                            setAction({
+                                kind: "move",
+                                target: { item, name: folder.name, from: folder.parent_id },
+                            })
+                        }
+                    >
+                        <FolderInput />
+                        Move to…
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setAction({ kind: "delete-folder", folder })}
+                    >
+                        <Trash2 />
+                        Delete
+                    </DropdownMenuItem>
+                </TreeRowMenu>
+            );
+        }
+        if (item.kind === "dataset") {
+            const dataset = datasetList.find((row) => row.slug === item.id);
+            if (!dataset) {
+                return null;
+            }
+            return (
+                <TreeRowMenu label={label}>
+                    {open}
+                    <DropdownMenuItem
+                        onSelect={() => setAction({ kind: "rename-dataset", dataset })}
+                    >
+                        <Pencil />
+                        Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() =>
+                            setAction({
+                                kind: "move",
+                                target: {
+                                    item,
+                                    name: dataset.name,
+                                    from: dataset.folder_id ?? null,
+                                },
+                            })
+                        }
+                    >
+                        <FolderInput />
+                        Move to…
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DeleteItem
+                        blocked={dataset.models.length > 0 ? "Used by models" : null}
+                        onSelect={() => setAction({ kind: "delete-dataset", dataset })}
+                    />
+                </TreeRowMenu>
+            );
+        }
+        const source = sourceList.find((row) => row.id === item.id);
+        if (!source) {
+            return null;
+        }
+        const readers = datasetList.filter((dataset) => usesSource(dataset, source.id)).length;
+        return (
+            <TreeRowMenu label={label}>
+                {open}
+                <DropdownMenuItem onSelect={() => createIn(item, source.id)}>
+                    <Grid2x2Plus />
+                    New dataset
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setAction({ kind: "rename-source", source })}>
+                    <Pencil />
+                    Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DeleteItem
+                    blocked={readers > 0 ? "Used by datasets" : null}
+                    onSelect={() => setAction({ kind: "delete-source", source })}
+                />
+            </TreeRowMenu>
+        );
+    };
+
     const focusTree = (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key === "ArrowDown") {
             const stop = treeBox.current?.querySelector<HTMLElement>(
@@ -486,7 +644,7 @@ export function DataExplorer() {
                 <SourcesOverview
                     sources={sourceList}
                     datasets={datasetList}
-                    onUploaded={onUploaded}
+                    adder={adder}
                     onAdd={add}
                     onSelect={select}
                 />
@@ -497,6 +655,7 @@ export function DataExplorer() {
                     kind={selected.id as SourceKind}
                     sources={sourceList}
                     datasets={datasetList}
+                    adder={adder}
                     onUploaded={onUploaded}
                     onAdd={add}
                 />
@@ -562,9 +721,12 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."
-                    actions={<AddSourceMenu onUploaded={onUploaded} onAdd={add} />}
+                    actions={<AddSourceMenu adder={adder} onAdd={add} />}
                 />
-                <ErrorLine error={sources.error ?? datasets.error ?? folders.error} />
+                <ErrorLine
+                    error={sources.error ?? datasets.error ?? folders.error ?? adder.error}
+                />
+                {adder.picker}
             </div>
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t @3xl:flex-row @3xl:overflow-hidden">
                 <aside
@@ -590,7 +752,7 @@ export function DataExplorer() {
                                     : `${count(matches)} match${matches === 1 ? "" : "es"}`}
                             </p>
                         )}
-                        <ErrorLine error={move.error} />
+                        <ErrorLine error={move.error ?? remove.error} />
                     </div>
                     <div ref={treeBox} className="min-h-0 flex-1 overflow-y-auto">
                         {loading ? (
@@ -610,6 +772,7 @@ export function DataExplorer() {
                                     }
                                     onMove={onMove}
                                     canDrop={canDrop}
+                                    rowActions={menuFor}
                                     empty={
                                         <p className="p-3 text-sm text-muted-foreground">
                                             Nothing matches. Search looks in names, column names,
@@ -649,6 +812,16 @@ export function DataExplorer() {
                     {detail}
                 </section>
             </div>
+            <TreeActionDialogs
+                action={action}
+                index={index}
+                onClose={() => {
+                    setAction(null);
+                    focusTreeRow();
+                }}
+                onSelect={select}
+                onRemove={(removal) => remove.mutateAsync(removal)}
+            />
             <AddFolderDialog
                 open={adding === "folder"}
                 roots={roots.data?.roots ?? []}

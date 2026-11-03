@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BookMarked, FolderTree, Globe, Package, Server } from "lucide-react";
+import { BookMarked, Cpu, FolderTree, Globe, Package, Server } from "lucide-react";
 import {
     Badge,
     Button,
@@ -18,6 +18,7 @@ import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SoftwareMark } from "~/components/SoftwareMark";
 import { count } from "~/lib/format";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 
@@ -79,6 +80,33 @@ function Row({
     return <SettingsRow label={label} description={description} control={children} />;
 }
 
+function SoftwareRow({
+    label,
+    mark,
+    fallback,
+    description,
+    children,
+}: {
+    label: string;
+    mark: string;
+    fallback?: ReactNode;
+    description?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <SettingsRow
+            label={
+                <span className="flex items-center gap-2.5">
+                    <SoftwareMark name={mark} fallback={fallback} />
+                    {label}
+                </span>
+            }
+            description={description}
+            control={children}
+        />
+    );
+}
+
 function version(value: string | null | undefined): ReactNode {
     return value ? <Text>{value}</Text> : <Muted>Not installed</Muted>;
 }
@@ -105,11 +133,12 @@ function Software({ info }: { info: InstallInfo }) {
             actions={<CopyButton value={versionsText(info)} label="Copy versions" />}
         >
             <SettingsGroup>
-                <Row label="minibrain">
+                <SoftwareRow label="minibrain" mark="minibrain">
                     <Text>{software.minibrain}</Text>
-                </Row>
-                <Row
+                </SoftwareRow>
+                <SoftwareRow
                     label="Build"
+                    mark="git"
                     description={
                         software.commit ? "The commit this install was built from." : undefined
                     }
@@ -122,17 +151,29 @@ function Software({ info }: { info: InstallInfo }) {
                     ) : (
                         <Muted>Not recorded</Muted>
                     )}
-                </Row>
-                <Row label="Python">{version(software.python)}</Row>
-                <Row label="DuckDB">{version(software.duckdb)}</Row>
-                <Row label="PyTorch">{version(software.torch)}</Row>
-                <Row label="Transformers">{version(software.transformers)}</Row>
-                <Row label="Operating system">
+                </SoftwareRow>
+                <SoftwareRow label="Python" mark="python">
+                    {version(software.python)}
+                </SoftwareRow>
+                <SoftwareRow label="DuckDB" mark="duckdb">
+                    {version(software.duckdb)}
+                </SoftwareRow>
+                <SoftwareRow label="PyTorch" mark="pytorch">
+                    {version(software.torch)}
+                </SoftwareRow>
+                <SoftwareRow label="Transformers" mark="transformers">
+                    {version(software.transformers)}
+                </SoftwareRow>
+                <SoftwareRow label="Operating system" mark={software.system}>
                     <Text>{software.system}</Text>
-                </Row>
-                <Row label="Architecture">
+                </SoftwareRow>
+                <SoftwareRow
+                    label="Architecture"
+                    mark="cpu"
+                    fallback={<Cpu className="text-muted-foreground" />}
+                >
                     <Text>{software.arch}</Text>
-                </Row>
+                </SoftwareRow>
             </SettingsGroup>
         </PanelSection>
     );
