@@ -177,6 +177,7 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
     const online = pool.nodes.filter((node) => node.online).length;
     return (
         <PanelSection
+            bare
             icon={Server}
             title={pool.name === "local" ? pool.label : `Pool ${pool.label}`}
             description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
@@ -347,7 +348,7 @@ const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
 
 function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
-        <PanelSection icon={HardDrive} title="Storage">
+        <PanelSection bare icon={HardDrive} title="Storage">
             <div className="flex flex-col gap-3">
                 <DataGrid columns={STORE_COLUMNS} rows={info?.stores ?? []} />
                 <p className="text-sm text-muted-foreground">
@@ -531,6 +532,7 @@ export function InfrastructurePage() {
                         </div>
                     </PanelSection>
                     <PanelSection
+                        bare
                         icon={MemoryStick}
                         title="Loaded in memory"
                         description="Base models and adapters the serving process holds right now."
