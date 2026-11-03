@@ -973,7 +973,7 @@ function BulkBar({
                 Undeploy
             </Button>
             <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
                 disabled={act.isPending}
                 onClick={() =>
