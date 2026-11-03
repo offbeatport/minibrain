@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import {
+    Badge,
     Button,
     Checkbox,
     Field,
-    InfoTip,
     Input,
     Label,
     Select,
@@ -176,8 +176,68 @@ const FIT_TEXT: Record<string, string> = {
     unknown: "Fit not checked",
 };
 
-const SOURCE_HELP =
-    "A Hugging Face model id or link (downloaded), an s3:// path, or an absolute folder path on the minibrain server (imported). Files must be in Hugging Face format: config.json, tokenizer files and .safetensors weights.";
+type SourceKind = "hub" | "s3" | "folder";
+
+const SOURCE_KINDS: { kind: SourceKind; title: string; example: string; body: string }[] = [
+    {
+        kind: "hub",
+        title: "Hugging Face model",
+        example: "Qwen/Qwen3-1.7B or a huggingface.co link",
+        body: "Looked up on Hugging Face and downloaded into this install at a fixed revision. Catalogue models use the tested revision. Hugging Face must be allowed under Model sources in Security.",
+    },
+    {
+        kind: "s3",
+        title: "S3 path",
+        example: "s3://bucket/models/qwen3-1.7b",
+        body: "Copied from your bucket into this install. The S3 endpoint must be allowed by the network policy in Security. The bucket is left as it was.",
+    },
+    {
+        kind: "folder",
+        title: "Folder on the minibrain server",
+        example: "/srv/models/qwen3-1.7b",
+        body: "A folder on the machine running minibrain, not on this computer. It is checked, then copied into this install; the original folder is left as it was.",
+    },
+];
+
+function sourceKindOf(text: string, target: SourcePlan["target"]): SourceKind | null {
+    if (target.kind === "catalogue" || target.kind === "hub") {
+        return "hub";
+    }
+    if (target.kind === "path") {
+        return text.trim().startsWith("s3://") ? "s3" : "folder";
+    }
+    return null;
+}
+
+function SourceKinds({ active }: { active: SourceKind | null }) {
+    return (
+        <div className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y rounded-md border">
+                {SOURCE_KINDS.map((item) => (
+                    <li
+                        key={item.kind}
+                        data-active={item.kind === active || undefined}
+                        className="flex flex-col gap-0.5 border-l-2 border-l-transparent px-3 py-2.5 data-active:border-l-primary data-active:bg-accent/60"
+                    >
+                        <span className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">{item.title}</span>
+                            {item.kind === active && <Badge variant="outline">Detected</Badge>}
+                        </span>
+                        <span className="font-mono text-sm text-muted-foreground">
+                            {item.example}
+                        </span>
+                        <span className="text-sm">{item.body}</span>
+                    </li>
+                ))}
+            </ul>
+            <p className="text-sm text-muted-foreground">
+                Every file gets a SHA-256 record, so the model can be verified and repaired later.
+                Files must be in Hugging Face format: config.json, tokenizer files and .safetensors
+                weights. GGUF files can be served but not fine-tuned.
+            </p>
+        </div>
+    );
+}
 
 export function looksLikeSource(text: string): boolean {
     return text.trim().includes("/");
@@ -332,12 +392,9 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-                <span className="flex items-center gap-1.5">
-                    <label htmlFor="base-source" className="text-sm font-medium">
-                        Hugging Face model, S3 path or folder
-                    </label>
-                    <InfoTip label="What can I add?">{SOURCE_HELP}</InfoTip>
-                </span>
+                <label htmlFor="base-source" className="text-sm font-medium">
+                    Hugging Face model, S3 path or folder
+                </label>
                 <Input
                     id="base-source"
                     value={text}
@@ -373,6 +430,7 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                     {pick?.kind === "import" ? "Import this model" : "Use this model"}
                 </Button>
             </div>
+            <SourceKinds active={sourceKindOf(text, plan.target)} />
         </div>
     );
 }
