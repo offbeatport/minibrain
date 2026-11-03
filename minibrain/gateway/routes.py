@@ -1,14 +1,16 @@
+import contextlib
 import json
 import time
 import uuid
-from collections.abc import Iterator
-from typing import Annotated
+from collections.abc import Callable, Iterator
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from minibrain.base_models import BaseModelSpec, base_model
+from minibrain.data.feedback import ORIGIN_API, Submission
 from minibrain.data.snapshot import Example
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.logs import LogBuffer, LogEntry
@@ -22,6 +24,10 @@ from minibrain.tasks.classify import build_messages
 router = APIRouter(prefix="/v1", tags=["openai"])
 
 DEFAULT_MAX_TOKENS = 64
+TEXT_MAX = 50_000
+COMMENT_MAX = 2_000
+
+FeedbackSink = Callable[[Submission], int]
 
 
 class Message(BaseModel):
@@ -113,6 +119,15 @@ def plain(messages: list[Message]) -> list[dict[str, str]]:
     return [{"role": message.role, "content": message.content or ""} for message in messages]
 
 
+def last_user_text(messages: list[Message]) -> str | None:
+    texts = [message.content for message in messages if message.role == "user" and message.content]
+    return texts[-1] if texts else None
+
+
+def response_id() -> str:
+    return f"chatcmpl-{uuid.uuid4().hex}"
+
+
 def usage(completion: Completion) -> dict[str, int]:
     return {
         "prompt_tokens": completion.prompt_tokens,
@@ -165,6 +180,7 @@ def chat_completions(
 ) -> dict | StreamingResponse:
     started = time.monotonic()
     logs: LogBuffer = request.app.state.request_logs
+    identifier = response_id()
     route = config.routes.get(body.model)
     status = 200
     completion: Completion | None = None
@@ -190,12 +206,68 @@ def chat_completions(
                 latency_ms=(time.monotonic() - started) * 1000,
                 prompt_tokens=completion.prompt_tokens if completion else 0,
                 completion_tokens=completion.completion_tokens if completion else 0,
+                response_id=identifier if completion else None,
+                input=last_user_text(body.messages) if completion and config.request_bodies else None,
+                output=completion.text if completion and config.request_bodies else None,
                 recorded=config.request_logs,
             )
         )
     if completion is None:
         raise HTTPException(status_code=500, detail="no completion")
-    identifier = f"chatcmpl-{uuid.uuid4().hex}"
     if body.stream:
         return StreamingResponse(stream_events(identifier, body.model, completion), media_type="text/event-stream")
     return response_body(identifier, body.model, completion)
+
+
+class FeedbackRequest(BaseModel):
+    model: str = Field(description="The model name the completion was requested from, such as support-triage.")
+    response_id: str = Field(
+        min_length=1, max_length=200, description="The id of the chat completion, as the gateway returned it."
+    )
+    rating: Literal["up", "down"] = Field(description="up when the answer was right, down when it was wrong.")
+    correction: str | None = Field(
+        default=None, max_length=TEXT_MAX, description="The right answer, when the rating is down and it is known."
+    )
+    comment: str | None = Field(default=None, max_length=COMMENT_MAX, description="A note for the reviewer.")
+    input: str | None = Field(
+        default=None,
+        max_length=TEXT_MAX,
+        description="The user message the model answered. Required unless this install keeps request inputs.",
+    )
+    output: str | None = Field(
+        default=None, max_length=TEXT_MAX, description="The answer the app received, when inputs are not kept."
+    )
+
+
+class FeedbackReceipt(BaseModel):
+    id: int
+    object: Literal["feedback"] = "feedback"
+    status: Literal["pending"] = "pending"
+
+
+@router.post("/feedback", status_code=201, summary="Rate or correct a chat completion")
+def feedback(body: FeedbackRequest, grant: GrantDep, config: ConfigDep, request: Request) -> FeedbackReceipt:
+    route = config.routes.get(body.model)
+    if route is None:
+        raise HTTPException(status_code=404, detail=f"model {body.model} not found")
+    if not grant.covers(route):
+        raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
+    if route.minibrain_id is None:
+        raise HTTPException(status_code=422, detail="feedback is collected for custom models only")
+    logs: LogBuffer = request.app.state.request_logs
+    with contextlib.suppress(Exception):
+        logs.flush()
+    sink: FeedbackSink = request.app.state.feedback
+    submission = Submission(
+        minibrain_id=route.minibrain_id,
+        origin=ORIGIN_API,
+        rating=body.rating,
+        response_id=body.response_id,
+        version=route.version,
+        key_id=grant.key_id,
+        input=body.input,
+        output=body.output,
+        correction=body.correction,
+        comment=body.comment,
+    )
+    return FeedbackReceipt(id=sink(submission))

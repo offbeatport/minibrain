@@ -135,6 +135,7 @@ class SnapshotInfo(BaseModel):
     created_at: datetime
     taken_at: datetime | None
     checks: list[CheckInfo] = Field(default_factory=list)
+    feedback_rows: int = 0
 
 
 class DismissRequest(BaseModel):
@@ -466,6 +467,7 @@ class CompleteRequest(BaseModel):
 
 
 class CompleteResponse(BaseModel):
+    id: str
     model: str
     output: str
     label: str | None

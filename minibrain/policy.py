@@ -89,6 +89,14 @@ FIELDS: tuple[Field, ...] = (
         True,
     ),
     Field(
+        "request_bodies",
+        "Request inputs and answers",
+        "Also keep each request's input and the model's answer, so apps can send feedback with the response ID "
+        "alone. Needs request logs; kept as long as they are.",
+        "bool",
+        False,
+    ),
+    Field(
         "data_folders",
         "Folder sources",
         "Folders on this server that folder sources may read, with everything under them. Leave empty to allow none.",

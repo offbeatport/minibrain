@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
+from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
 from minibrain.models.cache import touch
@@ -41,11 +42,31 @@ class LogBody(BaseModel):
     latency_ms: float
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    response_id: str | None = None
+    input: str | None = None
+    output: str | None = None
     recorded: bool = True
 
 
 class LogsBody(BaseModel):
     entries: list[LogBody]
+
+
+class FeedbackBody(BaseModel):
+    minibrain_id: int
+    origin: str
+    rating: str
+    response_id: str | None = None
+    version: int | None = None
+    key_id: int | None = None
+    input: str | None = None
+    output: str | None = None
+    correction: str | None = None
+    comment: str | None = None
+
+
+class FeedbackStored(BaseModel):
+    id: int
 
 
 class EngineBody(BaseModel):
@@ -125,6 +146,13 @@ def config(request: Request, version: str = "", wait: float = 0.0) -> Response:
 @router.post("/logs", status_code=204)
 def logs(body: LogsBody, request: Request) -> None:
     database_sink(request.app.state.sessions)([LogEntry(**entry.model_dump()) for entry in body.entries])
+
+
+@router.post("/feedback", status_code=201)
+def feedback(body: FeedbackBody, session: SessionDep) -> FeedbackStored:
+    item = record(session, Submission(**body.model_dump()))
+    session.commit()
+    return FeedbackStored(id=item.id)
 
 
 @router.get("/artifacts/{artifact_id}")

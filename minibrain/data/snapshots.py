@@ -1,5 +1,6 @@
 import tempfile
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -8,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.data.checks import blocking, run_checks
+from minibrain.data.feedback import training_rows
 from minibrain.data.limits import load_limits
 from minibrain.data.shared import dataset_of, dataset_sql, dataset_tables, fingerprint
 from minibrain.data.snapshot import MIN_ROWS, SPLITS, Example, SnapshotError, clean, labels_of, read_rows, split
-from minibrain.data.sources import copy_rows
+from minibrain.data.sources import copy_rows, merge_rows
 from minibrain.registry.files import ArtifactKind, store_file, store_for
 from minibrain.registry.models import Artifact, Dataset, Minibrain, Snapshot, Version, now
 from minibrain.registry.service import ConflictError, latest_snapshot
@@ -49,7 +51,9 @@ def find_snapshot(session: Session, dataset: Dataset, digest: str) -> Snapshot |
     return session.scalar(select(Snapshot).where(Snapshot.dataset_id == dataset.id, Snapshot.hash == digest))
 
 
-def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved: bool) -> Snapshot:
+def take_snapshot(
+    session: Session, settings: Settings, dataset: Dataset, saved: bool, extra: Sequence[Example] = ()
+) -> Snapshot:
     limits = load_limits(session)
     limit = limits.row_limit
     sql = dataset_sql(dataset)
@@ -63,6 +67,9 @@ def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved:
             raise ConflictError(over_limit(limit))
         if rows == 0:
             raise ConflictError("The query returns no rows, so there is nothing to snapshot.")
+        added = 0
+        if extra:
+            rows, added = merge_rows(target, [(example.input, example.label) for example in extra])
         rows_read = read_rows(target)
         counts, labels, splits = split_summary(rows_read)
         findings = run_checks(rows_read, splits, limits.checks())
@@ -88,6 +95,7 @@ def take_snapshot(session: Session, settings: Settings, dataset: Dataset, saved:
     found.checks = [finding.as_dict() for finding in findings]
     found.sql = sql
     found.saved = found.saved or saved
+    found.feedback_rows = added
     found.taken_at = moment
     session.flush()
     return found
@@ -98,10 +106,14 @@ def snapshot_for_model(session: Session, settings: Settings, minibrain: Minibrai
         current = latest_snapshot(minibrain)
         if current is not None:
             return current
-    snapshot = take_snapshot(session, settings, dataset_of(minibrain), saved)
+    snapshot = model_snapshot_now(session, settings, minibrain, saved)
     minibrain.snapshot = snapshot
     session.flush()
     return snapshot
+
+
+def model_snapshot_now(session: Session, settings: Settings, minibrain: Minibrain, saved: bool) -> Snapshot:
+    return take_snapshot(session, settings, dataset_of(minibrain), saved, training_rows(session, minibrain))
 
 
 def require_splits(snapshot: Snapshot) -> None:

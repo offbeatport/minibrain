@@ -31,7 +31,7 @@ from minibrain.data.shared import (
     sources_in,
     tables_of,
 )
-from minibrain.data.snapshots import cleanup, take_snapshot
+from minibrain.data.snapshots import cleanup, model_snapshot_now
 from minibrain.data.sources import safe_filename
 from minibrain.models.registry import available_bases, base_readiness
 from minibrain.registry.files import snapshot_dir
@@ -197,7 +197,7 @@ def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreD
 @router.post("/{slug}/snapshots", status_code=201)
 def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    minibrain.snapshot = take_snapshot(session, settings, dataset_of(minibrain), saved=True)
+    minibrain.snapshot = model_snapshot_now(session, settings, minibrain, saved=True)
     cleanup(session, settings)
     session.commit()
     return detail(settings, minibrain)

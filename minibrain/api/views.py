@@ -71,6 +71,7 @@ def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
         created_at=snapshot.created_at,
         taken_at=snapshot.taken_at,
         checks=check_infos(snapshot),
+        feedback_rows=snapshot.feedback_rows,
     )
 
 

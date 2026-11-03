@@ -1,11 +1,13 @@
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException
 
+from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
 from minibrain.gateway.config import GatewayConfig, RemoteConfig
 from minibrain.gateway.logs import LogBuffer, LogEntry
@@ -36,6 +38,17 @@ def create_gateway_app(
         body = {"entries": [entry.as_json() for entry in batch]}
         client.request("POST", "/internal/gateway/logs", json=body, headers=headers).raise_for_status()
 
+    def send_feedback(submission: Submission) -> int:
+        try:
+            response = client.request("POST", "/internal/gateway/feedback", json=asdict(submission), headers=headers)
+        except Exception as error:
+            detail = "main is unreachable, so the feedback was not stored; send it again"
+            raise HTTPException(status_code=503, detail=detail) from error
+        if response.status_code in (404, 422):
+            raise HTTPException(status_code=response.status_code, detail=response.json().get("detail"))
+        response.raise_for_status()
+        return int(response.json()["id"])
+
     source = RemoteConfig(fetch, home / "gateway-config.json")
     logs = LogBuffer(ship)
 
@@ -53,6 +66,7 @@ def create_gateway_app(
     app = FastAPI(title="minibrain gateway", lifespan=lifespan)
     app.state.gateway_config = source
     app.state.request_logs = logs
+    app.state.feedback = send_feedback
     serving = backend or EngineBackend(lambda: source.current().engines)
     app.state.backend = serving
     app.include_router(routes.router)

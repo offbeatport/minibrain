@@ -14,7 +14,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import detail, version_info
 from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
-from minibrain.gateway.routes import run
+from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.models.cache import touch
@@ -139,6 +139,7 @@ def complete(
     touch(session, minibrain.base_model)
     session.commit()
     return CompleteResponse(
+        id=response_id(),
         model=f"{route.slug}@{route.version}",
         output=completion.text,
         label=parse_label(completion.text, route.labels),

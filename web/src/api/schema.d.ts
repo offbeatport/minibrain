@@ -1437,6 +1437,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Feedback */
+        get: operations["list_feedback_api_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Feedback Facets */
+        get: operations["feedback_facets_api_feedback_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/{feedback_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Feedback */
+        get: operations["read_feedback_api_feedback__feedback_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/{feedback_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Feedback */
+        post: operations["review_feedback_api_feedback__feedback_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/{feedback_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Feedback */
+        post: operations["assign_feedback_api_feedback__feedback_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Playground Feedback */
+        post: operations["playground_feedback_api_minibrains__slug__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/feedback/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Feedback Summary */
+        get: operations["feedback_summary_api_minibrains__slug__feedback_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/keys": {
         parameters: {
             query?: never;
@@ -1762,6 +1881,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rate or correct a chat completion */
+        post: operations["feedback_v1_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/worker/register": {
         parameters: {
             query?: never;
@@ -1967,6 +2103,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/gateway/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Feedback */
+        post: operations["feedback_internal_gateway_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/gateway/artifacts/{artifact_id}": {
         parameters: {
             query?: never;
@@ -2066,6 +2219,11 @@ export interface components {
             availability: components["schemas"]["Availability"];
             /** Error */
             error: string | null;
+        };
+        /** AssignRequest */
+        AssignRequest: {
+            /** Mine */
+            mine: boolean;
         };
         /** AttemptInfo */
         AttemptInfo: {
@@ -2869,6 +3027,8 @@ export interface components {
         };
         /** CompleteResponse */
         CompleteResponse: {
+            /** Id */
+            id: string;
             /** Model */
             model: string;
             /** Output */
@@ -3375,6 +3535,238 @@ export interface components {
             log?: string | null;
             /** Code */
             code?: string | null;
+        };
+        /** FeedbackBody */
+        FeedbackBody: {
+            /** Minibrain Id */
+            minibrain_id: number;
+            /** Origin */
+            origin: string;
+            /** Rating */
+            rating: string;
+            /** Response Id */
+            response_id?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Key Id */
+            key_id?: number | null;
+            /** Input */
+            input?: string | null;
+            /** Output */
+            output?: string | null;
+            /** Correction */
+            correction?: string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** FeedbackDetail */
+        FeedbackDetail: {
+            /** Id */
+            id: number;
+            /** Model */
+            model: string;
+            /** Model Name */
+            model_name: string;
+            /** Version */
+            version: number | null;
+            /** Origin */
+            origin: string;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /** Input */
+            input: string;
+            /** Output */
+            output: string | null;
+            /** Correction */
+            correction: string | null;
+            /** Comment */
+            comment: string | null;
+            /** Suggestion */
+            suggestion: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "rejected";
+            /** Label */
+            label: string | null;
+            /**
+             * Signal
+             * @enum {string}
+             */
+            signal: "conflict" | "unsure" | "none";
+            /** Assignee */
+            assignee: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Response Id */
+            response_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Related */
+            related: components["schemas"]["FeedbackInfo"][];
+            /** Labels */
+            labels: string[];
+            request: components["schemas"]["LoggedRequest"] | null;
+        };
+        /** FeedbackFacets */
+        FeedbackFacets: {
+            /** Total */
+            total: number;
+            /** Statuses */
+            statuses: {
+                [key: string]: number;
+            };
+            /** Minibrains */
+            minibrains: {
+                [key: string]: number;
+            };
+        };
+        /** FeedbackInfo */
+        FeedbackInfo: {
+            /** Id */
+            id: number;
+            /** Model */
+            model: string;
+            /** Model Name */
+            model_name: string;
+            /** Version */
+            version: number | null;
+            /** Origin */
+            origin: string;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /** Input */
+            input: string;
+            /** Output */
+            output: string | null;
+            /** Correction */
+            correction: string | null;
+            /** Comment */
+            comment: string | null;
+            /** Suggestion */
+            suggestion: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "rejected";
+            /** Label */
+            label: string | null;
+            /**
+             * Signal
+             * @enum {string}
+             */
+            signal: "conflict" | "unsure" | "none";
+            /** Assignee */
+            assignee: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Response Id */
+            response_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** FeedbackPage */
+        FeedbackPage: {
+            /** Items */
+            items: components["schemas"]["FeedbackInfo"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
+        /** FeedbackReceipt */
+        FeedbackReceipt: {
+            /** Id */
+            id: number;
+            /**
+             * Object
+             * @default feedback
+             * @constant
+             */
+            object?: "feedback";
+            /**
+             * Status
+             * @default pending
+             * @constant
+             */
+            status?: "pending";
+        };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /**
+             * Model
+             * @description The model name the completion was requested from, such as support-triage.
+             */
+            model: string;
+            /**
+             * Response Id
+             * @description The id of the chat completion, as the gateway returned it.
+             */
+            response_id: string;
+            /**
+             * Rating
+             * @description up when the answer was right, down when it was wrong.
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /**
+             * Correction
+             * @description The right answer, when the rating is down and it is known.
+             */
+            correction?: string | null;
+            /**
+             * Comment
+             * @description A note for the reviewer.
+             */
+            comment?: string | null;
+            /**
+             * Input
+             * @description The user message the model answered. Required unless this install keeps request inputs.
+             */
+            input?: string | null;
+            /**
+             * Output
+             * @description The answer the app received, when inputs are not kept.
+             */
+            output?: string | null;
+        };
+        /** FeedbackStored */
+        FeedbackStored: {
+            /** Id */
+            id: number;
+        };
+        /** FeedbackSummary */
+        FeedbackSummary: {
+            /** Version */
+            version: number | null;
+            /** Since */
+            since: string | null;
+            /** Total */
+            total: number;
+            /** Accepted */
+            accepted: number;
+            /** Pending */
+            pending: number;
+            /** Rows */
+            rows: number;
         };
         /** FitInfo */
         FitInfo: {
@@ -3939,11 +4331,31 @@ export interface components {
              * @default 0
              */
             completion_tokens?: number;
+            /** Response Id */
+            response_id?: string | null;
+            /** Input */
+            input?: string | null;
+            /** Output */
+            output?: string | null;
             /**
              * Recorded
              * @default true
              */
             recorded?: boolean;
+        };
+        /** LoggedRequest */
+        LoggedRequest: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Status */
+            status: number;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Key Name */
+            key_name: string | null;
         };
         /** LogsBody */
         LogsBody: {
@@ -4286,6 +4698,26 @@ export interface components {
             /** Pinned */
             pinned: boolean;
         };
+        /** PlaygroundFeedback */
+        PlaygroundFeedback: {
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "up" | "down";
+            /** Input */
+            input: string;
+            /** Output */
+            output?: string | null;
+            /** Correction */
+            correction?: string | null;
+            /** Comment */
+            comment?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Response Id */
+            response_id?: string | null;
+        };
         /** PolicyChoice */
         PolicyChoice: {
             /** Value */
@@ -4414,6 +4846,16 @@ export interface components {
              */
             seen_at: string;
         };
+        /** ReviewRequest */
+        ReviewRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "accept" | "reject";
+            /** Label */
+            label?: string | null;
+        };
         /** S3SourceCreate */
         S3SourceCreate: {
             /** Connection Id */
@@ -4494,6 +4936,11 @@ export interface components {
             taken_at: string | null;
             /** Checks */
             checks?: components["schemas"]["CheckInfo"][];
+            /**
+             * Feedback Rows
+             * @default 0
+             */
+            feedback_rows?: number;
         };
         /** SnapshotUsage */
         SnapshotUsage: {
@@ -8074,6 +8521,243 @@ export interface operations {
             };
         };
     };
+    list_feedback_api_feedback_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+                model?: string[] | null;
+                status?: string[] | null;
+                assignee?: string[] | null;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_facets_api_feedback_facets_get: {
+        parameters: {
+            query?: {
+                model?: string[] | null;
+                status?: string[] | null;
+                assignee?: string[] | null;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackFacets"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_feedback_api_feedback__feedback_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_feedback_api_feedback__feedback_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_feedback_api_feedback__feedback_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feedback_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    playground_feedback_api_minibrains__slug__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaygroundFeedback"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_summary_api_minibrains__slug__feedback_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_keys_api_keys_get: {
         parameters: {
             query?: never;
@@ -8662,6 +9346,39 @@ export interface operations {
             };
         };
     };
+    feedback_v1_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_worker_internal_worker_register_post: {
         parameters: {
             query?: never;
@@ -9096,6 +9813,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_internal_gateway_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackStored"];
+                };
             };
             /** @description Validation Error */
             422: {

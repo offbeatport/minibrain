@@ -17,6 +17,7 @@ from minibrain.api import (
     connections,
     data,
     dataset_folders,
+    feedback,
     install,
     internal,
     internal_gateway,
@@ -37,6 +38,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
 from minibrain.data.extensions import configure as configure_extensions
+from minibrain.data.feedback import FeedbackError, database_feedback
 from minibrain.data.snapshot import SnapshotError
 from minibrain.data.sources import SourceError
 from minibrain.gateway import routes as gateway
@@ -75,6 +77,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     SourceError: 422,
     TagError: 422,
     SnapshotError: 422,
+    FeedbackError: 422,
     ArtifactError: 422,
     EngineUnavailableError: 503,
     PolicyError: 403,
@@ -187,6 +190,7 @@ def create_app(
         sessions, app.state.store, settings, engines.ensure if engines else no_engines, max_age=config_max_age
     )
     app.state.request_logs = LogBuffer(database_sink(sessions))
+    app.state.feedback = database_feedback(sessions)
     app.state.background = background
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
@@ -204,6 +208,7 @@ def create_app(
         audit,
         versions,
         cards,
+        feedback,
         keys,
         jobs,
         install,

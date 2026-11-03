@@ -416,3 +416,35 @@ def copy_rows(
     with duckdb.connect() as connection:
         found = connection.execute("SELECT count(*) FROM read_parquet(?)", [str(target)]).fetchone()
     return int(found[0]) if found else 0
+
+
+FEEDBACK_CHANGES = (
+    "CREATE TABLE changes AS SELECT f.* FROM feedback_rows f WHERE NOT ("
+    "EXISTS (SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.label = f.label) AND NOT EXISTS "
+    "(SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.label IS DISTINCT FROM f.label))"
+)
+FEEDBACK_MERGED = (
+    "SELECT * FROM (SELECT * FROM dataset WHERE input IS NULL OR trim(input) NOT IN (SELECT input FROM changes) "
+    "UNION ALL BY NAME SELECT * FROM changes) ORDER BY ALL"
+)
+
+
+def merge_rows(target: Path, rows: Sequence[tuple[str, str]]) -> tuple[int, int]:
+    merged = target.with_name(f"merged-{target.name}")
+    with duckdb.connect() as connection:
+        connection.execute(f"CREATE VIEW dataset AS SELECT * FROM read_parquet({quote_literal(str(target))})")
+        connection.execute("CREATE TABLE feedback_rows (input VARCHAR, label VARCHAR)")
+        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?)", list(rows))
+        connection.execute(FEEDBACK_CHANGES)
+        found = connection.execute("SELECT count(*) FROM changes").fetchone()
+        changed = int(found[0]) if found else 0
+        if changed:
+            connection.execute(
+                f"COPY ({FEEDBACK_MERGED}) TO {quote_literal(str(merged))} "
+                "(FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 100000)"
+            )
+    if changed:
+        merged.replace(target)
+    with duckdb.connect() as connection:
+        total = connection.execute("SELECT count(*) FROM read_parquet(?)", [str(target)]).fetchone()
+    return (int(total[0]) if total else 0), changed

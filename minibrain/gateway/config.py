@@ -74,6 +74,7 @@ class GatewayConfig:
     engines: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
     request_logs: bool = True
+    request_bodies: bool = False
     problems: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
@@ -90,6 +91,7 @@ class GatewayConfig:
             engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
             request_logs=bool(data.get("request_logs", True)),
+            request_bodies=bool(data.get("request_bodies", False)),
             problems=dict(data.get("problems", {})),
         )
 
@@ -196,7 +198,8 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         )
         for key in session.scalars(select(ApiKey))
     }
-    logging = bool(load_policy(session)["request_logs"])
+    policy = load_policy(session)
+    logging = bool(policy["request_logs"])
     config = GatewayConfig(
         version="",
         routes=routes,
@@ -205,6 +208,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         engines=engines,
         bases=bases,
         request_logs=logging,
+        request_bodies=logging and bool(policy["request_bodies"]),
         problems=problems,
     )
     return replace(config, version=hash_of(config.to_json()))

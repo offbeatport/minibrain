@@ -26,6 +26,9 @@ class LogEntry:
     latency_ms: float
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    response_id: str | None = None
+    input: str | None = None
+    output: str | None = None
     recorded: bool = True
 
     def as_json(self) -> dict:
