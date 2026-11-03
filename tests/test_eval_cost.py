@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,12 +25,16 @@ class FakeRuntime:
         self.spec = spec
         self.device = "cpu"
         self.batches: list[int] = []
+        self.choices: list[tuple[str, ...]] = []
 
     def render(self, messages: list[dict[str, str]]) -> str:
         return messages[-1]["content"]
 
-    def generate(self, prompts: list[str], adapter: str | None, max_new_tokens: int) -> list[Completion]:
+    def generate(
+        self, prompts: list[str], adapter: str | None, max_new_tokens: int, choices: Sequence[str] = ()
+    ) -> list[Completion]:
         self.batches.append(len(prompts))
+        self.choices.append(tuple(choices))
         return [
             Completion(
                 text=LABELS[0],
@@ -110,6 +115,8 @@ def test_eval_times_the_device_per_batch_of_held_out_rows(
     evaluate.main(spec)
     metrics = json.loads(spec.result_path.read_text())["metrics"]
     assert runtimes[0].batches == [1] + [1] * 20 + [8, 8, 8, 6]
+    assert set(runtimes[0].choices) == {tuple(sorted(LABELS))}
+    assert metrics["decoding"] == "labels"
     cost = metrics["cost"]
     assert cost | {"device_name": None, "prompt_tokens": None} == {
         "source": "device_time",

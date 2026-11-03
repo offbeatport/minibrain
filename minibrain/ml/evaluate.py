@@ -71,7 +71,9 @@ class Evaluation:
         completions: list[Completion] = []
         seconds = 0.0
         for start in range(0, len(prompts), batch_size):
-            batch = self.runtime.generate(prompts[start : start + batch_size], self.adapter, MAX_NEW_TOKENS)
+            batch = self.runtime.generate(
+                prompts[start : start + batch_size], self.adapter, MAX_NEW_TOKENS, self.labels
+            )
             completions += batch
             seconds += max((c.seconds for c in batch), default=0.0)
             self.advance(len(batch))
@@ -84,7 +86,7 @@ def main(spec: JobSpec) -> None:
     held_out = read_split(snapshot, "eval")
     runtime = Runtime(spec.base)
     evaluation = Evaluation(spec, runtime, len(golden) + len(held_out))
-    runtime.generate(evaluation.prompts(golden[:1]), evaluation.adapter, MAX_NEW_TOKENS)
+    runtime.generate(evaluation.prompts(golden[:1]), evaluation.adapter, MAX_NEW_TOKENS, evaluation.labels)
     golden_pass = evaluation.run(golden, batch_size=1)
     eval_pass = evaluation.run(held_out, batch_size=BATCH_SIZE)
     labels = evaluation.labels
@@ -95,6 +97,7 @@ def main(spec: JobSpec) -> None:
         "latency": latency([c.seconds for c in golden_completions]),
         "prompt_tokens": mean_of([c.prompt_tokens for c in golden_completions]),
         "device": runtime.device,
+        "decoding": "labels",
         "cost": measured_cost(eval_pass, runtime.device, device_name(runtime.device), spec.raw.get("pool")),
     }
     write_result(spec, {"metrics": metrics})

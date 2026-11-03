@@ -491,6 +491,8 @@ once it matches; only the cache budget below removes files.
   Otherwise the report shows the gap a trained version has to close.
 - Every version runs on the golden set and the held-out split: base, teacher and adapter on the same examples, scored
   with the task type's metric.
+- Eval decodes the way serving does: a Classify answer is held to the label set, so the score is what apps get and
+  "not a label" only counts answers cut off by the token limit.
 - Reported per model: score, p50 / p95 latency, cost per 1,000 requests (GPU time for local models, list price for API
   teachers). The headline reads like "base 54% → minibrain 91% at 1/20 of the teacher's cost".
 - Local cost: the eval job times the device per batch of 8 held-out rows and records GPU-seconds, requests, tokens in
@@ -995,6 +997,8 @@ Everything in the v1 scope below, after M1.
       rest not yet)
 - [x] Model card and validation report per version: in-app page, Markdown and JSON with a SHA-256 of the canonical card, editable intended use and known limits (audited)
 - [ ] Reference hardware configs
+- [ ] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`):
+      the last step before tagging v1
 
 ## v2
 
