@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import {
     Button,
-    Checkbox,
     Field,
     FieldGroup,
     Input,
@@ -28,6 +27,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Switch,
     Textarea,
     cn,
 } from "obp-ui";
@@ -309,7 +309,7 @@ function TrainingData({
         onSuccess: (created) => onDataset(created.slug),
     });
     return (
-        <div className="flex flex-col gap-4 pl-6">
+        <div className="flex flex-col gap-4 pl-10">
             <Select
                 value={source}
                 onValueChange={(next) => {
@@ -586,10 +586,7 @@ export function AddModelPage() {
                     <PanelSection icon={Database} title="Training data">
                         <div className="flex flex-col gap-3">
                             <Label className="flex items-center gap-2 font-normal">
-                                <Checkbox
-                                    checked={withData}
-                                    onCheckedChange={(next) => setWithData(next === true)}
-                                />
+                                <Switch checked={withData} onCheckedChange={setWithData} />
                                 Add training data now
                             </Label>
                             {withData ? (
@@ -600,7 +597,7 @@ export function AddModelPage() {
                                     onDataset={setDataset}
                                 />
                             ) : (
-                                <p className="pl-6 text-sm text-muted-foreground">
+                                <p className="pl-10 text-sm text-muted-foreground">
                                     You can add examples later on the Data page. Until it is
                                     trained, the model serves its base model.
                                 </p>
