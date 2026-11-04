@@ -146,7 +146,7 @@ function TaskSelect({ value, onChange }: { value: TaskKey; onChange: (task: Task
     return (
         <Field id="create-task" label="Task">
             <Select value={value} onValueChange={(next) => onChange(taskOf(String(next ?? "")))}>
-                <SelectTrigger id="create-task" className="w-full sm:max-w-sm">
+                <SelectTrigger id="create-task" className="w-full">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -416,7 +416,6 @@ export function AddModelPage() {
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             placeholder={suggestedName || "IT ticket classifier"}
-                            className="sm:max-w-md"
                         />
                     </Field>
                     <Field id="create-description" label={<Optional label="Description" />}>
@@ -443,7 +442,6 @@ export function AddModelPage() {
                             id="create-tags"
                             value={tags}
                             onChange={(event) => setTags(event.target.value)}
-                            className="sm:max-w-md"
                         />
                     </Field>
                     {option?.entry && (
