@@ -452,7 +452,7 @@ export function AddModelPage() {
                         onVariant={changeVariant}
                     />
                 </aside>
-                <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-3 border-t bg-background py-3 lg:col-span-2">
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-4 lg:col-span-2">
                     <ErrorLine error={add.error} />
                     <Button
                         type="button"
