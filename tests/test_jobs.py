@@ -232,7 +232,8 @@ def test_job_rows_cascade_with_the_minibrain(harness: Harness) -> None:
     claim = harness.claim(["train"])
     assert claim is not None
     fail(harness, claim, "x", retryable=False)
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    harness.settle()
     with harness.sessions() as session:
         assert session.get(Job, claim["job_id"]) is None
 

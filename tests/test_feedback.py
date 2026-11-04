@@ -208,6 +208,7 @@ def test_standalone_gateway_forwards_feedback_to_main(harness: Harness, tmp_path
 def test_feedback_is_deleted_with_its_model(harness: Harness) -> None:
     create_with_dataset(harness)
     played(harness, "charged twice", "down", correction="billing")
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    harness.settle()
     with harness.sessions() as session:
         assert session.scalars(select(Feedback)).all() == []

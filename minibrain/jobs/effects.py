@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from minibrain.jobs.queue import enqueue
@@ -16,6 +17,8 @@ from minibrain.registry.models import (
     JobStatus,
     Model,
     ModelStatus,
+    Teardown,
+    TeardownKind,
     VersionStatus,
     now,
 )
@@ -26,6 +29,13 @@ TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
 def nothing() -> None:
     return None
+
+
+def forget_removal(session: Session, model: Model) -> None:
+    removal = delete(Teardown).where(Teardown.model_id == model.id, Teardown.kind == TeardownKind.REMOVE_FILES)
+    session.execute(removal)
+    model.evicted_at = None
+    model.evicted_by = None
 
 
 class DomainEffects:
@@ -89,7 +99,7 @@ class DomainEffects:
         model.error = None
         model.verified_at = now()
         model.last_used_at = now()
-        model.evicted_at = None
+        forget_removal(session, model)
         set_health(model, None)
         self.installed()
 
@@ -111,7 +121,7 @@ class DomainEffects:
         model.updated_at = now()
         if restored:
             model.last_used_at = now()
-            model.evicted_at = None
+            forget_removal(session, model)
             self.installed()
 
     def trained(self, session: Session, job: Job) -> None:

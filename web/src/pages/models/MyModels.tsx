@@ -58,6 +58,7 @@ import { ErrorLine } from "~/components/Section";
 import { type HealthAction, HealthStatus } from "~/components/models/HealthStatus";
 import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { type Abilities, useCan } from "~/lib/access";
 import {
     deploymentPageHref,
@@ -67,7 +68,18 @@ import {
     trainingHref,
 } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
+import {
+    RETRY_LABELS,
+    beingDeleted,
+    builtOn,
+    busyTearingDown,
+    deleteModel,
+    retryTeardown,
+    rowId,
+    setDeployed,
+} from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { DeleteBaseDialog } from "./DeleteBaseDialog";
 import {
     ConfirmAction,
     type Confirmation,
@@ -82,6 +94,7 @@ import {
     STATE_RANK,
     entriesOf,
     entryHealth,
+    entryTeardown,
     failingEntry,
     stateOfEntry,
     usageOf,
@@ -115,6 +128,8 @@ const DEPLOYMENT_TONES: Record<string, Tone> = {
     running: "success",
     starting: "info",
     unhealthy: "destructive",
+    stopping: "info",
+    stop_failed: "destructive",
 };
 
 export function detailHref(row: ModelRow): string {
@@ -145,7 +160,10 @@ export function Availability({ row }: { row: ModelRow }) {
     if (state === "none") {
         return <span className="text-muted-foreground">—</span>;
     }
-    const label = AVAILABILITY_LABELS[state];
+    const label =
+        state === "evicted" && row.health?.state === "evicted"
+            ? row.health.label
+            : AVAILABILITY_LABELS[state];
     const moving = state === "downloading" || state === "importing";
     return (
         <div className="flex items-center gap-2">
@@ -205,6 +223,8 @@ const DEPLOYMENT_STATES: Record<string, string> = {
     running: "Live",
     starting: "Starting",
     unhealthy: "Unhealthy",
+    stopping: "Stopping",
+    stop_failed: "Stop failed",
 };
 
 export function Deployment({ row, short = false }: { row: ModelRow; short?: boolean }) {
@@ -242,6 +262,7 @@ type Handlers = {
     test: (row: ModelRow) => void;
     edit: (row: ModelRow) => void;
     confirm: (confirmation: Confirmation) => void;
+    remove: (row: ModelRow) => void;
     createFrom: (base: string) => void;
     refresh: () => Promise<unknown>;
     health: (row: ModelRow, action: HealthAction) => void;
@@ -255,25 +276,19 @@ function retry(row: ModelRow) {
     return unwrap(api.POST("/api/models/base/{key}/retry", { params: { path: { key: row.key } } }));
 }
 
-function setDeployed(row: ModelRow, deployed: boolean) {
-    const body = { deployed };
-    return row.kind === "base"
-        ? unwrap(
-              api.POST("/api/models/base/{key}/deploy", {
-                  params: { path: { key: row.key } },
-                  body,
-              }),
-          )
-        : unwrap(
-              api.POST("/api/minibrains/{slug}/deploy", {
-                  params: { path: { slug: row.key } },
-                  body,
-              }),
-          );
+function teardownStep(row: ModelRow, on: Handlers): { label: string; run: () => void } | null {
+    const teardown = row.teardown;
+    if (teardown?.state !== "failed") {
+        return null;
+    }
+    return { label: RETRY_LABELS[teardown.kind], run: () => retryTeardown(row).then(on.refresh) };
 }
 
 function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () => void } | null {
     const deployed = row.deployment.state === "running";
+    if (row.teardown) {
+        return teardownStep(row, on);
+    }
     if (row.health) {
         return healthStep(row, row.health.actions[0], on);
     }
@@ -302,12 +317,6 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
         return { label: "Test", run: () => on.test(row) };
     }
     return null;
-}
-
-function deleteModel(row: ModelRow) {
-    return row.kind === "base"
-        ? succeed(api.DELETE("/api/models/base/{key}", { params: { path: { key: row.key } } }))
-        : succeed(api.DELETE("/api/minibrains/{slug}", { params: { path: { slug: row.key } } }));
 }
 
 function DeployedWarning({ row }: { row: ModelRow }) {
@@ -347,10 +356,7 @@ function deleteConfirmation(row: ModelRow, on: Handlers): Confirmation {
             acknowledge: `Undeploy and delete ${row.name}`,
             confirmLabel: "Undeploy and delete",
             destructive: true,
-            run: () =>
-                setDeployed(row, false)
-                    .then(() => deleteModel(row))
-                    .then(on.refresh),
+            run: () => deleteModel(row, { undeploy: true }).then(on.refresh),
         };
     }
     return {
@@ -419,6 +425,9 @@ function versionAction(entry: Entry, on: Handlers): { label: string; run: () => 
     const version = entry.version;
     if (!version) {
         return null;
+    }
+    if (row.teardown) {
+        return entryTeardown(entry) ? teardownStep(row, on) : null;
     }
     const health = entryHealth(entry);
     if (health) {
@@ -524,8 +533,18 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
         !transferring &&
         !more.some((action) => action.kind === "verify") &&
         row.health?.actions[0]?.kind !== "verify";
+    const retryable = row.teardown?.state === "failed" ? row.teardown : null;
     return (
         <>
+            {retryable && (manages || retryable.kind === "undeploy") && (
+                <DropdownMenuItem
+                    className="md:hidden"
+                    onSelect={() => retryTeardown(row).then(on.refresh)}
+                >
+                    <RotateCcw />
+                    {RETRY_LABELS[retryable.kind]}
+                </DropdownMenuItem>
+            )}
             {fixes
                 .filter((action) => manages && action.kind !== "remove")
                 .map((action) => (
@@ -647,10 +666,7 @@ function StopItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: bo
                 </DropdownMenuItem>
             )}
             {(admin || row.kind === "custom") && (
-                <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => on.confirm(deleteConfirmation(row, on))}
-                >
+                <DropdownMenuItem variant="destructive" onSelect={() => on.remove(row)}>
                     <Trash2 />
                     {row.kind === "custom" ? "Delete model and all versions" : "Delete model"}
                 </DropdownMenuItem>
@@ -660,6 +676,7 @@ function StopItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: bo
 }
 
 const VIEWER_STEPS = new Set(["Use API", "Review results", "Test", "Details"]);
+const ADMIN_RETRIES = new Set(["Retry", RETRY_LABELS.delete, RETRY_LABELS.remove_files]);
 
 function allowedStep(
     step: { label: string; run: () => void } | null,
@@ -672,7 +689,7 @@ function allowedStep(
     if (!can.build) {
         return VIEWER_STEPS.has(step.label) ? step : null;
     }
-    return row.kind === "base" && (row.health || step.label === "Retry") ? null : step;
+    return row.kind === "base" && (row.health || ADMIN_RETRIES.has(step.label)) ? null : step;
 }
 
 function ViewerItems({ entry, on }: { entry: Entry; on: Handlers }) {
@@ -694,11 +711,29 @@ function ViewerItems({ entry, on }: { entry: Entry; on: Handlers }) {
     );
 }
 
+function FailedDeleteItems({ row, on, admin }: { row: ModelRow; on: Handlers; admin: boolean }) {
+    return (
+        <>
+            {(admin || row.kind === "custom") && (
+                <DropdownMenuItem onSelect={() => retryTeardown(row).then(on.refresh)}>
+                    <RotateCcw />
+                    {RETRY_LABELS.delete}
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => on.open(detailHref(row))}>
+                <Eye />
+                View details
+            </DropdownMenuItem>
+        </>
+    );
+}
+
 function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
     const can = useCan();
     const step = entry.version ? versionAction(entry, on) : primaryAction(row, on);
     const primary = allowedStep(step, row, can);
+    const busy = busyTearingDown(row);
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
@@ -716,13 +751,16 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
                     <Button
                         variant="ghost"
                         size="icon-xs"
+                        disabled={busy}
                         aria-label={`More actions for ${row.name}`}
                     >
                         <MoreHorizontal />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
-                    {can.build ? (
+                    {can.build && row.teardown?.kind === "delete" ? (
+                        <FailedDeleteItems row={row} on={on} admin={can.admin} />
+                    ) : can.build ? (
                         <>
                             <ActionItems entry={entry} on={on} admin={can.admin} />
                             <DropdownMenuSeparator />
@@ -788,6 +826,10 @@ function StatusCell({ entry }: { entry: Entry }) {
     const { model, version } = entry;
     const state = stateOfEntry(entry);
     const health = entryHealth(entry);
+    const teardown = entryTeardown(entry);
+    if (teardown) {
+        return <TeardownStatus teardown={teardown} name={model.name} />;
+    }
     if (health && !failingEntry(entry)) {
         return <HealthStatus health={health} />;
     }
@@ -1014,9 +1056,12 @@ function ModelListRow({
     widths: ColumnWidths;
 }) {
     const { model } = entry;
+    const deleting = beingDeleted(model);
+    const greyed = deleting ? "opacity-60" : undefined;
     return (
         <li
             data-state={selected ? "selected" : undefined}
+            aria-disabled={deleting || undefined}
             className={cn(
                 ROW_GRID,
                 "relative py-3 hover:bg-secondary has-[a:focus-visible]:bg-secondary data-[state=selected]:bg-accent/60",
@@ -1035,10 +1080,11 @@ function ModelListRow({
                 <Checkbox
                     aria-label={`Select ${model.name}${entry.version ? ` v${entry.version.number}` : ""}`}
                     checked={selected}
+                    disabled={deleting}
                     onCheckedChange={(value) => onSelect(value === true)}
                 />
             </label>
-            <div className="flex min-w-0 items-center gap-3">
+            <div className={cn("flex min-w-0 items-center gap-3", greyed)}>
                 <PublisherLogo publisher={model.publisher} name={model.name} />
                 <div className="flex min-w-0 flex-col">
                     <span className="flex min-w-0 items-center gap-2">
@@ -1062,7 +1108,7 @@ function ModelListRow({
                     </span>
                 </div>
             </div>
-            <div className="hidden min-w-0 truncate md:block">
+            <div className={cn("hidden min-w-0 truncate md:block", greyed)}>
                 <VersionCell entry={entry} />
             </div>
             <div
@@ -1073,7 +1119,7 @@ function ModelListRow({
             >
                 <StatusCell entry={entry} />
             </div>
-            <div className="relative z-10 hidden min-w-0 md:block">
+            <div className={cn("relative z-10 hidden min-w-0 md:block", greyed)}>
                 <Requests
                     usage={usageOf(entry)}
                     live={
@@ -1273,17 +1319,28 @@ async function undeploySelected(chosen: Entry[]): Promise<void> {
     }
 }
 
-async function deleteSelected(chosen: Entry[]): Promise<void> {
-    await undeploySelected(chosen);
+async function deleteSelected(chosen: Entry[], rows: ModelRow[]): Promise<void> {
     const whole = unique(chosen.filter((entry) => !entry.version).map((entry) => entry.model));
-    const wholeKeys = new Set(whole.map((row) => `${row.kind}:${row.key}`));
-    for (const entry of chosen) {
-        if (entry.version && !wholeKeys.has(`${entry.model.kind}:${entry.model.key}`)) {
-            await deleteVersion(entry.model, entry.version.number);
-        }
+    const wholeKeys = new Set(whole.map(rowId));
+    const cascading = new Set(
+        whole
+            .filter((row) => row.kind === "base")
+            .filter((row) => {
+                const built = builtOn(rows, row);
+                return built.length > 0 && built.every((item) => wholeKeys.has(rowId(item)));
+            })
+            .map((row) => row.key),
+    );
+    const versions = chosen.filter((entry) => entry.version && !wholeKeys.has(rowId(entry.model)));
+    await undeploySelected(versions);
+    for (const entry of versions) {
+        await deleteVersion(entry.model, entry.version?.number ?? 0);
     }
     for (const row of whole) {
-        await deleteModel(row);
+        if (row.kind === "custom" && cascading.has(row.base_model ?? "")) {
+            continue;
+        }
+        await deleteModel(row, { undeploy: true, cascade: cascading.has(row.key) });
     }
 }
 
@@ -1326,11 +1383,13 @@ function bulkDeleteConfirmation(chosen: Entry[], run: () => Promise<unknown>): C
 
 function BulkBar({
     chosen,
+    rows,
     onClear,
     onConfirm,
     onDone,
 }: {
     chosen: Entry[];
+    rows: ModelRow[];
     onClear: () => void;
     onConfirm: (confirmation: Confirmation) => void;
     onDone: () => Promise<unknown>;
@@ -1402,7 +1461,7 @@ function BulkBar({
                     onClick={() =>
                         onConfirm(
                             bulkDeleteConfirmation(chosen, () =>
-                                deleteSelected(chosen).then(onDone),
+                                deleteSelected(chosen, rows).then(onDone),
                             ),
                         )
                     }
@@ -1429,8 +1488,10 @@ export function MyModels({
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const [removing, setRemoving] = useState<ModelRow | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
     const healthActions = useRef<Handlers["health"] | null>(null);
+    const rowsRef = useRef<ModelRow[]>([]);
     const on: Handlers = useMemo(
         () => ({
             open: (path) => router.history.push(path),
@@ -1461,6 +1522,13 @@ export function MyModels({
             },
             edit: setEditing,
             confirm: setConfirmation,
+            remove: (row) => {
+                if (row.kind === "base" && builtOn(rowsRef.current, row).length > 0) {
+                    setRemoving(row);
+                    return;
+                }
+                setConfirmation(deleteConfirmation(row, on));
+            },
             createFrom: (base) =>
                 router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
             refresh,
@@ -1468,13 +1536,10 @@ export function MyModels({
         }),
         [router, refresh],
     );
-    const health = useHealthActions({
-        refresh,
-        confirm: setConfirmation,
-        remove: (row) => setConfirmation(deleteConfirmation(row, on)),
-    });
+    const health = useHealthActions({ refresh, confirm: setConfirmation, remove: on.remove });
     healthActions.current = health.run;
     const rows = models.data ?? [];
+    rowsRef.current = rows;
     const entries = entriesOf(rows);
     const sort = parseSort(search.sort);
     const setSort = (next: Sort) => {
@@ -1512,6 +1577,7 @@ export function MyModels({
             {can.build && selected.length > 0 ? (
                 <BulkBar
                     chosen={entries.filter((entry) => selected.includes(entry.key))}
+                    rows={rows}
                     onClear={() => setSelected([])}
                     onConfirm={setConfirmation}
                     onDone={async () => {
@@ -1574,6 +1640,12 @@ export function MyModels({
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
+            />
+            <DeleteBaseDialog
+                row={removing}
+                dependents={removing ? builtOn(rows, removing) : []}
+                onOpenChange={(open) => !open && setRemoving(null)}
+                onStarted={refresh}
             />
             {health.dialogs}
         </div>

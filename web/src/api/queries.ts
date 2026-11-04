@@ -4,6 +4,7 @@ import { type JobInfo, type ModelRow, type VersionInfo, api, unwrap } from "./cl
 const ACTIVE_JOB = new Set(["queued", "running"]);
 const ACTIVE_VERSION = new Set(["training", "evaluating"]);
 const POLL_MS = 2000;
+export const MODELS_POLL_MS = POLL_MS;
 
 export const keys = {
     minibrains: ["minibrains"] as const,
@@ -31,8 +32,13 @@ export function isModelMoving(row: ModelRow): boolean {
     return (
         MOVING_MODEL.has(row.availability.state) ||
         MOVING_ACTIVITY.has(row.activity.state) ||
-        row.deployment.state === "starting"
+        row.deployment.state === "starting" ||
+        row.teardown?.state === "running"
     );
+}
+
+export function loadModels() {
+    return unwrap(api.GET("/api/models"));
 }
 
 const path = (slug: string) => ({ params: { path: { slug } } });
@@ -208,7 +214,7 @@ export function useInstallSettings() {
 export function useModels() {
     return useQuery({
         queryKey: keys.models,
-        queryFn: () => unwrap(api.GET("/api/models")),
+        queryFn: loadModels,
         refetchInterval: (query) => (query.state.data?.some(isModelMoving) ? POLL_MS : 15000),
     });
 }

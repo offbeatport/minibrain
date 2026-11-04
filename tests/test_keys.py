@@ -70,7 +70,8 @@ def test_deleting_a_model_keeps_keys_that_cover_others(harness: Harness, tmp_pat
     add_key(harness, CUSTOM, name="only-custom")
     add_key(harness, CUSTOM, BASE, name="both")
     harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    harness.settle()
     keys = harness.client.get("/api/keys").json()
     assert [(key["name"], [model["key"] for model in key["models"]]) for key in keys] == [("both", ["base-one"])]
     with harness.sessions() as session:

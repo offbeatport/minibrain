@@ -126,6 +126,11 @@ class MlxRuntime:
             if dropped == self.active:
                 self.active = None
 
+    def drop_adapter(self, name: str) -> None:
+        if name == self.active:
+            self.activate(None)
+        self.adapters.pop(name, None)
+
     def activate(self, name: str | None) -> None:
         if name == self.active:
             return
@@ -187,6 +192,11 @@ class MlxBackend:
         if spec.key not in self.runtimes:
             self.runtimes[spec.key] = MlxRuntime(spec)
         return self.runtimes[spec.key]
+
+    def unload_adapter(self, name: str) -> None:
+        with self.lock:
+            for runtime in self.runtimes.values():
+                runtime.drop_adapter(name)
 
     def complete(self, request: CompletionRequest) -> Completion:
         with self.lock:

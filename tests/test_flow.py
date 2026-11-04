@@ -187,7 +187,7 @@ def test_cancel_queued_job_and_delete_guard(harness: Harness) -> None:
     assert harness.client.post(f"/api/jobs/{job['id']}/cancel").json()["status"] == "cancelled"
     assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "failed"
     assert harness.claim(["train"]) is None
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
 
 
 def test_bad_sql_is_rejected(harness: Harness) -> None:

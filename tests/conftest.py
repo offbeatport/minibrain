@@ -80,6 +80,11 @@ class Harness:
     def flush_logs(self) -> int:
         return self.app.state.request_logs.flush()
 
+    def settle(self, rounds: int = 10) -> None:
+        for _ in range(rounds):
+            if not self.app.state.teardowns.run_once():
+                return
+
     def worker_config(self, kinds: list[str] | None = None) -> WorkerConfig:
         config = WorkerConfig(api_url="http://testserver", token=self.token, home=self.settings.home / "worker")
         if kinds is not None:

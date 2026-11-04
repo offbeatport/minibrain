@@ -111,6 +111,13 @@ class SglangBackend:
             self.http.post(f"{url}/load_lora_adapter", json=body).raise_for_status()
             self.adapters[spec.key].add(name)
 
+    def unload_adapter(self, name: str) -> None:
+        with self.lock:
+            for key, (url, _) in self.servers.items():
+                if name in self.adapters.get(key, set()):
+                    self.http.post(f"{url}/unload_lora_adapter", json={"lora_name": name}).raise_for_status()
+                    self.adapters[key].discard(name)
+
     def complete(self, request: CompletionRequest) -> Completion:
         spec = request.base
         url = self.load(spec)

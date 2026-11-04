@@ -133,7 +133,9 @@ def test_missing_files_point_to_a_new_location_validated_against_the_saved_list(
     assert harness.worker(kinds=["verify"]).run_once()
     assert row(harness)["health"] is None and row(harness)["availability"]["state"] == "available"
     assert [event.detail["to"] for event in audited(harness, "model.relocate")] == [str(moved)]
-    assert harness.client.delete("/api/models/base/tiny").status_code == 204
+    assert harness.client.delete("/api/models/base/tiny").status_code == 202
+    harness.settle()
+    assert all(item["key"] != "tiny" for item in harness.client.get("/api/models").json())
     assert (moved / WEIGHTS).is_file()
 
 

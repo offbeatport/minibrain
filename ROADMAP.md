@@ -497,6 +497,27 @@ once it matches; only the cache budget below removes files.
   base in removal order with why it is kept. Each eviction writes `model.evict` (size, last use, budget, usage,
   trigger) to the audit log and a line to the server log; pin changes write `model.pin` and `model.unpin`.
 
+### Deleting and undeploying
+
+- Deleting a custom or base model, undeploying one and removing a base's files are teardowns: a row in `teardowns`
+  (one per model) that a loop on the leader main advances, so they survive a restart and run however small or large
+  the model is. Not jobs: workers never touch the database or the artifact store, and only main can remove rows and
+  files. The API stores the teardown and answers 202 with the new state at once.
+- States on the Models table, the model pages and Deployments: Deleting (row greyed, actions off, gone when done),
+  Delete failed, Stopping, Stop failed and Removing files, each failure with its reason and a Retry that repeats the
+  same call. Toasts come from a watcher in the shell, so they show on whichever page the person is on.
+- Stopping waits until every live gateway (main's own and standalone ones, which report what they route) has stopped
+  routing the model's names and every engine of its base has drained its requests in flight through those names and
+  unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
+  Ten minutes without that is Stop failed, naming what did not confirm.
+- Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, snapshots only it
+  uses, the minibrain folder and API key scopes. A base with models built on it answers 409 with their names unless
+  the call says `cascade=true`; the cascade deletes them first, then the base. Removing only a base's files keeps its
+  record and the models built on it, which show "Base missing files" until Download again.
+- Audit: `model.delete`, `model.undeploy` and `model.remove_files` when a person starts one (`retry` on a retry), and
+  `model.delete_finished`, `model.undeploy_finished` and `model.remove_files_finished` with the outcome, what went and
+  the reason a failure gives.
+
 ## Eval and promote
 
 - Eval first: the golden set (20–50 human-verified examples) is written or picked before any training.

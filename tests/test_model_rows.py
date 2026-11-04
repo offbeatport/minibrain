@@ -120,7 +120,7 @@ def test_a_deployed_model_must_be_undeployed_before_it_is_deleted(harness: Harne
     refused = harness.client.delete(f"/api/minibrains/{SLUG}")
     assert refused.status_code == 409 and "undeploy it first" in refused.json()["detail"]
     harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
 
 
 def test_new_models_take_a_task_type_and_can_start_from_the_sample(harness: Harness) -> None:

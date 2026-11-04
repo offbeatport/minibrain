@@ -76,7 +76,12 @@ class EngineManager:
         self.used[spec.key] = time.monotonic()
         return url
 
-    def ensure(self, specs: dict[str, BaseModelSpec], registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
+    def ensure(
+        self,
+        specs: dict[str, BaseModelSpec],
+        registered: dict[str, list[dict[str, str]]],
+        releasing: frozenset[str] = frozenset(),
+    ) -> dict[str, str]:
         with self.lock:
             own = {key: url for key, (url, _) in self.engines.items()}
             elsewhere = {
@@ -85,14 +90,15 @@ class EngineManager:
             for key, spec in specs.items():
                 if key not in self.engines and key not in elsewhere:
                     self.start(spec)
-            self.reap({key for key in specs if key not in elsewhere})
+            self.reap({key for key in specs if key not in elsewhere}, releasing)
             return {key: url for key, (url, _) in self.engines.items()}
 
-    def reap(self, keep: set[str]) -> None:
+    def reap(self, keep: set[str], releasing: frozenset[str] = frozenset()) -> None:
         moment = time.monotonic()
         for key in [key for key in self.engines if key not in keep]:
-            if moment - self.used.get(key, 0.0) > self.idle_seconds:
+            if key in releasing or moment - self.used.get(key, 0.0) > self.idle_seconds:
                 _, supervisor = self.engines.pop(key)
+                log.info("stopping the engine for %s", key)
                 supervisor.shutdown()
 
     def ensure_one(self, spec: BaseModelSpec) -> str:
@@ -133,6 +139,13 @@ class EngineManager:
 
 
 Engines = Callable[[], dict[str, list[dict[str, str]]]]
+DRAIN_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
+
+
+def drain_engine(http: HttpClient, url: str, routes: list[str], adapters: list[str]) -> dict[str, Any]:
+    response = http.request("POST", f"{url}/drain", json={"routes": routes, "adapters": adapters})
+    response.raise_for_status()
+    return dict(response.json())
 
 
 def engine_detail(response: Any) -> str:
@@ -159,7 +172,12 @@ class EngineBackend:
             if request.adapter
             else None
         )
-        body = {"messages": request.messages, "adapter": adapter, "max_tokens": request.max_tokens}
+        body = {
+            "messages": request.messages,
+            "adapter": adapter,
+            "max_tokens": request.max_tokens,
+            "route": request.route,
+        }
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)
         key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)

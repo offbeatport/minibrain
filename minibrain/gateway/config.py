@@ -1,8 +1,10 @@
 import hashlib
 import json
 import logging
+import socket
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
@@ -19,9 +21,18 @@ from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
 from minibrain.models.registry import model_folder, resolve_spec
 from minibrain.policy import load as load_policy
-from minibrain.registry.compute import live_engines
+from minibrain.registry.compute import GatewayReport, live_engines, record_gateway
 from minibrain.registry.files import ref, snapshot_location
-from minibrain.registry.models import ApiKey, Minibrain, Model, ModelStatus, VersionKind, VersionStatus
+from minibrain.registry.models import (
+    ApiKey,
+    Minibrain,
+    Model,
+    ModelStatus,
+    Teardown,
+    TeardownKind,
+    VersionKind,
+    VersionStatus,
+)
 from minibrain.registry.service import NotFoundError, adapter_name
 from minibrain.settings import Settings
 
@@ -169,24 +180,43 @@ def base_route(model: Model) -> Route:
     return base_route_for(model.id)
 
 
+def removed_problem(model: Model, removing: bool) -> str:
+    if removing and model.status != ModelStatus.EVICTED:
+        return f"{model.name}'s files are being removed; download it again on the Models page."
+    return f"{model.name}'s files were removed; download it again on the Models page."
+
+
 def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:
     policy = load_policy(session)
+    teardowns = list(session.scalars(select(Teardown)))
+    deleting = {item.minibrain_id for item in teardowns if item.kind == TeardownKind.DELETE}
+    dropped = {item.model_id for item in teardowns if item.kind == TeardownKind.DELETE}
+    removing = {item.model_id for item in teardowns if item.kind == TeardownKind.REMOVE_FILES}
     routes: dict[str, Route] = {}
     for minibrain in session.scalars(select(Minibrain).order_by(Minibrain.id)):
+        if minibrain.id in deleting:
+            continue
         bodies = policy.keeps_bodies(minibrain.request_bodies)
         routes |= {route.name: route for route in routes_for(session, store, minibrain, bodies)}
     deployed = select(Model).where(Model.deployed.is_(True), Model.status == ModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
-    routes |= {model.id: replace(base_route(model), request_bodies=default) for model in session.scalars(deployed)}
+    routes |= {
+        model.id: replace(base_route(model), request_bodies=default)
+        for model in session.scalars(deployed)
+        if model.id not in dropped
+    }
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
+        model = session.get(Model, key)
+        if model is not None and (model.status == ModelStatus.EVICTED or key in removing):
+            problems[key] = removed_problem(model, key in removing)
+            continue
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()
         except NotFoundError:
             routes = {name: route for name, route in routes.items() if route.base_model != key}
             continue
-        model = session.get(Model, key)
         problem = problem_of(model, model_folder(settings, model)) if model is not None else None
         if problem is not None:
             problems[key] = problem
@@ -238,6 +268,23 @@ def hash_of(payload: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
+def served_bases(config: GatewayConfig) -> list[str]:
+    return sorted(key for key in config.bases if key not in config.problems)
+
+
+def gateway_id(kind: str) -> str:
+    return f"{kind}-{uuid.uuid4().hex[:12]}"
+
+
+REPORT_SECONDS = 10.0
+EngineStarter = Callable[[dict[str, BaseModelSpec], Replicas, frozenset[str]], dict[str, str]]
+
+
+def releasing_bases(session: Session) -> frozenset[str]:
+    found = (item.detail.get("base") for item in session.scalars(select(Teardown)) if item.detail.get("release"))
+    return frozenset(str(key) for key in found if key)
+
+
 class ConfigSource(Protocol):
     def current(self) -> GatewayConfig: ...
 
@@ -248,7 +295,7 @@ class LocalConfig:
         sessions: sessionmaker[Session],
         store: ArtifactStore,
         settings: Settings,
-        engines: Callable[[dict[str, BaseModelSpec], Replicas], dict[str, str]],
+        engines: EngineStarter,
         max_age: float = 1.0,
     ) -> None:
         self.sessions = sessions
@@ -260,6 +307,9 @@ class LocalConfig:
         self.built_at = 0.0
         self.lock = threading.Lock()
         self.changed = threading.Condition()
+        self.id = gateway_id("main")
+        self.host = socket.gethostname()
+        self.reported: tuple[str, float] = ("", 0.0)
 
     def rebuild(self) -> GatewayConfig:
         with self.lock, self.sessions() as session:
@@ -268,15 +318,25 @@ class LocalConfig:
                 key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items() if key not in draft.problems
             }
             registered = registered_replicas(session, specs)
-            managed = self.engines(specs, registered)
+            managed = self.engines(specs, registered, releasing_bases(session))
             replicas = merge_replicas(managed, registered)
             config = build_config(session, self.store, self.settings, replicas) if replicas else draft
+            self.report(session, config)
         self.built_at = time.monotonic()
         if config.version != self.config.version:
             with self.changed:
                 self.config = config
                 self.changed.notify_all()
         return self.config
+
+    def report(self, session: Session, config: GatewayConfig) -> None:
+        version, at = self.reported
+        if version == config.version and time.monotonic() - at < REPORT_SECONDS:
+            return
+        report = GatewayReport(self.id, self.host, "main", config.version, list(config.routes), served_bases(config))
+        record_gateway(session, report)
+        session.commit()
+        self.reported = (config.version, time.monotonic())
 
     def current(self) -> GatewayConfig:
         if self.max_age <= 0 or time.monotonic() - self.built_at > self.max_age:
@@ -298,10 +358,20 @@ class LocalConfig:
                 log.exception("gateway config rebuild failed")
 
 
+def nothing_to_report(_config: GatewayConfig) -> None:
+    return None
+
+
 class RemoteConfig:
-    def __init__(self, fetch: Callable[[str, float], GatewayConfig | None], cache: Path) -> None:
+    def __init__(
+        self,
+        fetch: Callable[[str, float], GatewayConfig | None],
+        cache: Path,
+        report: Callable[[GatewayConfig], None] = nothing_to_report,
+    ) -> None:
         self.fetch = fetch
         self.cache = cache
+        self.report = report
         self.config = GatewayConfig.from_json(cache.read_text()) if cache.exists() else EMPTY
 
     def current(self) -> GatewayConfig:
@@ -323,6 +393,7 @@ class RemoteConfig:
         while not stop.is_set():
             try:
                 self.poll(wait)
+                self.report(self.config)
                 delay = 1.0
             except Exception:
                 log.warning("main unreachable; serving config %s from cache", self.config.version)

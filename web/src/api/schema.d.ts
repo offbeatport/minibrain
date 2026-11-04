@@ -1069,12 +1069,29 @@ export interface paths {
         get: operations["read_base_api_models_base__key__get"];
         put?: never;
         post?: never;
-        /** Delete Base */
-        delete: operations["delete_base_api_models_base__key__delete"];
+        /** Delete Base Model */
+        delete: operations["delete_base_model_api_models_base__key__delete"];
         options?: never;
         head?: never;
         /** Update Base */
         patch: operations["update_base_api_models_base__key__patch"];
+        trace?: never;
+    };
+    "/api/models/base/{key}/remove-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Base Files */
+        post: operations["remove_base_files_api_models_base__key__remove_files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/models/base/{key}/verify": {
@@ -2429,6 +2446,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/gateway/gateways": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Gateway */
+        post: operations["report_gateway_internal_gateway_gateways_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/gateway/bases/{key}": {
         parameters: {
             query?: never;
@@ -2877,6 +2911,7 @@ export interface components {
             pinned?: boolean;
             /** Last Used At */
             last_used_at?: string | null;
+            teardown?: components["schemas"]["TeardownInfo"] | null;
             /** Source */
             source: string;
             /** Repo */
@@ -3944,7 +3979,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "running" | "starting" | "unhealthy" | "not_deployed";
+            state: "running" | "starting" | "unhealthy" | "stopping" | "stop_failed" | "not_deployed";
             /** Label */
             label: string;
             /** Versions */
@@ -4203,6 +4238,11 @@ export interface components {
             hardware?: {
                 [key: string]: unknown;
             };
+            /**
+             * Managed
+             * @default false
+             */
+            managed?: boolean;
             /** Error */
             error?: string | null;
             /** Code */
@@ -4567,6 +4607,25 @@ export interface components {
             roots: string[];
             /** Locked */
             locked: boolean;
+        };
+        /** GatewayBody */
+        GatewayBody: {
+            /** Id */
+            id: string;
+            /** Host */
+            host: string;
+            /** Version */
+            version: string;
+            /**
+             * Routes
+             * @default []
+             */
+            routes?: string[];
+            /**
+             * Bases
+             * @default []
+             */
+            bases?: string[];
         };
         /** GpuInfo */
         GpuInfo: {
@@ -5234,6 +5293,7 @@ export interface components {
             /** Models */
             models: string[];
             request_bodies: components["schemas"]["RequestBodiesInfo"];
+            teardown?: components["schemas"]["TeardownInfo"] | null;
         };
         /** MinibrainSummary */
         MinibrainSummary: {
@@ -5430,6 +5490,7 @@ export interface components {
             pinned?: boolean;
             /** Last Used At */
             last_used_at?: string | null;
+            teardown?: components["schemas"]["TeardownInfo"] | null;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -6363,6 +6424,48 @@ export interface components {
              */
             loops: "single" | "leader" | "standby";
         };
+        /** TeardownInfo */
+        TeardownInfo: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "delete" | "undeploy" | "remove_files";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "failed";
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Error */
+            error?: string | null;
+            /** Started By */
+            started_by: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Waiting */
+            waiting?: string[];
+            /** Models */
+            models?: string[];
+            /** Part Of */
+            part_of?: string | null;
+            /**
+             * Cascade
+             * @default false
+             */
+            cascade?: boolean;
+            /**
+             * Undeploy
+             * @default false
+             */
+            undeploy?: boolean;
+        };
         /** TestRequest */
         TestRequest: {
             /** Text */
@@ -6970,7 +7073,9 @@ export interface operations {
     };
     delete_api_minibrains__slug__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                undeploy?: boolean;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -6980,11 +7085,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ModelRow"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -8918,9 +9025,12 @@ export interface operations {
             };
         };
     };
-    delete_base_api_models_base__key__delete: {
+    delete_base_model_api_models_base__key__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                cascade?: boolean;
+                undeploy?: boolean;
+            };
             header?: never;
             path: {
                 key: string;
@@ -8930,11 +9040,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ModelRow"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -8964,6 +9076,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_base_files_api_models_base__key__remove_files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11649,6 +11792,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EngineBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_gateway_internal_gateway_gateways_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatewayBody"];
             };
         };
         responses: {

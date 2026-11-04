@@ -21,7 +21,7 @@ from minibrain.jobs.specs import eval_params, train_params
 from minibrain.models.cache import touch
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, VersionKind
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, Model, VersionKind
 from minibrain.registry.prices import load_prices
 from minibrain.registry.service import (
     ConflictError,
@@ -31,6 +31,7 @@ from minibrain.registry.service import (
     promote,
 )
 from minibrain.tasks.classify import parse_label
+from minibrain.teardown import cancel_stop, require_idle
 
 router = APIRouter(prefix="/api", tags=["versions"])
 
@@ -54,6 +55,10 @@ def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
 @router.post("/minibrains/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
 def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: SettingsDep) -> VersionInfo:
     minibrain = get_minibrain(session, slug)
+    require_idle(minibrain.teardown, minibrain.name)
+    base = session.get(Model, minibrain.base_model)
+    if base is not None:
+        require_idle(base.teardown, base.name)
     kind = VersionKind(body.kind)
     readiness = base_readiness(session, minibrain.base_model)
     if readiness == "pending":
@@ -122,6 +127,7 @@ def promote_version(slug: str, number: int, session: SessionDep, settings: Setti
     if mismatch is not None:
         raise ConflictError(mismatch)
     previous, was_deployed = minibrain.current_version, minibrain.deployed
+    cancel_stop(session, minibrain.teardown, minibrain.name)
     promote(minibrain, version)
     if (previous, was_deployed) != (number, True):
         audit_version(

@@ -21,6 +21,9 @@ from minibrain.api.schemas import (
     SnapshotInfo,
     SourceInfo,
     SplitScore,
+    TeardownInfo,
+    TeardownKindName,
+    TeardownState,
     VersionInfo,
 )
 from minibrain.data.shared import table_of
@@ -37,12 +40,72 @@ from minibrain.registry.models import (
     Minibrain,
     Model,
     Snapshot,
+    Teardown,
+    TeardownKind,
+    TeardownStatus,
+    TeardownStep,
     Version,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
+
+TEARDOWN_LABELS: dict[tuple[str, str], str] = {
+    (TeardownKind.DELETE, TeardownStatus.RUNNING): "Deleting",
+    (TeardownKind.DELETE, TeardownStatus.FAILED): "Delete failed",
+    (TeardownKind.UNDEPLOY, TeardownStatus.RUNNING): "Stopping",
+    (TeardownKind.UNDEPLOY, TeardownStatus.FAILED): "Stop failed",
+    (TeardownKind.REMOVE_FILES, TeardownStatus.RUNNING): "Removing files",
+    (TeardownKind.REMOVE_FILES, TeardownStatus.FAILED): "Remove failed",
+}
+STOPPING_TEXT: dict[str, str] = {
+    TeardownKind.DELETE: "Gateways stop routing it and engines unload it once in-flight requests finish; then its "
+    "files and records are removed.",
+    TeardownKind.UNDEPLOY: "Gateways stop routing it and engines unload it once in-flight requests finish.",
+    TeardownKind.REMOVE_FILES: "Engines release it once in-flight requests finish; then its files are removed.",
+}
+TEARDOWN_KINDS: dict[str, TeardownKindName] = {
+    TeardownKind.DELETE: "delete",
+    TeardownKind.UNDEPLOY: "undeploy",
+    TeardownKind.REMOVE_FILES: "remove_files",
+}
+TEARDOWN_STATES: dict[str, TeardownState] = {TeardownStatus.RUNNING: "running", TeardownStatus.FAILED: "failed"}
+REMOVING_TEXT: dict[str, str] = {
+    TeardownKind.DELETE: "Removing its files and records.",
+    TeardownKind.REMOVE_FILES: "Removing its files.",
+}
+
+
+def teardown_text(teardown: Teardown) -> str:
+    if teardown.status == TeardownStatus.FAILED:
+        return teardown.error or "It stopped without a message."
+    waiting = list(teardown.detail.get("waiting") or [])
+    if waiting:
+        return f"Waiting for {'; '.join(waiting)}."
+    if teardown.step == TeardownStep.REMOVING:
+        return REMOVING_TEXT.get(teardown.kind, STOPPING_TEXT[teardown.kind])
+    return STOPPING_TEXT[teardown.kind]
+
+
+def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> TeardownInfo | None:
+    if teardown is None:
+        return None
+    detail = teardown.detail
+    return TeardownInfo(
+        kind=TEARDOWN_KINDS[teardown.kind],
+        state=TEARDOWN_STATES[teardown.status],
+        label=TEARDOWN_LABELS[(teardown.kind, teardown.status)],
+        detail=teardown_text(teardown),
+        error=teardown.error,
+        started_by=teardown.actor,
+        started_at=teardown.started_at,
+        waiting=list(detail.get("waiting") or []),
+        models=list(detail.get("models") or []),
+        part_of=part_of,
+        cascade=bool(detail.get("cascade")),
+        undeploy=bool(detail.get("live")),
+    )
 
 
 def source_info(settings: Settings, minibrain: Minibrain) -> SourceInfo | None:
@@ -239,6 +302,7 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         changed=model_changes(settings, minibrain),
         models=model_names(minibrain),
         request_bodies=bodies_info(minibrain),
+        teardown=teardown_info(minibrain.teardown),
     )
 
 

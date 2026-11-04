@@ -24,6 +24,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.compute import pools
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    SYSTEM_ACTOR,
     CatalogVariant,
     Job,
     JobKind,
@@ -209,12 +210,22 @@ def original_location(model: Model) -> str | None:
     return location if kind in (FOLDER, S3) and location else None
 
 
+def removed_by_person(model: Model) -> bool:
+    return model.evicted_by is not None and model.evicted_by != SYSTEM_ACTOR
+
+
 def evicted(model: Model, context: HealthContext) -> Health:
     when = f" on {model.evicted_at:%Y-%m-%d}" if model.evicted_at else ""
-    detail = (
-        f"Its files were removed{when} to keep base models under the cache budget, because no model, version, "
-        "deployment or job used it. Its record, licence acceptance and API keys stay."
-    )
+    if removed_by_person(model):
+        detail = (
+            f"{model.evicted_by} removed its files{when} to free the disk. Its record, licence acceptance, API keys "
+            "and the models built on it stay."
+        )
+    else:
+        detail = (
+            f"Its files were removed{when} to keep base models under the cache budget, because no model, version, "
+            "deployment or job used it. Its record, licence acceptance and API keys stay."
+        )
     location = original_location(model)
     copy = f", such as {location}" if location else ""
     if repairable(model, context):
@@ -226,7 +237,8 @@ def evicted(model: Model, context: HealthContext) -> Health:
     else:
         detail += f" Re-import it from a folder or S3 path that holds the same files{copy}."
         actions = [act("reimport"), act("remove")]
-    return Health(state="evicted", label="Removed to free space", detail=detail, actions=actions)
+    label = "Files removed" if removed_by_person(model) else "Removed to free space"
+    return Health(state="evicted", label=label, detail=detail, actions=actions)
 
 
 def base_health(model: Model, job: Job | None, context: HealthContext) -> Health | None:
@@ -254,7 +266,8 @@ def base_health(model: Model, job: Job | None, context: HealthContext) -> Health
 def custom_health(base: Health | None, base_name: str) -> Health | None:
     if base is None:
         return None
-    label = f"Base {base.label[0].lower()}{base.label[1:]}"
+    shown = "Missing files" if base.state == "evicted" else base.label
+    label = f"Base {shown[0].lower()}{shown[1:]}"
     return Health(
         state="base_unusable",
         label=label,

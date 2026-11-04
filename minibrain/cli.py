@@ -159,6 +159,7 @@ def engine(args: argparse.Namespace) -> None:
         url=advertised_url(args.host, args.port, args.url),
         pool=args.pool,
         requested=args.engine,
+        managed=args.parent is not None,
     )
     threading.Thread(target=watch_parent, args=(args.parent, threading.Event(), terminate_self), daemon=True).start()
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

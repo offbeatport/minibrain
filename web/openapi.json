@@ -614,11 +614,28 @@
               "type": "string",
               "title": "Slug"
             }
+          },
+          {
+            "name": "undeploy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Undeploy"
+            }
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRow"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -3217,8 +3234,70 @@
         "tags": [
           "models"
         ],
-        "summary": "Delete Base",
-        "operationId": "delete_base_api_models_base__key__delete",
+        "summary": "Delete Base Model",
+        "operationId": "delete_base_model_api_models_base__key__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cascade"
+            }
+          },
+          {
+            "name": "undeploy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Undeploy"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/base/{key}/remove-files": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Remove Base Files",
+        "operationId": "remove_base_files_api_models_base__key__remove_files_post",
         "parameters": [
           {
             "name": "key",
@@ -3231,8 +3310,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseModelDetail"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -7873,6 +7959,52 @@
         }
       }
     },
+    "/internal/gateway/gateways": {
+      "post": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Report Gateway",
+        "operationId": "report_gateway_internal_gateway_gateways_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/gateway/bases/{key}": {
       "get": {
         "tags": [
@@ -9221,6 +9353,16 @@
               }
             ],
             "title": "Last Used At"
+          },
+          "teardown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeardownInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -12725,6 +12867,8 @@
               "running",
               "starting",
               "unhealthy",
+              "stopping",
+              "stop_failed",
               "not_deployed"
             ],
             "title": "State"
@@ -13421,6 +13565,11 @@
             "type": "object",
             "title": "Hardware",
             "default": {}
+          },
+          "managed": {
+            "type": "boolean",
+            "title": "Managed",
+            "default": false
           },
           "error": {
             "anyOf": [
@@ -14620,6 +14769,45 @@
           "locked"
         ],
         "title": "FolderRoots"
+      },
+      "GatewayBody": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "routes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Routes",
+            "default": []
+          },
+          "bases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Bases",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "host",
+          "version"
+        ],
+        "title": "GatewayBody"
       },
       "GpuInfo": {
         "properties": {
@@ -16748,6 +16936,16 @@
           },
           "request_bodies": {
             "$ref": "#/components/schemas/RequestBodiesInfo"
+          },
+          "teardown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeardownInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -17323,6 +17521,16 @@
               }
             ],
             "title": "Last Used At"
+          },
+          "teardown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeardownInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -20144,6 +20352,100 @@
           "loops"
         ],
         "title": "SystemInfo"
+      },
+      "TeardownInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "undeploy",
+              "remove_files"
+            ],
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "started_by": {
+            "type": "string",
+            "title": "Started By"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Waiting"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "part_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Part Of"
+          },
+          "cascade": {
+            "type": "boolean",
+            "title": "Cascade",
+            "default": false
+          },
+          "undeploy": {
+            "type": "boolean",
+            "title": "Undeploy",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "state",
+          "label",
+          "detail",
+          "started_by",
+          "started_at"
+        ],
+        "title": "TeardownInfo"
       },
       "TestRequest": {
         "properties": {

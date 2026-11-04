@@ -203,7 +203,7 @@ def test_state_changing_calls_need_the_csrf_token(install: Install) -> None:
     assert admin.get("/api/minibrains").status_code == 200
     created = admin.post("/api/minibrains", json={"name": "Triage"}, headers=csrf(admin))
     assert created.status_code == 201
-    assert admin.delete("/api/minibrains/triage", headers=csrf(admin)).status_code == 204
+    assert admin.delete("/api/minibrains/triage", headers=csrf(admin)).status_code == 202
     [event] = install.events("model.delete")
     assert (event.actor, event.detail["sign_in"]) == (ADMIN, "local")
 

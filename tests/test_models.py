@@ -185,8 +185,10 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
     harness.client.post("/api/models/base/tiny/deploy", json={"deployed": False})
     custom = harness.client.post("/api/minibrains", json={"name": "Tickets", "base_model": "tiny"}).json()
     assert "Tickets is trained on Tiny" in harness.client.delete("/api/models/base/tiny").json()["detail"]
-    assert harness.client.delete(f"/api/minibrains/{custom['slug']}").status_code == 204
-    assert harness.client.delete("/api/models/base/tiny").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{custom['slug']}").status_code == 202
+    harness.settle()
+    assert harness.client.delete("/api/models/base/tiny").status_code == 202
+    harness.settle()
     assert not stored.exists() and "tiny" not in rows(harness)
     assert harness.client.get("/api/models/base/tiny").status_code == 404
     with harness.sessions() as session:

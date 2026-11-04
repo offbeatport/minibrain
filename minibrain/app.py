@@ -81,6 +81,7 @@ from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineB
 from minibrain.settings import Settings, load_settings
 from minibrain.siem import Forwarder
 from minibrain.tags import TagError
+from minibrain.teardown import Teardowns
 from minibrain.telemetry.context import RequestContext
 from minibrain.telemetry.logs import configure_logging
 from minibrain.telemetry.prometheus import load_metrics_access
@@ -143,7 +144,9 @@ def hub_allowed(sessions: sessionmaker[Session]) -> bool:
         return load_policy(session).outbound_allowed(hub.endpoint())
 
 
-def no_engines(_bases: dict[str, BaseModelSpec], _registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
+def no_engines(
+    _bases: dict[str, BaseModelSpec], _registered: dict[str, list[dict[str, str]]], _releasing: frozenset[str]
+) -> dict[str, str]:
     return {}
 
 
@@ -170,6 +173,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (rekey_forever, (app.state.sessions, app.state.store, keys_for(app.state.settings), stop, leader)),
             (app.state.siem.forever, (stop, leader)),
             (app.state.cache.forever, (stop, leader)),
+            (app.state.teardowns.forever, (stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
             (app.state.telemetry.refresh_forever, (stop,)),
@@ -231,6 +235,7 @@ def create_app(
     app.state.gateway_config = LocalConfig(
         sessions, app.state.store, settings, engines.ensure if engines else no_engines, max_age=config_max_age
     )
+    app.state.teardowns = Teardowns(sessions, settings, app.state.gateway_config)
     app.state.request_logs = LogBuffer(database_sink(sessions))
     app.state.feedback = database_feedback(sessions)
     app.state.siem = Forwarder(sessions)

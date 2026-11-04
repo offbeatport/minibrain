@@ -6,12 +6,15 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from minibrain.models.hardware import LOCAL_LABEL, LOCAL_POOL, Hardware, NodeReport
-from minibrain.registry.models import EngineReplica, Node, now
+from minibrain.registry.models import EngineReplica, Gateway, Node, now
 
 NODE_FRESH = timedelta(minutes=2)
 ENGINE_FRESH = timedelta(seconds=30)
+GATEWAY_FRESH = timedelta(seconds=90)
 FORGET_ENGINES = timedelta(hours=1)
+FORGET_GATEWAYS = timedelta(hours=1)
 FORGET_NODES = timedelta(days=7)
+STOPPED = "stopped"
 
 
 @dataclass(frozen=True)
@@ -24,6 +27,17 @@ class EngineReport:
     engine: str
     state: str
     hardware: dict[str, Any] = field(default_factory=dict)
+    managed: bool = False
+
+
+@dataclass(frozen=True)
+class GatewayReport:
+    id: str
+    host: str
+    kind: str
+    version: str
+    routes: list[str]
+    bases: list[str]
 
 
 @dataclass(frozen=True)
@@ -76,19 +90,39 @@ def record_engine(session: Session, report: EngineReport) -> EngineReplica:
     replica.engine = report.engine
     replica.url = report.url
     replica.state = report.state
+    replica.managed = report.managed
     replica.seen_at = now()
     session.add(replica)
     return replica
 
 
 def live_engines(session: Session) -> list[EngineReplica]:
-    query = select(EngineReplica).where(EngineReplica.seen_at >= now() - ENGINE_FRESH).order_by(EngineReplica.id)
+    fresh = EngineReplica.seen_at >= now() - ENGINE_FRESH
+    query = select(EngineReplica).where(fresh, EngineReplica.state != STOPPED).order_by(EngineReplica.id)
+    return list(session.scalars(query))
+
+
+def record_gateway(session: Session, report: GatewayReport) -> Gateway:
+    gateway = session.get(Gateway, report.id) or Gateway(id=report.id)
+    gateway.host = report.host
+    gateway.kind = report.kind
+    gateway.version = report.version
+    gateway.routes = sorted(report.routes)
+    gateway.bases = sorted(report.bases)
+    gateway.seen_at = now()
+    session.add(gateway)
+    return gateway
+
+
+def live_gateways(session: Session) -> list[Gateway]:
+    query = select(Gateway).where(Gateway.seen_at >= now() - GATEWAY_FRESH).order_by(Gateway.id)
     return list(session.scalars(query))
 
 
 def forget_stale(session: Session) -> None:
     moment = now()
     session.execute(delete(EngineReplica).where(EngineReplica.seen_at < moment - FORGET_ENGINES))
+    session.execute(delete(Gateway).where(Gateway.seen_at < moment - FORGET_GATEWAYS))
     session.execute(delete(Node).where(Node.seen_at < moment - FORGET_NODES))
 
 

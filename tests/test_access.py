@@ -103,6 +103,7 @@ ROUTE_ROLES = {
     ("POST", "/api/models/base/{key}/recheck"): "admin",
     ("POST", "/api/models/base/{key}/retry"): "admin",
     ("POST", "/api/models/base/{key}/pin"): "admin",
+    ("POST", "/api/models/base/{key}/remove-files"): "admin",
     ("POST", "/api/models/base/{key}/deploy"): "builder",
     ("POST", "/api/models/base/{key}/test"): "viewer",
     ("GET", "/api/settings/model-cache"): "viewer",

@@ -12,6 +12,7 @@ import {
 } from "obp-ui/shell";
 import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
+import { TeardownToasts } from "~/components/models/TeardownToasts";
 import { SECTIONS, SETTINGS_PAGES, isSettingsPath, visibleTo } from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
@@ -190,6 +191,7 @@ export function Shell() {
                     <AppShell rail={rail}>
                         <Outlet />
                     </AppShell>
+                    <TeardownToasts />
                 </Gate>
             </ToastProvider>
         </UIProvider>

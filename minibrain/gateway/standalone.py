@@ -1,8 +1,12 @@
+import logging
+import socket
 import threading
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -10,7 +14,7 @@ from fastapi.responses import PlainTextResponse, Response
 
 from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
-from minibrain.gateway.config import GatewayConfig, RemoteConfig
+from minibrain.gateway.config import REPORT_SECONDS, GatewayConfig, RemoteConfig, gateway_id, served_bases
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.serve.backend import ServingBackend
 from minibrain.serve.engines import EngineBackend
@@ -19,6 +23,8 @@ from minibrain.telemetry.logs import configure_logging
 from minibrain.telemetry.prometheus import load_metrics_access, metrics_response
 from minibrain.telemetry.setup import gateway_telemetry
 from minibrain.worker import HttpClient
+
+log = logging.getLogger("minibrain.gateway")
 
 
 def create_gateway_app(
@@ -54,7 +60,21 @@ def create_gateway_app(
         response.raise_for_status()
         return int(response.json()["id"])
 
-    source = RemoteConfig(fetch, home / "gateway-config.json")
+    identity = {"id": gateway_id("gateway"), "host": socket.gethostname()}
+    reported: dict[str, Any] = {"version": "", "at": 0.0}
+
+    def report(config: GatewayConfig) -> None:
+        if config.version == reported["version"] and time.monotonic() - reported["at"] < REPORT_SECONDS:
+            return
+        body = identity | {"version": config.version, "routes": sorted(config.routes), "bases": served_bases(config)}
+        try:
+            client.request("POST", "/internal/gateway/gateways", json=body, headers=headers).raise_for_status()
+        except Exception:
+            log.warning("could not tell main which config this gateway serves")
+            return
+        reported.update(version=config.version, at=time.monotonic())
+
+    source = RemoteConfig(fetch, home / "gateway-config.json", report)
     logs = LogBuffer(ship)
 
     @asynccontextmanager

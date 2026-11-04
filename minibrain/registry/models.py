@@ -59,6 +59,22 @@ class ModelStatus(StrEnum):
     EVICTED = "evicted"
 
 
+class TeardownKind(StrEnum):
+    DELETE = "delete"
+    UNDEPLOY = "undeploy"
+    REMOVE_FILES = "remove_files"
+
+
+class TeardownStatus(StrEnum):
+    RUNNING = "running"
+    FAILED = "failed"
+
+
+class TeardownStep(StrEnum):
+    STOPPING = "stopping"
+    REMOVING = "removing"
+
+
 class JobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -210,6 +226,7 @@ class Minibrain(Base):
     versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
+    teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
 
 class Snapshot(Base):
@@ -535,10 +552,12 @@ class Model(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     pinned: Mapped[bool] = mapped_column(default=False, server_default=false())
     evicted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    evicted_by: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     variant: Mapped[CatalogVariant | None] = relationship()
+    teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
 
 class Setting(Base):
@@ -657,5 +676,44 @@ class EngineReplica(Base):
     engine: Mapped[str]
     url: Mapped[str]
     state: Mapped[str]
+    managed: Mapped[bool] = mapped_column(default=False, server_default=false())
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class Gateway(Base):
+    __tablename__ = "gateways"
+
+    id: Mapped[str] = mapped_column(primary_key=True)
+    host: Mapped[str]
+    kind: Mapped[str]
+    version: Mapped[str]
+    routes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    bases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class Teardown(Base):
+    __tablename__ = "teardowns"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str]
+    minibrain_id: Mapped[int | None] = mapped_column(
+        ForeignKey("minibrains.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), unique=True, default=None)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("teardowns.id", ondelete="SET NULL"), default=None)
+    name: Mapped[str]
+    status: Mapped[str] = mapped_column(default=TeardownStatus.RUNNING)
+    step: Mapped[str] = mapped_column(default=TeardownStep.STOPPING)
+    actor: Mapped[str]
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(default=None)
+    attempt: Mapped[int] = mapped_column(default=1)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    minibrain: Mapped[Minibrain | None] = relationship(viewonly=True)
+    model: Mapped[Model | None] = relationship(viewonly=True)

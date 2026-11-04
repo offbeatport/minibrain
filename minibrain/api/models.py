@@ -1,9 +1,7 @@
-import shutil
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import admin, builder, viewer
@@ -25,13 +23,13 @@ from minibrain.api.schemas import (
     TestRequest,
     TestResponse,
 )
+from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
 from minibrain.models.cache import touch
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
 from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import (
-    model_dir,
     model_folder,
     relocate,
     require_usable,
@@ -43,21 +41,12 @@ from minibrain.models.registry import (
     start_verify,
 )
 from minibrain.models.sources import configured
-from minibrain.registry.models import (
-    ACTIVE_JOB_STATUSES,
-    AuditEvent,
-    CatalogModel,
-    Job,
-    KeyScope,
-    Minibrain,
-    Model,
-    ModelStatus,
-    now,
-)
-from minibrain.registry.service import ConflictError, NotFoundError, drop_orphan_keys
+from minibrain.registry.models import AuditEvent, CatalogModel, Model, ModelStatus, now
+from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
+from minibrain.teardown import cancel_stop, delete_base, remove_files, require_idle, undeploy_base
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -76,13 +65,34 @@ def get_model(session: Session, key: str) -> Model:
     return model
 
 
+def idle_model(session: Session, key: str) -> Model:
+    model = get_model(session, key)
+    require_idle(model.teardown, model.name)
+    return model
+
+
 def context_for(session: Session, settings: Settings, request: Request) -> HealthContext:
     return health_context(session, settings, get_local_node(request))
 
 
 def row_of(session: Session, settings: Settings, request: Request, model: Model) -> ModelRow:
     context = context_for(session, settings, request)
-    return base_row(model, model_job(session, model.id), settings, health_for(request), context=context)
+    job = model_job(session, model.id)
+    return base_row(model, job, settings, health_for(request), context=context, teardown=model.teardown)
+
+
+def model_row(
+    request: Request, session: Session, settings: Settings, store: ArtifactStore, kind: str, key: str
+) -> ModelRow:
+    rows = all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
+    found = next((row for row in rows if row.kind == kind and row.key == key), None)
+    if found is None:
+        raise NotFoundError(f"model {key} not found")
+    return found
+
+
+def wake_teardowns(request: Request) -> None:
+    request.app.state.teardowns.wake()
 
 
 def file_rows(settings: Settings, model: Model) -> list[ModelFile]:
@@ -184,31 +194,29 @@ def update_base(
     return detail_of(session, settings, request, model)
 
 
-@router.delete("/base/{key}", status_code=204, dependencies=[Depends(admin)])
-def delete_base(key: str, session: SessionDep, settings: SettingsDep) -> None:
-    model = get_model(session, key)
-    if model.deployed:
-        raise ConflictError(f"{model.name} is deployed; undeploy it first")
-    if session.scalar(select(Job.id).where(Job.model_id == model.id, Job.status.in_(ACTIVE_JOB_STATUSES))):
-        raise ConflictError(f"{model.name} has a download or import running; cancel it first")
-    users = session.scalars(select(Minibrain.name).where(Minibrain.base_model == model.id)).all()
-    if users:
-        verb = "is" if len(users) == 1 else "are"
-        raise ConflictError(f"{', '.join(users)} {verb} trained on {model.name}; delete them first")
-    session.query(KeyScope).filter(KeyScope.model_id == model.id).delete()
-    drop_orphan_keys(session)
-    session.add(
-        AuditEvent(
-            actor=current_actor(),
-            action="model.delete",
-            target=model.id,
-            detail={"name": model.name, "kind": "base", "size_bytes": model.size_bytes}
-            | ({"kept": model.path} if model.path else {}),
-        )
-    )
-    session.delete(model)
+@router.delete("/base/{key}", status_code=202, dependencies=[Depends(admin)])
+def delete_base_model(
+    key: str,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    cascade: bool = False,
+    undeploy: bool = False,
+) -> ModelRow:
+    delete_base(session, get_model(session, key), current_actor(), cascade=cascade, undeploy=undeploy)
     session.commit()
-    shutil.rmtree(model_dir(settings, model.id), ignore_errors=True)
+    wake_teardowns(request)
+    return model_row(request, session, settings, store, "base", key)
+
+
+@router.post("/base/{key}/remove-files", status_code=202, dependencies=[Depends(admin)])
+def remove_base_files(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = get_model(session, key)
+    remove_files(session, model, current_actor())
+    session.commit()
+    wake_teardowns(request)
+    return detail_of(session, settings, request, model)
 
 
 def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
@@ -219,7 +227,7 @@ def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
 
 @router.post("/base/{key}/verify", status_code=202, dependencies=[Depends(admin)])
 def verify_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = get_model(session, key)
+    model = idle_model(session, key)
     job = start_verify(session, settings, model)
     audit(session, "model.verify", model, job=job.id, files=len(model.files))
     session.commit()
@@ -228,7 +236,7 @@ def verify_base(key: str, request: Request, session: SessionDep, settings: Setti
 
 @router.post("/base/{key}/repair", status_code=202, dependencies=[Depends(admin)])
 def repair_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = get_model(session, key)
+    model = idle_model(session, key)
     job = start_repair(session, settings, model)
     audit(session, "model.repair", model, job=job.id, source=f"{model.repo}@{model.revision}")
     session.commit()
@@ -239,7 +247,7 @@ def repair_base(key: str, request: Request, session: SessionDep, settings: Setti
 def reimport_base(
     key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
-    model = get_model(session, key)
+    model = idle_model(session, key)
     job = start_reimport(session, settings, model, body.location, body.connection_id)
     audit(session, "model.reimport", model, job=job.id, source=body.location.strip())
     session.commit()
@@ -250,7 +258,7 @@ def reimport_base(
 def relocate_base(
     key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
-    model = get_model(session, key)
+    model = idle_model(session, key)
     before = str(model_folder(settings, model))
     job = relocate(session, settings, model, body.location)
     audit(session, "model.relocate", model, job=job.id, **{"from": before, "to": str(model_folder(settings, model))})
@@ -272,7 +280,7 @@ def recheck_base(key: str, request: Request, session: SessionDep, settings: Sett
 
 @router.post("/base/{key}/retry", status_code=202, dependencies=[Depends(admin)])
 def retry_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = retry(session, settings, get_model(session, key))
+    model = retry(session, settings, idle_model(session, key))
     session.commit()
     return detail_of(session, settings, request, model)
 
@@ -291,14 +299,22 @@ def pin_base(
 
 @router.post("/base/{key}/deploy", dependencies=[Depends(builder)])
 def deploy_base(
-    key: str, body: DeployRequest, request: Request, session: SessionDep, settings: SettingsDep
+    key: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
     model = get_model(session, key)
-    if body.deployed and model.status != ModelStatus.AVAILABLE:
+    if not body.deployed:
+        if undeploy_base(session, model, current_actor()) is not None:
+            response.status_code = 202
+        session.commit()
+        wake_teardowns(request)
+        return detail_of(session, settings, request, model)
+    if model.status != ModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; deploy it once its files are available")
-    if body.deployed:
-        require_usable(session, settings, model.id)
-    model.deployed = body.deployed
+    require_usable(session, settings, model.id)
+    cancel_stop(session, model.teardown, model.name)
+    if not model.deployed:
+        audit(session, "model.deploy", model)
+    model.deployed = True
     model.updated_at = now()
     session.commit()
     return detail_of(session, settings, request, model)

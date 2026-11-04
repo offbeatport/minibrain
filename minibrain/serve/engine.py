@@ -1,8 +1,9 @@
 import logging
 import threading
 import uuid
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from collections import Counter
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,59 @@ class GenerateBody(BaseModel):
     adapter: AdapterBody | None = None
     max_tokens: int = 64
     constraint: Constraint | None = None
+    route: str | None = None
+
+
+class DrainBody(BaseModel):
+    routes: list[str] = []
+    adapters: list[str] = []
+
+
+class DrainResult(BaseModel):
+    in_flight: int
+    total: int
+    loaded: list[str]
+
+
+class Flights:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.routes: Counter[str] = Counter()
+        self.adapters: Counter[str] = Counter()
+        self.total = 0
+
+    @contextmanager
+    def flying(self, route: str | None, adapter: str | None) -> Iterator[None]:
+        with self.lock:
+            self.total += 1
+            self.routes[route or ""] += 1
+            self.adapters[adapter or ""] += 1
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.total -= 1
+                self.routes[route or ""] -= 1
+                self.adapters[adapter or ""] -= 1
+
+    def on_routes(self, routes: list[str]) -> int:
+        with self.lock:
+            return sum(self.routes[route] for route in set(routes))
+
+    def busy(self, adapter: str) -> bool:
+        with self.lock:
+            return self.adapters[adapter] > 0
+
+
+def loaded_adapters(serving: ServingBackend, base: str) -> set[str]:
+    found = next((item for item in serving.status() if item.get("base_model") == base), None)
+    return set((found or {}).get("adapters") or [])
+
+
+def unload_adapter(serving: ServingBackend, name: str) -> None:
+    unload = getattr(serving, "unload_adapter", None)
+    if unload is not None:
+        unload(name)
 
 
 class GenerateResult(BaseModel):
@@ -113,6 +167,12 @@ class Announcer:
             if stop.wait(ANNOUNCE_SECONDS):
                 return
 
+    def farewell(self) -> None:
+        try:
+            self.announce("stopped")
+        except Exception:
+            log.warning("could not tell main that this engine stopped")
+
 
 def make_backend(engine: str, materialize: Callable[[dict[str, Any]], Path]) -> EngineRuntime:
     if engine == "mlx":
@@ -177,6 +237,7 @@ def create_engine_app(
     pool: str = LOCAL_POOL,
     node: NodeReport | None = None,
     requested: str | None = None,
+    managed: bool = False,
 ) -> FastAPI:
     base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
@@ -184,6 +245,7 @@ def create_engine_app(
     materialize = artifact_fetcher(store, client, token)
     ready = threading.Event()
     failed = threading.Event()
+    flights = Flights()
     current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend, "failure": None}
 
     def announced() -> dict[str, Any]:
@@ -196,9 +258,10 @@ def create_engine_app(
         hardware = node or report()
         if current["backend"] is None:
             current["engine"] = choose_engine(hardware, spec.format, requested)
+        announcer: Announcer | None = None
         if url is not None:
             body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
-            body |= {"pool": pool, "hardware": hardware.as_dict()}
+            body |= {"pool": pool, "hardware": hardware.as_dict(), "managed": managed}
             announcer = Announcer(client, token, lambda: body | announced())
             threading.Thread(target=announcer.forever, args=(ready, stop, failed), daemon=True).start()
         if current["backend"] is None:
@@ -212,6 +275,8 @@ def create_engine_app(
             ready.set()
         yield
         stop.set()
+        if announcer is not None:
+            announcer.farewell()
         closing = getattr(current["backend"], "close", None)
         if closing is not None:
             closing()
@@ -246,13 +311,29 @@ def create_engine_app(
                 raise HTTPException(status_code=409, detail=mismatch)
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
         try:
-            completion = serving.complete(
-                CompletionRequest(spec, body.messages, adapter, body.max_tokens, body.constraint)
-            )
+            with flights.flying(body.route, adapter.name if adapter else None):
+                completion = serving.complete(
+                    CompletionRequest(spec, body.messages, adapter, body.max_tokens, body.constraint, body.route)
+                )
         except AdapterNotSupportedError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except OutputFormatError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return GenerateResult(**completion.__dict__)
+
+    @app.post("/drain")
+    def drain(body: DrainBody) -> DrainResult:
+        serving: ServingBackend | None = current["backend"]
+        in_flight = flights.on_routes(body.routes)
+        if serving is None:
+            return DrainResult(in_flight=in_flight, total=flights.total, loaded=[])
+        if in_flight == 0:
+            for name in body.adapters:
+                if not flights.busy(name):
+                    unload_adapter(serving, name)
+        loaded = loaded_adapters(serving, base)
+        return DrainResult(
+            in_flight=in_flight, total=flights.total, loaded=[name for name in body.adapters if name in loaded]
+        )
 
     return app

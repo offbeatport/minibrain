@@ -359,11 +359,11 @@ function pinText(model: BaseModelDetail): string {
 export function KeepOnDisk({ model }: { model: BaseModelDetail }) {
     const pin = usePinBase();
     if (model.availability.state === "evicted") {
+        const removed =
+            model.health?.state === "evicted" ? model.health.label : "Removed to free space";
         return (
             <span className="text-muted-foreground">
-                {model.evicted_at
-                    ? `Removed to free space ${relativeTime(model.evicted_at)}`
-                    : "Removed to free space"}
+                {model.evicted_at ? `${removed} ${relativeTime(model.evicted_at)}` : removed}
             </span>
         );
     }

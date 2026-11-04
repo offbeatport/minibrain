@@ -23,8 +23,10 @@ import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Secti
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
+import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
+import { RETRY_LABELS, busyTearingDown, retryTeardown, setDeployed } from "~/lib/teardown";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
 function serving(detail: MinibrainDetail): string {
@@ -39,21 +41,27 @@ function serving(detail: MinibrainDetail): string {
         : `Serving v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`;
 }
 
-function DeployToggle({ slug, deployed }: { slug: string; deployed: boolean }) {
+function DeployToggle({ row, deployed }: { row: ModelRow; deployed: boolean }) {
     const client = useQueryClient();
     const can = useCan();
+    const failed = row.teardown?.state === "failed";
     const toggle = useMutation({
-        mutationFn: () =>
-            unwrap(
-                api.POST("/api/minibrains/{slug}/deploy", {
-                    params: { path: { slug } },
-                    body: { deployed: !deployed },
-                }),
-            ),
+        mutationFn: () => (failed ? retryTeardown(row) : setDeployed(row, !deployed)),
         onSuccess: () => client.invalidateQueries(),
     });
     if (!can.build) {
         return null;
+    }
+    if (row.teardown) {
+        return (
+            <Button
+                variant="outline"
+                onClick={() => toggle.mutate()}
+                disabled={!failed || toggle.isPending}
+            >
+                {failed ? RETRY_LABELS[row.teardown.kind] : row.teardown.label}
+            </Button>
+        );
     }
     return (
         <Button
@@ -141,6 +149,9 @@ function serves(row: ModelRow): string {
 }
 
 function DeploymentStatus({ row }: { row: ModelRow }) {
+    if (row.teardown) {
+        return <TeardownStatus teardown={row.teardown} name={row.name} />;
+    }
     if (row.health) {
         return <HealthStatus health={row.health} />;
     }
@@ -263,6 +274,7 @@ export function DeploymentsPage() {
 function VersionHistory({ row }: { row: ModelRow }) {
     const client = useQueryClient();
     const can = useCan();
+    const tearingDown = busyTearingDown(row);
     const deploy = useMutation({
         mutationFn: (number: number) =>
             unwrap(
@@ -323,7 +335,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
                     <Button
                         variant="outline"
                         size="xs"
-                        disabled={deploy.isPending}
+                        disabled={deploy.isPending || tearingDown}
                         onClick={() => deploy.mutate(item.original.number)}
                     >
                         {`Deploy v${item.original.number}`}
@@ -353,7 +365,7 @@ function DeploymentHeader({ row }: { row: ModelRow }) {
             title={row.name}
             icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
             caption={`Apps call it as ${row.key}${status}`}
-            actions={detail && <DeployToggle slug={row.key} deployed={detail.deployed ?? false} />}
+            actions={detail && <DeployToggle row={row} deployed={detail.deployed ?? false} />}
         />
     );
 }

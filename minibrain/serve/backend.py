@@ -42,6 +42,7 @@ class CompletionRequest:
     adapter: AdapterRef | None
     max_tokens: int
     constraint: Constraint | None = None
+    route: str | None = None
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
@@ -83,6 +84,12 @@ class TransformersBackend:
         while len(self.recent) > self.max_adapters:
             (key, name), _ = self.recent.popitem(last=False)
             self.runtimes[key].drop_adapter(name)
+
+    def unload_adapter(self, name: str) -> None:
+        with self.lock:
+            for key, runtime in self.runtimes.items():
+                runtime.drop_adapter(name)
+                self.recent.pop((key, name), None)
 
     def complete(self, request: CompletionRequest) -> Completion:
         with self.lock:

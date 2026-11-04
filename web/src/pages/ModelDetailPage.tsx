@@ -25,8 +25,18 @@ import {
     trainingHref,
 } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
+import {
+    RETRY_LABELS,
+    beingDeleted,
+    builtOn,
+    busyTearingDown,
+    deleteModel,
+    retryTeardown,
+    setDeployed,
+} from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
+import { DeleteBaseDialog } from "./models/DeleteBaseDialog";
 import { KeepOnDisk } from "./models/ModelCache";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
@@ -126,6 +136,49 @@ function HealthNotice({
     );
 }
 
+function TeardownNotice({
+    row,
+    canRetry,
+    onRetried,
+}: {
+    row: ModelRow;
+    canRetry: boolean;
+    onRetried: () => Promise<unknown>;
+}) {
+    const teardown = row.teardown;
+    const [error, setError] = useState<unknown>(null);
+    if (!teardown) {
+        return null;
+    }
+    const failed = teardown.state === "failed";
+    const retry = () =>
+        retryTeardown(row)
+            .then(onRetried)
+            .then(() => setError(null), setError);
+    return (
+        <div
+            className={cn(
+                "flex flex-wrap items-start justify-between gap-3 rounded-md border p-3 text-sm",
+                failed
+                    ? "border-destructive/40 bg-destructive-soft"
+                    : "border-info/40 bg-info-soft",
+            )}
+        >
+            <div className="flex min-w-0 max-w-3xl flex-col gap-1">
+                <StatusText tone={failed ? "destructive" : "info"} className="font-semibold">
+                    {teardown.label}
+                </StatusText>
+                <p>{teardown.detail}</p>
+                <p className="text-muted-foreground">
+                    {`Started by ${teardown.started_by} ${relativeTime(teardown.started_at)}.`}
+                </p>
+                <ErrorLine error={error} />
+            </div>
+            {failed && canRetry && <Button onClick={retry}>{RETRY_LABELS[teardown.kind]}</Button>}
+        </div>
+    );
+}
+
 function verifiedText(model: BaseModelDetail): string {
     if (!model.verified_at) {
         return "Each file is checked against the SHA-256 saved at install.";
@@ -178,18 +231,25 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const [removing, setRemoving] = useState<ModelRow | null>(null);
+    const models = useModels();
+    const dependents = builtOn(models.data ?? [], model);
     const job = useJob(model.activity.job_id ?? model.availability.job_id);
     const reload = async () => {
         await refresh();
         await queryClient.invalidateQueries({ queryKey: keys.baseModel(model.key) });
     };
-    const path = { params: { path: { key: model.key } } };
     const deployed = model.deployed;
-    const available = model.availability.state === "available" && !model.health;
+    const tearingDown = busyTearingDown(model);
+    const available = model.availability.state === "available" && !model.health && !tearingDown;
     const health = useHealthActions({
         refresh: reload,
         confirm: setConfirmation,
-        remove: (row) =>
+        remove: (row) => {
+            if (dependents.length > 0) {
+                setRemoving(row);
+                return;
+            }
             setConfirmation({
                 title: `Delete ${row.name}?`,
                 description: (
@@ -197,15 +257,17 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                         {model.relocated
                             ? `Its record and API keys are removed; the files in ${model.storage_path} stay.`
                             : "Its record, files and API keys are removed. You can download or import it again later."}
+                        {deployed ? " It is deployed, so it stops serving first." : ""}
                     </p>
                 ),
-                confirmLabel: "Delete",
+                confirmLabel: deployed ? "Undeploy and delete" : "Delete",
                 destructive: true,
                 run: () =>
-                    unwrap(api.DELETE("/api/models/base/{key}", path)).then(() => {
-                        router.history.push(modelsHref());
-                    }),
-            }),
+                    deleteModel(row, { undeploy: deployed })
+                        .then(refresh)
+                        .then(() => router.history.push(modelsHref())),
+            });
+        },
     });
     const busy = ["running", "queued"].includes(model.activity.state);
     const verify = () => health.run(model, { kind: "verify", label: "Verify files" });
@@ -222,13 +284,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
         ),
         confirmLabel: deployed ? "Undeploy" : "Deploy",
         destructive: deployed,
-        run: () =>
-            unwrap(
-                api.POST("/api/models/base/{key}/deploy", {
-                    ...path,
-                    body: { deployed: !deployed },
-                }),
-            ).then(reload),
+        run: () => setDeployed(model, !deployed).then(reload),
     });
     const repoLink = model.repo ? (
         <a
@@ -256,7 +312,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                 Test
                             </Button>
                         )}
-                        {can.build && (available || deployed) && (
+                        {can.build && !tearingDown && (available || deployed) && (
                             <Button
                                 variant={deployed ? "outline" : "default"}
                                 onClick={() => setConfirmation(deployConfirmation())}
@@ -264,7 +320,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                 {deployed ? "Undeploy" : "Deploy"}
                             </Button>
                         )}
-                        {can.admin && (
+                        {can.admin && !beingDeleted(model) && (
                             <Button variant="ghost" onClick={() => setEditing(model)}>
                                 Edit
                             </Button>
@@ -273,6 +329,11 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 }
             />
             <StatusStrip row={model} />
+            <TeardownNotice
+                row={model}
+                canRetry={can.admin || (can.build && model.teardown?.kind === "undeploy")}
+                onRetried={reload}
+            />
             <HealthNotice
                 row={model}
                 run={can.admin ? health.run : undefined}
@@ -385,6 +446,12 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
+            <DeleteBaseDialog
+                row={removing}
+                dependents={removing ? dependents : []}
+                onOpenChange={(open) => !open && setRemoving(null)}
+                onStarted={reload}
+            />
             {health.dialogs}
         </>
     );
@@ -449,7 +516,9 @@ const VERSION_COLUMNS: ColumnDef<VersionInfo, unknown>[] = [
 function CustomModelView({ row }: { row: ModelRow }) {
     const versions = useVersions(row.key);
     const can = useCan();
+    const refresh = useModelsRefresh();
     const jobs = useJobs(row.key);
+    const deleting = beingDeleted(row);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const router = useRouter();
     const recipe = useRouterState({
@@ -477,6 +546,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                         {can.build && (
                             <Button
                                 variant="outline"
+                                disabled={deleting}
                                 onClick={() => router.history.push(modelDataHref(row.key))}
                             >
                                 Data
@@ -485,6 +555,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                         {can.build && (
                             <Button
                                 variant="outline"
+                                disabled={deleting}
                                 onClick={() =>
                                     router.history.push(`${trainingHref(row.key)}${recipe}`)
                                 }
@@ -506,7 +577,11 @@ function CustomModelView({ row }: { row: ModelRow }) {
                             </Button>
                         )}
                         {can.build && (
-                            <Button variant="ghost" onClick={() => setEditing(row)}>
+                            <Button
+                                variant="ghost"
+                                disabled={deleting}
+                                onClick={() => setEditing(row)}
+                            >
                                 Edit
                             </Button>
                         )}
@@ -514,6 +589,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                 }
             />
             <StatusStrip row={row} />
+            <TeardownNotice row={row} canRetry={can.build} onRetried={refresh} />
             <HealthNotice row={row} run={open} />
             <ModelDataNotice slug={row.key} />
             {active.map((job) => (

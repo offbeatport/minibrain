@@ -16,7 +16,7 @@ from minibrain.models.cache import touch
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.registry import resolve_spec
-from minibrain.registry.compute import EngineReport, record_engine
+from minibrain.registry.compute import EngineReport, GatewayReport, record_engine, record_gateway
 from minibrain.serve.weights import local_dir
 
 MAX_WAIT_SECONDS = 30.0
@@ -78,8 +78,17 @@ class EngineBody(BaseModel):
     state: str
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = {}
+    managed: bool = False
     error: str | None = None
     code: str | None = None
+
+
+class GatewayBody(BaseModel):
+    id: str
+    host: str
+    version: str
+    routes: list[str] = []
+    bases: list[str] = []
 
 
 @router.post("/engines", status_code=204)
@@ -90,6 +99,12 @@ def register_engine(body: EngineBody, session: SessionDep) -> None:
     elif body.state == "ready":
         record_loaded(session, body.base_model)
         touch(session, body.base_model)
+    session.commit()
+
+
+@router.post("/gateways", status_code=204)
+def report_gateway(body: GatewayBody, session: SessionDep) -> None:
+    record_gateway(session, GatewayReport(kind="standalone", **body.model_dump()))
     session.commit()
 
 

@@ -216,6 +216,7 @@ def completion_request(
         adapter=adapter,
         max_tokens=max_tokens,
         constraint=constraint,
+        route=route.name,
     )
 
 

@@ -149,7 +149,9 @@ def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harne
         session.commit()
     seen: list[dict] = []
 
-    def spawn(specs: dict[str, BaseModelSpec], registered: dict[str, list[dict[str, str]]]) -> dict[str, str]:
+    def spawn(
+        specs: dict[str, BaseModelSpec], registered: dict[str, list[dict[str, str]]], releasing: frozenset[str]
+    ) -> dict[str, str]:
         seen.append(registered)
         return {}
 

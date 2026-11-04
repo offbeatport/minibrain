@@ -17,10 +17,11 @@ from minibrain.api.schemas import (
     Health,
     ModelRow,
     Stage,
+    TeardownInfo,
     Usage,
     VersionRow,
 )
-from minibrain.api.views import cost_info
+from minibrain.api.views import cost_info, teardown_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
@@ -38,6 +39,10 @@ from minibrain.registry.models import (
     Model,
     ModelStatus,
     RequestLog,
+    Teardown,
+    TeardownKind,
+    TeardownStatus,
+    TeardownStep,
     Version,
     VersionKind,
     VersionStatus,
@@ -62,7 +67,13 @@ TRANSFER_LABELS: dict[str, str] = {
     JobKind.VERIFY: "Verifying files",
     JobKind.REPAIR: "Repairing",
 }
-STATE_LABELS = {"running": "Running", "starting": "Starting", "unhealthy": "Unhealthy"}
+STATE_LABELS = {
+    "running": "Running",
+    "starting": "Starting",
+    "unhealthy": "Unhealthy",
+    "stopping": "Stopping",
+    "stop_failed": "Stop failed",
+}
 USAGE_DAYS = 7
 FAILED_STATUS = 500
 LATENCY_SAMPLE = 2000
@@ -301,7 +312,24 @@ def custom_availability(minibrain: Minibrain, store: ArtifactStore) -> Availabil
     return Availability(state="available" if present else "missing")
 
 
-def deployment(label_prefix: str, deployed: bool, health: str | None, versions: list[int]) -> Deployment:
+def stopping(teardown: Teardown | None) -> DeploymentState | None:
+    if teardown is None:
+        return None
+    if teardown.kind == TeardownKind.UNDEPLOY:
+        return "stopping" if teardown.status == TeardownStatus.RUNNING else "stop_failed"
+    live = teardown.kind == TeardownKind.DELETE and teardown.detail.get("live")
+    if live and teardown.status == TeardownStatus.RUNNING and teardown.step == TeardownStep.STOPPING:
+        return "stopping"
+    return None
+
+
+def deployment(
+    label_prefix: str, deployed: bool, health: str | None, versions: list[int], teardown: Teardown | None = None
+) -> Deployment:
+    halted = stopping(teardown)
+    if halted is not None:
+        label = STATE_LABELS[halted]
+        return Deployment(state=halted, label=f"{label_prefix} · {label}" if label_prefix else label)
     if not deployed:
         return Deployment(state="not_deployed", label="Not deployed")
     state: DeploymentState = "running" if health == "running" else "unhealthy" if health == "unhealthy" else "starting"
@@ -323,8 +351,10 @@ def custom_row(
     version_usage: dict[tuple[int, int], Usage] | None = None,
     base: tuple[str, Health | None, str | None, Availability | None] | None = None,
     prices: DevicePrices | None = None,
+    teardown: tuple[Teardown | None, TeardownInfo | None] = (None, None),
 ) -> ModelRow:
     base_name, broken, base_hash, base_state = base or (minibrain.base_model, None, None, None)
+    found, info = teardown
     availability = custom_availability(minibrain, store)
     if base_state is not None and base_state.state in ("downloading", "importing"):
         availability = base_state
@@ -352,6 +382,7 @@ def custom_row(
             minibrain.deployed,
             health(minibrain.base_model) if minibrain.deployed else None,
             [current] if minibrain.deployed and current is not None else [],
+            found,
         ),
         updated_at=updated,
         can_test=any(v.status == VersionStatus.READY for v in minibrain.versions),
@@ -365,6 +396,7 @@ def custom_row(
         accuracy=shown_accuracy(minibrain),
         usage=usage,
         health=custom_health(broken, base_name),
+        teardown=info,
     )
 
 
@@ -413,6 +445,7 @@ def base_row(
     health: EngineHealth,
     usage: Usage | None = None,
     context: HealthContext | None = None,
+    teardown: Teardown | None = None,
 ) -> ModelRow:
     availability = base_availability(model, job, settings)
     activity = base_activity(job)
@@ -432,7 +465,7 @@ def base_row(
         base_model=None,
         availability=availability,
         activity=activity,
-        deployment=deployment("", model.deployed, health(model.id) if model.deployed else None, []),
+        deployment=deployment("", model.deployed, health(model.id) if model.deployed else None, [], teardown),
         updated_at=updated,
         can_test=availability.state == "available" and problem is None,
         update_available=latest is not None and model.revision is not None and latest != model.revision,
@@ -448,6 +481,7 @@ def base_row(
         catalog_id=model.catalog_id,
         pinned=model.pinned,
         last_used_at=model.last_used_at or model.created_at,
+        teardown=teardown_info(teardown),
     )
 
 
@@ -478,10 +512,29 @@ def all_rows(
     weights = base_weights(session)
     usage = usage_index(session)
     prices = load_prices(session)
+    teardowns = list(session.scalars(select(Teardown)))
+    parents = {teardown.id: teardown.name for teardown in teardowns}
+    custom_teardowns = {item.minibrain_id: item for item in teardowns if item.minibrain_id is not None}
+    base_teardowns = {item.model_id: item for item in teardowns if item.model_id is not None}
     models = list(session.scalars(select(Model)))
     base_rows = [
-        base_row(model, by_model.get(model.id), settings, health, usage.base.get(model.id), context) for model in models
+        base_row(
+            model,
+            by_model.get(model.id),
+            settings,
+            health,
+            usage.base.get(model.id),
+            context,
+            base_teardowns.get(model.id),
+        )
+        for model in models
     ]
+
+    def custom_teardown(minibrain: Minibrain) -> tuple[Teardown | None, TeardownInfo | None]:
+        found = custom_teardowns.get(minibrain.id)
+        part_of = parents.get(found.parent_id) if found is not None and found.parent_id is not None else None
+        return found, teardown_info(found, part_of)
+
     bases = {
         model.id: (
             model.name,
@@ -502,6 +555,7 @@ def all_rows(
             usage.versions,
             bases.get(minibrain.base_model),
             prices,
+            custom_teardown(minibrain),
         )
         for minibrain in session.scalars(select(Minibrain))
     ]

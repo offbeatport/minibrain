@@ -1,12 +1,11 @@
-import shutil
-
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.models import model_row, wake_teardowns
 from minibrain.api.schemas import (
     DatasetChoice,
     DeployRequest,
@@ -15,6 +14,7 @@ from minibrain.api.schemas import (
     MinibrainCreate,
     MinibrainDetail,
     MinibrainSummary,
+    ModelRow,
     ModelUpdate,
     PreviewResponse,
     QueryRequest,
@@ -38,11 +38,10 @@ from minibrain.data.sources import safe_filename
 from minibrain.models.registry import available_bases, base_readiness
 from minibrain.policy import LockedError, bodies_choice
 from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, Minibrain, now
+from minibrain.registry.models import AuditEvent, Minibrain, now
 from minibrain.registry.service import (
     ConflictError,
     create_minibrain,
-    drop_orphan_keys,
     get_minibrain,
     latest_snapshot,
     list_minibrains,
@@ -50,6 +49,7 @@ from minibrain.registry.service import (
 )
 from minibrain.settings import sample_file
 from minibrain.tags import merged_tags, user_tags
+from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
 
 router = APIRouter(prefix="/api/minibrains", tags=["minibrains"])
 
@@ -104,26 +104,14 @@ def read(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDeta
     return found.model_copy(update={"snapshot": found.snapshot.model_copy(update={"checks": checks})})
 
 
-@router.delete("/{slug}", status_code=204, dependencies=[Depends(builder)])
-def delete(slug: str, session: SessionDep, settings: SettingsDep) -> None:
-    minibrain = get_minibrain(session, slug)
-    if minibrain.deployed:
-        raise ConflictError(f"{minibrain.name} is deployed; undeploy it first")
-    if any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
-        raise ConflictError("cancel the running jobs first")
-    session.add(
-        AuditEvent(
-            actor=current_actor(),
-            action="model.delete",
-            target=minibrain.slug,
-            detail={"name": minibrain.name, "kind": "custom", "versions": len(minibrain.versions)},
-        )
-    )
-    session.delete(minibrain)
-    drop_orphan_keys(session)
-    cleanup(session, settings)
+@router.delete("/{slug}", status_code=202, dependencies=[Depends(builder)])
+def delete(
+    slug: str, request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep, undeploy: bool = False
+) -> ModelRow:
+    delete_custom(session, get_minibrain(session, slug), current_actor(), undeploy=undeploy)
     session.commit()
-    shutil.rmtree(settings.minibrain_dir(slug), ignore_errors=True)
+    wake_teardowns(request)
+    return model_row(request, session, settings, store, "custom", slug)
 
 
 SAMPLE_NAME = "Travel intents (sample)"
@@ -132,13 +120,21 @@ SAMPLE_DESCRIPTION = "Sample: sort travel support messages into intents such as 
 
 
 @router.post("/{slug}/deploy", dependencies=[Depends(builder)])
-def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
+def deploy(
+    slug: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
+) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    if minibrain.deployed != body.deployed:
-        action = "model.deploy" if body.deployed else "model.undeploy"
+    if not body.deployed:
+        if undeploy_custom(session, minibrain, current_actor()) is not None:
+            response.status_code = 202
+        session.commit()
+        wake_teardowns(request)
+        return detail(settings, minibrain)
+    cancel_stop(session, minibrain.teardown, minibrain.name)
+    if not minibrain.deployed:
         facts = {"name": minibrain.name, "version": minibrain.current_version}
-        session.add(AuditEvent(actor=current_actor(), action=action, target=minibrain.slug, detail=facts))
-    minibrain.deployed = body.deployed
+        session.add(AuditEvent(actor=current_actor(), action="model.deploy", target=minibrain.slug, detail=facts))
+    minibrain.deployed = True
     minibrain.updated_at = now()
     session.commit()
     return detail(settings, minibrain)

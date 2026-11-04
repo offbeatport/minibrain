@@ -407,6 +407,25 @@ class VersionInfo(BaseModel):
     created_at: datetime
 
 
+TeardownKindName = Literal["delete", "undeploy", "remove_files"]
+TeardownState = Literal["running", "failed"]
+
+
+class TeardownInfo(BaseModel):
+    kind: TeardownKindName
+    state: TeardownState
+    label: str
+    detail: str
+    error: str | None = None
+    started_by: str
+    started_at: datetime
+    waiting: list[str] = Field(default_factory=list)
+    models: list[str] = Field(default_factory=list)
+    part_of: str | None = None
+    cascade: bool = False
+    undeploy: bool = False
+
+
 class MinibrainSummary(BaseModel):
     slug: str
     name: str
@@ -438,6 +457,7 @@ class MinibrainDetail(MinibrainSummary):
     changed: ChangeInfo | None = None
     models: list[str]
     request_bodies: RequestBodiesInfo
+    teardown: TeardownInfo | None = None
 
 
 class QueryRequest(BaseModel):
@@ -615,7 +635,7 @@ class InfrastructureInfo(BaseModel):
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "evicted", "none"]
 ActivityState = Literal["running", "queued", "failed", "ready", "needs_examples", "idle"]
-DeploymentState = Literal["running", "starting", "unhealthy", "not_deployed"]
+DeploymentState = Literal["running", "starting", "unhealthy", "stopping", "stop_failed", "not_deployed"]
 
 
 class Availability(BaseModel):
@@ -745,6 +765,7 @@ class ModelRow(BaseModel):
     catalog_id: str | None = None
     pinned: bool = False
     last_used_at: datetime | None = None
+    teardown: TeardownInfo | None = None
 
 
 FileState = Literal["ok", "corrupt", "missing", "wrong_size", "unchecked"]

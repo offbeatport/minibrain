@@ -1,6 +1,7 @@
 import type { ModelRow, ModelUsage, ModelVersionRow } from "~/api/client";
 import type { Health } from "~/components/models/HealthStatus";
 import { failingShare } from "~/components/models/ModelMetrics";
+import type { Teardown } from "~/lib/teardown";
 
 export type Entry = { key: string; model: ModelRow; version: ModelVersionRow | null };
 
@@ -46,6 +47,15 @@ export function failingEntry(entry: Entry): boolean {
     return isLive(entry) && failingShare(usageOf(entry)) >= FAILING_SHARE;
 }
 
+export function entryTeardown(entry: Entry): Teardown | null {
+    const { model, version } = entry;
+    const teardown = model.teardown ?? null;
+    if (!teardown || teardown.kind !== "undeploy" || !version) {
+        return teardown;
+    }
+    return version.number === model.current_version ? teardown : null;
+}
+
 export function entryHealth(entry: Entry): Health | null {
     const { model, version } = entry;
     if (!version) {
@@ -65,6 +75,10 @@ function modelError(model: ModelRow): boolean {
 
 export function stateOfEntry(entry: Entry): EntryState {
     const { model, version } = entry;
+    const teardown = entryTeardown(entry);
+    if (teardown) {
+        return teardown.state === "failed" ? "error" : "progress";
+    }
     if (failingEntry(entry)) {
         return "error";
     }
