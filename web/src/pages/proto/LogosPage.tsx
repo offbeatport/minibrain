@@ -373,12 +373,169 @@ function rainbowGlyph({
     };
 }
 
+const DOME = "M24 68 C14 68 13 60 15 53 C19 33 33 22 50 22 C67 22 81 33 85 53 C87 60 86 68 76 68 Z";
+const LEFT_HALF = "M46 18 C27 19 15 33 15 51 C15 69 27 83 46 84 Z";
+const RIGHT_HALF = "M54 18 C73 19 85 33 85 51 C85 69 73 83 54 84 Z";
+
+function stroked(size: number, base: number) {
+    return {
+        fill: "none",
+        strokeWidth: weight(size, base),
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+    } as const;
+}
+
+function DomeBrain({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <path d={DOME} />
+            <rect x={55} y={60} width={12} height={22} rx={6} />
+        </g>
+    );
+}
+
+function CloudBrain({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <circle cx={33} cy={46} r={18} />
+            <circle cx={52} cy={36} r={20} />
+            <circle cx={70} cy={45} r={17} />
+            <rect x={16} y={44} width={70} height={24} rx={12} />
+            <rect x={56} y={60} width={12} height={22} rx={6} />
+        </g>
+    );
+}
+
+function HalvesBrain({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <path d={LEFT_HALF} />
+            <path d={RIGHT_HALF} />
+        </g>
+    );
+}
+
+function FoldedHalvesBrain({ color, ground, size }: GlyphProps) {
+    return (
+        <g>
+            <path d={LEFT_HALF} fill={color} />
+            <path d={RIGHT_HALF} fill={color} />
+            <g stroke={ground} {...stroked(size, 5)}>
+                <path d="M22 44 C28 38 34 50 41 42" />
+                <path d="M22 62 C28 56 34 68 41 60" />
+                <path d="M59 42 C66 50 72 38 78 44" />
+                <path d="M59 60 C66 68 72 56 78 62" />
+            </g>
+        </g>
+    );
+}
+
+function WalnutBrain({ color, size }: GlyphProps) {
+    return (
+        <g stroke={color} {...stroked(size, 8)}>
+            <ellipse cx={50} cy={51} rx={33} ry={32} />
+            <path d="M50 20 C42 31 58 41 50 51 C42 61 58 71 50 82" />
+        </g>
+    );
+}
+
+function FoldBrain({ color, size }: GlyphProps) {
+    return (
+        <g stroke={color} {...stroked(size, 7.5)}>
+            <path d={DOME} />
+            <path d="M28 56 C28 44 40 42 41 52 C42 40 58 40 59 52 C60 42 72 44 72 56" />
+        </g>
+    );
+}
+
+function StackedBrain({ color, size }: GlyphProps) {
+    return (
+        <g stroke={color} {...stroked(size, 8)}>
+            <path d="M16 44 A8.5 8.5 0 0 1 33 44 A8.5 8.5 0 0 1 50 44 A8.5 8.5 0 0 1 67 44 A8.5 8.5 0 0 1 84 44" />
+            <path d="M24 66 A8.5 8.5 0 0 1 41 66 A8.5 8.5 0 0 1 58 66 A8.5 8.5 0 0 1 75 66" />
+        </g>
+    );
+}
+
+const PIXELS = [".XXXX.", "XXXXXX", "XXXXXX", "XXXXX.", "...X.."];
+
+const PIXEL_CELLS = PIXELS.flatMap((row, y) =>
+    [...row].map((cell, x) => ({ id: `${x}:${y}`, on: cell === "X", x, y })),
+).filter((cell) => cell.on);
+
+function PixelBrain({ color }: GlyphProps) {
+    const step = 13;
+    const left = 50 - (6 * step) / 2;
+    const top = 50 - (5 * step) / 2;
+    return (
+        <g fill={color}>
+            {PIXEL_CELLS.map((cell) => (
+                <rect
+                    key={cell.id}
+                    x={left + cell.x * step + 1}
+                    y={top + cell.y * step + 1}
+                    width={step - 2.5}
+                    height={step - 2.5}
+                    rx={3}
+                />
+            ))}
+        </g>
+    );
+}
+
+const NEURONS: { id: string; x: number; y: number; r: number }[] = [
+    { id: "a", x: 30, y: 44, r: 12 },
+    { id: "b", x: 52, y: 34, r: 13 },
+    { id: "c", x: 73, y: 45, r: 12 },
+    { id: "d", x: 39, y: 66, r: 11 },
+    { id: "e", x: 62, y: 65, r: 11 },
+    { id: "f", x: 70, y: 84, r: 6 },
+];
+
+function DotsBrain({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            {NEURONS.map((dot) => (
+                <circle key={dot.id} cx={dot.x} cy={dot.y} r={dot.r} />
+            ))}
+        </g>
+    );
+}
+
+function ProfileBrain({ color, size }: GlyphProps) {
+    return (
+        <g stroke={color} {...stroked(size, 7.5)}>
+            <path d={DOME} />
+            <path d="M50 24 C40 38 60 48 50 66" />
+            <path d="M61 68 V80" />
+        </g>
+    );
+}
+
 type Variant = { id: string; name: string; Glyph: ComponentType<GlyphProps>; bleed?: boolean };
 type Family = { id: string; name: string; idea: string; variants: Variant[] };
 
 const THIRD = (2 * Math.PI) / 3;
 
 const FAMILIES: Family[] = [
+    {
+        id: "brain",
+        name: "Brain",
+        idea: "The brain itself, kept to a few shapes so it reads from across a room.",
+        variants: [
+            { id: "x1", name: "Dome", Glyph: DomeBrain },
+            { id: "x2", name: "Cloud", Glyph: CloudBrain },
+            { id: "x3", name: "Halves", Glyph: HalvesBrain },
+            { id: "x4", name: "Folded halves", Glyph: FoldedHalvesBrain },
+            { id: "x5", name: "Walnut", Glyph: WalnutBrain },
+            { id: "x6", name: "One fold", Glyph: FoldBrain },
+            { id: "x7", name: "Gyri", Glyph: StackedBrain },
+            { id: "x8", name: "Pixels", Glyph: PixelBrain },
+            { id: "x9", name: "Neurons", Glyph: DotsBrain },
+            { id: "x10", name: "Profile", Glyph: ProfileBrain },
+        ],
+    },
     {
         id: "branches",
         name: "Branches",
@@ -649,7 +806,7 @@ export function LogosPage() {
         <Page>
             <PageHeader
                 title="Logos"
-                caption="Ten versions each of Branches, Waves and Rainbow, flat on Cobalt or ink. Prototype; not in the sidebar."
+                caption="Ten simple brains, then ten versions each of Branches, Waves and Rainbow. Flat on Cobalt or ink. Prototype; not in the sidebar."
             />
             {FAMILIES.map((family) => (
                 <FamilySection key={family.id} family={family} />
