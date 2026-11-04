@@ -106,6 +106,25 @@ const TASKS: {
     },
 ];
 
+type Problems = { model?: string; name?: string; licence?: string };
+
+const PROBLEM_ORDER: (keyof Problems)[] = ["model", "name", "licence"];
+
+const PROBLEM_TARGETS: Record<keyof Problems, string> = {
+    model: "base-model",
+    name: "create-name",
+    licence: "create-licence",
+};
+
+function slugOf(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48)
+        .replace(/-+$/, "");
+}
+
 function Optional({ label }: { label: string }) {
     return (
         <span>
@@ -197,6 +216,7 @@ export function AddModelPage() {
     const [task, setTask] = useState<TaskKey>("classify");
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
+    const [checked, setChecked] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
     const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "import" : "catalogue");
     const [copy, setCopy] = useState<CopySource | null>(null);
@@ -347,9 +367,39 @@ export function AddModelPage() {
             setAccepted(false);
         }
     };
-    const ready = baseReady && finalName.length > 0;
+    const takenSlugs = new Set(rows.filter((row) => row.kind === "custom").map((row) => row.key));
+    const licencePending =
+        plan.target.kind === "catalogue" && !plan.installedKey && !plan.blocked && !accepted;
+    const problems: Problems = {
+        model:
+            !option && current?.kind !== "import"
+                ? "Pick a base model."
+                : plan.blocked && !plan.installedKey
+                  ? plan.blocked
+                  : diskBlocks(need)
+                    ? "Not enough disk space for this model. Free some space or pick a smaller one."
+                    : current?.kind === "import" && !plan.ready && !licencePending
+                      ? "Check the import location first."
+                      : undefined,
+        name: !/[A-Za-z0-9]/.test(finalName)
+            ? "Use at least one letter or number."
+            : takenSlugs.has(slugOf(finalName))
+              ? `A model called ${finalName} already exists. Pick another name.`
+              : undefined,
+        licence: licencePending ? "Accept the licence to download this model." : undefined,
+    };
+    const shown = checked ? problems : {};
+    const ready = baseReady && !problems.model && !problems.name && !problems.licence;
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        setChecked(true);
+        const first = PROBLEM_ORDER.find((field) => problems[field]);
+        if (first) {
+            const target = document.getElementById(PROBLEM_TARGETS[first]);
+            target?.scrollIntoView({ block: "center", behavior: "smooth" });
+            target?.focus({ preventScroll: true });
+            return;
+        }
         if (ready && !add.isPending) {
             cacheCheck.check(need?.size, option?.name ?? plan.name ?? "It", () => add.mutate());
         }
@@ -380,7 +430,7 @@ export function AddModelPage() {
                 <Card className="gap-field p-panel">
                     <TaskSelect value={task} onChange={setTask} />
                     <div className="flex flex-col gap-3">
-                        <Field id="base-model" label="Model">
+                        <Field id="base-model" label="Model" error={shown.model}>
                             <BasePicker
                                 value={{
                                     option,
@@ -410,9 +460,10 @@ export function AddModelPage() {
                             onClearCopy={() => setCopy(null)}
                         />
                     </div>
-                    <Field id="create-name" label="Name">
+                    <Field id="create-name" label="Name" error={shown.name}>
                         <Input
                             id="create-name"
+                            aria-invalid={Boolean(shown.name)}
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             placeholder={suggestedName || "IT ticket classifier"}
@@ -448,11 +499,15 @@ export function AddModelPage() {
                         <div className="flex flex-col gap-label">
                             <span className="text-sm font-medium">Licence</span>
                             <Licence
+                                id="create-licence"
                                 option={option}
                                 plan={plan}
                                 accepted={accepted}
                                 onAccepted={setAccepted}
                             />
+                            {shown.licence && (
+                                <p className="text-sm text-destructive">{shown.licence}</p>
+                            )}
                         </div>
                     )}
                 </Card>
@@ -477,7 +532,7 @@ export function AddModelPage() {
                         <X />
                         Cancel
                     </Button>
-                    <Button type="submit" disabled={!ready || add.isPending}>
+                    <Button type="submit" disabled={add.isPending}>
                         <Plus />
                         {add.isPending ? "Adding…" : "Add model"}
                     </Button>

@@ -30,6 +30,10 @@ class ConflictError(Exception):
     pass
 
 
+class ModelNameError(ValueError):
+    pass
+
+
 def slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     return slug[:48].strip("-") or "minibrain"
@@ -49,9 +53,11 @@ def get_minibrain(session: Session, slug: str) -> Minibrain:
 def create_minibrain(session: Session, name: str, task: str, base_model: str) -> Minibrain:
     from minibrain.policy import load
 
+    if not re.search(r"[A-Za-z0-9]", name):
+        raise ModelNameError("a model name needs at least one letter or number")
     slug = slugify(name)
     if session.scalar(select(Minibrain).where(Minibrain.slug == slug)) is not None:
-        raise ConflictError(f"a model called {slug} already exists")
+        raise ConflictError(f"a model called {name.strip()} already exists, or one with the same address ({slug})")
     bodies = bool(load(session)["request_bodies"])
     minibrain = Minibrain(slug=slug, name=name.strip(), task=task, base_model=base_model, request_bodies=bodies)
     session.add(minibrain)

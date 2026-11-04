@@ -227,3 +227,11 @@ def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:
     assert harness.client.post("/internal/worker/claim", json=body).status_code == 401
     bad = {"Authorization": "Bearer nope"}
     assert harness.client.post("/internal/worker/claim", json=body, headers=bad).status_code == 401
+
+
+def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness) -> None:
+    blank = harness.client.post("/api/minibrains", json={"name": "**** "})
+    assert blank.status_code == 422 and "letter or number" in blank.json()["detail"]
+    assert harness.client.post("/api/minibrains", json={"name": "Support Triage"}).status_code == 201
+    taken = harness.client.post("/api/minibrains", json={"name": "support  triage!"})
+    assert taken.status_code == 409 and "support  triage!" in taken.json()["detail"]

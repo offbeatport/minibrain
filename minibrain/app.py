@@ -75,7 +75,7 @@ from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
-from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.registry.service import ConflictError, ModelNameError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.settings import Settings, load_settings
@@ -98,6 +98,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     MissingArtifactError: 409,
     SourceError: 422,
     TagError: 422,
+    ModelNameError: 422,
     SnapshotError: 422,
     FeedbackError: 422,
     ArtifactError: 422,

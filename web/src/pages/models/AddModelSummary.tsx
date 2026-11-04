@@ -106,11 +106,13 @@ function ReadLink({ href }: { href: string }) {
 }
 
 export function Licence({
+    id,
     option,
     plan,
     accepted,
     onAccepted,
 }: {
+    id?: string;
     option: BaseOption | null;
     plan: SourcePlan;
     accepted: boolean;
@@ -132,6 +134,7 @@ export function Licence({
         return (
             <Label className="flex items-start gap-2 text-sm leading-snug font-normal">
                 <Checkbox
+                    id={id}
                     checked={accepted}
                     onCheckedChange={(value) => onAccepted(value === true)}
                     className="mt-px"
