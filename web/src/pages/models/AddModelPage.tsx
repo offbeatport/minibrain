@@ -399,7 +399,6 @@ export function AddModelPage() {
                         <BaseSummary
                             option={option}
                             plan={plan}
-                            catalog={catalog.data}
                             need={need}
                             accepted={accepted}
                             onAccepted={setAccepted}
@@ -449,7 +448,9 @@ export function AddModelPage() {
                         plan={plan}
                         need={need}
                         free={catalog.data?.store_free_bytes}
+                        catalog={catalog.data}
                         onVariant={changeVariant}
+                        onPickAnother={() => setOpen(true)}
                     />
                 </aside>
                 <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-4 lg:col-span-2">

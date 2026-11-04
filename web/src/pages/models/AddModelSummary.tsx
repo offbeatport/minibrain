@@ -1,10 +1,10 @@
 import { Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
 import type { ReactNode } from "react";
-import type { CatalogVariantInfo } from "~/api/client";
+import type { CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { bytes } from "~/lib/time";
 import { FIT_TEXT, type SourcePlan } from "./BaseSource";
-import type { DiskNeed } from "./BaseSummary";
+import { ComputeHelp, type DiskNeed } from "./BaseSummary";
 import type { BaseOption } from "./baseOptions";
 
 const LOW_SPACE = 5 * 1024 ** 3;
@@ -189,13 +189,17 @@ export function AddModelSummary({
     plan,
     need,
     free,
+    catalog,
     onVariant,
+    onPickAnother,
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
     need: DiskNeed;
     free: number | null | undefined;
+    catalog: CatalogResponse | undefined;
     onVariant: (variant: string) => void;
+    onPickAnother: () => void;
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
     const disk = diskMeter(need, free);
@@ -230,6 +234,13 @@ export function AddModelSummary({
                         share={memory.share}
                         tone={memory.tone}
                         caption={memory.caption}
+                    />
+                )}
+                {variant?.fit.level === "insufficient" && option && catalog && (
+                    <ComputeHelp
+                        option={{ ...option, variant }}
+                        catalog={catalog}
+                        onPickAnother={onPickAnother}
                     />
                 )}
             </Block>

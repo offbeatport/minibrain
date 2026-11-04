@@ -206,7 +206,7 @@ function RunElsewhere({
     );
 }
 
-function ComputeHelp({
+export function ComputeHelp({
     option,
     catalog,
     onPickAnother,
@@ -216,27 +216,19 @@ function ComputeHelp({
     onPickAnother: () => void;
 }) {
     const [open, setOpen] = useState(false);
-    const variant = option.variant;
-    if (!variant) {
-        return null;
-    }
-    const needed = bytes(variant.fit.needed_bytes);
-    const reason = variant.fit.available_bytes
-        ? `Too big for ${catalog.hardware.machine}: it needs about ${needed} of memory, and this machine has ${bytes(variant.fit.available_bytes)}.`
-        : `Too big for this machine: it needs about ${needed} of memory.`;
     return (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <StatusText tone="warning" className="min-w-0 whitespace-normal tabular-nums">
-                {reason}
-            </StatusText>
-            <span className="flex items-center gap-2">
+        <div className="flex flex-col gap-2.5">
+            <p className="text-sm text-muted-foreground">
+                {`Too big for ${catalog.hardware.machine}. Add it now and run it on a machine that fits, or pick a smaller one.`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
                     Where to run it
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={onPickAnother}>
                     Pick a smaller one
                 </Button>
-            </span>
+            </div>
             <RunElsewhere option={option} catalog={catalog} open={open} onOpenChange={setOpen} />
         </div>
     );
@@ -262,7 +254,6 @@ function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) 
 export function BaseSummary({
     option,
     plan,
-    catalog,
     need,
     accepted,
     onAccepted,
@@ -272,7 +263,6 @@ export function BaseSummary({
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
-    catalog: CatalogResponse | undefined;
     need: DiskNeed;
     accepted: boolean;
     onAccepted: (accepted: boolean) => void;
@@ -281,7 +271,6 @@ export function BaseSummary({
     onPickAnother: () => void;
 }) {
     const variant = option?.kind === "catalogue" ? plan.variant : null;
-    const fit = variant?.fit.level ?? option?.fit;
     return (
         <div className="flex flex-col gap-3 text-sm" aria-live="polite">
             {copy && <CopyNote copy={copy} onClear={onClearCopy} />}
@@ -295,13 +284,6 @@ export function BaseSummary({
             )}
             {option?.kind === "catalogue" && (
                 <VariantLicence plan={plan} accepted={accepted} onAccepted={onAccepted} />
-            )}
-            {fit === "insufficient" && option && variant && catalog && (
-                <ComputeHelp
-                    option={{ ...option, variant }}
-                    catalog={catalog}
-                    onPickAnother={onPickAnother}
-                />
             )}
         </div>
     );
