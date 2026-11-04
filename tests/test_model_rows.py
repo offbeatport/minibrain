@@ -36,9 +36,11 @@ def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> No
     assert custom_row(harness, SLUG)["usage"] is None
     with harness.sessions() as session:
         minibrain = session.query(Minibrain).filter_by(slug=SLUG).one()
+        moment = now()
+        earlier_today = moment - (moment - moment.replace(hour=0, minute=0, second=0, microsecond=0)) / 2
         requests = [
-            (now(), 200, 10.0),
-            (now() - timedelta(minutes=5), 500, 30.0),
+            (moment, 200, 10.0),
+            (earlier_today, 500, 30.0),
             (now() - timedelta(days=2), 200, 20.0),
             (now() - timedelta(days=10), 200, 50.0),
             (now() - timedelta(days=30), 200, 999.0),
