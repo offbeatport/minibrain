@@ -1,10 +1,13 @@
-import { Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
+import { ExternalLink } from "lucide-react";
+import { Checkbox, Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
 import type { ReactNode } from "react";
 import type { CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import { FIT_TEXT, type SourcePlan } from "./BaseSource";
-import { ComputeHelp, type DiskNeed } from "./BaseSummary";
+import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
+import { licenceUseLabel } from "./DiscoverFilters";
 import type { BaseOption } from "./baseOptions";
 
 const LOW_SPACE = 5 * 1024 ** 3;
@@ -184,6 +187,63 @@ function memoryMeter(variant: CatalogVariantInfo | null) {
     };
 }
 
+function ReadLink({ href }: { href: string }) {
+    return (
+        <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+            Read it
+            <ExternalLink className="ml-0.5 inline size-3.5" />
+        </a>
+    );
+}
+
+export function Licence({
+    option,
+    plan,
+    accepted,
+    onAccepted,
+}: {
+    option: BaseOption | null;
+    plan: SourcePlan;
+    accepted: boolean;
+    onAccepted: (accepted: boolean) => void;
+}) {
+    const entry = plan.target.kind === "catalogue" ? plan.target.entry : option?.entry;
+    if (!entry) {
+        return null;
+    }
+    const use = `Commercial use: ${licenceUseLabel(entry.license_use).toLowerCase()}`;
+    if (plan.target.kind === "catalogue" && plan.variant && !plan.installedKey) {
+        if (plan.blocked) {
+            return (
+                <StatusText tone="warning" className="whitespace-normal">
+                    {plan.blocked}
+                </StatusText>
+            );
+        }
+        return (
+            <Label className="flex items-start gap-2 text-sm leading-snug font-normal">
+                <Checkbox
+                    checked={accepted}
+                    onCheckedChange={(value) => onAccepted(value === true)}
+                    className="mt-px"
+                />
+                <span>
+                    {`I accept the ${entry.license_name} for this install. `}
+                    <ReadLink href={entry.license_url} />
+                    <span className="mt-0.5 block text-muted-foreground">{use}</span>
+                </span>
+            </Label>
+        );
+    }
+    return (
+        <p className="text-sm leading-snug">
+            {`${entry.license_name}, already accepted on this install. `}
+            <ReadLink href={entry.license_url} />
+            <span className="mt-0.5 block text-muted-foreground">{use}</span>
+        </p>
+    );
+}
+
 export function AddModelSummary({
     option,
     plan,
@@ -225,6 +285,12 @@ export function AddModelSummary({
             </div>
             <Block title="Format">
                 <Formats plan={plan} variant={variant} onVariant={onVariant} />
+                {variant?.format === "gguf" && (
+                    <p className="text-sm text-muted-foreground">
+                        Compressed formats serve but can't be trained. Pick Full precision to train
+                        it.
+                    </p>
+                )}
             </Block>
             <Block>
                 <Meter label="Disk" share={disk.share} tone={disk.tone} caption={disk.caption} />
@@ -236,6 +302,7 @@ export function AddModelSummary({
                         caption={memory.caption}
                     />
                 )}
+                <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp
                         option={{ ...option, variant }}

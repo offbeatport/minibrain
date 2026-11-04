@@ -1,11 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
 import {
     Badge,
     Button,
-    Checkbox,
     Input,
-    Label,
     Link,
     Select,
     SelectContent,
@@ -263,51 +260,6 @@ export function formatLabel(variant: CatalogVariantInfo): string {
     return variant.format === "gguf"
         ? `Compressed (${variant.label}) · serve only`
         : `Full precision (${variant.label}) · trainable`;
-}
-
-export function VariantLicence({
-    plan,
-    accepted,
-    onAccepted,
-}: {
-    plan: SourcePlan;
-    accepted: boolean;
-    onAccepted: (accepted: boolean) => void;
-}) {
-    if (plan.target.kind !== "catalogue" || !plan.variant) {
-        return null;
-    }
-    const { entry } = plan.target;
-    return (
-        <>
-            {!plan.installedKey && plan.blocked && (
-                <StatusText tone="warning" className="whitespace-normal">
-                    {plan.blocked}
-                </StatusText>
-            )}
-            {!plan.installedKey && !plan.blocked && (
-                <Label className="flex items-start gap-2 font-normal">
-                    <Checkbox
-                        checked={accepted}
-                        onCheckedChange={(value) => onAccepted(value === true)}
-                        className="mt-px"
-                    />
-                    <span>
-                        {`I accept the ${entry.license_name} for this install. `}
-                        <a
-                            href={entry.license_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary hover:underline"
-                        >
-                            Read it
-                            <ExternalLink className="ml-0.5 inline size-3.5" />
-                        </a>
-                    </span>
-                </Label>
-            )}
-        </>
-    );
 }
 
 function HubResult({ repo }: { repo: string }) {

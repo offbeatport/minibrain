@@ -14,7 +14,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
-import { PathResult, type SourcePlan, VariantLicence } from "./BaseSource";
+import { PathResult, type SourcePlan } from "./BaseSource";
 import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
 
 const LOW_SPACE = 5 * 1024 ** 3;
@@ -47,7 +47,7 @@ export function diskBlocks(need: DiskNeed): boolean {
     return need !== null && need.free !== null && need.size > need.free;
 }
 
-function DiskLine({
+export function DiskLine({
     option,
     need,
     onPickAnother,
@@ -254,37 +254,21 @@ function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) 
 export function BaseSummary({
     option,
     plan,
-    need,
-    accepted,
-    onAccepted,
     copy,
     onClearCopy,
-    onPickAnother,
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
-    need: DiskNeed;
-    accepted: boolean;
-    onAccepted: (accepted: boolean) => void;
     copy: CopySource | null;
     onClearCopy: () => void;
-    onPickAnother: () => void;
 }) {
-    const variant = option?.kind === "catalogue" ? plan.variant : null;
+    if (!copy && option) {
+        return null;
+    }
     return (
         <div className="flex flex-col gap-3 text-sm" aria-live="polite">
             {copy && <CopyNote copy={copy} onClear={onClearCopy} />}
             {!option && <PathResult plan={plan} />}
-            <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
-            {variant?.format === "gguf" && (
-                <StatusText tone="warning" className="whitespace-normal">
-                    Compressed format: it serves but can't be trained. Pick Full precision to train
-                    it.
-                </StatusText>
-            )}
-            {option?.kind === "catalogue" && (
-                <VariantLicence plan={plan} accepted={accepted} onAccepted={onAccepted} />
-            )}
         </div>
     );
 }

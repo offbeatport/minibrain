@@ -31,10 +31,10 @@ import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page } from "~/components/Section";
+import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
-import { AddModelSummary } from "./AddModelSummary";
+import { AddModelSummary, Licence } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
@@ -319,6 +319,13 @@ export function AddModelPage() {
             }
             return created;
         },
+        onError: (error) => {
+            toast({
+                title: "The model was not added",
+                description: errorMessage(error),
+                tone: "destructive",
+            });
+        },
         onSuccess: async (created) => {
             await refresh();
             toast({
@@ -399,12 +406,8 @@ export function AddModelPage() {
                         <BaseSummary
                             option={option}
                             plan={plan}
-                            need={need}
-                            accepted={accepted}
-                            onAccepted={setAccepted}
                             copy={copy}
                             onClearCopy={() => setCopy(null)}
-                            onPickAnother={() => setOpen(true)}
                         />
                     </div>
                     <Field id="create-name" label="Name">
@@ -443,6 +446,17 @@ export function AddModelPage() {
                             className="sm:max-w-md"
                         />
                     </Field>
+                    {option?.entry && (
+                        <div className="flex flex-col gap-label">
+                            <span className="text-sm font-medium">Licence</span>
+                            <Licence
+                                option={option}
+                                plan={plan}
+                                accepted={accepted}
+                                onAccepted={setAccepted}
+                            />
+                        </div>
+                    )}
                 </Card>
                 <aside className="lg:sticky lg:top-6">
                     <AddModelSummary
