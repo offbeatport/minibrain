@@ -4149,6 +4149,148 @@
         }
       }
     },
+    "/api/settings/encryption": {
+      "get": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Encryption Status",
+        "operationId": "encryption_status_api_settings_encryption_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Change Encryption",
+        "operationId": "change_encryption_api_settings_encryption_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncryptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/encryption/test": {
+      "post": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Test Encryption",
+        "operationId": "test_encryption_api_settings_encryption_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncryptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/encryption/tasks": {
+      "post": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Start Task",
+        "operationId": "start_task_api_settings_encryption_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncryptionTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncryptionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit": {
       "get": {
         "tags": [
@@ -12635,6 +12777,474 @@
           "variant"
         ],
         "title": "DownloadRequest"
+      },
+      "EncryptionCheck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "EncryptionCheck"
+      },
+      "EncryptionChoice": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "EncryptionChoice"
+      },
+      "EncryptionCounts": {
+        "properties": {
+          "files": {
+            "type": "integer",
+            "title": "Files",
+            "default": 0
+          },
+          "current": {
+            "type": "integer",
+            "title": "Current",
+            "default": 0
+          },
+          "older": {
+            "type": "integer",
+            "title": "Older",
+            "default": 0
+          },
+          "plain": {
+            "type": "integer",
+            "title": "Plain",
+            "default": 0
+          },
+          "damaged": {
+            "type": "integer",
+            "title": "Damaged",
+            "default": 0
+          },
+          "encrypted": {
+            "type": "integer",
+            "title": "Encrypted",
+            "default": 0
+          },
+          "rewrapped": {
+            "type": "integer",
+            "title": "Rewrapped",
+            "default": 0
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed",
+            "default": 0
+          },
+          "secrets": {
+            "type": "integer",
+            "title": "Secrets",
+            "default": 0
+          },
+          "secrets_older": {
+            "type": "integer",
+            "title": "Secrets Older",
+            "default": 0
+          },
+          "resealed": {
+            "type": "integer",
+            "title": "Resealed",
+            "default": 0
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "EncryptionCounts"
+      },
+      "EncryptionField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/EncryptionChoice"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "description",
+          "kind",
+          "choices",
+          "value",
+          "locked",
+          "source"
+        ],
+        "title": "EncryptionField"
+      },
+      "EncryptionKey": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "where": {
+            "type": "string",
+            "title": "Where"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "files": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "key",
+          "where",
+          "current"
+        ],
+        "title": "EncryptionKey"
+      },
+      "EncryptionPass": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/EncryptionCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "counts"
+        ],
+        "title": "EncryptionPass"
+      },
+      "EncryptionStatus": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "provider_label": {
+            "type": "string",
+            "title": "Provider Label"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Where"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/EncryptionField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/EncryptionKey"
+            },
+            "type": "array",
+            "title": "Keys"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncryptionPass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncryptionTask"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "provider_label",
+          "key",
+          "where",
+          "problem",
+          "fields",
+          "keys",
+          "last",
+          "task"
+        ],
+        "title": "EncryptionStatus"
+      },
+      "EncryptionTask": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EncryptionCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "state"
+        ],
+        "title": "EncryptionTask"
+      },
+      "EncryptionTaskRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "EncryptionTaskRequest"
+      },
+      "EncryptionUpdate": {
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "EncryptionUpdate"
       },
       "EngineBody": {
         "properties": {

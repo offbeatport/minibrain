@@ -5,8 +5,10 @@ from pydantic import BaseModel
 
 from minibrain.api.access import admin
 from minibrain.api.deps import SessionDep, SettingsDep
+from minibrain.api.encryption import is_encryption_field
 from minibrain.auth.identity import current_actor
 from minibrain.connections.vault import seal
+from minibrain.encryption.keys import check_switch, keys_for
 from minibrain.policy import describe, update
 
 router = APIRouter(prefix="/api", tags=["security"])
@@ -41,6 +43,11 @@ def policies(session: SessionDep) -> list[PolicyInfo]:
 
 @router.put("/policies/{name}", dependencies=[Depends(admin)])
 def change_policy(name: str, body: PolicyUpdate, session: SessionDep, settings: SettingsDep) -> list[PolicyInfo]:
-    update(session, name, body.value, current_actor(), lambda text, context: seal(settings, text, context))
+    actor = current_actor()
+    update(session, name, body.value, actor, lambda text, context: seal(settings, text, context))
+    if is_encryption_field(name):
+        session.flush()
+        check_switch(session, settings, actor)
     session.commit()
+    keys_for(settings).invalidate()
     return [PolicyInfo(**item) for item in describe(session)]

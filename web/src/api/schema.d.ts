@@ -1437,6 +1437,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/encryption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Encryption Status */
+        get: operations["encryption_status_api_settings_encryption_get"];
+        /** Change Encryption */
+        put: operations["change_encryption_api_settings_encryption_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/encryption/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Encryption */
+        post: operations["test_encryption_api_settings_encryption_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/encryption/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Task */
+        post: operations["start_task_api_settings_encryption_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -3902,6 +3954,180 @@ export interface components {
              * @default false
              */
             accept_license?: boolean;
+        };
+        /** EncryptionCheck */
+        EncryptionCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+        };
+        /** EncryptionChoice */
+        EncryptionChoice: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+        };
+        /** EncryptionCounts */
+        EncryptionCounts: {
+            /**
+             * Files
+             * @default 0
+             */
+            files?: number;
+            /**
+             * Current
+             * @default 0
+             */
+            current?: number;
+            /**
+             * Older
+             * @default 0
+             */
+            older?: number;
+            /**
+             * Plain
+             * @default 0
+             */
+            plain?: number;
+            /**
+             * Damaged
+             * @default 0
+             */
+            damaged?: number;
+            /**
+             * Encrypted
+             * @default 0
+             */
+            encrypted?: number;
+            /**
+             * Rewrapped
+             * @default 0
+             */
+            rewrapped?: number;
+            /**
+             * Removed
+             * @default 0
+             */
+            removed?: number;
+            /**
+             * Secrets
+             * @default 0
+             */
+            secrets?: number;
+            /**
+             * Secrets Older
+             * @default 0
+             */
+            secrets_older?: number;
+            /**
+             * Resealed
+             * @default 0
+             */
+            resealed?: number;
+            /**
+             * Problems
+             * @default []
+             */
+            problems?: string[];
+        };
+        /** EncryptionField */
+        EncryptionField: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Kind */
+            kind: string;
+            /** Choices */
+            choices: components["schemas"]["EncryptionChoice"][];
+            /** Value */
+            value: unknown;
+            /** Locked */
+            locked: boolean;
+            /** Source */
+            source: string;
+        };
+        /** EncryptionKey */
+        EncryptionKey: {
+            /** Provider */
+            provider: string;
+            /** Key */
+            key: string;
+            /** Where */
+            where: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /** Retired At */
+            retired_at?: string | null;
+            /** Current */
+            current: boolean;
+            /** Files */
+            files?: number | null;
+        };
+        /** EncryptionPass */
+        EncryptionPass: {
+            /** Kind */
+            kind: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            counts: components["schemas"]["EncryptionCounts"];
+        };
+        /** EncryptionStatus */
+        EncryptionStatus: {
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /** Key */
+            key: string | null;
+            /** Where */
+            where: string | null;
+            /** Problem */
+            problem: string | null;
+            /** Fields */
+            fields: components["schemas"]["EncryptionField"][];
+            /** Keys */
+            keys: components["schemas"]["EncryptionKey"][];
+            last: components["schemas"]["EncryptionPass"] | null;
+            task: components["schemas"]["EncryptionTask"] | null;
+        };
+        /** EncryptionTask */
+        EncryptionTask: {
+            /** Kind */
+            kind: string;
+            /** State */
+            state: string;
+            /** Requested By */
+            requested_by?: string | null;
+            /** Requested At */
+            requested_at?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Error */
+            error?: string | null;
+            progress?: components["schemas"]["EncryptionCounts"] | null;
+        };
+        /** EncryptionTaskRequest */
+        EncryptionTaskRequest: {
+            /** Kind */
+            kind: string;
+        };
+        /** EncryptionUpdate */
+        EncryptionUpdate: {
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
         };
         /** EngineBody */
         EngineBody: {
@@ -9373,6 +9599,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PolicyInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encryption_status_api_settings_encryption_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncryptionStatus"];
+                };
+            };
+        };
+    };
+    change_encryption_api_settings_encryption_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncryptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncryptionStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_encryption_api_settings_encryption_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncryptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncryptionCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_task_api_settings_encryption_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncryptionTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EncryptionStatus"];
                 };
             };
             /** @description Validation Error */

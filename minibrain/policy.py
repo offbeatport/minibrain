@@ -234,7 +234,43 @@ FIELDS: tuple[Field, ...] = (
         "readable; re-wrap them under Encryption at rest. Off writes new files unencrypted.",
         "choice",
         "local",
-        ("local", "off"),
+        ("local", "vault", "off"),
+    ),
+    Field(
+        "vault_address",
+        "Vault address",
+        "Vault's URL, such as https://vault.internal:8200, for HashiCorp Vault Transit. minibrain calls it whatever "
+        "the network policy says, as it does artifact storage.",
+        "text",
+        "",
+    ),
+    Field("vault_mount", "Transit mount", "Path the Transit secrets engine is mounted at.", "text", "transit"),
+    Field(
+        "vault_key",
+        "Transit key",
+        "Name of the aes256-gcm96 Transit key that wraps the data keys.",
+        "text",
+        "minibrain",
+    ),
+    Field("vault_namespace", "Vault namespace", "Vault Enterprise namespace. Empty for none.", "text", ""),
+    Field(
+        "vault_auth",
+        "Vault sign-in",
+        "Token reads MINIBRAIN_VAULT_TOKEN, or the file MINIBRAIN_VAULT_TOKEN_FILE names. AppRole signs in with the "
+        "role ID below and the secret ID from MINIBRAIN_VAULT_SECRET_ID or MINIBRAIN_VAULT_SECRET_ID_FILE.",
+        "choice",
+        "token",
+        ("token", "approle"),
+    ),
+    Field("vault_role_id", "AppRole role ID", "Not a secret: the secret ID stays in the environment.", "text", ""),
+    Field("vault_auth_mount", "AppRole mount", "Path the AppRole auth method is mounted at.", "text", "approle"),
+    Field(
+        "vault_ca_bundle",
+        "Vault CA bundle",
+        "PEM file on this server with the CA certificates that sign Vault's TLS certificate. Empty trusts the "
+        "system's CAs.",
+        "text",
+        "",
     ),
 )
 
@@ -257,6 +293,9 @@ CHOICE_LABELS = {
     "builder": "Builder",
     "admin": "Admin",
     "local": "Local key file",
+    "vault": "HashiCorp Vault Transit",
+    "token": "Token",
+    "approle": "AppRole",
 } | {key: value[0] for key, value in LICENCES.items()}
 
 BY_NAME = {field.name: field for field in FIELDS}
