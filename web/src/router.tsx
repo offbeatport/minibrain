@@ -34,6 +34,7 @@ import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { ModelCardPage } from "./pages/models/ModelCardPage";
 import { LogosPage } from "./pages/proto/LogosPage";
+import { TypePage } from "./pages/proto/TypePage";
 import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -184,6 +185,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/settings/connections", guarded("admin", ConnectionsSettingsPage)),
     globalPage("/settings/install", guarded("admin", InstallSettingsPage)),
     globalPage("/proto/logos", LogosPage),
+    globalPage("/proto/type", TypePage),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),
     legacyTabRoute,
