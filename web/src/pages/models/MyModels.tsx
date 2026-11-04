@@ -41,7 +41,7 @@ import {
     cn,
 } from "obp-ui";
 import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
-import { type ModelRow, api, succeed, unwrap } from "~/api/client";
+import { type ModelRow, api, removed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import {
     type ColumnWidths,
@@ -377,7 +377,7 @@ function promoteVersion(row: ModelRow, number: number) {
 }
 
 function deleteVersion(row: ModelRow, number: number) {
-    return succeed(
+    return removed(
         api.DELETE("/api/minibrains/{slug}/versions/{number}", {
             params: { path: { slug: row.key, number } },
         }),
@@ -1331,7 +1331,13 @@ async function deleteSelected(chosen: Entry[], rows: ModelRow[]): Promise<void> 
             })
             .map((row) => row.key),
     );
-    const versions = chosen.filter((entry) => entry.version && !wholeKeys.has(rowId(entry.model)));
+    const versions = [
+        ...new Map(
+            chosen
+                .filter((entry) => entry.version && !wholeKeys.has(rowId(entry.model)))
+                .map((entry) => [`${rowId(entry.model)}@${entry.version?.number}`, entry]),
+        ).values(),
+    ];
     await undeploySelected(versions);
     for (const entry of versions) {
         await deleteVersion(entry.model, entry.version?.number ?? 0);

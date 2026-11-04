@@ -110,6 +110,13 @@ export async function succeed(request: Promise<Outcome<unknown>>): Promise<void>
     }
 }
 
+export async function removed(request: Promise<Outcome<unknown>>): Promise<void> {
+    const { error, response } = await request;
+    if (!response.ok && response.status !== 404) {
+        throw new Error(describeError(error, response.status));
+    }
+}
+
 export async function uploadSource(slug: string, file: File): Promise<MinibrainDetail> {
     const form = new FormData();
     form.append("file", file);
