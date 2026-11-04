@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, object_session
 
 from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.connections.store import get_connection, resolve
+from minibrain.data.delta import DELTA, LOG, delta_state, local_path, refuse_remote
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
 from minibrain.data.remote import (
     DATABASE,
@@ -55,13 +56,22 @@ def staging_of(store: ArtifactStore, source: Source) -> str:
     return store.staged(key, lambda target: stage(store.url(artifact_id, source.filename), target))
 
 
-def folder_scan(source: Source) -> FolderScan:
+def allowed_folder(source: Source) -> Path:
     session = object_session(source)
     if session is None or source.path is None:
         raise SourceError(f"{source.name} has no folder")
     if not inside(Path(source.path), allowed_roots(session)):
         raise SourceError(f"{source.path} is no longer in the folders minibrain may read (Settings, Security)")
-    return scan(Path(source.path), source.format or detect_format(Path(source.path)))
+    return Path(source.path)
+
+
+def folder_scan(source: Source) -> FolderScan:
+    root = allowed_folder(source)
+    return scan(root, source.format or detect_format(root))
+
+
+def delta_of(source: Source) -> RemoteState:
+    return delta_state(allowed_folder(source))
 
 
 def remote_state(settings: Settings, source: Source) -> RemoteState:
@@ -86,8 +96,8 @@ def remote_state(settings: Settings, source: Source) -> RemoteState:
 
 
 def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
-    if source.kind in REMOTE_KINDS:
-        state = remote_state(settings, source)
+    if source.kind in REMOTE_KINDS or source.kind == DELTA:
+        state = delta_of(source) if source.kind == DELTA else remote_state(settings, source)
         return Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader)
     if source.kind == FOLDER:
         found = folder_scan(source)
@@ -103,6 +113,8 @@ def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
 def fingerprint(settings: Settings, source: Source) -> str:
     if source.kind in REMOTE_KINDS:
         return remote_state(settings, source).fingerprint
+    if source.kind == DELTA:
+        return delta_of(source).fingerprint
     return folder_scan(source).fingerprint if source.kind == FOLDER else str(source.artifact_id)
 
 
@@ -142,6 +154,11 @@ def add_source(session: Session, store: ArtifactStore, filename: str, stream: Bi
 
 def add_folder(session: Session, path: str, name: str | None, format: str | None) -> Source:
     root = check_folder(session, path)
+    if (root / LOG).is_dir():
+        raise SourceError(
+            f"{root} is a Delta Lake table: add it as a Lakehouse table, so minibrain reads its current version "
+            "rather than every file in it"
+        )
     chosen = format or detect_format(root)
     if chosen not in READERS:
         raise SourceError("pick CSV, TSV, JSON, JSON Lines or Parquet")
@@ -158,6 +175,24 @@ def add_folder(session: Session, path: str, name: str | None, format: str | None
     )
     session.add(source)
     session.flush()
+    return source
+
+
+def add_delta(session: Session, path: str, name: str | None) -> Source:
+    refuse_remote(path)
+    root = check_folder(session, local_path(path))
+    state = delta_state(root)
+    label = (name or "").strip() or root.name or str(root)
+    source = Source(
+        name=label,
+        filename=root.name or str(root),
+        table_name=free_table_name(session, label),
+        kind=DELTA,
+        path=str(root),
+    )
+    session.add(source)
+    session.flush()
+    describe(Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader))
     return source
 
 

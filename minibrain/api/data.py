@@ -20,6 +20,7 @@ from minibrain.api.schemas import (
     DatasetSummary,
     DataSettings,
     DataSettingsUpdate,
+    DeltaSourceCreate,
     DiffRow,
     DismissRequest,
     FolderCreate,
@@ -45,6 +46,7 @@ from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.data.dataset_folders import folder_or_root
+from minibrain.data.delta import DELTA
 from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
@@ -53,11 +55,13 @@ from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     FOLDER,
     add_dataset,
+    add_delta,
     add_folder,
     add_source,
     aliases_for,
     dataset_sql,
     dataset_tables,
+    delta_of,
     folder_scan,
     get_dataset,
     get_source,
@@ -118,7 +122,7 @@ def cached_describe(table: Table) -> tuple[tuple[ColumnInfo, ...], int]:
 
 
 def source_kind(source: Source) -> SourceKind:
-    if source.kind in REMOTE_KINDS:
+    if source.kind in REMOTE_KINDS or source.kind == DELTA:
         return cast(SourceKind, source.kind)
     return "folder" if source.kind == FOLDER else "upload"
 
@@ -140,6 +144,21 @@ def folder_fields(source: Source) -> dict[str, Any]:
         "files": len(found.files),
         "modified_at": found.modified_at,
         "size": found.size,
+    }
+
+
+def delta_fields(source: Source) -> dict[str, Any]:
+    if source.kind != DELTA:
+        return {}
+    try:
+        state = delta_of(source)
+    except (SourceError, PolicyError) as error:
+        return {"path": source.path, "error": str(error)}
+    return {
+        "path": source.path,
+        "modified_at": state.modified_at,
+        "fingerprint": state.fingerprint,
+        "fingerprint_detail": state.detail,
     }
 
 
@@ -169,7 +188,9 @@ def remote_fields(settings: Settings, source: Source) -> dict[str, Any]:
 
 
 def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> SourceSummary:
-    fields: dict[str, Any] = {"size": source.size} | folder_fields(source) | remote_fields(settings, source)
+    fields: dict[str, Any] = (
+        {"size": source.size} | folder_fields(source) | delta_fields(source) | remote_fields(settings, source)
+    )
     columns: tuple[ColumnInfo, ...] = ()
     rows: int | None = None
     if not fields.get("error"):
@@ -341,6 +362,16 @@ def folder_roots(session: SessionDep) -> FolderRoots:
 @router.post("/sources/folders", status_code=201, dependencies=[Depends(builder)])
 def add_folder_source(body: FolderCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
     source = add_folder(session, body.path, body.name, body.format)
+    summary = source_summary(settings, store, source)
+    session.commit()
+    return summary
+
+
+@router.post("/sources/delta", status_code=201, dependencies=[Depends(builder)])
+def add_delta_source(
+    body: DeltaSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceSummary:
+    source = add_delta(session, body.path, body.name)
     summary = source_summary(settings, store, source)
     session.commit()
     return summary

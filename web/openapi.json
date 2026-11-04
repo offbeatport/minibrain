@@ -1170,6 +1170,47 @@
         }
       }
     },
+    "/api/sources/delta": {
+      "post": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Add Delta Source",
+        "operationId": "add_delta_source_api_sources_delta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeltaSourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/samples": {
       "get": {
         "tags": [
@@ -12565,6 +12606,33 @@
         ],
         "title": "DatasetSummary"
       },
+      "DeltaSourceCreate": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "DeltaSourceCreate"
+      },
       "DeployRequest": {
         "properties": {
           "deployed": {
@@ -19390,7 +19458,8 @@
               "folder",
               "s3",
               "database",
-              "iceberg"
+              "iceberg",
+              "delta"
             ],
             "title": "Kind"
           }
@@ -19443,7 +19512,8 @@
               "folder",
               "s3",
               "database",
-              "iceberg"
+              "iceberg",
+              "delta"
             ],
             "title": "Kind"
           },

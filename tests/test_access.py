@@ -87,6 +87,7 @@ ROUTE_ROLES = {
     ("POST", "/api/sources/s3"): "builder",
     ("POST", "/api/sources/database"): "builder",
     ("POST", "/api/sources/iceberg"): "builder",
+    ("POST", "/api/sources/delta"): "builder",
     ("GET", "/api/models"): "viewer",
     ("GET", "/api/models/sources"): "viewer",
     ("POST", "/api/models/inspect"): "admin",

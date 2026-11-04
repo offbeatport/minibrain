@@ -12,12 +12,12 @@ import {
     Trash2,
 } from "lucide-react";
 import {
+    Badge,
     Button,
     DropdownMenuItem,
     DropdownMenuSeparator,
     EmptyState,
     FileName,
-    FileTypeIcon,
     Link,
     SearchInput,
     Tooltip,
@@ -54,11 +54,12 @@ import {
     addSourceKind,
     useSourceAdder,
 } from "./AddSource";
-import { AddDatabaseDialog, AddIcebergDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
+import { AddDatabaseDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { CreateDataset, DatasetDetail } from "./DatasetDetail";
 import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFolders";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
+import { AddLakehouseDialog, LakehouseGroup } from "./Lakehouse";
 import { SourcesOverview } from "./Sources";
 import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
@@ -66,19 +67,22 @@ import {
     type FolderIndex,
     type ItemRef,
     SOURCES_GROUP,
-    SOURCE_KINDS,
-    type SourceKind,
+    SOURCE_GROUPS,
+    type SourceGroupId,
+    TABLE_FORMATS,
     datasetText,
     datasetsInside,
     folderIndex,
+    inGroup,
     itemHref,
     itemKey,
     parseItem,
     siblingNamed,
     sourceText,
+    tableFormat,
     usesSource,
 } from "./catalogue";
-import { KindIcon } from "./icons";
+import { GroupIcon, SourceIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
 const WIDTH_KEY = "minibrain.data.treeWidth";
@@ -90,14 +94,23 @@ const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
 function sourceNode(source: SourceSummary): TreeNode {
     const id = itemKey({ kind: "source", id: source.id });
+    const format = tableFormat(source.kind);
+    if (format) {
+        return {
+            id,
+            label: source.name,
+            icon: <SourceIcon source={source} />,
+            meta: <Badge variant="outline">{TABLE_FORMATS[format].short}</Badge>,
+        };
+    }
     if (source.kind !== "upload") {
-        return { id, label: source.name, icon: <KindIcon kind={source.kind} /> };
+        return { id, label: source.name, icon: <SourceIcon source={source} /> };
     }
     return {
         id,
         label: <FileName name={source.name} />,
         textValue: source.name,
-        icon: <FileTypeIcon name={source.filename || source.name} />,
+        icon: <SourceIcon source={source} />,
     };
 }
 
@@ -184,12 +197,12 @@ function buildTree(
         droppable: true,
         children: folderNodes(index, null),
     };
-    const sourceGroups = SOURCE_KINDS.map(({ kind, label }) => {
-        const members = sources.filter((source) => source.kind === kind);
+    const sourceGroups = SOURCE_GROUPS.map((group) => {
+        const members = sources.filter((source) => inGroup(source, group));
         return {
-            id: itemKey({ kind: "group", id: kind }),
-            label,
-            icon: <KindIcon kind={kind} />,
+            id: itemKey({ kind: "group", id: group.id }),
+            label: group.label,
+            icon: <GroupIcon group={group.id} />,
             meta: members.length,
             children: members.map(sourceNode),
         };
@@ -212,8 +225,8 @@ function searchIndex(
     const index = new Map<string, string>();
     index.set(itemKey(DATASETS_GROUP), "datasets");
     index.set(itemKey(SOURCES_GROUP), "sources");
-    for (const { kind, label } of SOURCE_KINDS) {
-        index.set(itemKey({ kind: "group", id: kind }), label.toLowerCase());
+    for (const { id, label } of SOURCE_GROUPS) {
+        index.set(itemKey({ kind: "group", id }), label.toLowerCase());
     }
     for (const folder of folders) {
         index.set(itemKey({ kind: "folder", id: folder.id }), folder.name.toLowerCase());
@@ -241,7 +254,7 @@ function GroupDetail({
     onUploaded,
     onAdd,
 }: {
-    kind: SourceKind;
+    kind: SourceGroupId;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
     adder: SourceAdder;
@@ -255,6 +268,9 @@ function GroupDetail({
     );
     if (kind === "folder") {
         return <FoldersGroup sources={sources} datasets={datasets} onAdded={onUploaded} />;
+    }
+    if (kind === "lakehouse") {
+        return <LakehouseGroup sources={sources} datasets={datasets} onAdd={() => onAdd(kind)} />;
     }
     if (kind !== "upload") {
         return (
@@ -483,12 +499,12 @@ export function DataExplorer() {
             const choices =
                 item.id === "sources"
                     ? SOURCE_CHOICES
-                    : SOURCE_CHOICES.filter((choice) => choice.kind === item.id);
+                    : SOURCE_CHOICES.filter((choice) => choice.group === item.id);
             return (
                 <TreeRowMenu label={label}>
                     {choices.map((choice) => (
-                        <DropdownMenuItem key={choice.kind} onSelect={() => addKind(choice.kind)}>
-                            <KindIcon kind={choice.kind} />
+                        <DropdownMenuItem key={choice.group} onSelect={() => addKind(choice.group)}>
+                            <GroupIcon group={choice.group} />
                             {choice.label}
                         </DropdownMenuItem>
                     ))}
@@ -652,7 +668,7 @@ export function DataExplorer() {
         } else if (selected.kind === "group") {
             detail = (
                 <GroupDetail
-                    kind={selected.id as SourceKind}
+                    kind={selected.id as SourceGroupId}
                     sources={sourceList}
                     datasets={datasetList}
                     adder={adder}
@@ -838,9 +854,10 @@ export function DataExplorer() {
                 onOpenChange={(open) => setAdding(open ? "database" : null)}
                 onAdded={onUploaded}
             />
-            <AddIcebergDialog
-                open={adding === "iceberg"}
-                onOpenChange={(open) => setAdding(open ? "iceberg" : null)}
+            <AddLakehouseDialog
+                open={adding === "lakehouse"}
+                roots={roots.data?.roots ?? []}
+                onOpenChange={(open) => setAdding(open ? "lakehouse" : null)}
                 onAdded={onUploaded}
             />
         </div>

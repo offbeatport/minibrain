@@ -16,6 +16,7 @@ PURPOSES = {
     "mysql_scanner": "MySQL sources",
     "iceberg": "Iceberg sources",
     "avro": "Iceberg sources",
+    "delta": "Delta Lake sources",
 }
 NEEDS = {"iceberg": ("avro",)}
 INSTALL_HINT = "minibrain extensions install --from <folder>"

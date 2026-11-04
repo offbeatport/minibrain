@@ -420,9 +420,9 @@ Often added with `-e`:
 
 ### DuckDB extensions
 
-The image carries httpfs, postgres_scanner, iceberg and avro for its DuckDB version and platform, so S3, Postgres and
-Iceberg sources work offline. minibrain installs each one into `/data/duckdb/extensions` the first time a source
-needs it. To install them all now:
+The image carries httpfs, postgres_scanner, iceberg, avro and delta for its DuckDB version and platform, so S3,
+Postgres, Iceberg and Delta Lake sources work offline. minibrain installs each one into `/data/duckdb/extensions` the
+first time a source needs it. To install them all now:
 
 ```sh
 docker exec minibrain minibrain extensions install
@@ -432,6 +432,12 @@ docker exec minibrain minibrain extensions
 `mysql_scanner` is left out by default. It links the MySQL client library, which is GPLv2 with the Universal FOSS
 Exception, and its licence review is not done. Build with `--build-arg INCLUDE_MYSQL=true` to add it if your own
 review allows it.
+
+delta is the largest of the set: 30.5 MB compressed on linux_amd64 and 28.3 MB on linux_arm64 (DuckDB v2.0.0), about
+100 MB once installed into `/data`. It takes the default set from 54 MB to 85 MB on amd64 (50 MB to 78 MB on arm64).
+It reads Delta tables from folders on the server only, so mount the table's folder into the container and add it under
+Settings → Security → Folder sources ([why not S3](security.md#tls-in-duckdb-extensions)). Licences of the extensions
+and what delta bundles: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
 ### Compose
 
@@ -565,7 +571,7 @@ platform and DuckDB release. On a connected machine with the same minibrain vers
 platform (`linux_amd64`, `linux_arm64`, `osx_arm64`, `osx_amd64` or `windows_amd64`):
 
 ```sh
-minibrain extensions download --to ./duckdb-extensions --platform linux_amd64 httpfs postgres_scanner iceberg avro
+minibrain extensions download --to ./duckdb-extensions --platform linux_amd64 httpfs postgres_scanner iceberg avro delta
 ```
 
 On the target, install them, or point minibrain at the folder so it installs each one on first use:

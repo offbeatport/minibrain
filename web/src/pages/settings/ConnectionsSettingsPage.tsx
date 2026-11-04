@@ -533,7 +533,7 @@ function Extensions() {
         <PanelSection
             icon={Puzzle}
             title="DuckDB extensions"
-            description="S3, database and Iceberg sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
+            description="S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
         >
             <ErrorLine error={extensions.error} />
             {data && (

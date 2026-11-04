@@ -25,7 +25,7 @@ SOURCE_TABLE = "source"
 QUERY_TIMEOUT_SECONDS = 30
 TABLE_NAME_LENGTH = 48
 BLOCKED_FUNCTIONS = ("query", "query_table", "which_secret")
-BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "sqlite_", "duckdb_secrets")
+BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "delta_", "sqlite_", "duckdb_secrets")
 
 
 class SourceError(Exception):

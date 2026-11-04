@@ -127,6 +127,46 @@ password, or read it with `--password-stdin`, and record `command line` as the a
   session ([observability](observability.md#prometheus)).
 - Every response carries an `X-Request-ID`, and JSON logs (`MINIBRAIN_LOG_FORMAT=json`) carry it on each line.
 - Content hashes and signatures use SHA-256 through OpenSSL or `cryptography`; never MD5 or SHA-1.
+- DuckDB extensions are native code; the one that does its own TLS (delta) is kept off the network
+  ([below](#tls-in-duckdb-extensions)).
+
+## TLS in DuckDB extensions
+
+S3, Iceberg and Delta Lake sources are read by DuckDB extensions, native code that the Python crypto checks cannot see.
+Checked on DuckDB v2.0.0 (osx_arm64 and linux_amd64 builds from extensions.duckdb.org):
+
+| Extension | Sources | TLS and S3 request signing |
+|---|---|---|
+| httpfs | S3, Iceberg data and metadata | OpenSSL 3.6.0, linked into the extension |
+| iceberg, avro | Iceberg | None of their own: they read through httpfs |
+| delta | Delta Lake | The table log: delta-kernel-rs's own client, object_store 0.13.2 over reqwest and rustls 0.23 with ring 0.17 (aws-lc-rs is linked too), SigV4 signed with ring's HMAC. Data files: httpfs |
+
+So minibrain reads Delta tables only from folders on the server, inside Settings → Security → Folder sources: local
+disk, NFS or SMB, or a bucket mounted by a client whose TLS you control. `s3://`, `https://` and every other URL is
+refused when the source is added, and dataset SQL cannot call `delta_*` functions. On a local path the kernel opens no
+connection and does no cryptography: the extension checks DuckDB's `allowed_directories` (the table's folder), the
+kernel reads `_delta_log` itself, and DuckDB reads the data files through its own file system. A `_delta_log` that is
+a symbolic link is refused.
+
+Evidence:
+
+- Build: DuckDB v2.0.0 pins duckdb-delta at `9dcfb65`, whose `CMakeLists.txt` builds delta-kernel-rs v0.28.0 with
+  `--features default-engine-rustls`. Its scan code says the kernel "resolves the table location using its own file
+  and HTTP I/O, outside of the file systems of DuckDB".
+- Binary: `delta.duckdb_extension` has no OpenSSL (no `SSL_CTX_new`, no OpenSSL version string; httpfs has both) and
+  carries rustls 0.23.37, ring 0.17.14, aws-lc-rs 1.16.2, hyper-rustls and object_store 0.13.2; `otool -L` shows
+  only system libraries. `object_store::util::hmac_sha256` calls `ring::hmac::Key::new` and `ring::hmac::sign`.
+- Run: S3 (moto) over TLS with a private CA, behind a proxy that logs each ClientHello. With DuckDB's
+  `ca_cert_file` (an OpenSSL setting) pointing at the CA, `read_parquet` over httpfs succeeds with OpenSSL's
+  ClientHello (30 cipher suites with CBC and DHE, X25519MLKEM768 offered). `delta_scan` on the same connection fails
+  in the kernel (`DeltaKernel ObjectStoreError`, "error sending request" after 10 retries), each attempt a rustls
+  ClientHello (9 AEAD suites and the renegotiation SCSV, no CBC, groups X25519, P-256 and P-384: ring's set). Over
+  plain HTTP, the log requests carry `User-Agent: object_store/0.13.2` and the data file reads `duckdb/v2.0.0`.
+
+Re-check after a DuckDB upgrade: `strings -a delta.duckdb_extension | grep -E 'rustls-|ring-|^OpenSSL [0-9]'`. Delta
+on S3 can come back when the kernel reads its log through DuckDB's file system or is built with
+`default-engine-native-tls` against OpenSSL; a self-built extension would also need DuckDB's unsigned extensions
+setting, which minibrain keeps off.
 
 ## Audit log integrity
 

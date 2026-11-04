@@ -41,11 +41,10 @@ import { FORMAT_LABELS } from "./Folders";
 import { usesSource } from "./catalogue";
 import { useDataRefresh } from "./parts";
 
-export type ConnectedKind = "s3" | "database" | "iceberg";
+export type ConnectedKind = "s3" | "database";
 
 const CONNECTION_KINDS: Record<ConnectedKind, ConnectionInfo["kind"][]> = {
     s3: ["s3"],
-    iceberg: ["s3"],
     database: ["postgres", "mysql"],
 };
 
@@ -62,12 +61,6 @@ const GROUPS: Record<ConnectedKind, { title: string; body: string; add: string; 
         add: "Add table or query",
         noun: "table",
     },
-    iceberg: {
-        title: "Iceberg",
-        body: "An Iceberg table on S3, read at its current snapshot. Changes are tracked by the snapshot id.",
-        add: "Add Iceberg table",
-        noun: "table",
-    },
 };
 
 const S3_FORMATS = [
@@ -81,11 +74,14 @@ const S3_FORMATS = [
 
 type S3Format = Exclude<(typeof S3_FORMATS)[number]["value"], "auto">;
 
-function usable(connections: ConnectionInfo[] | undefined, kind: ConnectedKind): ConnectionInfo[] {
+export function usable(
+    connections: ConnectionInfo[] | undefined,
+    kind: ConnectedKind,
+): ConnectionInfo[] {
     return (connections ?? []).filter((item) => CONNECTION_KINDS[kind].includes(item.kind));
 }
 
-function ConnectionPicker({
+export function ConnectionPicker({
     id,
     options,
     value,
@@ -127,7 +123,7 @@ function ConnectionPicker({
     );
 }
 
-function ExtensionWarning({ needed }: { needed: string[] }) {
+export function ExtensionWarning({ needed }: { needed: string[] }) {
     const extensions = useExtensions();
     const missing = missingExtensions(extensions.data, needed);
     if (missing.length === 0) {
@@ -146,7 +142,7 @@ function ExtensionWarning({ needed }: { needed: string[] }) {
     );
 }
 
-function AddDialog({
+export function AddDialog({
     open,
     title,
     description,
@@ -199,7 +195,7 @@ function AddDialog({
     );
 }
 
-function useAddSource(
+export function useAddSource(
     request: () => Promise<SourceSummary>,
     onAdded: (source: SourceSummary) => void,
     onOpenChange: (open: boolean) => void,
@@ -215,7 +211,10 @@ function useAddSource(
     });
 }
 
-function NameField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function NameField({
+    value,
+    onChange,
+}: { value: string; onChange: (value: string) => void }) {
     return (
         <Field id="connected-name" label="Name" hint="Taken from the path or table if empty.">
             <Input
@@ -228,7 +227,7 @@ function NameField({ value, onChange }: { value: string; onChange: (value: strin
     );
 }
 
-function firstId(options: ConnectionInfo[]): number | null {
+export function firstId(options: ConnectionInfo[]): number | null {
     return options[0]?.id ?? null;
 }
 
@@ -314,73 +313,6 @@ export function AddS3Dialog({
             </Field>
             <NameField value={name} onChange={setName} />
             <ExtensionWarning needed={EXTENSIONS_FOR.s3} />
-        </AddDialog>
-    );
-}
-
-export function AddIcebergDialog({
-    open,
-    onOpenChange,
-    onAdded,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onAdded: (source: SourceSummary) => void;
-}) {
-    const connections = useConnections();
-    const options = usable(connections.data, "iceberg");
-    const [connection, setConnection] = useState<number | null>(null);
-    const [path, setPath] = useState("");
-    const [name, setName] = useState("");
-    const chosen = connection ?? firstId(options);
-    const bucket = options.find((item) => item.id === chosen)?.bucket;
-    const add = useAddSource(
-        () =>
-            unwrap(
-                api.POST("/api/sources/iceberg", {
-                    body: {
-                        connection_id: chosen ?? 0,
-                        path: path.trim(),
-                        name: name.trim() || null,
-                    },
-                }),
-            ),
-        onAdded,
-        onOpenChange,
-    );
-    return (
-        <AddDialog
-            open={open}
-            title="Add an Iceberg table"
-            description="minibrain reads the table's newest metadata and queries its current snapshot in place. Each snapshot taken here copies the rows."
-            pending={add.isPending}
-            ready={chosen !== null && path.trim().startsWith("s3://")}
-            submitLabel="Add Iceberg table"
-            error={add.error}
-            onOpenChange={onOpenChange}
-            onSubmit={() => add.mutate()}
-        >
-            <ConnectionPicker
-                id="iceberg-connection"
-                options={options}
-                value={chosen}
-                onChange={setConnection}
-            />
-            <Field
-                id="iceberg-path"
-                label="Table folder"
-                hint="The folder that holds the table's metadata and data folders."
-            >
-                <Input
-                    id="iceberg-path"
-                    value={path}
-                    className="font-mono"
-                    placeholder={`s3://${bucket || "lake"}/warehouse/sales/orders`}
-                    onChange={(event) => setPath(event.target.value)}
-                />
-            </Field>
-            <NameField value={name} onChange={setName} />
-            <ExtensionWarning needed={EXTENSIONS_FOR.iceberg} />
         </AddDialog>
     );
 }
@@ -595,7 +527,7 @@ export function ConnectedGroup({
 }
 
 export function ConnectedFacts({ source }: { source: SourceSummary }) {
-    if (source.kind !== "s3" && source.kind !== "database" && source.kind !== "iceberg") {
+    if (source.kind !== "s3" && source.kind !== "database") {
         return null;
     }
     return (

@@ -431,7 +431,8 @@ def main() -> None:
     engine_command.add_argument("--spec", default=None, help=argparse.SUPPRESS)
     engine_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)
     extensions_command = commands.add_parser(
-        "extensions", help="list, install or download the DuckDB extensions S3, database and Iceberg sources use"
+        "extensions",
+        help="list, install or download the DuckDB extensions S3, database, Iceberg and Delta Lake sources use",
     )
     actions = extensions_command.add_subparsers(dest="action")
     actions.add_parser("status", help="show which extensions are installed")

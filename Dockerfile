@@ -53,7 +53,7 @@ RUN --mount=type=cache,id=minibrain-uv,target=/root/.cache/uv \
     uv venv /opt/venv && uv pip install --require-hashes --no-deps --requirement /lock/requirements.txt
 RUN --mount=type=bind,from=wheel,target=/dist uv pip install --no-deps /dist/minibrain-*.whl
 ARG INCLUDE_MYSQL=false
-RUN set -- httpfs postgres_scanner iceberg avro \
+RUN set -- httpfs postgres_scanner iceberg avro delta \
     && if [ "${INCLUDE_MYSQL}" = "true" ]; then set -- "$@" mysql_scanner; fi \
     && MINIBRAIN_HOME=/tmp/minibrain minibrain extensions download --to /extensions "$@"
 

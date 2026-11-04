@@ -7,14 +7,21 @@ import { bytes } from "~/lib/time";
 import { type AddKind, AddSourceMenu, type SourceAdder } from "./AddSource";
 import {
     type ItemRef,
-    SOURCE_KINDS,
-    type SourceKind,
+    SOURCE_GROUPS,
+    type SourceGroupId,
+    inGroup,
     itemHref,
     plural,
     usesSource,
 } from "./catalogue";
 
-type KindRow = { kind: SourceKind; label: string; noun: string; sources: number; datasets: number };
+type KindRow = {
+    kind: SourceGroupId;
+    label: string;
+    noun: string;
+    sources: number;
+    datasets: number;
+};
 
 const KIND_COLUMNS: ColumnDef<KindRow, unknown>[] = [
     {
@@ -56,12 +63,12 @@ export function SourcesOverview({
     onAdd: (kind: AddKind) => void;
     onSelect: (item: ItemRef) => void;
 }) {
-    const rows = SOURCE_KINDS.map(({ kind, label, noun }) => {
-        const members = sources.filter((source) => source.kind === kind);
+    const rows = SOURCE_GROUPS.map((group) => {
+        const members = sources.filter((source) => inGroup(source, group));
         return {
-            kind,
-            label,
-            noun,
+            kind: group.id,
+            label: group.label,
+            noun: group.noun,
             sources: members.length,
             datasets: datasets.filter((dataset) =>
                 members.some((source) => usesSource(dataset, source.id)),

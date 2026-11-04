@@ -109,7 +109,8 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "data_folders",
         "Folder sources",
-        "Folders on this server that folder sources may read, with everything under them. Leave empty to allow none.",
+        "Folders on this server that folder sources and Delta Lake tables may read, with everything under them. Leave "
+        "empty to allow none.",
         "list",
         [],
     ),

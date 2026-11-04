@@ -15,18 +15,18 @@ import { type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
 import { useSamples } from "~/api/queries";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
-import type { SourceKind } from "./catalogue";
-import { KindIcon } from "./icons";
+import type { SourceGroupId } from "./catalogue";
+import { GroupIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
-export type AddKind = "folder" | "s3" | "database" | "iceberg";
+export type AddKind = Exclude<SourceGroupId, "upload">;
 
-export const SOURCE_CHOICES: { kind: SourceKind; label: string; detail: string }[] = [
-    { kind: "upload", label: "Upload a file", detail: "CSV, TSV, JSON, Parquet" },
-    { kind: "folder", label: "Connect a folder", detail: "Files on this server" },
-    { kind: "s3", label: "S3 path", detail: "Objects in a bucket" },
-    { kind: "database", label: "Database table or query", detail: "PostgreSQL or MySQL" },
-    { kind: "iceberg", label: "Iceberg table", detail: "A table on S3" },
+export const SOURCE_CHOICES: { group: SourceGroupId; label: string; detail: string }[] = [
+    { group: "upload", label: "Upload a file", detail: "CSV, TSV, JSON, Parquet" },
+    { group: "folder", label: "Connect a folder", detail: "Files on this server" },
+    { group: "s3", label: "S3 path", detail: "Objects in a bucket" },
+    { group: "database", label: "Database table or query", detail: "PostgreSQL or MySQL" },
+    { group: "lakehouse", label: "Lakehouse table", detail: "Iceberg, Delta Lake" },
 ];
 
 export type SourceAdder = {
@@ -78,7 +78,7 @@ export function useSourceAdder(onUploaded: (source: SourceSummary) => void): Sou
 }
 
 export function addSourceKind(adder: SourceAdder, onAdd: (kind: AddKind) => void) {
-    return (kind: SourceKind) => (kind === "upload" ? adder.choose() : onAdd(kind));
+    return (group: SourceGroupId) => (group === "upload" ? adder.choose() : onAdd(group));
 }
 
 export function AddSourceMenu({
@@ -107,11 +107,11 @@ export function AddSourceMenu({
             <DropdownMenuContent align="end" className="w-72">
                 {SOURCE_CHOICES.map((choice) => (
                     <DropdownMenuItem
-                        key={choice.kind}
-                        onSelect={() => pick(choice.kind)}
+                        key={choice.group}
+                        onSelect={() => pick(choice.group)}
                         className="items-start"
                     >
-                        <KindIcon kind={choice.kind} className="mt-0.5" />
+                        <GroupIcon group={choice.group} className="mt-0.5" />
                         <span className="flex min-w-0 flex-col gap-0.5">
                             <span className="font-medium">{choice.label}</span>
                             <span className="text-sm text-muted-foreground">{choice.detail}</span>

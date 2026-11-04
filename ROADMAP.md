@@ -200,8 +200,9 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 Data is shared across models:
 
 - A **source** is something minibrain reads: an upload (stored once, content-addressed, staged into DuckDB), a
-  folder on the server, an S3 path, a database table or query, or an Iceberg table (the last four read in place, the
-  last three through a connection). Each source is a table in dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
+  folder on the server, an S3 path, a database table or query, or a Lakehouse table: Iceberg on S3 or Delta Lake in a
+  server folder (all but uploads read in place; S3, database and Iceberg through a connection). Each source is a
+  table in dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
   `support_tickets_2`); renaming the source keeps the table name, so saved SQL keeps working.
 - A **dataset** stands on its own: one saved DuckDB query that returns `input` and `label`, plus any extra columns,
   over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
@@ -220,8 +221,8 @@ Data is shared across models:
   It then runs in an in-memory DuckDB with external access off and the configuration locked: uploads are attached
   read-only, a folder is a view over its listed files and `allowed_paths` names exactly those files, and a query
   stops after 30 seconds. Sources are named by table name alone: a catalog- or schema-qualified name and the scanner
-  table functions (`postgres_query`, `mysql_*`, `iceberg_*`, `query`, `query_table`) are refused, so dataset SQL
-  cannot reach past its sources into the rest of an attached database.
+  table functions (`postgres_query`, `mysql_*`, `iceberg_*`, `delta_*`, `query`, `query_table`) are refused, so
+  dataset SQL cannot reach past its sources into the rest of an attached database.
 
 ### Sources
 
@@ -242,11 +243,21 @@ Data is shared across models:
   `statement_timeout`. Fingerprint: with an updated-at column, the row count plus its maximum; without one, the query
   plus the time read, so every read counts as new data. Use a read-only database user: minibrain never writes, but
   the user's grants are the real control.
-- Iceberg: an S3 connection plus the table's folder. minibrain lists `metadata/`, takes the highest-numbered
-  `*.metadata.json` and its `current-snapshot-id`, and DuckDB's iceberg extension reads that snapshot
-  (`iceberg_scan(…, version, snapshot_from_id)`) with `allowed_directories` limited to the table folder.
-  Fingerprint: the snapshot id. REST catalogues come later; DuckDB can attach them, but tables on S3 need nothing
-  beyond the S3 connection.
+- Lakehouse tables, one group in the Data tree whose items each show their table format (the source kind stays
+  `iceberg` or `delta`, so no migration); Add source → Lakehouse table picks the format, then the connection or folder:
+  - Iceberg: an S3 connection plus the table's folder. minibrain lists `metadata/`, takes the highest-numbered
+    `*.metadata.json` and its `current-snapshot-id`, and DuckDB's iceberg extension reads that snapshot
+    (`iceberg_scan(…, version, snapshot_from_id)`) with `allowed_directories` limited to the table folder.
+    Fingerprint: the snapshot id. REST catalogues come later; DuckDB can attach them, but tables on S3 need nothing
+    beyond the S3 connection.
+  - Delta Lake: a table folder on the server, inside the Folder sources policy (local disk, NFS, SMB or a mounted
+    bucket). minibrain lists `_delta_log/`, takes the newest commit (or checkpoint) version, and DuckDB's delta
+    extension reads that version (`delta_scan(…, version)`) with `allowed_directories` limited to the table folder.
+    Fingerprint: `v<version>-` plus a SHA-256 of the folder, the version and the newest log file's name, size and
+    modification time, so a snapshot names the table version it copied. Not from S3 or HTTPS: the extension's
+    delta-kernel-rs reads the log over its own rustls and ring TLS, outside OpenSSL, so it is not FIPS-ready
+    (`docs/security.md`, TLS in DuckDB extensions); those paths are refused with that reason. A folder holding
+    `_delta_log` cannot be added as a plain folder source.
 - Remote fingerprints are cached for 30 seconds per source so listing pages does not hit a bucket or database on
   every request. Everything goes through the row limit and the 30-second timeout, and snapshots copy the rows to
   Parquet like any other source.
@@ -359,8 +370,8 @@ before a run starts:
   so training, evaluation and the gateway's prompt-only context read only the snapshot. Fewer than 100 usable rows
   block training and scoring, not saving.
 - Data changed: every source has a cheap fingerprint (an upload's content hash; for a folder, a hash of its file
-  list with sizes and modification times). A snapshot records its sources' fingerprints and the query; a dataset and a
-  model say when either changed since their last snapshot.
+  list with sizes and modification times; for a Delta table, its version and newest log file). A snapshot records its
+  sources' fingerprints and the query; a dataset and a model say when either changed since their last snapshot.
 - Diff: any two snapshots compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
   rows per label, with samples of each. The model page links each version to the diff against the version before it,
   next to the change in held-out accuracy; a version's scores say whether its data matches the live version's.
@@ -709,10 +720,12 @@ keys, and `/v1` stays key-only.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
 - Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with two sections, Datasets and
   Sources; the selected item's detail on the right. Sources holds one group per kind (Uploads, Folders, S3, Databases,
-  Iceberg), shown only once it has a source; an empty Sources points to Add source, and a link to an empty group opens
-  Sources. One "Add source" menu: Upload a file, Connect a folder, S3 path, Database table or query, Iceberg table,
-  and the samples. A source shows its table name, columns, stats, first rows and the datasets that read it; a folder
-  also shows its file count, size and last change; a connected source shows its connection, path, table or query, and
+  Lakehouse), shown only once it has a source; an empty Sources points to Add source, and a link to an empty group
+  opens Sources. Lakehouse holds Iceberg and Delta Lake tables, each with its format's `FileTypeIcon` and a format
+  badge (`group:iceberg` links open it). One "Add source" menu: Upload a file, Connect a folder, S3 path, Database
+  table or query, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format first), and the samples. A source
+  shows its table name, columns, stats, first rows and the datasets that read it; a folder also shows its file count,
+  size and last change; a connected source shows its connection, path, table or query, and
   how its changes are tracked.
   A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
   preview, label balance, splits, its snapshots (tick two to compare), the models that use it, "Save snapshot now"
@@ -804,11 +817,12 @@ Fully offline by default. Nothing in the data, labelling, training, serving or g
 - Install bundle: Docker images, Python wheels, Presidio's spaCy model, the frontend build. Nothing downloads at install
   or run time.
 - No telemetry. OpenTelemetry export is opt-in and goes only to the customer's collector (see Observability).
-- DuckDB extensions: S3, database and Iceberg sources need httpfs, postgres_scanner, mysql_scanner, iceberg and avro.
-  DuckDB downloads extensions from the internet by default; minibrain never lets it (`autoinstall_known_extensions`
-  and `autoload_known_extensions` off on every connection) and loads them only from its own extension directory
-  (`<home>/duckdb/extensions`, or `MINIBRAIN_DUCKDB_EXTENSIONS`). They are not in git or the wheel: one set is tens
-  of MB per platform and DuckDB release. Vendoring: on a connected machine,
+- DuckDB extensions: S3, database, Iceberg and Delta Lake sources need httpfs, postgres_scanner, mysql_scanner,
+  iceberg, avro and delta. DuckDB downloads extensions from the internet by default; minibrain never lets it
+  (`autoinstall_known_extensions` and `autoload_known_extensions` off on every connection) and loads them only from its
+  own extension directory (`<home>/duckdb/extensions`, or `MINIBRAIN_DUCKDB_EXTENSIONS`). They are not in git or the
+  wheel: the image's set is 85 MB compressed on linux_amd64 for DuckDB v2.0.0, 30.5 MB of it delta (78 and 28.3 MB on
+  linux_arm64). Vendoring: on a connected machine,
   `minibrain extensions download --to ./duckdb-extensions --platform linux_amd64 --platform linux_arm64` saves
   DuckDB's repository layout (`<version>/<platform>/<name>.duckdb_extension.gz`) for the installed DuckDB version; the
   folder goes into the install bundle or the image (`MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY` pointing at it), and
@@ -856,7 +870,9 @@ v1, the evidence regulated buyers ask for first:
 - FIPS-ready design, so FIPS mode in v2 is a build setting, not a rewrite:
   - SHA-256 for every content hash and signature; never MD5 or SHA-1 (ruff `S324` in CI).
   - Non-security hashing (MinHash) passes `usedforsecurity=False`.
-  - All crypto through OpenSSL or the `cryptography` library; nothing hand-rolled.
+  - All crypto through OpenSSL or the `cryptography` library; nothing hand-rolled. Native code that brings its own TLS
+    stays off the network: DuckDB's delta extension (rustls and ring in delta-kernel-rs) reads Delta tables from
+    server folders only, while httpfs does S3 and Iceberg TLS through OpenSSL (`docs/security.md`).
   - Base images that can run in FIPS mode (Red Hat UBI).
   - Enforced in CI and `mise run check` by ruff `S324` and `scripts/check_crypto.py` (tested in
     `tests/test_check_crypto.py`), which fails on: MD5, SHA-1 or BLAKE2 through `hashlib` without
@@ -976,8 +992,9 @@ Everything in the v1 scope below, after M1.
       against v0 on Evaluations and model cards done; list price for API teachers waits for the teacher pool, and
       "no training needed" for `target.min_score`, which does not exist yet)
 - [ ] `minibrain.yaml` and `minibrain run`
-- [x] Sources: uploads, server folders, S3, PostgreSQL, MySQL and Iceberg on S3 via DuckDB, through connections with
-      encrypted write-only secrets; DuckDB extensions installed offline
+- [x] Sources: uploads, server folders, S3, PostgreSQL, MySQL and Lakehouse tables via DuckDB (Iceberg on S3; Delta
+      Lake from server folders only, as its S3 reads use TLS outside OpenSSL), through connections with encrypted
+      write-only secrets; DuckDB extensions, delta included, installed offline and baked into the image
 - [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor (column picker and SQL over several sources
       done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`

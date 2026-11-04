@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/delta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Delta Source */
+        post: operations["add_delta_source_api_sources_delta_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/samples": {
         parameters: {
             query?: never;
@@ -3885,6 +3902,13 @@ export interface components {
              */
             updated_at: string;
         };
+        /** DeltaSourceCreate */
+        DeltaSourceCreate: {
+            /** Path */
+            path: string;
+            /** Name */
+            name?: string | null;
+        };
         /** DeployRequest */
         DeployRequest: {
             /** Deployed */
@@ -6107,7 +6131,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "upload" | "folder" | "s3" | "database" | "iceberg";
+            kind: "upload" | "folder" | "s3" | "database" | "iceberg" | "delta";
         };
         /** SourceStats */
         SourceStats: {
@@ -6126,7 +6150,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "upload" | "folder" | "s3" | "database" | "iceberg";
+            kind: "upload" | "folder" | "s3" | "database" | "iceberg" | "delta";
             /** Name */
             name: string;
             /** Filename */
@@ -7347,6 +7371,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["FolderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_delta_source_api_sources_delta_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeltaSourceCreate"];
             };
         };
         responses: {

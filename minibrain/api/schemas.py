@@ -32,7 +32,7 @@ class MappingInfo(BaseModel):
     sql: str | None
 
 
-SourceKind = Literal["upload", "folder", "s3", "database", "iceberg"]
+SourceKind = Literal["upload", "folder", "s3", "database", "iceberg", "delta"]
 FileFormat = Literal[".csv", ".tsv", ".json", ".jsonl", ".parquet"]
 
 
@@ -97,6 +97,11 @@ class DatabaseSourceCreate(BaseModel):
 class IcebergSourceCreate(BaseModel):
     connection_id: int
     path: str = Field(min_length=6, max_length=4096)
+    name: str | None = Field(default=None, max_length=120)
+
+
+class DeltaSourceCreate(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
     name: str | None = Field(default=None, max_length=120)
 
 

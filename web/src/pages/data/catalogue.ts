@@ -3,7 +3,11 @@ import type { DatasetFolder } from "~/api/dataQueries";
 
 export type SourceKind = SourceSummary["kind"];
 
-export type GroupId = SourceKind | "datasets" | "sources";
+export type TableFormat = Extract<SourceKind, "iceberg" | "delta">;
+
+export type SourceGroupId = "upload" | "folder" | "s3" | "database" | "lakehouse";
+
+export type GroupId = SourceGroupId | "datasets" | "sources";
 
 export type ItemRef =
     | { kind: "group"; id: GroupId }
@@ -11,13 +15,32 @@ export type ItemRef =
     | { kind: "folder"; id: number }
     | { kind: "dataset"; id: string };
 
-export const SOURCE_KINDS: { kind: SourceKind; label: string; noun: string }[] = [
-    { kind: "upload", label: "Uploads", noun: "file" },
-    { kind: "folder", label: "Folders", noun: "folder" },
-    { kind: "s3", label: "S3", noun: "bucket" },
-    { kind: "database", label: "Databases", noun: "database" },
-    { kind: "iceberg", label: "Iceberg", noun: "table" },
+export type SourceGroup = { id: SourceGroupId; label: string; noun: string; kinds: SourceKind[] };
+
+export const SOURCE_GROUPS: SourceGroup[] = [
+    { id: "upload", label: "Uploads", noun: "file", kinds: ["upload"] },
+    { id: "folder", label: "Folders", noun: "folder", kinds: ["folder"] },
+    { id: "s3", label: "S3", noun: "bucket", kinds: ["s3"] },
+    { id: "database", label: "Databases", noun: "database", kinds: ["database"] },
+    { id: "lakehouse", label: "Lakehouse", noun: "table", kinds: ["iceberg", "delta"] },
 ];
+
+export const TABLE_FORMATS: Record<TableFormat, { label: string; short: string }> = {
+    iceberg: { label: "Iceberg", short: "Iceberg" },
+    delta: { label: "Delta Lake", short: "Delta" },
+};
+
+export function tableFormat(kind: SourceKind): TableFormat | null {
+    return kind === "iceberg" || kind === "delta" ? kind : null;
+}
+
+export function groupOf(kind: SourceKind): SourceGroup {
+    return SOURCE_GROUPS.find((group) => group.kinds.includes(kind)) ?? SOURCE_GROUPS[0];
+}
+
+export function inGroup(source: SourceSummary, group: SourceGroup): boolean {
+    return group.kinds.includes(source.kind);
+}
 
 export const DATASETS_GROUP: ItemRef = { kind: "group", id: "datasets" };
 
@@ -50,12 +73,10 @@ export function parseItem(value: unknown): ItemRef | null {
     if (kind === "group" && (id === "datasets" || id === "sources")) {
         return { kind, id };
     }
-    const group = SOURCE_KINDS.find((entry) => entry.kind === id);
-    return kind === "group" && group ? { kind, id: group.kind } : null;
-}
-
-export function kindLabel(kind: SourceKind): string {
-    return SOURCE_KINDS.find((entry) => entry.kind === kind)?.label ?? kind;
+    const group = SOURCE_GROUPS.find(
+        (entry) => entry.id === id || entry.kinds.some((member) => member === id),
+    );
+    return kind === "group" && group ? { kind, id: group.id } : null;
 }
 
 function haystack(parts: (string | null | undefined)[]): string {
@@ -63,7 +84,9 @@ function haystack(parts: (string | null | undefined)[]): string {
 }
 
 export function sourceText(source: SourceSummary): string {
+    const format = tableFormat(source.kind);
     return haystack([
+        format ? TABLE_FORMATS[format].label : null,
         source.name,
         source.filename,
         source.table,

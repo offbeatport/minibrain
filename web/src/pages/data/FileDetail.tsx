@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge, Button, DataGrid, FileName, FileTypeIcon, Link } from "obp-ui";
+import { Badge, Button, DataGrid, FileName, Link } from "obp-ui";
 import { useState } from "react";
 import {
     type ColumnStats,
@@ -18,7 +18,9 @@ import { bytes, relativeTime } from "~/lib/time";
 import { ConnectedFacts } from "./Connected";
 import { CreateDataset } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
-import { type ItemRef, itemHref, kindLabel, plural } from "./catalogue";
+import { LakehouseFacts } from "./Lakehouse";
+import { type ItemRef, TABLE_FORMATS, groupOf, itemHref, plural, tableFormat } from "./catalogue";
+import { SourceIcon } from "./icons";
 import {
     About,
     DeleteAction,
@@ -31,11 +33,9 @@ import {
 } from "./parts";
 
 const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
-const CONNECTED = new Set(["s3", "database", "iceberg"]);
 const CONNECTED_LABELS: Record<string, string> = {
     s3: "S3 path",
     database: "Database",
-    iceberg: "Iceberg table",
 };
 
 function share(part: number, whole: number): string {
@@ -219,24 +219,29 @@ export function FileDetail({
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/sources/{source_id}", path)),
         onSuccess: async () => {
-            onSelect({ kind: "group", id: source.kind });
+            onSelect({ kind: "group", id: groupOf(source.kind).id });
             await refresh();
         },
     });
     const models = [...new Set(datasets.flatMap((dataset) => dataset.models))];
+    const format = tableFormat(source.kind);
     return (
         <div className="flex flex-col gap-6">
             <ItemHeader
                 title={source.kind === "upload" ? <FileName name={source.name} /> : source.name}
                 icon={
-                    source.kind === "upload" ? (
-                        <FileTypeIcon name={source.filename || source.name} />
-                    ) : undefined
+                    source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined
                 }
                 detail={
-                    CONNECTED.has(source.kind) ? (
+                    format ? (
                         <>
-                            {`${CONNECTED_LABELS[source.kind] ?? kindLabel(source.kind)} · ${source.connection ?? "no connection"} · table `}
+                            {`${TABLE_FORMATS[format].label} table · ${format === "iceberg" ? (source.connection ?? "no connection") : "folder on this server"} · table `}
+                            <span className="font-mono">{source.table}</span>
+                            {` · added ${relativeTime(source.created_at)}`}
+                        </>
+                    ) : CONNECTED_LABELS[source.kind] ? (
+                        <>
+                            {`${CONNECTED_LABELS[source.kind]} · ${source.connection ?? "no connection"} · table `}
                             <span className="font-mono">{source.table}</span>
                             {` · added ${relativeTime(source.created_at)}`}
                         </>
@@ -250,7 +255,7 @@ export function FileDetail({
                         </>
                     ) : (
                         <>
-                            {`${kindLabel(source.kind)} · `}
+                            {`${groupOf(source.kind).label} · `}
                             <span className="font-mono">{source.filename}</span>
                             {" · table "}
                             <span className="font-mono">{source.table}</span>
@@ -306,6 +311,7 @@ export function FileDetail({
             <ErrorLine error={remove.error} />
             {source.error && <p className="text-sm text-destructive">{source.error}</p>}
             <ConnectedFacts source={source} />
+            <LakehouseFacts source={source} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(source.rows)} />
                 <Stat label="Columns" value={count(source.columns.length)} />
@@ -320,6 +326,12 @@ export function FileDetail({
                             value={source.modified_at ? relativeTime(source.modified_at) : "–"}
                         />
                     </>
+                )}
+                {format && (
+                    <Stat
+                        label="Last change"
+                        value={source.modified_at ? relativeTime(source.modified_at) : "–"}
+                    />
                 )}
                 {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
                     <Stat label="Size" value={bytes(source.size)} />

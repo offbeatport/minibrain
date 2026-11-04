@@ -11,7 +11,7 @@ import {
     folderRef,
     removalText,
 } from "./DatasetFolders";
-import { type FolderIndex, type ItemRef, folderPath } from "./catalogue";
+import { type FolderIndex, type ItemRef, folderPath, groupOf } from "./catalogue";
 import { useDataRefresh } from "./parts";
 
 export type TreeAction =
@@ -46,7 +46,7 @@ function parentRef(removal: Removal): ItemRef {
     if (removal.kind === "dataset") {
         return folderRef(removal.dataset.folder_id ?? null);
     }
-    return { kind: "group", id: removal.source.kind };
+    return { kind: "group", id: groupOf(removal.source.kind).id };
 }
 
 function sameItem(a: ItemRef, b: ItemRef): boolean {

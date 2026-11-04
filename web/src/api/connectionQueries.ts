@@ -25,6 +25,7 @@ export const EXTENSIONS_FOR: Record<string, string[]> = {
     s3: ["httpfs"],
     database: ["postgres_scanner", "mysql_scanner"],
     iceberg: ["httpfs", "iceberg", "avro"],
+    delta: ["delta"],
     postgres: ["postgres_scanner"],
     mysql: ["mysql_scanner"],
 };
