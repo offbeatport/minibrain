@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain import storage
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.model_rows import base_availability, model_job
@@ -38,7 +39,6 @@ from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
 from minibrain.settings import Settings
-from minibrain.storage import free_bytes
 
 router = APIRouter(prefix="/api/catalog", tags=["catalog"])
 SYNC_INTERVAL_SECONDS = 24 * 3600
@@ -140,6 +140,7 @@ def catalogue(
     entries = session.scalars(select(CatalogModel).order_by(CatalogModel.position))
     synced = [entry.synced_at for entry in session.scalars(select(CatalogModel)) if entry.synced_at is not None]
     sync = latest_sync(session)
+    space = storage.disk_space(models_dir(settings))
     return CatalogResponse(
         entries=[entry_info(session, settings, entry, machines) for entry in entries],
         hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
@@ -149,7 +150,8 @@ def catalogue(
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         hub_add_allowed=policy["model_sources"] == "any",
         downloads_allowed=policy["model_sources"] != "imports",
-        store_free_bytes=free_bytes(models_dir(settings)),
+        store_free_bytes=space.free if space else None,
+        store_total_bytes=space.total if space else None,
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),

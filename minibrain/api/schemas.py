@@ -924,6 +924,7 @@ class CatalogResponse(BaseModel):
     hub_add_allowed: bool
     downloads_allowed: bool
     store_free_bytes: int | None
+    store_total_bytes: int | None = None
     endpoint: str
     token_configured: bool
     synced_at: datetime | None

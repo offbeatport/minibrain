@@ -204,7 +204,8 @@ def test_download_is_refused_when_the_model_disk_is_too_full(
     monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=GIB // 2, total=GIB))
     response = harness.client.post("/api/catalog/tiny/download", json={"variant": "tiny:bf16", "accept_license": True})
     assert response.status_code == 409 and response.json()["detail"].startswith("Needs ")
-    assert harness.client.get("/api/catalog").json()["store_free_bytes"] == GIB // 2
+    catalog = harness.client.get("/api/catalog").json()
+    assert (catalog["store_free_bytes"], catalog["store_total_bytes"]) == (GIB // 2, GIB)
 
 
 def test_checksum_mismatch_is_retried_not_trusted(harness: Harness, hub: Path) -> None:

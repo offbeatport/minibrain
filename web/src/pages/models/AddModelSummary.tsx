@@ -8,64 +8,8 @@ import { bytes } from "~/lib/time";
 import { FIT_TEXT, type SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
+import { DiskGauge, MemoryGauge } from "./ResourceGauges";
 import type { BaseOption } from "./baseOptions";
-
-const LOW_SPACE = 5 * 1024 ** 3;
-
-type Tone = "normal" | "warning" | "destructive";
-
-const FILL: Record<Tone, string> = {
-    normal: "bg-primary",
-    warning: "bg-warning",
-    destructive: "bg-destructive",
-};
-
-const TEXT: Record<Tone, string> = {
-    normal: "text-muted-foreground",
-    warning: "text-warning",
-    destructive: "text-destructive",
-};
-
-type Reading = { share: number | null; tone: Tone; left: string; right: string };
-
-function Meter({ label, reading }: { label: string; reading: Reading }) {
-    const { share, tone, left, right } = reading;
-    const capped = share === null ? 0 : Math.min(1, share);
-    const width = share === null ? 0 : Math.max(share > 0 ? 2 : 0, capped * 100);
-    const percent = share === null ? null : Math.round(share * 100);
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm font-medium">{label}</span>
-                <span
-                    className={cn(
-                        "text-lg font-semibold tabular-nums",
-                        tone === "normal" ? "text-foreground" : TEXT[tone],
-                    )}
-                >
-                    {percent === null ? "–" : `${percent}%`}
-                </span>
-            </div>
-            <div
-                role="meter"
-                aria-label={label}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(capped * 100)}
-                className="h-8 rounded-lg border bg-secondary p-1"
-            >
-                <div
-                    className={cn("h-full rounded-md", FILL[tone])}
-                    style={{ width: `${width}%` }}
-                />
-            </div>
-            <div className="flex items-baseline justify-between gap-3 text-sm tabular-nums">
-                <span className={TEXT[tone]}>{left}</span>
-                <span className="text-muted-foreground">{right}</span>
-            </div>
-        </div>
-    );
-}
 
 function Block({ title, children }: { title?: string; children: ReactNode }) {
     return (
@@ -152,48 +96,6 @@ function Formats({
     return <span className="text-sm text-muted-foreground">As installed</span>;
 }
 
-function diskMeter(need: DiskNeed, free: number | null | undefined): Reading {
-    if (free === null || free === undefined) {
-        return { share: null, tone: "normal", left: "Free space unknown", right: "" };
-    }
-    if (!need) {
-        return {
-            share: 0,
-            tone: "normal",
-            left: "Nothing to download",
-            right: `${bytes(free)} free`,
-        };
-    }
-    const after = free - need.size;
-    const tone: Tone = after < 0 ? "destructive" : after < LOW_SPACE ? "warning" : "normal";
-    return {
-        share: free > 0 ? need.size / free : 1,
-        tone,
-        left:
-            after < 0 ? `${bytes(need.size)}, does not fit` : `${bytes(need.size)} for this model`,
-        right: `${bytes(free)} free`,
-    };
-}
-
-function memoryMeter(variant: CatalogVariantInfo | null): Reading | null {
-    const fit = variant?.fit;
-    if (!fit || !fit.available_bytes) {
-        return null;
-    }
-    const tone: Tone =
-        fit.level === "insufficient"
-            ? "destructive"
-            : fit.level === "limited"
-              ? "warning"
-              : "normal";
-    return {
-        share: fit.needed_bytes / fit.available_bytes,
-        tone,
-        left: `Needs ${bytes(fit.needed_bytes)}`,
-        right: `${bytes(fit.available_bytes)} usable`,
-    };
-}
-
 function ReadLink({ href }: { href: string }) {
     return (
         <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
@@ -269,8 +171,7 @@ export function AddModelSummary({
     onPickAnother: () => void;
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
-    const disk = diskMeter(need, free);
-    const memory = memoryMeter(variant);
+    const onDisk = need ? null : (variant?.size_bytes ?? option?.size ?? null);
     const facts = [option?.publisher, option?.params, option?.entry?.license_name].filter(Boolean);
     return (
         <section
@@ -300,8 +201,13 @@ export function AddModelSummary({
                 )}
             </Block>
             <Block>
-                <Meter label="Disk" reading={disk} />
-                {memory && <Meter label="Memory" reading={memory} />}
+                <DiskGauge
+                    need={need}
+                    free={free}
+                    total={catalog?.store_total_bytes}
+                    onDisk={onDisk}
+                />
+                <MemoryGauge variant={variant} memoryLabel={catalog?.hardware.memory_label} />
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp

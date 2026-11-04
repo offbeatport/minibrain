@@ -11095,6 +11095,17 @@
             ],
             "title": "Store Free Bytes"
           },
+          "store_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Store Total Bytes"
+          },
           "endpoint": {
             "type": "string",
             "title": "Endpoint"

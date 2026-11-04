@@ -3379,6 +3379,8 @@ export interface components {
             downloads_allowed: boolean;
             /** Store Free Bytes */
             store_free_bytes: number | null;
+            /** Store Total Bytes */
+            store_total_bytes?: number | null;
             /** Endpoint */
             endpoint: string;
             /** Token Configured */
