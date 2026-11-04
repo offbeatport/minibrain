@@ -114,7 +114,6 @@ function variantColumns(
             cell: ({ row }) => (
                 <div className="flex justify-end">
                     <Button
-                        size="xs"
                         variant="outline"
                         disabled={!allowed}
                         onClick={() => onDownload(row.original)}
