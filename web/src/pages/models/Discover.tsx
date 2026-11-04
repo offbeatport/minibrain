@@ -626,7 +626,46 @@ function SelectionBar({
     );
 }
 
-const SKELETON_GROUPS = ["task", "size", "licence", "publisher", "access"];
+const SKELETON_GROUPS: { id: string; title?: string; rows: number }[] = [
+    { id: "toggles", rows: 2 },
+    { id: "task", title: "Task", rows: 5 },
+    { id: "size", title: "Size", rows: 4 },
+    { id: "publisher", title: "Publisher", rows: 6 },
+    { id: "commercial", title: "Commercial use", rows: 3 },
+    { id: "licence", title: "Licence", rows: 4 },
+];
+
+const SKELETON_WIDTHS = ["70%", "52%", "64%", "46%", "58%", "40%"];
+
+function skeletonRows(id: string, rows: number): string[] {
+    return SKELETON_WIDTHS.slice(0, rows).map((width) => `${id}:${width}`);
+}
+
+function FilterSkeleton() {
+    return (
+        <div className="flex flex-col divide-y rounded-md border bg-card">
+            <div className="flex h-10 items-center px-3">
+                <span className="text-sm font-semibold">Filters</span>
+            </div>
+            {SKELETON_GROUPS.map((group) => (
+                <div key={group.id} className="flex flex-col px-3 py-3">
+                    {group.title && (
+                        <span className="mb-2 text-sm font-semibold">{group.title}</span>
+                    )}
+                    {skeletonRows(group.id, group.rows).map((row) => (
+                        <div key={row} className="flex h-[26px] items-center gap-2">
+                            <Skeleton className="size-4 rounded-sm" />
+                            <Skeleton className="h-3.5" style={{ width: row.split(":")[1] }} />
+                            <Skeleton className="ml-auto h-3.5 w-5" />
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function noSelection() {}
 
 function DiscoverSkeleton({
     columns,
@@ -641,15 +680,7 @@ function DiscoverSkeleton({
         <div className="flex flex-col gap-3">
             <div className="flex items-start gap-4">
                 <aside className="hidden w-56 shrink-0 min-[1400px]:block">
-                    <div className="flex flex-col divide-y rounded-md border bg-card">
-                        {SKELETON_GROUPS.map((group) => (
-                            <div key={group} className="flex flex-col gap-2.5 px-3 py-3">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-4 w-36" />
-                                <Skeleton className="h-4 w-32" />
-                            </div>
-                        ))}
-                    </div>
+                    <FilterSkeleton />
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -668,9 +699,13 @@ function DiscoverSkeleton({
                         columns={columns}
                         rows={[]}
                         loading
-                        loadingRows={10}
+                        loadingRows={12}
+                        loadingLines={3}
                         storageKey="minibrain.discover.columns"
+                        columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
+                        selectedIds={[]}
+                        onSelectedIdsChange={noSelection}
                         minWidth="min-w-[840px]"
                     />
                 </div>

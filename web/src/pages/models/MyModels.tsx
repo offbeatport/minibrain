@@ -559,7 +559,7 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
             {manages && (
                 <DropdownMenuItem onSelect={() => on.edit(row)}>
                     <Pencil />
-                    Edit name, description and tags
+                    Edit
                 </DropdownMenuItem>
             )}
             {row.kind === "custom" && (
