@@ -68,6 +68,19 @@ def cached_fully(variant: CatalogVariant) -> bool:
     return True
 
 
+def ensure_reachable(session: Session, entry: CatalogModel, variant: CatalogVariant) -> None:
+    if cached_fully(variant):
+        return
+    load_policy(session).outbound(hub.endpoint())
+    if hub.CONNECTIVITY.check() is False:
+        raise ConflictError("Offline: downloads need a connection. Import the model files instead.")
+    if entry.gated and hub.token() is None:
+        raise ConflictError(
+            f"{entry.name} is gated. Accept its licence at {hub.endpoint()}/{variant.repo} "
+            "and set HF_TOKEN on the minibrain server, then retry."
+        )
+
+
 def added_for(session: Session, settings: Settings, entry: CatalogModel) -> list[AddedInfo]:
     added: list[AddedInfo] = []
     for model in session.scalars(select(Model).where(Model.catalog_id == entry.id)):
@@ -172,16 +185,7 @@ def download(
         raise NotFoundError(f"{catalog_id} has no variant {body.variant}")
     if not body.accept_license:
         raise ConflictError(f"Review and accept the {entry.license_name} before downloading {entry.name}")
-    local = cached_fully(variant)
-    if not local:
-        load_policy(session).outbound(hub.endpoint())
-    if not local and hub.CONNECTIVITY.check() is False:
-        raise ConflictError("Offline: downloads need a connection. Import the model files instead.")
-    if not local and entry.gated and hub.token() is None:
-        raise ConflictError(
-            f"{entry.name} is gated. Accept its licence at {hub.endpoint()}/{variant.repo} "
-            "and set HF_TOKEN on the minibrain server, then retry."
-        )
+    ensure_reachable(session, entry, variant)
     model = start_download(session, settings, entry, variant, current_actor())
     session.commit()
     return row_of(session, settings, request, model)

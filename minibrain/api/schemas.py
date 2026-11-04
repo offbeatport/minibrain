@@ -460,6 +460,11 @@ class MinibrainDetail(MinibrainSummary):
     teardown: TeardownInfo | None = None
 
 
+class SampleDetail(MinibrainDetail):
+    base_name: str
+    download_bytes: int | None
+
+
 class QueryRequest(BaseModel):
     sql: str = Field(min_length=1)
 

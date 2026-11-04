@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
+from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.models import model_row, wake_teardowns
@@ -20,9 +21,11 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     RequestBodiesUpdate,
+    SampleDetail,
 )
 from minibrain.api.views import detail, summary
-from minibrain.auth.identity import current_actor
+from minibrain.auth.identity import current_actor, current_role
+from minibrain.auth.roles import Role, allows
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import snapshot
 from minibrain.data.shared import (
@@ -35,10 +38,10 @@ from minibrain.data.shared import (
 )
 from minibrain.data.snapshots import cleanup, model_snapshot_now
 from minibrain.data.sources import safe_filename
-from minibrain.models.registry import available_bases, base_readiness
-from minibrain.policy import LockedError, bodies_choice
+from minibrain.models.registry import ACTIVE_STATUSES, available_bases, base_readiness, start_download
+from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import AuditEvent, Minibrain, now
+from minibrain.registry.models import AuditEvent, CatalogModel, Minibrain, Model, ModelStatus, now
 from minibrain.registry.service import (
     ConflictError,
     create_minibrain,
@@ -47,7 +50,7 @@ from minibrain.registry.service import (
     list_minibrains,
     slugify,
 )
-from minibrain.settings import sample_file
+from minibrain.settings import Settings, sample_file
 from minibrain.tags import merged_tags, user_tags
 from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
 
@@ -182,14 +185,33 @@ def free_name(session: Session, name: str) -> str:
     return next(candidate for candidate in candidates if slugify(candidate) not in taken)
 
 
+def fetch_sample_base(session: Session, settings: Settings) -> tuple[str, int | None]:
+    entry = session.get(CatalogModel, DEFAULT_BASE_MODEL)
+    if entry is None or not entry.variants:
+        raise ConflictError(f"The sample needs {DEFAULT_BASE_MODEL}, which is missing from the model catalogue")
+    model = session.get(Model, DEFAULT_BASE_MODEL)
+    if model is not None and model.status in (ModelStatus.AVAILABLE, *ACTIVE_STATUSES):
+        return entry.name, None
+    variant = entry.variants[0]
+    try:
+        if not allows(current_role(), Role.ADMIN):
+            raise ConflictError("Ask an admin to add it from Discover first.")
+        ensure_reachable(session, entry, variant)
+        start_download(session, settings, entry, variant, current_actor())
+    except (ConflictError, PolicyError) as error:
+        raise ConflictError(f"The sample needs {entry.name}, which is not on this install. {error}") from error
+    return entry.name, variant.size_bytes
+
+
 @router.post("/sample", status_code=201, dependencies=[Depends(builder)])
-def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> MinibrainDetail:
+def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> SampleDetail:
+    base_name, download_bytes = fetch_sample_base(session, settings)
     minibrain = create_minibrain(session, free_name(session, SAMPLE_NAME), "classify", DEFAULT_BASE_MODEL)
     minibrain.description = SAMPLE_DESCRIPTION
     with sample_file(SAMPLE_FILE).open("rb") as stream:
         attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
     session.commit()
-    return detail(settings, minibrain)
+    return SampleDetail(**detail(settings, minibrain).model_dump(), base_name=base_name, download_bytes=download_bytes)
 
 
 @router.put("/{slug}/dataset", dependencies=[Depends(builder)])

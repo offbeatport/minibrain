@@ -516,3 +516,25 @@ def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> 
     assert rows(harness)["tickets"]["availability"]["state"] == "downloading"
     assert harness.worker(kinds=["download"]).run_once()
     assert rows(harness)["tickets"]["availability"]["state"] == "none"
+
+
+def test_sample_starts_its_base_download_once(harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=100 * GIB, total=200 * GIB))
+    first = harness.client.post("/api/minibrains/sample")
+    assert first.status_code == 201, first.text
+    assert (first.json()["base_name"], first.json()["download_bytes"] > GIB) == ("Qwen3 0.6B", True)
+    assert rows(harness)["qwen3-0.6b"]["availability"]["state"] == "downloading"
+    second = harness.client.post("/api/minibrains/sample").json()
+    assert (second["name"], second["download_bytes"]) == ("Travel intents (sample) 2", None)
+
+
+def test_sample_needing_a_download_offline_creates_nothing(
+    harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("minibrain.api.catalog.cached_fully", lambda _variant: False)
+    monkeypatch.setenv("MINIBRAIN_OFFLINE", "1")
+    response = harness.client.post("/api/minibrains/sample")
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail.startswith("The sample needs Qwen3 0.6B, which is not on this install.") and "Offline" in detail
+    assert harness.client.get("/api/minibrains").json() == []

@@ -3,6 +3,7 @@ import { Boxes } from "lucide-react";
 import { Button, useToast } from "obp-ui";
 import { api, unwrap } from "~/api/client";
 import { errorMessage } from "~/components/Section";
+import { bytes } from "~/lib/time";
 import { useModelsRefresh } from "./dialogs";
 
 export function ModelsEmpty() {
@@ -12,9 +13,13 @@ export function ModelsEmpty() {
         mutationFn: () => unwrap(api.POST("/api/minibrains/sample")),
         onSuccess: async (created) => {
             await refresh();
+            const messages = `${created.name}: ${created.source?.rows ?? 0} messages`;
             toast({
                 title: "Sample added",
-                description: `${created.name} comes with its data, ready to train.`,
+                description:
+                    created.download_bytes === null
+                        ? `${messages} on ${created.base_name}, ready to train.`
+                        : `${messages}. Downloading ${created.base_name} (${bytes(created.download_bytes)}) to train it.`,
                 tone: "success",
             });
         },
@@ -40,7 +45,7 @@ export function ModelsEmpty() {
                 disabled={sample.isPending}
                 onClick={() => sample.mutate()}
             >
-                {sample.isPending ? "Adding the sample…" : "Try the sample"}
+                {sample.isPending ? "Adding sample data…" : "Try with sample data"}
             </Button>
         </div>
     );

@@ -6071,6 +6071,46 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** SampleDetail */
+        SampleDetail: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Task */
+            task: string;
+            /** Base Model */
+            base_model: string;
+            /** Current Version */
+            current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
+            /** Current Accuracy */
+            current_accuracy: number | null;
+            /** Versions */
+            versions: number;
+            /** Active Jobs */
+            active_jobs: number;
+            source: components["schemas"]["SourceInfo"] | null;
+            mapping: components["schemas"]["MappingInfo"];
+            /** Dataset */
+            dataset?: string | null;
+            /** Dataset Name */
+            dataset_name?: string | null;
+            snapshot: components["schemas"]["SnapshotInfo"] | null;
+            changed?: components["schemas"]["ChangeInfo"] | null;
+            /** Models */
+            models: string[];
+            request_bodies: components["schemas"]["RequestBodiesInfo"];
+            teardown?: components["schemas"]["TeardownInfo"] | null;
+            /** Base Name */
+            base_name: string;
+            /** Download Bytes */
+            download_bytes: number | null;
+        };
         /** SampleInfo */
         SampleInfo: {
             /** File */
@@ -7273,7 +7313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["SampleDetail"];
                 };
             };
         };

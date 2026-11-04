@@ -819,7 +819,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/SampleDetail"
                 }
               }
             }
@@ -19342,6 +19342,170 @@
           "path"
         ],
         "title": "S3SourceCreate"
+      },
+      "SampleDetail": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
+          },
+          "current_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Accuracy"
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "active_jobs": {
+            "type": "integer",
+            "title": "Active Jobs"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/MappingInfo"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "request_bodies": {
+            "$ref": "#/components/schemas/RequestBodiesInfo"
+          },
+          "teardown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeardownInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_name": {
+            "type": "string",
+            "title": "Base Name"
+          },
+          "download_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "task",
+          "base_model",
+          "current_version",
+          "current_accuracy",
+          "versions",
+          "active_jobs",
+          "source",
+          "mapping",
+          "snapshot",
+          "models",
+          "request_bodies",
+          "base_name",
+          "download_bytes"
+        ],
+        "title": "SampleDetail"
       },
       "SampleInfo": {
         "properties": {
