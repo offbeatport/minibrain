@@ -16,27 +16,14 @@ import {
 import { useEffect, useState } from "react";
 import type { ModelRow } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
-import { StatusText } from "~/components/models/StatusText";
 import { deleteModel, isLiveRow, removeFiles } from "~/lib/teardown";
 import { bytes } from "~/lib/time";
+import { DeleteList, rowItem } from "./DeleteModelsDialog";
 
 type Choice = "files" | "cascade";
 
 function count(total: number, one: string, many: string): string {
     return `${total} ${total === 1 ? one : many}`;
-}
-
-function DependentList({ rows }: { rows: ModelRow[] }) {
-    return (
-        <ul className="flex max-h-40 flex-col divide-y overflow-y-auto rounded-md border text-sm">
-            {rows.map((row) => (
-                <li key={row.key} className="flex items-center justify-between gap-3 px-3 py-1.5">
-                    <span className="truncate">{row.name}</span>
-                    {isLiveRow(row) && <StatusText tone="success">Live</StatusText>}
-                </li>
-            ))}
-        </ul>
-    );
 }
 
 export function DeleteBaseDialog({
@@ -89,7 +76,9 @@ export function DeleteBaseDialog({
                         {`${others} ${dependents.length === 1 ? "is" : "are"} built on it.`}
                     </DialogDescription>
                 </DialogHeader>
-                <DependentList rows={dependents} />
+                <DeleteList
+                    items={dependents.map((item) => rowItem(item, [], `Built on ${name}`))}
+                />
                 <RadioGroup
                     value={choice}
                     onValueChange={(next) => setChoice(next === "cascade" ? "cascade" : "files")}

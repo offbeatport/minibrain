@@ -4,7 +4,6 @@ import {
     ArrowUpDown,
     CircleX,
     Eye,
-    FileCheck,
     FlaskConical,
     GraduationCap,
     MoreHorizontal,
@@ -21,7 +20,6 @@ import {
     Checkbox,
     CheckboxSelect,
     DropdownMenu,
-    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -79,6 +77,7 @@ import {
 } from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeleteBaseDialog } from "./DeleteBaseDialog";
+import { DeleteModelsDialog } from "./DeleteModelsDialog";
 import { ModelsEmpty } from "./ModelsEmpty";
 import {
     ConfirmAction,
@@ -329,46 +328,6 @@ function DeployedWarning({ row }: { row: ModelRow }) {
     );
 }
 
-function deleteConfirmation(row: ModelRow, on: Handlers): Confirmation {
-    const deployed = row.deployment.state !== "not_deployed";
-    const removed =
-        row.kind === "base" ? (
-            <p>
-                {row.size_bytes
-                    ? `Its weights (${bytes(row.size_bytes)}) are removed from storage, with its API keys.`
-                    : "Its record and API keys are removed."}{" "}
-                You can download or import it again later.
-            </p>
-        ) : (
-            <p>
-                Its data, versions, evaluation results and API keys are removed. This cannot be
-                undone.
-            </p>
-        );
-    if (deployed) {
-        return {
-            title: `${row.name} is deployed. Delete it?`,
-            description: (
-                <>
-                    <DeployedWarning row={row} />
-                    {removed}
-                </>
-            ),
-            acknowledge: `Undeploy and delete ${row.name}`,
-            confirmLabel: "Undeploy and delete",
-            destructive: true,
-            run: () => deleteModel(row, { undeploy: true }).then(on.refresh),
-        };
-    }
-    return {
-        title: `Delete ${row.name}?`,
-        description: removed,
-        confirmLabel: "Delete",
-        destructive: true,
-        run: () => deleteModel(row).then(on.refresh),
-    };
-}
-
 function promoteVersion(row: ModelRow, number: number) {
     return unwrap(
         api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
@@ -481,15 +440,6 @@ function cancelTransferConfirmation(row: ModelRow, on: Handlers): Confirmation {
     };
 }
 
-function setPinned(row: ModelRow, pinned: boolean) {
-    return unwrap(
-        api.POST("/api/models/base/{key}/pin", {
-            params: { path: { key: row.key } },
-            body: { pinned },
-        }),
-    );
-}
-
 function TrainItem({
     label,
     blocked,
@@ -527,13 +477,6 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
     const deployable =
         !row.health && (row.kind === "custom" || row.availability.state === "available");
     const fixes = entryHealth(entry)?.actions ?? [];
-    const more = fixes.slice(1);
-    const verifiable =
-        row.kind === "base" &&
-        row.availability.state === "available" &&
-        !transferring &&
-        !more.some((action) => action.kind === "verify") &&
-        row.health?.actions[0]?.kind !== "verify";
     const retryable = row.teardown?.state === "failed" ? row.teardown : null;
     return (
         <>
@@ -606,22 +549,6 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
                 <DropdownMenuItem onSelect={() => on.confirm(deployConfirmation(row, on))}>
                     <Rocket />
                     Deploy
-                </DropdownMenuItem>
-            )}
-            {admin && row.kind === "base" && row.availability.state === "available" && (
-                <DropdownMenuCheckboxItem
-                    checked={row.pinned ?? false}
-                    onCheckedChange={(pinned) => setPinned(row, pinned).then(on.refresh)}
-                >
-                    Keep on disk
-                </DropdownMenuCheckboxItem>
-            )}
-            {admin && verifiable && (
-                <DropdownMenuItem
-                    onSelect={() => on.health(row, { kind: "verify", label: "Verify files" })}
-                >
-                    <FileCheck />
-                    Verify files
                 </DropdownMenuItem>
             )}
             {admin && transferring && row.activity.job_id !== null && (
@@ -1350,7 +1277,7 @@ async function undeploySelected(chosen: Entry[]): Promise<void> {
     }
 }
 
-async function deleteSelected(chosen: Entry[], rows: ModelRow[]): Promise<void> {
+async function deleteSelected(chosen: Entry[], rows: ModelRow[], cascade: boolean): Promise<void> {
     const whole = unique(chosen.filter((entry) => !entry.version).map((entry) => entry.model));
     const wholeKeys = new Set(whole.map(rowId));
     const cascading = new Set(
@@ -1358,14 +1285,22 @@ async function deleteSelected(chosen: Entry[], rows: ModelRow[]): Promise<void> 
             .filter((row) => row.kind === "base")
             .filter((row) => {
                 const built = builtOn(rows, row);
-                return built.length > 0 && built.every((item) => wholeKeys.has(rowId(item)));
+                return (
+                    built.length > 0 &&
+                    (cascade || built.every((item) => wholeKeys.has(rowId(item))))
+                );
             })
             .map((row) => row.key),
     );
     const versions = [
         ...new Map(
             chosen
-                .filter((entry) => entry.version && !wholeKeys.has(rowId(entry.model)))
+                .filter(
+                    (entry) =>
+                        entry.version &&
+                        !wholeKeys.has(rowId(entry.model)) &&
+                        !cascading.has(entry.model.base_model ?? ""),
+                )
                 .map((entry) => [`${rowId(entry.model)}@${entry.version?.number}`, entry]),
         ).values(),
     ];
@@ -1385,50 +1320,15 @@ function plural(count: number, word: string): string {
     return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-function bulkDeleteConfirmation(chosen: Entry[], run: () => Promise<unknown>): Confirmation {
-    const versions = chosen.filter((entry) => entry.version).length;
-    const models = chosen.length - versions;
-    const live = chosen.filter(liveOf).length;
-    const parts = [
-        models ? plural(models, "model") : "",
-        versions ? plural(versions, "version") : "",
-    ].filter(Boolean);
-    return {
-        title: `Delete ${parts.join(" and ")}?`,
-        description: (
-            <>
-                <p>
-                    {models
-                        ? "Models go with all their versions, data links, scores and API keys. "
-                        : ""}
-                    {versions ? "Versions go with their adapters, scores and results. " : ""}
-                    This cannot be undone.
-                </p>
-                {live > 0 && (
-                    <p>
-                        {`${plural(live, "selected row")} ${live === 1 ? "is" : "are"} deployed and must be undeployed first; apps calling them get errors from then on.`}
-                    </p>
-                )}
-            </>
-        ),
-        acknowledge: live > 0 ? "Undeploy and delete" : undefined,
-        confirmLabel: live > 0 ? "Undeploy and delete" : "Delete",
-        destructive: true,
-        run,
-    };
-}
-
 function BulkBar({
     chosen,
-    rows,
     onClear,
-    onConfirm,
+    onDelete,
     onDone,
 }: {
     chosen: Entry[];
-    rows: ModelRow[];
     onClear: () => void;
-    onConfirm: (confirmation: Confirmation) => void;
+    onDelete: () => void;
     onDone: () => Promise<unknown>;
 }) {
     const act = useMutation({
@@ -1491,18 +1391,7 @@ function BulkBar({
                     orientation="vertical"
                     className="mx-1 data-[orientation=vertical]:h-5"
                 />
-                <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={act.isPending}
-                    onClick={() =>
-                        onConfirm(
-                            bulkDeleteConfirmation(chosen, () =>
-                                deleteSelected(chosen, rows).then(onDone),
-                            ),
-                        )
-                    }
-                >
+                <Button variant="destructive" size="sm" disabled={act.isPending} onClick={onDelete}>
                     <Trash2 />
                     Delete
                 </Button>
@@ -1526,6 +1415,7 @@ export function MyModels({
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [removing, setRemoving] = useState<ModelRow | null>(null);
+    const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
     const healthActions = useRef<Handlers["health"] | null>(null);
     const rowsRef = useRef<ModelRow[]>([]);
@@ -1564,7 +1454,7 @@ export function MyModels({
                     setRemoving(row);
                     return;
                 }
-                setConfirmation(deleteConfirmation(row, on));
+                setDeleting([{ key: rowId(row), model: row, version: null }]);
             },
             createFrom: (base) =>
                 router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
@@ -1614,9 +1504,10 @@ export function MyModels({
             {can.build && selected.length > 0 ? (
                 <BulkBar
                     chosen={entries.filter((entry) => selected.includes(entry.key))}
-                    rows={rows}
                     onClear={() => setSelected([])}
-                    onConfirm={setConfirmation}
+                    onDelete={() =>
+                        setDeleting(entries.filter((entry) => selected.includes(entry.key)))
+                    }
                     onDone={async () => {
                         setSelected([]);
                         await refresh();
@@ -1669,6 +1560,16 @@ export function MyModels({
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
+            />
+            <DeleteModelsDialog
+                chosen={deleting}
+                rows={rows}
+                onOpenChange={(open) => !open && setDeleting(null)}
+                onDelete={async (cascade) => {
+                    await deleteSelected(deleting ?? [], rows, cascade);
+                    setSelected([]);
+                    await refresh();
+                }}
             />
             <DeleteBaseDialog
                 row={removing}
