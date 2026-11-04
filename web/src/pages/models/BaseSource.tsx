@@ -182,13 +182,6 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     };
 }
 
-export const FIT_TEXT: Record<string, string> = {
-    fits: "Runs here",
-    limited: "Tight fit",
-    insufficient: "Needs more compute",
-    unknown: "Fit not checked",
-};
-
 type SourceKind = "hub" | "s3" | "folder";
 
 const SOURCE_KINDS: { kind: SourceKind; title: string; example: string; body: string }[] = [

@@ -16,6 +16,7 @@ import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { PathResult, type SourcePlan } from "./BaseSource";
 import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
+import { runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
 
@@ -118,7 +119,7 @@ function PoolFit({
     if (!fit) {
         return <li className="text-muted-foreground">{`Checking ${pool.label}…`}</li>;
     }
-    const fits = fit === "fits" || fit === "limited";
+    const fits = runnable(fit);
     return (
         <li>
             <StatusText tone={fits ? "success" : "neutral"} className="whitespace-normal">

@@ -1519,10 +1519,10 @@ export function MyModels({
                         <p>
                             The playground loads {row.base_model}
                             {row.needed_bytes
-                                ? ` (about ${bytes(row.needed_bytes)} of memory)`
+                                ? ` (needs about ${bytes(row.needed_bytes)} memory)`
                                 : ""}{" "}
-                            on this machine if it is not running yet. It unloads after 15 minutes
-                            without requests; nothing is deployed.
+                            if it is not running yet. It unloads after 15 minutes without requests;
+                            nothing is deployed.
                         </p>
                     ),
                     confirmLabel: "Open playground",

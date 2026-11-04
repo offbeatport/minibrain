@@ -1,6 +1,7 @@
 import type { CatalogEntry, CatalogVariantInfo, FitInfo, ModelRow } from "~/api/client";
 import { parameters } from "./Discover";
 import { FIT_ORDER, type LicenceUse } from "./DiscoverFilters";
+import { runnable } from "./runsHere";
 
 export type TaskKey = "classify" | "extract" | "rewrite" | "sql" | "distill" | "answer";
 
@@ -52,10 +53,6 @@ const TASK_NEEDS: Record<TaskKey, TaskNeeds> = {
 const RUNS_HERE = 3;
 const NEEDS_MORE = 2;
 const RECENT = 3;
-
-function runsHere(level: FitLevel): boolean {
-    return level === "fits" || level === "limited";
-}
 
 function taskScore(entry: CatalogEntry, task: TaskKey): number | null {
     const needs = TASK_NEEDS[task];
@@ -219,7 +216,7 @@ export function recommend(
         const option = catalogueOption(entry);
         return { ...option, note: entry.recommendation ?? null };
     });
-    const here = options.filter((option) => runsHere(option.fit)).slice(0, RUNS_HERE);
+    const here = options.filter((option) => runnable(option.fit)).slice(0, RUNS_HERE);
     const more = options.filter((option) => option.fit === "insufficient").slice(0, NEEDS_MORE);
     const unchecked =
         here.length + more.length === 0 ? options.slice(0, RUNS_HERE + NEEDS_MORE) : [];

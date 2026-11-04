@@ -17,11 +17,10 @@ import {
     AccessSteps,
     type Actions,
     EntryAction,
-    Fit,
     addModelHref,
     discoverHref,
+    memoryNeeded,
     parameters,
-    poolPhrase,
 } from "./Discover";
 import { useModelsRefresh } from "./dialogs";
 
@@ -52,6 +51,7 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
                         ["Publisher", entry.provider],
                         ["Repository", external(`${catalog.endpoint}/${entry.repo}`, entry.repo)],
                         ["Parameters", `${parameters(entry)} · size ${entry.tier}`],
+                        ["Memory needed", memoryNeeded(entry)],
                         ["Architecture", `${entry.architecture} · generation ${entry.generation}`],
                         ["Tasks", entry.capabilities.join(", ")],
                         ["Downloads", `${DOWNLOADS.format(entry.popularity)} on Hugging Face`],
@@ -101,17 +101,6 @@ function variantColumns(
             header: "Memory needed",
             accessorFn: (variant) => variant.fit.needed_bytes,
             cell: ({ row }) => bytes(row.original.fit.needed_bytes),
-        },
-        {
-            id: "fit",
-            header: "Fit",
-            enableSorting: false,
-            cell: ({ row }) => (
-                <div className="flex max-w-96 flex-col whitespace-normal">
-                    <Fit fit={row.original.fit} />
-                    <span className="text-sm text-muted-foreground">{row.original.fit.basis}</span>
-                </div>
-            ),
         },
         {
             id: "runtimes",
@@ -233,7 +222,7 @@ export function DiscoverModelPage() {
                         <PanelSection
                             icon={Layers}
                             title="Variants"
-                            description={`Fit is estimated for ${poolPhrase(data)} from the weights' size; real use also depends on context length and batch size.`}
+                            description="Memory needed is estimated from the weights' size; real use also depends on context length and batch size."
                             bare
                         >
                             <DataGrid columns={table} rows={entry.variants} sortable={false} />

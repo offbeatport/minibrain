@@ -3,6 +3,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import type { CatalogEntry, CatalogVariantInfo, FitInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { ModelsSearch, ModelsSearchKey } from "~/lib/modelsSearch";
+import type { RunsHere } from "./runsHere";
 
 const READY = "ready";
 const NEEDS_ACCESS = "needs-access";
@@ -42,16 +43,15 @@ export function licenceUseLabel(use: LicenceUse): string {
     return LICENCE_USES.find((item) => item.value === use)?.label ?? use;
 }
 
-type Facet = "access" | "publishers" | "tasks" | "tiers" | "fit" | "uses" | "licences" | "latest";
+type Facet = "access" | "publishers" | "tasks" | "tiers" | "uses" | "licences" | "latest";
 
-export type Filters = Record<Facet, string[]> & { q: string };
+export type Filters = Record<Facet, string[]> & { q: string; runs: RunsHere | null };
 
 const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
     access: "access",
     publishers: "provider",
     tasks: "task",
     tiers: "tier",
-    fit: "fit",
     uses: "use",
     licences: "licence",
     latest: "latest",
@@ -69,7 +69,6 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
     publishers: (entry) => [entry.provider],
     tasks: (entry) => entry.capabilities,
     tiers: (entry) => [entry.tier],
-    fit: (entry) => [bestFit(entry).fit.level],
     uses: (entry) => [entry.license_use],
     licences: (entry) => [licenceOf(entry)],
     latest: (entry) => (entry.superseded_by ? [] : [YES]),
@@ -93,24 +92,17 @@ function readAccess(value: string | undefined): string[] {
     return value === ANY ? [] : list(value);
 }
 
-function readFit(search: ModelsSearch): string[] {
-    if (search.fit) {
-        return list(search.fit);
-    }
-    return search.fits === "true" ? ["fits", "limited"] : [];
-}
-
-export function readFilters(search: ModelsSearch, fitsKnown: boolean): Filters {
+export function readFilters(search: ModelsSearch, runsHere: RunsHere): Filters {
     return {
         q: (search.q ?? "").trim().toLowerCase(),
         access: readAccess(search.access),
         publishers: list(search.provider),
         tasks: list(search.task),
         tiers: list(search.tier),
-        fit: fitsKnown ? readFit(search) : [],
         uses: list(search.use),
         licences: list(search.licence),
         latest: list(search.latest),
+        runs: search.fits === "true" ? runsHere : null,
     };
 }
 
@@ -121,16 +113,19 @@ function facetHit(entry: CatalogEntry, filters: Filters, facet: Facet): boolean 
     );
 }
 
-export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet): boolean {
+export function matches(entry: CatalogEntry, filters: Filters, skip?: Facet | "runs"): boolean {
     const text = `${entry.name} ${entry.description} ${entry.provider} ${entry.repo} ${entry.family} ${entry.architecture}`;
     if (filters.q && !text.toLowerCase().includes(filters.q)) {
+        return false;
+    }
+    if (filters.runs && skip !== "runs" && !filters.runs(entry)) {
         return false;
     }
     return FACETS.every((facet) => facet === skip || facetHit(entry, filters, facet));
 }
 
 export function activeFilters(filters: Filters): number {
-    const toggles = (filters.fit.length > 0 ? 1 : 0) + (latestOnly(filters) ? 1 : 0);
+    const toggles = (filters.runs ? 1 : 0) + (latestOnly(filters) ? 1 : 0);
     return PANEL_FACETS.reduce((sum, facet) => sum + filters[facet].length, toggles);
 }
 
@@ -142,14 +137,13 @@ const FILTERS_CLEARED: ModelsSearch = {
     licence: "",
     use: "",
     fits: "",
-    fit: "",
     latest: "",
 };
 
 export const CLEARED: ModelsSearch = { ...FILTERS_CLEARED, q: "" };
 
-export function fitsPatch(on: boolean): ModelsSearch {
-    return { fit: "", fits: on ? "true" : "" };
+export function runsHerePatch(on: boolean): ModelsSearch {
+    return { fits: on ? "true" : "" };
 }
 
 export function latestPatch(on: boolean): ModelsSearch {

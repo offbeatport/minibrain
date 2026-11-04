@@ -8,10 +8,8 @@ import {
 } from "obp-ui";
 import type { CatalogEntry } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
-import { FIT_TONES, fitLabel, parameters } from "./Discover";
-import { bestFit } from "./DiscoverFilters";
+import { memoryNeeded, parameters } from "./Discover";
 
 function smallestDownload(entry: CatalogEntry): number {
     return Math.min(...entry.variants.map((variant) => variant.size_bytes));
@@ -32,7 +30,6 @@ function candidates(entries: CatalogEntry[], compared: string[]): CatalogEntry[]
 }
 
 function Candidate({ entry }: { entry: CatalogEntry }) {
-    const fit = bestFit(entry).fit;
     return (
         <>
             <PublisherLogo publisher={entry.provider} name={entry.name} size="sm" />
@@ -40,11 +37,11 @@ function Candidate({ entry }: { entry: CatalogEntry }) {
                 <span className="truncate font-semibold">{entry.name}</span>
                 <span className="truncate text-muted-foreground">{entry.provider}</span>
             </span>
-            <span className="flex shrink-0 flex-col items-end">
-                <span className="tabular-nums">
-                    {`${parameters(entry)} · ${entry.variants.length > 1 ? "from " : ""}${bytes(smallestDownload(entry))}`}
+            <span className="flex shrink-0 flex-col items-end tabular-nums">
+                <span>
+                    {`${parameters(entry)} · ${entry.variants.length > 1 ? "from " : ""}${bytes(smallestDownload(entry))} download`}
                 </span>
-                <StatusText tone={FIT_TONES[fit.level]}>{fitLabel(fit)}</StatusText>
+                <span className="text-muted-foreground">{`${memoryNeeded(entry)} memory`}</span>
             </span>
         </>
     );
@@ -55,14 +52,12 @@ export function ComparePicker({
     onOpenChange,
     entries,
     compared,
-    poolPhrase,
     onPick,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     entries: CatalogEntry[];
     compared: string[];
-    poolPhrase: string;
     onPick: (entry: CatalogEntry) => void;
 }) {
     const items = candidates(entries, compared);
@@ -72,7 +67,8 @@ export function ComparePicker({
                 <DialogHeader>
                     <DialogTitle>Add model to compare</DialogTitle>
                     <DialogDescription>
-                        {`Catalogue models not in the comparison yet, with fit for ${poolPhrase}. Models from the same families come first.`}
+                        Catalogue models not in the comparison yet. Models from the same families
+                        come first.
                     </DialogDescription>
                 </DialogHeader>
                 <SearchList

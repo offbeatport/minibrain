@@ -1,4 +1,3 @@
-import { useQueries } from "@tanstack/react-query";
 import { Boxes, ChevronDown } from "lucide-react";
 import {
     Badge,
@@ -16,8 +15,7 @@ import {
     type TabbedSearchListTab,
 } from "obp-ui";
 import { useState } from "react";
-import { type CatalogEntry, type CatalogResponse, type ModelRow, api, unwrap } from "~/api/client";
-import { keys } from "~/api/queries";
+import type { CatalogResponse, ModelRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { bytes } from "~/lib/time";
 import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
@@ -32,6 +30,7 @@ import {
     localBases,
     searchText,
 } from "./baseOptions";
+import { RUNS_HERE_INFO, useRunsHere } from "./runsHere";
 
 export type PickerTab = "catalogue" | "mine" | "import";
 
@@ -128,12 +127,6 @@ function groupOf(
     options: BaseOption[],
 ): TabbedSearchListGroup<Row> {
     return { key, label, items: rows(key, options) };
-}
-
-const RUNNABLE: FitLevel[] = ["fits", "limited"];
-
-function runsIn(entry: CatalogEntry | undefined): boolean {
-    return Boolean(entry?.variants.some((variant) => RUNNABLE.includes(variant.fit.level)));
 }
 
 type PickerValue = { option: BaseOption | null; importText: string | null };
@@ -244,23 +237,12 @@ export function BasePicker({
     const [uses, setUses] = useState<string[]>([]);
     const [runsHere, setRunsHere] = useState(false);
     const entries = catalog?.entries ?? [];
-    const otherPools = (catalog?.pools ?? []).filter((pool) => pool.name !== catalog?.pool);
-    const pools = useQueries({
-        queries: otherPools.map((pool) => ({
-            queryKey: [...keys.catalog, pool.name],
-            queryFn: () =>
-                unwrap(api.GET("/api/catalog", { params: { query: { pool: pool.name } } })),
-        })),
-    });
-    const elsewhere = pools.flatMap((query) => (query.data ? [query.data.entries] : []));
-    const runsSomewhere = (option: BaseOption) =>
-        runsIn(option.entry ?? undefined) ||
-        elsewhere.some((list) => runsIn(list.find((entry) => entry.id === option.entry?.id)));
+    const runsSomewhere = useRunsHere(catalog);
     const everything = entries.map((entry) => catalogueOption(entry));
     const catalogue = everything.filter(
         (option) =>
             (tiers.length === 0 || tiers.includes(option.entry?.tier ?? "")) &&
-            (!runsHere || runsSomewhere(option)) &&
+            (!runsHere || runsSomewhere(option.entry)) &&
             (uses.length === 0 || uses.includes(option.licence ?? "unknown")),
     );
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
@@ -316,10 +298,7 @@ export function BasePicker({
                             />
                             Runs here
                         </Label>
-                        <InfoTip label="What runs here means">
-                            Fits in memory on a machine in one of your compute pools, on demand ones
-                            included.
-                        </InfoTip>
+                        <InfoTip label="What runs here means">{RUNS_HERE_INFO}</InfoTip>
                     </span>
                 </div>
             ),

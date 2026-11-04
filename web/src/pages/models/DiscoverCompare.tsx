@@ -32,14 +32,12 @@ import {
     type Actions,
     COMPARE_MAX,
     EntryAction,
-    Fit,
     addModelHref,
     compareHref,
     discoverHref,
     parameters,
-    poolPhrase,
 } from "./Discover";
-import { TIERS, bestFit, licenceOf, licenceUseLabel } from "./DiscoverFilters";
+import { TIERS, licenceOf, licenceUseLabel } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
@@ -54,7 +52,7 @@ const USE_TONES: Record<CatalogEntry["license_use"], Tone> = {
     unknown: "neutral",
 };
 
-const SKELETON_ROWS = ["parameters", "fit", "memory", "download", "runtimes", "licence", "use"];
+const SKELETON_ROWS = ["parameters", "memory", "download", "runtimes", "licence", "use"];
 
 type Variant = CatalogEntry["variants"][number];
 
@@ -143,20 +141,6 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                             <span className="text-muted-foreground">{`Size ${tierLabel(entry)}`}</span>
                         </div>
                     ),
-                },
-                {
-                    id: "fit",
-                    label: `Fit on ${poolPhrase(catalog)}`,
-                    key: (entry) => bestFit(entry).fit.level,
-                    render: (entry) => {
-                        const best = bestFit(entry);
-                        return (
-                            <div className="flex flex-col items-start">
-                                <Fit fit={best.fit} />
-                                <span className="text-muted-foreground">{`Best with ${best.label}`}</span>
-                            </div>
-                        );
-                    },
                 },
                 {
                     id: "memory",
@@ -756,7 +740,7 @@ export function DiscoverComparePage() {
                 title="Compare models"
                 caption={
                     data && comparing
-                        ? `${entries.length} models side by side. Fit is estimated for ${poolPhrase(data)}.`
+                        ? `${entries.length} models side by side.`
                         : "Catalogue models side by side."
                 }
                 actions={
@@ -872,7 +856,6 @@ export function DiscoverComparePage() {
                     onOpenChange={setPicking}
                     entries={data.entries}
                     compared={shown}
-                    poolPhrase={poolPhrase(data)}
                     onPick={(entry) => go([...shown, entry.id], only)}
                 />
             )}

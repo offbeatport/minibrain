@@ -27,69 +27,37 @@ import {
     cn,
 } from "obp-ui";
 import { type ReactNode, useId, useMemo, useState } from "react";
-import { type CatalogEntry, type CatalogResponse, type FitInfo, api, unwrap } from "~/api/client";
+import { type CatalogEntry, type CatalogResponse, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import {
     CLEARED,
-    FIT_ORDER,
     FilterPanel,
     Option,
     activeFilters,
-    bestFit,
-    fitsPatch,
     latestOnly,
     latestPatch,
     licenceUseLabel,
     matches,
     readFilters,
+    runsHerePatch,
 } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
+import { RUNS_HERE_INFO, type RunsHere, useRunsHere } from "./runsHere";
 
-const FIT_LABELS: Record<FitInfo["level"], string> = {
-    fits: "Fits",
-    limited: "Tight",
-    insufficient: "Too big",
-    unknown: "Not checked",
-};
-export const FIT_TONES: Record<FitInfo["level"], Tone> = {
-    fits: "success",
-    limited: "warning",
-    insufficient: "destructive",
-    unknown: "neutral",
-};
-export function fitLabel(fit: FitInfo): string {
-    const enoughMemory = fit.available_bytes !== null && fit.needed_bytes <= fit.available_bytes;
-    return fit.level === "insufficient" && enoughMemory
-        ? "Not supported here"
-        : FIT_LABELS[fit.level];
+export function leastMemory(entry: CatalogEntry): number {
+    return Math.min(...entry.variants.map((variant) => variant.fit.needed_bytes));
 }
 
-export function Fit({ fit }: { fit: FitInfo }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="rounded-sm text-left">
-                    <StatusText tone={FIT_TONES[fit.level]}>{fitLabel(fit)}</StatusText>
-                </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-80">
-                <span className="flex flex-col gap-0.5">
-                    {fit.available_bytes !== null && (
-                        <span className="tabular-nums">
-                            {`Needs ${bytes(fit.needed_bytes)} of ${bytes(fit.available_bytes)}`}
-                        </span>
-                    )}
-                    <span>{fit.basis}</span>
-                </span>
-            </TooltipContent>
-        </Tooltip>
-    );
+export function memoryNeeded(entry: CatalogEntry): string {
+    const needs = new Set(entry.variants.map((variant) => variant.fit.needed_bytes));
+    const least = bytes(leastMemory(entry));
+    return needs.size > 1 ? `From ${least}` : least;
 }
 
 export function AccessSteps({
@@ -291,19 +259,18 @@ function AddedStatus({ entry }: { entry: CatalogEntry }) {
     return null;
 }
 
-function recommendedOrder(entry: CatalogEntry): number[] {
-    const fitRank = FIT_ORDER.indexOf(bestFit(entry).fit.level);
+function recommendedOrder(entry: CatalogEntry, runsHere: RunsHere): number[] {
     return [
-        fitRank < 0 ? 9 : fitRank,
+        runsHere(entry) ? 0 : 1,
         entry.recommended ? 0 : 1,
         entry.superseded_by ? 1 : 0,
         -entry.popularity,
     ];
 }
 
-function byRecommended(left: CatalogEntry, right: CatalogEntry): number {
-    const a = recommendedOrder(left);
-    const b = recommendedOrder(right);
+function byRecommended(left: CatalogEntry, right: CatalogEntry, runsHere: RunsHere): number {
+    const a = recommendedOrder(left, runsHere);
+    const b = recommendedOrder(right, runsHere);
     const index = a.findIndex((value, position) => value !== b[position]);
     return index < 0 ? 0 : a[index] - b[index];
 }
@@ -314,7 +281,7 @@ function smallest(entry: CatalogEntry): number {
 
 const SORTS: Record<
     string,
-    { label: string; compare: (a: CatalogEntry, b: CatalogEntry) => number }
+    { label: string; compare: (a: CatalogEntry, b: CatalogEntry, runsHere: RunsHere) => number }
 > = {
     recommended: { label: "Recommended", compare: byRecommended },
     popular: { label: "Most popular", compare: (a, b) => b.popularity - a.popularity },
@@ -382,8 +349,9 @@ export function compareHref(ids: string[], pool?: string, onlyDifferences = fals
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
+const COLUMNS_KEY = "minibrain.discover.columns.v2";
+
 const HIDDEN_COLUMNS = [
-    "size",
     "newer",
     "publisher",
     "tasks",
@@ -445,6 +413,13 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             cell: ({ row }) => parameters(row.original),
         },
         {
+            id: "memory",
+            header: "Memory",
+            meta: { info: "Memory the model needs to run, in its smallest format." },
+            accessorFn: leastMemory,
+            cell: ({ row }) => memoryNeeded(row.original),
+        },
+        {
             id: "size",
             header: "Download",
             accessorFn: smallestVariant,
@@ -452,15 +427,6 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
                 row.original.variants.length > 1
                     ? `From ${bytes(smallestVariant(row.original))}`
                     : bytes(row.original.variants[0]?.size_bytes),
-        },
-        {
-            id: "fit",
-            header: "Fits here",
-            meta: {
-                info: "Estimated from the best-fitting variant's memory needs and this machine's memory.",
-            },
-            accessorFn: (entry) => FIT_ORDER.indexOf(bestFit(entry).fit.level),
-            cell: ({ row }) => <Fit fit={bestFit(row.original).fit} />,
         },
         {
             id: "licence",
@@ -502,76 +468,6 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             cell: ({ row }) => <span className="font-mono">{row.original.repo}</span>,
         },
     ];
-}
-
-function PoolSelect({
-    catalog,
-    onPool,
-}: {
-    catalog: CatalogResponse;
-    onPool: (pool: string) => void;
-}) {
-    if (catalog.pools.length < 2) {
-        return null;
-    }
-    return (
-        <Select value={catalog.pool} onValueChange={(next) => onPool(String(next))}>
-            <SelectTrigger aria-label="Compute pool" className="w-full">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                {catalog.pools.map((pool) => (
-                    <SelectItem key={pool.name} value={pool.name}>
-                        {`Pool: ${pool.label}`}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-}
-
-export function poolPhrase(catalog: CatalogResponse): string {
-    return catalog.pool === "local" ? "this machine" : `pool ${catalog.pool}`;
-}
-
-function fitHint(catalog: CatalogResponse): string {
-    const phrase = poolPhrase(catalog);
-    if (!catalog.hardware.known) {
-        return `Unavailable: the memory of ${phrase} is unknown, so fit is not checked.`;
-    }
-    return `Shows models that fit, or fit with limited headroom, on ${phrase}: ${bytes(catalog.hardware.memory_bytes)} ${catalog.hardware.memory_label}.`;
-}
-
-const FITTING: FitInfo["level"][] = ["fits", "limited"];
-
-function FitsOption({
-    catalog,
-    checked,
-    count,
-    onChecked,
-    onPool,
-}: {
-    catalog: CatalogResponse;
-    checked: boolean;
-    count: number;
-    onChecked: (checked: boolean) => void;
-    onPool: (pool: string) => void;
-}) {
-    const known = catalog.hardware.known;
-    return (
-        <>
-            <Option
-                checked={known && checked}
-                disabled={!known}
-                onChange={onChecked}
-                count={known ? count : undefined}
-            >
-                {`Fits ${poolPhrase(catalog)}`}
-                <InfoTip label="About hardware fit">{fitHint(catalog)}</InfoTip>
-            </Option>
-            <PoolSelect catalog={catalog} onPool={onPool} />
-        </>
-    );
 }
 
 function compareHint(count: number): ReactNode {
@@ -701,7 +597,7 @@ function DiscoverSkeleton({
                         loading
                         loadingRows="fill"
                         loadingLines={3}
-                        storageKey="minibrain.discover.columns"
+                        storageKey={COLUMNS_KEY}
                         columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
                         selectedIds={[]}
@@ -732,6 +628,7 @@ export function Discover({
     const catalog = useCatalog(search.pool);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const data = catalog.data;
+    const runsHere = useRunsHere(data);
     const on: Actions = useMemo(
         () => ({
             download: (entry) => router.history.push(addModelHref(entry)),
@@ -762,29 +659,28 @@ export function Discover({
             </div>
         );
     }
-    const filters = readFilters(search, data.hardware.known);
+    const filters = readFilters(search, runsHere);
     const needsAccess = filters.access.includes("needs-access");
     const sort = SORTS[search.sort ?? ""] ? (search.sort ?? "recommended") : "recommended";
     const visible = data.entries.filter((entry) => matches(entry, filters));
-    visible.sort(SORTS[sort].compare);
+    visible.sort((left, right) => SORTS[sort].compare(left, right, runsHere));
     const active = activeFilters(filters);
     const selecting = selected.length > 0;
     const select = (ids: string[]) => update({ selected: ids.join(",") });
     const toggles = (
         <>
-            <FitsOption
-                catalog={data}
-                checked={filters.fit.length > 0}
+            <Option
+                checked={filters.runs !== null}
+                onChange={(checked) => update(runsHerePatch(checked))}
                 count={
                     data.entries.filter(
-                        (entry) =>
-                            matches(entry, filters, "fit") &&
-                            FITTING.includes(bestFit(entry).fit.level),
+                        (entry) => matches(entry, filters, "runs") && runsHere(entry),
                     ).length
                 }
-                onChecked={(checked) => update(fitsPatch(checked))}
-                onPool={(pool) => update({ pool: pool === "local" ? "" : pool })}
-            />
+            >
+                Runs here
+                <InfoTip label="What runs here means">{RUNS_HERE_INFO}</InfoTip>
+            </Option>
             <Option
                 checked={latestOnly(filters)}
                 onChange={(checked) => update(latestPatch(checked))}
@@ -878,7 +774,7 @@ export function Discover({
                         columns={tableColumns}
                         rows={visible}
                         getRowId={(entry) => entry.id}
-                        storageKey="minibrain.discover.columns"
+                        storageKey={COLUMNS_KEY}
                         onOpen={(entry) => router.history.push(discoverHref(entry, search.pool))}
                         columnPicker
                         hiddenColumns={HIDDEN_COLUMNS}
