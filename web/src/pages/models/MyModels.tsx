@@ -1186,9 +1186,9 @@ function ModelList({
                         return (
                             members.length > 0 && (
                                 <Fragment key={group.kind}>
-                                    <li className="col-span-full flex h-9 items-center gap-2 bg-muted px-4 text-sm">
+                                    <li className="col-span-full flex items-baseline gap-2 px-4 pt-4 pb-1.5 text-sm text-muted-foreground">
                                         <span className="font-medium">{group.label}</span>
-                                        <span className="text-muted-foreground tabular-nums">
+                                        <span className="tabular-nums">
                                             {groupFacts(group.kind, members)}
                                         </span>
                                     </li>
