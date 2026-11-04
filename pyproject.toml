@@ -39,6 +39,9 @@ mlx = [
 llamacpp = [
     "llama-cpp-python>=0.3.36",
 ]
+hsm = [
+    "pykcs11>=1.5.20",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -112,6 +115,11 @@ reportMissingImports = "warning"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests/test_engines.py"
+extraPaths = ["."]
+reportMissingImports = "warning"
+
+[[tool.pyright.executionEnvironments]]
+root = "minibrain/encryption/hsm.py"
 extraPaths = ["."]
 reportMissingImports = "warning"
 

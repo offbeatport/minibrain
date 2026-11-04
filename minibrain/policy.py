@@ -234,7 +234,7 @@ FIELDS: tuple[Field, ...] = (
         "readable; re-wrap them under Encryption at rest. Off writes new files unencrypted.",
         "choice",
         "local",
-        ("local", "vault", "off"),
+        ("local", "vault", "hsm", "off"),
     ),
     Field(
         "vault_address",
@@ -272,6 +272,22 @@ FIELDS: tuple[Field, ...] = (
         "text",
         "",
     ),
+    Field(
+        "hsm_library",
+        "PKCS#11 library",
+        "Path of the HSM vendor's PKCS#11 module on this server, such as /usr/lib/softhsm/libsofthsm2.so. The user "
+        "PIN comes from MINIBRAIN_HSM_PIN or the file MINIBRAIN_HSM_PIN_FILE names.",
+        "text",
+        "",
+    ),
+    Field("hsm_token", "HSM token", "Label of the token (partition) that holds the key.", "text", ""),
+    Field(
+        "hsm_key",
+        "HSM key label",
+        "Label of the AES-256 keys that wrap the data keys; each version has its number as CKA_ID.",
+        "text",
+        "minibrain-master",
+    ),
 )
 
 CHOICE_LABELS = {
@@ -294,6 +310,7 @@ CHOICE_LABELS = {
     "admin": "Admin",
     "local": "Local key file",
     "vault": "HashiCorp Vault Transit",
+    "hsm": "PKCS#11 HSM",
     "token": "Token",
     "approle": "AppRole",
 } | {key: value[0] for key, value in LICENCES.items()}

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from minibrain.encryption.envelope import Wrapped, new_key
+from minibrain.encryption.hsm import HSM, hsm_provider
 from minibrain.encryption.providers import LOCAL, KeyFile, KeyProvider, KeyUnavailableError, LocalKeys
 from minibrain.encryption.vault_transit import VAULT, vault_provider
 from minibrain.policy import load as load_policy
@@ -29,7 +30,7 @@ POLICY = "encryption"
 RECORDS = "encryption.keys"
 TTL_SECONDS = 1.0
 PROBE_CONTEXT = b"minibrain.probe"
-LABELS = {LOCAL: "Local key file", VAULT: "HashiCorp Vault Transit", OFF: "Off"}
+LABELS = {LOCAL: "Local key file", VAULT: "HashiCorp Vault Transit", HSM: "PKCS#11 HSM", OFF: "Off"}
 
 Factory = Callable[[Settings, dict[str, Any], bool], KeyProvider]
 FACTORIES: dict[str, Factory] = {}
@@ -54,6 +55,7 @@ def local_provider(settings: Settings, _values: dict[str, Any], may_create: bool
 
 FACTORIES[LOCAL] = local_provider
 FACTORIES[VAULT] = vault_provider
+FACTORIES[HSM] = hsm_provider
 
 
 def provider_settings(values: dict[str, Any], kind: str) -> tuple[tuple[str, str], ...]:
