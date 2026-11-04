@@ -1,8 +1,28 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ExternalLink, Files, History, Info, Plug, ThumbsUp } from "lucide-react";
-import { Badge, Button, Card, CardContent, DataGrid, Link, cn } from "obp-ui";
+import {
+    Check,
+    ChevronLeft,
+    ExternalLink,
+    Files,
+    History,
+    Info,
+    Plug,
+    ThumbsUp,
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    DataGrid,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+    cn,
+} from "obp-ui";
 import { useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
@@ -468,23 +488,43 @@ const FILE_COLUMNS: ColumnDef<BaseModelDetail["files"][number], unknown>[] = [
     },
     {
         header: "SHA-256",
-        accessorKey: "sha256",
-        cell: (info) => (
-            <span className="font-mono text-muted-foreground">
-                {String(info.getValue() ?? "—").slice(0, 16)}
-            </span>
-        ),
-    },
-    {
-        header: "Hash",
-        id: "state",
-        accessorFn: (file) => file.state ?? "unchecked",
-        cell: ({ row }) => {
-            const state = FILE_STATES[row.original.state ?? "unchecked"];
-            return <StatusText tone={state.tone}>{state.label}</StatusText>;
-        },
+        id: "sha256",
+        accessorFn: (file) => `${file.state ?? "unchecked"} ${file.sha256 ?? ""}`,
+        cell: ({ row }) => <FileHash file={row.original} />,
     },
 ];
+
+function FileHash({ file }: { file: BaseModelDetail["files"][number] }) {
+    const state = file.state ?? "unchecked";
+    const hash = (
+        <span className="font-mono text-muted-foreground">
+            {file.sha256 ? file.sha256.slice(0, 16) : "—"}
+        </span>
+    );
+    if (state === "ok") {
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-1.5 rounded-sm">
+                        <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+                        <span className="sr-only">Matches: </span>
+                        {hash}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent>Matches the SHA-256 saved at install</TooltipContent>
+            </Tooltip>
+        );
+    }
+    if (state === "unchecked") {
+        return hash;
+    }
+    return (
+        <span className="inline-flex items-center gap-2">
+            <StatusText tone={FILE_STATES[state].tone}>{FILE_STATES[state].label}</StatusText>
+            {hash}
+        </span>
+    );
+}
 
 const VERSION_COLUMNS: ColumnDef<VersionInfo, unknown>[] = [
     {
