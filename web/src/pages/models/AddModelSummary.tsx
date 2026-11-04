@@ -5,7 +5,7 @@ import type { CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
-import { FIT_TEXT, type SourcePlan } from "./BaseSource";
+import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
@@ -39,7 +39,7 @@ function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control
                 <span className="text-sm tabular-nums">{bytes(variant.size_bytes)}</span>
             </span>
             <span className="text-sm text-muted-foreground">
-                {`${variant.label.replace(/\s*safetensors/i, "")} · ${formatUse(variant)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
+                {`${variant.label.replace(/\s*safetensors/i, "")} · ${formatUse(variant)} · ${bytes(variant.fit.needed_bytes)} memory`}
             </span>
         </span>
     );

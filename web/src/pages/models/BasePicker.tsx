@@ -1,20 +1,24 @@
+import { useQueries } from "@tanstack/react-query";
 import { Boxes, ChevronDown } from "lucide-react";
 import {
     Badge,
+    Checkbox,
     CheckboxSelect,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    InfoTip,
+    Label,
     TabbedSearchList,
     type TabbedSearchListGroup,
     type TabbedSearchListTab,
 } from "obp-ui";
 import { useState } from "react";
-import type { CatalogResponse, ModelRow } from "~/api/client";
+import { type CatalogEntry, type CatalogResponse, type ModelRow, api, unwrap } from "~/api/client";
+import { keys } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { StatusText, type Tone } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
 import { TIERS } from "./DiscoverFilters";
@@ -31,24 +35,12 @@ import {
 
 export type PickerTab = "catalogue" | "mine" | "import";
 
-const FIT_HINT: Record<FitLevel, { text: string; tone: Tone }> = {
-    fits: { text: "Runs here", tone: "success" },
-    limited: { text: "Tight fit", tone: "warning" },
-    insufficient: { text: "Needs more compute", tone: "info" },
-    unknown: { text: "Fit not checked", tone: "neutral" },
-};
-
 const LICENCE_TEXT: Record<string, string> = {
     commercial: "Commercial use",
     restricted: "Commercial use with conditions",
     "non-commercial": "No commercial use",
     unknown: "Licence not reviewed",
 };
-
-const FIT_FILTERS = [
-    { value: "here", label: "Runs here" },
-    { value: "more", label: "Needs more compute" },
-];
 
 const USE_FILTERS = [
     { value: "commercial", label: "Commercial use" },
@@ -84,8 +76,13 @@ function Availability({ option }: { option: BaseOption }) {
     ) : null;
 }
 
+function memoryText(option: BaseOption): string | null {
+    const needed = option.variant?.fit.needed_bytes;
+    return needed ? `Needs ${gigabytes(needed)} GB memory` : null;
+}
+
 function OptionRow({ option, recommended }: { option: BaseOption; recommended?: boolean }) {
-    const fit = FIT_HINT[option.fit];
+    const memory = option.kind === "local" ? null : memoryText(option);
     const facts = [
         option.kind === "custom" ? null : option.publisher,
         option.params ? `${option.params} parameters` : null,
@@ -109,7 +106,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                 <Availability option={option} />
-                {option.kind !== "local" && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
+                {memory && <span className="text-muted-foreground tabular-nums">{memory}</span>}
             </span>
         </span>
     );
@@ -133,12 +130,10 @@ function groupOf(
     return { key, label, items: rows(key, options) };
 }
 
-function fitMatches(fit: FitLevel, chosen: string[]): boolean {
-    if (chosen.length === 0) {
-        return true;
-    }
-    const value = fit === "insufficient" ? "more" : fit === "unknown" ? "unknown" : "here";
-    return chosen.includes(value);
+const RUNNABLE: FitLevel[] = ["fits", "limited"];
+
+function runsIn(entry: CatalogEntry | undefined): boolean {
+    return Boolean(entry?.variants.some((variant) => RUNNABLE.includes(variant.fit.level)));
 }
 
 type PickerValue = { option: BaseOption | null; importText: string | null };
@@ -151,11 +146,11 @@ function Trigger({ value }: { value: PickerValue }) {
               option.kind === "custom" ? null : option.publisher,
               option.params ? `${option.params} parameters` : null,
               option.size ? bytes(option.size) : null,
+              option.kind === "local" ? null : memoryText(option),
               option.licence ? LICENCE_TEXT[option.licence] : null,
           ].filter(Boolean)
         : [];
     const description = option ? descriptionOf(option) : null;
-    const fit = option && option.kind !== "local" ? FIT_HINT[option.fit] : null;
     return (
         <DialogTrigger asChild>
             <button
@@ -185,7 +180,6 @@ function Trigger({ value }: { value: PickerValue }) {
                             </span>
                             <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-muted-foreground tabular-nums">
                                 <span className="truncate">{facts.join(" · ")}</span>
-                                {fit && <StatusText tone={fit.tone}>{fit.text}</StatusText>}
                             </span>
                             {description && (
                                 <span className="line-clamp-2 text-foreground">{description}</span>
@@ -247,14 +241,26 @@ export function BasePicker({
     onImport: (pick: ImportPick) => void;
 }) {
     const [tiers, setTiers] = useState<string[]>([]);
-    const [fits, setFits] = useState<string[]>([]);
     const [uses, setUses] = useState<string[]>([]);
+    const [runsHere, setRunsHere] = useState(false);
     const entries = catalog?.entries ?? [];
+    const otherPools = (catalog?.pools ?? []).filter((pool) => pool.name !== catalog?.pool);
+    const pools = useQueries({
+        queries: otherPools.map((pool) => ({
+            queryKey: [...keys.catalog, pool.name],
+            queryFn: () =>
+                unwrap(api.GET("/api/catalog", { params: { query: { pool: pool.name } } })),
+        })),
+    });
+    const elsewhere = pools.flatMap((query) => (query.data ? [query.data.entries] : []));
+    const runsSomewhere = (option: BaseOption) =>
+        runsIn(option.entry ?? undefined) ||
+        elsewhere.some((list) => runsIn(list.find((entry) => entry.id === option.entry?.id)));
     const everything = entries.map((entry) => catalogueOption(entry));
     const catalogue = everything.filter(
         (option) =>
             (tiers.length === 0 || tiers.includes(option.entry?.tier ?? "")) &&
-            fitMatches(option.fit, fits) &&
+            (!runsHere || runsSomewhere(option)) &&
             (uses.length === 0 || uses.includes(option.licence ?? "unknown")),
     );
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
@@ -277,7 +283,7 @@ export function BasePicker({
             value: "catalogue",
             label: "Catalogue",
             toolbar: (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <CheckboxSelect
                         label="Size"
                         allLabel="Any size"
@@ -291,18 +297,6 @@ export function BasePicker({
                         className="w-40"
                     />
                     <CheckboxSelect
-                        label="Fit"
-                        allLabel="Any fit"
-                        noun="fits"
-                        options={FIT_FILTERS.map((item) => ({
-                            ...item,
-                            count: count((option) => fitMatches(option.fit, [item.value])),
-                        }))}
-                        value={fits}
-                        onValueChange={setFits}
-                        className="w-48"
-                    />
-                    <CheckboxSelect
                         label="Licence use"
                         allLabel="Any licence"
                         noun="licence uses"
@@ -314,6 +308,19 @@ export function BasePicker({
                         onValueChange={setUses}
                         className="w-48"
                     />
+                    <span className="ml-auto flex items-center gap-1.5">
+                        <Label className="flex items-center gap-2 font-normal">
+                            <Checkbox
+                                checked={runsHere}
+                                onCheckedChange={(checked) => setRunsHere(checked === true)}
+                            />
+                            Runs here
+                        </Label>
+                        <InfoTip label="What runs here means">
+                            Fits in memory on a machine in one of your compute pools, on demand ones
+                            included.
+                        </InfoTip>
+                    </span>
                 </div>
             ),
             groups: [
