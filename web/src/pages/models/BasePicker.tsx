@@ -28,6 +28,7 @@ import {
     customOptions,
     gigabytes,
     localBases,
+    logoPublisher,
     searchText,
 } from "./baseOptions";
 import { RUNS_HERE_INFO, useRunsHere } from "./runsHere";
@@ -90,7 +91,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
     const description = descriptionOf(option);
     return (
         <span className="flex w-full min-w-0 items-start gap-3 py-1.5">
-            <PublisherLogo publisher={option.publisher} name={option.name} />
+            <PublisherLogo publisher={logoPublisher(option)} name={option.name} />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="truncate text-base font-semibold">{option.name}</span>
@@ -152,7 +153,7 @@ function Trigger({ value }: { value: PickerValue }) {
                 className="flex w-full min-w-0 items-center gap-4 rounded-lg border border-input bg-input-background p-4 text-left text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             >
                 {option ? (
-                    <PublisherLogo publisher={option.publisher} name={option.name} size="lg" />
+                    <PublisherLogo publisher={logoPublisher(option)} name={option.name} size="lg" />
                 ) : (
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
                         <Boxes aria-hidden="true" className="size-4" />

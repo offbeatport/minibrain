@@ -232,6 +232,10 @@ export function recommend(
     return { recent, here, more, unchecked };
 }
 
+export function logoPublisher(option: BaseOption | null): string | null {
+    return option && option.kind !== "custom" ? option.publisher : null;
+}
+
 export function searchText(option: BaseOption): string {
     return [
         option.name,

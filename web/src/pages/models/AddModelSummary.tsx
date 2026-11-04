@@ -9,7 +9,7 @@ import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
-import type { BaseOption } from "./baseOptions";
+import { type BaseOption, logoPublisher } from "./baseOptions";
 
 function Block({ title, children }: { title?: string; children: ReactNode }) {
     return (
@@ -182,7 +182,7 @@ export function AddModelSummary({
             className="flex flex-1 flex-col divide-y rounded-xl border bg-card text-card-foreground"
         >
             <div className="flex items-center gap-3 px-panel py-4">
-                <PublisherLogo publisher={option?.publisher} name={option?.name ?? "Model"} />
+                <PublisherLogo publisher={logoPublisher(option)} name={option?.name ?? "Model"} />
                 <div className="flex min-w-0 flex-col">
                     <span className="truncate font-semibold">
                         {option?.name ?? "Pick a base model"}

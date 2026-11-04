@@ -256,13 +256,7 @@ function CardView({
             <BackLink slug={target.slug} name={card.version.name} />
             <PageHeader
                 title={`${card.version.name} v${card.version.number}`}
-                icon={
-                    <PublisherLogo
-                        publisher={card.base_model.publisher}
-                        name={card.base_model.name}
-                        size="lg"
-                    />
-                }
+                icon={<PublisherLogo name={card.version.name} size="lg" />}
                 caption="Model card and validation report, built from the stored version, its data, its scores and the audit log."
                 actions={<Downloads target={target} />}
             />
