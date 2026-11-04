@@ -451,7 +451,7 @@ from. They have different endpoints and keys, so they are configured apart.
 Every install (download, import) saves a SHA-256 list of its files: the hub's LFS hashes where published, a local hash
 otherwise. It is stored on the model and as `minibrain-model.json` in its folder. The base's content hash is the
 SHA-256 of that list. Health handling never deletes anything: a repair writes to `.part` files and replaces a file only
-once it matches; only the cache budget below removes files.
+once it matches; only deleting a base removes its files.
 
 | Failure | Detected by | State | Primary action |
 |---|---|---|---|
@@ -477,46 +477,31 @@ once it matches; only the cache budget below removes files.
 - UI: the state is the Models list status cell, the primary action is the row button, the rest are in the row menu.
   The model page's Files section lists each file with size and hash state, the last verified time and "Verify files".
 
-### Base model cache
+### Base models on disk
 
-- Settings → Storage: "Base model cache budget", off by default, a size in GB. It covers bases in the model folder
-  (downloaded or imported); a base pointed to an outside folder is neither counted nor removed.
-- Over the budget, the least recently used bases that are unused and not pinned are removed until under it. Runs
-  after a download, import or restore finishes, hourly on the leader, and on demand ("Free up space now").
-- Never removed: the base of any custom model, a base whose content hash any version was trained on, a deployed base,
-  one with a running job, one an engine has loaded, a pinned one ("Keep on disk", on the model page and in the row
-  menu), and one used or added in the last hour (so a fresh download never removes itself).
-- `last_used_at` moves when a base is added or restored, an engine reports it loaded, a training or scoring job is
-  queued on it, or it is tested; at most every five minutes.
-- A removed base keeps its row, file list, licence acceptance and keys, with status `evicted`: "Removed to free space"
-  with Download again (the repair job from the hub at the pinned revision, when online and Model sources allow it)
-  or Re-import (the repair job from a folder or S3 path), both checked against the saved SHA-256 list.
-- Before a download or import, Add model estimates the cache after it; when that is over the budget it names the bases
-  that would be removed and how much they free, and asks to continue. Download again shows the same estimate.
-- Infrastructure → Storage shows usage against the budget, what can be removed, what goes at the next check, and every
-  base in removal order with why it is kept. Each eviction writes `model.evict` (size, last use, budget, usage,
-  trigger) to the audit log and a line to the server log; pin changes write `model.pin` and `model.unpin`.
+- A base stays on disk until someone deletes it, and deleting it removes its files. A base with models built on it is
+  deleted together with them, once the cascade checkbox in the delete dialog is ticked.
+- Rows an earlier cache budget left in status `evicted` keep "Removed to free space" with Download again or Re-import
+  (the repair job, checked against the saved SHA-256 list).
 
 ### Deleting and undeploying
 
-- Deleting a custom or base model, undeploying one and removing a base's files are teardowns: a row in `teardowns`
-  (one per model) that a loop on the leader main advances, so they survive a restart and run however small or large
-  the model is. Not jobs: workers never touch the database or the artifact store, and only main can remove rows and
-  files. The API stores the teardown and answers 202 with the new state at once.
+- Deleting a custom or base model and undeploying one are teardowns: a row in `teardowns` (one per model) that a loop on
+  the leader main advances, so they survive a restart and run however small or large the model is. Not jobs: workers
+  never touch the database or the artifact store, and only main can remove rows and files. The API stores the teardown
+  and answers 202 with the new state at once.
 - States on the Models table, the model pages and Deployments: Deleting (row greyed, actions off, gone when done),
-  Delete failed, Stopping, Stop failed and Removing files, each failure with its reason and a Retry that repeats the
-  same call. Toasts come from a watcher in the shell, so they show on whichever page the person is on.
+  Delete failed, Stopping and Stop failed, each failure with its reason and a Retry that repeats the same call. Toasts
+  come from a watcher in the shell, so they show on whichever page the person is on.
 - Stopping waits until every live gateway (main's own and standalone ones, which report what they route) has stopped
   routing the model's names and every engine of its base has drained its requests in flight through those names and
   unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
   Ten minutes without that is Stop failed, naming what did not confirm.
 - Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, snapshots only it
   uses, the minibrain folder and API key scopes. A base with models built on it answers 409 with their names unless
-  the call says `cascade=true`; the cascade deletes them first, then the base. Removing only a base's files keeps its
-  record and the models built on it, which show "Base missing files" until Download again.
-- Audit: `model.delete`, `model.undeploy` and `model.remove_files` when a person starts one (`retry` on a retry), and
-  `model.delete_finished`, `model.undeploy_finished` and `model.remove_files_finished` with the outcome, what went and
-  the reason a failure gives.
+  the call says `cascade=true`; the cascade deletes them first, then the base.
+- Audit: `model.delete` and `model.undeploy` when a person starts one (`retry` on a retry), and `model.delete_finished`
+  and `model.undeploy_finished` with the outcome, what went and the reason a failure gives.
 
 ## Eval and promote
 
@@ -779,7 +764,7 @@ keys, and `/v1` stays key-only.
   datasets inside folders and opens their path. Create, rename, move and delete are audited (`dataset_folder.*`), and
   so is a dataset changing folder (`dataset.move`).
 - Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
-  their limits. Settings → Storage: where artifacts live, and the base model cache budget.
+  their limits. Settings → Storage: where artifacts live.
 - Settings → Connections: the buckets and databases that sources and imports read (see Connections), with each
   one's address, secret state, sources and test, and which DuckDB extensions are installed.
 
@@ -1046,8 +1031,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Base model registry, default recipe, chat template parity tests
 - [x] Base model health: saved SHA-256 file list, verify, repair, re-import, relocate, failure states with one action
       each, adapters pinned to their base's content hash
-- [x] Base model cache budget: least recently used unused bases removed after downloads, hourly and on demand; pins,
-      estimate before a download, Download again or Re-import, `model.evict` audit
+- [x] Base models stay on disk until deleted; deleting removes their files, and a base with models built on it goes
+      with them after the cascade checkbox
 - [x] Eval vs base, side-by-side review, deploy any version at any step, rollback
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
