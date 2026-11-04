@@ -728,6 +728,8 @@ keys, and `/v1` stays key-only.
     its training data, and its trained version's rows and epochs, carried to the Training page as `?rows=&epochs=`),
     or an imported base. Import: a Hugging Face id or link, an `s3://` path or a folder.
   - Each option shows publisher, parameters, licence use, "On this install" or the download size, and a fit hint.
+  - Logos: a base model shows its publisher's logo (a letter tile when the publisher is unknown); a custom model
+    always shows a letter tile from its own name, with its base named in text, on every page.
   - Under the picker: the download against free space on the model files disk (blocked when it does not fit), the
     variant and licence, and for a base that needs more compute, the pools it fits and how to join a GPU machine to a
     pool. It can always be downloaded now and run later.
@@ -1151,6 +1153,7 @@ Everything in the v1 scope below, after M1.
 - [ ] Catalogue export/import and model bundles for air-gapped sites — only if needed
 - [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
+- [ ] Custom model logos: PNG, JPEG or WebP up to 256 KB, stored with the model; never SVG, which can carry scripts
 - Preinstalled appliance
 
 ## Risks to verify early
