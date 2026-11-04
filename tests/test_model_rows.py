@@ -1,6 +1,11 @@
 from datetime import timedelta
 
-from minibrain.registry.models import Minibrain, RequestLog, now
+import pytest
+
+from minibrain.api.model_rows import usage_index
+from minibrain.models.hardware import GIB
+from minibrain.registry.models import Minibrain, Model, ModelStatus, RequestLog, now
+from minibrain.storage import Space
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
 
@@ -66,7 +71,9 @@ def test_last_use_is_reported_even_without_recent_requests(harness: Harness) -> 
     assert (usage["total"], usage["previous"], usage["p50_ms"]) == (0, 1, None)
 
 
-def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness) -> None:
+def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.api.catalog.cached_fully", lambda _variant: True)
+    monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=100 * GIB, total=200 * GIB))
     first = harness.client.post("/api/minibrains/sample")
     assert first.status_code == 201, first.text
     body = first.json()
@@ -129,3 +136,13 @@ def test_new_models_take_a_task_type_and_can_start_from_the_sample(harness: Harn
     created = harness.client.post("/api/minibrains", json={"name": "Trips", "sample": True})
     assert created.status_code == 201
     assert created.json()["dataset"] is not None and created.json()["source"]["rows"] > 0
+
+
+def test_a_base_model_counts_only_requests_made_since_it_was_added(harness: Harness) -> None:
+    with harness.sessions() as session:
+        session.add(RequestLog(at=now() - timedelta(days=2), model="tiny", status=200, latency_ms=5.0))
+        session.add(Model(id="tiny", source="download", name="Tiny", status=ModelStatus.AVAILABLE))
+        session.commit()
+        session.add(RequestLog(at=now(), model="tiny", status=200, latency_ms=5.0))
+        session.commit()
+        assert usage_index(session).base["tiny"].total == 1

@@ -262,7 +262,8 @@ class UsageIndex:
 
 def usage_index(session: Session) -> UsageIndex:
     custom = usage_for(session, [RequestLog.minibrain_id], RequestLog.minibrain_id.is_not(None))
-    base = usage_for(session, [RequestLog.model], RequestLog.minibrain_id.is_(None))
+    added = select(Model.created_at).where(Model.id == RequestLog.model).scalar_subquery()
+    base = usage_for(session, [RequestLog.model], RequestLog.minibrain_id.is_(None) & (RequestLog.at >= added))
     versions = usage_for(session, [RequestLog.minibrain_id, RequestLog.version], RequestLog.minibrain_id.is_not(None))
     return UsageIndex(
         custom={target[0]: usage for target, usage in custom.items()},
