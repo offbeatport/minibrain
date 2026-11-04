@@ -26,6 +26,7 @@ from minibrain.serve.backend import (
 )
 from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.serve.structured import Constraint
+from minibrain.telemetry.logs import configure_logging
 from minibrain.worker import HttpClient, StreamReader
 
 
@@ -190,6 +191,7 @@ def create_engine_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        configure_logging()
         stop = threading.Event()
         hardware = node or report()
         if current["backend"] is None:

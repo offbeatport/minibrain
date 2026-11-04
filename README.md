@@ -59,6 +59,9 @@ Other roles, same package:
 Remote workers and gateways need the tokens in `~/.minibrain/secrets` (or `MINIBRAIN_WORKER_TOKEN` and
 `MINIBRAIN_GATEWAY_TOKEN`).
 
+OpenTelemetry export to your own collector, a Prometheus `/metrics` endpoint and JSON logs are all off by default:
+[`docs/observability.md`](docs/observability.md).
+
 The first scoring job downloads the base model (Qwen3-0.6B, about 1.5 GB) into the Hugging Face cache.
 
 To try it, upload `samples/travel_intents.jsonl` (quick) or `samples/banking77.csv` (where training pays). See

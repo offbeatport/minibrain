@@ -155,6 +155,7 @@ ROUTE_ROLES = {
     ("GET", "/api/requests"): "viewer",
     ("GET", "/api/requests/facets"): "viewer",
     ("GET", "/api/requests/summary"): "viewer",
+    ("GET", "/api/requests/overview"): "viewer",
     ("GET", "/api/requests/{request_id}"): "viewer",
     ("GET", "/api/artifacts/{artifact_id}"): "builder",
     ("GET", "/api/system/install"): "admin",

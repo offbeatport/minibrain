@@ -6175,6 +6175,104 @@
         }
       }
     },
+    "/api/requests/overview": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Request Overview",
+        "operationId": "request_overview_api_requests_overview_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 8,
+              "minimum": 1,
+              "default": 5,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/requests": {
       "get": {
         "tags": [
@@ -14429,6 +14527,9 @@
           },
           "network": {
             "$ref": "#/components/schemas/InstallNetwork"
+          },
+          "observability": {
+            "$ref": "#/components/schemas/InstallObservability"
           }
         },
         "type": "object",
@@ -14437,7 +14538,8 @@
           "places",
           "catalogue",
           "compute",
-          "network"
+          "network",
+          "observability"
         ],
         "title": "InstallInfo"
       },
@@ -14484,6 +14586,46 @@
           "endpoints"
         ],
         "title": "InstallNetwork"
+      },
+      "InstallObservability": {
+        "properties": {
+          "otlp": {
+            "type": "boolean",
+            "title": "Otlp"
+          },
+          "metrics": {
+            "type": "boolean",
+            "title": "Metrics"
+          },
+          "metrics_token": {
+            "type": "boolean",
+            "title": "Metrics Token"
+          },
+          "metrics_addresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics Addresses"
+          },
+          "log_format": {
+            "type": "string",
+            "enum": [
+              "text",
+              "json"
+            ],
+            "title": "Log Format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "otlp",
+          "metrics",
+          "metrics_token",
+          "metrics_addresses",
+          "log_format"
+        ],
+        "title": "InstallObservability"
       },
       "InstallPlaces": {
         "properties": {
@@ -16617,6 +16759,207 @@
         ],
         "title": "NodeInfo"
       },
+      "OverviewBucket": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "seconds": {
+            "type": "integer",
+            "title": "Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "seconds"
+        ],
+        "title": "OverviewBucket"
+      },
+      "OverviewModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "custom",
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "last_at"
+        ],
+        "title": "OverviewModel"
+      },
+      "OverviewPoint": {
+        "properties": {
+          "bucket": {
+            "type": "integer",
+            "title": "Bucket"
+          },
+          "series": {
+            "type": "integer",
+            "title": "Series"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bucket",
+          "series",
+          "requests",
+          "errors",
+          "p50_ms",
+          "p95_ms",
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "title": "OverviewPoint"
+      },
+      "OverviewSeries": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom"
+          },
+          "other": {
+            "type": "boolean",
+            "title": "Other",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "custom"
+        ],
+        "title": "OverviewSeries"
+      },
       "PasswordLink": {
         "properties": {
           "account": {
@@ -17528,6 +17871,63 @@
           "comment"
         ],
         "title": "RequestFeedback"
+      },
+      "RequestOverview": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until"
+          },
+          "bucket_seconds": {
+            "type": "integer",
+            "title": "Bucket Seconds"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewSeries"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewModel"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "bucket_seconds",
+          "buckets",
+          "series",
+          "points",
+          "models"
+        ],
+        "title": "RequestOverview"
       },
       "RequestPage": {
         "properties": {

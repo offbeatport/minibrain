@@ -26,17 +26,25 @@ import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusTe
 import { useCan } from "~/lib/access";
 import { jobDuration, jobSeconds } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
-import { REQUESTS_PATH } from "~/lib/requests";
+import { JOBS_PATH, OVERVIEW_PATH, REQUESTS_PATH } from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
+import { OverviewTab } from "./monitor/OverviewTab";
 import { LiveControl, RequestsTab } from "./monitor/RequestsTab";
 
 const ALL = "all";
-const JOBS_PATH = "/monitor";
 
 const TABS: TabNavItem[] = [
+    { label: "Overview", href: OVERVIEW_PATH },
     { label: "Jobs", href: JOBS_PATH },
     { label: "Requests", href: REQUESTS_PATH },
 ];
+
+const CAPTIONS: Record<string, string> = {
+    [OVERVIEW_PATH]: "Traffic on the /v1 API by model: request rate, errors, latency and tokens.",
+    [JOBS_PATH]:
+        "Background jobs across every model: data builds, training, scoring and downloads.",
+    [REQUESTS_PATH]: "Calls to the /v1 API as they arrive: model, key, status, latency and tokens.",
+};
 
 const STATES: { key: string; label: string }[] = [
     { key: ALL, label: "All" },
@@ -277,30 +285,33 @@ function JobsTab() {
     );
 }
 
+function tabOf(pathname: string): string {
+    const trimmed = pathname.replace(/\/+$/, "") || OVERVIEW_PATH;
+    return trimmed in CAPTIONS ? trimmed : OVERVIEW_PATH;
+}
+
 export function MonitorPage() {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const requests = pathname === REQUESTS_PATH;
+    const tab = tabOf(pathname);
     const [paused, setPaused] = useState(false);
     return (
         <Page wide>
             <PageHeader
                 title="Monitor"
-                caption={
-                    requests
-                        ? "Calls to the /v1 API as they arrive: model, key, status, latency and tokens."
-                        : "Background jobs across every model: data builds, training, scoring and downloads."
-                }
+                caption={CAPTIONS[tab]}
                 actions={
-                    requests ? (
+                    tab === JOBS_PATH ? undefined : (
                         <LiveControl
                             paused={paused}
                             onToggle={() => setPaused((value) => !value)}
                         />
-                    ) : undefined
+                    )
                 }
             />
             <TabNav label="Monitor pages" tabs={TABS} />
-            {requests ? <RequestsTab paused={paused} /> : <JobsTab />}
+            {tab === OVERVIEW_PATH && <OverviewTab paused={paused} />}
+            {tab === JOBS_PATH && <JobsTab />}
+            {tab === REQUESTS_PATH && <RequestsTab paused={paused} />}
         </Page>
     );
 }

@@ -414,6 +414,9 @@ Often added with `-e`:
 | `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror. Also set `MINIBRAIN_OFFLINE=0` and `HF_HUB_OFFLINE=0`, and allow the host in Settings → Security |
 | `MINIBRAIN_TRAIN_DEVICE` | Force `cuda` or `cpu` for training |
 | `MINIBRAIN_ADMIN_EMAIL`, `MINIBRAIN_ADMIN_PASSWORD_FILE` | Create the first admin on the first start, with the password in a mounted secret file ([First admin](#first-admin)) |
+| `MINIBRAIN_LOG_FORMAT` | `json` for one JSON object per log line on standard output ([observability](observability.md#json-logs)) |
+| `MINIBRAIN_METRICS_TOKEN`, `MINIBRAIN_METRICS_ADDRESSES` | Turn on `/metrics` for Prometheus ([observability](observability.md#prometheus)) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME` | OpenTelemetry export to your collector ([observability](observability.md#opentelemetry-export)) |
 
 ### DuckDB extensions
 

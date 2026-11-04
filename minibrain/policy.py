@@ -1,8 +1,12 @@
+import functools
+import logging
 import os
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import yaml
 from sqlalchemy.orm import Session
@@ -11,7 +15,11 @@ from minibrain.models.rules import LICENCES, PUBLISHERS, licence_use
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read, write
 
+log = logging.getLogger("minibrain.policy")
+
 PREFIX = "policy."
+OTLP_HTTP = "http/protobuf"
+HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 
 
 class PolicyError(Exception):
@@ -179,6 +187,47 @@ FIELDS: tuple[Field, ...] = (
         "",
     ),
     Field(
+        "otel_protocol",
+        "OpenTelemetry export",
+        "Send traces and metrics of /v1 requests, jobs and workers to your own OpenTelemetry collector over OTLP. They "
+        "go there and nowhere else, whatever the network policy, and never carry prompts or answers. Off sends "
+        "nothing.",
+        "choice",
+        "off",
+        ("off", OTLP_HTTP),
+    ),
+    Field(
+        "otel_endpoint",
+        "Collector endpoint",
+        "Base URL of the collector's OTLP/HTTP receiver, such as https://otel-collector.internal:4318. Traces go to "
+        "/v1/traces under it and metrics to /v1/metrics.",
+        "url",
+        "",
+    ),
+    Field(
+        "otel_headers",
+        "Collector headers",
+        "Headers sent with every export, as name=value pairs separated by commas, such as "
+        "Authorization=Bearer <token>. The values are stored encrypted and never shown again; only the names are.",
+        "headers",
+        "",
+    ),
+    Field(
+        "otel_service_name",
+        "Service name",
+        "The service.name on every span and metric, so the collector can tell installs apart.",
+        "text",
+        "minibrain",
+    ),
+    Field(
+        "otel_ca_bundle",
+        "Collector CA bundle",
+        "PEM file on this server with the CA certificates that sign the collector's TLS certificate. Empty trusts the "
+        "system's CAs.",
+        "text",
+        "",
+    ),
+    Field(
         "encryption",
         "Encryption at rest",
         "Where the master key lives that wraps each stored file's own data key. Files written before a change stay "
@@ -202,6 +251,7 @@ CHOICE_LABELS = {
     "tls": "TLS",
     "tcp": "TCP",
     "udp": "UDP",
+    OTLP_HTTP: "OTLP over HTTP (protobuf)",
     "none": "No role",
     "viewer": "Viewer",
     "builder": "Builder",
@@ -211,6 +261,16 @@ CHOICE_LABELS = {
 
 BY_NAME = {field.name: field for field in FIELDS}
 ENV = {field.name: f"MINIBRAIN_POLICY_{field.name.upper()}" for field in FIELDS}
+OTEL_ENV = {
+    "otel_protocol": "OTEL_EXPORTER_OTLP_PROTOCOL",
+    "otel_endpoint": "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "otel_headers": "OTEL_EXPORTER_OTLP_HEADERS",
+    "otel_service_name": "OTEL_SERVICE_NAME",
+    "otel_ca_bundle": "OTEL_EXPORTER_OTLP_CERTIFICATE",
+}
+OTEL_SIGNAL_ENDPOINTS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
+TRUE = {"1", "true", "yes", "on"}
+Sealer = Callable[[str, str], str]
 
 
 def config_path() -> Path:
@@ -237,11 +297,56 @@ def from_file() -> dict[str, Any]:
     return config_section("policy")
 
 
+def header_pairs(text: str) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for item in text.split(","):
+        if not item.strip():
+            continue
+        name, equals, raw = item.partition("=")
+        name, raw = name.strip(), raw.strip()
+        if not equals or not HEADER_NAME.fullmatch(name) or not raw:
+            raise PolicyError("Collector headers are name=value pairs separated by commas, such as X-Tenant=acme")
+        found = unquote(raw)
+        if any(character in found for character in "\r\n\0"):
+            raise PolicyError(f"Collector header {name} cannot contain line breaks")
+        pairs.append((name, found))
+    return pairs
+
+
+def header_names(value: Any) -> list[str]:
+    return list(value.get("names", [])) if isinstance(value, dict) else []
+
+
+def plain_url(field: Field, value: Any) -> str:
+    text = str(value).strip().rstrip("/")
+    if not text:
+        return ""
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise PolicyError(f"{field.label} is an http:// or https:// URL, such as https://otel-collector.internal:4318")
+    if parsed.username or parsed.password:
+        raise PolicyError(f"{field.label} cannot carry a user name or password; send credentials as headers")
+    if parsed.query or parsed.fragment:
+        raise PolicyError(f"{field.label} takes no query string or fragment")
+    try:
+        port = parsed.port
+    except ValueError:
+        port = 0
+    if port == 0:
+        raise PolicyError(f"{field.label} has an invalid port")
+    return text
+
+
 def coerce(field: Field, value: Any) -> Any:
     if field.kind == "bool":
         if isinstance(value, str):
-            return value.strip().lower() in {"1", "true", "yes", "on"}
+            return value.strip().lower() in TRUE
         return bool(value)
+    if field.kind == "url":
+        return plain_url(field, value)
+    if field.kind == "headers":
+        text = str(value or "").strip()
+        return {"names": [name for name, _ in header_pairs(text)], "plain": text}
     if field.kind == "int":
         number = int(value)
         if number < field.minimum:
@@ -283,11 +388,37 @@ def locked_sources() -> dict[str, tuple[str, Any]]:
     auth = config_section("auth")
     if "default_role" in auth:
         found["default_role"] = ("config file", coerce(BY_NAME["default_role"], auth["default_role"]))
+    found |= otel_environment(found)
     for name, variable in ENV.items():
         if os.environ.get(variable):
             found[name] = ("environment", coerce(BY_NAME[name], os.environ[variable]))
     if os.environ.get("MINIBRAIN_OFFLINE", "").strip().lower() in {"1", "true", "yes"}:
         found["network"] = ("environment", "offline")
+    return found
+
+
+@functools.cache
+def unsupported_protocol(value: str) -> str:
+    log.warning("OTEL_EXPORTER_OTLP_PROTOCOL is %s; minibrain exports only %s, so export stays off", value, OTLP_HTTP)
+    return "off"
+
+
+def otel_value(name: str, raw: str) -> Any:
+    if name == "otel_protocol" and raw.strip().lower() not in BY_NAME[name].choices:
+        return unsupported_protocol(raw.strip().lower())
+    return coerce(BY_NAME[name], raw)
+
+
+def otel_environment(locked: dict[str, tuple[str, Any]]) -> dict[str, tuple[str, Any]]:
+    found: dict[str, tuple[str, Any]] = {}
+    for name, variable in OTEL_ENV.items():
+        if os.environ.get(variable, "").strip():
+            found[name] = ("environment", otel_value(name, os.environ[variable]))
+    aimed = "otel_endpoint" in found or any(os.environ.get(variable, "").strip() for variable in OTEL_SIGNAL_ENDPOINTS)
+    if aimed and "otel_protocol" not in found and "otel_protocol" not in locked:
+        found["otel_protocol"] = ("environment", OTLP_HTTP)
+    if os.environ.get("OTEL_SDK_DISABLED", "").strip().lower() in TRUE:
+        found["otel_protocol"] = ("environment", "off")
     return found
 
 
@@ -351,6 +482,10 @@ def choice_of(field: Field, choice: str) -> dict[str, Any]:
     return described
 
 
+def shown(field: Field, value: Any) -> Any:
+    return header_names(value) if field.kind == "headers" else value
+
+
 def describe(session: Session) -> list[dict[str, Any]]:
     locked = locked_sources()
     policy = load(session)
@@ -362,7 +497,7 @@ def describe(session: Session) -> list[dict[str, Any]]:
             "kind": field.kind,
             "choices": [choice_of(field, choice) for choice in field.choices],
             "maximum": field.maximum,
-            "value": policy[field.name],
+            "value": shown(field, policy[field.name]),
             "locked": field.name in locked or not field.editable,
             "source": locked[field.name][0] if field.name in locked else ("built in" if not field.editable else "ui"),
         }
@@ -370,14 +505,25 @@ def describe(session: Session) -> list[dict[str, Any]]:
     ]
 
 
-def update(session: Session, name: str, value: Any, actor: str) -> Any:
+def sealed(field: Field, value: dict[str, Any], seal: Sealer | None) -> dict[str, Any]:
+    if not value["plain"]:
+        return {"names": [], "sealed": ""}
+    if seal is None:
+        raise PolicyError(f"{field.label} can only be set where secrets can be encrypted")
+    return {"names": value["names"], "sealed": seal(value["plain"], PREFIX + field.name)}
+
+
+def update(session: Session, name: str, value: Any, actor: str, seal: Sealer | None = None) -> Any:
     field = BY_NAME.get(name)
     if field is None:
         raise PolicyError(f"No policy called {name}")
     if not field.editable or name in locked_sources():
         raise LockedError(f"{field.label} is set by configuration and cannot be changed here")
-    before = load(session)[name]
+    before = shown(field, load(session)[name])
     after = coerce(field, value)
+    if field.kind == "headers":
+        after = sealed(field, after, seal)
     write(session, PREFIX + name, after)
-    session.add(AuditEvent(actor=actor, action="policy.update", target=name, detail={"from": before, "to": after}))
+    detail = {"from": before, "to": shown(field, after)}
+    session.add(AuditEvent(actor=actor, action="policy.update", target=name, detail=detail))
     return after

@@ -30,6 +30,7 @@ from minibrain.serve.backend import (
 )
 from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
 from minibrain.tasks.classify import build_messages
+from minibrain.telemetry.call import current_call
 
 router = APIRouter(prefix="/v1", tags=["openai"])
 log = logging.getLogger("minibrain.gateway")
@@ -107,6 +108,9 @@ def authorize(request: Request, config: ConfigDep) -> Grant:
         raise HTTPException(status_code=401, detail="invalid API key")
     if grant.expired(now()):
         raise HTTPException(status_code=401, detail="API key expired")
+    call = current_call()
+    if call is not None:
+        call.labels["minibrain.api_key.id"] = grant.key_id
     return grant
 
 
@@ -267,6 +271,35 @@ def finish_reason(completion: Completion) -> str:
     return "stop" if completion.stopped else "length"
 
 
+def served_model(route: Route) -> str:
+    return route.slug if route.version is None else f"{route.slug}@{route.version}"
+
+
+def note_chat(
+    body: ChatCompletionRequest,
+    route: Route | None,
+    completion: Completion | None,
+    answered: str | None,
+    code: str | None,
+) -> None:
+    call = current_call()
+    if call is None:
+        return
+    call.operation = "chat"
+    call.request_model = body.model
+    call.model_known = route is not None
+    call.max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
+    call.response_id = answered
+    call.error_type = code
+    if route is not None:
+        call.response_model = served_model(route)
+        call.labels |= {"minibrain.model.slug": route.slug, "minibrain.model.version": route.version}
+    if completion is not None:
+        call.input_tokens = completion.prompt_tokens
+        call.output_tokens = completion.completion_tokens
+        call.finish_reasons = (finish_reason(completion),)
+
+
 def response_body(identifier: str, model: str, completion: Completion) -> dict:
     return {
         "id": identifier,
@@ -310,6 +343,7 @@ def chat_completions(
     identifier = response_id()
     route = config.routes.get(body.model)
     status = 200
+    code: str | None = None
     completion: Completion | None = None
     try:
         if route is None:
@@ -322,9 +356,11 @@ def chat_completions(
         completion = conformed(requested, completion)
     except (HTTPException, OpenAIError) as error:
         status = error.status_code
+        code = error.code if isinstance(error, OpenAIError) else None
         raise
     finally:
         answered = completion is not None and status == 200
+        note_chat(body, route, completion, identifier if answered else None, code)
         logs.add(
             LogEntry(
                 at=now(),

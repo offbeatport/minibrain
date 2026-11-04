@@ -16,6 +16,7 @@ log with who, before and after.
 | API keys | Expiry in days for new keys | Gateway rejects expired keys with 401, and models the key does not cover with 403 |
 | Audit log retention | Days, 0 keeps every event (default) | Hourly prune on the leader, cut at a chain anchor (below) |
 | SIEM export | Off (default), TLS, TCP or UDP; host, port (0 is 6514 for TLS, 514 otherwise), CA bundle path | Syslog forwarder on the leader (below) |
+| OpenTelemetry export | Off (default) or OTLP over HTTP; collector endpoint, headers (encrypted, write-only), service name, CA bundle path; also `OTEL_EXPORTER_OTLP_*` | Exporters in main and gateways, applied within 5 seconds ([observability](observability.md)) |
 
 ## Accounts and sign-in
 
@@ -118,7 +119,11 @@ password, or read it with `--password-stdin`, and record `command line` as the a
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM
-  you configure and artifact storage you point at a bucket; Settings → This install lists both.
+  you configure, traces and metrics to the OpenTelemetry collector you configure, and artifact storage you point at a
+  bucket; Settings → This install lists them. The OTLP exporter ignores proxy variables and does not follow redirects.
+- `/metrics` is off until `metrics.addresses` or a scrape token is set, and then needs that address or token, not a
+  session ([observability](observability.md#prometheus)).
+- Every response carries an `X-Request-ID`, and JSON logs (`MINIBRAIN_LOG_FORMAT=json`) carry it on each line.
 - Content hashes and signatures use SHA-256 through OpenSSL or `cryptography`; never MD5 or SHA-1.
 
 ## Audit log integrity

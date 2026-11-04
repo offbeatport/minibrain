@@ -33,6 +33,10 @@ from minibrain.registry.models import CatalogModel, Job, JobStatus, Model, Node,
 from minibrain.registry.settings_store import read
 from minibrain.settings import REPO_ROOT, Settings
 from minibrain.siem import target_of
+from minibrain.telemetry.logs import log_format
+from minibrain.telemetry.prometheus import load_metrics_access
+from minibrain.telemetry.target import OtlpTarget, TargetError
+from minibrain.telemetry.target import target_of as otlp_target_of
 from minibrain.versions import library_version
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -102,12 +106,21 @@ class InstallNetwork(BaseModel):
     endpoints: list[InstallEndpoint]
 
 
+class InstallObservability(BaseModel):
+    otlp: bool
+    metrics: bool
+    metrics_token: bool
+    metrics_addresses: list[str]
+    log_format: Literal["text", "json"]
+
+
 class InstallInfo(BaseModel):
     software: InstallSoftware
     places: InstallPlaces
     catalogue: InstallCatalogue
     compute: InstallCompute
     network: InstallNetwork
+    observability: InstallObservability
 
 
 def git_commit(git: Path) -> str | None:
@@ -234,12 +247,33 @@ def network(session: Session, settings: Settings, store: ArtifactStore) -> Insta
     siem = target_of(policy)
     if siem is not None:
         endpoints.append(InstallEndpoint(name="SIEM export", url=siem.describe(), allowed=True, by_policy=False))
+    collector = otlp_target(policy.values)
+    for name, url in collector.urls() if collector is not None else []:
+        endpoints.append(InstallEndpoint(name=name, url=url, allowed=True, by_policy=False))
     return InstallNetwork(
         mode=policy["network"],
         locked=bool(described["locked"]),
         source=str(described["source"]),
         allowed_hosts=list(policy["allowed_hosts"]),
         endpoints=endpoints,
+    )
+
+
+def otlp_target(values: dict[str, Any]) -> OtlpTarget | None:
+    try:
+        return otlp_target_of(values | {"otel_headers": None})
+    except TargetError:
+        return None
+
+
+def observability(session: Session) -> InstallObservability:
+    access = load_metrics_access()
+    return InstallObservability(
+        otlp=otlp_target(load_policy(session).values) is not None,
+        metrics=access.enabled,
+        metrics_token=access.token is not None,
+        metrics_addresses=[str(network) for network in access.networks],
+        log_format="json" if log_format() == "json" else "text",
     )
 
 
@@ -250,6 +284,7 @@ def install_info(session: Session, settings: Settings, store: ArtifactStore, nod
         catalogue=catalogue(session),
         compute=compute(session, node),
         network=network(session, settings, store),
+        observability=observability(session),
     )
 
 

@@ -1,5 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Box, FolderLock, Globe, KeyRound, LogIn, type LucideIcon, ScrollText } from "lucide-react";
+import {
+    Box,
+    FolderLock,
+    Globe,
+    KeyRound,
+    LogIn,
+    type LucideIcon,
+    Radar,
+    ScrollText,
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,6 +34,7 @@ import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
@@ -32,6 +42,7 @@ type PolicyInfo = components["schemas"]["PolicyInfo"];
 const POLICIES = ["policies"] as const;
 const AUDIT = ["audit"] as const;
 const POLICY_CHANGES = auditHref({ action: "policy.update" });
+const INSTALL_PATH = "/settings/install";
 
 type Group = { icon: LucideIcon; title: string; names: string[]; description?: ReactNode };
 
@@ -73,6 +84,26 @@ const GROUPS: Group[] = [
                     audit log
                 </Link>
                 {" shows whether the SIEM is keeping up and whether the hash chain verifies."}
+            </>
+        ),
+    },
+    {
+        icon: Radar,
+        title: "OpenTelemetry export",
+        names: [
+            "otel_protocol",
+            "otel_endpoint",
+            "otel_headers",
+            "otel_service_name",
+            "otel_ca_bundle",
+        ],
+        description: (
+            <>
+                {"Prometheus scraping and JSON logs are set in minibrain.yaml; "}
+                <Link href={INSTALL_PATH} className="text-primary hover:underline">
+                    This install
+                </Link>
+                {" shows what is on."}
             </>
         ),
     },
@@ -121,6 +152,10 @@ const PLACEHOLDERS: Record<string, string> = {
     data_folders: "/srv/exports, /mnt/shared/datasets",
     siem_host: "siem.internal",
     siem_ca_bundle: "/etc/minibrain/siem-ca.pem",
+    otel_endpoint: "https://otel-collector.internal:4318",
+    otel_headers: "Authorization=Bearer <token>, X-Scope-OrgID=acme",
+    otel_service_name: "minibrain",
+    otel_ca_bundle: "/etc/minibrain/collector-ca.pem",
 };
 
 function asList(value: unknown): string[] {
@@ -194,6 +229,82 @@ function TextRow({ policy }: { policy: PolicyInfo }) {
                         {draft !== null && draft !== current && (
                             <Button type="submit" disabled={change.isPending}>
                                 Save
+                            </Button>
+                        )}
+                    </>
+                }
+            />
+        </form>
+    );
+}
+
+function HeadersRow({ policy }: { policy: PolicyInfo }) {
+    const change = useChange(policy.name);
+    const id = policyId(policy);
+    const names = asList(policy.value);
+    const [draft, setDraft] = useState<string | null>(null);
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        change.mutate(draft ?? "", { onSuccess: () => setDraft(null) });
+    };
+    if (names.length > 0 && draft === null) {
+        return (
+            <SettingsRow
+                id={id}
+                label={policy.label}
+                description={
+                    <>
+                        {policy.description}
+                        <StatusText tone="success" className="mt-1 flex w-fit">
+                            {`Set: ${names.join(", ")}`}
+                        </StatusText>
+                    </>
+                }
+                error={errorMessage(change.error)}
+                control={
+                    <>
+                        <Button variant="outline" onClick={() => setDraft("")}>
+                            Replace
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            disabled={change.isPending}
+                            onClick={() => change.mutate("")}
+                        >
+                            Clear
+                        </Button>
+                    </>
+                }
+            />
+        );
+    }
+    return (
+        <form onSubmit={submit}>
+            <SettingsRow
+                id={id}
+                wide
+                label={policy.label}
+                description={policy.description}
+                error={errorMessage(change.error)}
+                control={
+                    <>
+                        <Input
+                            id={id}
+                            type="password"
+                            autoComplete="off"
+                            value={draft ?? ""}
+                            aria-describedby={`${id}-description`}
+                            onChange={(event) => setDraft(event.target.value)}
+                            placeholder={PLACEHOLDERS[policy.name]}
+                        />
+                        {draft && (
+                            <Button type="submit" disabled={change.isPending}>
+                                Save
+                            </Button>
+                        )}
+                        {draft !== null && names.length > 0 && (
+                            <Button variant="ghost" onClick={() => setDraft(null)}>
+                                Cancel
                             </Button>
                         )}
                     </>
@@ -333,6 +444,9 @@ function PolicyRow({ policy }: { policy: PolicyInfo }) {
     }
     if (policy.kind === "choice") {
         return <ChoiceRow policy={policy} />;
+    }
+    if (policy.kind === "headers") {
+        return <HeadersRow policy={policy} />;
     }
     if (policy.choices.length > 0) {
         return <ChoiceListRow policy={policy} />;

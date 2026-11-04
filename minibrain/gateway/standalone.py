@@ -5,7 +5,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse, Response
 
 from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
@@ -13,6 +14,10 @@ from minibrain.gateway.config import GatewayConfig, RemoteConfig
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.serve.backend import ServingBackend
 from minibrain.serve.engines import EngineBackend
+from minibrain.telemetry.context import RequestContext
+from minibrain.telemetry.logs import configure_logging
+from minibrain.telemetry.prometheus import load_metrics_access, metrics_response
+from minibrain.telemetry.setup import gateway_telemetry
 from minibrain.worker import HttpClient
 
 
@@ -54,6 +59,7 @@ def create_gateway_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        configure_logging()
         stop = threading.Event()
         if background:
             threading.Thread(target=source.follow, args=(stop,), daemon=True).start()
@@ -62,6 +68,7 @@ def create_gateway_app(
                 threading.Thread(target=serving.probe_forever, args=(stop,), daemon=True).start()
         yield
         stop.set()
+        app.state.telemetry.shutdown()
 
     app = FastAPI(title="minibrain gateway", lifespan=lifespan)
     app.state.gateway_config = source
@@ -69,7 +76,11 @@ def create_gateway_app(
     app.state.feedback = send_feedback
     serving = backend or EngineBackend(lambda: source.current().engines)
     app.state.backend = serving
+    app.state.metrics_access = load_metrics_access()
+    app.state.telemetry = gateway_telemetry(app.state.metrics_access)
+    app.state.telemetry.refresh()
     app.add_exception_handler(routes.OpenAIError, routes.openai_error)
+    app.add_middleware(RequestContext)
     app.include_router(routes.router)
 
     @app.get("/healthz")
@@ -81,5 +92,9 @@ def create_gateway_app(
         if source.current().version == "empty":
             raise HTTPException(status_code=503, detail="no config yet")
         return {"status": "ready", "config": source.current().version}
+
+    @app.get("/metrics", response_class=PlainTextResponse)
+    def metrics(request: Request) -> Response:
+        return metrics_response(request)
 
     return app

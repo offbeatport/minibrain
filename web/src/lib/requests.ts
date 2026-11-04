@@ -1,8 +1,11 @@
 import type { Tone } from "~/components/models/StatusText";
 
+export const OVERVIEW_PATH = "/monitor";
+export const JOBS_PATH = "/monitor/jobs";
 export const REQUESTS_PATH = "/monitor/requests";
 export const SECURITY_PATH = "/settings/security";
 export const REQUEST_KEYS = ["model", "version", "key", "status", "range", "q", "request"] as const;
+export const OVERVIEW_KEYS = ["model", "range"] as const;
 
 export type StatusClass = "ok" | "client_error" | "server_error";
 

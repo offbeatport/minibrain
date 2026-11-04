@@ -29,6 +29,7 @@ from minibrain.api import (
     model_cache,
     models,
     ops,
+    overview,
     policies,
     request_logs,
     system,
@@ -79,6 +80,10 @@ from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineB
 from minibrain.settings import Settings, load_settings
 from minibrain.siem import Forwarder
 from minibrain.tags import TagError
+from minibrain.telemetry.context import RequestContext
+from minibrain.telemetry.logs import configure_logging
+from minibrain.telemetry.prometheus import load_metrics_access
+from minibrain.telemetry.setup import main_telemetry
 
 EXPIRY_SECONDS = 5.0
 API_PREFIXES = ("api/", "v1/", "internal/", "healthz", "readyz", "metrics")
@@ -152,6 +157,7 @@ def expire_forever(queue: SqlJobQueue, stop: threading.Event, leader: Leader) ->
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    configure_logging()
     stop = threading.Event()
     if app.state.background:
         leader = app.state.leader
@@ -165,6 +171,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (app.state.cache.forever, (stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
+            (app.state.telemetry.refresh_forever, (stop,)),
         ):
             threading.Thread(target=target, args=args, daemon=True).start()
         if isinstance(app.state.backend, EngineBackend):
@@ -173,6 +180,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     stop.set()
     app.state.leader.release()
     app.state.request_logs.flush()
+    app.state.telemetry.shutdown()
     if app.state.engines is not None:
         app.state.engines.stop()
 
@@ -185,6 +193,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or load_settings()
     configure_extensions(settings.home)
+    configure_logging()
     capture()
     migrate(settings.database_url)
     sessions = make_sessions(settings.database_url)
@@ -225,12 +234,16 @@ def create_app(
     app.state.feedback = database_feedback(sessions)
     app.state.siem = Forwarder(sessions)
     app.state.background = background
+    app.state.metrics_access = load_metrics_access()
+    app.state.telemetry = main_telemetry(sessions, settings, app.state.metrics_access)
+    app.state.telemetry.refresh()
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
     app.add_exception_handler(gateway.OpenAIError, gateway.openai_error)
     app.add_middleware(PeerAddress)
     app.add_middleware(Identify)
     app.add_middleware(TrustedProxy)
+    app.add_middleware(RequestContext)
     for module in (
         auth,
         accounts,
@@ -249,6 +262,7 @@ def create_app(
         feedback,
         keys,
         jobs,
+        overview,
         request_logs,
         install,
         system,

@@ -11,6 +11,9 @@ export type RequestDetail = Schemas["RequestDetail"];
 export type RequestFacets = Schemas["RequestFacets"];
 export type RequestSummary = Schemas["RequestSummary"];
 export type RequestFeedback = Schemas["RequestFeedback"];
+export type RequestOverview = Schemas["RequestOverview"];
+export type OverviewModel = Schemas["OverviewModel"];
+export type OverviewSeries = Schemas["OverviewSeries"];
 
 export type RequestFilter = {
     model: string[];
@@ -25,6 +28,7 @@ const PAGE = 50;
 const LIVE_PAGE = 200;
 const LIVE_MS = 3000;
 const STATS_MS = 5000;
+const OVERVIEW_MS = 10000;
 const ROOT = ["requests"] as const;
 
 function listOrUndefined<T>(values: T[]): T[] | undefined {
@@ -140,5 +144,27 @@ export function useRequestDetail(id: number | null) {
                 }),
             ),
         enabled: id !== null,
+    });
+}
+
+export type OverviewFilter = { model: string[]; range: string };
+
+export function overviewFilter(filter: OverviewFilter): RequestFilter {
+    return { ...filter, version: [], key: [], status: [], q: "" };
+}
+
+export function useRequestOverview(filter: OverviewFilter, paused: boolean) {
+    const query = { model: listOrUndefined(filter.model), range: filter.range };
+    return useQuery({
+        queryKey: [...ROOT, "overview", query] as const,
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/requests/overview", {
+                    params: { query: { model: query.model, since: sinceOf(query.range) } },
+                }),
+            ),
+        placeholderData: keepPreviousData,
+        refetchInterval: paused ? false : OVERVIEW_MS,
+        refetchOnWindowFocus: !paused,
     });
 }

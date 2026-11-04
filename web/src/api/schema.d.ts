@@ -1950,6 +1950,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/requests/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Request Overview */
+        get: operations["request_overview_api_requests_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests": {
         parameters: {
             query?: never;
@@ -4480,6 +4497,7 @@ export interface components {
             catalogue: components["schemas"]["InstallCatalogue"];
             compute: components["schemas"]["InstallCompute"];
             network: components["schemas"]["InstallNetwork"];
+            observability: components["schemas"]["InstallObservability"];
         };
         /** InstallNetwork */
         InstallNetwork: {
@@ -4496,6 +4514,22 @@ export interface components {
             allowed_hosts: string[];
             /** Endpoints */
             endpoints: components["schemas"]["InstallEndpoint"][];
+        };
+        /** InstallObservability */
+        InstallObservability: {
+            /** Otlp */
+            otlp: boolean;
+            /** Metrics */
+            metrics: boolean;
+            /** Metrics Token */
+            metrics_token: boolean;
+            /** Metrics Addresses */
+            metrics_addresses: string[];
+            /**
+             * Log Format
+             * @enum {string}
+             */
+            log_format: "text" | "json";
         };
         /** InstallPlaces */
         InstallPlaces: {
@@ -5174,6 +5208,74 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** OverviewBucket */
+        OverviewBucket: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Seconds */
+            seconds: number;
+        };
+        /** OverviewModel */
+        OverviewModel: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Custom */
+            custom: boolean;
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Last At */
+            last_at: string | null;
+        };
+        /** OverviewPoint */
+        OverviewPoint: {
+            /** Bucket */
+            bucket: number;
+            /** Series */
+            series: number;
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+        };
+        /** OverviewSeries */
+        OverviewSeries: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Custom */
+            custom: boolean;
+            /**
+             * Other
+             * @default false
+             */
+            other?: boolean;
+        };
         /** PasswordLink */
         PasswordLink: {
             account: components["schemas"]["AccountInfo"];
@@ -5470,6 +5572,29 @@ export interface components {
             correction: string | null;
             /** Comment */
             comment: string | null;
+        };
+        /** RequestOverview */
+        RequestOverview: {
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+            /** Bucket Seconds */
+            bucket_seconds: number;
+            /** Buckets */
+            buckets: components["schemas"]["OverviewBucket"][];
+            /** Series */
+            series: components["schemas"]["OverviewSeries"][];
+            /** Points */
+            points: components["schemas"]["OverviewPoint"][];
+            /** Models */
+            models: components["schemas"]["OverviewModel"][];
         };
         /** RequestPage */
         RequestPage: {
@@ -10299,6 +10424,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_overview_api_requests_overview_get: {
+        parameters: {
+            query?: {
+                model?: string[] | null;
+                since?: string | null;
+                until?: string | null;
+                top?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOverview"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -201,7 +201,7 @@ export function LiveControl({ paused, onToggle }: { paused: boolean; onToggle: (
     );
 }
 
-function SummaryStrip({
+export function SummaryStrip({
     summary,
     range,
     onRange,
@@ -257,7 +257,7 @@ function SettingsLink({ children }: { children: ReactNode }) {
     );
 }
 
-function LoggingOff() {
+export function LoggingOff() {
     const can = useCan();
     return (
         <EmptyState title="Request logs are off">
@@ -273,7 +273,7 @@ function LoggingOff() {
     );
 }
 
-function NothingYet({ summary, range }: { summary: RequestSummary; range: string }) {
+export function NothingYet({ summary, range }: { summary: RequestSummary; range: string }) {
     if (summary.last_at) {
         return (
             <EmptyState title={`No requests ${rangeOf(range).phrase}`}>

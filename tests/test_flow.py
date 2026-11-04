@@ -219,7 +219,7 @@ def test_system_settings_and_ops(harness: Harness) -> None:
     assert settings["splits"]["golden"] == 50
     assert harness.client.get("/healthz").json() == {"status": "ok"}
     assert harness.client.get("/readyz").json() == {"status": "ready"}
-    assert "minibrain_queue_oldest_seconds" in harness.client.get("/metrics").text
+    assert harness.client.get("/metrics").status_code == 404
 
 
 def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:

@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from minibrain.api.access import admin
-from minibrain.api.deps import SessionDep
+from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.auth.identity import current_actor
+from minibrain.connections.vault import seal
 from minibrain.policy import describe, update
 
 router = APIRouter(prefix="/api", tags=["security"])
@@ -39,7 +40,7 @@ def policies(session: SessionDep) -> list[PolicyInfo]:
 
 
 @router.put("/policies/{name}", dependencies=[Depends(admin)])
-def change_policy(name: str, body: PolicyUpdate, session: SessionDep) -> list[PolicyInfo]:
-    update(session, name, body.value, current_actor())
+def change_policy(name: str, body: PolicyUpdate, session: SessionDep, settings: SettingsDep) -> list[PolicyInfo]:
+    update(session, name, body.value, current_actor(), lambda text, context: seal(settings, text, context))
     session.commit()
     return [PolicyInfo(**item) for item in describe(session)]

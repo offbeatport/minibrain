@@ -173,6 +173,7 @@ const routeTree = rootRoute.addChildren([
         },
     }),
     globalPage("/monitor", MonitorPage),
+    globalPage("/monitor/jobs", MonitorPage),
     globalPage("/monitor/requests", MonitorPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", guarded("admin", SecurityPage)),

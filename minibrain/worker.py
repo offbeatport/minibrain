@@ -21,6 +21,7 @@ from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.models import JobKind
+from minibrain.telemetry.logs import configure_logging
 from minibrain.versions import JOB_PROTOCOL
 
 MODULES: dict[str, str] = {
@@ -254,6 +255,7 @@ class Worker:
         self.store = ArtifactStore(config.home / "artifacts", config.home / "cache")
 
     def run_forever(self, stop: threading.Event) -> None:
+        configure_logging()
         self.client.stop = stop
         try:
             self.client.register()

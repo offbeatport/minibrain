@@ -20,7 +20,9 @@
         "obp-ui": "github:offbeatport/obp-ui#main",
         "openapi-fetch": "^0.13.0",
         "react": "^19.0.0",
-        "react-dom": "^19.0.0"
+        "react-dom": "^19.0.0",
+        "react-is": "^19.3.1",
+        "recharts": "^3.10.1"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.9.4",

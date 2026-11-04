@@ -653,7 +653,13 @@ keys, and `/v1` stays key-only.
     (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
     right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
     Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
-- Monitor has two tabs: Jobs (`/monitor`) and Requests (`/monitor/requests`), every `/v1` call as it arrives. Requests
+- Monitor has three tabs: Overview (`/monitor`), Jobs (`/monitor/jobs`) and Requests (`/monitor/requests`), every
+  `/v1` call as it arrives. Overview charts the request logs for a time range and models
+  (`?range=&model=<slug>,<slug>`): requests per minute (stacked), error rate, p50 or p95 latency and tokens in or out,
+  one series per model for the five busiest and "Other models" for the rest, in buckets sized to the range (about 60;
+  15 seconds for 15 minutes, 30 minutes for a day), aggregated in SQL that runs on SQLite and Postgres
+  (`/api/requests/overview`). The Requests summary sits above, a per-model table below (requests, error rate, p50,
+  p95, tokens, last request; a row opens Requests for that model), refreshed every 10 seconds unless paused. Requests
   is the kit's `DataGrid`, paged on the server by request id: time, model@version, key, status, latency, tokens in and
   out, finish reason, response id and a feedback mark. New rows join the top every 3 seconds (Pause stops that) and
   leave a scrolled reader in place. Model, version, key, status (OK, 4xx, 5xx), a response id search and a time range
@@ -761,6 +767,29 @@ target:
   min_score: 0.85
 ```
 
+## Observability
+
+Off by default, and only ever towards systems the customer runs. Details: `docs/observability.md`.
+
+- OpenTelemetry: OTLP over HTTP (protobuf; no gRPC) to the customer's collector, set as admin policies (endpoint,
+  headers encrypted and write-only, protocol, service name, CA bundle) that `minibrain.yaml` and the standard
+  `OTEL_EXPORTER_OTLP_*` variables lock. The collector is reached whatever the network policy, like the SIEM, and
+  nothing else: no proxy variables, no redirects. Standalone gateways read the same settings from their own
+  `minibrain.yaml` and environment.
+- One SERVER span per `/v1` request on the GenAI semantic conventions (`gen_ai.operation.name`,
+  `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.response.id`, `gen_ai.usage.input_tokens` and
+  `output_tokens`, `gen_ai.response.finish_reasons`, `server.address`, `error.type`) plus `minibrain.model.slug`,
+  `minibrain.model.version` and `minibrain.api_key.id`, joined to the caller's trace by `traceparent`. Never a prompt
+  or an answer.
+- Metrics: `gen_ai.client.operation.duration` and `gen_ai.client.token.usage` histograms, `minibrain.gateway.requests`
+  by route, status and model, `minibrain.jobs.queued` by kind, `minibrain.jobs.queued.oldest_age` and
+  `minibrain.workers.online` by pool. Unknown models count as `_unknown`, so callers cannot grow the series.
+- Prometheus: `/metrics` in text format with the same metrics, answering only once `metrics.addresses` or a scrape
+  token (`metrics.token_file`, `MINIBRAIN_METRICS_TOKEN`) is set, like the trusted proxy addresses; no user session.
+- Logs: `MINIBRAIN_LOG_FORMAT=json` (or `logging.format`) writes one JSON line per event with level, logger, message,
+  request id and response id; plain text stays the default. Every response carries `X-Request-ID`.
+- A Grafana dashboard over the Prometheus metrics ships in `docs/grafana/minibrain.json`.
+
 ## Offline
 
 Fully offline by default. Nothing in the data, labelling, training, serving or gateway path calls out.
@@ -771,7 +800,7 @@ Fully offline by default. Nothing in the data, labelling, training, serving or g
   in by disk or an internal mirror, registered by local path. `HF_HUB_OFFLINE=1` everywhere.
 - Install bundle: Docker images, Python wheels, Presidio's spaCy model, the frontend build. Nothing downloads at install
   or run time.
-- No telemetry.
+- No telemetry. OpenTelemetry export is opt-in and goes only to the customer's collector (see Observability).
 - DuckDB extensions: S3, database and Iceberg sources need httpfs, postgres_scanner, mysql_scanner, iceberg and avro.
   DuckDB downloads extensions from the internet by default; minibrain never lets it (`autoinstall_known_extensions`
   and `autoload_known_extensions` off on every connection) and loads them only from its own extension directory
@@ -972,6 +1001,17 @@ Everything in the v1 scope below, after M1.
       request logs and opt-in request inputs and answers done)
 - [x] Monitor → Requests: live `/v1` request log, server-paged, with filters and a summary, finish reasons recorded
       (migration 0033), and a detail with the kept input and answer (Builder and up) and linked feedback
+- [x] Monitor → Overview (first tab): requests per minute, error rate, p50 / p95 latency and tokens by model (top 5
+      and Other) in buckets sized to the range, a per-model table, live with Pause; SQL checked on SQLite and Postgres
+- [x] OpenTelemetry export, opt-in: OTLP over HTTP/protobuf to the customer's collector only; a GenAI-convention span
+      per `/v1` request and duration, token, request, queue and worker metrics; settings as policies with
+      write-only encrypted headers, `OTEL_EXPORTER_OTLP_*` honoured (checked against OpenTelemetry Collector 0.130)
+- [x] Prometheus `/metrics`, off by default, by scrape token or scrape addresses, no session (scraped by Prometheus 3.5;
+      `promtool check metrics` passes)
+- [x] JSON logs on standard output (`MINIBRAIN_LOG_FORMAT=json`) with request and response ids; `X-Request-ID` on every
+      response
+- [ ] Grafana dashboard (`docs/grafana/minibrain.json`; imports into Grafana 12 and its queries run against
+      Prometheus, not yet looked at with real traffic)
 - [x] Playground
 - [x] Harness config export: curl, Python, JavaScript, .env, LangChain, LlamaIndex, LiteLLM, Continue, Open WebUI
 - [ ] Login: local accounts, OIDC, trusted reverse-proxy headers; sessions; always on, with the first admin from a

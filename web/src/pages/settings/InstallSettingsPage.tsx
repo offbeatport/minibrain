@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BookMarked, Cpu, FolderTree, Globe, Package, Server } from "lucide-react";
+import { BookMarked, Cpu, FolderTree, Globe, Package, Radar, Server } from "lucide-react";
 import {
     Badge,
     Button,
@@ -390,9 +390,60 @@ function NetworkSection({ info }: { info: InstallInfo }) {
                 ))}
                 <Row
                     label="Telemetry"
-                    description="No usage data, crash reports or analytics leave this install."
+                    description="No usage data, crash reports or analytics go to the minibrain developers or any third party."
                 >
                     <Text>None</Text>
+                </Row>
+            </SettingsGroup>
+        </PanelSection>
+    );
+}
+
+function scrapeAccess(observability: InstallInfo["observability"]): string {
+    const ways = [
+        observability.metrics_token ? "a bearer token" : "",
+        observability.metrics_addresses.length > 0
+            ? `scrapes from ${observability.metrics_addresses.join(", ")}`
+            : "",
+    ].filter(Boolean);
+    return `On /metrics, needing ${ways.join(" and ")}.`;
+}
+
+function Observability({ info }: { info: InstallInfo }) {
+    const observability = info.observability;
+    return (
+        <PanelSection
+            icon={Radar}
+            title="Observability"
+            description="Metrics, traces and logs for your own monitoring."
+            actions={
+                <Button variant="outline" asChild>
+                    <Link href="/settings/security">OpenTelemetry in Security</Link>
+                </Button>
+            }
+        >
+            <SettingsGroup>
+                <Row
+                    label="OpenTelemetry export"
+                    description="Traces and metrics of /v1 requests, jobs and workers, sent only to your collector."
+                >
+                    <Text>{observability.otlp ? "On" : "Off"}</Text>
+                </Row>
+                <Row
+                    label="Prometheus"
+                    description={
+                        observability.metrics
+                            ? scrapeAccess(observability)
+                            : "Turn it on with metrics.addresses or metrics.token_file in minibrain.yaml, or MINIBRAIN_METRICS_TOKEN."
+                    }
+                >
+                    <Text>{observability.metrics ? "On" : "Off"}</Text>
+                </Row>
+                <Row
+                    label="Log format"
+                    description="JSON writes one line per event to standard output. Set MINIBRAIN_LOG_FORMAT or logging.format in minibrain.yaml."
+                >
+                    <Text>{observability.log_format === "json" ? "JSON" : "Text"}</Text>
                 </Row>
             </SettingsGroup>
         </PanelSection>
@@ -430,6 +481,7 @@ export function InstallSettingsPage() {
                     <Catalogue info={info} />
                     <Compute info={info} />
                     <NetworkSection info={info} />
+                    <Observability info={info} />
                 </PanelSections>
             )}
         </SettingsLayout>
