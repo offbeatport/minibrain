@@ -1,3 +1,6 @@
+from sqlalchemy import select
+
+from minibrain.registry.models import Snapshot
 from tests.conftest import Harness, tickets_csv
 
 
@@ -31,15 +34,22 @@ def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:
     assert harness.client.get("/api/datasets/tickets").json()["models"] == ["triage-a", "triage-b"]
 
 
-def test_datasets_and_sources_in_use_cannot_be_deleted(harness: Harness) -> None:
+def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_snapshots(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     harness.client.post("/api/minibrains", json={"name": "Triage"})
     harness.client.put("/api/minibrains/triage/dataset", json={"dataset": "tickets"})
-    assert "used by Triage" in harness.client.delete("/api/datasets/tickets").json()["detail"]
+    taken = snapshot_hash(harness, "triage")
+    assert harness.client.get("/api/datasets/tickets").json()["model_names"] == ["Triage"]
     assert "used by Tickets" in harness.client.delete(f"/api/sources/{source['id']}").json()["detail"]
-    harness.client.put("/api/minibrains/triage/dataset", json={"dataset": None})
     assert harness.client.delete("/api/datasets/tickets").status_code == 204
+    model = harness.client.get("/api/minibrains/triage").json()
+    assert model["dataset"] is None
+    with harness.sessions() as session:
+        kept = session.scalar(select(Snapshot).where(Snapshot.hash == taken))
+        assert kept is not None and kept.dataset_id is None
+    events = harness.client.get("/api/audit", params={"action": "dataset.delete"}).json()["events"]
+    assert events[0]["detail"]["models"] == ["triage"]
     assert harness.client.delete(f"/api/sources/{source['id']}").status_code == 204
 
 

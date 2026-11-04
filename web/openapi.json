@@ -12583,6 +12583,14 @@
             "type": "array",
             "title": "Models"
           },
+          "model_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Model Names",
+            "default": []
+          },
           "splits": {
             "anyOf": [
               {

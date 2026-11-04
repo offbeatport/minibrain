@@ -585,7 +585,7 @@ export function DataExplorer() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DeleteItem
-                        blocked={dataset.models.length > 0 ? "Used by models" : null}
+                        blocked={null}
                         onSelect={() => setAction({ kind: "delete-dataset", dataset })}
                     />
                 </TreeRowMenu>

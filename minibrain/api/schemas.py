@@ -196,6 +196,7 @@ class DatasetSummary(BaseModel):
     error: str | None
     mapping: MappingInfo
     models: list[str]
+    model_names: list[str] = []
     splits: dict[str, int] | None
     snapshot: SnapshotInfo | None = None
     changed: ChangeInfo | None = None

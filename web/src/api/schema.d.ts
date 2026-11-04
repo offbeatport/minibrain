@@ -3900,6 +3900,11 @@ export interface components {
             mapping: components["schemas"]["MappingInfo"];
             /** Models */
             models: string[];
+            /**
+             * Model Names
+             * @default []
+             */
+            model_names?: string[];
             /** Splits */
             splits: {
                 [key: string]: number;

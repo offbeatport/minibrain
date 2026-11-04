@@ -44,6 +44,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
+from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.data.dataset_folders import folder_or_root
 from minibrain.data.delta import DELTA
@@ -90,7 +91,7 @@ from minibrain.data.sources import (
 )
 from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import Dataset, Snapshot, Source, now
+from minibrain.registry.models import AuditEvent, Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags
@@ -259,6 +260,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         error=problem,
         mapping=mapping_info(dataset),
         models=[minibrain.slug for minibrain in dataset.minibrains],
+        model_names=[minibrain.name for minibrain in dataset.minibrains],
         splits=known_splits(latest, changed),
         snapshot=snapshot_info(latest) if latest is not None else None,
         changed=changed,
@@ -512,11 +514,19 @@ def dataset_query(
 @router.delete("/datasets/{slug}", status_code=204, dependencies=[Depends(builder)])
 def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     dataset = get_dataset(session, slug)
-    if dataset.minibrains:
-        names = ", ".join(minibrain.name for minibrain in dataset.minibrains)
-        raise ConflictError(f"{dataset.name} is used by {names}; pick another dataset for them first")
+    released = sorted(minibrain.slug for minibrain in dataset.minibrains)
+    for minibrain in list(dataset.minibrains):
+        minibrain.dataset_id = None
     for snapshot in dataset.snapshots:
         snapshot.dataset = None
+    session.add(
+        AuditEvent(
+            actor=current_actor(),
+            action="dataset.delete",
+            target=f"dataset:{dataset.slug}",
+            detail={"name": dataset.name, "models": released},
+        )
+    )
     session.delete(dataset)
     session.flush()
     cleanup(session, settings)

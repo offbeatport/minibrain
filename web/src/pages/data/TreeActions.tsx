@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ConfirmDialog } from "obp-ui";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
 import type { DatasetFolder } from "~/api/dataQueries";
+import { datasetDeleteNote } from "~/lib/datasetUse";
 import {
     MoveDialog,
     type MoveTarget,
@@ -98,7 +99,7 @@ function removalCopy(action: TreeAction, index: FolderIndex) {
     if (action.kind === "delete-dataset") {
         return {
             title: `Delete ${action.dataset.name}?`,
-            description: "The query goes; the sources it reads stay.",
+            description: datasetDeleteNote(action.dataset.model_names ?? []),
             confirmLabel: "Delete",
             removal: { kind: "dataset", dataset: action.dataset } as Removal,
         };

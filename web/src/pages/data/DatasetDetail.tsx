@@ -14,6 +14,7 @@ import { useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
 import { keys, useDataset, useDatasetPreview, useModels, useSources } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
+import { datasetDeleteNote } from "~/lib/datasetUse";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { ChecksSection } from "./Checks";
@@ -304,13 +305,9 @@ export function DatasetDetail({
                             Move to…
                         </Button>
                         <DeleteAction
-                            blocked={
-                                dataset.models.length
-                                    ? "Used by models: pick another dataset for them first"
-                                    : null
-                            }
+                            blocked={null}
                             title={`Delete ${dataset.name}?`}
-                            description="The query goes; the sources it reads stay."
+                            description={datasetDeleteNote(dataset.model_names ?? [])}
                             onConfirm={() => remove.mutateAsync().catch(() => undefined)}
                         />
                     </>

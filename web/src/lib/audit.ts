@@ -34,6 +34,7 @@ const ACTIONS: Record<string, string> = {
     "feedback.fix": "Feedback fixed and accepted",
     "feedback.reject": "Feedback rejected",
     "feedback.unassign": "Feedback unassigned",
+    "dataset.delete": "Dataset deleted",
     "dataset.move": "Dataset moved",
     "dataset_folder.create": "Dataset folder created",
     "dataset_folder.delete": "Dataset folder deleted",
