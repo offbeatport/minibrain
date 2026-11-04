@@ -135,7 +135,6 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
                     moving.availability.job_id !== undefined && (
                         <Button
                             variant="ghost"
-                            size="xs"
                             onClick={() =>
                                 cancelJob(moving.availability.job_id ?? 0).then(on.refresh)
                             }
@@ -149,7 +148,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     if (available) {
         return (
             <div className="flex justify-end">
-                <Button size="xs" onClick={() => on.download(entry)}>
+                <Button onClick={() => on.download(entry)}>
                     <Plus />
                     Add model
                 </Button>
@@ -164,7 +163,6 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             <div className="flex flex-col items-end gap-1">
                 <Button
                     variant="outline"
-                    size="xs"
                     onClick={() => retry.mutate(failed.key)}
                     disabled={retry.isPending}
                 >
@@ -181,7 +179,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     if (entry.gated && !on.tokenConfigured) {
         return (
             <div className="flex justify-end">
-                <Button size="xs" onClick={() => on.requirements(entry)}>
+                <Button onClick={() => on.requirements(entry)}>
                     <KeyRound />
                     Get access
                 </Button>
@@ -197,16 +195,12 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     return (
         <div className="flex justify-end gap-1">
             {on.online ? (
-                <Button size="xs" onClick={() => on.download(entry)}>
-                    {label}
-                </Button>
+                <Button onClick={() => on.download(entry)}>{label}</Button>
             ) : (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <span>
-                            <Button size="xs" disabled>
-                                {label}
-                            </Button>
+                            <Button disabled>{label}</Button>
                         </span>
                     </TooltipTrigger>
                     <TooltipContent>
