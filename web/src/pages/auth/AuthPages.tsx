@@ -277,7 +277,8 @@ export function SetupPage() {
             description={
                 <span className="flex flex-col gap-2">
                     <span>
-                        Small models trained on your own data, running on your own machines.
+                        Train, evaluate and serve models of any size on your own data and your own
+                        hardware.
                     </span>
                     <span>
                         {linkToken

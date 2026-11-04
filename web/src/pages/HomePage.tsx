@@ -68,7 +68,7 @@ export function HomePage() {
         <Page>
             <PageHeader
                 title="Home"
-                caption="Small models trained on your data and served on an OpenAI-compatible endpoint. Everything runs on this machine."
+                caption="Models of any size, trained on your data and served on an OpenAI-compatible endpoint. Everything runs on your own hardware."
             />
             <Section title="Overview">
                 <div className="flex flex-wrap gap-8">
