@@ -82,9 +82,13 @@ def test_dataset_created_with_the_picked_columns(harness: Harness) -> None:
     body = {"name": "Reversed", "source_id": source["id"], "input_column": "category", "label_column": "text"}
     created = harness.client.post("/api/datasets", json=body).json()
     assert (created["mapping"]["input_column"], created["mapping"]["label_column"]) == ("category", "text")
-    sql = "SELECT text AS input, category AS label FROM source WHERE category = 'bug'"
+    single = "SELECT text AS input, category AS label FROM source WHERE category = 'bug'"
+    refused = harness.client.post("/api/datasets", json={"name": "Bugs", "source_id": source["id"], "sql": single})
+    assert refused.status_code == 409 and refused.json()["detail"].startswith("Only one label")
+    sql = "SELECT text AS input, category AS label FROM source WHERE category IN ('bug', 'billing')"
     by_sql = harness.client.post("/api/datasets", json={"name": "Bugs", "source_id": source["id"], "sql": sql}).json()
     assert (by_sql["mapping"]["sql"], by_sql["mapping"]["input_column"]) == (sql, None)
+    assert (by_sql["snapshot"]["number"], by_sql["snapshot"]["rows"]) == (1, 100)
     bad = {"name": "Broken", "source_id": source["id"], "input_column": "nope", "label_column": "text"}
     assert harness.client.post("/api/datasets", json=bad).status_code == 422
     assert [dataset["slug"] for dataset in harness.client.get("/api/datasets").json()] == ["bugs", "reversed"]
@@ -113,14 +117,13 @@ def test_preview_counts_rows_per_label(harness: Harness) -> None:
     assert counts == [{"label": label, "rows": 50} for label in ("account", "billing", "bug", "feature")]
 
 
-def test_splits_are_known_once_a_model_builds_the_dataset(harness: Harness) -> None:
+def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     harness.client.post("/api/minibrains", json={"name": "Triage"})
     harness.client.put("/api/minibrains/triage/dataset", json={"dataset": "tickets"})
-    assert harness.client.get("/api/datasets/tickets").json()["splits"] is None
-    snapshot_hash(harness, "triage")
     splits = harness.client.get("/api/datasets/tickets").json()["splits"]
+    assert snapshot_hash(harness, "triage") == harness.client.get("/api/datasets/tickets").json()["snapshot"]["hash"]
     assert sum(splits.values()) == 200
     harness.client.patch("/api/datasets/tickets", json={"description": "still the same rows"})
     assert harness.client.get("/api/datasets/tickets").json()["splits"] == splits

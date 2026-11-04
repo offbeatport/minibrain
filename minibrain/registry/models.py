@@ -231,13 +231,18 @@ class Minibrain(Base):
 class Snapshot(Base):
     __tablename__ = "snapshots"
     __table_args__ = (
-        Index("uq_snapshots_dataset_hash", "dataset_id", "hash", unique=True),
+        Index("uq_snapshots_dataset_number", "dataset_id", "number", unique=True),
+        Index("ix_snapshots_dataset_hash", "dataset_id", "hash"),
         {"sqlite_autoincrement": True},
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
+    number: Mapped[int | None] = mapped_column(default=None)
+    base_id: Mapped[int | None] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="SET NULL", name="fk_snapshots_base"), default=None
+    )
     hash: Mapped[str]
     directory: Mapped[str | None] = mapped_column(default=None)
     artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
@@ -256,6 +261,8 @@ class Snapshot(Base):
     minibrain: Mapped[Minibrain | None] = relationship(back_populates="snapshots", foreign_keys=[minibrain_id])
     dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
     versions: Mapped[list["Version"]] = relationship(back_populates="snapshot")
+    base: Mapped["Snapshot | None"] = relationship(remote_side="Snapshot.id", back_populates="copies")
+    copies: Mapped[list["Snapshot"]] = relationship(back_populates="base")
 
 
 class Version(Base):

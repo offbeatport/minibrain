@@ -14,7 +14,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import detail, version_info
 from minibrain.auth.identity import current_actor
-from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
+from minibrain.data.snapshots import cleanup, require_splits, training_snapshot
 from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
@@ -71,8 +71,9 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
             f"{minibrain.base_model} has GGUF weights, which can be served but not fine-tuned; use safetensors"
         )
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
-    require_splits(snapshot_for_model(session, settings, minibrain, saved=False))
-    version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {})
+    snapshot = training_snapshot(session, settings, minibrain, body.snapshot_id)
+    require_splits(snapshot)
+    version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {}, snapshot)
     audit_version(
         session,
         minibrain,

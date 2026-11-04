@@ -34,6 +34,7 @@ from minibrain.api.card_schemas import (
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS
 from minibrain.data.snapshot import SPLITS, Example, SnapshotError, read_split
+from minibrain.data.snapshots import version_number
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
 from minibrain.registry.files import MissingArtifactError, snapshot_location, store_for
@@ -218,6 +219,8 @@ def data_card(session: Session, snapshot: Snapshot, splits: dict[str, list[Examp
     return CardData(
         dataset_slug=dataset.slug if dataset is not None else None,
         dataset_name=dataset.name if dataset is not None else None,
+        dataset_version=version_number(snapshot),
+        snapshot_feedback_rows=snapshot.feedback_rows,
         snapshot_hash=snapshot.hash,
         snapshot_rows=snapshot.rows or sum(counts.values()),
         snapshot_taken_at=stamp(snapshot.taken_at or snapshot.created_at) or "",
@@ -481,7 +484,7 @@ def score_limits(evaluation: CardEvaluation) -> list[CardLimit]:
         found.append(
             CardLimit(
                 kind="small_held_out",
-                text=f"The held-out set has {split.examples} rows from the same snapshot as training: one row moves "
+                text=f"The held-out set has {split.examples} rows from the same data as training: one row moves "
                 f"accuracy by {100 / split.examples:.1f} points, and inputs unlike the training data are not measured.",
             )
         )

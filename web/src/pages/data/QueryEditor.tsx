@@ -177,6 +177,7 @@ export function QueryEditor({
     onSave,
     onRun,
     title = "Query",
+    caption = "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.",
     saveLabel,
     before,
     extraActions,
@@ -188,6 +189,7 @@ export function QueryEditor({
     onSave: (body: MappingBody) => Promise<unknown>;
     onRun: (sql: string) => Promise<QueryResponse>;
     title?: string;
+    caption?: string;
     saveLabel?: string;
     before?: ReactNode;
     extraActions?: ReactNode;
@@ -239,7 +241,7 @@ export function QueryEditor({
     return (
         <Section
             title={title}
-            caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources."
+            caption={caption}
             actions={
                 <>
                     <SegmentedTabs tabs={MODES} active={mode} onSelect={switchMode} />
@@ -270,8 +272,8 @@ export function QueryEditor({
                     </div>
                     <p className="text-sm text-muted-foreground">
                         Return columns named <span className="font-mono">input</span> and{" "}
-                        <span className="font-mono">label</span>; other columns are kept in
-                        snapshots. Join, union, filter and clean up with DuckDB SQL; Cmd/Ctrl+Enter
+                        <span className="font-mono">label</span>; other columns are kept in each
+                        version. Join, union, filter and clean up with DuckDB SQL; Cmd/Ctrl+Enter
                         runs it. Queries are read-only and cannot reach other files or the network.
                     </p>
                     <div className="flex flex-wrap gap-2">

@@ -293,7 +293,7 @@ const SOURCE_COLUMNS: ColumnDef<Source, unknown>[] = [
 
 function CheckList({ checks }: { checks: Check[] }) {
     if (checks.length === 0) {
-        return <Muted>No checks were recorded with this snapshot.</Muted>;
+        return <Muted>No checks were recorded with this data.</Muted>;
     }
     return (
         <ul className="flex flex-col divide-y text-sm">
@@ -318,6 +318,16 @@ function CheckList({ checks }: { checks: Check[] }) {
     );
 }
 
+function datasetVersion(data: ModelCard["training_data"]): string {
+    if (data.dataset_version === null || data.dataset_version === undefined) {
+        return NONE;
+    }
+    const rows = data.snapshot_feedback_rows ?? 0;
+    return rows > 0
+        ? `Version ${data.dataset_version}, plus ${count(rows)} ${rows === 1 ? "row" : "rows"} from feedback`
+        : `Version ${data.dataset_version}`;
+}
+
 export function DataSection({ card }: { card: ModelCard }) {
     const data = card.training_data;
     const splits = data.splits;
@@ -336,23 +346,20 @@ export function DataSection({ card }: { card: ModelCard }) {
         <PanelSection
             icon={Database}
             title="Training data"
-            description="The snapshot this version trained and scored on, with the checks run when it was taken."
+            description="The dataset version this model version trained and scored on, with the checks run when it was saved."
             bare
         >
             <Panel>
                 <Facts
                     items={[
                         ["Dataset", dataset],
+                        ["Dataset version", datasetVersion(data)],
                         [
-                            "Snapshot",
-                            <Hash
-                                key="snapshot"
-                                value={data.snapshot_hash}
-                                label="snapshot hash"
-                            />,
+                            "SHA-256",
+                            <Hash key="snapshot" value={data.snapshot_hash} label="data hash" />,
                         ],
                         ["Rows", <Numeric key="rows" value={count(data.snapshot_rows)} />],
-                        ["Taken", when(data.snapshot_taken_at)],
+                        ["Saved", when(data.snapshot_taken_at)],
                         [
                             "Splits",
                             <Numeric
@@ -381,17 +388,17 @@ export function DataSection({ card }: { card: ModelCard }) {
                     getRowId={(row) => row.label}
                 />
             ) : (
-                <Muted>Not available: the snapshot file could not be read.</Muted>
+                <Muted>Not available: the data file could not be read.</Muted>
             )}
             <Subhead
                 title="Sources"
-                caption="Each source's fingerprint when the snapshot was taken."
+                caption="Each source's fingerprint when the version was saved."
             />
             <DataGrid
                 columns={SOURCE_COLUMNS}
                 rows={data.sources}
                 getRowId={(row) => row.table}
-                empty="No source fingerprints were recorded with this snapshot."
+                empty="No source fingerprints were recorded with this data."
             />
             <Subhead title="Checks" />
             <Panel>
@@ -601,8 +608,8 @@ function ComparisonTable({ card }: { card: ModelCard }) {
             id: "data",
             label: "Data",
             cells: [
-                "This snapshot",
-                ...theirs.map((other) => (other.same_data ? "Same snapshot" : "Other snapshot")),
+                "This data",
+                ...theirs.map((other) => (other.same_data ? "Same data" : "Other data")),
             ],
         },
         ...metrics(card).map((metric) => metricRow(metric, others)),

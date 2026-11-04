@@ -2968,6 +2968,13 @@ export interface components {
             dataset_slug: string | null;
             /** Dataset Name */
             dataset_name: string | null;
+            /** Dataset Version */
+            dataset_version?: number | null;
+            /**
+             * Snapshot Feedback Rows
+             * @default 0
+             */
+            snapshot_feedback_rows?: number;
             /** Snapshot Hash */
             snapshot_hash: string;
             /** Snapshot Rows */
@@ -6030,6 +6037,10 @@ export interface components {
             hash: string;
             /** Dataset */
             dataset: string | null;
+            /** Number */
+            number?: number | null;
+            /** Base Number */
+            base_number?: number | null;
             /** Rows */
             rows: number;
             /** Size */
@@ -6407,6 +6418,8 @@ export interface components {
             max_rows?: number | null;
             /** Epochs */
             epochs?: number | null;
+            /** Snapshot Id */
+            snapshot_id?: number | null;
         };
         /** VersionInfo */
         VersionInfo: {
@@ -6424,6 +6437,8 @@ export interface components {
             snapshot_id: number;
             /** Snapshot Dataset */
             snapshot_dataset?: string | null;
+            /** Snapshot Number */
+            snapshot_number?: number | null;
             /**
              * Snapshot Rows
              * @default 0

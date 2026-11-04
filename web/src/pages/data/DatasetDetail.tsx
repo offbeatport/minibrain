@@ -19,8 +19,14 @@ import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { ChecksSection } from "./Checks";
 import { MoveDialog, type MoveTarget, PathLinks, folderRef } from "./DatasetFolders";
+import {
+    ChangeNotice,
+    FirstVersionNotice,
+    RowLimitNotice,
+    VersionsSection,
+    useVersionRefresh,
+} from "./DatasetVersions";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
-import { ChangeNotice, RowLimitNotice, SaveSnapshot, SnapshotsSection } from "./Snapshots";
 import { type FolderIndex, type ItemRef, itemHref, stem } from "./catalogue";
 import {
     About,
@@ -44,10 +50,12 @@ const SPLITS: [string, string][] = [
 function useDatasetRefresh(slug: string) {
     const client = useQueryClient();
     const refresh = useDataRefresh();
+    const versions = useVersionRefresh(slug);
     return async () => {
         await Promise.all([
             client.invalidateQueries({ queryKey: keys.dataset(slug) }),
             client.invalidateQueries({ queryKey: keys.datasetPreview(slug) }),
+            versions(),
             refresh(),
         ]);
     };
@@ -64,6 +72,7 @@ export function DatasetQuery({
     const path = { params: { path: { slug: dataset.slug } } };
     return (
         <QueryEditor
+            caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources. Saving makes the next version of the dataset."
             mapping={dataset.mapping}
             mode={dataset.mode}
             sourceId={dataset.source_id}
@@ -119,6 +128,7 @@ export function CreateDataset({
     return (
         <QueryEditor
             title="New dataset"
+            caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources. Creating the dataset saves version 1 of its rows."
             saveLabel="Create dataset"
             mapping={EMPTY_MAPPING}
             mode="columns"
@@ -288,7 +298,6 @@ export function DatasetDetail({
                                 Train a model
                             </Link>
                         </Button>
-                        <SaveSnapshot dataset={dataset} />
                         <Button variant="outline" onClick={() => setEditing(true)}>
                             Edit
                         </Button>
@@ -319,10 +328,12 @@ export function DatasetDetail({
                 <p className="text-sm text-destructive">{`The query fails: ${dataset.error}`}</p>
             )}
             <RowLimitNotice rows={dataset.rows} limit={dataset.row_limit ?? 0} />
+            <FirstVersionNotice dataset={dataset} />
             <ChangeNotice
                 changed={dataset.changed}
                 snapshot={dataset.snapshot}
-                after="Models take a new one when they next train."
+                dataset={dataset.slug}
+                after="Models keep training on it until you update."
             />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
@@ -339,12 +350,13 @@ export function DatasetDetail({
                             <span className="font-normal text-muted-foreground">
                                 {dataset.snapshot
                                     ? "Unknown since the change"
-                                    : "Set by the first snapshot"}
+                                    : "Set by the first version"}
                             </span>
                         }
                     />
                 )}
             </div>
+            <VersionsSection dataset={dataset} />
             <ChecksSection snapshot={dataset.snapshot} dataset={dataset.slug} />
             {mapped && preview.data && (
                 <Section
@@ -362,7 +374,6 @@ export function DatasetDetail({
                     loading={preview.isLoading}
                 />
             )}
-            <SnapshotsSection dataset={dataset} />
             <UsedBy dataset={dataset} />
             <MoveDialog
                 targets={moving ? [moving] : null}

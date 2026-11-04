@@ -208,8 +208,9 @@ function MakeDatasetDialog({
                 <DialogHeader>
                     <DialogTitle>{`Make a dataset from ${plural(chosen.length, "source")}`}</DialogTitle>
                     <DialogDescription>
-                        Their rows are stacked into one dataset. Pick the column that holds the
-                        input and the one that holds the label; every source needs both.
+                        Their rows are stacked into one dataset, saved as its version 1. Pick the
+                        column that holds the input and the one that holds the label; every source
+                        needs both.
                     </DialogDescription>
                 </DialogHeader>
                 <ul className="flex max-h-48 flex-col divide-y overflow-y-auto rounded-lg border">

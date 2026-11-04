@@ -234,7 +234,7 @@ export function StorageSettingsPage() {
                 <PanelSection
                     icon={HardDrive}
                     title="Where artifacts live"
-                    description="Uploads, snapshots, adapters and logs. New ones go to the place chosen here; ones already stored stay readable where they are."
+                    description="Uploads, dataset versions, adapters and logs. New ones go to the place chosen here; ones already stored stay readable where they are."
                 >
                     {settings.data && (
                         <div className="flex flex-col gap-field">

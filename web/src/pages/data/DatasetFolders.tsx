@@ -549,7 +549,7 @@ function DeleteContentsDialog({
                 <DialogHeader>
                     <DialogTitle>{`Delete ${contentsLabel(chosen)}?`}</DialogTitle>
                     <DialogDescription>
-                        {`Datasets go with their checks and saved snapshots no model uses.${folders ? " A deleted folder's contents move up a level; nothing inside is deleted." : ""} This cannot be undone.`}
+                        {`Datasets go with their checks and the versions no model uses.${folders ? " A deleted folder's contents move up a level; nothing inside is deleted." : ""} This cannot be undone.`}
                     </DialogDescription>
                 </DialogHeader>
                 <ul className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border">
@@ -827,7 +827,7 @@ export function DatasetsRoot({
                     <h2 className="text-2xl font-semibold">Datasets</h2>
                     <p className="text-sm text-muted-foreground">
                         Saved queries that turn one or more sources into input and label rows.
-                        Models train on a snapshot of one.
+                        Models train on a saved version of one.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

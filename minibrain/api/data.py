@@ -72,7 +72,7 @@ from minibrain.data.shared import (
     tables_of,
 )
 from minibrain.data.snapshot import is_parquet
-from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_snapshot, taken
+from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_version, version_if_mapped, versions_of
 from minibrain.data.sources import (
     SourceError,
     Table,
@@ -468,6 +468,7 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     )
     if mapping.sql is not None or (mapping.input_column and mapping.label_column):
         apply_mapping(session, settings, store, dataset, mapping)
+    version_if_mapped(session, settings, dataset)
     session.commit()
     return dataset_summary(settings, store, dataset)
 
@@ -493,6 +494,8 @@ def update_dataset_mapping(
 ) -> DatasetSummary:
     dataset = get_dataset(session, slug)
     apply_mapping(session, settings, store, dataset, body)
+    take_version(session, settings, dataset)
+    cleanup(session, settings)
     session.commit()
     return dataset_summary(settings, store, dataset)
 
@@ -535,13 +538,12 @@ def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> Non
 
 @router.get("/datasets/{slug}/snapshots", dependencies=[Depends(builder)])
 def list_snapshots(slug: str, session: SessionDep) -> list[SnapshotInfo]:
-    dataset = get_dataset(session, slug)
-    return [snapshot_info(snapshot) for snapshot in sorted(dataset.snapshots, key=taken, reverse=True)]
+    return [snapshot_info(snapshot) for snapshot in versions_of(get_dataset(session, slug))]
 
 
 @router.post("/datasets/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
 def save_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> SnapshotInfo:
-    snapshot = take_snapshot(session, settings, get_dataset(session, slug), saved=True)
+    snapshot = take_version(session, settings, get_dataset(session, slug))
     cleanup(session, settings)
     session.commit()
     return snapshot_info(snapshot)
@@ -550,14 +552,14 @@ def save_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> Snap
 def get_snapshot(session: Session, snapshot_id: int) -> Snapshot:
     found = session.get(Snapshot, snapshot_id)
     if found is None:
-        raise NotFoundError(f"no snapshot {snapshot_id}")
+        raise NotFoundError(f"no dataset version {snapshot_id}")
     return found
 
 
 def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
     location = snapshot_location(session, store, snapshot)
     if not is_parquet(location):
-        raise ConflictError(f"snapshot {snapshot.hash[:12]} predates Parquet snapshots and cannot be compared")
+        raise ConflictError(f"the data {snapshot.hash[:12]} was saved before Parquet files and cannot be compared")
     return location
 
 

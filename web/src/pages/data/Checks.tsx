@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Link } from "obp-ui";
 import { api, succeed } from "~/api/client";
 import type { SnapshotInfo } from "~/api/dataQueries";
-import { useMinibrain } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { ErrorLine, Section } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
@@ -108,7 +107,7 @@ export function ChecksReport({
     if (checks.length === 0) {
         return (
             <p className="text-sm text-muted-foreground">
-                This snapshot was taken before checks ran. The next one carries a report.
+                This version was saved before checks ran. The next one carries a report.
             </p>
         );
     }
@@ -170,16 +169,14 @@ export function ChecksSection({
     return (
         <Section
             title="Checks"
-            caption={`On the last snapshot, taken ${relativeTime(snapshot.taken_at ?? snapshot.created_at)}. Warnings do not block training; an empty dataset or a single label does. Turn checks on or off under Settings, Data.`}
+            caption={`On version ${snapshot.number ?? "–"}, saved ${relativeTime(snapshot.taken_at ?? snapshot.created_at)}. Warnings do not block training; an empty dataset or a single label stops a version from being saved. Turn checks on or off under Settings, Data.`}
         >
             <ChecksReport snapshot={snapshot} dataset={dataset} />
         </Section>
     );
 }
 
-export function ModelChecks({ slug }: { slug: string }) {
-    const detail = useMinibrain(slug);
-    const snapshot = detail.data?.snapshot;
+export function ModelChecks({ snapshot }: { snapshot: SnapshotInfo | null | undefined }) {
     const all = snapshot?.checks ?? [];
     if (!snapshot || all.length === 0) {
         return null;
@@ -191,8 +188,8 @@ export function ModelChecks({ slug }: { slug: string }) {
         <div className="mb-4 flex flex-col gap-2">
             <p className="text-sm text-muted-foreground">
                 {open.length === 0
-                    ? "Checks on the last snapshot passed."
-                    : `Checks on the last snapshot found ${open.length === 1 ? "one thing" : `${open.length} things`} to look at. Training still runs.`}
+                    ? `Checks on version ${snapshot.number ?? "–"} passed.`
+                    : `Checks on version ${snapshot.number ?? "–"} found ${open.length === 1 ? "one thing" : `${open.length} things`} to look at. Training still runs.`}
                 {snapshot.dataset && (
                     <>
                         {" "}

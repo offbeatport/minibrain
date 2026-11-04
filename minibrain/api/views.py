@@ -27,7 +27,7 @@ from minibrain.api.schemas import (
     VersionInfo,
 )
 from minibrain.data.shared import table_of
-from minibrain.data.snapshots import Changes, changes_since, model_snapshot
+from minibrain.data.snapshots import Changes, changes_since, version_number
 from minibrain.data.sources import SourceError, describe
 from minibrain.policy import bodies_choice
 from minibrain.registry.files import store_for
@@ -123,16 +123,19 @@ def mapping_info(dataset: Dataset | None) -> MappingInfo:
 
 
 def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
+    users = [*snapshot.versions, *(version for copy in snapshot.copies for version in copy.versions)]
     return SnapshotInfo(
         id=snapshot.id,
         hash=snapshot.hash,
         dataset=snapshot.dataset.slug if snapshot.dataset is not None else None,
+        number=snapshot.number,
+        base_number=snapshot.base.number if snapshot.base is not None else None,
         rows=snapshot.rows or sum(snapshot.counts.values()),
         size=snapshot.size,
         counts=snapshot.counts,
         labels=snapshot.labels,
         saved=snapshot.saved,
-        versions=sorted(f"{version.minibrain.slug}@{version.number}" for version in snapshot.versions),
+        versions=sorted({f"{version.minibrain.slug}@{version.number}" for version in users}),
         created_at=snapshot.created_at,
         taken_at=snapshot.taken_at,
         checks=check_infos(snapshot),
@@ -156,7 +159,7 @@ def model_changes(settings: Settings, minibrain: Minibrain) -> ChangeInfo | None
     if minibrain.dataset is None:
         return None
     try:
-        return change_info(changes_since(settings, minibrain.dataset, model_snapshot(minibrain)))
+        return change_info(changes_since(settings, minibrain.dataset, latest_snapshot(minibrain)))
     except SourceError:
         return None
 
@@ -236,6 +239,7 @@ def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | 
         snapshot_hash=version.snapshot.hash,
         snapshot_id=version.snapshot.id,
         snapshot_dataset=version.snapshot.dataset.slug if version.snapshot.dataset is not None else None,
+        snapshot_number=version_number(version.snapshot),
         snapshot_rows=version.snapshot.rows or sum(version.snapshot.counts.values()),
         recipe=version.recipe,
         golden=split_score(metrics, "golden"),

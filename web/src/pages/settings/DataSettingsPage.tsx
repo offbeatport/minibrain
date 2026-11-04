@@ -127,8 +127,8 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
     return (
         <PanelSection
             icon={ListChecks}
-            title="Snapshot checks"
-            description="Run on every snapshot. Warnings never block training; an empty dataset or a single label always does."
+            title="Version checks"
+            description="Run on every dataset version. Warnings never block training; an empty dataset or a single label stops the version from being saved."
         >
             <SettingsGroup>
                 {CHECKS.map((check) => (
@@ -174,13 +174,13 @@ export function DataSettingsPage() {
             <PanelSections>
                 <PanelSection
                     icon={Rows3}
-                    title="Snapshot size"
-                    description="Training copies a dataset's rows into a snapshot. Larger datasets are refused with a hint to filter or sample in the query."
+                    title="Version size"
+                    description="Each dataset version copies the query's rows. A larger result is refused with a hint to filter or sample in the query."
                 >
                     <SettingsGroup>
                         <NumberSetting
                             id="row-limit"
-                            label="Most rows in one snapshot"
+                            label="Most rows in one version"
                             description={`Default ${count(200_000)}.`}
                             value={data?.row_limit}
                             field="row_limit"
@@ -194,13 +194,13 @@ export function DataSettingsPage() {
                 </PanelSection>
                 <PanelSection
                     icon={Archive}
-                    title="Snapshot retention"
-                    description="Snapshots a version uses are always kept, and those of deleted versions are removed. This sets how many saved snapshots no version uses stay per dataset."
+                    title="Version retention"
+                    description="Dataset versions a model version uses are always kept, and so is each dataset's latest. This sets how many versions no model uses stay per dataset."
                 >
                     <SettingsGroup>
                         <NumberSetting
                             id="keep-snapshots"
-                            label="Keep the last saved snapshots per dataset"
+                            label="Keep the last unused versions per dataset"
                             description="Default 5. Older ones are removed with their files."
                             value={data?.keep_snapshots}
                             field="keep_snapshots"

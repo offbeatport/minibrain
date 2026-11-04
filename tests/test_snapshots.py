@@ -32,50 +32,107 @@ def save(harness: Harness, slug: str = "tickets") -> dict:
     return response.json()
 
 
-def test_a_saved_snapshot_is_a_content_hashed_parquet_copy(harness: Harness) -> None:
+def versions(harness: Harness, slug: str = "tickets") -> list[dict]:
+    return harness.client.get(f"/api/datasets/{slug}/snapshots").json()
+
+
+def remap(harness: Harness, where: str, slug: str = "tickets") -> dict:
+    sql = f"SELECT text AS input, category AS label FROM tickets WHERE {where}"
+    response = harness.client.put(f"/api/datasets/{slug}/mapping", json={"sql": sql})
+    assert response.status_code == 200, response.text
+    return response.json()["snapshot"]
+
+
+def test_creating_a_dataset_saves_version_1_as_a_content_hashed_parquet_copy(harness: Harness) -> None:
     dataset_with_model(harness)
-    first = save(harness)
-    assert (first["rows"], first["saved"], first["dataset"], first["versions"]) == (200, True, "tickets", [])
+    [first] = versions(harness)
+    assert (first["number"], first["rows"], first["saved"], first["dataset"], first["versions"]) == (
+        1,
+        200,
+        True,
+        "tickets",
+        [],
+    )
     assert first["counts"] == {"golden": 20, "eval": 30, "shots": 4, "train": 146}
     store = store_for(harness.settings)
     assert store.has(first["hash"])
     with store.open(first["hash"]) as stream:
         assert stream.read(4) == b"PAR1"
     again = save(harness)
-    assert (again["id"], again["hash"]) == (first["id"], first["hash"])
-    harness.client.put(
-        "/api/datasets/tickets/mapping",
-        json={"sql": "SELECT text AS input, category AS label FROM tickets WHERE category <> 'bug'"},
-    )
-    filtered = save(harness)
-    assert filtered["hash"] != first["hash"] and filtered["rows"] == 150
-    listed = harness.client.get("/api/datasets/tickets/snapshots").json()
-    assert [item["id"] for item in listed] == [filtered["id"], first["id"]]
+    assert (again["id"], again["hash"], again["number"]) == (first["id"], first["hash"], 1)
+    filtered = remap(harness, "category <> 'bug'")
+    assert (filtered["number"], filtered["rows"]) == (2, 150) and filtered["hash"] != first["hash"]
+    assert [item["number"] for item in versions(harness)] == [2, 1]
     summary = harness.client.get("/api/datasets/tickets").json()
     assert summary["snapshot"]["id"] == filtered["id"]
     assert summary["changed"] == {"data": False, "query": False, "dataset": False}
+    back = remap(harness, "category IS NOT NULL")
+    assert (back["number"], back["hash"]) == (3, first["hash"])
 
 
-def test_training_starts_from_a_fresh_snapshot_recorded_on_the_version(harness: Harness) -> None:
-    dataset_with_model(harness)
-    prepared = harness.client.post(f"/api/minibrains/{SLUG}/snapshots").json()["snapshot"]
-    version = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "lora", "max_rows": 100})
+def test_a_dataset_with_no_columns_picked_has_no_version_until_it_is_mapped(harness: Harness) -> None:
+    rows = "\n".join(["question,team", *(f"ticket {n},{'ab'[n % 2]}" for n in range(120))]).encode()
+    response = harness.client.post("/api/sources", files={"file": ("plain.csv", rows, "text/csv")})
+    assert response.status_code == 201, response.text
+    created = harness.client.post("/api/datasets", json={"name": "Plain", "source_id": response.json()["id"]})
+    assert created.status_code == 201, created.text
+    assert (created.json()["mapping"]["sql"], created.json()["snapshot"]) == (None, None)
+    assert versions(harness, "plain") == []
+    mapped = harness.client.put(
+        "/api/datasets/plain/mapping",
+        json={"source_id": response.json()["id"], "input_column": "question", "label_column": "team"},
+    )
+    assert mapped.status_code == 200, mapped.text
+    assert [item["number"] for item in versions(harness, "plain")] == [1]
+    stacked = harness.client.post(
+        "/api/datasets", json={"name": "Stacked", "sql": "SELECT question AS input, team AS label FROM plain"}
+    )
+    assert stacked.status_code == 201, stacked.text
+    assert stacked.json()["snapshot"]["number"] == 1
+
+
+def test_training_uses_the_chosen_dataset_version(harness: Harness) -> None:
+    source = dataset_with_model(harness)
+    [first] = versions(harness)
+    second = remap(harness, "category <> 'feature'")
+    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["snapshot"]["id"] == second["id"]
+    chosen = {"kind": "lora", "max_rows": 100, "snapshot_id": first["id"]}
+    version = harness.client.post(f"/api/minibrains/{SLUG}/versions", json=chosen)
     assert version.status_code == 201, version.text
-    assert (version.json()["snapshot_id"], version.json()["snapshot_dataset"]) == (prepared["id"], "tickets")
+    found = version.json()
+    assert (found["snapshot_id"], found["snapshot_number"], found["snapshot_dataset"]) == (first["id"], 1, "tickets")
     claim = harness.claim(["train"])
     assert claim is not None
     assert claim["params"]["snapshot"]["packing"] == "file"
     assert claim["params"]["snapshot"]["name"] == "snapshot.parquet"
-    harness.client.put(
-        "/api/datasets/tickets/mapping",
-        json={"sql": "SELECT text AS input, category AS label FROM tickets WHERE category <> 'feature'"},
-    )
-    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
-    assert detail["changed"] == {"data": False, "query": True, "dataset": False}
+    assert claim["params"]["snapshot"]["id"] == first["hash"]
     scored = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"}).json()
-    assert scored["snapshot_id"] != prepared["id"] and scored["snapshot_rows"] == 150
-    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
-    assert detail["changed"] == {"data": False, "query": False, "dataset": False}
+    assert (scored["snapshot_id"], scored["snapshot_number"], scored["snapshot_rows"]) == (second["id"], 2, 150)
+    assert [item["number"] for item in versions(harness)] == [2, 1]
+    other = harness.client.post("/api/datasets", json={"name": "Other", "source_id": source["id"]})
+    assert other.status_code == 201, other.text
+    for wrong in (999, other.json()["snapshot"]["id"]):
+        refused = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt", "snapshot_id": wrong})
+        assert refused.status_code == 409 and "pick a version" in refused.json()["detail"]
+
+
+def test_a_source_change_offers_an_update_that_makes_the_next_version(harness: Harness, tmp_path: Path) -> None:
+    root = tmp_path / "exports"
+    root.mkdir()
+    (root / "jan.csv").write_bytes(tickets_csv(150))
+    harness.client.put("/api/policies/data_folders", json={"value": [str(root)]})
+    source = harness.client.post("/api/sources/folders", json={"path": str(root), "name": "Exports"}).json()
+    created = harness.client.post("/api/datasets", json={"name": "Exports", "source_id": source["id"]}).json()
+    assert (created["snapshot"]["number"], created["snapshot"]["rows"]) == (1, 150)
+    assert created["changed"] == {"data": False, "query": False, "dataset": False}
+    (root / "feb.csv").write_bytes(tickets_csv(60))
+    summary = harness.client.get("/api/datasets/exports").json()
+    assert summary["changed"] == {"data": True, "query": False, "dataset": False}
+    assert summary["splits"] is None and summary["snapshot"]["number"] == 1
+    updated = save(harness, "exports")
+    assert (updated["number"], updated["rows"]) == (2, 210)
+    after = harness.client.get("/api/datasets/exports").json()
+    assert after["changed"]["data"] is False and after["snapshot"]["number"] == 2
 
 
 def test_splits_are_derived_from_the_parquet_file(harness: Harness) -> None:
@@ -88,8 +145,8 @@ def test_splits_are_derived_from_the_parquet_file(harness: Harness) -> None:
     assert len(labels) == 4 and len(shots) == 4
 
 
-def test_the_row_limit_refuses_large_snapshots_with_a_way_out(harness: Harness) -> None:
-    dataset_with_model(harness)
+def test_the_row_limit_refuses_large_versions_with_a_way_out(harness: Harness) -> None:
+    source = dataset_with_model(harness)
     current = harness.client.get("/api/settings/data").json()
     assert (current["row_limit"], current["keep_snapshots"]) == (200_000, 5)
     changed = harness.client.put("/api/settings/data", json={"row_limit": 150}).json()
@@ -98,32 +155,24 @@ def test_the_row_limit_refuses_large_snapshots_with_a_way_out(harness: Harness) 
     refused = harness.client.post("/api/datasets/tickets/snapshots")
     assert refused.status_code == 409
     assert "more than 150 rows" in refused.json()["detail"] and "USING SAMPLE" in refused.json()["detail"]
-    blocked = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"})
-    assert blocked.status_code == 409
+    created = harness.client.post("/api/datasets", json={"name": "Too big", "source_id": source["id"]})
+    assert created.status_code == 409 and "more than 150 rows" in created.json()["detail"]
+    assert harness.client.get("/api/datasets/too-big").status_code == 404
+    remapped = harness.client.put(
+        "/api/datasets/tickets/mapping",
+        json={"sql": "SELECT text AS input, category AS label FROM tickets WHERE text <> ''"},
+    )
+    assert remapped.status_code == 409
+    assert harness.client.get("/api/datasets/tickets").json()["mapping"]["input_column"] == "text"
+    assert harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"}).status_code == 201
     assert harness.client.put("/api/settings/data", json={"row_limit": 5}).status_code == 422
 
 
 def test_too_few_rows_block_training_but_not_saving(harness: Harness) -> None:
     dataset_with_model(harness, rows=40)
-    assert save(harness)["counts"] == {}
+    assert versions(harness)[0]["counts"] == {}
     refused = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"})
     assert refused.status_code == 409 and "fewer than 100" in refused.json()["detail"]
-
-
-def test_folder_changes_show_as_data_changed(harness: Harness, tmp_path: Path) -> None:
-    root = tmp_path / "exports"
-    root.mkdir()
-    (root / "jan.csv").write_bytes(tickets_csv(150))
-    harness.client.put("/api/policies/data_folders", json={"value": [str(root)]})
-    source = harness.client.post("/api/sources/folders", json={"path": str(root), "name": "Exports"}).json()
-    harness.client.post("/api/datasets", json={"name": "Exports", "source_id": source["id"]})
-    save(harness, "exports")
-    assert harness.client.get("/api/datasets/exports").json()["changed"]["data"] is False
-    (root / "feb.csv").write_bytes(tickets_csv(60))
-    summary = harness.client.get("/api/datasets/exports").json()
-    assert summary["changed"] == {"data": True, "query": False, "dataset": False}
-    assert summary["splits"] is None
-    assert save(harness, "exports")["rows"] == 210
 
 
 def stored_snapshots(harness: Harness) -> list[Snapshot]:
@@ -131,50 +180,51 @@ def stored_snapshots(harness: Harness) -> list[Snapshot]:
         return list(session.scalars(select(Snapshot).order_by(Snapshot.id)))
 
 
-def test_retention_keeps_used_snapshots_and_the_last_saved_ones(harness: Harness) -> None:
+def numbers(harness: Harness) -> list[int | None]:
+    return [snapshot.number for snapshot in stored_snapshots(harness)]
+
+
+def test_retention_keeps_used_versions_the_latest_and_the_last_unused_ones(harness: Harness) -> None:
     dataset_with_model(harness)
     harness.client.put("/api/settings/data", json={"keep_snapshots": 2})
-    saved = []
     for category in ("bug", "feature", "account"):
-        harness.client.put(
-            "/api/datasets/tickets/mapping",
-            json={"sql": f"SELECT text AS input, category AS label FROM tickets WHERE category <> '{category}'"},
-        )
-        saved.append(save(harness)["id"])
-    assert [snapshot.id for snapshot in stored_snapshots(harness)] == saved[1:]
-    harness.client.put("/api/datasets/tickets/mapping", json={"input_column": "text", "label_column": "category"})
-    trained = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"}).json()
+        remap(harness, f"category <> '{category}'")
+    assert numbers(harness) == [3, 4]
+    third = versions(harness)[1]
+    trained = harness.client.post(
+        f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt", "snapshot_id": third["id"]}
+    ).json()
+    assert trained["snapshot_id"] == third["id"]
     finish(harness, "eval")
-    kept = {snapshot.id for snapshot in stored_snapshots(harness)}
-    assert trained["snapshot_id"] in kept and set(saved[1:]) <= kept
-    harness.client.put(
-        "/api/datasets/tickets/mapping",
-        json={"sql": "SELECT text AS input, category AS label FROM tickets WHERE text <> ''"},
-    )
-    later = harness.client.post(f"/api/minibrains/{SLUG}/snapshots").json()["snapshot"]
-    assert later["id"] == trained["snapshot_id"] and later["saved"] is True
+    remap(harness, "text <> ''")
+    remap(harness, "category <> 'billing'")
+    assert numbers(harness) == [3, 5, 6]
+    assert harness.client.put("/api/settings/data", json={"keep_snapshots": 0}).status_code == 200
+    assert numbers(harness) == [3, 6]
     assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
-    assert trained["snapshot_id"] in {snapshot.id for snapshot in stored_snapshots(harness)}
+    assert numbers(harness) == [6]
 
 
-def test_snapshots_of_deleted_versions_are_removed_with_their_files(harness: Harness) -> None:
+def test_feedback_copies_are_removed_with_their_versions(harness: Harness) -> None:
     dataset_with_model(harness)
+    [first] = versions(harness)
+    played = harness.client.post(
+        f"/api/minibrains/{SLUG}/feedback",
+        json={"rating": "down", "input": "ticket 0 about billing", "output": "billing", "correction": "bug"},
+    ).json()
+    assert harness.client.post(f"/api/feedback/{played['id']}/review", json={"decision": "accept"}).status_code == 200
     version = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"}).json()
-    snapshot = next(item for item in stored_snapshots(harness) if item.id == version["snapshot_id"])
-    assert snapshot.saved is False
-    harness.client.put(
-        "/api/datasets/tickets/mapping",
-        json={"sql": "SELECT text AS input, category AS label FROM tickets WHERE category <> 'bug'"},
-    )
-    assert harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "prompt"}).status_code == 201
-    finish(harness, "eval")
+    copy = next(item for item in stored_snapshots(harness) if item.id == version["snapshot_id"])
+    assert (copy.number, copy.base_id, copy.feedback_rows, copy.saved) == (None, first["id"], 1, False)
+    assert version["snapshot_number"] == 1
+    assert versions(harness)[0]["versions"] == [f"{SLUG}@0"]
     finish(harness, "eval")
     assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
-    assert snapshot.id not in {item.id for item in stored_snapshots(harness)}
-    assert not store_for(harness.settings).has(snapshot.hash)
+    assert [item.id for item in stored_snapshots(harness)] == [first["id"]]
+    assert not store_for(harness.settings).has(copy.hash)
     with harness.sessions() as session:
-        assert session.get(Artifact, snapshot.hash) is None
-    assert harness.client.get("/api/system/infrastructure").json()["snapshots"]["for_versions"] == 1
+        assert session.get(Artifact, copy.hash) is None
+    assert harness.client.get("/api/system/infrastructure").json()["snapshots"]["for_versions"] == 0
 
 
 def test_snapshot_migrations_round_trip(tmp_path: Path) -> None:
@@ -209,6 +259,40 @@ def test_snapshot_migrations_round_trip(tmp_path: Path) -> None:
     command.downgrade(config, "0019")
     with engine.connect() as connection:
         assert connection.execute(text("SELECT minibrain_id FROM snapshots")).scalars().all() == [1]
+
+
+def test_old_snapshots_become_numbered_dataset_versions(tmp_path: Path) -> None:
+    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
+    config = migration_config(engine)
+    command.upgrade(config, "0037")
+    rows = [
+        ("a", "2026-01-03 00:00:00", None, 0),
+        ("b", "2026-01-01 00:00:00", "2026-01-05 00:00:00", 0),
+        ("c", "2026-01-02 00:00:00", None, 0),
+        ("d", "2026-01-04 00:00:00", None, 3),
+    ]
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO datasets (slug, name, created_at, updated_at) "
+                "VALUES ('t', 'T', '2026-01-01', '2026-01-01')"
+            )
+        )
+        for digest, created, taken, feedback in rows:
+            connection.execute(
+                text(
+                    "INSERT INTO snapshots (dataset_id, hash, counts, labels, created_at, taken_at, feedback_rows) "
+                    "VALUES (1, :hash, '{}', '[]', :created, :taken, :feedback)"
+                ),
+                {"hash": digest, "created": created, "taken": taken, "feedback": feedback},
+            )
+    command.upgrade(config, "0038")
+    with engine.connect() as connection:
+        found = connection.execute(text("SELECT hash, number, saved FROM snapshots ORDER BY hash")).all()
+    assert found == [("a", 2, 1), ("b", 3, 1), ("c", 1, 1), ("d", None, 0)]
+    command.downgrade(config, "0037")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM snapshots WHERE dataset_id = 1")).scalar() == 4
 
 
 def test_two_snapshots_diff_by_input_with_label_shift(harness: Harness) -> None:

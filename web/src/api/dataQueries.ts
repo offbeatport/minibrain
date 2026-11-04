@@ -30,11 +30,12 @@ export function useDatasetFolders() {
     });
 }
 
-export function useSnapshots(slug: string) {
+export function useSnapshots(slug: string, enabled = true) {
     return useQuery({
         queryKey: dataKeys.snapshots(slug),
         queryFn: () =>
             unwrap(api.GET("/api/datasets/{slug}/snapshots", { params: { path: { slug } } })),
+        enabled: enabled && slug !== "",
     });
 }
 

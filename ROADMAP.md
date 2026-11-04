@@ -68,14 +68,14 @@ mapping comes down to a few fields.
 | Term | Meaning |
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
-| Version | Prompt-only (model + system prompt + few-shot examples) or trained (snapshot hash + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
-| Snapshot | A dataset's rows copied to content-hashed Parquet when a run starts; splits are derived from it |
+| Version | Prompt-only (model + system prompt + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
+| Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it. Internally a snapshot |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
 | Task type | Classify, Extract, Rewrite, Text-to-SQL or Distill; sets shape, schema, metric, recipe |
 | Golden set | 20–50 human-verified examples; defines the task and scores every version |
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
-| Rebase | Rebuilding a minibrain on a new base model from its snapshot, golden set and config, then comparing it with `current` |
+| Rebase | Rebuilding a minibrain on a new base model from its dataset version, golden set and config, then comparing it with `current` |
 | Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue |
 | Index | The minibrain's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
 
@@ -85,7 +85,7 @@ task type → golden set → version 0: prompt-only on the teacher, evaluated �
 acceptable.
 
 Otherwise: source → DuckDB (query in place or stage) → mapping / SQL → built-in steps → teacher labels + human review
-→ chat JSONL snapshot (train/eval split) → quality + PII + preview → LoRA training (worker subprocess) → eval vs base,
+→ dataset version (train/eval split) → quality + PII + preview → LoRA training (worker subprocess) → eval vs base,
 teacher and version 0 on the golden set + human review → promote → load adapter into pool → gateway
 `/v1/chat/completions`
 
@@ -211,15 +211,15 @@ Data is shared across models:
   over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
   SQL mode joins, unions, filters and cleans across sources. A dataset over one source can still say `FROM source`.
   Each custom model points at one dataset, and several models can use the same dataset to compare fairly.
-- A **snapshot** is a full copy of a dataset's rows, never a reference (see Snapshots). Each version records the
-  snapshot it trained and scored on.
+- A **dataset version** is a full copy of a dataset's rows, never a reference (see Dataset versions). Each model
+  version records the dataset version it trained and scored on.
 - Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
   model gets a new dataset. A dataset or source still in use cannot be deleted.
 - Catalogue: sources and datasets carry a name, an optional description and tags. Search covers names, table names,
   column names, descriptions and tags. Column stats (type, empty share, approximate distinct count, range for non-text
   types) come from a bounded sample (`SUMMARIZE` over the first 10,000 rows); the preview runs the query live, shows
   its first 20 rows and counts rows per label across the whole result; a dataset shows its train / held-out / test /
-  few-shot split while its last snapshot still matches its data and query.
+  few-shot split while its latest version still matches its data and query.
 - User SQL is parsed first (`json_serialize_sql`): exactly one SELECT, whose table names pick the sources to expose.
   It then runs in an in-memory DuckDB with external access off and the configuration locked: uploads are attached
   read-only, a folder is a view over its listed files and `allowed_paths` names exactly those files, and a query
@@ -257,19 +257,19 @@ Data is shared across models:
     bucket). minibrain lists `_delta_log/`, takes the newest commit (or checkpoint) version, and DuckDB's delta
     extension reads that version (`delta_scan(…, version)`) with `allowed_directories` limited to the table folder.
     Fingerprint: `v<version>-` plus a SHA-256 of the folder, the version and the newest log file's name, size and
-    modification time, so a snapshot names the table version it copied. Not from S3 or HTTPS: the extension's
+    modification time, so a dataset version names the table version it copied. Not from S3 or HTTPS: the extension's
     delta-kernel-rs reads the log over its own rustls and ring TLS, outside OpenSSL, so it is not FIPS-ready
     (`docs/security.md`, TLS in DuckDB extensions); those paths are refused with that reason. A folder holding
     `_delta_log` cannot be added as a plain folder source.
 - Remote fingerprints are cached for 30 seconds per source so listing pages does not hit a bucket or database on
-  every request. Everything goes through the row limit and the 30-second timeout, and snapshots copy the rows to
-  Parquet like any other source.
+  every request. Everything goes through the row limit and the 30-second timeout, and dataset versions copy the
+  rows to Parquet like any other source.
 - Materialize into the minibrain's DuckDB file only when previews get slow or the source must not be hit repeatedly.
 - dlt arrives with the first API source (Zendesk, Jira, Confluence), loading into the same DuckDB file. Its incremental
   state is what v2 "retrain on new data" runs on.
-- The DuckDB file is a cache, rebuildable from the source. The only durable data artifact is the snapshot.
+- The DuckDB file is a cache, rebuildable from the source. The only durable data artifact is the dataset version.
 - Gateway request logs are a source like any other; the Distill task reads them directly.
-- Sources are defined once per minibrain and feed both training (a frozen snapshot) and the index (continuous sync):
+- Sources are defined once per minibrain and feed both training (a saved dataset version) and the index (continuous sync):
   one connector, one PII policy, one set of access rules, one lineage.
 - Training uses only rows every user of the minibrain may see. Rows with narrower access go to the index only, where
   retrieval filters them per user.
@@ -335,11 +335,11 @@ Generated Q&A (`generate_qa`):
 Empty fields, exact and near duplicates (MinHash), token length vs `max_seq_len`, label imbalance, train/eval leakage,
 PII counts.
 
-Snapshot checks, run on every snapshot and stored with it; the report shows on the dataset and on the Training page
-before a run starts:
+Version checks, run on every dataset version (and every feedback copy) and stored with it; the report shows on the
+dataset and on the Training page before a run starts:
 
-- Hard stops, always on: no row with both an input and a label, or a single label. These refuse the snapshot, and so
-  the run.
+- Hard stops, always on: no row with both an input and a label, or a single label. These refuse the version, so a
+  dataset is not created and a query is not saved while they hold.
 - Warnings, each with an on/off switch under Settings → Data, never block: repeated inputs; the same input with
   different labels; label balance (one label above a share, 90% by default, or labels under a row count, 10 by
   default, both editable); train/test leakage (a test or held-out input also in training once case, spacing and
@@ -347,7 +347,7 @@ before a run starts:
   a token); personal data found by local patterns: email addresses, phone numbers, card numbers (Luhn-checked) and
   IBANs (mod-97-checked). The report says plainly that the patterns can miss names and addresses.
 - "Dismiss for this dataset" stores the check and a signature of its result on the dataset; the warning shows again
-  when a later snapshot's result for that check differs.
+  when a later version's result for that check differs.
 
 ### PII
 
@@ -360,35 +360,56 @@ before a run starts:
 - Consistent fakes, not `<PERSON>` tags, or the model learns to emit the tags.
 - Detection is risk reduction, not a guarantee; the UI says so. minibrain access control stays the real control.
 
-### Snapshots
+### Dataset versions
 
-- Taken when a version starts (training or scoring), by Prepare training data on the Training page, or with "Save
-  snapshot now" on a dataset. Taking one runs the dataset's query once in the main process, sorts the rows
-  (`ORDER BY ALL`) and writes them to Parquet; the file's SHA-256 is the snapshot id and its artifact id, so identical
-  rows are stored once and a re-take of unchanged data reuses the same snapshot.
+A dataset saves its rows when it is created, and each refresh is a new version, so what the preview shows and what
+trains are the same rows. "Snapshot" is the internal name (the `snapshots` table, `/api/datasets/<slug>/snapshots`);
+the UI says version.
+
+- Saved when a dataset is created with its columns or SQL (version 1), when its query or columns are saved, and with
+  Update on the dataset (or on Training, when its sources changed). A dataset created with no columns picked has no
+  version until its first successful mapping. Saving runs the dataset's query once in the main process, sorts the
+  rows (`ORDER BY ALL`) and writes them to Parquet; the file's SHA-256 is the version's hash and its artifact id, so
+  identical rows are stored once. Rows identical to the latest version make no new version (Update then only records
+  the sources' new fingerprints); rows identical to an older one make the next version, sharing its file.
+- Versions are numbered per dataset (`snapshots.number`, unique per dataset) and listed newest first: number, saved,
+  rows, labels, checks, the model versions that use it, size and hash. Migration 0038 numbered the snapshots that
+  existed in the order they were taken; snapshots that had merged feedback became feedback copies with no number.
+- Saving a query and saving its version are one step: a query that cannot be saved as a version (over the row limit,
+  no rows, a hard-stop check) is refused with the reason and nothing changes. Creating a dataset is refused the same
+  way.
 - Row limit: 200,000 rows by default (Settings → Data). A larger result is refused with a message to filter or sample
-  in the query (`USING SAMPLE reservoir(… ROWS) REPEATABLE (7)`) or raise the limit; the bound is what keeps taking a
-  snapshot quick enough to run in the request.
-- Splits are derived from the snapshot alone and deterministically (empty and repeated inputs dropped, seeded shuffle),
-  so training, evaluation and the gateway's prompt-only context read only the snapshot. Fewer than 100 usable rows
-  block training and scoring, not saving.
+  in the query (`USING SAMPLE reservoir(… ROWS) REPEATABLE (7)`) or raise the limit; the bound is what keeps saving a
+  version quick enough to run in the request.
+- Splits are derived from the version alone and deterministically (empty and repeated inputs dropped, seeded
+  shuffle), so training, evaluation and the gateway's prompt-only context read only the version. Fewer than 100
+  usable rows block training and scoring, not saving.
 - Data changed: every source has a cheap fingerprint (an upload's content hash; for a folder, a hash of its file
-  list with sizes and modification times; for a Delta table, its version and newest log file). A snapshot records its
-  sources' fingerprints and the query; a dataset and a model say when either changed since their last snapshot.
-- Diff: any two snapshots compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
-  rows per label, with samples of each. The model page links each version to the diff against the version before it,
-  next to the change in held-out accuracy; a version's scores say whether its data matches the live version's.
-- Feedback: a model's accepted feedback rows merge into every snapshot taken for it (see Feedback loop).
-- Retention: snapshots a version uses are kept; those taken for versions that were deleted are removed with their
-  files; of the saved snapshots no version uses, the last N per dataset stay (Settings → Data, 5 by default).
-  Infrastructure → Storage shows how much snapshots use.
+  list with sizes and modification times; for a Delta table, its version and newest log file). A version records
+  its sources' fingerprints and the query; the dataset, the model page and the Training page say "Sources changed
+  since v3" or "Query changed since v3" and offer Update. Nothing updates on its own.
+- Training and scoring pick a dataset version of the model's dataset (`snapshot_id` on `POST
+  /api/minibrains/<slug>/versions`), the latest by default; a run never reads the live query. A model's data is its
+  dataset's latest version.
+- Feedback: a model's accepted feedback rows merge into the picked version when a model version starts, as a
+  feedback copy (`base_id` names the dataset version, no number of its own); feedback that changes nothing reuses the
+  version itself (see Feedback loop).
+- Diff: any two versions compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
+  rows per label, with samples of each. The model page links each model version to the diff against the one before
+  it, next to the change in held-out accuracy; a model version's scores say whether its data matches the live one's.
+- Retention: dataset versions a model version uses are kept (with the version a used feedback copy starts from), and
+  so is each dataset's latest; feedback copies of deleted model versions are removed with their files; of the
+  versions no model uses, the last N per dataset stay (Settings → Data, 5 by default). Infrastructure → Storage shows
+  how much they use.
+- Later, not built: zero-copy versions for Iceberg and Delta tables that pin the table's snapshot id instead of
+  copying rows (the version then records the table version, not a file), and an opt-in "update when sources change".
 - `HF_DATASETS_CACHE` points at the job directory and is deleted when the job ends.
 
 ### Artifact storage
 
 - One location per install, set in Settings → Storage: a local folder under `MINIBRAIN_HOME` (default) or an
   S3-compatible bucket (AWS, MinIO, Ceph) by endpoint, bucket, prefix, region and keys. It is an `ArtifactStore`
-  backend over s3fs, so uploads, snapshots, adapters and logs all follow it, and workers and engines keep pulling
+  backend over s3fs, so uploads, dataset versions, adapters and logs all follow it, and workers and engines keep pulling
   artifacts through main.
 - minibrain connects only to the endpoint set there, with explicit keys (no instance-metadata lookups). The secret key
   is kept in a 0600 file under `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection"
@@ -533,7 +554,7 @@ once it matches; only deleting a base removes its files.
 ### Rebase
 
 1. A new base model is registered (offline bundle, pinned commit). Its chat template parity test runs first.
-2. `minibrain rebase --base <model>`, or one button, reruns every minibrain: training from the stored snapshot
+2. `minibrain rebase --base <model>`, or one button, reruns every minibrain: training from the stored dataset version
    (relabelled first if the teacher changed), then eval on the golden set.
 3. The report compares each rebased version with `current` on score, latency and cost.
 4. Deploying stays per minibrain and explicit. Nothing that is live changes until someone deploys.
@@ -555,10 +576,11 @@ once it matches; only deleting a base removes its files.
    the same input, ignoring case and spacing, that suggests different answers), then thumbs-down with no answer, then
    the rest, newest first. Assignment is "Assign to me"; every review and assignment is audited.
 4. Accepted feedback becomes the model's feedback rows: input and accepted answer, the latest review winning per input.
-   Every snapshot taken for the model (Prepare training data, or a version starting) merges them in: a dataset row
-   with the same trimmed input is replaced, a new input is added, and a row the dataset already agrees with changes
-   nothing. The snapshot records how many rows feedback added or relabelled ("Includes N rows from feedback" on
-   Training); "Save snapshot now" on a dataset leaves feedback out. Feedback rows fall into the derived splits like any
+   When a model version starts, they merge into the dataset version it trains on: a row with the same trimmed input
+   is replaced, a new input is added, and a row the dataset already agrees with changes nothing. The result is a
+   feedback copy of that dataset version that records how many rows feedback added or relabelled (the model card
+   shows "Version 3, plus N rows from feedback"); dataset versions themselves never hold feedback, so models that
+   share a dataset do not see each other's. Feedback rows fall into the derived splits like any
    other row; sending the worst failures to the golden set waits for golden set authoring.
 5. The model page and the Training page show "Feedback since vN: total (accepted)" and the reviews still waiting;
    "Train with feedback" trains a new version with the last trained version's recipe.
@@ -676,8 +698,9 @@ keys, and `/v1` stays key-only.
 - Training, Evaluations and Feedback cover every model, like Deployments and Monitor. Training and Evaluations are the
   kit's `DataGrid` with model and status filters kept in the URL: `?model=<slug>,<slug>&status=<status>,<status>`.
   - Training lists training and scoring jobs: model, version, job, status, progress, started, duration. A row opens
-    the job's log (`?job=<id>`). "Train a model" picks a model and opens `/training/<slug>`: its training data,
-    prepare step, new version (score a prompt or train) and recent jobs.
+    the job's log (`?job=<id>`). "Train a model" picks a model and opens `/training/<slug>`: its training data
+    (picking a dataset saves its first version if it has none), new version (the dataset version to use, latest by
+    default, then score a prompt or train) and recent jobs.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
     view.
@@ -751,10 +774,10 @@ keys, and `/v1` stays key-only.
   size and last change; a connected source shows its connection, path, table or query, and
   how its changes are tracked.
   A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
-  preview, label balance, splits, its snapshots (tick two to compare), the models that use it, "Save snapshot now"
-  and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
+  preview, label balance, splits, its versions (tick two to compare), the models that use it, Update when its sources
+  or query changed since the latest version, and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
   (`group:datasets`, `group:sources`, `group:upload`, `folder:3`, `source:12`, `dataset:<slug>`, plus
-  `&compare=<id>~<id>` for a snapshot diff) is the permalink; `/data/datasets/<slug>` redirects to it.
+  `&compare=<id>~<id>` for a version diff) is the permalink; `/data/datasets/<slug>` redirects to it.
 - Dataset folders (`dataset_folders`, `datasets.folder_id`) only organise; nothing a model trains on depends on them.
   They nest, sort before datasets (both by name), and a name is unique among its siblings, case aside. New folder sits
   on Datasets and on every folder; a folder shows its contents with counts, and Rename, Move to… and Delete. Rows move
@@ -763,7 +786,7 @@ keys, and `/v1` stays key-only.
   subfolders up one level (a clashing subfolder name gets a number) and deletes nothing else. Search still finds
   datasets inside folders and opens their path. Create, rename, move and delete are audited (`dataset_folder.*`), and
   so is a dataset changing folder (`dataset.move`).
-- Settings → Data: snapshot row limit, how many saved snapshots stay per dataset, and the snapshot checks with
+- Settings → Data: most rows in one version, how many unused versions stay per dataset, and the version checks with
   their limits. Settings → Storage: where artifacts live.
 - Settings → Connections: the buckets and databases that sources and imports read (see Connections), with each
   one's address, secret state, sources and test, and which DuckDB extensions are installed.
@@ -1022,9 +1045,10 @@ Everything in the v1 scope below, after M1.
       done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
 - [x] Preview of 5–10 examples
-- [ ] Quality score and PII report (snapshot checks with pattern-based PII done; Presidio and near duplicates
+- [ ] Quality score and PII report (version checks with pattern-based PII done; Presidio and near duplicates
       not yet)
-- [x] Content-hashed Parquet snapshots copied at training time, derived splits, row limit, diff, retention
+- [x] Dataset versions: content-hashed Parquet copies saved when a dataset is created or updated, picked at training
+      time; derived splits, row limit, diff, retention
 - [x] Artifact store on a local folder or an S3-compatible bucket
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
@@ -1092,7 +1116,7 @@ Everything in the v1 scope below, after M1.
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
 - [ ] Rebase: rebuild every minibrain on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
-      in the playground → review queue; accepted rows join the model's next snapshot; "Train with feedback"
+      in the playground → review queue; accepted rows join the next version's training data; "Train with feedback"
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
       Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
 - [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, image SBOMs per release,

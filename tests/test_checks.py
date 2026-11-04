@@ -102,17 +102,16 @@ def report_of(response: dict) -> dict[str, dict]:
     return {item["check"]: item for item in response["checks"]}
 
 
-def test_a_snapshot_carries_its_report_and_hard_stops_refuse_it(harness: Harness) -> None:
+def test_a_version_carries_its_report_and_hard_stops_refuse_it(harness: Harness) -> None:
     dataset(harness)
     report = report_of(harness.client.post("/api/datasets/tickets/snapshots").json())
     assert report["duplicates"]["status"] == "ok" and report["leakage"]["status"] == "ok"
-    harness.client.put(
-        "/api/datasets/tickets/mapping", json={"sql": "SELECT text AS input, 'billing' AS label FROM tickets"}
-    )
-    refused = harness.client.post("/api/datasets/tickets/snapshots")
+    single = {"sql": "SELECT text AS input, 'billing' AS label FROM tickets"}
+    refused = harness.client.put("/api/datasets/tickets/mapping", json=single)
     assert refused.status_code == 409 and refused.json()["detail"].startswith("Only one label")
+    assert harness.client.get("/api/datasets/tickets").json()["mapping"]["sql"] != single["sql"]
     harness.client.put("/api/settings/data", json={"checks_off": ["duplicates", "balance"]})
-    assert harness.client.post("/api/datasets/tickets/snapshots").status_code == 409
+    assert harness.client.put("/api/datasets/tickets/mapping", json=single).status_code == 409
 
 
 def test_dismissed_warnings_return_when_their_result_changes(harness: Harness) -> None:

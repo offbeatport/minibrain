@@ -79,6 +79,8 @@ class CardCheck(BaseModel):
 class CardData(BaseModel):
     dataset_slug: str | None
     dataset_name: str | None
+    dataset_version: int | None = None
+    snapshot_feedback_rows: int = 0
     snapshot_hash: str
     snapshot_rows: int
     snapshot_taken_at: str

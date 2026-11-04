@@ -9810,6 +9810,22 @@
             ],
             "title": "Dataset Name"
           },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version"
+          },
+          "snapshot_feedback_rows": {
+            "type": "integer",
+            "title": "Snapshot Feedback Rows",
+            "default": 0
+          },
           "snapshot_hash": {
             "type": "string",
             "title": "Snapshot Hash"
@@ -19381,6 +19397,28 @@
             ],
             "title": "Dataset"
           },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "base_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Number"
+          },
           "rows": {
             "type": "integer",
             "title": "Rows"
@@ -20416,6 +20454,17 @@
               }
             ],
             "title": "Epochs"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
           }
         },
         "type": "object",
@@ -20460,6 +20509,17 @@
               }
             ],
             "title": "Snapshot Dataset"
+          },
+          "snapshot_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Number"
           },
           "snapshot_rows": {
             "type": "integer",

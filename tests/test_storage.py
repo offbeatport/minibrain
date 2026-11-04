@@ -98,7 +98,7 @@ def test_artifacts_go_to_the_bucket_and_the_secret_never_comes_back(harness: Har
     pulled = harness.client.get(f"/internal/worker/artifacts/{snapshot['hash']}", headers=headers)
     assert pulled.status_code == 200 and pulled.content[:4] == b"PAR1"
     stores = {item["name"]: item for item in harness.client.get("/api/system/infrastructure").json()["stores"]}
-    assert stores["Snapshots"]["kind"] == "s3" and stores["Snapshots"]["free_bytes"] is None
+    assert stores["Dataset versions"]["kind"] == "s3" and stores["Dataset versions"]["free_bytes"] is None
 
 
 def test_switching_back_to_local_keeps_bucket_artifacts_readable(harness: Harness, bucket: MemoryFileSystem) -> None:

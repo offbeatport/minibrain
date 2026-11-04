@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.registry.models import (
     ApiKey,
+    Dataset,
     KeyScope,
     Minibrain,
     Snapshot,
@@ -65,7 +66,14 @@ def create_minibrain(session: Session, name: str, task: str, base_model: str) ->
     return minibrain
 
 
+def latest_version(dataset: Dataset) -> Snapshot | None:
+    numbered = [snapshot for snapshot in dataset.snapshots if snapshot.number is not None]
+    return max(numbered, key=lambda snapshot: snapshot.number or 0, default=None)
+
+
 def latest_snapshot(minibrain: Minibrain) -> Snapshot | None:
+    if minibrain.dataset is not None:
+        return latest_version(minibrain.dataset)
     if minibrain.snapshot is not None:
         return minibrain.snapshot
     return max(minibrain.snapshots, key=lambda snapshot: snapshot.id, default=None)
@@ -88,10 +96,9 @@ def next_version_number(minibrain: Minibrain) -> int:
     return minibrain.last_version
 
 
-def create_version(session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any]) -> Version:
-    snapshot = latest_snapshot(minibrain)
-    if snapshot is None:
-        raise ConflictError("pick a dataset before creating a version")
+def create_version(
+    session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any], snapshot: Snapshot
+) -> Version:
     version = Version(
         minibrain=minibrain,
         snapshot=snapshot,

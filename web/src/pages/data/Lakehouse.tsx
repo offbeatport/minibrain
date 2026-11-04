@@ -29,8 +29,8 @@ const FORMAT_ORDER: TableFormat[] = ["iceberg", "delta"];
 
 const DESCRIPTIONS: Record<TableFormat, string> = {
     iceberg:
-        "minibrain reads the table's newest metadata from S3 and queries its current snapshot in place. Each snapshot taken here copies the rows.",
-    delta: "minibrain reads the table's newest version from its _delta_log and queries it in place. Each snapshot taken here copies the rows.",
+        "minibrain reads the table's newest metadata from S3 and queries its current snapshot in place. Each dataset version saved here copies the rows.",
+    delta: "minibrain reads the table's newest version from its _delta_log and queries it in place. Each dataset version saved here copies the rows.",
 };
 
 const NOT_FIPS_READY =

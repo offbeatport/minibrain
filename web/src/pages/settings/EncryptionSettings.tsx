@@ -428,7 +428,7 @@ export function EncryptionSettings() {
         <PanelSection
             icon={Lock}
             title="Encryption at rest"
-            description="Each stored file has its own data key; the master key here wraps it. Uploads, snapshots, adapters, logs and staging copies are encrypted."
+            description="Each stored file has its own data key; the master key here wraps it. Uploads, dataset versions, adapters, logs and staging copies are encrypted."
         >
             <ErrorLine error={status.error} />
             {status.data && (

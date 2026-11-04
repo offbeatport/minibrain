@@ -131,6 +131,8 @@ class SnapshotInfo(BaseModel):
     id: int
     hash: str
     dataset: str | None
+    number: int | None = None
+    base_number: int | None = None
     rows: int
     size: int
     counts: dict[str, int]
@@ -394,6 +396,7 @@ class VersionInfo(BaseModel):
     snapshot_hash: str
     snapshot_id: int
     snapshot_dataset: str | None = None
+    snapshot_number: int | None = None
     snapshot_rows: int = 0
     recipe: dict[str, Any]
     golden: SplitScore | None
@@ -516,6 +519,7 @@ class VersionCreate(BaseModel):
     kind: Literal["prompt", "lora"]
     max_rows: int | None = Field(default=None, ge=10)
     epochs: float | None = Field(default=None, gt=0, le=10)
+    snapshot_id: int | None = None
 
 
 class CompleteRequest(BaseModel):

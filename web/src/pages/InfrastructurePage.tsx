@@ -406,23 +406,23 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     );
 }
 
-function SnapshotUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
+function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
     const usage = info?.snapshots;
     return (
         <PanelSection
             icon={Archive}
-            title="Snapshots"
-            description="Frozen copies of datasets that versions train and score on. Identical rows are stored once."
+            title="Dataset versions"
+            description="Saved copies of dataset rows that models train and score on, and the copies that add accepted feedback. Identical rows are stored once."
         >
             <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-x-8 gap-y-4">
-                    <Stat label="Snapshots" value={count(usage?.count)} />
+                    <Stat label="Copies" value={count(usage?.count)} />
                     <Stat label="Stored" value={bytes(usage?.size)} />
-                    <Stat label="Used by versions" value={count(usage?.for_versions)} />
-                    <Stat label="Saved, unused" value={count(usage?.saved)} />
+                    <Stat label="Used by models" value={count(usage?.for_versions)} />
+                    <Stat label="Unused, kept" value={count(usage?.saved)} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    {`Snapshots a version uses are kept; those of deleted versions are removed, and the last ${count(usage?.keep)} saved per dataset stay. `}
+                    {`Versions a model uses are kept, and so is each dataset's latest; of the rest, the last ${count(usage?.keep)} per dataset stay. `}
                     <Link href="/settings/data" className="text-primary hover:underline">
                         Change retention
                     </Link>
@@ -617,7 +617,7 @@ export function InfrastructurePage() {
             {active === "/infrastructure/storage" && (
                 <PanelSections>
                     <StorageSection info={infrastructure.data} />
-                    <SnapshotUsageSection info={infrastructure.data} />
+                    <VersionUsageSection info={infrastructure.data} />
                 </PanelSections>
             )}
         </Page>

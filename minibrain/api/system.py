@@ -200,7 +200,7 @@ def infrastructure(
         stores=[
             database,
             folder_store("Model files", models_dir(settings), int(weights or 0)),
-            artifact_store("Snapshots", settings, store, usage.size),
+            artifact_store("Dataset versions", settings, store, usage.size),
             artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
         ],
         snapshots=usage,
@@ -210,6 +210,7 @@ def infrastructure(
 def snapshot_usage(session: Session) -> SnapshotUsage:
     snapshots = session.scalars(select(Snapshot).where(Snapshot.minibrain_id.is_(None))).all()
     used = set(session.scalars(select(Version.snapshot_id)))
+    used |= {snapshot.base_id for snapshot in snapshots if snapshot.id in used and snapshot.base_id is not None}
     stored = {snapshot.artifact_id: snapshot.size for snapshot in snapshots if snapshot.artifact_id}
     return SnapshotUsage(
         count=len(snapshots),

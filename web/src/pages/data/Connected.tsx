@@ -267,7 +267,7 @@ export function AddS3Dialog({
         <AddDialog
             open={open}
             title="Add an S3 path"
-            description="minibrain lists the matching objects and reads them in place as one table each time a query runs. Nothing is copied until a snapshot is taken."
+            description="minibrain lists the matching objects and reads them in place as one table each time a query runs. Nothing is copied until a dataset saves a version."
             pending={add.isPending}
             ready={chosen !== null && path.trim().startsWith("s3://")}
             submitLabel="Add S3 path"

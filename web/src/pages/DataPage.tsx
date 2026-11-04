@@ -380,8 +380,8 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     const snapshot = detail.snapshot;
     return (
         <Section
-            title="Snapshot"
-            caption="A frozen copy of the cleaned rows, split into a test set, a held-out set, few-shot examples and training rows."
+            title="Dataset version"
+            caption="The saved copy of the dataset's rows that new versions train on, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
                 <Button
                     size="sm"
@@ -389,10 +389,10 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
                     disabled={build.isPending || building}
                 >
                     {build.isPending || building
-                        ? "Building…"
+                        ? "Saving…"
                         : snapshot
-                          ? "Rebuild"
-                          : "Build dataset"}
+                          ? "Update"
+                          : "Save version 1"}
                 </Button>
             }
         >
@@ -409,12 +409,16 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
                         <Stat label="Training" value={count(snapshot.counts.train)} />
                         <Stat label="Labels" value={count(snapshot.labels.length)} />
                         <Stat
-                            label="Snapshot"
+                            label="Version"
+                            value={snapshot.number == null ? "–" : count(snapshot.number)}
+                        />
+                        <Stat
+                            label="SHA-256"
                             value={<span className="font-mono">{snapshot.hash.slice(0, 12)}</span>}
                         />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Built {dateTime(snapshot.created_at)}
+                        Saved {dateTime(snapshot.taken_at ?? snapshot.created_at)}
                     </p>
                     <div>
                         <Button
@@ -429,7 +433,7 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
                 </div>
             ) : (
                 <p className="text-sm text-muted-foreground">
-                    Build the dataset before scoring or training.
+                    Save a version of the dataset before scoring or training.
                 </p>
             )}
         </Section>
@@ -533,7 +537,7 @@ function ModelData({ slug }: { slug: string }) {
         <Page>
             <PageHeader
                 title="Data"
-                caption={`The dataset ${model?.name ?? "this model"} trains on, its mapping and its snapshot.`}
+                caption={`The dataset ${model?.name ?? "this model"} trains on, its mapping and its latest version.`}
             />
             <ErrorLine error={minibrains.error} />
             {minibrains.data && !model && (

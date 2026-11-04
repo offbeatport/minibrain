@@ -10,5 +10,5 @@ export function datasetDeleteNote(names: string[]): string {
         return "The query goes; the sources it reads stay.";
     }
     const plural = names.length > 1;
-    return `Used by ${listed(names)}. ${plural ? "They keep their" : "It keeps its"} trained versions and data snapshots, and ${plural ? "need" : "needs"} a new dataset before ${plural ? "they train" : "it trains"} again. The sources it reads stay.`;
+    return `Used by ${listed(names)}. ${plural ? "They keep their" : "It keeps its"} trained versions and the data they trained on, and ${plural ? "need" : "needs"} a new dataset before ${plural ? "they train" : "it trains"} again. The sources it reads stay.`;
 }

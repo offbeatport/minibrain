@@ -1,20 +1,93 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { Database } from "lucide-react";
-import { Button, Field, Link, NumberField } from "obp-ui";
+import {
+    Button,
+    Field,
+    Link,
+    NumberField,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "obp-ui";
 import { useEffect, useRef, useState } from "react";
 import { type JobInfo, type MinibrainDetail, api, unwrap } from "~/api/client";
+import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
 import { ErrorLine, PanelSection, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useInvalidate } from "~/lib/jobs";
+import { relativeTime } from "~/lib/time";
 import { ModelChecks } from "./data/Checks";
 import { TrainingData } from "./data/TrainingData";
 import { ModelDataNotice } from "./data/versionData";
 
 const FINISHED_SHOWN = 5;
+
+function DataLine({
+    detail,
+    snapshot,
+}: {
+    detail: MinibrainDetail;
+    snapshot: SnapshotInfo | null | undefined;
+}) {
+    if (!snapshot) {
+        return null;
+    }
+    const name = detail.dataset_name ?? "Training data";
+    const version =
+        snapshot.number === null || snapshot.number === undefined
+            ? ""
+            : `, version ${snapshot.number}`;
+    return (
+        <p className="text-sm text-muted-foreground tabular-nums">
+            {`${name}${version}: ${count(snapshot.counts.train)} training rows, ${count(snapshot.counts.golden)} in the test set, ${count(snapshot.labels.length)} labels. Accepted feedback joins these rows when a version starts. `}
+            <Link
+                href={`/data?minibrain=${encodeURIComponent(detail.slug)}`}
+                className="text-primary hover:underline"
+            >
+                Data and test set
+            </Link>
+        </p>
+    );
+}
+
+function VersionPicker({
+    versions,
+    value,
+    onChange,
+}: {
+    versions: SnapshotInfo[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <Field id="dataset-version" label="Dataset version">
+            <Select value={value} onValueChange={(next) => next && onChange(String(next))}>
+                <SelectTrigger id="dataset-version" className="w-72 max-w-full">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {versions.map((item, index) => (
+                        <SelectItem
+                            key={item.id}
+                            value={String(item.id)}
+                            description={`${count(item.rows)} rows · saved ${relativeTime(item.taken_at ?? item.created_at)}`}
+                        >
+                            {index === 0
+                                ? `Version ${item.number} (latest)`
+                                : `Version ${item.number}`}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </Field>
+    );
+}
 
 function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusTrain: boolean }) {
     const slug = detail.slug;
@@ -30,11 +103,18 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     });
     const [maxRows, setMaxRows] = useState<number | null>(Number(preset.rows) || 3000);
     const [epochs, setEpochs] = useState<number | null>(Number(preset.epochs) || 1);
-    const feedbackRows = detail.snapshot?.feedback_rows ?? 0;
+    const versions = useSnapshots(detail.dataset ?? "", Boolean(detail.dataset));
+    const options = versions.data ?? [];
+    const [picked, setPicked] = useState<string | null>(null);
+    const chosen = options.find((item) => String(item.id) === picked);
+    const shown = chosen ?? detail.snapshot;
     const create = useMutation({
         mutationFn: (body: { kind: "prompt" | "lora"; max_rows?: number; epochs?: number }) =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/versions", { params: { path: { slug } }, body }),
+                api.POST("/api/minibrains/{slug}/versions", {
+                    params: { path: { slug } },
+                    body: chosen ? { ...body, snapshot_id: chosen.id } : body,
+                }),
             ),
         onSuccess: invalidate,
     });
@@ -48,21 +128,18 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
             title="New version"
             caption="Score the base model with a prompt first. Train when the score shows a gap worth closing."
         >
-            {detail.snapshot && (
-                <p className="mb-4 text-sm text-muted-foreground tabular-nums">
-                    {`${detail.dataset_name ?? "Training data"}: ${count(detail.snapshot.counts.train)} training rows, ${count(detail.snapshot.counts.golden)} in the test set, ${count(detail.snapshot.labels.length)} labels. `}
-                    {feedbackRows > 0 &&
-                        `Includes ${count(feedbackRows)} ${feedbackRows === 1 ? "row" : "rows"} from feedback. `}
-                    <Link
-                        href={`/data?minibrain=${encodeURIComponent(slug)}`}
-                        className="text-primary hover:underline"
-                    >
-                        Data and test set
-                    </Link>
-                </p>
-            )}
-            <ModelDataNotice slug={slug} />
-            <ModelChecks slug={slug} />
+            <div className="mb-4 flex flex-col gap-3">
+                <DataLine detail={detail} snapshot={shown} />
+                {options.length > 0 && (
+                    <VersionPicker
+                        versions={options}
+                        value={String((chosen ?? options[0]).id)}
+                        onChange={setPicked}
+                    />
+                )}
+                <ModelDataNotice slug={slug} />
+            </div>
+            <ModelChecks snapshot={shown} />
             <div className="flex flex-wrap items-end gap-6">
                 <Button variant="outline" onClick={() => create.mutate({ kind: "prompt" })}>
                     Score prompt-only version
@@ -115,7 +192,7 @@ function prepareHint(dataset: string, mapped: boolean, preparing: boolean): stri
     if (!mapped) {
         return "Pick the input and label columns above and save them first.";
     }
-    return "Splits the rows into training, held-out, few-shot and test rows. Takes a few seconds.";
+    return "Models train on a saved version of the dataset's rows, split into training, held-out, few-shot and test rows.";
 }
 
 function AddTrainingData({
@@ -148,7 +225,7 @@ function AddTrainingData({
         <PanelSection
             icon={Database}
             title="Training data"
-            description="This model has no examples yet. Add labelled examples, prepare them, then train."
+            description="This model has no examples yet. Add labelled examples, pick the dataset, then train."
         >
             <div className="flex flex-col gap-4">
                 <TrainingData dataset={dataset} onDataset={setDataset} />
@@ -158,7 +235,7 @@ function AddTrainingData({
                             onClick={() => prepare.mutate()}
                             disabled={!dataset || !mapped || busy}
                         >
-                            {busy ? "Preparing…" : "Prepare training data"}
+                            {busy ? "Saving…" : "Use this dataset"}
                         </Button>
                         <output className="text-sm text-muted-foreground">
                             {prepareHint(dataset, mapped, busy)}

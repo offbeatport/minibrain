@@ -36,7 +36,7 @@ from minibrain.data.shared import (
     sources_in,
     tables_of,
 )
-from minibrain.data.snapshots import cleanup, model_snapshot_now
+from minibrain.data.snapshots import cleanup, take_version, version_if_mapped
 from minibrain.data.sources import safe_filename
 from minibrain.models.registry import ACTIVE_STATUSES, available_bases, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
@@ -74,7 +74,9 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
     minibrain.tags = user_tags(body.tags)
     if body.sample:
         with sample_file(SAMPLE_FILE).open("rb") as stream:
-            attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
+            version_if_mapped(
+                session, settings, attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
+            )
     session.commit()
     return detail(settings, minibrain)
 
@@ -174,7 +176,9 @@ def upload_source(
     slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    attach_upload(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
+    dataset = attach_upload(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
+    version_if_mapped(session, settings, dataset)
+    cleanup(session, settings)
     session.commit()
     return detail(settings, minibrain)
 
@@ -209,7 +213,7 @@ def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     minibrain = create_minibrain(session, free_name(session, SAMPLE_NAME), "classify", DEFAULT_BASE_MODEL)
     minibrain.description = SAMPLE_DESCRIPTION
     with sample_file(SAMPLE_FILE).open("rb") as stream:
-        attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream)
+        version_if_mapped(session, settings, attach_upload(session, settings, store, minibrain, SAMPLE_FILE, stream))
     session.commit()
     return SampleDetail(**detail(settings, minibrain).model_dump(), base_name=base_name, download_bytes=download_bytes)
 
@@ -228,7 +232,10 @@ def update_mapping(
     slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    apply_mapping(session, settings, store, dataset_of(minibrain), body)
+    dataset = dataset_of(minibrain)
+    apply_mapping(session, settings, store, dataset, body)
+    take_version(session, settings, dataset)
+    cleanup(session, settings)
     session.commit()
     return detail(settings, minibrain)
 
@@ -248,7 +255,7 @@ def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreD
 @router.post("/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
 def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
     minibrain = get_minibrain(session, slug)
-    minibrain.snapshot = model_snapshot_now(session, settings, minibrain, saved=True)
+    take_version(session, settings, dataset_of(minibrain))
     cleanup(session, settings)
     session.commit()
     return detail(settings, minibrain)

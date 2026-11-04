@@ -148,7 +148,7 @@ def snapshot_rows(harness: Harness, snapshot_id: int) -> dict[str, str]:
     return {text or "": label or "" for text, label in read_rows(location)}
 
 
-def test_accepted_feedback_joins_the_next_snapshot(harness: Harness) -> None:
+def test_accepted_feedback_joins_the_rows_a_new_version_trains_on(harness: Harness) -> None:
     before = create_with_dataset(harness)
     relabel = played(harness, "ticket 0 about billing", "down", correction="bug")
     added = played(harness, "my card was declined", "up", output="billing")
@@ -160,18 +160,24 @@ def test_accepted_feedback_joins_the_next_snapshot(harness: Harness) -> None:
     review(harness, rejected, "reject")
     summary = harness.client.get(f"/api/minibrains/{SLUG}/feedback/summary").json()
     assert summary == summary | {"version": None, "total": 5, "accepted": 3, "pending": 1, "rows": 3}
-    response = harness.client.post(f"/api/minibrains/{SLUG}/snapshots")
-    snapshot = response.json()["snapshot"]
-    assert (snapshot["feedback_rows"], snapshot["rows"]) == (2, 201)
-    assert snapshot["hash"] != before["hash"]
-    rows = snapshot_rows(harness, snapshot["id"])
+    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
+    assert (detail["snapshot"]["id"], detail["snapshot"]["feedback_rows"]) == (before["id"], 0)
+    version = add_version(harness, "prompt")
+    assert (version["snapshot_number"], version["snapshot_rows"]) == (before["number"], 201)
+    with harness.sessions() as session:
+        copy = session.get(Snapshot, version["snapshot_id"])
+        assert copy is not None
+        assert (copy.base_id, copy.feedback_rows, copy.number) == (before["id"], 2, None)
+        assert copy.hash != before["hash"]
+    rows = snapshot_rows(harness, version["snapshot_id"])
     assert rows["ticket 0 about billing"] == "bug" and rows["my card was declined"] == "billing"
     assert rows["ticket 2 about account"] == "account" and rows["ticket 3 about feature"] == "feature"
-    version = add_version(harness, "prompt")
-    assert version["snapshot_id"] == snapshot["id"]
+    assert snapshot_rows(harness, before["id"])["ticket 0 about billing"] == "billing"
     finish(harness, "eval")
+    again = add_version(harness, "prompt")
+    assert again["snapshot_id"] == version["snapshot_id"]
     later = harness.client.get(f"/api/minibrains/{SLUG}/feedback/summary").json()
-    assert (later["version"], later["total"], later["accepted"], later["rows"]) == (0, 0, 0, 3)
+    assert (later["version"], later["total"], later["accepted"], later["rows"]) == (1, 0, 0, 3)
 
 
 def test_saving_a_dataset_snapshot_leaves_feedback_out(harness: Harness) -> None:

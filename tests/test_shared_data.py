@@ -40,6 +40,7 @@ def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_snapshots
     harness.client.post("/api/minibrains", json={"name": "Triage"})
     harness.client.put("/api/minibrains/triage/dataset", json={"dataset": "tickets"})
     taken = snapshot_hash(harness, "triage")
+    assert harness.client.post("/api/minibrains/triage/versions", json={"kind": "prompt"}).status_code == 201
     assert harness.client.get("/api/datasets/tickets").json()["model_names"] == ["Triage"]
     assert "used by Tickets" in harness.client.delete(f"/api/sources/{source['id']}").json()["detail"]
     assert harness.client.delete("/api/datasets/tickets").status_code == 204

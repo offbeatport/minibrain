@@ -2,8 +2,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Link } from "obp-ui";
 import type { VersionInfo } from "~/api/client";
 import { useMinibrain } from "~/api/queries";
-import { compareParam } from "./SnapshotDiff";
-import { ChangeNotice } from "./Snapshots";
+import { ChangeNotice } from "./DatasetVersions";
+import { compareParam } from "./VersionDiff";
 import { itemHref } from "./catalogue";
 
 function previousOf(version: VersionInfo, versions: VersionInfo[]): VersionInfo | undefined {
@@ -88,7 +88,8 @@ export function ModelDataNotice({ slug }: { slug: string }) {
         <ChangeNotice
             changed={detail.data?.changed}
             snapshot={detail.data?.snapshot}
-            after="The next training or scoring run takes a new one."
+            dataset={detail.data?.dataset}
+            after="New versions train on it until the dataset is updated."
         />
     );
 }

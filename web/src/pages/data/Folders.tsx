@@ -118,7 +118,7 @@ export function AddFolderDialog({
                         <DialogTitle>Add a folder</DialogTitle>
                         <DialogDescription>
                             minibrain reads the files where they are, as one table, each time a
-                            query runs. Nothing is copied until a snapshot is taken.
+                            query runs. Nothing is copied until a dataset saves a version.
                         </DialogDescription>
                     </DialogHeader>
                     <FieldGroup>
