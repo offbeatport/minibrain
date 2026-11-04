@@ -699,7 +699,7 @@ function DiscoverSkeleton({
                         columns={columns}
                         rows={[]}
                         loading
-                        loadingRows={12}
+                        loadingRows="fill"
                         loadingLines={3}
                         storageKey="minibrain.discover.columns"
                         columnPicker
