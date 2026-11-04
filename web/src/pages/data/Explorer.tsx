@@ -60,6 +60,7 @@ import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFold
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
 import { AddLakehouseDialog, LakehouseGroup } from "./Lakehouse";
+import { SourceTable } from "./SourceTable";
 import { SourcesOverview } from "./Sources";
 import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
@@ -73,6 +74,7 @@ import {
     datasetText,
     datasetsInside,
     folderIndex,
+    groupOf,
     inGroup,
     itemHref,
     itemKey,
@@ -253,6 +255,8 @@ function GroupDetail({
     adder,
     onUploaded,
     onAdd,
+    onSelect,
+    onCreated,
 }: {
     kind: SourceGroupId;
     sources: SourceSummary[];
@@ -260,28 +264,41 @@ function GroupDetail({
     adder: SourceAdder;
     onUploaded: (source: SourceSummary) => void;
     onAdd: (kind: AddKind) => void;
+    onSelect: (item: ItemRef) => void;
+    onCreated: (dataset: DatasetSummary) => Promise<void>;
 }) {
-    const members = sources.filter((source) => source.kind === kind);
+    const grouped = sources.filter((source) => groupOf(source.kind).id === kind);
+    const table = grouped.length > 0 && (
+        <SourceTable sources={grouped} onSelect={onSelect} onCreated={onCreated} />
+    );
+    if (kind !== "upload") {
+        return (
+            <div className="flex flex-col gap-6">
+                {kind === "folder" ? (
+                    <FoldersGroup sources={sources} datasets={datasets} onAdded={onUploaded} />
+                ) : kind === "lakehouse" ? (
+                    <LakehouseGroup
+                        sources={sources}
+                        datasets={datasets}
+                        onAdd={() => onAdd(kind)}
+                    />
+                ) : (
+                    <ConnectedGroup
+                        kind={kind}
+                        sources={sources}
+                        datasets={datasets}
+                        onAdd={() => onAdd(kind)}
+                    />
+                )}
+                {table}
+            </div>
+        );
+    }
+    const members = grouped;
     const ids = new Set(members.map((source) => source.id));
     const built = datasets.filter((dataset) =>
         dataset.sources.some((source) => ids.has(source.id)),
     );
-    if (kind === "folder") {
-        return <FoldersGroup sources={sources} datasets={datasets} onAdded={onUploaded} />;
-    }
-    if (kind === "lakehouse") {
-        return <LakehouseGroup sources={sources} datasets={datasets} onAdd={() => onAdd(kind)} />;
-    }
-    if (kind !== "upload") {
-        return (
-            <ConnectedGroup
-                kind={kind}
-                sources={sources}
-                datasets={datasets}
-                onAdd={() => onAdd(kind)}
-            />
-        );
-    }
     return (
         <div className="flex flex-col gap-6">
             <header className="flex flex-wrap items-start justify-between gap-3">
@@ -315,10 +332,7 @@ function GroupDetail({
                     dataset from it under Datasets.
                 </EmptyState>
             ) : (
-                <p className="text-sm text-muted-foreground">
-                    Pick a file to see its columns, rows and the datasets that read it. Each file is
-                    a table in dataset SQL, under the name shown on it.
-                </p>
+                table
             )}
         </div>
     );
@@ -674,6 +688,8 @@ export function DataExplorer() {
                     adder={adder}
                     onUploaded={onUploaded}
                     onAdd={add}
+                    onSelect={select}
+                    onCreated={created}
                 />
             );
         } else if (selected.kind === "source") {

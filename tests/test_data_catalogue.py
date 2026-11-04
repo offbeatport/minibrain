@@ -170,3 +170,18 @@ def test_editing_tags_keeps_the_system_tags(harness: Harness) -> None:
     assert sample["tags"] == ["minibrain:sample"]
     edited = harness.client.patch(f"/api/sources/{sample['id']}", json={"tags": ["demo"]}).json()
     assert edited["tags"] == ["minibrain:sample", "demo"]
+
+
+def test_a_dataset_can_stack_sources_that_share_columns(harness: Harness) -> None:
+    sources = [
+        harness.client.post("/api/sources", files={"file": (name, tickets_csv(rows), "text/csv")}).json()
+        for name, rows in (("march.csv", 200), ("april.csv", 150))
+    ]
+    sql = "\nUNION ALL\n".join(
+        f'SELECT "text" AS input, "category" AS label FROM "{source["table"]}"' for source in sources
+    )
+    response = harness.client.post("/api/datasets", json={"name": "Tickets", "sql": sql})
+    assert response.status_code == 201, response.text
+    dataset = response.json()
+    assert sorted(source["id"] for source in dataset["sources"]) == sorted(source["id"] for source in sources)
+    assert dataset["rows"] == 350
