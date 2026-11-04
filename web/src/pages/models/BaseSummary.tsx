@@ -1,6 +1,16 @@
-import { Button, Link } from "obp-ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Link,
+} from "obp-ui";
+import { useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { CopyButton } from "~/components/CopyButton";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
@@ -48,9 +58,6 @@ function DiskLine({
 }) {
     const state = option?.added?.availability.state;
     if (option && !need) {
-        if (state === "downloading" || state === "importing") {
-            return <StatusText tone="info">Downloading now; nothing more to download</StatusText>;
-        }
         if (state === "missing") {
             return (
                 <span className="flex flex-wrap items-center gap-2">
@@ -123,7 +130,17 @@ function PoolFit({
     );
 }
 
-function ComputeHelp({ option, catalog }: { option: BaseOption; catalog: CatalogResponse }) {
+function RunElsewhere({
+    option,
+    catalog,
+    open,
+    onOpenChange,
+}: {
+    option: BaseOption;
+    catalog: CatalogResponse;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
     const { entry, variant } = option;
     if (!entry || !variant) {
         return null;
@@ -131,66 +148,96 @@ function ComputeHelp({ option, catalog }: { option: BaseOption; catalog: Catalog
     const origin = window.location.origin;
     const others = catalog.pools.filter((pool) => pool.name !== catalog.pool);
     const model = option.baseKey ?? addedKey(entry, variant);
+    const commands = `minibrain worker --api-url ${origin} --pool gpu\nminibrain engine --model ${model} --main-url ${origin} --pool gpu --host 0.0.0.0`;
     return (
-        <div className="flex flex-col gap-3 rounded-md border px-3 py-3 text-sm">
-            <div className="flex flex-col gap-0.5">
-                <StatusText tone="info" className="whitespace-normal">
-                    Needs more compute than this machine has
-                </StatusText>
-                <span className="text-muted-foreground tabular-nums">
-                    {variant.fit.available_bytes
-                        ? `It needs about ${bytes(variant.fit.needed_bytes)} of memory; ${catalog.hardware.machine} has ${bytes(variant.fit.available_bytes)}.`
-                        : `It needs about ${bytes(variant.fit.needed_bytes)} of memory.`}
-                </span>
-            </div>
-            <ol className="flex list-decimal flex-col gap-3 pl-5">
-                <li className="flex flex-col gap-1.5">
-                    <span className="font-medium">Use a compute pool that fits</span>
-                    {others.length > 0 ? (
-                        <ul className="flex flex-col gap-1">
-                            {others.map((pool) => (
-                                <PoolFit
-                                    key={pool.name}
-                                    pool={pool}
-                                    entry={entry}
-                                    variant={variant.id}
-                                />
-                            ))}
-                        </ul>
-                    ) : (
-                        <span className="text-muted-foreground">
-                            No other compute pool has a machine online yet.
-                        </span>
-                    )}
-                </li>
-                <li className="flex flex-col gap-1.5">
-                    <span className="font-medium">Add a GPU machine to a compute pool</span>
-                    <span className="text-muted-foreground">
-                        Install minibrain on it, and set MINIBRAIN_WORKER_TOKEN and
-                        MINIBRAIN_GATEWAY_TOKEN from secrets/worker_token and secrets/gateway_token
-                        in this install's home folder. Then start a worker for training and an
-                        engine for serving:
-                    </span>
-                    <pre className="overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-sm">
-                        {`minibrain worker --api-url ${origin} --pool gpu\nminibrain engine --model ${model} --main-url ${origin} --pool gpu --host 0.0.0.0`}
-                    </pre>
-                    <span>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>{`Where to run ${option.name}`}</DialogTitle>
+                    <DialogDescription>
+                        You can add it now either way: the weights download to this install, and it
+                        trains or serves once a machine that fits joins a pool.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex min-w-0 flex-col gap-5 text-sm">
+                    <section className="flex min-w-0 flex-col gap-1.5">
+                        <h3 className="font-medium">A compute pool that fits</h3>
+                        {others.length > 0 ? (
+                            <ul className="flex flex-col gap-1">
+                                {others.map((pool) => (
+                                    <PoolFit
+                                        key={pool.name}
+                                        pool={pool}
+                                        entry={entry}
+                                        variant={variant.id}
+                                    />
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground">
+                                No other compute pool has a machine online yet.
+                            </p>
+                        )}
+                    </section>
+                    <section className="flex min-w-0 flex-col gap-1.5">
+                        <h3 className="font-medium">A GPU machine in a new pool</h3>
+                        <p className="text-muted-foreground">
+                            Install minibrain on it and set MINIBRAIN_WORKER_TOKEN and
+                            MINIBRAIN_GATEWAY_TOKEN from secrets/worker_token and
+                            secrets/gateway_token in this install's home folder. Then start a worker
+                            for training and an engine for serving:
+                        </p>
+                        <div className="flex items-start gap-2 rounded-md border bg-muted px-3 py-2">
+                            <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-sm">
+                                {commands}
+                            </pre>
+                            <CopyButton value={commands} label="Copy the commands" />
+                        </div>
                         <Link
                             href="/infrastructure/machines"
-                            className="text-primary hover:underline"
+                            className="w-fit text-primary hover:underline"
                         >
                             See machines and pools in Infrastructure
                         </Link>
-                    </span>
-                </li>
-                <li className="flex flex-col gap-0.5">
-                    <span className="font-medium">Or add it now, and run it later</span>
-                    <span className="text-muted-foreground">
-                        The weights download to this install; train or serve it once a machine that
-                        fits has joined a pool.
-                    </span>
-                </li>
-            </ol>
+                    </section>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ComputeHelp({
+    option,
+    catalog,
+    onPickAnother,
+}: {
+    option: BaseOption;
+    catalog: CatalogResponse;
+    onPickAnother: () => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const variant = option.variant;
+    if (!variant) {
+        return null;
+    }
+    const needed = bytes(variant.fit.needed_bytes);
+    const reason = variant.fit.available_bytes
+        ? `Too big for ${catalog.hardware.machine}: it needs about ${needed} of memory, and this machine has ${bytes(variant.fit.available_bytes)}.`
+        : `Too big for this machine: it needs about ${needed} of memory.`;
+    return (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <StatusText tone="warning" className="min-w-0 whitespace-normal tabular-nums">
+                {reason}
+            </StatusText>
+            <span className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+                    Where to run it
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={onPickAnother}>
+                    Pick a smaller one
+                </Button>
+            </span>
+            <RunElsewhere option={option} catalog={catalog} open={open} onOpenChange={setOpen} />
         </div>
     );
 }
@@ -250,7 +297,11 @@ export function BaseSummary({
                 <VariantLicence plan={plan} accepted={accepted} onAccepted={onAccepted} />
             )}
             {fit === "insufficient" && option && variant && catalog && (
-                <ComputeHelp option={{ ...option, variant }} catalog={catalog} />
+                <ComputeHelp
+                    option={{ ...option, variant }}
+                    catalog={catalog}
+                    onPickAnother={onPickAnother}
+                />
             )}
         </div>
     );

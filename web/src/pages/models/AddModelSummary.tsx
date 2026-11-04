@@ -103,7 +103,7 @@ function Formats({
     variant: CatalogVariantInfo | null;
     onVariant: (variant: string) => void;
 }) {
-    if (plan.target.kind === "catalogue" && plan.variant && plan.target.entry.variants.length > 1) {
+    if (plan.target.kind === "catalogue" && plan.variant) {
         return (
             <RadioGroup
                 aria-label="Format"
