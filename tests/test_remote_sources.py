@@ -370,10 +370,10 @@ def test_s3_sources_read_through_httpfs(
     harness: Harness, bucket: FakeS3, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(extensions.DIRECTORY_ENV, os.environ["MINIBRAIN_TEST_DUCKDB_EXTENSIONS"])
-    bucket.put("data", "exports/jan.parquet", parquet(tmp_path))
+    bucket.put("data", "httpfs/jan.parquet", parquet(tmp_path))
     connection = s3_connection(harness, bucket)
     source = harness.client.post(
-        "/api/sources/s3", json={"connection_id": connection["id"], "path": "s3://data/exports/"}
+        "/api/sources/s3", json={"connection_id": connection["id"], "path": "s3://data/httpfs/"}
     )
     assert source.status_code == 201, source.text
     assert source.json()["rows"] == 120
