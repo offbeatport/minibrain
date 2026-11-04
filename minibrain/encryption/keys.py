@@ -13,6 +13,7 @@ from sqlalchemy.pool import NullPool
 
 from minibrain.encryption.envelope import Wrapped, new_key
 from minibrain.encryption.hsm import HSM, hsm_provider
+from minibrain.encryption.kms import KMS, kms_provider
 from minibrain.encryption.providers import LOCAL, KeyFile, KeyProvider, KeyUnavailableError, LocalKeys
 from minibrain.encryption.vault_transit import VAULT, vault_provider
 from minibrain.policy import load as load_policy
@@ -30,7 +31,13 @@ POLICY = "encryption"
 RECORDS = "encryption.keys"
 TTL_SECONDS = 1.0
 PROBE_CONTEXT = b"minibrain.probe"
-LABELS = {LOCAL: "Local key file", VAULT: "HashiCorp Vault Transit", HSM: "PKCS#11 HSM", OFF: "Off"}
+LABELS = {
+    LOCAL: "Local key file",
+    VAULT: "HashiCorp Vault Transit",
+    HSM: "PKCS#11 HSM",
+    KMS: "AWS KMS",
+    OFF: "Off",
+}
 
 Factory = Callable[[Settings, dict[str, Any], bool], KeyProvider]
 FACTORIES: dict[str, Factory] = {}
@@ -56,6 +63,7 @@ def local_provider(settings: Settings, _values: dict[str, Any], may_create: bool
 FACTORIES[LOCAL] = local_provider
 FACTORIES[VAULT] = vault_provider
 FACTORIES[HSM] = hsm_provider
+FACTORIES[KMS] = kms_provider
 
 
 def provider_settings(values: dict[str, Any], kind: str) -> tuple[tuple[str, str], ...]:
@@ -219,17 +227,12 @@ def check_switch(session: Session, settings: Settings, actor: str) -> None:
     try:
         provider = build(settings, kind, values, records_of(session))
         probe(provider)
+        current, where = provider.current(), provider.describe()
     except KeyUnavailableError as error:
         raise EncryptionError(str(error)) from error
-    if record(session, kind, provider.current(), actor, provider.describe()):
-        session.add(
-            AuditEvent(
-                actor=actor,
-                action="encryption.key",
-                target=f"{kind}:{provider.current()}",
-                detail={"provider": kind, "key": provider.current(), "where": provider.describe()},
-            )
-        )
+    if record(session, kind, current, actor, where):
+        detail = {"provider": kind, "key": current, "where": where}
+        session.add(AuditEvent(actor=actor, action="encryption.key", target=f"{kind}:{current}", detail=detail))
 
 
 def ensure_master_key(session: Session, keys: Keys, actor: str) -> None:

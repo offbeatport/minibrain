@@ -234,7 +234,7 @@ FIELDS: tuple[Field, ...] = (
         "readable; re-wrap them under Encryption at rest. Off writes new files unencrypted.",
         "choice",
         "local",
-        ("local", "vault", "hsm", "off"),
+        ("local", "vault", "hsm", "kms", "off"),
     ),
     Field(
         "vault_address",
@@ -288,6 +288,29 @@ FIELDS: tuple[Field, ...] = (
         "text",
         "minibrain-master",
     ),
+    Field(
+        "kms_key",
+        "AWS KMS key",
+        "ARN of the symmetric KMS key (or an alias ARN) that wraps the data keys. Credentials come from the server's "
+        "AWS environment: variables, profile, web identity or instance role.",
+        "text",
+        "",
+    ),
+    Field("kms_region", "AWS region", "Region of the key. Empty takes it from the key ARN.", "text", ""),
+    Field(
+        "kms_endpoint",
+        "AWS KMS endpoint",
+        "https:// URL of a VPC endpoint for KMS. Empty uses AWS's endpoint for the region.",
+        "text",
+        "",
+    ),
+    Field(
+        "kms_fips",
+        "FIPS endpoints",
+        "Call KMS through its FIPS 140 validated endpoint (kms-fips.<region>.amazonaws.com).",
+        "bool",
+        False,
+    ),
 )
 
 CHOICE_LABELS = {
@@ -311,6 +334,7 @@ CHOICE_LABELS = {
     "local": "Local key file",
     "vault": "HashiCorp Vault Transit",
     "hsm": "PKCS#11 HSM",
+    "kms": "AWS KMS",
     "token": "Token",
     "approle": "AppRole",
 } | {key: value[0] for key, value in LICENCES.items()}
