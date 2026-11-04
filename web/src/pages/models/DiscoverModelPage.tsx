@@ -200,7 +200,9 @@ export function DiscoverModelPage() {
                 <>
                     <PageHeader
                         title={entry.name}
-                        icon={<PublisherLogo publisher={entry.provider} name={entry.name} />}
+                        icon={
+                            <PublisherLogo publisher={entry.provider} name={entry.name} size="lg" />
+                        }
                         caption={`${entry.provider} · ${parameters(entry)} · ${entry.license_name}`}
                         actions={<EntryAction entry={entry} on={on} />}
                     />

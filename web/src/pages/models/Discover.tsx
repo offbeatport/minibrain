@@ -363,12 +363,8 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex w-64 items-center gap-2.5">
-                    <PublisherLogo
-                        publisher={row.original.provider}
-                        name={row.original.name}
-                        size="sm"
-                    />
+                <div className="flex w-64 items-start gap-3">
+                    <PublisherLogo publisher={row.original.provider} name={row.original.name} />
                     <div className="flex min-w-0 flex-col">
                         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span className="min-w-0 truncate text-base font-semibold">

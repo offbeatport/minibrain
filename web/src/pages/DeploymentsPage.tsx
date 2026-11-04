@@ -363,7 +363,7 @@ function DeploymentHeader({ row }: { row: ModelRow }) {
     return (
         <PageHeader
             title={row.name}
-            icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
+            icon={<PublisherLogo publisher={row.publisher} name={row.name} size="lg" />}
             caption={`Apps call it as ${row.key}${status}`}
             actions={detail && <DeployToggle row={row} deployed={detail.deployed ?? false} />}
         />

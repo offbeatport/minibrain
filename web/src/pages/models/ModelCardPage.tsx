@@ -260,6 +260,7 @@ function CardView({
                     <PublisherLogo
                         publisher={card.base_model.publisher}
                         name={card.base_model.name}
+                        size="lg"
                     />
                 }
                 caption="Model card and validation report, built from the stored version, its data, its scores and the audit log."

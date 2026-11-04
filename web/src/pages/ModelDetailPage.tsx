@@ -303,7 +303,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
         <>
             <PageHeader
                 title={model.name}
-                icon={<PublisherLogo publisher={model.publisher} name={model.name} />}
+                icon={<PublisherLogo publisher={model.publisher} name={model.name} size="lg" />}
                 caption={model.description || model.key}
                 actions={
                     <>
@@ -539,7 +539,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
         <>
             <PageHeader
                 title={row.name}
-                icon={<PublisherLogo publisher={row.publisher} name={row.name} />}
+                icon={<PublisherLogo publisher={row.publisher} name={row.name} size="lg" />}
                 caption={row.description || `Custom model on ${row.base_model}`}
                 actions={
                     <>

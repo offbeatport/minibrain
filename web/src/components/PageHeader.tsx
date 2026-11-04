@@ -17,31 +17,29 @@ export function PageHeader({
 }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const Icon = icon ? undefined : navEntryFor(pathname)?.icon;
+    const heading = (
+        <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="flex items-center gap-3 text-3xl font-normal">
+                {Icon && (
+                    <Icon aria-hidden="true" className="size-7 shrink-0 text-muted-foreground" />
+                )}
+                {title}
+            </h1>
+            {caption && (
+                <p className={cn("text-base text-muted-foreground", Icon && "pl-10")}>{caption}</p>
+            )}
+        </div>
+    );
     return (
         <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
-            <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="flex items-center gap-3 text-3xl font-normal">
+            {icon ? (
+                <div className="flex min-w-0 items-center gap-4">
                     {icon}
-                    {Icon && (
-                        <Icon
-                            aria-hidden="true"
-                            className="size-7 shrink-0 text-muted-foreground"
-                        />
-                    )}
-                    {title}
-                </h1>
-                {caption && (
-                    <p
-                        className={cn(
-                            "text-base text-muted-foreground",
-                            Icon && "pl-10",
-                            icon && "pl-11",
-                        )}
-                    >
-                        {caption}
-                    </p>
-                )}
-            </div>
+                    {heading}
+                </div>
+            ) : (
+                heading
+            )}
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
     );
