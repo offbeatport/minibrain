@@ -9,6 +9,7 @@ import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from
 import { ApiKeys } from "~/components/ApiKeys";
 import { Facts } from "~/components/Facts";
 import { FeedbackSince } from "~/components/FeedbackSince";
+import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -211,12 +212,9 @@ function ApiSection({ model }: { model: BaseModelDetail }) {
                         : "Deploy it to call it from the API; keys can be created now."
                 }
             >
-                <pre
-                    id="api"
-                    className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm"
-                >
-                    {`curl ${origin}/v1/chat/completions \\\n  -H "Authorization: Bearer $MINIBRAIN_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "${model.key}", "messages": [{"role": "user", "content": "Hello"}]}'`}
-                </pre>
+                <div id="api">
+                    <HarnessConfigs baseUrl={`${origin}/v1`} model={model.key} keyValue={null} />
+                </div>
             </PanelSection>
             {can.build && <ApiKeys scope={{ kind: "base", key: model.key }} />}
         </>
