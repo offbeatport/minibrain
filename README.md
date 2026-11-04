@@ -1,8 +1,8 @@
 # minibrain
 
-Private platform for small, task-specific models. Point it at your data, score a prompt-only baseline, train a LoRA,
-compare versions on the same examples, and serve the one you promote on an OpenAI-compatible endpoint. Runs on your own
-hardware, offline.
+Private platform for building models of any size on your own data, task-specific or general purpose. Point it at your
+data, score a prompt-only baseline, train a LoRA, compare versions on the same examples, and serve the one you promote
+on an OpenAI-compatible endpoint. Runs on your own hardware, offline.
 
 Plan: [`ROADMAP.md`](ROADMAP.md).
 

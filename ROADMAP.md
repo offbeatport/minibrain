@@ -1,21 +1,23 @@
 # minibrain roadmap
 
-Private platform for small, task-specific models. Point at a data source → build examples → train a LoRA → eval
-against the base → serve an OpenAI-compatible API. Many minibrains per install. On-prem / VPC, fully offline by
-default. One deployable in v1, split into services later.
+Private platform for building models of any size on your own data, task-specific or general purpose. Point at a data
+source → build examples → train a LoRA → eval against the base → serve an OpenAI-compatible API. Many minibrains per
+install. On-prem / VPC, fully offline by default. One deployable in v1, split into services later.
 
 Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factory.
 
 ## Positioning
 
+- Size follows the job: a small base where latency and cost matter, a large one where breadth matters. A minibrain can
+  do one task or be a general-purpose assistant for a domain.
 - A minibrain learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
   things relate, rarely changing policy). Exact, changing or citable facts come from retrieval.
 - Facts that change, need citations, or sit behind per-document access rules come from the minibrain's own index
   (RAG), built from the same sources as training.
-- Train only when it pays off. Every minibrain starts prompt-only on the large local model; the eval shows whether a
-  trained small model beats it on score, latency or cost.
+- Train only when it pays off. Every minibrain starts prompt-only on a local base model; the eval shows whether a
+  trained version beats it on score, latency or cost.
 - Two products on one install: a **private frontier endpoint** (the large open model behind the gateway, offline) and
-  **minibrains** specialized from it on the customer's data.
+  **minibrains** built on the customer's data, from small task models to large general-purpose ones.
 - The customer owns the result: weights, data, evals, and the decision when anything changes. Every minibrain carries
   forward to each new base model (rebase).
 
@@ -29,7 +31,8 @@ Good fit, v1 targets:
 | Contract review | Clause extraction and classification → JSON |
 | Industry domain model | Jargon, formats, proprietary label sets |
 | Financial analysis | Text-to-SQL on the customer's own schema |
-| Distillation | Logged frontier-model calls → small private model at lower cost and latency |
+| Distillation | Logged frontier-model calls → a private model at lower cost and latency |
+| Domain assistant | A general-purpose model adapted to the organisation's language, formats and policies |
 
 Need the index (Answer task type): internal knowledge Q&A, sales enablement, codebase assistant, compliance and
 policy, HR helpdesk, customer success onboarding.
