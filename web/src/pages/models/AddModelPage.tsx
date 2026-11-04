@@ -375,7 +375,7 @@ export function AddModelPage() {
             <form
                 onSubmit={submit}
                 onKeyDown={shortcut}
-                className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem]"
+                className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch"
             >
                 <Card className="gap-field p-panel">
                     <TaskSelect value={task} onChange={setTask} />
@@ -458,7 +458,7 @@ export function AddModelPage() {
                         </div>
                     )}
                 </Card>
-                <aside className="lg:sticky lg:top-6">
+                <aside className="flex flex-col">
                     <AddModelSummary
                         option={option}
                         plan={plan}

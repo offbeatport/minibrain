@@ -176,7 +176,7 @@ export function AddModelSummary({
     return (
         <section
             aria-label="Summary"
-            className="flex flex-col divide-y rounded-xl border bg-card text-card-foreground"
+            className="flex flex-1 flex-col divide-y rounded-xl border bg-card text-card-foreground"
         >
             <div className="flex items-center gap-3 px-panel py-4">
                 <PublisherLogo publisher={option?.publisher} name={option?.name ?? "Model"} />
