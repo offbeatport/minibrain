@@ -1235,7 +1235,9 @@ function ModelList({
                 </div>
             </div>
             {entries.length === 0 ? (
-                <div className="col-span-full px-4 py-8">{empty}</div>
+                <div className="col-span-full flex h-72 flex-col items-center justify-center gap-3 px-4 text-center">
+                    {empty}
+                </div>
             ) : (
                 <ul className="col-span-full grid grid-cols-subgrid divide-y">
                     {entries.map((entry) => (
