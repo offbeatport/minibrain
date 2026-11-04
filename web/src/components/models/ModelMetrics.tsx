@@ -106,36 +106,48 @@ function Trend({ usage }: { usage: ModelUsage }) {
     );
 }
 
-const FLOOR = 31.5;
-const CEILING = 4;
 const IDLE_WEEK = [0, 0, 0, 0, 0, 0, 0];
 
-function Sparkline({ values }: { values: number[] }) {
+function DailyBars({ values, days }: { values: number[]; days: string[] }) {
     const peak = Math.max(...values, 1);
-    const step = 100 / Math.max(values.length - 1, 1);
-    const heights = values.map((value) => FLOOR - (value / peak) * (FLOOR - CEILING));
-    const points = heights.map((height, index) => `${index * step},${height}`);
-    const today = heights.at(-1) ?? FLOOR;
+    const summary = values.map((value, index) => `${dayName(days[index])}: ${count(value)}`);
     return (
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <svg
-                aria-hidden="true"
-                viewBox="0 0 100 32"
-                preserveAspectRatio="none"
-                className="size-full"
-            >
-                <path d={`M0,32 L${points.join(" L")} L100,32 Z`} className="fill-primary/15" />
-                <path
-                    d={`M${points.join(" L")}`}
-                    vectorEffect="non-scaling-stroke"
-                    strokeWidth={1}
-                    className="fill-none stroke-primary"
-                />
-            </svg>
-            <span
-                className="absolute -right-0.75 size-1.5 rounded-full bg-primary"
-                style={{ top: `${today - 3}px` }}
-            />
+        <span
+            role="img"
+            aria-label={`Requests per day. ${summary.join(", ")}`}
+            className="flex h-7 shrink-0 items-end gap-0.5"
+        >
+            {values.map((value, index) => {
+                const today = index === values.length - 1;
+                return (
+                    <Tooltip key={days[index]}>
+                        <TooltipTrigger asChild>
+                            <span className="group flex h-full w-2 items-end">
+                                <span
+                                    className={cn(
+                                        "w-full rounded-t-sm transition-opacity duration-150 motion-reduce:transition-none",
+                                        value === 0
+                                            ? "h-0.5 bg-border"
+                                            : today
+                                              ? "bg-primary"
+                                              : "bg-primary/40 group-hover:bg-primary/70",
+                                    )}
+                                    style={
+                                        value === 0
+                                            ? undefined
+                                            : { height: `${Math.max(12, (value / peak) * 100)}%` }
+                                    }
+                                />
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <span className="tabular-nums">
+                                {`${today ? "Today" : dayName(days[index])}: ${count(value)} ${value === 1 ? "request" : "requests"}`}
+                            </span>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            })}
         </span>
     );
 }
@@ -152,32 +164,29 @@ export function Requests({
             return <span className="text-muted-foreground">Never used</span>;
         }
         return (
-            <span className="relative flex h-8 w-full max-w-36 items-center">
-                <Sparkline values={IDLE_WEEK} />
-                <span className="relative px-1 text-muted-foreground">Never used</span>
+            <span className="flex items-center gap-3">
+                <span className="text-muted-foreground">Never used</span>
+                <DailyBars values={IDLE_WEEK} days={recentDays(IDLE_WEEK.length)} />
             </span>
         );
     }
     const days =
         usage.days?.length === usage.daily.length ? usage.days : recentDays(usage.daily.length);
-    const used = usage.daily.some((value) => value > 0);
+    const total = usage.total ?? usage.daily.reduce((sum, value) => sum + value, 0);
     return (
-        <span className="relative flex h-8 w-full max-w-36 items-center">
-            {(used || live) && <Sparkline values={usage.daily} />}
+        <span className="flex w-full max-w-44 items-center justify-between gap-3">
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <span className="relative inline-flex w-fit items-baseline gap-2 rounded-sm px-1 tabular-nums">
-                        <span className="font-semibold">
-                            {count(
-                                usage.total ?? usage.daily.reduce((sum, value) => sum + value, 0),
-                            )}
+                    <span className="flex min-w-0 flex-col rounded-sm tabular-nums">
+                        <span className="font-semibold">{count(total)}</span>
+                        <span className="text-sm">
+                            <Trend usage={usage} />
                         </span>
-                        <Trend usage={usage} />
                     </span>
                 </TooltipTrigger>
                 <TooltipContent>
                     <span className="flex flex-col gap-0.5 tabular-nums">
-                        <span className="font-semibold">Requests per day</span>
+                        <span className="font-semibold">Requests, last 7 days</span>
                         {usage.daily.map((value, position) => (
                             <span key={days[position]} className="flex justify-between gap-4">
                                 <span>{dayName(days[position])}</span>
@@ -188,6 +197,7 @@ export function Requests({
                     </span>
                 </TooltipContent>
             </Tooltip>
+            {(total > 0 || live) && <DailyBars values={usage.daily} days={days} />}
         </span>
     );
 }
