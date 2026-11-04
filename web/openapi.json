@@ -15066,6 +15066,14 @@
             ],
             "title": "Problem"
           },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ImportCheckItem"
+            },
+            "type": "array",
+            "title": "Checks",
+            "default": []
+          },
           "source_type": {
             "anyOf": [
               {
@@ -15174,6 +15182,35 @@
           "ok"
         ],
         "title": "ImportCheck"
+      },
+      "ImportCheckItem": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "ok"
+        ],
+        "title": "ImportCheckItem"
       },
       "ImportRequest": {
         "properties": {

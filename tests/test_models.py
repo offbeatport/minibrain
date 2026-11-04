@@ -478,8 +478,11 @@ def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Pat
         (folder / name).write_bytes(data)
     found = harness.client.post("/api/models/inspect", json={"location": str(folder)}).json()
     assert (found["ok"], found["source_type"], found["name"], found["files"]) == (True, "folder", "corp model v2", 3)
+    assert [check["ok"] for check in found["checks"]] == [True] * len(found["checks"])
+    assert {check["label"] for check in found["checks"]} >= {"config.json", "Tokenizer"}
     empty = harness.client.post("/api/models/inspect", json={"location": str(tmp_path)}).json()
     assert not empty["ok"] and "config.json" in empty["problem"]
+    assert [check["label"] for check in empty["checks"] if not check["ok"]] == ["config.json", "Weights", "Tokenizer"]
     monkeypatch.delenv("MINIBRAIN_MODELS_S3_URL", raising=False)
     relative = harness.client.post("/api/models/inspect", json={"location": "models/qwen"}).json()
     assert "absolute folder path" in relative["problem"]

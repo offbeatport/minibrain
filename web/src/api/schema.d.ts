@@ -4711,6 +4711,11 @@ export interface components {
             ok: boolean;
             /** Problem */
             problem?: string | null;
+            /**
+             * Checks
+             * @default []
+             */
+            checks?: components["schemas"]["ImportCheckItem"][];
             /** Source Type */
             source_type?: ("folder" | "s3") | null;
             /** Resolved */
@@ -4737,6 +4742,15 @@ export interface components {
             connection_id?: number | null;
             /** Connection */
             connection?: string | null;
+        };
+        /** ImportCheckItem */
+        ImportCheckItem: {
+            /** Label */
+            label: string;
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail?: string | null;
         };
         /** ImportRequest */
         ImportRequest: {

@@ -825,9 +825,16 @@ class InspectRequest(BaseModel):
     connection_id: int | None = None
 
 
+class ImportCheckItem(BaseModel):
+    label: str
+    ok: bool
+    detail: str | None = None
+
+
 class ImportCheck(BaseModel):
     ok: bool
     problem: str | None = None
+    checks: list[ImportCheckItem] = []
     source_type: Literal["folder", "s3"] | None = None
     resolved: str | None = None
     architecture: str | None = None

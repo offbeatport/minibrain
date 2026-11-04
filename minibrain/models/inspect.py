@@ -10,7 +10,7 @@ from minibrain.connections.s3 import filesystem
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import resolve
 from minibrain.ml.context import FinalError
-from minibrain.models.importer import detected_revision, validate
+from minibrain.models.importer import checklist, detected_revision
 from minibrain.models.sources import FOLDER, S3, StorageSource, location_url, s3_base, s3_endpoint
 from minibrain.policy import PolicyError
 from minibrain.policy import load as load_policy
@@ -62,11 +62,15 @@ def inspect_location(
                 load_policy(session).outbound(s3_endpoint())
             source = StorageSource(url)
         files = source.files()
-        validate(source, files)
+        checks = checklist(source, files)
     except (FinalError, PolicyError, ConnectionProblem) as error:
         return found | {"problem": str(error)}
     except Exception as error:
         return found | {"problem": f"Cannot read {found['resolved'] or location}: {error}"}
+    failed = [check for check in checks if not check["ok"]]
+    found |= {"checks": checks, "files": len(files), "size_bytes": sum(item["size"] for item in files)}
+    if failed:
+        return found | {"problem": f"{failed[0]['label']}: {failed[0]['detail']}"}
     config = json.loads(source.read_text("config.json"))
     architecture = str(config.get("model_type") or "")
     matched = catalogue_match(session, detected_revision(source))
@@ -74,8 +78,6 @@ def inspect_location(
     return found | {
         "ok": True,
         "architecture": architecture,
-        "files": len(files),
-        "size_bytes": sum(item["size"] for item in files),
         "name": entry.name if entry else suggested_name(Path(location).name or location),
         "variant_id": variant.id if variant else None,
         "match": f"{entry.name} · {variant.label}" if entry and variant else None,

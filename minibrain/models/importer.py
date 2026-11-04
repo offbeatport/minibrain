@@ -13,6 +13,63 @@ SHARD_INDEX = "model.safetensors.index.json"
 HF_METADATA = ".cache/huggingface/download/config.json.metadata"
 
 
+def checklist(source: StorageSource, files: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    names = {entry["path"] for entry in files}
+    checks: list[dict[str, Any]] = []
+    has_config = "config.json" in names
+    checks.append(
+        {
+            "label": "config.json",
+            "ok": has_config,
+            "detail": None if has_config else "Missing: import a Hugging Face format folder",
+        }
+    )
+    if has_config:
+        architectures = json.loads(source.read_text("config.json")).get("architectures") or []
+        causal = any(name.endswith("ForCausalLM") for name in architectures)
+        checks.append(
+            {
+                "label": "Causal language model",
+                "ok": causal,
+                "detail": None if causal else f"This folder has {', '.join(architectures) or 'no architecture'}",
+            }
+        )
+    weights = [entry for entry in files if entry["path"].endswith(".safetensors")]
+    pickled = not weights and any(name.endswith(PICKLE_SUFFIXES) for name in source.names())
+    checks.append(
+        {
+            "label": f"Weights: {len(weights)} .safetensors {'file' if len(weights) == 1 else 'files'}"
+            if weights
+            else "Weights",
+            "ok": bool(weights),
+            "detail": None
+            if weights
+            else "Only pickle weights, which can run code when loaded; use the safetensors version"
+            if pickled
+            else "No .safetensors weights",
+        }
+    )
+    if SHARD_INDEX in names:
+        shards = set(json.loads(source.read_text(SHARD_INDEX)).get("weight_map", {}).values())
+        missing = sorted(shards - names)
+        checks.append(
+            {
+                "label": "All weight shards",
+                "ok": not missing,
+                "detail": f"Missing {', '.join(missing[:3])}" if missing else None,
+            }
+        )
+    tokenizer = bool(names.intersection(TOKENIZER_FILES))
+    checks.append(
+        {
+            "label": "Tokenizer",
+            "ok": tokenizer,
+            "detail": None if tokenizer else "No tokenizer.json or tokenizer_config.json",
+        }
+    )
+    return checks
+
+
 def validate(source: StorageSource, files: list[dict[str, Any]]) -> None:
     names = {entry["path"] for entry in files}
     if "config.json" not in names:
