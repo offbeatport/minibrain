@@ -273,11 +273,18 @@ export function SetupPage() {
     const [linkToken] = useState(tokenFromQuery);
     return (
         <AuthFrame
-            title="Create the admin account"
+            title="Welcome to minibrain"
             description={
-                linkToken
-                    ? "This one-time link sets up the first admin, who then adds everyone else under Settings, Accounts."
-                    : "Paste the setup token from the setup link minibrain printed in its log when it started."
+                <span className="flex flex-col gap-2">
+                    <span>
+                        Small models trained on your own data, running on your own machines.
+                    </span>
+                    <span>
+                        {linkToken
+                            ? "Create the admin account to get started. You can invite everyone else later from Settings, Accounts."
+                            : "Create the admin account to get started, with the setup token minibrain printed in its log when it started."}
+                    </span>
+                </span>
             }
             footer={
                 <div className="flex flex-col gap-1">
