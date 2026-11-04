@@ -1077,23 +1077,6 @@ export interface paths {
         patch: operations["update_base_api_models_base__key__patch"];
         trace?: never;
     };
-    "/api/models/base/{key}/remove-files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Remove Base Files */
-        post: operations["remove_base_files_api_models_base__key__remove_files_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/models/base/{key}/verify": {
         parameters: {
             query?: never;
@@ -1196,23 +1179,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/pin": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Pin Base */
-        post: operations["pin_base_api_models_base__key__pin_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/models/base/{key}/deploy": {
         parameters: {
             query?: never;
@@ -1241,75 +1207,6 @@ export interface paths {
         put?: never;
         /** Test Base */
         post: operations["test_base_api_models_base__key__test_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/model-cache": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Cache Settings */
-        get: operations["read_cache_settings_api_settings_model_cache_get"];
-        /** Update Cache Settings */
-        put: operations["update_cache_settings_api_settings_model_cache_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/cache": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Model Cache */
-        get: operations["model_cache_api_models_cache_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/cache/estimate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Estimate Download */
-        post: operations["estimate_download_api_models_cache_estimate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/cache/free": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Free Up Space */
-        post: operations["free_up_space_api_models_cache_free_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2904,11 +2801,6 @@ export interface components {
             health?: components["schemas"]["Health"] | null;
             /** Catalog Id */
             catalog_id?: string | null;
-            /**
-             * Pinned
-             * @default false
-             */
-            pinned?: boolean;
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
@@ -2949,8 +2841,6 @@ export interface components {
              * @default false
              */
             relocated?: boolean;
-            /** Evicted At */
-            evicted_at?: string | null;
         };
         /** BaseWeights */
         BaseWeights: {
@@ -2970,52 +2860,6 @@ export interface components {
         Body_upload_source_api_sources_post: {
             /** File */
             file: string;
-        };
-        /** CacheEstimateRequest */
-        CacheEstimateRequest: {
-            /** Size Bytes */
-            size_bytes: number;
-        };
-        /** CachePlanInfo */
-        CachePlanInfo: {
-            /** Enabled */
-            enabled: boolean;
-            /** Budget Bytes */
-            budget_bytes: number;
-            /** Used Bytes */
-            used_bytes: number;
-            /** Incoming Bytes */
-            incoming_bytes: number;
-            /** Freed Bytes */
-            freed_bytes: number;
-            /** After Bytes */
-            after_bytes: number;
-            /** Over */
-            over: boolean;
-            /** Still Over */
-            still_over: boolean;
-            /** Evict */
-            evict: components["schemas"]["CachedBaseInfo"][];
-        };
-        /** CachedBaseInfo */
-        CachedBaseInfo: {
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
-            /** Size Bytes */
-            size_bytes: number;
-            /**
-             * Last Used At
-             * Format: date-time
-             */
-            last_used_at: string;
-            /** Pinned */
-            pinned: boolean;
-            /** Kept */
-            kept: string[];
-            /** Evictable */
-            evictable: boolean;
         };
         /** CardBaseModel */
         CardBaseModel: {
@@ -5346,29 +5190,6 @@ export interface components {
             /** Output */
             output: string;
         };
-        /** ModelCacheInfo */
-        ModelCacheInfo: {
-            /** Enabled */
-            enabled: boolean;
-            /** Budget Gb */
-            budget_gb: number;
-            /** Budget Bytes */
-            budget_bytes: number;
-            /** Used Bytes */
-            used_bytes: number;
-            /** Evictable Bytes */
-            evictable_bytes: number;
-            /** Bases */
-            bases: components["schemas"]["CachedBaseInfo"][];
-            plan: components["schemas"]["CachePlanInfo"];
-        };
-        /** ModelCacheSettings */
-        ModelCacheSettings: {
-            /** Enabled */
-            enabled: boolean;
-            /** Budget Gb */
-            budget_gb: number;
-        };
         /** ModelCard */
         ModelCard: {
             /**
@@ -5501,11 +5322,6 @@ export interface components {
             health?: components["schemas"]["Health"] | null;
             /** Catalog Id */
             catalog_id?: string | null;
-            /**
-             * Pinned
-             * @default false
-             */
-            pinned?: boolean;
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
@@ -5649,11 +5465,6 @@ export interface components {
             role: components["schemas"]["Role"] | null;
             /** Role Locked */
             role_locked: boolean;
-        };
-        /** PinRequest */
-        PinRequest: {
-            /** Pinned */
-            pinned: boolean;
         };
         /** PlaygroundFeedback */
         PlaygroundFeedback: {
@@ -6488,7 +6299,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "delete" | "undeploy" | "remove_files";
+            kind: "delete" | "undeploy";
             /**
              * State
              * @enum {string}
@@ -9152,37 +8963,6 @@ export interface operations {
             };
         };
     };
-    remove_base_files_api_models_base__key__remove_files_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     verify_base_api_models_base__key__verify_post: {
         parameters: {
             query?: never;
@@ -9377,41 +9157,6 @@ export interface operations {
             };
         };
     };
-    pin_base_api_models_base__key__pin_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PinRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     deploy_base_api_models_base__key__deploy_post: {
         parameters: {
             query?: never;
@@ -9478,132 +9223,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_cache_settings_api_settings_model_cache_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelCacheSettings"];
-                };
-            };
-        };
-    };
-    update_cache_settings_api_settings_model_cache_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelCacheSettings"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelCacheSettings"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    model_cache_api_models_cache_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelCacheInfo"];
-                };
-            };
-        };
-    };
-    estimate_download_api_models_cache_estimate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CacheEstimateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CachePlanInfo"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    free_up_space_api_models_cache_free_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CachePlanInfo"];
                 };
             };
         };

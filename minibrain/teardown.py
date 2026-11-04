@@ -24,7 +24,6 @@ from minibrain.registry.models import (
     KeyScope,
     Minibrain,
     Model,
-    ModelStatus,
     Snapshot,
     Teardown,
     TeardownKind,
@@ -45,7 +44,6 @@ ERROR_LENGTH = 500
 STARTED = {
     TeardownKind.DELETE: "model.delete",
     TeardownKind.UNDEPLOY: "model.undeploy",
-    TeardownKind.REMOVE_FILES: "model.remove_files",
 }
 FINISHED = {kind: f"{action}_finished" for kind, action in STARTED.items()}
 
@@ -189,24 +187,20 @@ def drop(session: Session, teardown: Teardown) -> None:
             session.expire(owner, ["teardown"])
 
 
-def busy_with(teardown: Teardown, name: str) -> ConflictError:
-    if teardown.kind == TeardownKind.DELETE:
-        return ConflictError(f"{name} is being deleted")
-    return ConflictError(f"{name}'s files are being removed")
+def being_deleted(name: str) -> ConflictError:
+    return ConflictError(f"{name} is being deleted")
 
 
 def require_idle(teardown: Teardown | None, name: str) -> None:
     if teardown is None or teardown.kind == TeardownKind.UNDEPLOY:
         return
-    if teardown.kind == TeardownKind.REMOVE_FILES and teardown.status == TeardownStatus.FAILED:
-        return
-    raise busy_with(teardown, name)
+    raise being_deleted(name)
 
 
 def undeploy_custom(session: Session, minibrain: Minibrain, actor: str) -> Teardown | None:
     existing = minibrain.teardown
     if existing is not None and existing.kind != TeardownKind.UNDEPLOY:
-        raise busy_with(existing, minibrain.name)
+        raise being_deleted(minibrain.name)
     if existing is not None:
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
     if not minibrain.deployed:
@@ -222,7 +216,7 @@ def undeploy_custom(session: Session, minibrain: Minibrain, actor: str) -> Teard
 def undeploy_base(session: Session, model: Model, actor: str) -> Teardown | None:
     existing = model.teardown
     if existing is not None and existing.kind == TeardownKind.DELETE:
-        raise busy_with(existing, model.name)
+        raise being_deleted(model.name)
     if existing is not None and existing.kind == TeardownKind.UNDEPLOY:
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
     if not model.deployed:
@@ -239,7 +233,7 @@ def cancel_stop(session: Session, teardown: Teardown | None, name: str) -> None:
     if teardown is None:
         return
     if teardown.kind != TeardownKind.UNDEPLOY:
-        raise busy_with(teardown, name)
+        raise being_deleted(name)
     drop(session, teardown)
 
 
@@ -289,8 +283,6 @@ def delete_base(session: Session, model: Model, actor: str, cascade: bool = Fals
             raise ConflictError(f"deleting {model.name} with the models built on it failed; retry it with cascade=true")
         return restart(session, existing, actor)
     running = existing is not None and existing.status == TeardownStatus.RUNNING
-    if existing is not None and running and existing.kind == TeardownKind.REMOVE_FILES:
-        raise ConflictError(f"{model.name}'s files are being removed; delete it once that finishes")
     if base_job_running(session, model):
         raise ConflictError(f"{model.name} has a download or import running; cancel it first")
     dependents = dependents_of(session, model)
@@ -298,7 +290,7 @@ def delete_base(session: Session, model: Model, actor: str, cascade: bool = Fals
     if built and not cascade:
         raise ConflictError(
             f"{names(built)} {are(built)} trained on {model.name}; delete them first, or delete them with it "
-            "(cascade=true), or remove only its files"
+            "(cascade=true)"
         )
     busy = [minibrain.name for minibrain in dependents if running_jobs(minibrain)]
     if busy:
@@ -328,29 +320,6 @@ def delete_base(session: Session, model: Model, actor: str, cascade: bool = Fals
     for minibrain in dependents:
         delete_custom(session, minibrain, actor, undeploy=True, parent=teardown)
     return teardown
-
-
-def remove_files(session: Session, model: Model, actor: str) -> Teardown:
-    existing = model.teardown
-    if existing is not None and existing.kind == TeardownKind.REMOVE_FILES:
-        return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
-    if existing is not None and existing.kind == TeardownKind.DELETE:
-        raise ConflictError(f"{model.name} is being deleted")
-    if model.status == ModelStatus.EVICTED:
-        raise ConflictError(f"{model.name}'s files are already removed")
-    if model.status != ModelStatus.AVAILABLE:
-        raise ConflictError(f"{model.name} is {model.status}; remove its files once they are available")
-    if model.path:
-        raise ConflictError(
-            f"{model.name}'s files are in {model.path}, outside the model folder; minibrain does not remove them"
-        )
-    if base_job_running(session, model):
-        raise ConflictError(f"{model.name} has a job running; cancel it first")
-    built = [minibrain.name for minibrain in dependents_of(session, model)]
-    detail = base_targets(model) | {"routes": [], "models": built, "size_bytes": model.size_bytes}
-    facts = {"name": model.name, "kind": "base", "size_bytes": model.size_bytes, "models": built}
-    session.add(AuditEvent(actor=actor, action="model.remove_files", target=model.id, detail=facts))
-    return begin(session, TeardownKind.REMOVE_FILES, actor, model.name, detail, model=model)
 
 
 def remove_folder(folder: Path) -> None:
@@ -487,15 +456,12 @@ class Teardowns:
         routes = sorted(set(detail.get("routes") or []))
         adapters = list(detail.get("adapters") or [])
         base = str(detail.get("base") or "")
-        clearing = teardown.kind == TeardownKind.REMOVE_FILES
         waiting: list[str] = []
         for gateway in live_gateways(session):
             still = [route for route in routes if route in gateway.routes]
             if still:
                 waiting.append(f"the gateway on {gateway.host} to stop routing {names(still)}")
-            elif clearing and base in gateway.bases:
-                waiting.append(f"the gateway on {gateway.host} to stop serving {base}")
-        needed = not clearing and self.needed(base)
+        needed = self.needed(base)
         release = False
         for replica in live_engines(session):
             if replica.base_model != base:
@@ -520,9 +486,7 @@ class Teardowns:
         return waiting
 
     def remove(self, session: Session, teardown: Teardown) -> None:
-        if teardown.kind == TeardownKind.REMOVE_FILES:
-            self.clear_files(session, teardown)
-        elif teardown.minibrain_id is not None:
+        if teardown.minibrain_id is not None:
             self.delete_custom(session, teardown)
         else:
             self.delete_base(session, teardown)
@@ -565,23 +529,6 @@ class Teardowns:
         session.flush()
         drop_orphan_keys(session)
         self.finish(session, record, removed=removed)
-
-    def clear_files(self, session: Session, teardown: Teardown) -> None:
-        record = record_of(teardown)
-        model = session.get(Model, teardown.model_id)
-        if model is None:
-            drop(session, teardown)
-            self.finish(session, record)
-            return
-        if model.status != ModelStatus.EVICTED:
-            model.status = ModelStatus.EVICTED
-            model.evicted_at = now()
-            model.evicted_by = teardown.actor
-            model.updated_at = now()
-            session.commit()
-        remove_folder(model_dir(self.settings, model.id))
-        drop(session, teardown)
-        self.finish(session, record, removed={"size_bytes": model.size_bytes})
 
     def fail(self, session: Session, teardown: Teardown, error: str) -> None:
         teardown.status = TeardownStatus.FAILED

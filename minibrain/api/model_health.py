@@ -223,8 +223,8 @@ def evicted(model: Model, context: HealthContext) -> Health:
         )
     else:
         detail = (
-            f"Its files were removed{when} to keep base models under the cache budget, because no model, version, "
-            "deployment or job used it. Its record, licence acceptance and API keys stay."
+            f"Its files were removed{when} to free space while no model, version, deployment or job used it. Its "
+            "record, licence acceptance and API keys stay."
         )
     location = original_location(model)
     copy = f", such as {location}" if location else ""

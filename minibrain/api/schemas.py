@@ -407,7 +407,7 @@ class VersionInfo(BaseModel):
     created_at: datetime
 
 
-TeardownKindName = Literal["delete", "undeploy", "remove_files"]
+TeardownKindName = Literal["delete", "undeploy"]
 TeardownState = Literal["running", "failed"]
 
 
@@ -768,7 +768,6 @@ class ModelRow(BaseModel):
     key_count: int = 0
     health: Health | None = None
     catalog_id: str | None = None
-    pinned: bool = False
     last_used_at: datetime | None = None
     teardown: TeardownInfo | None = None
 
@@ -801,7 +800,6 @@ class BaseModelDetail(ModelRow):
     verified_at: datetime | None = None
     content_hash: str | None = None
     relocated: bool = False
-    evicted_at: datetime | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -854,10 +852,6 @@ class ImportCheck(BaseModel):
 
 class DeployRequest(BaseModel):
     deployed: bool
-
-
-class PinRequest(BaseModel):
-    pinned: bool
 
 
 class TestRequest(BaseModel):

@@ -16,7 +16,6 @@ import type { components } from "~/api/schema";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { StatusText } from "~/components/models/StatusText";
-import { ModelCacheSettings } from "./ModelCacheSettings";
 
 type StorageSettings = components["schemas"]["StorageSettings"];
 type StorageUpdate = components["schemas"]["StorageUpdate"];
@@ -259,7 +258,6 @@ export function StorageSettingsPage() {
                         </div>
                     )}
                 </PanelSection>
-                <ModelCacheSettings />
             </PanelSections>
         </SettingsLayout>
     );

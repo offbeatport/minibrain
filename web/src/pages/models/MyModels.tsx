@@ -76,7 +76,6 @@ import {
     setDeployed,
 } from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
-import { DeleteBaseDialog } from "./DeleteBaseDialog";
 import { DeleteModelsDialog } from "./DeleteModelsDialog";
 import { ModelsEmpty } from "./ModelsEmpty";
 import {
@@ -604,7 +603,7 @@ function StopItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: bo
 }
 
 const VIEWER_STEPS = new Set(["Use API", "Review results", "Test", "Details"]);
-const ADMIN_RETRIES = new Set(["Retry", RETRY_LABELS.delete, RETRY_LABELS.remove_files]);
+const ADMIN_RETRIES = new Set(["Retry", RETRY_LABELS.delete]);
 
 function allowedStep(
     step: { label: string; run: () => void } | null,
@@ -1414,11 +1413,9 @@ export function MyModels({
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-    const [removing, setRemoving] = useState<ModelRow | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
     const healthActions = useRef<Handlers["health"] | null>(null);
-    const rowsRef = useRef<ModelRow[]>([]);
     const on: Handlers = useMemo(
         () => ({
             open: (path) => router.history.push(path),
@@ -1449,13 +1446,7 @@ export function MyModels({
             },
             edit: setEditing,
             confirm: setConfirmation,
-            remove: (row) => {
-                if (row.kind === "base" && builtOn(rowsRef.current, row).length > 0) {
-                    setRemoving(row);
-                    return;
-                }
-                setDeleting([{ key: rowId(row), model: row, version: null }]);
-            },
+            remove: (row) => setDeleting([{ key: rowId(row), model: row, version: null }]),
             createFrom: (base) =>
                 router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
             refresh,
@@ -1466,7 +1457,6 @@ export function MyModels({
     const health = useHealthActions({ refresh, confirm: setConfirmation, remove: on.remove });
     healthActions.current = health.run;
     const rows = models.data ?? [];
-    rowsRef.current = rows;
     const entries = entriesOf(rows);
     const sort = parseSort(search.sort);
     const setSort = (next: Sort) => {
@@ -1570,12 +1560,6 @@ export function MyModels({
                     setSelected([]);
                     await refresh();
                 }}
-            />
-            <DeleteBaseDialog
-                row={removing}
-                dependents={removing ? builtOn(rows, removing) : []}
-                onOpenChange={(open) => !open && setRemoving(null)}
-                onStarted={refresh}
             />
             {health.dialogs}
         </div>

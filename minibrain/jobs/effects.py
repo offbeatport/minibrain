@@ -1,6 +1,3 @@
-from collections.abc import Callable
-
-from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from minibrain.jobs.queue import enqueue
@@ -17,8 +14,6 @@ from minibrain.registry.models import (
     JobStatus,
     Model,
     ModelStatus,
-    Teardown,
-    TeardownKind,
     VersionStatus,
     now,
 )
@@ -27,21 +22,14 @@ from minibrain.settings import Settings
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
 
-def nothing() -> None:
-    return None
-
-
-def forget_removal(session: Session, model: Model) -> None:
-    removal = delete(Teardown).where(Teardown.model_id == model.id, Teardown.kind == TeardownKind.REMOVE_FILES)
-    session.execute(removal)
+def forget_removal(model: Model) -> None:
     model.evicted_at = None
     model.evicted_by = None
 
 
 class DomainEffects:
-    def __init__(self, settings: Settings, installed: Callable[[], None] = nothing) -> None:
+    def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.installed = installed
 
     def on_success(self, session: Session, job: Job) -> None:
         if job.kind == JobKind.TRAIN:
@@ -99,9 +87,8 @@ class DomainEffects:
         model.error = None
         model.verified_at = now()
         model.last_used_at = now()
-        forget_removal(session, model)
+        forget_removal(model)
         set_health(model, None)
-        self.installed()
 
     def verified(self, session: Session, job: Job) -> None:
         model = session.get(Model, job.model_id) if job.model_id else None
@@ -121,8 +108,7 @@ class DomainEffects:
         model.updated_at = now()
         if restored:
             model.last_used_at = now()
-            forget_removal(session, model)
-            self.installed()
+            forget_removal(model)
 
     def trained(self, session: Session, job: Job) -> None:
         version = job.version

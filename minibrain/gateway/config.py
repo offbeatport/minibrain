@@ -180,9 +180,7 @@ def base_route(model: Model) -> Route:
     return base_route_for(model.id)
 
 
-def removed_problem(model: Model, removing: bool) -> str:
-    if removing and model.status != ModelStatus.EVICTED:
-        return f"{model.name}'s files are being removed; download it again on the Models page."
+def removed_problem(model: Model) -> str:
     return f"{model.name}'s files were removed; download it again on the Models page."
 
 
@@ -191,7 +189,6 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     teardowns = list(session.scalars(select(Teardown)))
     deleting = {item.minibrain_id for item in teardowns if item.kind == TeardownKind.DELETE}
     dropped = {item.model_id for item in teardowns if item.kind == TeardownKind.DELETE}
-    removing = {item.model_id for item in teardowns if item.kind == TeardownKind.REMOVE_FILES}
     routes: dict[str, Route] = {}
     for minibrain in session.scalars(select(Minibrain).order_by(Minibrain.id)):
         if minibrain.id in deleting:
@@ -209,8 +206,8 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
         model = session.get(Model, key)
-        if model is not None and (model.status == ModelStatus.EVICTED or key in removing):
-            problems[key] = removed_problem(model, key in removing)
+        if model is not None and model.status == ModelStatus.EVICTED:
+            problems[key] = removed_problem(model)
             continue
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()

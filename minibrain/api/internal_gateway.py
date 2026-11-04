@@ -12,10 +12,10 @@ from minibrain.artifacts import is_artifact_id
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import LogEntry, database_sink
-from minibrain.models.cache import touch
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.registry import resolve_spec
+from minibrain.models.usage import touch
 from minibrain.registry.compute import EngineReport, GatewayReport, record_engine, record_gateway
 from minibrain.serve.weights import local_dir
 

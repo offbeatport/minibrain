@@ -49,16 +49,15 @@ import { modelsHref } from "~/lib/modelsSearch";
 import {
     RETRY_LABELS,
     beingDeleted,
-    builtOn,
     busyTearingDown,
     deleteModel,
     retryTeardown,
+    rowId,
     setDeployed,
 } from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
-import { DeleteBaseDialog } from "./models/DeleteBaseDialog";
-import { KeepOnDisk } from "./models/ModelCache";
+import { DeleteModelsDialog } from "./models/DeleteModelsDialog";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
     ConfirmAction,
@@ -67,6 +66,7 @@ import {
     TestBaseDialog,
     useModelsRefresh,
 } from "./models/dialogs";
+import type { Entry } from "./models/entries";
 import { useHealthActions } from "./models/healthActions";
 
 function BackLink() {
@@ -249,9 +249,8 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-    const [removing, setRemoving] = useState<ModelRow | null>(null);
+    const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const models = useModels();
-    const dependents = builtOn(models.data ?? [], model);
     const job = useJob(model.activity.job_id ?? model.availability.job_id);
     const reload = async () => {
         await refresh();
@@ -263,29 +262,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
     const health = useHealthActions({
         refresh: reload,
         confirm: setConfirmation,
-        remove: (row) => {
-            if (dependents.length > 0) {
-                setRemoving(row);
-                return;
-            }
-            setConfirmation({
-                title: `Delete ${row.name}?`,
-                description: (
-                    <p>
-                        {model.relocated
-                            ? `Its record and API keys are removed; the files in ${model.storage_path} stay.`
-                            : "Its record, files and API keys are removed. You can download or import it again later."}
-                        {deployed ? " It is deployed, so it stops serving first." : ""}
-                    </p>
-                ),
-                confirmLabel: deployed ? "Undeploy and delete" : "Delete",
-                destructive: true,
-                run: () =>
-                    deleteModel(row, { undeploy: deployed })
-                        .then(refresh)
-                        .then(() => router.history.push(modelsHref())),
-            });
-        },
+        remove: (row) => setDeleting([{ key: rowId(row), model: row, version: null }]),
     });
     const busy = ["running", "queued"].includes(model.activity.state);
     const verify = () => health.run(model, { kind: "verify", label: "Verify files" });
@@ -416,7 +393,6 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                                     "—"
                                 ),
                             ],
-                            ["Pinned", <KeepOnDisk key="pinned" model={model} />],
                             [
                                 "Content hash",
                                 model.content_hash ? (
@@ -464,11 +440,15 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
-            <DeleteBaseDialog
-                row={removing}
-                dependents={removing ? dependents : []}
-                onOpenChange={(open) => !open && setRemoving(null)}
-                onStarted={reload}
+            <DeleteModelsDialog
+                chosen={deleting}
+                rows={models.data ?? []}
+                onOpenChange={(open) => !open && setDeleting(null)}
+                onDelete={async (cascade) => {
+                    await deleteModel(model, { cascade, undeploy: true });
+                    await refresh();
+                    router.history.push(modelsHref());
+                }}
             />
             {health.dialogs}
         </>

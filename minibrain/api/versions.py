@@ -18,9 +18,9 @@ from minibrain.data.snapshots import cleanup, require_splits, snapshot_for_model
 from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
-from minibrain.models.cache import touch
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
+from minibrain.models.usage import touch
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, Model, VersionKind
 from minibrain.registry.prices import load_prices
 from minibrain.registry.service import (

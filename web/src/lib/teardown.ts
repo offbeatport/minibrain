@@ -63,12 +63,6 @@ export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
           );
 }
 
-export function removeFiles(row: ModelRow) {
-    return unwrap(
-        api.POST("/api/models/base/{key}/remove-files", { params: { path: { key: row.key } } }),
-    );
-}
-
 export function retryTeardown(row: ModelRow): Promise<unknown> {
     const teardown = row.teardown;
     if (!teardown) {
@@ -77,16 +71,12 @@ export function retryTeardown(row: ModelRow): Promise<unknown> {
     if (teardown.kind === "undeploy") {
         return setDeployed(row, false);
     }
-    if (teardown.kind === "remove_files") {
-        return removeFiles(row);
-    }
     return deleteModel(row, { cascade: teardown.cascade, undeploy: teardown.undeploy });
 }
 
 export const RETRY_LABELS: Record<Teardown["kind"], string> = {
     delete: "Retry delete",
     undeploy: "Retry undeploy",
-    remove_files: "Retry removing files",
 };
 
 function models(count: number): string {
@@ -101,21 +91,9 @@ function deleted(teardown: Teardown, name: string): ToastOptions {
     };
 }
 
-function cleared(teardown: Teardown, name: string): ToastOptions {
-    const kept = teardown.models?.length ?? 0;
-    return {
-        title: `Removed the files of ${name}`,
-        description: kept
-            ? `${kept === 1 ? "The model" : `The ${kept} models`} built on it show Base missing files until it is downloaded again.`
-            : "Its record stays; download it again to use it.",
-        tone: "success",
-    };
-}
-
 const FAILED_TITLES: Record<Teardown["kind"], (name: string) => string> = {
     delete: (name) => `Couldn't delete ${name}`,
     undeploy: (name) => `Couldn't stop ${name}`,
-    remove_files: (name) => `Couldn't remove the files of ${name}`,
 };
 
 export function outcomeOf(before: ModelRow, after: ModelRow | undefined): ToastOptions | null {
@@ -136,9 +114,6 @@ export function outcomeOf(before: ModelRow, after: ModelRow | undefined): ToastO
     }
     if (!after || after.teardown) {
         return null;
-    }
-    if (teardown.kind === "remove_files") {
-        return cleared(teardown, before.name);
     }
     return {
         title: `Undeployed ${before.name}`,

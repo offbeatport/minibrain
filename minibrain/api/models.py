@@ -19,14 +19,12 @@ from minibrain.api.schemas import (
     ModelFile,
     ModelRow,
     ModelUpdate,
-    PinRequest,
     TestRequest,
     TestResponse,
 )
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
-from minibrain.models.cache import touch
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
 from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import (
@@ -41,12 +39,13 @@ from minibrain.models.registry import (
     start_verify,
 )
 from minibrain.models.sources import configured
+from minibrain.models.usage import touch
 from minibrain.registry.models import AuditEvent, CatalogModel, Model, ModelStatus, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
-from minibrain.teardown import cancel_stop, delete_base, remove_files, require_idle, undeploy_base
+from minibrain.teardown import cancel_stop, delete_base, require_idle, undeploy_base
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -132,7 +131,6 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         verified_at=model.verified_at,
         content_hash=content_hash(model.files),
         relocated=model.path is not None,
-        evicted_at=model.evicted_at,
     )
 
 
@@ -210,15 +208,6 @@ def delete_base_model(
     return model_row(request, session, settings, store, "base", key)
 
 
-@router.post("/base/{key}/remove-files", status_code=202, dependencies=[Depends(admin)])
-def remove_base_files(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = get_model(session, key)
-    remove_files(session, model, current_actor())
-    session.commit()
-    wake_teardowns(request)
-    return detail_of(session, settings, request, model)
-
-
 def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
     session.add(
         AuditEvent(actor=current_actor(), action=action, target=model.id, detail={"name": model.name, **detail})
@@ -282,18 +271,6 @@ def recheck_base(key: str, request: Request, session: SessionDep, settings: Sett
 def retry_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
     model = retry(session, settings, idle_model(session, key))
     session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/pin", dependencies=[Depends(admin)])
-def pin_base(
-    key: str, body: PinRequest, request: Request, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = get_model(session, key)
-    if model.pinned != body.pinned:
-        model.pinned = body.pinned
-        audit(session, "model.pin" if body.pinned else "model.unpin", model)
-        session.commit()
     return detail_of(session, settings, request, model)
 
 

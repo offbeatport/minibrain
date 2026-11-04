@@ -27,7 +27,6 @@ from minibrain.api import (
     jobs,
     keys,
     minibrains,
-    model_cache,
     models,
     ops,
     overview,
@@ -64,7 +63,6 @@ from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
 from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
-from minibrain.models.cache import CacheKeeper
 from minibrain.models.catalog import seed
 from minibrain.models.health import report_problems
 from minibrain.models.registry import model_folder
@@ -173,7 +171,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (seal_forever, (app.state.sessions, stop, leader)),
             (rekey_forever, (app.state.sessions, app.state.store, keys_for(app.state.settings), stop, leader)),
             (app.state.siem.forever, (stop, leader)),
-            (app.state.cache.forever, (stop, leader)),
             (app.state.teardowns.forever, (stop, leader)),
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
@@ -223,8 +220,7 @@ def create_app(
     app.state.store = store_for(settings)
     with sessions() as session:
         apply_storage(app.state.store, session, settings)
-    app.state.cache = CacheKeeper(sessions, settings)
-    app.state.queue = SqlJobQueue(sessions, DomainEffects(settings, app.state.cache.wake))
+    app.state.queue = SqlJobQueue(sessions, DomainEffects(settings))
     app.state.queue.grace()
     engines = None
     if backend is None:
@@ -259,7 +255,6 @@ def create_app(
         dataset_folders,
         connections,
         models,
-        model_cache,
         catalog,
         compute,
         policies,

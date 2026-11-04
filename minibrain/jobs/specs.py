@@ -2,8 +2,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from minibrain.models.cache import touch
 from minibrain.models.registry import resolve_spec
+from minibrain.models.usage import touch
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
 from minibrain.registry.models import Version

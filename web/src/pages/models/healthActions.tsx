@@ -19,7 +19,6 @@ import type { HealthAction } from "~/components/models/HealthStatus";
 import { trainingHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { AccessSteps } from "./Discover";
-import { DownloadAgainText } from "./ModelCache";
 import type { Confirmation } from "./dialogs";
 
 type Dialogs = "reimport" | "relocate" | "get_access";
@@ -58,7 +57,12 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
     if (action.kind === "download_again") {
         return {
             title: `Download ${row.name} again?`,
-            description: <DownloadAgainText name={row.name} size={row.size_bytes} />,
+            description: (
+                <p>
+                    Downloads its files again from the model hub at the pinned revision. Each file
+                    must match the SHA-256 saved at install.
+                </p>
+            ),
             confirmLabel: "Download again",
             run: () => unwrap(api.POST("/api/models/base/{key}/repair", target(row))),
         };

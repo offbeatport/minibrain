@@ -310,26 +310,21 @@ def test_cascade_deletes_the_base_and_every_model_built_on_it(harness: Harness) 
     assert set(finished) == {foo, wef, BASE} and finished[BASE]["models"] == ["Foo", "Wef"]
 
 
-def test_removing_only_the_files_keeps_the_base_and_the_models_built_on_it(harness: Harness) -> None:
+def test_a_base_goes_only_with_the_models_built_on_it_and_takes_its_files(harness: Harness) -> None:
     folder = add_base(harness)
     foo = add_custom(harness, "Foo")
-    harness.client.post(f"/api/minibrains/{foo}/deploy", json={"deployed": True})
-    headers = bearer(harness, ("custom", foo))
-    started = harness.client.post(f"/api/models/base/{BASE}/remove-files")
-    assert started.status_code == 202 and started.json()["teardown"]["label"] == "Removing files"
+    refused = harness.client.delete(f"/api/models/base/{BASE}")
+    assert refused.status_code == 409 and refused.json()["detail"].endswith("delete them with it (cascade=true)")
+    assert harness.client.post(f"/api/models/base/{BASE}/remove-files").status_code in (404, 405)
+    assert folder.is_dir() and shown(harness, BASE, "base")["availability"]["state"] == "available"
+    assert shown(harness, foo)["health"] is None and teardowns(harness) == []
+    started = harness.client.delete(f"/api/models/base/{BASE}", params={"cascade": True})
+    assert started.status_code == 202 and started.json()["teardown"]["models"] == ["Foo"]
     harness.settle()
-    base = shown(harness, BASE, "base")
-    custom = shown(harness, foo)
-    assert not folder.exists()
-    assert base["availability"]["state"] == "evicted" and base["teardown"] is None
-    assert base["health"]["label"] == "Files removed" and ADMIN_EMAIL in base["health"]["detail"]
-    assert custom["health"]["label"] == "Base missing files"
-    served = harness.client.post("/v1/chat/completions", headers=headers, json=CHAT | {"model": foo})
-    assert served.status_code == 503 and "files were removed" in served.json()["detail"]
-    assert events(harness, "model.remove_files")[0].detail["models"] == ["Foo"]
-    assert events(harness, "model.remove_files_finished")[0].detail["outcome"] == "done"
-    again = harness.client.post(f"/api/models/base/{BASE}/remove-files")
-    assert again.status_code == 409 and "already removed" in again.json()["detail"]
+    assert not folder.exists() and row(harness, BASE, "base") is None and row(harness, foo) is None
+    assert events(harness, "model.delete_finished")[-1].detail["removed"]["size_bytes"] == sum(
+        map(len, WEIGHTS.values())
+    )
 
 
 def test_a_failed_delete_shows_the_reason_and_retry_finishes_it(harness: Harness) -> None:
@@ -374,7 +369,7 @@ def test_released_engines_stop_once_nothing_routes_their_base(harness: Harness) 
     assert [event.action for event in events(harness, "model.undeploy")] == ["model.undeploy"]
 
 
-def test_who_can_delete_undeploy_and_remove_files(harness: Harness) -> None:
+def test_who_can_delete_and_undeploy(harness: Harness) -> None:
     add_base(harness)
     foo = add_custom(harness, "Foo")
     harness.client.post(f"/api/minibrains/{foo}/deploy", json={"deployed": True})
@@ -383,7 +378,6 @@ def test_who_can_delete_undeploy_and_remove_files(harness: Harness) -> None:
     assert viewer.delete(f"/api/minibrains/{foo}").status_code == 403
     assert viewer.post(f"/api/minibrains/{foo}/deploy", json={"deployed": False}).status_code == 403
     assert builder.delete(f"/api/models/base/{BASE}", params={"cascade": True}).status_code == 403
-    assert builder.post(f"/api/models/base/{BASE}/remove-files").status_code == 403
     assert builder.post(f"/api/minibrains/{foo}/deploy", json={"deployed": False}).status_code == 202
     assert builder.delete(f"/api/minibrains/{foo}").status_code == 202
     assert events(harness, "model.delete")[0].actor == "builder@example.com"

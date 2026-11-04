@@ -62,7 +62,6 @@ class ModelStatus(StrEnum):
 class TeardownKind(StrEnum):
     DELETE = "delete"
     UNDEPLOY = "undeploy"
-    REMOVE_FILES = "remove_files"
 
 
 class TeardownStatus(StrEnum):
@@ -552,7 +551,6 @@ class Model(Base):
     health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
-    pinned: Mapped[bool] = mapped_column(default=False, server_default=false())
     evicted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     evicted_by: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)

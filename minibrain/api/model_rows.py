@@ -480,7 +480,6 @@ def base_row(
         revision=model.revision,
         health=problem,
         catalog_id=model.catalog_id,
-        pinned=model.pinned,
         last_used_at=model.last_used_at or model.created_at,
         teardown=teardown_info(teardown),
     )

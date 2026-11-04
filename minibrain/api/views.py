@@ -56,24 +56,19 @@ TEARDOWN_LABELS: dict[tuple[str, str], str] = {
     (TeardownKind.DELETE, TeardownStatus.FAILED): "Delete failed",
     (TeardownKind.UNDEPLOY, TeardownStatus.RUNNING): "Stopping",
     (TeardownKind.UNDEPLOY, TeardownStatus.FAILED): "Stop failed",
-    (TeardownKind.REMOVE_FILES, TeardownStatus.RUNNING): "Removing files",
-    (TeardownKind.REMOVE_FILES, TeardownStatus.FAILED): "Remove failed",
 }
 STOPPING_TEXT: dict[str, str] = {
     TeardownKind.DELETE: "Gateways stop routing it and engines unload it once in-flight requests finish; then its "
     "files and records are removed.",
     TeardownKind.UNDEPLOY: "Gateways stop routing it and engines unload it once in-flight requests finish.",
-    TeardownKind.REMOVE_FILES: "Engines release it once in-flight requests finish; then its files are removed.",
 }
 TEARDOWN_KINDS: dict[str, TeardownKindName] = {
     TeardownKind.DELETE: "delete",
     TeardownKind.UNDEPLOY: "undeploy",
-    TeardownKind.REMOVE_FILES: "remove_files",
 }
 TEARDOWN_STATES: dict[str, TeardownState] = {TeardownStatus.RUNNING: "running", TeardownStatus.FAILED: "failed"}
 REMOVING_TEXT: dict[str, str] = {
     TeardownKind.DELETE: "Removing its files and records.",
-    TeardownKind.REMOVE_FILES: "Removing its files.",
 }
 
 
