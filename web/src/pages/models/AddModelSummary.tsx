@@ -26,6 +26,8 @@ const TEXT: Record<Tone, string> = {
     destructive: "text-destructive",
 };
 
+const CELLS = Array.from({ length: 24 }, (_, position) => `cell-${position}`);
+
 function Meter({
     label,
     share,
@@ -37,9 +39,13 @@ function Meter({
     tone: Tone;
     caption: string;
 }) {
-    const width = share === null ? 0 : Math.max(2, Math.min(100, share * 100));
+    const filled =
+        share === null
+            ? 0
+            : Math.max(share > 0 ? 1 : 0, Math.round(Math.min(1, share) * CELLS.length));
+    const percent = share === null ? 0 : Math.round(Math.min(1, share) * 100);
     return (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium">{label}</span>
                 <span className={cn("text-sm tabular-nums", TEXT[tone])}>{caption}</span>
@@ -49,13 +55,18 @@ function Meter({
                 aria-label={label}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={Math.round(width)}
-                className="h-1.5 overflow-hidden rounded-full bg-secondary"
+                aria-valuenow={percent}
+                className="grid h-3 grid-cols-[repeat(24,minmax(0,1fr))] gap-0.5"
             >
-                <div
-                    className={cn("h-full rounded-full", FILL[tone])}
-                    style={{ width: `${width}%` }}
-                />
+                {CELLS.map((cell, position) => (
+                    <span
+                        key={cell}
+                        className={cn(
+                            "rounded-[2px]",
+                            position < filled ? FILL[tone] : "bg-secondary",
+                        )}
+                    />
+                ))}
             </div>
         </div>
     );
