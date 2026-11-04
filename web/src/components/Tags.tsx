@@ -12,8 +12,33 @@ export function editableTags(tags: string[]): string {
 
 export const TAGS_HINT = "Comma separated. Use key:value for structure, e.g. team:fraud.";
 
-export const TAGS_HELP =
-    "Comma separated. Tags show on the model and match in the Models search, so a shared key:value scheme pays off as the list grows: team:fraud finds every model the fraud team owns, env:prod everything live, data:pii whatever touches personal data. The API returns them too, for scripts that pick models by tag. Tags starting with minibrain: are set by minibrain.";
+const TAG_EXAMPLES = [
+    { tag: "team:fraud", finds: "the fraud team's models" },
+    { tag: "env:prod", finds: "everything live" },
+    { tag: "data:pii", finds: "anything with personal data" },
+];
+
+export function TagsHelp() {
+    return (
+        <div className="flex flex-col gap-2.5 p-1.5 text-left text-pretty">
+            <p>Comma separated. Tags show on the model and match in Models search.</p>
+            <div className="flex flex-col gap-1">
+                <p className="font-medium">Use key:value to find groups</p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                    {TAG_EXAMPLES.map((example) => (
+                        <div key={example.tag} className="contents">
+                            <dt className="font-mono">{example.tag}</dt>
+                            <dd className="opacity-75">{example.finds}</dd>
+                        </div>
+                    ))}
+                </dl>
+            </div>
+            <p className="opacity-75">
+                The API returns tags too. Tags starting with minibrain: are set by minibrain.
+            </p>
+        </div>
+    );
+}
 
 function TagBadge({ tag }: { tag: string }) {
     if (isSystemTag(tag)) {

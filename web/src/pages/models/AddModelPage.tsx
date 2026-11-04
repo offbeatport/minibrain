@@ -32,7 +32,7 @@ import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
-import { TAGS_HELP } from "~/components/Tags";
+import { TagsHelp } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
 import { AddModelSummary } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
@@ -430,7 +430,9 @@ export function AddModelPage() {
                         label={
                             <span className="flex items-center gap-1.5">
                                 <Optional label="Tags" />
-                                <InfoTip label="How tags help">{TAGS_HELP}</InfoTip>
+                                <InfoTip label="How tags help">
+                                    <TagsHelp />
+                                </InfoTip>
                             </span>
                         }
                     >
