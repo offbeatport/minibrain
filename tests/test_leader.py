@@ -14,7 +14,7 @@ from minibrain import app as app_module
 from minibrain.app import create_app, expire_forever
 from minibrain.leader import AdvisoryLeader, SingleLeader, leader_for
 from minibrain.settings import Settings
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import FakeBackend, Harness, sign_in
 
 POSTGRES = os.environ.get("MINIBRAIN_TEST_POSTGRES_URL")
 needs_postgres = pytest.mark.skipif(not POSTGRES, reason="set MINIBRAIN_TEST_POSTGRES_URL to run against Postgres")
@@ -100,6 +100,8 @@ def test_two_mains_share_postgres_and_one_runs_the_loops(postgres: str, tmp_path
 
     first, second = main("a"), main("b")
     with TestClient(first) as a, TestClient(second) as b:
+        sign_in(first, a)
+        sign_in(second, b)
         first.state.leader.held()
         second.state.leader.held()
         assert {a.get("/api/system").json()["loops"], b.get("/api/system").json()["loops"]} == {"leader", "standby"}
