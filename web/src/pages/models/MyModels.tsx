@@ -17,7 +17,6 @@ import {
     X,
 } from "lucide-react";
 import {
-    Badge,
     Button,
     Checkbox,
     CheckboxSelect,
@@ -40,7 +39,7 @@ import {
     TooltipTrigger,
     cn,
 } from "obp-ui";
-import { type CSSProperties, type ReactNode, useMemo, useRef, useState } from "react";
+import { type CSSProperties, Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import { type ModelRow, api, removed, unwrap } from "~/api/client";
 import { useModels } from "~/api/queries";
 import {
@@ -166,10 +165,11 @@ export function Availability({ row }: { row: ModelRow }) {
             ? row.health.label
             : AVAILABILITY_LABELS[state];
     const moving = state === "downloading" || state === "importing";
+    const subject = moving && row.kind === "custom" ? `${label} base` : label;
     return (
         <div className="flex items-center gap-2">
             <StatusText tone={AVAILABILITY_TONES[state]}>
-                {label}
+                {subject}
                 {moving && percent(progress) && (
                     <span className="tabular-nums"> · {percent(progress)}</span>
                 )}
@@ -878,11 +878,12 @@ const muted = (text: string) => <span className="text-muted-foreground">{text}</
 
 function summary(entry: Entry): string {
     const { model } = entry;
+    const size = model.kind === "base" && model.size_bytes ? bytes(model.size_bytes) : null;
     if (model.description) {
-        return model.description;
+        return size ? `${size} · ${model.description}` : model.description;
     }
     if (model.kind === "base") {
-        return model.size_bytes ? `Base model · ${bytes(model.size_bytes)}` : "Base model";
+        return size ? `Base model · ${size}` : "Base model";
     }
     return `On ${model.base_model}`;
 }
@@ -1095,11 +1096,6 @@ function ModelListRow({
                         >
                             {model.name}
                         </Link>
-                        {model.kind === "base" && (
-                            <Badge variant="outline" className="shrink-0">
-                                Base
-                            </Badge>
-                        )}
                     </span>
                     <span
                         className="line-clamp-2 text-sm text-muted-foreground"
@@ -1154,6 +1150,23 @@ function ResetWidths({ onReset }: { onReset: () => void }) {
             <TooltipContent>Reset column widths</TooltipContent>
         </Tooltip>
     );
+}
+
+const GROUPS = [
+    { kind: "custom", label: "Your models" },
+    { kind: "base", label: "Base models" },
+] as const;
+
+function groupFacts(kind: ModelRow["kind"], members: Entry[]): string {
+    const models = unique(members.map((entry) => entry.model));
+    const count = plural(models.length, "model");
+    if (kind === "custom") {
+        return count;
+    }
+    const disk = models
+        .filter((row) => row.availability.state === "available")
+        .reduce((sum, row) => sum + (row.size_bytes ?? 0), 0);
+    return disk > 0 ? `${count} · ${bytes(disk)} on disk` : count;
 }
 
 function ModelList({
@@ -1241,23 +1254,38 @@ function ModelList({
                 </div>
             ) : (
                 <ul className="col-span-full grid grid-cols-subgrid divide-y">
-                    {entries.map((entry) => (
-                        <ModelListRow
-                            key={entry.key}
-                            entry={entry}
-                            on={on}
-                            selected={selected.includes(entry.key)}
-                            selecting={selected.length > 0}
-                            onSelect={(on) =>
-                                onSelected(
-                                    on
-                                        ? [...selected, entry.key]
-                                        : selected.filter((id) => id !== entry.key),
-                                )
-                            }
-                            widths={sizing.widths}
-                        />
-                    ))}
+                    {GROUPS.map((group) => {
+                        const members = entries.filter((entry) => entry.model.kind === group.kind);
+                        return (
+                            members.length > 0 && (
+                                <Fragment key={group.kind}>
+                                    <li className="col-span-full flex h-9 items-center gap-2 bg-muted px-4 text-sm">
+                                        <span className="font-medium">{group.label}</span>
+                                        <span className="text-muted-foreground tabular-nums">
+                                            {groupFacts(group.kind, members)}
+                                        </span>
+                                    </li>
+                                    {members.map((entry) => (
+                                        <ModelListRow
+                                            key={entry.key}
+                                            entry={entry}
+                                            on={on}
+                                            selected={selected.includes(entry.key)}
+                                            selecting={selected.length > 0}
+                                            onSelect={(on) =>
+                                                onSelected(
+                                                    on
+                                                        ? [...selected, entry.key]
+                                                        : selected.filter((id) => id !== entry.key),
+                                                )
+                                            }
+                                            widths={sizing.widths}
+                                        />
+                                    ))}
+                                </Fragment>
+                            )
+                        );
+                    })}
                 </ul>
             )}
         </div>

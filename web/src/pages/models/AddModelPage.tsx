@@ -34,6 +34,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
+import { bytes } from "~/lib/time";
 import { AddModelSummary, Licence } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
@@ -351,7 +352,7 @@ export function AddModelPage() {
             toast({
                 title: "Model added",
                 description: need
-                    ? `${created.name}: the base model is downloading. Its progress shows in Models.`
+                    ? `${created.name}. ${need.verb === "import" ? "Importing" : "Downloading"} ${option?.name ?? "the base model"} (${bytes(need.size)}) first.`
                     : `${created.name} is ready to train.`,
                 tone: "success",
             });
