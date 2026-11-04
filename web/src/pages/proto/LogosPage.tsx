@@ -513,12 +513,540 @@ function ProfileBrain({ color, size }: GlyphProps) {
     );
 }
 
+function TwoLobes({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <circle cx={37} cy={46} r={23} />
+            <circle cx={63} cy={46} r={23} />
+            <rect x={14} y={46} width={72} height={22} rx={11} />
+            <rect x={56} y={60} width={12} height={22} rx={6} />
+        </g>
+    );
+}
+
+function ThreeHumps({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <circle cx={28} cy={52} r={14} />
+            <circle cx={50} cy={42} r={17} />
+            <circle cx={72} cy={52} r={14} />
+            <rect x={14} y={52} width={72} height={20} rx={10} />
+        </g>
+    );
+}
+
+const LOBE_HALVES = [
+    { id: "left", x: 28 },
+    { id: "right", x: 72 },
+];
+
+function FourLobes({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            {LOBE_HALVES.map((half) => (
+                <g key={half.id}>
+                    <circle cx={half.x} cy={36} r={17} />
+                    <circle cx={half.x} cy={63} r={19} />
+                    <rect x={half.x - 15} y={36} width={30} height={28} />
+                </g>
+            ))}
+        </g>
+    );
+}
+
+function ThickM({ color, size }: GlyphProps) {
+    return (
+        <path
+            d="M20 76 V48 A15 15 0 0 1 50 48 V76 M50 48 A15 15 0 0 1 80 48 V76"
+            fill="none"
+            stroke={color}
+            strokeWidth={weight(size, 12)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    );
+}
+
+function SolidM({ color }: GlyphProps) {
+    return <path d="M16 74 V50 A17 17 0 0 1 48 47 A17 17 0 0 1 84 50 V74 Z" fill={color} />;
+}
+
+function Bean({ color }: GlyphProps) {
+    return (
+        <path
+            d="M50 24 C70 18 88 30 86 52 C84 72 66 80 50 74 C34 80 16 72 14 52 C12 30 30 18 50 24 Z"
+            fill={color}
+        />
+    );
+}
+
+function Outline({ color, size }: GlyphProps) {
+    return (
+        <g
+            fill="none"
+            stroke={color}
+            strokeWidth={weight(size, 9)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M24 66 C14 66 14 58 16 52 C20 33 33 24 50 24 C67 24 80 33 84 52 C86 58 86 66 76 66 Z" />
+            <path d="M61 66 V80" />
+        </g>
+    );
+}
+
+function SCut({ color, ground, size }: GlyphProps) {
+    return (
+        <g>
+            <circle cx={50} cy={50} r={36} fill={color} />
+            <path
+                d="M50 12 C38 28 62 40 50 52 C38 64 62 74 50 88"
+                fill="none"
+                stroke={ground}
+                strokeWidth={weight(size, 6)}
+                strokeLinecap="round"
+            />
+        </g>
+    );
+}
+
+function Hemisphere({ color, ground, size }: GlyphProps) {
+    return (
+        <g>
+            <path d="M12 70 A38 38 0 0 1 88 70 Z" fill={color} />
+            <path
+                d="M30 70 C30 54 44 52 50 62 C56 52 70 54 70 70"
+                fill="none"
+                stroke={ground}
+                strokeWidth={weight(size, 6)}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </g>
+    );
+}
+
+function Pebbles({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <path d="M46 20 H40 C24 20 14 32 14 50 C14 68 24 80 40 80 H46 Z" />
+            <path d="M54 20 H60 C76 20 86 32 86 50 C86 68 76 80 60 80 H54 Z" />
+        </g>
+    );
+}
+
+type GearOptions = {
+    cx: number;
+    cy: number;
+    teeth: number;
+    outer: number;
+    root: number;
+    from?: number;
+    to?: number;
+    phase?: number;
+};
+
+function gearPath({
+    cx,
+    cy,
+    teeth,
+    outer,
+    root,
+    from = 0,
+    to = 2 * Math.PI,
+    phase = 0,
+}: GearOptions): string {
+    const full = to - from >= 2 * Math.PI - 1e-6;
+    const pitch = (2 * Math.PI) / teeth;
+    const points: Point[] = [];
+    const polar = (radius: number, angle: number): Point => [
+        cx + radius * Math.cos(angle),
+        cy + radius * Math.sin(angle),
+    ];
+    for (let index = 0; index < teeth; index += 1) {
+        const base = phase + index * pitch;
+        const corners = [
+            [root, base],
+            [outer, base + pitch * 0.12],
+            [outer, base + pitch * 0.38],
+            [root, base + pitch * 0.5],
+        ] as const;
+        for (const [radius, angle] of corners) {
+            const wrapped = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+            if (full || (wrapped >= from && wrapped <= to)) {
+                points.push(polar(radius, angle));
+            }
+        }
+    }
+    if (!full) {
+        points.push(polar(root, to), [cx, cy], polar(root, from));
+    }
+    return `M${points.map(at).join(" L")} Z`;
+}
+
+function Gear({
+    color,
+    ground,
+    hole = 0,
+    ...options
+}: GearOptions & { color: string; ground: string; hole?: number }) {
+    return (
+        <g>
+            <path d={gearPath(options)} fill={color} strokeLinejoin="round" />
+            {hole > 0 && <circle cx={options.cx} cy={options.cy} r={hole} fill={ground} />}
+        </g>
+    );
+}
+
+function TwinCogs({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={31}
+                cy={50}
+                teeth={9}
+                outer={22}
+                root={17}
+                hole={6}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={69}
+                cy={50}
+                teeth={9}
+                outer={22}
+                root={17}
+                hole={6}
+                phase={0.35}
+            />
+        </g>
+    );
+}
+
+function DomeOfCogs({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={28}
+                cy={58}
+                teeth={8}
+                outer={18}
+                root={14}
+                hole={5}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={50}
+                cy={34}
+                teeth={10}
+                outer={21}
+                root={16.5}
+                hole={6}
+                phase={0.2}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={72}
+                cy={58}
+                teeth={8}
+                outer={18}
+                root={14}
+                hole={5}
+                phase={0.4}
+            />
+        </g>
+    );
+}
+
+function CogCluster({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={36}
+                cy={42}
+                teeth={10}
+                outer={24}
+                root={19}
+                hole={7}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={70}
+                cy={40}
+                teeth={7}
+                outer={16}
+                root={12}
+                hole={4.5}
+                phase={0.3}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={63}
+                cy={68}
+                teeth={7}
+                outer={14}
+                root={10.5}
+                hole={4}
+                phase={0.1}
+            />
+        </g>
+    );
+}
+
+function GearDome({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <path
+                d={gearPath({
+                    cx: 50,
+                    cy: 62,
+                    teeth: 14,
+                    outer: 40,
+                    root: 34,
+                    from: Math.PI,
+                    to: 2 * Math.PI,
+                    phase: Math.PI,
+                })}
+            />
+            <rect x={56} y={58} width={12} height={22} rx={6} />
+        </g>
+    );
+}
+
+function HalfCogs({ color }: GlyphProps) {
+    return (
+        <g fill={color}>
+            <path
+                d={gearPath({
+                    cx: 47,
+                    cy: 50,
+                    teeth: 14,
+                    outer: 36,
+                    root: 30,
+                    from: Math.PI / 2,
+                    to: (3 * Math.PI) / 2,
+                })}
+            />
+            <path
+                d={gearPath({
+                    cx: 53,
+                    cy: 50,
+                    teeth: 14,
+                    outer: 36,
+                    root: 30,
+                    from: (3 * Math.PI) / 2,
+                    to: 2 * Math.PI,
+                })}
+            />
+            <path
+                d={gearPath({
+                    cx: 53,
+                    cy: 50,
+                    teeth: 14,
+                    outer: 36,
+                    root: 30,
+                    from: 0,
+                    to: Math.PI / 2,
+                })}
+            />
+        </g>
+    );
+}
+
+function CogWithFold({ color, ground, size }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={50}
+                cy={50}
+                teeth={12}
+                outer={40}
+                root={33}
+                hole={25}
+            />
+            <path
+                d="M36 56 C36 46 46 44 50 52 C54 44 64 46 64 56"
+                fill="none"
+                stroke={color}
+                strokeWidth={weight(size, 6)}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </g>
+    );
+}
+
+function DomeWithCog({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <path
+                d="M24 68 C14 68 13 60 15 53 C19 33 33 22 50 22 C67 22 81 33 85 53 C87 60 86 68 76 68 Z"
+                fill={color}
+            />
+            <rect x={55} y={60} width={12} height={22} rx={6} fill={color} />
+            <Gear
+                color={ground}
+                ground={color}
+                cx={50}
+                cy={47}
+                teeth={8}
+                outer={15}
+                root={11}
+                hole={4.5}
+            />
+        </g>
+    );
+}
+
+function TriadCogs({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={50}
+                cy={31}
+                teeth={8}
+                outer={19}
+                root={14.5}
+                hole={5}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={31}
+                cy={64}
+                teeth={8}
+                outer={19}
+                root={14.5}
+                hole={5}
+                phase={0.4}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={69}
+                cy={64}
+                teeth={8}
+                outer={19}
+                root={14.5}
+                hole={5}
+                phase={0.15}
+            />
+        </g>
+    );
+}
+
+function CerebellumCogs({ color, ground }: GlyphProps) {
+    return (
+        <g>
+            <Gear
+                color={color}
+                ground={ground}
+                cx={42}
+                cy={42}
+                teeth={12}
+                outer={30}
+                root={24}
+                hole={8}
+            />
+            <Gear
+                color={color}
+                ground={ground}
+                cx={74}
+                cy={74}
+                teeth={7}
+                outer={14}
+                root={10}
+                hole={4}
+                phase={0.2}
+            />
+        </g>
+    );
+}
+
+function bumpPath(cx: number, cy: number, bumps: number, radius: number, depth: number): string {
+    const points: Point[] = [];
+    const steps = bumps * 24;
+    for (let index = 0; index < steps; index += 1) {
+        const angle = (2 * Math.PI * index) / steps;
+        const swell = depth * Math.abs(Math.sin((bumps * angle) / 2));
+        points.push([
+            cx + (radius + swell) * Math.cos(angle),
+            cy + (radius + swell) * Math.sin(angle),
+        ]);
+    }
+    return `M${points.map(at).join(" L")} Z`;
+}
+
+function SoftCog({ color, ground, size }: GlyphProps) {
+    return (
+        <g>
+            <path d={bumpPath(50, 50, 8, 32, 7)} fill={color} />
+            <path
+                d="M50 22 C44 34 56 42 50 50 C44 58 56 66 50 78"
+                fill="none"
+                stroke={ground}
+                strokeWidth={weight(size, 5.5)}
+                strokeLinecap="round"
+            />
+        </g>
+    );
+}
+
 type Variant = { id: string; name: string; Glyph: ComponentType<GlyphProps>; bleed?: boolean };
 type Family = { id: string; name: string; idea: string; variants: Variant[] };
 
 const THIRD = (2 * Math.PI) / 3;
 
 const FAMILIES: Family[] = [
+    {
+        id: "cogs",
+        name: "Cogs",
+        idea: "Gears that form a brain: thinking as a machine you can build, tune and run.",
+        variants: [
+            { id: "c1", name: "Twin cogs", Glyph: TwinCogs },
+            { id: "c2", name: "Dome of cogs", Glyph: DomeOfCogs },
+            { id: "c3", name: "Cluster", Glyph: CogCluster },
+            { id: "c4", name: "Gear dome", Glyph: GearDome },
+            { id: "c5", name: "Half cogs", Glyph: HalfCogs },
+            { id: "c6", name: "Cog with fold", Glyph: CogWithFold },
+            { id: "c7", name: "Dome with cog", Glyph: DomeWithCog },
+            { id: "c8", name: "Triad", Glyph: TriadCogs },
+            { id: "c9", name: "Cerebellum", Glyph: CerebellumCogs },
+            { id: "c10", name: "Soft cog", Glyph: SoftCog },
+        ],
+    },
+    {
+        id: "simple-brain",
+        name: "Simpler brains",
+        idea: "One or two shapes each: the least a mark can say and still read as a brain.",
+        variants: [
+            { id: "s1", name: "Two lobes", Glyph: TwoLobes },
+            { id: "s2", name: "Three humps", Glyph: ThreeHumps },
+            { id: "s3", name: "Four lobes", Glyph: FourLobes },
+            { id: "s4", name: "Thick m", Glyph: ThickM },
+            { id: "s5", name: "Solid m", Glyph: SolidM },
+            { id: "s6", name: "Bean", Glyph: Bean },
+            { id: "s7", name: "Outline", Glyph: Outline },
+            { id: "s8", name: "S cut", Glyph: SCut },
+            { id: "s9", name: "Hemisphere", Glyph: Hemisphere },
+            { id: "s10", name: "Pebbles", Glyph: Pebbles },
+        ],
+    },
     {
         id: "brain",
         name: "Brain",
@@ -806,7 +1334,7 @@ export function LogosPage() {
         <Page>
             <PageHeader
                 title="Logos"
-                caption="Ten simple brains, then ten versions each of Branches, Waves and Rainbow. Flat on Cobalt or ink. Prototype; not in the sidebar."
+                caption="Cogs that form a brain, simpler brains, simple brains, then Branches, Waves and Rainbow: ten of each. Flat on Cobalt or ink. Prototype; not in the sidebar."
             />
             {FAMILIES.map((family) => (
                 <FamilySection key={family.id} family={family} />
