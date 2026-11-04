@@ -20,7 +20,7 @@ export function PageHeader({
     return (
         <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
             <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="flex items-center gap-3 text-3xl font-light">
+                <h1 className="flex items-center gap-3 text-3xl font-normal">
                     {icon}
                     {Icon && (
                         <Icon
