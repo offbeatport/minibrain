@@ -265,14 +265,21 @@ def test_repeated_failures_lock_the_account_for_a_while(install: Install) -> Non
 def test_sessions_end_after_the_idle_and_absolute_lifetimes(install: Install) -> None:
     admin = set_up(install)
     with install.sessions() as session:
-        session.execute(update(LoginSession).values(last_seen_at=now() - timedelta(minutes=31)))
+        session.execute(update(LoginSession).values(last_seen_at=now() - timedelta(minutes=7 * 60)))
         session.commit()
-    assert admin.get("/api/minibrains").status_code == 401
+    assert admin.get("/api/minibrains").status_code == 200
+    with install.sessions() as session:
+        session.execute(update(LoginSession).values(last_seen_at=now() - timedelta(minutes=8 * 60 + 1)))
+        session.commit()
+    idle = admin.get("/api/minibrains")
+    assert (idle.status_code, idle.headers["x-signed-out"]) == (401, "idle:480")
     browser = install.browser()
     assert browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
     with install.sessions() as session:
-        session.execute(update(LoginSession).values(created_at=now() - timedelta(hours=13)))
+        session.execute(update(LoginSession).values(created_at=now() - timedelta(days=7, minutes=1)))
         session.commit()
+    expired = browser.get("/api/auth/session")
+    assert (expired.status_code, expired.headers["x-signed-out"]) == (200, "expired:168")
     assert browser.get("/api/minibrains").status_code == 401
     with install.sessions() as session:
         assert session.scalars(select(LoginSession)).all() == []

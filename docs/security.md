@@ -54,7 +54,7 @@ People sign in to the UI and `/api`; apps call `/v1` with API keys only, and wor
 - Accounts are always on: everyone who opens the UI or calls `/api` signs in, on loopback too. Audit events name
   the person; workers, engines and `/v1` keep their tokens and API keys.
 - Sessions: a random 256-bit token in an HttpOnly, SameSite=Lax cookie; the database keeps only its SHA-256. Idle
-  and absolute lifetimes are the `session_idle_minutes` (30) and `session_hours` (12) policies. Signing out, a new
+  and absolute lifetimes are the `session_idle_minutes` (480, a working day) and `session_hours` (168, a week) policies. Signing out, a new
   password or turning an account off ends sessions at once.
 - The cookie is Secure when the request is HTTPS, a configured proxy says it was (`X-Forwarded-Proto`), or the
   browser's `Origin` is HTTPS. Plain HTTP on loopback (`localhost`, `127.0.0.1`, `::1`) gets no Secure flag, since

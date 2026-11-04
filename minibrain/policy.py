@@ -137,14 +137,14 @@ FIELDS: tuple[Field, ...] = (
         "People are signed out after this long without using minibrain. 0 keeps them signed in until the session "
         "lifetime ends.",
         "int",
-        30,
+        8 * 60,
     ),
     Field(
         "session_hours",
         "Session lifetime (hours)",
         "People sign in again after this long, however active they are.",
         "int",
-        12,
+        7 * 24,
         maximum=24 * 90,
         minimum=1,
     ),

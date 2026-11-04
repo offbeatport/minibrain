@@ -152,20 +152,28 @@ def start_session(session: Session, user: User, ip: str | None, user_agent: str 
     return row, token
 
 
-def live_session(session: Session, token: str) -> LoginSession | None:
+def checked_session(session: Session, token: str) -> tuple[LoginSession | None, str | None]:
     row = session.scalar(select(LoginSession).where(LoginSession.token_hash == token_digest(token)))
     if row is None:
-        return None
+        return None, None
     moment = now()
     limits = lifetimes(session)
     ends = min(row.expires_at, row.created_at + limits.absolute)
     idle = limits.idle is not None and moment - row.last_seen_at > limits.idle
     if ends <= moment or idle or row.user.disabled:
         session.delete(row)
-        return None
+        if row.user.disabled:
+            return None, None
+        if idle and limits.idle is not None:
+            return None, f"idle:{int(limits.idle.total_seconds() // 60)}"
+        return None, f"expired:{int(limits.absolute.total_seconds() // 3600)}"
     if moment - row.last_seen_at > TOUCH_EVERY:
         row.last_seen_at = moment
-    return row
+    return row, None
+
+
+def live_session(session: Session, token: str) -> LoginSession | None:
+    return checked_session(session, token)[0]
 
 
 def end_session(session: Session, token: str) -> None:

@@ -5,7 +5,7 @@ run = ["uv sync --all-extras", "pnpm --dir web install"]
 [tasks."dev:api"]
 description = "API and job worker on :8000, restarted on Python changes; pages redirect to the web UI on :5173"
 run = "uv run watchfiles --filter python 'minibrain serve' minibrain"
-env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain", MINIBRAIN_UI_URL = "http://localhost:5173" }
+env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain", MINIBRAIN_UI_URL = "http://localhost:5173", MINIBRAIN_POLICY_SESSION_IDLE_MINUTES = "0" }
 
 [tasks."dev:web"]
 description = "Web UI with hot reload on :5173"

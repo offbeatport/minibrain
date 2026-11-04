@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.datastructures import Headers
 from starlette.requests import cookie_parser
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, csrf_matches
 from minibrain.auth.addresses import ip_of
@@ -32,6 +32,7 @@ PUBLIC_PATHS = frozenset(
     }
 )
 SIGN_IN_NEEDED = "Sign in to use minibrain"
+SIGNED_OUT_HEADER = "X-Signed-Out"
 CSRF_MISSING = "This request has no valid CSRF token. Reload the page and try again."
 NO_ROLE = "You do not have access yet. Ask an admin to give you a role."
 
@@ -97,6 +98,17 @@ def refusal(found: Identity, facts: RequestFacts, key: bytes) -> tuple[int, str]
     return None
 
 
+def with_header(send: Send, name: str, value: str) -> Send:
+    async def sending(message: Message) -> None:
+        if message["type"] == "http.response.start":
+            headers = list(message.get("headers", []))
+            headers.append((name.lower().encode("latin-1"), value.encode("latin-1")))
+            message = {**message, "headers": headers}
+        await send(message)
+
+    return sending
+
+
 class Identify:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -109,9 +121,13 @@ class Identify:
         facts = facts_of(scope)
         found = await anyio.to_thread.run_sync(partial(resolve, state, facts))
         refused = refusal(found, facts, state.csrf_key)
+        ended = {SIGNED_OUT_HEADER: found.ended} if found.ended else None
         if refused is not None:
-            await JSONResponse(status_code=refused[0], content={"detail": refused[1]})(scope, receive, send)
+            response = JSONResponse(status_code=refused[0], content={"detail": refused[1]}, headers=ended)
+            await response(scope, receive, send)
             return
+        if ended is not None:
+            send = with_header(send, SIGNED_OUT_HEADER, found.ended or "")
         scope.setdefault("state", {})["identity"] = found
         person = found.person
         signed_in = (person.actor, person.source) if person is not None else None

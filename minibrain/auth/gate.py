@@ -7,9 +7,9 @@ from minibrain.auth.accounts import (
     NAME_LENGTH,
     PROXY,
     TURNED_OFF,
+    checked_session,
     external_user,
     groups_of,
-    live_session,
     person_for,
 )
 from minibrain.auth.config import AuthConfig
@@ -34,6 +34,7 @@ class Identity:
     person: Person | None
     csrf_subject: str | None = None
     refused: str | None = None
+    ended: str | None = None
 
 
 def proxy_identity(session: Session, config: AuthConfig, facts: RequestFacts) -> Identity | None:
@@ -68,8 +69,9 @@ def identify(session: Session, facts: RequestFacts, config: AuthConfig) -> Ident
     if proxied is not None:
         return proxied
     if facts.token:
-        row = live_session(session, facts.token)
+        row, ended = checked_session(session, facts.token)
         if row is not None:
             person = person_for(session, row.user, config)
             return Identity(person=person, csrf_subject=f"session:{row.token_hash}")
+        return Identity(person=None, ended=ended)
     return Identity(person=None)

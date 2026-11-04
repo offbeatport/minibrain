@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { api, onSignedOut, setCsrfToken, succeed, unwrap } from "./client";
+import { api, clearSignOutReason, onSignedOut, setCsrfToken, succeed, unwrap } from "./client";
 import type { components } from "./schema";
 
 type Schemas = components["schemas"];
@@ -41,6 +41,7 @@ export function usePerson(): PersonInfo | null {
 function useSignedIn() {
     const client = useQueryClient();
     return async (info: SessionInfo) => {
+        clearSignOutReason();
         setCsrfToken(info.csrf_token ?? null);
         client.setQueryData(authKeys.session, info);
         await client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "auth" });

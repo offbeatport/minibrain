@@ -54,8 +54,38 @@ function guarded(method: string, headers: Headers): Headers {
     return headers;
 }
 
+let signedOutReason: string | null = null;
+
+function reasonText(header: string): string | null {
+    const [kind, amount] = header.split(":");
+    const count = Number(amount);
+    if (kind === "idle" && count > 0) {
+        return count % 60 === 0
+            ? `You were signed out after ${count / 60} ${count === 60 ? "hour" : "hours"} without activity.`
+            : `You were signed out after ${count} minutes without activity.`;
+    }
+    if (kind === "expired" && count > 0) {
+        return count % 24 === 0
+            ? `Your sign-in reached its ${count / 24}-day limit.`
+            : `Your sign-in reached its ${count}-hour limit.`;
+    }
+    return null;
+}
+
+export function signOutReason(): string | null {
+    return signedOutReason;
+}
+
+export function clearSignOutReason(): void {
+    signedOutReason = null;
+}
+
 function noticeSignedOut(response: Response): Response {
-    if (response.status === 401) {
+    const ended = response.headers.get("x-signed-out");
+    if (ended) {
+        signedOutReason = reasonText(ended) ?? signedOutReason;
+    }
+    if (response.status === 401 || ended) {
         for (const listener of signedOutListeners) {
             listener();
         }

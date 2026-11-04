@@ -18,6 +18,7 @@ import {
     useSignIn,
     useSignOut,
 } from "~/api/authQueries";
+import { signOutReason } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 
 const MIN_PASSWORD = 12;
@@ -140,6 +141,7 @@ function SingleSignOn({ label, divider }: { label: string; divider: string }) {
 
 export function SignInPage({ session }: { session?: SessionInfo }) {
     const signIn = useSignIn();
+    const [reason] = useState(signOutReason);
     const sso = session?.methods.oidc;
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -155,6 +157,11 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
             <form onSubmit={submit}>
                 <FieldGroup>
                     <InsecureNotice />
+                    {reason && (
+                        <p className="rounded-md border bg-secondary px-3 py-2 text-sm">
+                            {`${reason} Sign in again to carry on where you were.`}
+                        </p>
+                    )}
                     {sso && <SingleSignOn label={sso} divider="or with a password" />}
                     <Field id="email" label="Email">
                         <Input
