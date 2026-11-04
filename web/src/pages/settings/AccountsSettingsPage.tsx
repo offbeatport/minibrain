@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { KeyRound, MoreHorizontal, Users } from "lucide-react";
+import { KeyRound, MoreHorizontal, UserPlus, Users } from "lucide-react";
 import {
     Badge,
     Button,
@@ -143,7 +143,7 @@ function AddPersonDialog({
             <DialogContent className="sm:max-w-md">
                 <form onSubmit={submit} className="contents">
                     <DialogHeader>
-                        <DialogTitle>Add person</DialogTitle>
+                        <DialogTitle>Invite person</DialogTitle>
                         <DialogDescription>
                             They get a link to choose their own password. You see the link once.
                         </DialogDescription>
@@ -181,7 +181,8 @@ function AddPersonDialog({
                             Cancel
                         </Button>
                         <Button type="submit" disabled={add.isPending}>
-                            Add person
+                            <UserPlus />
+                            Invite
                         </Button>
                     </DialogFooter>
                 </form>
@@ -467,7 +468,8 @@ function People() {
             description="Everyone who can sign in. Turning someone off signs them out at once."
             actions={
                 <Button variant="outline" onClick={() => setAdding(true)}>
-                    Add person
+                    <UserPlus />
+                    Invite person
                 </Button>
             }
             bare
