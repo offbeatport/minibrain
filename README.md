@@ -109,14 +109,14 @@ Needs [uv](https://docs.astral.sh/uv/), Node with pnpm, and [mise](https://mise.
 ```sh
 mise run setup       # uv sync + pnpm install
 mise run dev         # API + worker on :8000, UI with hot reload on :5173
+mise run setup-link  # a fresh one-time link to create the first admin of .minibrain/
 mise run check       # tests, ruff, pyright, biome, tsc
 mise run build       # dist/minibrain-*.whl with the built UI inside
 mise run api-types   # regenerate the TypeScript client after API changes
 ```
 
 On a fresh `.minibrain/`, the `mise run dev` log prints a setup link on `http://localhost:5173/setup?token=…` that
-creates the first admin; the same path on :8000 redirects there. `minibrain admin setup-link` (with
-`MINIBRAIN_HOME=.minibrain`) prints a new one.
+creates the first admin; the same path on :8000 redirects there. `mise run setup-link` prints a new one.
 
 Training runs on CUDA when available, otherwise on CPU: the Metal GPU hangs during LoRA training on Apple Silicon (see
 `docs/findings.md`). Set `MINIBRAIN_TRAIN_DEVICE` to override.

@@ -15,6 +15,11 @@ run = "pnpm --dir web dev"
 description = "API, worker and web UI with hot reload"
 depends = ["dev:api", "dev:web"]
 
+[tasks.setup-link]
+description = "Print a fresh one-time link to create the first admin of the dev install in .minibrain/"
+run = "uv run minibrain admin setup-link --url http://localhost:5173"
+env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain" }
+
 [tasks.serve]
 description = "API, worker and the built UI on :8000, data in .minibrain/"
 run = ["pnpm --dir web build", "uv run minibrain serve"]
