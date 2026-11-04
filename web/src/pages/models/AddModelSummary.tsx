@@ -26,47 +26,42 @@ const TEXT: Record<Tone, string> = {
     destructive: "text-destructive",
 };
 
-const CELLS = Array.from({ length: 24 }, (_, position) => `cell-${position}`);
+type Reading = { share: number | null; tone: Tone; left: string; right: string };
 
-function Meter({
-    label,
-    share,
-    tone,
-    caption,
-}: {
-    label: string;
-    share: number | null;
-    tone: Tone;
-    caption: string;
-}) {
-    const filled =
-        share === null
-            ? 0
-            : Math.max(share > 0 ? 1 : 0, Math.round(Math.min(1, share) * CELLS.length));
-    const percent = share === null ? 0 : Math.round(Math.min(1, share) * 100);
+function Meter({ label, reading }: { label: string; reading: Reading }) {
+    const { share, tone, left, right } = reading;
+    const capped = share === null ? 0 : Math.min(1, share);
+    const width = share === null ? 0 : Math.max(share > 0 ? 2 : 0, capped * 100);
+    const percent = share === null ? null : Math.round(share * 100);
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium">{label}</span>
-                <span className={cn("text-sm tabular-nums", TEXT[tone])}>{caption}</span>
+                <span
+                    className={cn(
+                        "text-lg font-semibold tabular-nums",
+                        tone === "normal" ? "text-foreground" : TEXT[tone],
+                    )}
+                >
+                    {percent === null ? "–" : `${percent}%`}
+                </span>
             </div>
             <div
                 role="meter"
                 aria-label={label}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={percent}
-                className="grid h-3 grid-cols-[repeat(24,minmax(0,1fr))] gap-0.5"
+                aria-valuenow={Math.round(capped * 100)}
+                className="h-8 rounded-lg border bg-secondary p-1"
             >
-                {CELLS.map((cell, position) => (
-                    <span
-                        key={cell}
-                        className={cn(
-                            "rounded-[2px]",
-                            position < filled ? FILL[tone] : "bg-secondary",
-                        )}
-                    />
-                ))}
+                <div
+                    className={cn("h-full rounded-md", FILL[tone])}
+                    style={{ width: `${width}%` }}
+                />
+            </div>
+            <div className="flex items-baseline justify-between gap-3 text-sm tabular-nums">
+                <span className={TEXT[tone]}>{left}</span>
+                <span className="text-muted-foreground">{right}</span>
             </div>
         </div>
     );
@@ -157,15 +152,16 @@ function Formats({
     return <span className="text-sm text-muted-foreground">As installed</span>;
 }
 
-function diskMeter(need: DiskNeed, free: number | null | undefined) {
+function diskMeter(need: DiskNeed, free: number | null | undefined): Reading {
     if (free === null || free === undefined) {
-        return { share: null, tone: "normal" as Tone, caption: "Free space unknown" };
+        return { share: null, tone: "normal", left: "Free space unknown", right: "" };
     }
     if (!need) {
         return {
             share: 0,
-            tone: "normal" as Tone,
-            caption: `Nothing to download · ${bytes(free)} free`,
+            tone: "normal",
+            left: "Nothing to download",
+            right: `${bytes(free)} free`,
         };
     }
     const after = free - need.size;
@@ -173,14 +169,13 @@ function diskMeter(need: DiskNeed, free: number | null | undefined) {
     return {
         share: free > 0 ? need.size / free : 1,
         tone,
-        caption:
-            after < 0
-                ? `${bytes(need.size)}, only ${bytes(free)} free`
-                : `${bytes(need.size)} of ${bytes(free)} free`,
+        left:
+            after < 0 ? `${bytes(need.size)}, does not fit` : `${bytes(need.size)} for this model`,
+        right: `${bytes(free)} free`,
     };
 }
 
-function memoryMeter(variant: CatalogVariantInfo | null) {
+function memoryMeter(variant: CatalogVariantInfo | null): Reading | null {
     const fit = variant?.fit;
     if (!fit || !fit.available_bytes) {
         return null;
@@ -194,7 +189,8 @@ function memoryMeter(variant: CatalogVariantInfo | null) {
     return {
         share: fit.needed_bytes / fit.available_bytes,
         tone,
-        caption: `Needs ${bytes(fit.needed_bytes)} of ${bytes(fit.available_bytes)}`,
+        left: `Needs ${bytes(fit.needed_bytes)}`,
+        right: `${bytes(fit.available_bytes)} usable`,
     };
 }
 
@@ -304,15 +300,8 @@ export function AddModelSummary({
                 )}
             </Block>
             <Block>
-                <Meter label="Disk" share={disk.share} tone={disk.tone} caption={disk.caption} />
-                {memory && (
-                    <Meter
-                        label="Memory"
-                        share={memory.share}
-                        tone={memory.tone}
-                        caption={memory.caption}
-                    />
-                )}
+                <Meter label="Disk" reading={disk} />
+                {memory && <Meter label="Memory" reading={memory} />}
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp
