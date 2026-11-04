@@ -80,6 +80,7 @@ import {
 } from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeleteBaseDialog } from "./DeleteBaseDialog";
+import { ModelsEmpty } from "./ModelsEmpty";
 import {
     ConfirmAction,
     type Confirmation,
@@ -1235,7 +1236,7 @@ function ModelList({
                 </div>
             </div>
             {entries.length === 0 ? (
-                <div className="col-span-full flex h-72 flex-col items-center justify-center gap-3 px-4 text-center">
+                <div className="col-span-full flex min-h-72 flex-col items-center justify-center gap-3 px-4 text-center">
                     {empty}
                 </div>
             ) : (
@@ -1632,15 +1633,7 @@ export function MyModels({
                     onSelected={setSelected}
                     sort={sort}
                     onSort={toggleSort}
-                    empty={
-                        rows.length === 0 ? (
-                            <p className="text-muted-foreground">
-                                No models yet. Add one to start from a base model.
-                            </p>
-                        ) : (
-                            noMatch
-                        )
-                    }
+                    empty={rows.length === 0 ? <ModelsEmpty /> : noMatch}
                 />
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
