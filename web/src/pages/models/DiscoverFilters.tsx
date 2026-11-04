@@ -192,7 +192,7 @@ function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: num
 
 function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
     return (
-        <fieldset className="flex flex-col px-panel py-5">
+        <fieldset className="flex flex-col px-4 py-4">
             <legend className="float-left mb-2 text-sm font-semibold">{title}</legend>
             {children}
         </fieldset>
@@ -289,7 +289,7 @@ export function FilterPanel({
     const active = activeFilters(filters);
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
-            <div className="flex h-12 items-center gap-2 px-panel">
+            <div className="flex h-12 items-center gap-2 px-4">
                 <span className="text-sm font-semibold">Filters</span>
                 {active > 0 && (
                     <>
@@ -307,7 +307,7 @@ export function FilterPanel({
                     </>
                 )}
             </div>
-            <div className="flex flex-col px-panel py-5">{toggles}</div>
+            <div className="flex flex-col px-4 py-4">{toggles}</div>
             <Group title="Task">
                 <OptionList items={items("tasks", distinct("tasks"))} />
             </Group>

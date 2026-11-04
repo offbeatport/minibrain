@@ -644,11 +644,11 @@ function skeletonRows(id: string, rows: number): string[] {
 function FilterSkeleton() {
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
-            <div className="flex h-12 items-center px-panel">
+            <div className="flex h-12 items-center px-4">
                 <span className="text-sm font-semibold">Filters</span>
             </div>
             {SKELETON_GROUPS.map((group) => (
-                <div key={group.id} className="flex flex-col px-panel py-5">
+                <div key={group.id} className="flex flex-col px-4 py-4">
                     {group.title && (
                         <span className="mb-2 text-sm font-semibold">{group.title}</span>
                     )}
@@ -679,7 +679,7 @@ function DiscoverSkeleton({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-start gap-4">
-                <aside className="hidden w-64 shrink-0 min-[1400px]:block">
+                <aside className="hidden w-60 shrink-0 min-[1400px]:block">
                     <FilterSkeleton />
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -828,7 +828,7 @@ export function Discover({
                 </div>
             )}
             <div className="flex items-start gap-4">
-                <aside className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] w-64 shrink-0 overflow-y-auto min-[1400px]:block">
+                <aside className="sticky top-4 hidden max-h-[calc(100dvh-2rem)] w-60 shrink-0 overflow-y-auto min-[1400px]:block">
                     {panel}
                 </aside>
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
