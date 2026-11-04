@@ -28,18 +28,31 @@ export function StatusText({
     );
 }
 
+const PULSE = {
+    primary: "bg-primary/70",
+    destructive: "bg-destructive/70",
+};
+
 export function ProgressBar({
     value,
     label,
     className = "w-24",
-}: { value: number | null | undefined; label: string; className?: string }) {
+    tone = "primary",
+}: {
+    value: number | null | undefined;
+    label: string;
+    className?: string;
+    tone?: keyof typeof PULSE;
+}) {
     if (value === null || value === undefined) {
         return (
             <span
                 aria-hidden
                 className={`block h-1 overflow-hidden rounded-sm bg-secondary ${className}`}
             >
-                <span className="block h-full w-1/3 animate-pulse bg-primary/70 motion-reduce:animate-none" />
+                <span
+                    className={`block h-full w-1/3 animate-pulse ${PULSE[tone]} motion-reduce:animate-none`}
+                />
             </span>
         );
     }
