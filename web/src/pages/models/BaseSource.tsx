@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, X } from "lucide-react";
 import {
-    Badge,
     Button,
+    InfoTip,
     Input,
     Link,
     Select,
@@ -68,6 +69,7 @@ type Inspection = {
     variant_id?: string | null;
     connection_id?: number | null;
     connection?: string | null;
+    checks?: { label: string; ok: boolean; detail?: string | null }[];
 };
 
 export type SourceState = {
@@ -182,66 +184,60 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     };
 }
 
-type SourceKind = "hub" | "s3" | "folder";
-
-const SOURCE_KINDS: { kind: SourceKind; title: string; example: string; body: string }[] = [
+const SOURCES = [
     {
-        kind: "hub",
         title: "Hugging Face model",
-        example: "Qwen/Qwen3-1.7B or a huggingface.co link",
-        body: "Looked up on Hugging Face and downloaded into this install at a fixed revision. Catalogue models use the tested revision. Hugging Face must be allowed under Model sources in Security.",
+        body: "Downloaded at a fixed revision. Hugging Face must be allowed under Model sources in Security.",
     },
     {
-        kind: "s3",
         title: "S3 path",
-        example: "s3://bucket/models/qwen3-1.7b",
-        body: "Copied from your bucket into this install with an S3 connection from Settings, Connections: the one for that bucket, or the one picked here. The endpoint must be allowed by the network policy in Security. The bucket is left as it was.",
+        body: "Copied in with the S3 connection for that bucket, or the one you pick. The bucket is left as it was.",
     },
     {
-        kind: "folder",
         title: "Folder on the minibrain server",
-        example: "/srv/models/qwen3-1.7b",
-        body: "A folder on the machine running minibrain, not on this computer. It is checked, then copied into this install; the original folder is left as it was.",
+        body: "A folder on the machine running minibrain, not on this computer. Copied in; the original is left as it was.",
     },
 ];
 
-function sourceKindOf(text: string, target: SourcePlan["target"]): SourceKind | null {
-    if (target.kind === "catalogue" || target.kind === "hub") {
-        return "hub";
-    }
-    if (target.kind === "path") {
-        return text.trim().startsWith("s3://") ? "s3" : "folder";
-    }
-    return null;
-}
+const EXAMPLES = ["Qwen/Qwen3-1.7B", "s3://bucket/models/qwen3-1.7b", "/srv/models/qwen3-1.7b"];
 
-function SourceKinds({ active }: { active: SourceKind | null }) {
+function SourcesHelp() {
     return (
-        <div className="flex flex-col gap-2">
-            <ul className="flex flex-col divide-y rounded-md border">
-                {SOURCE_KINDS.map((item) => (
-                    <li
-                        key={item.kind}
-                        data-active={item.kind === active || undefined}
-                        className="flex flex-col gap-0.5 border-l-2 border-l-transparent px-3 py-2.5 data-active:border-l-primary data-active:bg-accent/60"
-                    >
-                        <span className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">{item.title}</span>
-                            {item.kind === active && <Badge variant="outline">Detected</Badge>}
-                        </span>
-                        <span className="font-mono text-sm text-muted-foreground">
-                            {item.example}
-                        </span>
-                        <span className="text-sm">{item.body}</span>
-                    </li>
+        <div className="flex flex-col gap-2.5 p-1.5 text-left text-pretty">
+            <dl className="flex flex-col gap-2">
+                {SOURCES.map((source) => (
+                    <div key={source.title} className="flex flex-col gap-0.5">
+                        <dt className="font-medium">{source.title}</dt>
+                        <dd className="opacity-75">{source.body}</dd>
+                    </div>
                 ))}
-            </ul>
-            <p className="text-sm text-muted-foreground">
-                Every file gets a SHA-256 record, so the model can be verified and repaired later.
+            </dl>
+            <p className="opacity-75">
                 Files must be in Hugging Face format: config.json, tokenizer files and .safetensors
-                weights. GGUF files can be served but not fine-tuned.
+                weights. GGUF serves but can't be fine-tuned. Every file gets a SHA-256 record, so
+                the model can be verified and repaired later.
             </p>
         </div>
+    );
+}
+
+function Examples({ onPick }: { onPick: (example: string) => void }) {
+    return (
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+            <span>For example</span>
+            {EXAMPLES.map((example, index) => (
+                <span key={example} className="flex items-center gap-1.5">
+                    {index > 0 && <span aria-hidden="true">·</span>}
+                    <button
+                        type="button"
+                        onClick={() => onPick(example)}
+                        className="rounded-sm font-mono text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        {example}
+                    </button>
+                </span>
+            ))}
+        </p>
     );
 }
 
@@ -288,6 +284,37 @@ function HubResult({ repo }: { repo: string }) {
     );
 }
 
+function Checklist({ checks }: { checks: NonNullable<Inspection["checks"]> }) {
+    return (
+        <ul className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
+            {checks.map((check) => (
+                <li key={check.label} className="flex items-start gap-2">
+                    {check.ok ? (
+                        <Check
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 flex-none text-success"
+                        />
+                    ) : (
+                        <X
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 flex-none text-destructive"
+                        />
+                    )}
+                    <span className="flex min-w-0 flex-col">
+                        <span>
+                            <span className="sr-only">{check.ok ? "Passed: " : "Failed: "}</span>
+                            {check.label}
+                        </span>
+                        {check.detail && (
+                            <span className="text-muted-foreground">{check.detail}</span>
+                        )}
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 export function PathResult({ plan }: { plan: SourcePlan }) {
     if (plan.target.kind !== "path" || plan.target.location.length < 2) {
         return null;
@@ -296,7 +323,7 @@ export function PathResult({ plan }: { plan: SourcePlan }) {
         return <span className="text-sm text-muted-foreground">Checking…</span>;
     }
     const { found } = plan;
-    if (!found.ok) {
+    if (!found.checks?.length) {
         return (
             <StatusText tone="destructive" className="whitespace-normal">
                 {found.problem ?? "Cannot read this path"}
@@ -304,16 +331,25 @@ export function PathResult({ plan }: { plan: SourcePlan }) {
         );
     }
     const where = found.source_type === "s3" ? "S3" : "Folder";
+    const facts = [found.architecture, `${found.files} files`, bytes(found.size_bytes)].filter(
+        Boolean,
+    );
     return (
-        <div className="flex flex-col gap-0.5 text-sm">
-            <StatusText tone="success" className="whitespace-normal">
-                {`${where} · ${found.architecture || "unknown architecture"} · ${found.files} files · ${bytes(found.size_bytes)}`}
-            </StatusText>
-            <span className="text-muted-foreground">
-                {found.match
-                    ? `Matches ${found.match}; files are checked against its catalogue checksums.`
-                    : "No catalogue match: it imports as not verified."}
-            </span>
+        <div className="flex flex-col divide-y rounded-md border text-sm">
+            <div className="flex flex-col gap-0.5 px-3 py-2.5">
+                <span className="font-semibold">{found.name || where}</span>
+                <span className="text-muted-foreground tabular-nums">
+                    {[where, ...facts].join(" · ")}
+                </span>
+            </div>
+            <Checklist checks={found.checks} />
+            {found.ok && (
+                <span className="px-3 py-2.5 text-muted-foreground">
+                    {found.match
+                        ? `Matches ${found.match}; files are checked against its catalogue checksums.`
+                        : "No catalogue match: it imports as not verified."}
+                </span>
+            )}
         </div>
     );
 }
@@ -398,10 +434,15 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
               : null;
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-                <label htmlFor="base-source" className="text-sm font-medium">
-                    Hugging Face model, S3 path or folder
-                </label>
+            <div className="flex flex-col gap-label">
+                <span className="flex items-center gap-1.5">
+                    <label htmlFor="base-source" className="text-sm font-medium">
+                        Hugging Face model, S3 path or folder
+                    </label>
+                    <InfoTip label="Where models can come from">
+                        <SourcesHelp />
+                    </InfoTip>
+                </span>
                 <Input
                     id="base-source"
                     value={text}
@@ -412,9 +453,10 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                             onUse(pick);
                         }
                     }}
-                    placeholder="Qwen/Qwen3-1.7B, s3://bucket/models/x or /srv/models/x"
+                    placeholder="Paste a model id, s3:// path or folder"
                     className="font-mono"
                 />
+                {!text.trim() && <Examples onPick={setText} />}
             </div>
             {plan.target.kind === "catalogue" && (
                 <div className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-sm">
@@ -440,7 +482,6 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                     {pick?.kind === "import" ? "Import this model" : "Use this model"}
                 </Button>
             </div>
-            <SourceKinds active={sourceKindOf(text, plan.target)} />
         </div>
     );
 }
