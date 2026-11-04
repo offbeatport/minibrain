@@ -182,12 +182,12 @@ def test_forwarded_addresses_count_only_from_the_proxy(proxied: Proxied) -> None
     through = proxied.client()
     headers = admin | {"X-Forwarded-For": "203.0.113.5, 10.0.0.1", "X-Forwarded-Proto": "https"}
     headers |= csrf_for(through, headers)
-    assert through.put("/api/policies/request_logs", json={"value": False}, headers=headers).status_code == 200
+    assert through.put("/api/policies/request_bodies", json={"value": True}, headers=headers).status_code == 200
     stranger = proxied.client(STRANGER)
     set_up_admin(proxied, stranger)
     token = csrf(stranger)
     spoofed = {"X-Forwarded-For": "203.0.113.99"} | token
-    assert stranger.put("/api/policies/request_logs", json={"value": True}, headers=spoofed).status_code == 200
+    assert stranger.put("/api/policies/request_bodies", json={"value": False}, headers=spoofed).status_code == 200
     events = proxied.events("policy.update")
     assert [event.ip for event in events] == ["203.0.113.5", STRANGER]
 

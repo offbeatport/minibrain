@@ -360,6 +360,7 @@ def chat_completions(
         raise
     finally:
         answered = completion is not None and status == 200
+        kept = answered and route is not None and route.request_bodies
         note_chat(body, route, completion, identifier if answered else None, code)
         logs.add(
             LogEntry(
@@ -373,10 +374,9 @@ def chat_completions(
                 prompt_tokens=completion.prompt_tokens if completion else 0,
                 completion_tokens=completion.completion_tokens if completion else 0,
                 response_id=identifier if answered else None,
-                input=last_user_text(body.messages) if answered and config.request_bodies else None,
-                output=completion.text if completion and answered and config.request_bodies else None,
+                input=last_user_text(body.messages) if kept else None,
+                output=completion.text if completion and kept else None,
                 finish_reason=finish_reason(completion) if completion and answered else None,
-                recorded=config.request_logs,
             )
         )
     if completion is None:
@@ -399,10 +399,10 @@ class FeedbackRequest(BaseModel):
     input: str | None = Field(
         default=None,
         max_length=TEXT_MAX,
-        description="The user message the model answered. Required unless this install keeps request inputs.",
+        description="The user message the model answered. Required unless the model keeps request inputs and answers.",
     )
     output: str | None = Field(
-        default=None, max_length=TEXT_MAX, description="The answer the app received, when inputs are not kept."
+        default=None, max_length=TEXT_MAX, description="The answer the app received, when the model does not keep it."
     )
 
 

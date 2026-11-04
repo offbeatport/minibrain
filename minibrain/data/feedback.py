@@ -98,14 +98,18 @@ def logged_request(session: Session, minibrain_id: int, response_id: str | None)
     return session.scalar(query.order_by(RequestLog.id.desc()).limit(1))
 
 
-def missing_input(session: Session, response_id: str | None) -> str:
+def missing_input(session: Session, minibrain_id: int, response_id: str | None) -> str:
+    minibrain = session.get(Minibrain, minibrain_id)
     policy = load_policy(session)
-    if not policy["request_logs"]:
-        return "Send input with the feedback: request logs are off, so this install did not keep the request."
-    if not policy["request_bodies"]:
+    if minibrain is not None and not policy.keeps_bodies(minibrain.request_bodies):
+        where = (
+            "locked off for every model under Settings, Security"
+            if policy["request_bodies_locked"]
+            else f"turn it on under Deployments, {minibrain.name}"
+        )
         return (
-            "Send input with the feedback: request inputs are not kept "
-            "(Settings, Security, Request inputs and answers)."
+            f"Send input with the feedback: {minibrain.name} does not keep request inputs and answers "
+            f"(Keep request inputs and answers: {where})."
         )
     return f"Send input with the feedback: no kept request has the response ID {response_id or '(none)'}."
 
@@ -125,7 +129,7 @@ def record(session: Session, submission: Submission) -> Feedback:
     log = logged_request(session, submission.minibrain_id, submission.response_id)
     text = cleaned(submission.input) or (cleaned(log.input) if log else None)
     if text is None:
-        raise FeedbackError(missing_input(session, submission.response_id))
+        raise FeedbackError(missing_input(session, submission.minibrain_id, submission.response_id))
     correction = cleaned(submission.correction)
     if submission.rating == UP and correction:
         raise FeedbackError("A correction goes with a thumbs-down: send rating down with the right answer.")

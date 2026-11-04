@@ -59,7 +59,7 @@ def test_config_file_and_environment_lock_values(
     assert (found["network"]["value"], found["network"]["source"]) == ("offline", "environment")
     assert set_policy(harness, "model_sources", "any") == 409
     assert set_policy(harness, "network", "open") == 409
-    assert set_policy(harness, "request_logs", False) == 200
+    assert set_policy(harness, "request_bodies", True) == 200
 
 
 def test_network_policy_gates_every_outbound_path(harness: Harness, hub: Path) -> None:  # noqa: F811
@@ -118,7 +118,7 @@ def test_unreviewed_switch_becomes_any_licence(tmp_path: Path) -> None:
     assert rows == {"policy.licence_mode": '"all"'}
 
 
-def test_key_expiry_and_request_log_policies(harness: Harness) -> None:
+def test_key_expiry_policy(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
@@ -128,11 +128,10 @@ def test_key_expiry_and_request_log_policies(harness: Harness) -> None:
     with harness.sessions() as session:
         key = session.query(ApiKey).one()
         assert key.expires_at is not None and key.expires_at > now() + timedelta(days=29)
-    set_policy(harness, "request_logs", False)
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 200
     harness.flush_logs()
     with harness.sessions() as session:
-        assert session.query(RequestLog).count() == 0
+        assert session.query(RequestLog).count() == 1
         assert session.query(ApiKey).one().last_used_at is not None
         session.query(ApiKey).update({"expires_at": now() - timedelta(seconds=1)})
         session.commit()

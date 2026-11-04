@@ -3,6 +3,7 @@ import { Link } from "obp-ui";
 import { CopyButton } from "~/components/CopyButton";
 import { PanelSection } from "~/components/Section";
 import { feedbackForModel } from "~/lib/feedback";
+import { REQUEST_BODIES_ID, deploymentPageHref } from "~/lib/modelLinks";
 
 function feedbackCurl(baseUrl: string, model: string, key: string): string {
     const body = {
@@ -24,11 +25,13 @@ export function FeedbackApi({
     baseUrl,
     model,
     slug,
+    kept,
     keyValue,
 }: {
     baseUrl: string;
     model: string;
     slug: string;
+    kept: boolean;
     keyValue: string | null;
 }) {
     const code = feedbackCurl(baseUrl, model, keyValue ?? "YOUR_KEY");
@@ -50,12 +53,25 @@ export function FeedbackApi({
                     <span className="font-mono">comment</span>. The key must cover this model.
                 </p>
                 <p className="text-muted-foreground">
-                    Send <span className="font-mono">input</span>, the user message, unless{" "}
-                    <Link href="/settings/security" className="text-primary hover:underline">
-                        Security
-                    </Link>{" "}
-                    keeps request inputs and answers; then the response ID alone is enough. Accepted
-                    answers from{" "}
+                    {kept ? (
+                        <>
+                            This model keeps request inputs and answers, so the response ID alone is
+                            enough.{" "}
+                        </>
+                    ) : (
+                        <>
+                            Send <span className="font-mono">input</span>, the user message, too:
+                            this model does not{" "}
+                            <Link
+                                href={`${deploymentPageHref(slug)}#${REQUEST_BODIES_ID}`}
+                                className="text-primary hover:underline"
+                            >
+                                keep request inputs and answers
+                            </Link>
+                            .{" "}
+                        </>
+                    )}
+                    Accepted answers from{" "}
                     <Link href={feedbackForModel(slug)} className="text-primary hover:underline">
                         Feedback
                     </Link>{" "}

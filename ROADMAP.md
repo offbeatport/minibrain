@@ -536,13 +536,14 @@ once it matches; only the cache budget below removes files.
 
 1. `POST /v1/feedback` with an API key: `model`, `response_id` (the chat completion's `id`), `rating` (`up` or
    `down`), and optionally `correction` (the right answer, with `down` only) and `comment`. The key must cover the
-   model; base models take no feedback. When this install does not keep request inputs, the call carries `input` too
-   (and optionally `output`, the answer the app got); otherwise the response id is enough. A second call on the same
+   model; base models take no feedback. When the model does not keep request inputs and answers, the call carries
+   `input` too (and optionally `output`, the answer the app got), and a call without it gets a 422 that names the
+   model's switch; otherwise the response id is enough. A second call on the same
    response while it waits for review updates it. The standalone gateway forwards the call to main. Playground thumbs
    and "Correct it" store the same record through `/api/minibrains/<slug>/feedback`.
-2. Request logs carry each response id. "Request inputs and answers" under Settings → Security (off by default, needs
-   request logs) also keeps the last user message and the answer, for as long as the logs. Feedback is stored per model
-   and version and links to its request log by response id.
+2. Request logs always carry each response id. "Keep request inputs and answers", a per-model switch on the model's
+   deployment page (off by default; see API and access), also keeps the last user message and the answer, for as long
+   as the logs. Feedback is stored per model and version and links to its request log by response id.
 3. Feedback lands in the review queue (the Feedback page): accept the suggested answer (the correction, or the model's
    own answer for a thumbs-up), fix and accept with another answer, or reject. Disagreement comes first (feedback on
    the same input, ignoring case and spacing, that suggests different answers), then thumbs-down with no answer, then
@@ -593,7 +594,17 @@ once it matches; only the cache budget below removes files.
   `<base>:<adapter>` name.
 - API keys cover one or more models; a call to a model the key does not cover gets 403. Keys are managed on
   Deployments and on each endpoint. Audit log: who created, changed or revoked which key, when.
-- Request logging opt-in per minibrain; it feeds feedback and distillation.
+- Request metadata is logged for every `/v1` call: time, model, version, key, status, latency, tokens, finish reason
+  and response id, never content. Monitor, Overview, cost and the Requests tab depend on it, so it cannot be turned
+  off; log retention deletes it.
+- Request inputs and answers (the last user message and the model's answer) are kept per model: "Keep request inputs
+  and answers" on the model's deployment page, off by default, changed by Builders and audited as
+  `model.request_bodies` (before and after). They feed feedback by response id, distillation and the Requests tab, and
+  are deleted with the request logs. The install-wide "Request inputs and answers" policy is the default for new models
+  and for base models served through `/v1`; an admin can lock it for every model ("Lock for every model" under
+  Settings → Security, or `request_bodies` in `minibrain.yaml` or the environment), and then each model's switch shows
+  the locked value and cannot be changed. Gateways, standalone ones included, get each model's value in their config
+  snapshot. Migration 0034 turned it on for existing models only where the install kept inputs and answers before.
 - A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
@@ -682,8 +693,9 @@ keys, and `/v1` stays key-only.
   leave a scrolled reader in place. Model, version, key, status (OK, 4xx, 5xx), a response id search and a time range
   (`?model=&version=<slug>@<n>&key=&status=&q=&range=`) filter the list and the summary above it: requests, error
   rate, p50 / p95 latency, tokens in and out. A row opens its detail (`?request=<id>`): the metadata, the key's name,
-  the kept input and answer for Builders and Admins (Viewers see that it needs the Builder role; admins see where to
-  turn it on) and the feedback on its response id. With request logs off, the empty state says where to turn them on.
+  the kept input and answer for Builders and Admins (Viewers see that it needs the Builder role; when the model does
+  not keep them, "Not kept for this model", with a link to its switch for Builders) and the feedback on its response
+  id.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
 - Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
@@ -1017,8 +1029,8 @@ Everything in the v1 scope below, after M1.
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
       calls, optional sync from our catalogue URL; Add from Hugging Face with support badges
-- [x] Security policies under Settings: network, model sources, licences, safetensors only, request logs and retention,
-      key expiry; config-locked values; audited; enforced in the backend
+- [x] Security policies under Settings: network, model sources, licences, safetensors only, request inputs and answers
+      (default and lock), log retention, key expiry; config-locked values; audited; enforced in the backend
 - [x] Compute pools with hardware reported by workers and engines; fit per pool in Discover
 - [x] Engines chosen per node (SGLang, MLX, `transformers`, llama.cpp); remote engines join pools
 - [x] Gateway routing across replicas: least in-flight, sticky, overflow, health checks
@@ -1026,10 +1038,12 @@ Everything in the v1 scope below, after M1.
 - [x] `transformers` backend for local mode and tests
 - [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
-- [ ] Gateway: `response_format`, opt-in request bodies, retrieval context step (`response_format`, response ids on
-      request logs and opt-in request inputs and answers done)
+- [ ] Gateway: `response_format`, per-model request bodies, retrieval context step (`response_format`, response ids
+      on request logs and per-model request inputs and answers done)
 - [x] Monitor → Requests: live `/v1` request log, server-paged, with filters and a summary, finish reasons recorded
       (migration 0033), and a detail with the kept input and answer (Builder and up) and linked feedback
+- [x] Request metadata always logged; request inputs and answers kept per model, with an install default and an admin
+      lock (migration 0034)
 - [x] Monitor → Overview (first tab): requests per minute, error rate, p50 / p95 latency and tokens by model (top 5
       and Other) in buckets sized to the range, a per-model table, live with Pause; SQL checked on SQLite and Postgres
 - [x] OpenTelemetry export, opt-in: OTLP over HTTP/protobuf to the customer's collector only; a GenAI-convention span

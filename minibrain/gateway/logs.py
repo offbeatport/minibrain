@@ -30,7 +30,6 @@ class LogEntry:
     input: str | None = None
     output: str | None = None
     finish_reason: str | None = None
-    recorded: bool = True
 
     def as_json(self) -> dict:
         return asdict(self) | {"at": self.at.isoformat()}
@@ -91,11 +90,7 @@ def database_sink(sessions: sessionmaker[Session]) -> Sink:
     def write(batch: list[LogEntry]) -> None:
         with sessions() as session:
             entries = list(map(existing(session, batch), batch))
-            session.add_all(
-                RequestLog(**{key: value for key, value in asdict(entry).items() if key != "recorded"})
-                for entry in entries
-                if entry.recorded
-            )
+            session.add_all(RequestLog(**asdict(entry)) for entry in entries)
             last_used: dict[int, datetime] = {}
             for entry in entries:
                 if entry.key_id is not None and entry.status < 400:

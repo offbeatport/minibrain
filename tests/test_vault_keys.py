@@ -109,7 +109,7 @@ def test_vault_settings_are_checked(harness: Harness, vault: FakeVault) -> None:
     assert refused.status_code in (422, 503) and "https://" in refused.text
     no_role = harness.client.put("/api/settings/encryption", json={"values": VAULT | {"vault_auth": "approle"}})
     assert no_role.status_code in (422, 503) and "role ID" in no_role.text
-    other = harness.client.put("/api/settings/encryption", json={"values": {"request_logs": False}})
+    other = harness.client.put("/api/settings/encryption", json={"values": {"request_bodies": True}})
     assert other.status_code == 403
 
 

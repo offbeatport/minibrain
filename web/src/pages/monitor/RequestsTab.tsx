@@ -29,7 +29,6 @@ import {
 } from "~/api/requestQueries";
 import { ErrorLine, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
-import { useCan } from "~/lib/access";
 import { count, milliseconds, percent } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import {
@@ -37,7 +36,6 @@ import {
     RANGES,
     REQUESTS_PATH,
     REQUEST_KEYS,
-    SECURITY_PATH,
     STATUS_CLASSES,
     STATUS_TONES,
     type StatusClass,
@@ -249,30 +247,6 @@ export function SummaryStrip({
     );
 }
 
-function SettingsLink({ children }: { children: ReactNode }) {
-    return (
-        <Link href={SECURITY_PATH} className="text-primary hover:underline">
-            {children}
-        </Link>
-    );
-}
-
-export function LoggingOff() {
-    const can = useCan();
-    return (
-        <EmptyState title="Request logs are off">
-            {can.admin ? (
-                <>
-                    Turn on Request logs under <SettingsLink>Settings, Security</SettingsLink> to
-                    record every call to <span className="font-mono">/v1</span> here.
-                </>
-            ) : (
-                "An admin can turn on Request logs under Settings, Security to record every call to /v1 here."
-            )}
-        </EmptyState>
-    );
-}
-
 export function NothingYet({ summary, range }: { summary: RequestSummary; range: string }) {
     if (summary.last_at) {
         return (
@@ -325,19 +299,16 @@ export function RequestsTab({ paused }: { paused: boolean }) {
     const selected = requestId(search.request);
     const loaded = list.rows.find((row) => row.id === selected);
     const statuses = facets.data?.statuses ?? {};
-    const empty =
-        summary.data && !summary.data.logging && !summary.data.last_at ? (
-            <LoggingOff />
-        ) : filtering ? (
-            <div className="flex flex-wrap items-center gap-2">
-                <p className="text-muted-foreground">No requests match these filters.</p>
-                <Button variant="outline" onClick={clear}>
-                    Clear filters
-                </Button>
-            </div>
-        ) : summary.data ? (
-            <NothingYet summary={summary.data} range={range} />
-        ) : null;
+    const empty = filtering ? (
+        <div className="flex flex-wrap items-center gap-2">
+            <p className="text-muted-foreground">No requests match these filters.</p>
+            <Button variant="outline" onClick={clear}>
+                Clear filters
+            </Button>
+        </div>
+    ) : summary.data ? (
+        <NothingYet summary={summary.data} range={range} />
+    ) : null;
     return (
         <>
             <div className="flex flex-wrap items-center gap-2">
@@ -389,12 +360,6 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                     </Button>
                 )}
             </div>
-            {summary.data && !summary.data.logging && summary.data.last_at && (
-                <p className="text-sm text-warning">
-                    Request logs are off, so new requests are not recorded. Older logs stay until
-                    they expire.
-                </p>
-            )}
             <SummaryStrip
                 summary={summary.data}
                 range={range}
@@ -420,12 +385,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                 empty={empty}
                 minWidth="min-w-[1040px]"
             />
-            <RequestDialog
-                id={selected}
-                loaded={loaded}
-                bodies={summary.data?.bodies ?? false}
-                onClose={() => update({ request: "" })}
-            />
+            <RequestDialog id={selected} loaded={loaded} onClose={() => update({ request: "" })} />
         </>
     );
 }

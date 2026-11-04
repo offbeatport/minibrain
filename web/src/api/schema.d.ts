@@ -246,6 +246,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/{slug}/request-bodies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Keep Request Bodies */
+        put: operations["keep_request_bodies_api_minibrains__slug__request_bodies_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/source": {
         parameters: {
             query?: never;
@@ -4485,12 +4502,12 @@ export interface components {
             comment?: string | null;
             /**
              * Input
-             * @description The user message the model answered. Required unless this install keeps request inputs.
+             * @description The user message the model answered. Required unless the model keeps request inputs and answers.
              */
             input?: string | null;
             /**
              * Output
-             * @description The answer the app received, when inputs are not kept.
+             * @description The answer the app received, when the model does not keep it.
              */
             output?: string | null;
         };
@@ -5102,11 +5119,6 @@ export interface components {
             output?: string | null;
             /** Finish Reason */
             finish_reason?: string | null;
-            /**
-             * Recorded
-             * @default true
-             */
-            recorded?: boolean;
         };
         /** LoggedRequest */
         LoggedRequest: {
@@ -5214,6 +5226,7 @@ export interface components {
             changed?: components["schemas"]["ChangeInfo"] | null;
             /** Models */
             models: string[];
+            request_bodies: components["schemas"]["RequestBodiesInfo"];
         };
         /** MinibrainSummary */
         MinibrainSummary: {
@@ -5717,6 +5730,20 @@ export interface components {
              */
             seen_at: string;
         };
+        /** RequestBodiesInfo */
+        RequestBodiesInfo: {
+            /** Kept */
+            kept: boolean;
+            /** Locked */
+            locked: boolean;
+            /** Source */
+            source: string;
+        };
+        /** RequestBodiesUpdate */
+        RequestBodiesUpdate: {
+            /** Kept */
+            kept: boolean;
+        };
         /** RequestDetail */
         RequestDetail: {
             /** Id */
@@ -5765,7 +5792,9 @@ export interface components {
              * Body
              * @enum {string}
              */
-            body: "kept" | "hidden" | "not_kept";
+            body: "kept" | "hidden" | "missing" | "off";
+            /** Body Locked */
+            body_locked: boolean;
             /** Input */
             input: string | null;
             /** Output */
@@ -5916,10 +5945,6 @@ export interface components {
             prompt_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
-            /** Logging */
-            logging: boolean;
-            /** Bodies */
-            bodies: boolean;
             /** Retention Days */
             retention_days: number;
             /** Last At */
@@ -7012,6 +7037,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DeployRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_request_bodies_api_minibrains__slug__request_bodies_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestBodiesUpdate"];
             };
         };
         responses: {

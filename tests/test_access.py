@@ -37,6 +37,7 @@ ROUTE_ROLES = {
     ("POST", "/api/minibrains/sample"): "builder",
     ("PUT", "/api/minibrains/{slug}/dataset"): "builder",
     ("PUT", "/api/minibrains/{slug}/mapping"): "builder",
+    ("PUT", "/api/minibrains/{slug}/request-bodies"): "builder",
     ("POST", "/api/minibrains/{slug}/query"): "builder",
     ("GET", "/api/minibrains/{slug}/preview"): "builder",
     ("POST", "/api/minibrains/{slug}/snapshots"): "builder",
@@ -254,7 +255,7 @@ def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}
     assert status(builder, "POST", "/api/keys", body) == 201
     assert status(builder, "POST", "/api/minibrains/triage/deploy", {"deployed": True}) in {200, 409, 422}
-    refused = builder.put("/api/policies/request_logs", json={"value": False}, headers=csrf(builder))
+    refused = builder.put("/api/policies/request_bodies", json={"value": True}, headers=csrf(builder))
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Admin role"
     assert status(builder, "GET", "/api/audit") == 403
     assert status(builder, "GET", "/api/accounts") == 403
@@ -266,7 +267,7 @@ def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
 
 def test_admins_reach_everything(team: Team) -> None:
     admin = team.admin
-    assert status(admin, "PUT", "/api/policies/request_logs", {"value": False}) == 200
+    assert status(admin, "PUT", "/api/policies/request_bodies", {"value": False}) == 200
     assert status(admin, "GET", "/api/audit") == 200
     assert status(admin, "GET", "/api/system/install") == 200
     assert status(admin, "GET", "/api/accounts") == 200

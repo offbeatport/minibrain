@@ -92,17 +92,19 @@ FIELDS: tuple[Field, ...] = (
         editable=False,
     ),
     Field(
-        "request_logs",
-        "Request logs",
-        "Record each API request: time, key, model, status, latency. Logs never leave this install.",
-        "bool",
-        True,
-    ),
-    Field(
         "request_bodies",
         "Request inputs and answers",
-        "Also keep each request's input and the model's answer, so apps can send feedback with the response ID "
-        "alone. Needs request logs; kept as long as they are.",
+        "The default for new models: keep each request's input (the last user message) and the model's answer with "
+        "its request log, for feedback by response ID, distillation and the Requests tab. Builders change it per model "
+        "on its deployment page. Deleted with the request logs.",
+        "bool",
+        False,
+    ),
+    Field(
+        "request_bodies_locked",
+        "Lock for every model",
+        "Every model, existing and new, follows Request inputs and answers above, and Builders cannot change it per "
+        "model.",
         "bool",
         False,
     ),
@@ -351,6 +353,7 @@ OTEL_ENV = {
 }
 OTEL_SIGNAL_ENDPOINTS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
 TRUE = {"1", "true", "yes", "on"}
+RETIRED = {"request_logs": "request metadata is always logged; request_bodies sets whether inputs and answers are kept"}
 Sealer = Callable[[str, str], str]
 
 
@@ -461,11 +464,24 @@ def coerce(field: Field, value: Any) -> Any:
     return choice
 
 
+@functools.cache
+def retired(name: str, source: str) -> None:
+    log.warning("%s sets %s, which is no longer a policy: %s", source, name, RETIRED[name])
+
+
+def implied_locks(found: dict[str, tuple[str, Any]]) -> dict[str, tuple[str, Any]]:
+    if "request_bodies" in found and "request_bodies_locked" not in found:
+        return {"request_bodies_locked": (found["request_bodies"][0], True)}
+    return {}
+
+
 def locked_sources() -> dict[str, tuple[str, Any]]:
     found: dict[str, tuple[str, Any]] = {}
     for name, value in from_file().items():
         if name in BY_NAME:
             found[name] = ("config file", coerce(BY_NAME[name], value))
+        elif name in RETIRED:
+            retired(name, "minibrain.yaml")
     auth = config_section("auth")
     if "default_role" in auth:
         found["default_role"] = ("config file", coerce(BY_NAME["default_role"], auth["default_role"]))
@@ -473,9 +489,12 @@ def locked_sources() -> dict[str, tuple[str, Any]]:
     for name, variable in ENV.items():
         if os.environ.get(variable):
             found[name] = ("environment", coerce(BY_NAME[name], os.environ[variable]))
+    for name in RETIRED:
+        if os.environ.get(f"MINIBRAIN_POLICY_{name.upper()}"):
+            retired(name, f"MINIBRAIN_POLICY_{name.upper()}")
     if os.environ.get("MINIBRAIN_OFFLINE", "").strip().lower() in {"1", "true", "yes"}:
         found["network"] = ("environment", "offline")
-    return found
+    return found | implied_locks(found)
 
 
 @functools.cache
@@ -540,6 +559,9 @@ class Policy:
         if self["model_sources"] != "any":
             raise PolicyError("Model sources policy does not allow adding models from Hugging Face")
 
+    def keeps_bodies(self, chosen: bool) -> bool:
+        return bool(self["request_bodies"]) if self["request_bodies_locked"] else chosen
+
 
 def value(session: Session, name: str) -> Any:
     locked = locked_sources()
@@ -554,6 +576,14 @@ def load(session: Session) -> Policy:
         values[name] = value
     values["safetensors_only"] = True
     return Policy(values)
+
+
+def bodies_choice(session: Session, chosen: bool) -> tuple[bool, str | None]:
+    policy = load(session)
+    if not policy["request_bodies_locked"]:
+        return chosen, None
+    source = locked_sources().get("request_bodies_locked", ("ui", True))[0]
+    return bool(policy["request_bodies"]), source
 
 
 def choice_of(field: Field, choice: str) -> dict[str, Any]:

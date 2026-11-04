@@ -46,7 +46,6 @@ class LogBody(BaseModel):
     input: str | None = None
     output: str | None = None
     finish_reason: str | None = None
-    recorded: bool = True
 
 
 class LogsBody(BaseModel):

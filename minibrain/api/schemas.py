@@ -418,6 +418,16 @@ class MinibrainSummary(BaseModel):
     active_jobs: int
 
 
+class RequestBodiesInfo(BaseModel):
+    kept: bool
+    locked: bool
+    source: str
+
+
+class RequestBodiesUpdate(BaseModel):
+    kept: bool
+
+
 class MinibrainDetail(MinibrainSummary):
     source: SourceInfo | None
     mapping: MappingInfo
@@ -426,6 +436,7 @@ class MinibrainDetail(MinibrainSummary):
     snapshot: SnapshotInfo | None
     changed: ChangeInfo | None = None
     models: list[str]
+    request_bodies: RequestBodiesInfo
 
 
 class QueryRequest(BaseModel):

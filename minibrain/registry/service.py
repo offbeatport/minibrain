@@ -47,10 +47,13 @@ def get_minibrain(session: Session, slug: str) -> Minibrain:
 
 
 def create_minibrain(session: Session, name: str, task: str, base_model: str) -> Minibrain:
+    from minibrain.policy import load
+
     slug = slugify(name)
     if session.scalar(select(Minibrain).where(Minibrain.slug == slug)) is not None:
         raise ConflictError(f"a model called {slug} already exists")
-    minibrain = Minibrain(slug=slug, name=name.strip(), task=task, base_model=base_model)
+    bodies = bool(load(session)["request_bodies"])
+    minibrain = Minibrain(slug=slug, name=name.strip(), task=task, base_model=base_model, request_bodies=bodies)
     session.add(minibrain)
     session.commit()
     return minibrain

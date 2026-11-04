@@ -42,6 +42,7 @@ class Route:
     shots: list[list[str]]
     adapter: dict[str, Any] | None
     task: str = ""
+    request_bodies: bool = False
 
 
 @dataclass(frozen=True)
@@ -74,8 +75,6 @@ class GatewayConfig:
     models: dict[str, list[str]] = field(default_factory=dict)
     engines: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
-    request_logs: bool = True
-    request_bodies: bool = False
     problems: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
@@ -91,8 +90,6 @@ class GatewayConfig:
             models=dict(data["models"]),
             engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
-            request_logs=bool(data.get("request_logs", True)),
-            request_bodies=bool(data.get("request_bodies", False)),
             problems=dict(data.get("problems", {})),
         )
 
@@ -107,7 +104,7 @@ def replicas_of(found: Any) -> list[dict[str, str]]:
 EMPTY = GatewayConfig(version="empty")
 
 
-def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> list[Route]:
+def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain, bodies: bool) -> list[Route]:
     ready = sorted((v for v in minibrain.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
     for version in ready:
@@ -132,6 +129,7 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
             shots=[[shot.input, shot.label] for shot in shots],
             adapter=adapter,
             task=minibrain.task,
+            request_bodies=bodies,
         )
         routes.append(route)
         if minibrain.deployed and version.number == minibrain.current_version:
@@ -145,6 +143,7 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain) -> 
                 minibrain_id=minibrain.id,
                 model_id=None,
                 slug=minibrain.slug,
+                request_bodies=bodies,
             )
         )
     return routes
@@ -171,11 +170,14 @@ def base_route(model: Model) -> Route:
 
 
 def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:
+    policy = load_policy(session)
     routes: dict[str, Route] = {}
     for minibrain in session.scalars(select(Minibrain).order_by(Minibrain.id)):
-        routes |= {route.name: route for route in routes_for(session, store, minibrain)}
+        bodies = policy.keeps_bodies(minibrain.request_bodies)
+        routes |= {route.name: route for route in routes_for(session, store, minibrain, bodies)}
     deployed = select(Model).where(Model.deployed.is_(True), Model.status == ModelStatus.AVAILABLE)
-    routes |= {model.id: base_route(model) for model in session.scalars(deployed)}
+    default = bool(policy["request_bodies"])
+    routes |= {model.id: replace(base_route(model), request_bodies=default) for model in session.scalars(deployed)}
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
@@ -200,8 +202,6 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         )
         for key in session.scalars(select(ApiKey))
     }
-    policy = load_policy(session)
-    logging = bool(policy["request_logs"])
     config = GatewayConfig(
         version="",
         routes=routes,
@@ -209,8 +209,6 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         models=models,
         engines=engines,
         bases=bases,
-        request_logs=logging,
-        request_bodies=logging and bool(policy["request_bodies"]),
         problems=problems,
     )
     return replace(config, version=hash_of(config.to_json()))

@@ -47,6 +47,7 @@ const ACTIONS: Record<string, string> = {
     "model.evict": "Model files removed",
     "model.pin": "Model pinned",
     "model.reimport": "Model re-imported",
+    "model.request_bodies": "Request inputs and answers changed",
     "model.relocate": "Model moved",
     "model.repair": "Model repaired",
     "model.undeploy": "Model undeployed",

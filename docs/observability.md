@@ -11,7 +11,8 @@ minibrain sends nothing anywhere by default. Three opt-in outputs feed the custo
 None of them ever carries a prompt, an answer or an API key. Settings → This install shows which are on.
 
 Monitor → Overview shows the same traffic inside minibrain, from the request logs: requests per minute, error rate,
-p50 / p95 latency and tokens per model over a time range, and a per-model table.
+p50 / p95 latency and tokens per model over a time range, and a per-model table. Request logs are always written,
+metadata only; inputs and answers are kept only for models that turn it on ([security](security.md#request-logs)).
 
 ## OpenTelemetry export
 

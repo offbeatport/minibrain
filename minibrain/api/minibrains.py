@@ -19,6 +19,7 @@ from minibrain.api.schemas import (
     PreviewResponse,
     QueryRequest,
     QueryResponse,
+    RequestBodiesUpdate,
 )
 from minibrain.api.views import detail, summary
 from minibrain.auth.identity import current_actor
@@ -35,6 +36,7 @@ from minibrain.data.shared import (
 from minibrain.data.snapshots import cleanup, model_snapshot_now
 from minibrain.data.sources import safe_filename
 from minibrain.models.registry import available_bases, base_readiness
+from minibrain.policy import LockedError, bodies_choice
 from minibrain.registry.files import snapshot_location
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, Minibrain, now
 from minibrain.registry.service import (
@@ -137,6 +139,32 @@ def deploy(slug: str, body: DeployRequest, session: SessionDep, settings: Settin
         facts = {"name": minibrain.name, "version": minibrain.current_version}
         session.add(AuditEvent(actor=current_actor(), action=action, target=minibrain.slug, detail=facts))
     minibrain.deployed = body.deployed
+    minibrain.updated_at = now()
+    session.commit()
+    return detail(settings, minibrain)
+
+
+LOCKED_BY = {
+    "ui": "locked for every model under Settings, Security",
+    "config file": "set for every model in minibrain.yaml",
+    "environment": "set for every model by the server's environment",
+}
+
+
+@router.put("/{slug}/request-bodies", dependencies=[Depends(builder)])
+def keep_request_bodies(
+    slug: str, body: RequestBodiesUpdate, session: SessionDep, settings: SettingsDep
+) -> MinibrainDetail:
+    minibrain = get_minibrain(session, slug)
+    _, lock = bodies_choice(session, minibrain.request_bodies)
+    if lock is not None:
+        raise LockedError(f"Keep request inputs and answers is {LOCKED_BY.get(lock, lock)}")
+    if minibrain.request_bodies != body.kept:
+        facts = {"name": minibrain.name, "from": minibrain.request_bodies, "to": body.kept}
+        session.add(
+            AuditEvent(actor=current_actor(), action="model.request_bodies", target=minibrain.slug, detail=facts)
+        )
+    minibrain.request_bodies = body.kept
     minibrain.updated_at = now()
     session.commit()
     return detail(settings, minibrain)

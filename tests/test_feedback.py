@@ -11,7 +11,6 @@ from minibrain.registry.models import AuditEvent, Feedback, RequestLog, Snapshot
 from tests.conftest import FakeBackend, Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 from tests.test_gateway import CHAT, Down, servable
-from tests.test_policies import set_policy
 
 
 def chat(harness: Harness, headers: dict[str, str]) -> str:
@@ -52,10 +51,7 @@ def test_without_kept_inputs_the_call_must_carry_the_input(harness: Harness) -> 
     headers = servable(harness)
     response_id = chat(harness, headers)
     missing = send(harness, headers, response_id=response_id, rating="down", correction="bug")
-    assert missing.status_code == 422 and "inputs are not kept" in missing.json()["detail"]
-    assert set_policy(harness, "request_logs", False) == 200
-    off = send(harness, headers, response_id=chat(harness, headers), rating="down")
-    assert off.status_code == 422 and "request logs are off" in off.json()["detail"]
+    assert missing.status_code == 422 and "does not keep request inputs and answers" in missing.json()["detail"]
     sent = send(harness, headers, response_id=response_id, rating="down", correction="bug", input="Charged twice")
     assert sent.status_code == 201 and sent.json()["object"] == "feedback"
     up = send(harness, headers, response_id=response_id, rating="up", correction="bug", input="Charged twice")
@@ -64,7 +60,7 @@ def test_without_kept_inputs_the_call_must_carry_the_input(harness: Harness) -> 
 
 def test_kept_inputs_let_feedback_name_a_response_by_id(harness: Harness) -> None:
     headers = servable(harness)
-    assert set_policy(harness, "request_bodies", True) == 200
+    assert harness.client.put(f"/api/minibrains/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
     response_id = chat(harness, headers)
     first = send(harness, headers, response_id=response_id, rating="down")
     assert first.status_code == 201, first.text
@@ -195,7 +191,7 @@ def test_standalone_gateway_forwards_feedback_to_main(harness: Harness, tmp_path
     with TestClient(app) as gateway:
         response_id = gateway.post("/v1/chat/completions", headers=headers, json=CHAT).json()["id"]
         missing = gateway.post("/v1/feedback", headers=headers, json=body | {"response_id": response_id})
-        assert missing.status_code == 422 and "inputs are not kept" in missing.json()["detail"]
+        assert missing.status_code == 422 and "does not keep request inputs" in missing.json()["detail"]
         sent = gateway.post(
             "/v1/feedback", headers=headers, json=body | {"response_id": response_id, "input": "Charged twice"}
         )

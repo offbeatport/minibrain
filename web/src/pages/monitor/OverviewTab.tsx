@@ -24,7 +24,7 @@ import {
     rangeOf,
 } from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
-import { LoggingOff, NothingYet, SummaryStrip } from "./RequestsTab";
+import { NothingYet, SummaryStrip } from "./RequestsTab";
 
 const SLOT_COLORS = [
     "var(--primary)",
@@ -177,9 +177,7 @@ export function OverviewTab({ paused }: { paused: boolean }) {
     const data = overview.data;
     const nothing = data !== undefined && data.models.length === 0;
     const empty =
-        summary.data && !summary.data.logging && !summary.data.last_at ? (
-            <LoggingOff />
-        ) : filter.model.length > 0 ? (
+        filter.model.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-muted-foreground">No requests from these models.</p>
                 <Button variant="outline" onClick={() => update({ model: "" })}>
@@ -208,12 +206,6 @@ export function OverviewTab({ paused }: { paused: boolean }) {
                     </Button>
                 )}
             </div>
-            {summary.data && !summary.data.logging && summary.data.last_at && (
-                <p className="text-sm text-warning">
-                    Request logs are off, so new requests are not counted here. Older logs stay
-                    until they expire.
-                </p>
-            )}
             <SummaryStrip
                 summary={summary.data}
                 range={range}

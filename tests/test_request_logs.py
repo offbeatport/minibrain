@@ -15,7 +15,6 @@ from tests.test_data_catalogue import columns_of, migration_config
 from tests.test_feedback import chat, send
 from tests.test_flow import SLUG, add_key
 from tests.test_gateway import CHAT, servable
-from tests.test_policies import set_policy
 
 RESPONSE = "chatcmpl-" + "ab" * 16
 
@@ -113,7 +112,7 @@ def test_summary_counts_errors_latency_and_tokens(harness: Harness) -> None:
     servable(harness)
     empty = listed(harness.client, "/api/requests/summary")
     assert (empty["requests"], empty["p50_ms"], empty["error_rate"], empty["last_at"]) == (0, None, None, None)
-    assert (empty["logging"], empty["bodies"], empty["retention_days"]) == (True, False, 30)
+    assert empty["retention_days"] == 30
     statuses = [200] * 7 + [404, 422, 500]
     seed(harness, *({"latency_ms": float(10 * (n + 1)), "status": status} for n, status in enumerate(statuses)))
     summary = listed(harness.client, "/api/requests/summary")
@@ -123,11 +122,6 @@ def test_summary_counts_errors_latency_and_tokens(harness: Harness) -> None:
     assert datetime.fromisoformat(summary["last_at"]) <= now()
     failing = listed(harness.client, "/api/requests/summary", status="client_error")
     assert (failing["requests"], failing["p50_ms"], failing["p95_ms"]) == (2, 80.0, 90.0)
-    assert set_policy(harness, "request_bodies", True) == 200
-    assert listed(harness.client, "/api/requests/summary")["bodies"] is True
-    assert set_policy(harness, "request_logs", False) == 200
-    off = listed(harness.client, "/api/requests/summary")
-    assert (off["logging"], off["bodies"]) == (False, False)
 
 
 def test_the_gateway_records_finish_reasons(harness: Harness) -> None:
@@ -152,7 +146,7 @@ def test_the_gateway_records_finish_reasons(harness: Harness) -> None:
 def test_bodies_need_the_builder_role_and_feedback_is_linked(harness: Harness) -> None:
     headers = servable(harness)
     secret = headers["Authorization"].removeprefix("Bearer ")
-    assert set_policy(harness, "request_bodies", True) == 200
+    assert harness.client.put(f"/api/minibrains/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
     response_id = chat(harness, headers)
     sent = send(harness, headers, response_id=response_id, rating="down", correction="bug", comment="double charge")
     assert sent.status_code == 201, sent.text
@@ -190,7 +184,7 @@ def test_requests_without_kept_bodies_say_so(harness: Harness) -> None:
     harness.flush_logs()
     request_id = listed(harness.client)["items"][0]["id"]
     detail = listed(harness.client, f"/api/requests/{request_id}")
-    assert (detail["body"], detail["input"], detail["output"], detail["feedback"]) == ("not_kept", None, None, [])
+    assert (detail["body"], detail["input"], detail["output"], detail["feedback"]) == ("off", None, None, [])
 
 
 def test_migration_adds_finish_reason_and_filter_indexes(tmp_path: Path) -> None:

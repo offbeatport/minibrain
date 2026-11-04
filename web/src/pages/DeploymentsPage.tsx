@@ -18,6 +18,7 @@ import { FeedbackApi } from "~/components/FeedbackApi";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { RequestBodies } from "~/components/RequestBodies";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
@@ -109,8 +110,10 @@ function Connect({ slug }: { slug: string }) {
                 baseUrl={baseUrl}
                 model={model}
                 slug={slug}
+                kept={detail.request_bodies.kept}
                 keyValue={created?.secret ?? null}
             />
+            <RequestBodies detail={detail} />
             {can.build && <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />}
         </>
     );

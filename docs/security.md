@@ -12,12 +12,34 @@ log with who, before and after.
 | Model sources | Approved publishers (default), any, imports only | Download, retry, Add from Hugging Face (shown only with any) |
 | Licences | Only selected licences (default; a list of reviewed commercial licences) or any licence, including unreviewed ones | Download, retry, Add from Hugging Face |
 | Safetensors only | Always on | Download file filter; pickle weights are never loaded |
-| Request logs | On or off, retention in days | Gateway config; hourly purge on the leader |
+| Request logs | Always on, metadata only; retention in days | Hourly purge on the leader ([below](#request-logs)) |
+| Request inputs and answers | Default for new models (off), and Lock for every model | Gateway config, per model ([below](#request-logs)) |
 | API keys | Expiry in days for new keys | Gateway rejects expired keys with 401, and models the key does not cover with 403 |
 | Audit log retention | Days, 0 keeps every event (default) | Hourly prune on the leader, cut at a chain anchor (below) |
 | SIEM export | Off (default), TLS, TCP or UDP; host, port (0 is 6514 for TLS, 514 otherwise), CA bundle path | Syslog forwarder on the leader (below) |
 | OpenTelemetry export | Off (default) or OTLP over HTTP; collector endpoint, headers (encrypted, write-only), service name, CA bundle path; also `OTEL_EXPORTER_OTLP_*` | Exporters in main and gateways, applied within 5 seconds ([observability](observability.md)) |
 | Encryption at rest | Local key file (default), HashiCorp Vault Transit, PKCS#11 HSM, AWS KMS or Off; each provider's settings | Every file main stores (below) |
+
+### Request logs
+
+- Every `/v1` request is logged with its time, model, version, key, status, latency, tokens in and out, finish reason
+  and response ID. These hold no content; Monitor, Overview, cost and the Requests tab depend on them, so there is no
+  switch to turn them off. Log retention deletes them.
+- A request's input (the last user message) and the model's answer are kept only for models whose "Keep request inputs
+  and answers" switch is on, on the model's deployment page. Off by default. Builders change it; each change is audited
+  as `model.request_bodies` with the value before and after. Kept inputs and answers let apps send feedback with the
+  response ID alone, feed distillation, and show on the Requests tab to Builders and Admins. They are stored in the
+  database next to the request log and deleted with it.
+- The Request inputs and answers policy is the default for new models, and the setting for base models served through
+  `/v1`. Lock for every model (`request_bodies_locked`) makes every model follow it: each model's switch shows the
+  value and cannot be changed, and Builders get a 409. Setting `request_bodies` in `minibrain.yaml` or
+  `MINIBRAIN_POLICY_REQUEST_BODIES` locks it for every model too, unless `request_bodies_locked: false` is set beside it.
+- `POST /v1/feedback` without `input` for a model that does not keep them returns 422 and names the model's switch.
+- Gateways, standalone ones included, get each model's value in their config snapshot, within a second of a change.
+- Upgrading: migration 0034 sets each existing model's switch to what the install did before (on only where both
+  Request logs and Request inputs and answers were on, in the database, `minibrain.yaml` or the environment). The
+  `request_logs` policy is gone; a `minibrain.yaml` or `MINIBRAIN_POLICY_REQUEST_LOGS` value for it is ignored with a
+  warning in the log.
 
 ## Accounts and sign-in
 
@@ -246,7 +268,7 @@ locked when `minibrain.yaml` (`policy:`) or `MINIBRAIN_POLICY_<NAME>` sets it.
 | Uploads, snapshots, adapters, job logs (the artifact store) | Yes, in the local folder and in an S3 bucket | The bucket only ever holds ciphertext (client-side encryption). Snapshots older than Parquet snapshots (folders packed as tar) are still unpacked into main's cache when read |
 | Staging databases built from uploads (`<home>/staging`) | Yes | Built in a private temporary folder, sealed, and the plaintext removed straight away |
 | Connection secrets and sealed settings (OpenTelemetry headers) | Yes, same master key | One AES-256-GCM envelope per value, the row's id as associated data |
-| The database (SQLite or Postgres) | No | Request inputs and answers you choose to keep live there: put SQLite on an encrypted volume, or use Postgres with storage encryption |
+| The database (SQLite or Postgres) | No | Request inputs and answers kept for the models you choose live there: put SQLite on an encrypted volume, or use Postgres with storage encryption |
 | Base model weights (`<home>/models`) | No | Public weights; imported private weights are not encrypted by minibrain either |
 
 Main never writes decrypted copies of these files. DuckDB reads snapshots, uploads and staging databases through a

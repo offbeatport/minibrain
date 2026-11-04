@@ -72,7 +72,9 @@ const GROUPS: Group[] = [
     {
         icon: KeyRound,
         title: "Request logs and API keys",
-        names: ["request_logs", "request_bodies", "log_retention_days", "key_expiry_days"],
+        names: ["request_bodies", "request_bodies_locked", "log_retention_days", "key_expiry_days"],
+        description:
+            "Every /v1 call's time, model, version, key, status, latency, tokens and response ID are always logged; they hold no content.",
     },
     {
         icon: ScrollText,

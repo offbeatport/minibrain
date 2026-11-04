@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import sees_rows, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.data.feedback import UP
+from minibrain.policy import bodies_choice
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Minibrain, Model, RequestLog
 from minibrain.registry.service import NotFoundError
@@ -27,7 +28,7 @@ NO_KEY = "none"
 RESPONSE_ID = re.compile(r"chatcmpl-[0-9a-f]{32}")
 
 StatusClass = Literal["ok", "client_error", "server_error"]
-BodyState = Literal["kept", "hidden", "not_kept"]
+BodyState = Literal["kept", "hidden", "missing", "off"]
 Facet = Literal["model", "version", "key", "status"]
 STATUS_CLASSES: tuple[StatusClass, ...] = ("ok", "client_error", "server_error")
 
@@ -81,8 +82,6 @@ class RequestSummary(BaseModel):
     p95_ms: float | None
     prompt_tokens: int
     completion_tokens: int
-    logging: bool
-    bodies: bool
     retention_days: int
     last_at: datetime | None
 
@@ -99,6 +98,7 @@ class RequestFeedback(BaseModel):
 
 class RequestDetail(RequestRow):
     body: BodyState
+    body_locked: bool
     input: str | None
     output: str | None
     feedback: list[RequestFeedback]
@@ -400,7 +400,6 @@ def request_summary(session: SessionDep, filters: FilterDep) -> RequestSummary:
     requests, errors, prompt_tokens, completion_tokens = session.execute(totals).one()
     last_at = session.scalar(select(func.max(RequestLog.at)))
     policy = load_policy(session)
-    logging = bool(policy["request_logs"])
     return RequestSummary(
         requests=requests,
         errors=errors,
@@ -409,8 +408,6 @@ def request_summary(session: SessionDep, filters: FilterDep) -> RequestSummary:
         p95_ms=latency_at(session, where, 0.95, requests),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        logging=logging,
-        bodies=logging and bool(policy["request_bodies"]),
         retention_days=int(policy["log_retention_days"]),
         last_at=aware(last_at) if last_at is not None else None,
     )
@@ -434,10 +431,13 @@ def linked_feedback(session: Session, log: RequestLog, rows: bool) -> list[Reque
     ]
 
 
-def body_state(log: RequestLog, rows: bool) -> BodyState:
-    if log.input is None and log.output is None:
-        return "not_kept"
-    return "kept" if rows else "hidden"
+def body_state(session: Session, log: RequestLog, rows: bool) -> tuple[BodyState, bool]:
+    minibrain = session.get(Minibrain, log.minibrain_id) if log.minibrain_id is not None else None
+    chosen = minibrain.request_bodies if minibrain is not None else bool(load_policy(session)["request_bodies"])
+    kept, lock = bodies_choice(session, chosen)
+    if log.input is not None or log.output is not None:
+        return ("kept" if rows else "hidden"), lock is not None
+    return ("missing" if kept else "off"), lock is not None
 
 
 @router.get("/requests/{request_id}", dependencies=[Depends(viewer)])
@@ -447,9 +447,10 @@ def read_request(request_id: int, session: SessionDep) -> RequestDetail:
         raise NotFoundError(f"request {request_id} not found")
     log = found[0][0]
     rows = sees_rows()
-    state = body_state(log, rows)
+    state, locked = body_state(session, log, rows)
     extra = {
         "body": state,
+        "body_locked": locked,
         "input": log.input if state == "kept" else None,
         "output": log.output if state == "kept" else None,
         "feedback": linked_feedback(session, log, rows),

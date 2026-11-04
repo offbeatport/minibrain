@@ -28,6 +28,7 @@ import {
     ratingLabel,
 } from "~/lib/feedback";
 import { count, milliseconds } from "~/lib/format";
+import { REQUEST_BODIES_ID, deploymentPageHref } from "~/lib/modelLinks";
 import { SECURITY_PATH, STATUS_CLASSES, STATUS_TONES, modelLabel } from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
 
@@ -52,31 +53,67 @@ function Note({ children }: { children: ReactNode }) {
     return <p className="text-sm text-muted-foreground">{children}</p>;
 }
 
-function NotKept({ bodies }: { bodies: boolean }) {
+function SecurityLink() {
     const can = useCan();
-    if (bodies) {
-        return <Note>This request's input and answer were not kept.</Note>;
+    if (!can.admin) {
+        return <>Settings, Security</>;
     }
-    if (can.admin) {
+    return (
+        <Link href={SECURITY_PATH} className="text-primary hover:underline">
+            Settings, Security
+        </Link>
+    );
+}
+
+function NotKept({ detail }: { detail: RequestDetail }) {
+    const can = useCan();
+    if (detail.body === "missing") {
         return (
             <Note>
-                Inputs and answers are not kept. Turn on Request inputs and answers under{" "}
-                <Link href={SECURITY_PATH} className="text-primary hover:underline">
-                    Settings, Security
-                </Link>{" "}
-                to keep them with each request log.
+                Not kept for this request: it did not get an answer, or it came before this model
+                kept inputs and answers.
+            </Note>
+        );
+    }
+    if (detail.body_locked) {
+        return (
+            <Note>
+                Not kept for this model: Request inputs and answers is off for every model under{" "}
+                <SecurityLink />.
+            </Note>
+        );
+    }
+    if (!detail.custom) {
+        return (
+            <Note>
+                Not kept for this model. Base models follow Request inputs and answers under{" "}
+                <SecurityLink />.
+            </Note>
+        );
+    }
+    if (!can.build) {
+        return (
+            <Note>
+                Not kept for this model. A Builder can turn on Keep request inputs and answers on
+                its deployment page.
             </Note>
         );
     }
     return (
         <Note>
-            Inputs and answers are not kept. An admin can turn on Request inputs and answers under
-            Settings, Security.
+            {"Not kept for this model. Turn on "}
+            <Link
+                href={`${deploymentPageHref(detail.model_key)}#${REQUEST_BODIES_ID}`}
+                className="text-primary hover:underline"
+            >
+                Keep request inputs and answers
+            </Link>
+            {" on its deployment page to keep them with each request log."}
         </Note>
     );
 }
 
-function Bodies({ detail, bodies }: { detail: RequestDetail; bodies: boolean }) {
+function Bodies({ detail }: { detail: RequestDetail }) {
     if (detail.body === "hidden") {
         return (
             <Block label="Input and answer">
@@ -84,10 +121,10 @@ function Bodies({ detail, bodies }: { detail: RequestDetail; bodies: boolean }) 
             </Block>
         );
     }
-    if (detail.body === "not_kept") {
+    if (detail.body === "off" || detail.body === "missing") {
         return (
             <Block label="Input and answer">
-                <NotKept bodies={bodies} />
+                <NotKept detail={detail} />
             </Block>
         );
     }
@@ -220,12 +257,10 @@ function facts(row: RequestRow): [string, ReactNode][] {
 export function RequestDialog({
     id,
     loaded,
-    bodies,
     onClose,
 }: {
     id: number | null;
     loaded: RequestRow | undefined;
-    bodies: boolean;
     onClose: () => void;
 }) {
     const detail = useRequestDetail(id);
@@ -245,7 +280,7 @@ export function RequestDialog({
                 {row && (
                     <div className="flex min-w-0 flex-col gap-6">
                         <Facts items={facts(row)} />
-                        {detail.data && <Bodies detail={detail.data} bodies={bodies} />}
+                        {detail.data && <Bodies detail={detail.data} />}
                         {detail.data && <FeedbackList items={detail.data.feedback} />}
                     </div>
                 )}

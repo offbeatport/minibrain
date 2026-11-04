@@ -16,6 +16,8 @@ export function modelDataHref(slug: string): string {
     return `/data?minibrain=${encodeURIComponent(slug)}`;
 }
 
+export const REQUEST_BODIES_ID = "request-bodies";
+
 export function deploymentPageHref(slug: string): string {
     return `/deployments/${encodeURIComponent(slug)}`;
 }

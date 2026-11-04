@@ -685,6 +685,58 @@
         }
       }
     },
+    "/api/minibrains/{slug}/request-bodies": {
+      "put": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Keep Request Bodies",
+        "operationId": "keep_request_bodies_api_minibrains__slug__request_bodies_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestBodiesUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/source": {
       "post": {
         "tags": [
@@ -14353,7 +14405,7 @@
               }
             ],
             "title": "Input",
-            "description": "The user message the model answered. Required unless this install keeps request inputs."
+            "description": "The user message the model answered. Required unless the model keeps request inputs and answers."
           },
           "output": {
             "anyOf": [
@@ -14366,7 +14418,7 @@
               }
             ],
             "title": "Output",
-            "description": "The answer the app received, when inputs are not kept."
+            "description": "The answer the app received, when the model does not keep it."
           }
         },
         "type": "object",
@@ -16318,11 +16370,6 @@
               }
             ],
             "title": "Finish Reason"
-          },
-          "recorded": {
-            "type": "boolean",
-            "title": "Recorded",
-            "default": true
           }
         },
         "type": "object",
@@ -16679,6 +16726,9 @@
             },
             "type": "array",
             "title": "Models"
+          },
+          "request_bodies": {
+            "$ref": "#/components/schemas/RequestBodiesInfo"
           }
         },
         "type": "object",
@@ -16694,7 +16744,8 @@
           "source",
           "mapping",
           "snapshot",
-          "models"
+          "models",
+          "request_bodies"
         ],
         "title": "MinibrainDetail"
       },
@@ -18234,6 +18285,42 @@
         ],
         "title": "ReplicaInfo"
       },
+      "RequestBodiesInfo": {
+        "properties": {
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kept",
+          "locked",
+          "source"
+        ],
+        "title": "RequestBodiesInfo"
+      },
+      "RequestBodiesUpdate": {
+        "properties": {
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kept"
+        ],
+        "title": "RequestBodiesUpdate"
+      },
       "RequestDetail": {
         "properties": {
           "id": {
@@ -18354,9 +18441,14 @@
             "enum": [
               "kept",
               "hidden",
-              "not_kept"
+              "missing",
+              "off"
             ],
             "title": "Body"
+          },
+          "body_locked": {
+            "type": "boolean",
+            "title": "Body Locked"
           },
           "input": {
             "anyOf": [
@@ -18409,6 +18501,7 @@
           "feedback_up",
           "feedback_down",
           "body",
+          "body_locked",
           "input",
           "output",
           "feedback"
@@ -18830,14 +18923,6 @@
             "type": "integer",
             "title": "Completion Tokens"
           },
-          "logging": {
-            "type": "boolean",
-            "title": "Logging"
-          },
-          "bodies": {
-            "type": "boolean",
-            "title": "Bodies"
-          },
           "retention_days": {
             "type": "integer",
             "title": "Retention Days"
@@ -18864,8 +18949,6 @@
           "p95_ms",
           "prompt_tokens",
           "completion_tokens",
-          "logging",
-          "bodies",
           "retention_days",
           "last_at"
         ],

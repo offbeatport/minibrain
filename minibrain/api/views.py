@@ -1,7 +1,7 @@
 from dataclasses import asdict
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from minibrain.api.schemas import (
     AttemptInfo,
@@ -17,6 +17,7 @@ from minibrain.api.schemas import (
     MinibrainDetail,
     MinibrainSummary,
     Mistake,
+    RequestBodiesInfo,
     SnapshotInfo,
     SourceInfo,
     SplitScore,
@@ -25,6 +26,7 @@ from minibrain.api.schemas import (
 from minibrain.data.shared import table_of
 from minibrain.data.snapshots import Changes, changes_since, model_snapshot
 from minibrain.data.sources import SourceError, describe
+from minibrain.policy import bodies_choice
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -211,6 +213,12 @@ def summary(minibrain: Minibrain) -> MinibrainSummary:
     )
 
 
+def bodies_info(minibrain: Minibrain) -> RequestBodiesInfo:
+    session = object_session(minibrain)
+    kept, lock = bodies_choice(session, minibrain.request_bodies) if session else (minibrain.request_bodies, None)
+    return RequestBodiesInfo(kept=kept, locked=lock is not None, source=lock or "model")
+
+
 def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
     current = latest_snapshot(minibrain)
     return MinibrainDetail(
@@ -230,6 +238,7 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         snapshot=snapshot_info(current) if current is not None else None,
         changed=model_changes(settings, minibrain),
         models=model_names(minibrain),
+        request_bodies=bodies_info(minibrain),
     )
 
 
