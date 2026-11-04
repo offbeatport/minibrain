@@ -22,7 +22,7 @@ importers:
         version: 1.64.0(@types/react@19.3.0)(react@19.3.1)
       obp-ui:
         specifier: github:offbeatport/obp-ui#main
-        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/3b92b173ac2938e88dc311901e5290273e8aa650(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
+        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/91afc5050cb6ad72a53bc6973bc6489f04ae43b8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
       openapi-fetch:
         specifier: ^0.13.0
         version: 0.13.8
@@ -1229,8 +1229,8 @@ packages:
     resolution: {integrity: sha512-5NUN6QCxNFrS9oEA9RPS+d0AP+ooGBzzovY2JhIpDRHacPvOhHjXjUsUMX9qp4nLHZ+5jVgXB2jj/P4arGOE/g==}
     engines: {node: '>=18'}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/3b92b173ac2938e88dc311901e5290273e8aa650:
-    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/3b92b173ac2938e88dc311901e5290273e8aa650}
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/91afc5050cb6ad72a53bc6973bc6489f04ae43b8:
+    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/91afc5050cb6ad72a53bc6973bc6489f04ae43b8}
     version: 0.1.0
     peerDependencies:
       '@xyflow/react': ^12
@@ -2430,7 +2430,7 @@ snapshots:
 
   node-releases@2.0.61: {}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/3b92b173ac2938e88dc311901e5290273e8aa650(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/91afc5050cb6ad72a53bc6973bc6489f04ae43b8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@codemirror/autocomplete': 6.20.4
