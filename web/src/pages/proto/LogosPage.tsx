@@ -3,10 +3,9 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 
 const BRAND = { fill: "#026ecd", glyph: "#ffffff" };
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const PHI_GROWTH = Math.log((1 + Math.sqrt(5)) / 2) / (Math.PI / 2);
 
-type GlyphProps = { color: string; ground: string; size: number };
+type Point = [number, number];
+type GlyphProps = { color: string; ground: string; size: number; uid: string };
 
 function weight(size: number, base: number): number {
     if (size >= 40) {
@@ -18,537 +17,628 @@ function weight(size: number, base: number): number {
     return base * 1.7;
 }
 
-function centred(points: [number, number][], span: number): [number, number][] {
+function fit(points: Point[], span: number): (point: Point) => Point {
     const xs = points.map(([x]) => x);
     const ys = points.map(([, y]) => y);
     const width = Math.max(...xs) - Math.min(...xs);
     const height = Math.max(...ys) - Math.min(...ys);
     const scale = span / Math.max(width, height);
-    const left = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const top = (Math.min(...ys) + Math.max(...ys)) / 2;
-    return points.map(([x, y]) => [50 + (x - left) * scale, 50 + (y - top) * scale]);
+    const midX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    return ([x, y]) => [50 + (x - midX) * scale, 50 + (y - midY) * scale];
 }
 
-function line(points: [number, number][]): string {
-    return `M${points.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(" L")}`;
+function at([x, y]: Point): string {
+    return `${x.toFixed(2)} ${y.toFixed(2)}`;
 }
 
-function RegressGlyph({ color, size }: GlyphProps) {
-    const ratio = 0.7;
-    const vanish: [number, number] = [66, 34];
-    const count = size >= 40 ? 5 : size >= 22 ? 4 : 3;
-    const stroke = weight(size, 5);
-    return (
-        <g fill="none" stroke={color} strokeWidth={stroke}>
-            {Array.from({ length: count }, (_, index) => {
-                const shrink = ratio ** index;
-                const side = 74 * shrink;
-                const cx = vanish[0] + (50 - vanish[0]) * shrink;
-                const cy = vanish[1] + (50 - vanish[1]) * shrink;
-                return (
-                    <rect
-                        key={side}
-                        x={cx - side / 2}
-                        y={cy - side / 2}
-                        width={side}
-                        height={side}
-                        rx={side * 0.22}
-                    />
-                );
-            })}
-        </g>
-    );
-}
+type TreeOptions = {
+    depth: number;
+    angle: number;
+    ratio?: number;
+    split?: 2 | 3;
+    curved?: boolean;
+    arms?: number[];
+    roots?: number;
+    span?: number;
+};
 
-function seeds(count: number): { id: string; x: number; y: number; r: number }[] {
-    const spacing = 41 / Math.sqrt(count);
-    return Array.from({ length: count }, (_, index) => {
-        const radius = spacing * Math.sqrt(index + 0.5);
-        const angle = index * GOLDEN_ANGLE;
-        return {
-            id: `seed-${count}-${index}`,
-            x: 50 + radius * Math.cos(angle),
-            y: 50 + radius * Math.sin(angle),
-            r: spacing * (0.32 + 0.22 * Math.sqrt(index / count)),
-        };
-    });
-}
+type Tree = { d: string; tips: Point[] };
 
-const SEEDS = { large: seeds(55), medium: seeds(34), small: seeds(21) };
-
-function SeedsGlyph({ color, size }: GlyphProps) {
-    const dots = size >= 40 ? SEEDS.large : size >= 22 ? SEEDS.medium : SEEDS.small;
-    return (
-        <g fill={color}>
-            {dots.map((dot) => (
-                <circle key={dot.id} cx={dot.x} cy={dot.y} r={dot.r} />
-            ))}
-        </g>
-    );
-}
-
-const SPIRAL = (() => {
-    const points: [number, number][] = [];
-    const turns = 3.6 * Math.PI;
-    for (let index = 0; index <= 360; index += 1) {
-        const theta = (turns * index) / 360;
-        const radius = Math.exp(PHI_GROWTH * theta);
-        points.push([radius * Math.cos(theta), -radius * Math.sin(theta)]);
-    }
-    return line(centred(points, 74));
-})();
-
-function SpiralGlyph({ color, size }: GlyphProps) {
-    return (
-        <path
-            d={SPIRAL}
-            fill="none"
-            stroke={color}
-            strokeWidth={weight(size, 6.5)}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-    );
-}
-
-function branches(depth: number): string {
-    const segments: [number, number][][] = [];
-    const grow = (x: number, y: number, angle: number, length: number, level: number) => {
-        const end: [number, number] = [x + length * Math.sin(angle), y - length * Math.cos(angle)];
-        segments.push([[x, y], end]);
-        if (level === depth) {
+function tree({
+    depth,
+    angle,
+    ratio = 0.7,
+    split = 2,
+    curved = false,
+    arms = [0],
+    roots = 0,
+    span = 76,
+}: TreeOptions): Tree {
+    const segments: Point[][] = [];
+    const ends: Point[] = [];
+    const grow = (start: Point, heading: number, length: number, level: number, limit: number) => {
+        const end: Point = [
+            start[0] + length * Math.sin(heading),
+            start[1] - length * Math.cos(heading),
+        ];
+        if (curved && level > 0) {
+            const bend = heading > 0 ? 0.35 : heading < 0 ? -0.35 : 0;
+            const control: Point = [
+                start[0] + 0.55 * length * Math.sin(heading - bend),
+                start[1] - 0.55 * length * Math.cos(heading - bend),
+            ];
+            segments.push([start, control, end]);
+        } else {
+            segments.push([start, end]);
+        }
+        if (level === limit) {
+            ends.push(end);
             return;
         }
-        grow(end[0], end[1], angle - 0.5, length * 0.7, level + 1);
-        grow(end[0], end[1], angle + 0.5, length * 0.7, level + 1);
+        const turns = split === 3 ? [-angle, 0, angle] : [-angle, angle];
+        for (const turn of turns) {
+            grow(end, heading + turn, length * ratio, level + 1, limit);
+        }
     };
-    grow(0, 0, 0, 1, 0);
-    const all = centred(segments.flat(), 76);
-    const paths: string[] = [];
-    for (let index = 0; index < all.length; index += 2) {
-        paths.push(line([all[index], all[index + 1]]));
+    for (const arm of arms) {
+        grow([0, 0], arm, 1, 0, depth);
     }
-    return paths.join(" ");
+    if (roots > 0) {
+        grow([0, 0], Math.PI, 0.6, 0, roots);
+    }
+    const place = fit(segments.flat(), span);
+    const d = segments
+        .map((segment) => {
+            const [first, ...rest] = segment.map(place);
+            return rest.length === 2
+                ? `M${at(first)} Q${at(rest[0])} ${at(rest[1])}`
+                : `M${at(first)} L${at(rest[0])}`;
+        })
+        .join(" ");
+    return { d, tips: ends.map(place) };
 }
 
-const TREE: Record<number, string> = { 3: branches(3), 4: branches(4) };
+function treeGlyph(options: TreeOptions, stroke: number, tipDot = 0): ComponentType<GlyphProps> {
+    const shape = tree(options);
+    return function TreeGlyph({ color, size }: GlyphProps) {
+        return (
+            <g>
+                <path
+                    d={shape.d}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={weight(size, stroke)}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+                {tipDot > 0 &&
+                    shape.tips.map((tip) => (
+                        <circle
+                            key={at(tip)}
+                            cx={tip[0]}
+                            cy={tip[1]}
+                            r={weight(size, tipDot)}
+                            fill={color}
+                        />
+                    ))}
+            </g>
+        );
+    };
+}
 
-function BranchesGlyph({ color, size }: GlyphProps) {
+function SeedlingGlyph({ color, size }: GlyphProps) {
     return (
-        <path
-            d={TREE[size >= 40 ? 4 : 3]}
-            fill="none"
-            stroke={color}
-            strokeWidth={weight(size, 5.5)}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
+        <g fill={color}>
+            <path
+                d="M50 86 V44"
+                stroke={color}
+                strokeWidth={weight(size, 8)}
+                strokeLinecap="round"
+                fill="none"
+            />
+            <path d="M50 58 C30 60 18 46 18 30 C36 30 50 40 50 58 Z" />
+            <path d="M50 50 C70 52 82 38 82 22 C64 22 50 32 50 50 Z" />
+        </g>
     );
 }
 
-function WavesGlyph({ color, ground, size }: GlyphProps) {
-    const radius = size >= 40 ? 17 : size >= 22 ? 21 : 26;
-    const rings = size >= 40 ? [1, 0.68, 0.36] : [1, 0.5];
-    const stroke = weight(size, 3.6);
-    const id = `waves-${size}-${color.replace(/[^a-z0-9]/gi, "")}`;
-    const scales: [number, number][] = [];
+type WaveOptions = {
+    radius: number;
+    rings: number[];
+    stroke: number;
+    clip: "circle" | "tile" | "band" | "horizon" | "square";
+    alternate?: boolean;
+    dot?: boolean;
+};
+
+function scaleCentres(radius: number): Point[] {
+    const centres: Point[] = [];
     for (let row = 0; row * (radius / 2) <= 100 + radius; row += 1) {
-        const y = row * (radius / 2);
         const shift = row % 2 === 0 ? 0 : radius;
         for (let x = -radius + shift; x <= 100 + radius; x += 2 * radius) {
-            scales.push([x, y]);
+            centres.push([x, row * (radius / 2)]);
         }
     }
+    return centres;
+}
+
+function Scale({
+    centre,
+    options,
+    color,
+    ground,
+    size,
+}: {
+    centre: Point;
+    options: WaveOptions;
+    color: string;
+    ground: string;
+    size: number;
+}) {
+    const stroke = weight(size, options.stroke);
+    const [x, y] = centre;
     return (
         <g>
-            <defs>
-                <clipPath id={id}>
-                    <circle cx={50} cy={50} r={44} />
-                </clipPath>
-            </defs>
-            <g clipPath={`url(#${id})`}>
-                {scales.map(([x, y]) => (
-                    <g key={`${x}-${y}`}>
-                        <circle cx={x} cy={y} r={radius} fill={ground} />
-                        {rings.map((ring) => (
-                            <circle
-                                key={ring}
-                                cx={x}
-                                cy={y}
-                                r={radius * ring - stroke / 2}
-                                fill="none"
-                                stroke={color}
-                                strokeWidth={stroke}
+            <circle cx={x} cy={y} r={options.radius} fill={ground} />
+            {options.rings.map((ring, order) =>
+                options.alternate ? (
+                    <circle
+                        key={ring}
+                        cx={x}
+                        cy={y}
+                        r={options.radius * ring}
+                        fill={order % 2 === 0 ? color : ground}
+                    />
+                ) : (
+                    <circle
+                        key={ring}
+                        cx={x}
+                        cy={y}
+                        r={options.radius * ring - stroke / 2}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={stroke}
+                    />
+                ),
+            )}
+            {options.dot && <circle cx={x} cy={y} r={options.radius * 0.14} fill={color} />}
+        </g>
+    );
+}
+
+const WAVE_CLIPS: Record<WaveOptions["clip"], ReactNode> = {
+    circle: <circle cx={50} cy={50} r={44} />,
+    tile: <rect x={-10} y={-10} width={120} height={120} />,
+    band: <rect x={6} y={28} width={88} height={44} rx={22} />,
+    horizon: <rect x={0} y={56} width={100} height={44} />,
+    square: <rect x={10} y={10} width={80} height={80} rx={18} />,
+};
+
+function wavesGlyph(options: WaveOptions): ComponentType<GlyphProps> {
+    const centres = scaleCentres(options.radius);
+    return function WavesGlyph({ color, ground, size, uid }: GlyphProps) {
+        const id = `${uid}-clip`;
+        const horizon = options.clip === "horizon";
+        return (
+            <g>
+                <defs>
+                    <clipPath id={id}>{WAVE_CLIPS[options.clip]}</clipPath>
+                    <clipPath id={`${id}-disc`}>
+                        <circle cx={50} cy={50} r={horizon ? 44 : 200} />
+                    </clipPath>
+                </defs>
+                {horizon && <circle cx={50} cy={52} r={20} fill={color} />}
+                <g clipPath={`url(#${id}-disc)`}>
+                    <g clipPath={`url(#${id})`}>
+                        {centres.map((centre) => (
+                            <Scale
+                                key={at(centre)}
+                                centre={centre}
+                                options={options}
+                                color={color}
+                                ground={ground}
+                                size={size}
                             />
                         ))}
                     </g>
-                ))}
+                </g>
             </g>
-        </g>
-    );
+        );
+    };
 }
 
-function DoorsGlyph({ color, size }: GlyphProps) {
-    const sides = size >= 22 ? [76, 48, 22] : [76, 40];
-    const vanish: [number, number] = [62, 38];
-    return (
-        <g fill="none" stroke={color} strokeWidth={weight(size, 9)}>
-            {sides.map((side) => {
-                const shrink = side / 76;
-                const cx = vanish[0] + (50 - vanish[0]) * shrink;
-                const cy = vanish[1] + (50 - vanish[1]) * shrink;
-                return (
-                    <rect
-                        key={side}
-                        x={cx - side / 2}
-                        y={cy - side / 2}
-                        width={side}
-                        height={side}
-                        rx={side * 0.24}
-                    />
-                );
-            })}
-        </g>
-    );
-}
+const PYRAMID: Point[] = [
+    [50, 46],
+    [28, 68],
+    [72, 68],
+];
 
-function OverflowGlyph({ color, size }: GlyphProps) {
-    const stroke = weight(size, 11);
+function PyramidGlyph({ color, ground, size }: GlyphProps) {
+    const options: WaveOptions = { radius: 22, rings: [1, 0.66, 0.33], stroke: 4.5, clip: "tile" };
     return (
         <g>
-            <path
-                d="M16 50 A34 34 0 0 0 84 50"
-                fill="none"
-                stroke={color}
-                strokeWidth={stroke}
-                strokeLinecap="round"
-            />
-            <circle cx={50} cy={40} r={size >= 22 ? 21 : 23} fill={color} />
-        </g>
-    );
-}
-
-function RainbowGlyph({ color, size }: GlyphProps) {
-    const radii = size >= 22 ? [38, 24, 10] : [36, 16];
-    const stroke = size >= 22 ? weight(size, 9) : 14;
-    return (
-        <g fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round">
-            {radii.map((radius) => (
-                <path
-                    key={radius}
-                    d={`M${50 - radius} 70 A${radius} ${radius} 0 0 1 ${50 + radius} 70`}
+            {PYRAMID.map((centre) => (
+                <Scale
+                    key={at(centre)}
+                    centre={centre}
+                    options={options}
+                    color={color}
+                    ground={ground}
+                    size={size}
                 />
             ))}
+            <rect x={0} y={68} width={100} height={32} fill={ground} />
         </g>
     );
 }
 
-function FieldGlyph({ color, size }: GlyphProps) {
-    const step = size >= 22 ? 40 : 43;
-    const radius = size >= 22 ? 10.5 : 13;
-    const spots = [-1, 0, 1].flatMap((row) =>
-        [-1, 0, 1].map((column) => ({
-            id: `${row}:${column}`,
-            x: 50 + column * step,
-            y: 50 + row * step,
-        })),
-    );
-    return (
-        <g fill={color}>
-            {spots.map((spot) => (
-                <circle key={spot.id} cx={spot.x} cy={spot.y} r={radius} />
-            ))}
-        </g>
-    );
-}
-
-const COIL = (() => {
-    const points: [number, number][] = [];
-    const turns = 3.2 * Math.PI;
-    for (let index = 0; index <= 240; index += 1) {
-        const theta = (turns * index) / 240;
-        const radius = 1 + theta;
-        points.push([radius * Math.cos(theta), radius * Math.sin(theta)]);
-    }
-    return line(centred(points, 70));
-})();
-
-function CoilGlyph({ color, size }: GlyphProps) {
-    return (
-        <path
-            d={COIL}
-            fill="none"
-            stroke={color}
-            strokeWidth={weight(size, 10)}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-    );
-}
-
-type Concept = {
-    id: string;
-    name: string;
-    idea: string;
-    Glyph: ComponentType<GlyphProps>;
-    bleed?: boolean;
+type RainbowOptions = {
+    radii: number[];
+    stroke: number;
+    kind?: "arc" | "arch" | "band" | "quarter" | "mirror" | "rings" | "offset";
+    sun?: number;
+    base?: number;
 };
 
-const CONCEPTS: Concept[] = [
-    {
-        id: "regress",
-        name: "Regress",
-        idea: "Squares inside squares, falling towards one point and never reaching it: there is always another model inside.",
-        Glyph: RegressGlyph,
-    },
-    {
-        id: "seeds",
-        name: "Seeds",
-        idea: "Dots set at the golden angle, the way sunflower seeds pack: growth that keeps going and fills every gap.",
-        Glyph: SeedsGlyph,
-    },
-    {
-        id: "spiral",
-        name: "Spiral",
-        idea: "A golden spiral: the same shape at every scale, widening for ever.",
-        Glyph: SpiralGlyph,
-    },
+function rainbowGlyph({
+    radii,
+    stroke,
+    kind = "arc",
+    sun = 0,
+    base = 68,
+}: RainbowOptions): ComponentType<GlyphProps> {
+    return function RainbowGlyph({ color, size }: GlyphProps) {
+        const width = weight(size, stroke);
+        const line = {
+            fill: "none",
+            stroke: color,
+            strokeWidth: width,
+            strokeLinecap: "round",
+        } as const;
+        if (kind === "band") {
+            return (
+                <g fill={color}>
+                    {radii.map((outer) => {
+                        const inner = outer - stroke;
+                        return (
+                            <path
+                                key={outer}
+                                d={`M${50 - outer} ${base} A${outer} ${outer} 0 0 1 ${50 + outer} ${base} H${50 + inner} A${inner} ${inner} 0 0 0 ${50 - inner} ${base} Z`}
+                            />
+                        );
+                    })}
+                </g>
+            );
+        }
+        if (kind === "quarter") {
+            return (
+                <g {...line}>
+                    {radii.map((radius) => (
+                        <path
+                            key={radius}
+                            d={`M14 ${86 - radius} A${radius} ${radius} 0 0 1 ${14 + radius} 86`}
+                        />
+                    ))}
+                </g>
+            );
+        }
+        if (kind === "rings") {
+            return (
+                <g {...line}>
+                    {radii.map((radius) => (
+                        <circle key={radius} cx={50} cy={base} r={radius} />
+                    ))}
+                </g>
+            );
+        }
+        if (kind === "mirror") {
+            return (
+                <g {...line}>
+                    {radii.map((radius) => (
+                        <g key={radius}>
+                            <path
+                                d={`M${50 - radius} 45 A${radius} ${radius} 0 0 1 ${50 + radius} 45`}
+                            />
+                            <path
+                                d={`M${50 - radius} 57 A${radius} ${radius} 0 0 0 ${50 + radius} 57`}
+                            />
+                        </g>
+                    ))}
+                </g>
+            );
+        }
+        return (
+            <g>
+                <g {...line}>
+                    {radii.map((radius) => {
+                        const order = radii.indexOf(radius);
+                        const cx = kind === "offset" ? 44 + order * 6 : 50;
+                        return kind === "arch" ? (
+                            <path
+                                key={radius}
+                                d={`M${cx - radius} 86 V${base - radius / 2} A${radius} ${radius} 0 0 1 ${cx + radius} ${base - radius / 2} V86`}
+                            />
+                        ) : (
+                            <path
+                                key={radius}
+                                d={`M${cx - radius} ${base} A${radius} ${radius} 0 0 1 ${cx + radius} ${base}`}
+                            />
+                        );
+                    })}
+                </g>
+                {sun > 0 && <circle cx={50} cy={base} r={sun} fill={color} />}
+            </g>
+        );
+    };
+}
+
+type Variant = { id: string; name: string; Glyph: ComponentType<GlyphProps>; bleed?: boolean };
+type Family = { id: string; name: string; idea: string; variants: Variant[] };
+
+const THIRD = (2 * Math.PI) / 3;
+
+const FAMILIES: Family[] = [
     {
         id: "branches",
         name: "Branches",
-        idea: "One stem that keeps splitting in two: a base model that grows into as many models as you need.",
-        Glyph: BranchesGlyph,
+        idea: "One stem that keeps splitting: a base model that grows into as many models as you need.",
+        variants: [
+            { id: "b1", name: "Original", Glyph: treeGlyph({ depth: 4, angle: 0.5 }, 5.5) },
+            {
+                id: "b2",
+                name: "Wide crown",
+                Glyph: treeGlyph({ depth: 3, angle: 0.85, ratio: 0.66 }, 6.5),
+            },
+            {
+                id: "b3",
+                name: "Narrow",
+                Glyph: treeGlyph({ depth: 4, angle: 0.32, ratio: 0.74 }, 5.5),
+            },
+            { id: "b4", name: "Budding", Glyph: treeGlyph({ depth: 3, angle: 0.55 }, 6, 4.5) },
+            {
+                id: "b5",
+                name: "Bold",
+                Glyph: treeGlyph({ depth: 2, angle: 0.6, ratio: 0.72 }, 11),
+            },
+            {
+                id: "b6",
+                name: "Trident",
+                Glyph: treeGlyph({ depth: 2, angle: 0.62, split: 3, ratio: 0.62 }, 7.5),
+            },
+            {
+                id: "b7",
+                name: "Radial",
+                Glyph: treeGlyph({ depth: 2, angle: 0.55, arms: [0, THIRD, 2 * THIRD] }, 6.5),
+            },
+            { id: "b8", name: "Roots", Glyph: treeGlyph({ depth: 2, angle: 0.6, roots: 2 }, 6.5) },
+            {
+                id: "b9",
+                name: "Organic",
+                Glyph: treeGlyph({ depth: 3, angle: 0.55, curved: true }, 6.5),
+            },
+            { id: "b10", name: "Seedling", Glyph: SeedlingGlyph },
+        ],
     },
     {
         id: "waves",
         name: "Waves",
-        idea: "Seigaiha, the Japanese pattern of overlapping waves that stands for abundance and calm that lasts. It runs past the edge.",
-        Glyph: WavesGlyph,
-    },
-];
-
-const BOLD: Concept[] = [
-    {
-        id: "doors",
-        name: "Doors",
-        idea: "Three heavy frames, one inside the next, heading for a point you never reach. Regress, readable across a room.",
-        Glyph: DoorsGlyph,
-    },
-    {
-        id: "overflow",
-        name: "Overflow",
-        idea: "A bowl holding more than it can: the full moon sits higher than its rim.",
-        Glyph: OverflowGlyph,
+        idea: "Seigaiha, overlapping waves that stand for abundance and a calm that lasts.",
+        variants: [
+            {
+                id: "w1",
+                name: "Medallion",
+                Glyph: wavesGlyph({
+                    radius: 17,
+                    rings: [1, 0.68, 0.36],
+                    stroke: 3.6,
+                    clip: "circle",
+                }),
+            },
+            {
+                id: "w2",
+                name: "Large scales",
+                Glyph: wavesGlyph({
+                    radius: 25,
+                    rings: [1, 0.66, 0.33],
+                    stroke: 4.5,
+                    clip: "circle",
+                }),
+            },
+            {
+                id: "w3",
+                name: "Full bleed",
+                Glyph: wavesGlyph({ radius: 24, rings: [1, 0.6], stroke: 3.5, clip: "tile" }),
+                bleed: true,
+            },
+            {
+                id: "w4",
+                name: "Band",
+                Glyph: wavesGlyph({ radius: 18, rings: [1, 0.6], stroke: 5, clip: "band" }),
+            },
+            { id: "w5", name: "Pyramid", Glyph: PyramidGlyph },
+            {
+                id: "w6",
+                name: "Solid rings",
+                Glyph: wavesGlyph({
+                    radius: 24,
+                    rings: [1, 0.72, 0.44],
+                    stroke: 0,
+                    clip: "circle",
+                    alternate: true,
+                }),
+            },
+            {
+                id: "w7",
+                name: "Two rings",
+                Glyph: wavesGlyph({ radius: 24, rings: [1, 0.5], stroke: 7, clip: "circle" }),
+            },
+            {
+                id: "w8",
+                name: "Sunrise at sea",
+                Glyph: wavesGlyph({ radius: 16, rings: [1, 0.6], stroke: 4.5, clip: "horizon" }),
+            },
+            {
+                id: "w9",
+                name: "Window",
+                Glyph: wavesGlyph({
+                    radius: 20,
+                    rings: [1, 0.62, 0.3],
+                    stroke: 4.5,
+                    clip: "square",
+                }),
+            },
+            {
+                id: "w10",
+                name: "Pearls",
+                Glyph: wavesGlyph({
+                    radius: 22,
+                    rings: [1, 0.62],
+                    stroke: 5,
+                    clip: "circle",
+                    dot: true,
+                }),
+            },
+        ],
     },
     {
         id: "rainbow",
         name: "Rainbow",
-        idea: "Three arcs, the oldest sign of a promise that lasts. Each band rests on the one below.",
-        Glyph: RainbowGlyph,
-    },
-    {
-        id: "field",
-        name: "Field",
-        idea: "A grid of dots cut off by the edge of the tile, so it reads as one corner of something that never ends.",
-        Glyph: FieldGlyph,
-        bleed: true,
-    },
-    {
-        id: "coil",
-        name: "Coil",
-        idea: "A thick spiral, two turns and opening: the spiral idea at a weight that survives 16 pixels.",
-        Glyph: CoilGlyph,
+        idea: "Arcs resting on one another: the oldest sign of a promise that lasts.",
+        variants: [
+            { id: "r1", name: "Original", Glyph: rainbowGlyph({ radii: [38, 24, 10], stroke: 9 }) },
+            {
+                id: "r2",
+                name: "Four fine",
+                Glyph: rainbowGlyph({ radii: [40, 30, 20, 10], stroke: 5.5 }),
+            },
+            { id: "r3", name: "Two heavy", Glyph: rainbowGlyph({ radii: [37, 17], stroke: 14 }) },
+            {
+                id: "r4",
+                name: "Arches",
+                Glyph: rainbowGlyph({ radii: [36, 22, 8], stroke: 8.5, kind: "arch", base: 58 }),
+            },
+            {
+                id: "r5",
+                name: "With sun",
+                Glyph: rainbowGlyph({ radii: [38, 24], stroke: 9, sun: 8 }),
+            },
+            {
+                id: "r6",
+                name: "Reflection",
+                Glyph: rainbowGlyph({ radii: [38, 24, 10], stroke: 7, kind: "mirror" }),
+            },
+            {
+                id: "r7",
+                name: "Solid bands",
+                Glyph: rainbowGlyph({ radii: [42, 28, 14], stroke: 10, kind: "band" }),
+            },
+            {
+                id: "r8",
+                name: "Corner",
+                Glyph: rainbowGlyph({ radii: [66, 48, 30], stroke: 10, kind: "quarter" }),
+            },
+            {
+                id: "r9",
+                name: "Drift",
+                Glyph: rainbowGlyph({ radii: [38, 26, 14], stroke: 8.5, kind: "offset" }),
+            },
+            {
+                id: "r10",
+                name: "Sunrise",
+                Glyph: rainbowGlyph({
+                    radii: [62, 46, 30, 14],
+                    stroke: 8,
+                    kind: "rings",
+                    base: 96,
+                }),
+                bleed: true,
+            },
+        ],
     },
 ];
 
-const ALL = [...CONCEPTS, ...BOLD];
+type TileStyle = "brand" | "ink";
 
-type TileStyle = "brand" | "ink" | "paper";
-
-const TILE: Record<TileStyle, { fill: string; glyph: string; border?: string }> = {
+const TILE: Record<TileStyle, { fill: string; glyph: string }> = {
     brand: { fill: BRAND.fill, glyph: BRAND.glyph },
     ink: { fill: "var(--foreground)", glyph: "var(--background)" },
-    paper: { fill: "var(--card)", glyph: BRAND.fill, border: "var(--border)" },
 };
 
 function Tile({
-    concept,
+    variant,
     size,
     style = "brand",
-}: { concept: Concept; size: number; style?: TileStyle }) {
-    const { Glyph } = concept;
+}: {
+    variant: Variant;
+    size: number;
+    style?: TileStyle;
+}) {
+    const { Glyph } = variant;
     const look = TILE[style];
-    const inner = concept.bleed ? 1 : size >= 40 ? 0.7 : size >= 22 ? 0.78 : 0.88;
+    const inner = variant.bleed ? 1 : size >= 40 ? 0.7 : size >= 22 ? 0.78 : 0.88;
     const offset = 50 - 50 * inner;
-    const clip = `tile-${concept.id}-${style}-${size}`;
+    const uid = `${variant.id}-${style}-${size}`;
     return (
         <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
             <defs>
-                <clipPath id={clip}>
+                <clipPath id={`${uid}-tile`}>
                     <rect x={0} y={0} width={100} height={100} rx={22} />
                 </clipPath>
             </defs>
-            <rect
-                x={0.5}
-                y={0.5}
-                width={99}
-                height={99}
-                rx={22}
-                fill={look.fill}
-                stroke={look.border ?? "none"}
-            />
-            <g clipPath={`url(#${clip})`}>
+            <rect x={0} y={0} width={100} height={100} rx={22} fill={look.fill} />
+            <g clipPath={`url(#${uid}-tile)`}>
                 <g transform={`translate(${offset} ${offset}) scale(${inner})`}>
-                    <Glyph color={look.glyph} ground={look.fill} size={size * inner} />
+                    <Glyph color={look.glyph} ground={look.fill} size={size * inner} uid={uid} />
                 </g>
             </g>
         </svg>
     );
 }
 
-function Bare({
-    concept,
-    size,
-    color,
-    ground,
-}: {
-    concept: Concept;
-    size: number;
-    color: string;
-    ground: string;
-}) {
-    const { Glyph } = concept;
+function Cell({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
-            <Glyph color={color} ground={ground} size={size} />
-        </svg>
-    );
-}
-
-function Wordmark({ className }: { className: string }) {
-    return (
-        <span className={`font-display font-semibold tracking-tight ${className}`}>minibrain</span>
-    );
-}
-
-function Cell({
-    label,
-    children,
-    className = "bg-background",
-    labelClassName = "text-muted-foreground",
-}: {
-    label: string;
-    children: ReactNode;
-    className?: string;
-    labelClassName?: string;
-}) {
-    return (
-        <div className={`flex min-w-0 flex-col gap-3 rounded-md border p-4 ${className}`}>
-            <span className={`text-sm ${labelClassName}`}>{label}</span>
-            <div className="flex flex-1 flex-wrap items-center gap-4">{children}</div>
+        <div className="flex min-w-0 flex-col gap-3 rounded-md border bg-background p-4">
+            <span className="text-sm text-muted-foreground">{label}</span>
+            {children}
         </div>
     );
 }
 
-function Sizes({ concept, style }: { concept: Concept; style: TileStyle }) {
+function VariantCell({ family, variant }: { family: Family; variant: Variant }) {
+    const number = family.variants.indexOf(variant) + 1;
     return (
-        <div className="flex items-end gap-3">
-            <Tile concept={concept} size={64} style={style} />
-            <Tile concept={concept} size={32} style={style} />
-            <Tile concept={concept} size={16} style={style} />
-        </div>
-    );
-}
-
-function ConceptSection({ concept, index }: { concept: Concept; index: number }) {
-    return (
-        <Section title={`${index + 1}. ${concept.name}`} caption={concept.idea}>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Cell label="Cobalt">
-                    <Sizes concept={concept} style="brand" />
-                </Cell>
-                <Cell label="Ink">
-                    <Sizes concept={concept} style="ink" />
-                </Cell>
-                <Cell label="Lockup">
-                    <div className="flex items-center gap-3 text-foreground">
-                        <Tile concept={concept} size={44} />
-                        <Wordmark className="text-3xl" />
-                    </div>
-                </Cell>
-                <Cell
-                    label="Mark only, inverse"
-                    className="bg-foreground"
-                    labelClassName="text-background"
-                >
-                    <div className="flex items-center gap-3 text-background">
-                        <Bare
-                            concept={concept}
-                            size={40}
-                            color="var(--background)"
-                            ground="var(--foreground)"
-                        />
-                        <Wordmark className="text-2xl" />
-                    </div>
-                </Cell>
+        <Cell label={`${number}. ${variant.name}`}>
+            <div className="flex items-end gap-3">
+                <Tile variant={variant} size={64} />
+                <Tile variant={variant} size={32} />
+                <Tile variant={variant} size={16} />
+                <Tile variant={variant} size={32} style="ink" />
             </div>
-        </Section>
+            <div className="flex items-center gap-2 text-foreground">
+                <Tile variant={variant} size={22} />
+                <span className="font-display text-lg font-semibold tracking-tight">minibrain</span>
+            </div>
+        </Cell>
     );
 }
 
-function CompareSection() {
+function FamilySection({ family }: { family: Family }) {
     return (
-        <Section
-            title="Side by side"
-            caption="Where a mark has to work hardest: the sidebar and the browser tab."
-        >
-            <div className="grid gap-3 md:grid-cols-2">
-                <div className="md:col-span-2">
-                    <Cell label="All ten at 48 and 24 pixels: detailed on the left, bold on the right">
-                        <div className="flex flex-col gap-3">
-                            {[48, 24].map((size) => (
-                                <div key={size} className="flex flex-wrap items-center gap-3">
-                                    {ALL.map((concept) => (
-                                        <Tile key={concept.id} concept={concept} size={size} />
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    </Cell>
+        <Section title={family.name} caption={family.idea}>
+            <div className="flex flex-col gap-3">
+                <Cell label="All ten at 16 pixels, the size of a browser tab">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {family.variants.map((variant) => (
+                            <Tile key={variant.id} variant={variant} size={16} />
+                        ))}
+                    </div>
+                </Cell>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    {family.variants.map((variant) => (
+                        <VariantCell key={variant.id} family={family} variant={variant} />
+                    ))}
                 </div>
-                <Cell label="Sidebar header">
-                    <div className="flex w-full flex-col gap-2">
-                        {ALL.map((concept) => (
-                            <div
-                                key={concept.id}
-                                className="flex items-center gap-2 rounded-md border bg-card px-3 py-2"
-                            >
-                                <Tile concept={concept} size={22} />
-                                <span className="text-base font-semibold">minibrain</span>
-                                <span className="ml-auto text-sm text-muted-foreground">
-                                    {concept.name}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </Cell>
-                <Cell label="Browser tabs at 16px">
-                    <div className="flex w-full flex-col gap-2">
-                        {(["brand", "ink", "paper"] as const).map((style) => (
-                            <div key={style} className="flex flex-wrap gap-1">
-                                {ALL.map((concept) => (
-                                    <div
-                                        key={concept.id}
-                                        className="flex items-center gap-1.5 rounded-t-md border border-b-0 bg-card px-2.5 py-1.5"
-                                    >
-                                        <Tile concept={concept} size={16} style={style} />
-                                        <span className="text-sm">Models</span>
-                                    </div>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </Cell>
             </div>
         </Section>
     );
@@ -559,11 +649,10 @@ export function LogosPage() {
         <Page>
             <PageHeader
                 title="Logos"
-                caption="Ten original directions on infinity, abundance and forever: five detailed, five bold enough to read across a room. Flat on Cobalt or ink. Prototype; not in the sidebar."
+                caption="Ten versions each of Branches, Waves and Rainbow, flat on Cobalt or ink. Prototype; not in the sidebar."
             />
-            <CompareSection />
-            {ALL.map((concept, index) => (
-                <ConceptSection key={concept.id} concept={concept} index={index} />
+            {FAMILIES.map((family) => (
+                <FamilySection key={family.id} family={family} />
             ))}
         </Page>
     );
