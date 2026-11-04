@@ -36,6 +36,7 @@ import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/componen
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
+import { EncryptionSettings } from "~/pages/settings/EncryptionSettings";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 
@@ -578,6 +579,7 @@ export function SecurityPage() {
                             </SettingsGroup>
                         </PanelSection>
                     ))}
+                {policies.data && <EncryptionSettings />}
                 <p className="text-sm text-muted-foreground">
                     {"Every change on this page is recorded in the "}
                     <Link href={POLICY_CHANGES} className="text-primary hover:underline">

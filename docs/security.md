@@ -17,6 +17,7 @@ log with who, before and after.
 | Audit log retention | Days, 0 keeps every event (default) | Hourly prune on the leader, cut at a chain anchor (below) |
 | SIEM export | Off (default), TLS, TCP or UDP; host, port (0 is 6514 for TLS, 514 otherwise), CA bundle path | Syslog forwarder on the leader (below) |
 | OpenTelemetry export | Off (default) or OTLP over HTTP; collector endpoint, headers (encrypted, write-only), service name, CA bundle path; also `OTEL_EXPORTER_OTLP_*` | Exporters in main and gateways, applied within 5 seconds ([observability](observability.md)) |
+| Encryption at rest | Local key file (default), HashiCorp Vault Transit, PKCS#11 HSM, AWS KMS or Off; each provider's settings | Every file main stores (below) |
 
 ## Accounts and sign-in
 
@@ -119,8 +120,9 @@ password, or read it with `--password-stdin`, and record `command line` as the a
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM
-  you configure, traces and metrics to the OpenTelemetry collector you configure, and artifact storage you point at a
-  bucket; Settings → This install lists them. The OTLP exporter ignores proxy variables and does not follow redirects.
+  you configure, traces and metrics to the OpenTelemetry collector you configure, the Vault or AWS KMS that holds the
+  master key, and artifact storage you point at a bucket. Settings → This install lists the SIEM, collector and
+  bucket; Settings → Security shows the key service. The OTLP exporter ignores proxy variables and does not follow redirects.
 - `/metrics` is off until `metrics.addresses` or a scrape token is set, and then needs that address or token, not a
   session ([observability](observability.md#prometheus)).
 - Every response carries an `X-Request-ID`, and JSON logs (`MINIBRAIN_LOG_FORMAT=json`) carry it on each line.
@@ -188,6 +190,199 @@ address and nowhere else; the network policy does not apply to it, as it does no
 - While the SIEM is unreachable minibrain retries every 15 seconds, events queue in the database, and Settings →
   Audit log shows the error and how many events wait. Turning export on for the first time sends the whole retained
   log, oldest first.
+
+## Encryption at rest
+
+Every file minibrain stores is encrypted with its own random 256-bit data key, and that data key is wrapped by a
+master key that lives somewhere else: a local key file (the default), HashiCorp Vault Transit, a PKCS#11 HSM, or AWS
+KMS. Settings → Security → Encryption at rest picks the provider, tests it before saving, shows which key each file
+uses, and starts checks, rotations and the encryption of older files. Everything there is admin-only, audited, and
+locked when `minibrain.yaml` (`policy:`) or `MINIBRAIN_POLICY_<NAME>` sets it.
+
+### What is encrypted
+
+| Kept by main | Encrypted | Notes |
+|---|---|---|
+| Uploads, snapshots, adapters, job logs (the artifact store) | Yes, in the local folder and in an S3 bucket | The bucket only ever holds ciphertext (client-side encryption). Snapshots older than Parquet snapshots (folders packed as tar) are still unpacked into main's cache when read |
+| Staging databases built from uploads (`<home>/staging`) | Yes | Built in a private temporary folder, sealed, and the plaintext removed straight away |
+| Connection secrets and sealed settings (OpenTelemetry headers) | Yes, same master key | One AES-256-GCM envelope per value, the row's id as associated data |
+| The database (SQLite or Postgres) | No | Request inputs and answers you choose to keep live there: put SQLite on an encrypted volume, or use Postgres with storage encryption |
+| Base model weights (`<home>/models`) | No | Public weights; imported private weights are not encrypted by minibrain either |
+
+Main never writes decrypted copies of these files. DuckDB reads snapshots, uploads and staging databases through a
+filesystem that decrypts on the fly, a chunk at a time, so queries, previews, diffs and the gateway's prompt context
+work on the encrypted files directly (the sandbox still refuses every path it was not given). The trade-off is a
+little CPU per read (measured below) instead of a decrypted cache on disk.
+
+Workers, engines and gateways are different: training, evaluation and serving read plain files, and those machines
+hold no master key. Main decrypts an artifact when a worker or engine pulls it over HTTPS, and the worker's or
+engine's own home (`<home>/worker`, `<home>/engines`, `<home>/gateway`) holds plain working copies of the snapshots
+and adapters it uses. Put those folders on an encrypted volume (or tmpfs) on GPU boxes; they are caches and can be
+wiped at any time. A worker's outputs are encrypted the moment main stores them.
+
+### File format
+
+A sealed file is a 4,096-byte header followed by the body in chunks.
+
+| Bytes | Field |
+|---|---|
+| 0-7 | Magic `89 4D 42 45 0D 0A 1A 0A` |
+| 8 | Format version, 1 |
+| 9 | Cipher suite, 1: AES-256-GCM in a STREAM construction |
+| 10-11 | Reserved, zero |
+| 12-15 | Chunk size in plaintext bytes, big-endian (1 MiB) |
+| 16-22 | Random 7-byte nonce prefix |
+| 23-63 | Reserved, zero |
+| 64-2079 | Key slot A |
+| 2080-4095 | Key slot B |
+
+- Body: each plaintext chunk is encrypted with AES-256-GCM under the file's data key, with the 96-bit nonce
+  `prefix ‖ chunk index (4 bytes, big-endian) ‖ final flag (1 byte)`, the first 64 header bytes as associated data,
+  and a 16-byte tag appended. Every chunk but the last is exactly `chunk size + 16` bytes. Reordering, dropping,
+  duplicating or appending chunks, cutting the file at a chunk boundary or anywhere else, and changing a header byte
+  all fail authentication. Each data key encrypts one file only, so a nonce never repeats under a key.
+- Key slot: a sequence number (4 bytes), the length of a JSON payload (2 bytes), the payload, zero padding, and the
+  slot's SHA-256 in its last 32 bytes. The payload is `{"p": provider, "k": key reference, "w": wrapped data key}`.
+  Readers use the valid slot with the highest sequence number; the other one lets re-wrapping replace a header in
+  place without a moment where a crash leaves the file unreadable.
+- The wrapped data key is bound to the file: the wrap's associated data (local key, HSM), encryption context (KMS) or
+  wrapped plaintext (Vault, which carries the SHA-256 of the context next to the key) holds `minibrain.artifact.<id>`
+  for artifacts and `minibrain.staging.<key>` for staging databases, so a header copied onto another file does not
+  open.
+- Files without the magic are read as plaintext, so files written before encryption at rest stay readable.
+- Plaintext size is the file size minus the header and 16 bytes per chunk, so random access needs no index.
+
+Content hashes stay over the plaintext: an artifact's id is still the SHA-256 of its plain bytes. Identical uploads
+and snapshots are still stored once, a re-taken snapshot still matches its earlier copy, and model cards and AI-BOMs
+keep the hashes customers can check against their own files. The hash says only what any copy of the same content
+would hash to, which the content-addressed file name already revealed.
+
+### Key providers
+
+| Provider | Master key | Wrapped by | Rotation |
+|---|---|---|---|
+| Local key file (default) | `<home>/keys/master.key` (folder 0700, file 0600), made on first start; or the file `MINIBRAIN_MASTER_KEY_FILE` names, such as a Kubernetes or Docker secret | AES-256-GCM through `cryptography`, random 96-bit nonce, the file's context as associated data | `minibrain keys rotate` adds a key to the file. A mounted file is never written: add a line yourself |
+| HashiCorp Vault Transit | An `aes256-gcm96` Transit key | Transit `encrypt` and `decrypt` over HTTPS (httpx, TLS 1.2+ through Python's `ssl`), token or AppRole | Transit's key rotate, then re-wrap |
+| PKCS#11 HSM | Non-extractable AES-256 key objects with one label, the version as `CKA_ID` | `C_Encrypt` with `CKM_AES_GCM` inside the HSM, random 96-bit IV, the context's SHA-256 as associated data (PyKCS11) | A new key object, then re-wrap |
+| AWS KMS | A symmetric KMS key | KMS `Encrypt` and `Decrypt` through botocore, the context's SHA-256 as encryption context | KMS rotates key material itself; point minibrain at a new key ARN to move every data key |
+
+Local key file. The file holds one base64 256-bit key per line; the last line is the current key and the others stay
+readable. An install that kept its connection secrets under `<home>/secrets/master.key` moves that key into
+`keys/master.key` on first start, so there is one key for everything. Back the key up separately from the data: a
+backup that holds both protects nothing, and data whose key is lost cannot be read. With more than one main, every
+main needs the same key file: mount it from your secret store and set `MINIBRAIN_MASTER_KEY_FILE`. A main that finds
+the install already encrypting under a local key it does not have refuses to make its own and says so.
+
+```sh
+openssl rand -base64 32 > /run/secrets/minibrain-master.key   # then MINIBRAIN_MASTER_KEY_FILE=/run/secrets/minibrain-master.key
+```
+
+HashiCorp Vault Transit.
+
+```sh
+vault secrets enable transit
+vault write -f transit/keys/minibrain type=aes256-gcm96
+vault policy write minibrain - <<'HCL'
+path "transit/encrypt/minibrain"     { capabilities = ["update"] }
+path "transit/decrypt/minibrain"     { capabilities = ["update"] }
+path "transit/keys/minibrain"        { capabilities = ["read"] }
+path "transit/keys/minibrain/rotate" { capabilities = ["update"] }
+HCL
+vault auth enable approle
+vault write auth/approle/role/minibrain token_policies=minibrain token_ttl=1h
+```
+
+```yaml
+policy:
+  encryption: vault
+  vault_address: https://vault.internal:8200
+  vault_auth: approle               # or token, read from MINIBRAIN_VAULT_TOKEN(_FILE)
+  vault_role_id: 7f1c…              # the secret ID comes from MINIBRAIN_VAULT_SECRET_ID(_FILE)
+  vault_ca_bundle: /etc/minibrain/vault-ca.pem
+  vault_namespace: ""               # Vault Enterprise only
+```
+
+Drop the `rotate` path from the policy if Vault admins rotate the key themselves; minibrain then re-wraps to whatever
+version is newest. Tested against Vault 1.20.4 in dev mode with AppRole.
+
+PKCS#11 HSM. Install the extra (`pip install 'minibrain[hsm]'`, which adds PyKCS11) and the vendor's PKCS#11 module.
+
+```yaml
+policy:
+  encryption: hsm
+  hsm_library: /usr/lib/softhsm/libsofthsm2.so   # the vendor module
+  hsm_token: minibrain                          # token (partition) label
+  hsm_key: minibrain-master                     # key label; the PIN comes from MINIBRAIN_HSM_PIN(_FILE)
+```
+
+If the token has no key with that label the first time minibrain uses it, minibrain generates one (AES-256,
+sensitive, not extractable, `CKA_ID` 1); create it yourself if your HSM policy reserves key generation for its
+officers. Tested against SoftHSM 2.7.0.
+
+AWS KMS. Credentials come from the server's AWS environment (variables, profile, web identity on EKS, or the instance
+role); nothing calls AWS unless KMS is the provider.
+
+```yaml
+policy:
+  encryption: kms
+  kms_key: arn:aws:kms:us-gov-west-1:111122223333:key/1234abcd-…
+  kms_fips: true                    # kms-fips.<region>.amazonaws.com
+  kms_endpoint: ""                  # an https:// VPC endpoint, if you use one
+```
+
+The IAM policy needs `kms:Encrypt`, `kms:Decrypt` and `kms:DescribeKey` on the key. With S3 storage on AWS,
+SSE-KMS on the bucket is a useful second layer: it protects the objects at the storage layer and logs every read in
+CloudTrail, but it decrypts for anyone holding the bucket credentials, while minibrain's client-side layer keeps the
+bucket's contents unreadable without the master key.
+
+The network policy does not apply to Vault or KMS, as it does not to artifact storage: an admin chose them.
+Switching provider tests a wrap and an unwrap first and refuses the change if either fails; files wrapped under the
+old provider stay readable as long as its settings stay in place.
+
+### Rotation, checks and older files
+
+| Action | Command | UI | What it does |
+|---|---|---|---|
+| Check | `minibrain keys status` | Check now | Reads every header and counts files under the current key, under older keys, unencrypted and unreadable, per key |
+| Rotate | `minibrain keys rotate` | Rotate master key | Makes a new master key version, then re-wraps every data key under it |
+| Encrypt older files | `minibrain keys encrypt-existing` | Encrypt existing files | Encrypts files written before encryption at rest, in place |
+
+- Re-wrapping rewrites only the header: unwrap with the old key, wrap with the new one, write the free slot, sync,
+  then clear the old slot. File bodies are never re-encrypted. Bucket objects are uploaded again with the new header
+  and the same body. Secrets are resealed in the same pass.
+- Older local key versions stay readable until a pass finds nothing uses them and the new key is at least an hour
+  old; the leader runs that check on its own and then drops them from the key file (`--retire-now` skips the wait
+  when no server is running). Vault, HSM and KMS keep their versions: retire them there.
+- Encrypting an older file writes an encrypted copy beside it, reads the copy back and checks its SHA-256 against the
+  file's id, then swaps the two atomically; a file whose content does not match its id is left alone and reported.
+  The same pass deletes leftover plaintext staging files and main's old decrypted cache.
+- In the UI these run as one background pass on the leader, with progress; each is audited (`encryption.rotate`,
+  `encryption.rewrap`, `encryption.encrypt_existing`, `encryption.check`, `encryption.retire`, `encryption.key`).
+- Rotation answers "a key version should no longer be used"; it does not make copies of files taken before the
+  rotation unreadable to someone who also has the old key.
+
+### Upgrading an existing install
+
+Encryption at rest is on by default for new and existing installs: on first start after the upgrade, main makes the
+local key (or moves `secrets/master.key` into `keys/`), every new file is encrypted, and files already stored stay
+readable as they are. Run `minibrain keys encrypt-existing` or press Encrypt existing files when convenient. On by
+default because encryption at rest is part of what the install claims to buyers, reads of both kinds keep working, and
+older files can be encrypted later without downtime. Set the master key to Off (`MINIBRAIN_POLICY_ENCRYPTION=off`)
+only for a multi-main install whose mains do not share a key file yet.
+
+### Performance
+
+Measured on an Apple M1 Pro (macOS, `cryptography` 50.0.2 on OpenSSL 4.0.3) with a 1 GiB file of random bytes,
+reading and writing the local SSD, best of two runs:
+
+| Operation | Plaintext (before) | Encrypted |
+|---|---|---|
+| Store: read, SHA-256, write | 1,009 MB/s | 712 MB/s |
+| Read: read, SHA-256 | 1,929 MB/s | 1,427 MB/s |
+| AES-256-GCM alone, in memory, 1 MiB chunks | | 4,349 MiB/s encrypt, 2,104 MiB/s decrypt |
+
+Memory stays flat: 1 MiB chunks are encrypted and decrypted one at a time, and random reads keep at most 8 decrypted
+chunks per open file.
 
 ## Bills of materials
 

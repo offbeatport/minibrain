@@ -215,3 +215,21 @@ def test_the_leader_runs_requested_passes_and_records_them(harness: Harness) -> 
         events = [event for event in session.scalars(select(AuditEvent)) if event.action.startswith("encryption.")]
     assert finished["state"] == rekey.DONE and last["tally"]["encrypted"] == 1
     assert [(event.action, event.actor) for event in events] == [("encryption.encrypt_existing", "admin@example.com")]
+
+
+def test_settings_show_the_key_counts_and_queue_passes(harness: Harness) -> None:
+    old = legacy_store(harness)
+    old.put_stream(io.BytesIO(b"old rows"))
+    queued = harness.client.post("/api/settings/encryption/tasks", json={"kind": "encrypt"})
+    assert queued.status_code == 200, queued.text
+    assert queued.json()["task"]["state"] == rekey.QUEUED
+    assert harness.client.post("/api/settings/encryption/tasks", json={"kind": "check"}).status_code == 422
+    task = rekey.pending(harness.sessions)
+    assert task is not None
+    rekey.execute(harness.sessions, store_for(harness.settings), keys.keys_for(harness.settings), task)
+    status = harness.client.get("/api/settings/encryption").json()
+    assert (status["provider"], status["task"]["state"]) == ("local", rekey.DONE)
+    assert (status["last"]["counts"]["encrypted"], status["last"]["counts"]["plain"]) == (1, 0)
+    current = [key for key in status["keys"] if key["current"]]
+    assert len(current) == 1 and current[0]["files"] == 1 and current[0]["key"] == status["key"]
+    assert status["fields"][0]["name"] == "encryption"

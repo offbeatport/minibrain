@@ -380,6 +380,8 @@ before a run starts:
   is kept in a 0600 file under `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection"
   writes, reads back and removes a probe object; saving S3 runs the same check. Artifacts already stored stay readable
   after switching either way.
+- Both locations hold only ciphertext: main encrypts each artifact with its own data key before it reaches the folder
+  or the bucket (client-side), so the bucket's own SSE-KMS is an optional second layer.
 
 ### Connections
 
@@ -392,9 +394,10 @@ from. They have different endpoints and keys, so they are configured apart.
   it works on unsaved changes too.
 - Each connection's endpoint must pass the network policy when it is saved, tested and every time it is used; a
   blocked one says which host to add under Allowed hosts.
-- Secrets are write-only: encrypted at rest with AES-256-GCM (`cryptography`, through OpenSSL) under a master key at
-  `<home>/secrets/master.key` (0600, created on first use) or the file `MINIBRAIN_MASTER_KEY_FILE` names (container
-  secret mounts), with the connection's id as associated data. The API only says whether a secret is set; Replace
+- Secrets are write-only: encrypted at rest with AES-256-GCM (`cryptography`, through OpenSSL) under their own data
+  key, wrapped by the install's master key (see Encryption at rest in `docs/security.md`: `<home>/keys/master.key`,
+  the file `MINIBRAIN_MASTER_KEY_FILE` names, Vault Transit, a PKCS#11 HSM or AWS KMS), with the connection's id as
+  associated data. The API only says whether a secret is set; Replace
   writes a new one. Create, update and delete are audited (`connection.create`, `connection.update` with the changed
   field names and whether the secret was replaced, `connection.delete`), never with secret values.
 - Locked-down installs declare connections in `minibrain.yaml` under `connections:` (a list with `name`, `kind` and
@@ -839,7 +842,13 @@ v1, the evidence regulated buyers ask for first:
   out-of-order commits on Postgres just seal later); `minibrain audit verify`, `GET /api/audit/chain` and the Audit log
   page report the first break; SIEM export is RFC 5424 over TLS, TCP or UDP with a stored cursor. Format, canonical
   form and guarantees: `docs/security.md`.
-- Encryption at rest for snapshots, staging files and adapters.
+- Encryption at rest for snapshots, staging files and adapters. Built: every stored file (uploads, snapshots,
+  adapters, logs, staging databases; local folder or S3 bucket) is sealed with its own AES-256-GCM data key in a
+  chunked STREAM format, wrapped by a master key from a local key file (default), HashiCorp Vault Transit, a PKCS#11
+  HSM or AWS KMS (FIPS endpoints); content hashes stay over the plaintext. DuckDB reads sealed files through a
+  decrypting filesystem, so main keeps no plaintext copies; workers, engines and gateways keep plain working copies.
+  `minibrain keys status | rotate | encrypt-existing` and Settings → Security re-wrap headers without re-encrypting
+  bodies and encrypt older files in place. Format, providers and measurements: `docs/security.md`.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
 - PII and PHI handling as in Data; access to every minibrain is scoped and audited.
@@ -1049,9 +1058,11 @@ Everything in the v1 scope below, after M1.
       release file built; signing first runs for real on the first tag)
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
-- [ ] Hash-chained audit log with SIEM export; encryption at rest (hash chain sealed by the leader, prune anchors,
-      verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP done; encryption at
-      rest not yet)
+- [x] Hash-chained audit log with SIEM export; encryption at rest: hash chain sealed by the leader, prune anchors,
+      verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP; every stored file
+      under its own AES-256-GCM data key wrapped by a local key file, Vault Transit, a PKCS#11 HSM or AWS KMS, with
+      rotation and in-place encryption of older files (Vault tested on 1.20.4 dev, HSM on SoftHSM 2.7.0, KMS on moto;
+      not yet on a production HSM or real AWS KMS; worker, engine and gateway caches stay plain)
 - [x] Model card and validation report per version: in-app page, Markdown and JSON with a SHA-256 of the canonical card, editable intended use and known limits (audited)
 - [ ] Reference hardware configs
 - [ ] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`):

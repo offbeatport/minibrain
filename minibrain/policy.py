@@ -229,9 +229,9 @@ FIELDS: tuple[Field, ...] = (
     ),
     Field(
         "encryption",
-        "Encryption at rest",
+        "Master key",
         "Where the master key lives that wraps each stored file's own data key. Files written before a change stay "
-        "readable; re-wrap them under Encryption at rest. Off writes new files unencrypted.",
+        "readable; Rotate master key re-wraps them under the new one. Off writes new files unencrypted.",
         "choice",
         "local",
         ("local", "vault", "hsm", "kms", "off"),
