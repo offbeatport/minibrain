@@ -7,6 +7,7 @@ import {
     CardTitle,
     Field,
     FieldGroup,
+    InfoTip,
     Input,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useState } from "react";
@@ -190,6 +191,9 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
     );
 }
 
+const SETUP_TOKEN_INFO =
+    "A one-time code minibrain prints in its log the first time it starts. It proves you run this server, so nobody else who can reach it creates the admin first. It works once; run minibrain admin setup-link on the server for a new one.";
+
 function tokenFromQuery(): string {
     const query = typeof window === "undefined" ? "" : window.location.search;
     return new URLSearchParams(query).get("token")?.trim() ?? "";
@@ -198,14 +202,13 @@ function tokenFromQuery(): string {
 function AdminForm({ linkToken }: { linkToken: string }) {
     const setup = useSetup();
     const [token, setToken] = useState(linkToken);
-    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [again, setAgain] = useState("");
     const submit = (event: FormEvent) => {
         event.preventDefault();
         if (password === again) {
-            setup.mutate({ token: token.trim(), name, email, password });
+            setup.mutate({ token: token.trim(), email, password });
         }
     };
     return (
@@ -214,7 +217,14 @@ function AdminForm({ linkToken }: { linkToken: string }) {
                 {!linkToken && (
                     <Field
                         id="setup-token"
-                        label="Setup token"
+                        label={
+                            <span className="flex items-center gap-1.5">
+                                Setup token
+                                <InfoTip label="What is the setup token?">
+                                    {SETUP_TOKEN_INFO}
+                                </InfoTip>
+                            </span>
+                        }
                         hint="The part after token= in the setup link."
                     >
                         <Input
@@ -229,15 +239,6 @@ function AdminForm({ linkToken }: { linkToken: string }) {
                         />
                     </Field>
                 )}
-                <Field id="admin-name" label="Name">
-                    <Input
-                        id="admin-name"
-                        autoComplete="name"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        autoFocus={Boolean(linkToken)}
-                    />
-                </Field>
                 <Field id="admin-email" label="Email">
                     <Input
                         id="admin-email"
@@ -246,6 +247,7 @@ function AdminForm({ linkToken }: { linkToken: string }) {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
+                        autoFocus={Boolean(linkToken)}
                     />
                 </Field>
                 <PasswordFields
