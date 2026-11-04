@@ -16,6 +16,7 @@ import {
     Button,
     Card,
     Field,
+    InfoTip,
     Input,
     Link,
     Select,
@@ -31,7 +32,7 @@ import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
 import { keys, useCatalog, useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
-import { TAGS_HINT } from "~/components/Tags";
+import { TAGS_HELP } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
 import { AddModelSummary } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
@@ -104,6 +105,14 @@ const TASKS: {
         icon: BookOpen,
     },
 ];
+
+function Optional({ label }: { label: string }) {
+    return (
+        <span>
+            {label} <span className="font-normal text-faint">(optional)</span>
+        </span>
+    );
+}
 
 type Picked =
     | { kind: "base"; key: string }
@@ -408,16 +417,24 @@ export function AddModelPage() {
                             className="sm:max-w-md"
                         />
                     </Field>
-                    <Field id="create-description" label="Description (optional)">
+                    <Field id="create-description" label={<Optional label="Description" />}>
                         <Textarea
                             id="create-description"
                             value={description}
                             onChange={(event) => setDescription(event.target.value)}
-                            rows={3}
+                            className="min-h-32"
                             placeholder="Routes incoming tickets to the right queue"
                         />
                     </Field>
-                    <Field id="create-tags" label="Tags (optional)" hint={TAGS_HINT}>
+                    <Field
+                        id="create-tags"
+                        label={
+                            <span className="flex items-center gap-1.5">
+                                <Optional label="Tags" />
+                                <InfoTip label="How tags help">{TAGS_HELP}</InfoTip>
+                            </span>
+                        }
+                    >
                         <Input
                             id="create-tags"
                             value={tags}
