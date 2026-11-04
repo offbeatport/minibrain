@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Folder, Layers, Table2 } from "lucide-react";
+import { Folder, FolderInput, Layers, Table2, Trash2, X } from "lucide-react";
 import {
     Button,
     ConfirmDialog,
@@ -320,60 +320,86 @@ function branchIds(nodes: TreeNode[]): string[] {
 }
 
 export function MoveDialog({
-    target,
+    targets,
     index,
     onOpenChange,
+    onMoved,
 }: {
-    target: MoveTarget | null;
+    targets: MoveTarget[] | null;
     index: FolderIndex;
     onOpenChange: (open: boolean) => void;
+    onMoved?: () => void;
 }) {
     const move = useMoveItem();
     const [chosen, setChosen] = useState<string | null>(null);
-    const reset = move.reset;
-    const from = target?.from ?? null;
+    const moveAll = useMutation({
+        mutationFn: async (into: number | null) => {
+            for (const target of targets ?? []) {
+                if (target.from !== into) {
+                    await move.mutateAsync({ item: target.item, into });
+                }
+            }
+        },
+        onSuccess: () => {
+            onMoved?.();
+            onOpenChange(false);
+        },
+    });
+    const reset = moveAll.reset;
+    const first = targets?.[0] ?? null;
+    const from = first?.from ?? null;
+    const together = (targets ?? []).every((target) => target.from === from);
+    const opened = targets
+        ? targets.map((target) => `${target.item.kind}:${target.item.id}`).join(",")
+        : null;
     useEffect(() => {
-        if (target) {
-            setChosen(itemKey(folderRef(target.from)));
+        if (opened !== null) {
+            setChosen(itemKey(folderRef(from)));
             reset();
         }
-    }, [target, reset]);
-    const blocked = new Set(
-        target?.item.kind === "folder" ? insideFolder(index, target.item.id) : [],
+    }, [opened, from, reset]);
+    const folders = (targets ?? []).flatMap((target) =>
+        target.item.kind === "folder" ? [target.item.id] : [],
     );
+    const blocked = new Set(folders.flatMap((id) => insideFolder(index, id)));
     const nodes: TreeNode[] = [
         {
             id: itemKey(DATASETS_GROUP),
             label: "Datasets",
             icon: <Layers />,
-            meta: from === null ? "Current" : undefined,
+            meta: together && from === null ? "Current" : undefined,
             children: folderChoices(index, null, blocked, from),
         },
     ];
     const into = folderOf(parseItem(chosen));
-    const problem = target && into !== undefined ? moveProblem(index, target, into) : null;
-    const unchanged = into === undefined || into === from;
+    const problem =
+        into === undefined
+            ? null
+            : ((targets ?? [])
+                  .map((target) => moveProblem(index, target, into))
+                  .find((found) => found !== null) ?? null);
+    const unchanged = into === undefined || (targets ?? []).every((target) => target.from === into);
+    const many = (targets?.length ?? 0) > 1;
     return (
-        <Dialog open={target !== null} onOpenChange={onOpenChange}>
+        <Dialog open={targets !== null} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <form
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (target && into !== undefined && !unchanged && !problem) {
-                            move.mutate(
-                                { item: target.item, into },
-                                { onSuccess: () => onOpenChange(false) },
-                            );
+                        if (targets && into !== undefined && !unchanged && !problem) {
+                            moveAll.mutate(into);
                         }
                     }}
                 >
                     <DialogHeader>
-                        <DialogTitle>{`Move ${target?.name ?? ""}`}</DialogTitle>
+                        <DialogTitle>
+                            {many
+                                ? `Move ${plural(targets?.length ?? 0, "item")}`
+                                : `Move ${first?.name ?? ""}`}
+                        </DialogTitle>
                         <DialogDescription>
-                            {target?.item.kind === "folder"
-                                ? "Pick the folder it goes into. Everything inside it moves along."
-                                : "Pick the folder it goes into."}
+                            {`Pick the folder ${many ? "they go" : "it goes"} into.${folders.length > 0 ? " Everything inside a folder moves along." : ""}`}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="max-h-72 overflow-y-auto rounded-lg border">
@@ -385,12 +411,15 @@ export function MoveDialog({
                             defaultExpandedIds={branchIds(nodes)}
                         />
                     </div>
-                    <ErrorLine error={problem ?? move.error} />
+                    <ErrorLine error={problem ?? moveAll.error} />
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={unchanged || !!problem || move.isPending}>
+                        <Button
+                            type="submit"
+                            disabled={unchanged || !!problem || moveAll.isPending}
+                        >
                             Move
                         </Button>
                     </DialogFooter>
@@ -461,6 +490,104 @@ function contentRows(index: FolderIndex, folderId: number | null): ContentRow[] 
     return [...folders, ...datasets];
 }
 
+function contentsLabel(rows: ContentRow[]): string {
+    const folders = rows.filter((row) => row.folder).length;
+    const datasets = rows.length - folders;
+    return [datasets ? plural(datasets, "dataset") : "", folders ? plural(folders, "folder") : ""]
+        .filter(Boolean)
+        .join(" and ");
+}
+
+function removalNote(row: ContentRow): string {
+    if (row.folder) {
+        return `${row.detail} inside, moved up`;
+    }
+    return row.models > 0
+        ? `Used by ${plural(row.models, "model")}; their trained versions stay`
+        : row.detail;
+}
+
+function DeleteContentsDialog({
+    rows,
+    onOpenChange,
+    onDeleted,
+}: {
+    rows: ContentRow[] | null;
+    onOpenChange: (open: boolean) => void;
+    onDeleted: () => void;
+}) {
+    const refresh = useDataRefresh();
+    const chosen = rows ?? [];
+    const remove = useMutation({
+        mutationFn: async () => {
+            for (const row of [...chosen].sort((a, b) => Number(a.folder) - Number(b.folder))) {
+                if (row.item.kind === "folder") {
+                    await succeed(
+                        api.DELETE("/api/dataset-folders/{folder_id}", {
+                            params: { path: { folder_id: Number(row.item.id) } },
+                        }),
+                    );
+                } else {
+                    await succeed(
+                        api.DELETE("/api/datasets/{slug}", {
+                            params: { path: { slug: String(row.item.id) } },
+                        }),
+                    );
+                }
+            }
+        },
+        onSuccess: () => {
+            onDeleted();
+            onOpenChange(false);
+        },
+        onSettled: refresh,
+    });
+    const folders = chosen.some((row) => row.folder);
+    return (
+        <Dialog open={rows !== null} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{`Delete ${contentsLabel(chosen)}?`}</DialogTitle>
+                    <DialogDescription>
+                        {`Datasets go with their checks and saved snapshots no model uses.${folders ? " A deleted folder's contents move up a level; nothing inside is deleted." : ""} This cannot be undone.`}
+                    </DialogDescription>
+                </DialogHeader>
+                <ul className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border">
+                    {chosen.map((row) => (
+                        <li key={row.key} className="flex items-center gap-3 px-3 py-2.5">
+                            <span
+                                aria-hidden="true"
+                                className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground [&>svg]:size-4"
+                            >
+                                {row.folder ? <Folder /> : <Table2 />}
+                            </span>
+                            <span className="flex min-w-0 flex-col">
+                                <span className="truncate font-medium">{row.name}</span>
+                                <span className="truncate text-sm text-muted-foreground">
+                                    {removalNote(row)}
+                                </span>
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+                <ErrorLine error={remove.error} />
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        disabled={remove.isPending}
+                        onClick={() => remove.mutate()}
+                    >
+                        {remove.isPending ? "Deleting…" : `Delete ${contentsLabel(chosen)}`}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function FolderContents({
     index,
     folderId,
@@ -472,16 +599,73 @@ export function FolderContents({
     empty: ReactNode;
     onSelect: (item: ItemRef) => void;
 }) {
+    const rows = contentRows(index, folderId);
+    const [selected, setSelected] = useState<string[]>([]);
+    const [moving, setMoving] = useState<MoveTarget[] | null>(null);
+    const [deleting, setDeleting] = useState<ContentRow[] | null>(null);
+    const [scope, setScope] = useState(folderId);
+    if (scope !== folderId) {
+        setScope(folderId);
+        setSelected([]);
+    }
+    const chosen = rows.filter((row) => selected.includes(row.key));
+    const clear = () => setSelected([]);
     return (
-        <DataGrid
-            columns={CONTENT_COLUMNS}
-            rows={contentRows(index, folderId)}
-            getRowId={(row) => row.key}
-            sortable={false}
-            onOpen={(row) => onSelect(row.item)}
-            rowLabel={(row) => `${row.folder ? "Folder" : "Dataset"} ${row.name}`}
-            empty={empty}
-        />
+        <div className="flex flex-col gap-3">
+            {chosen.length > 0 && (
+                <div className="flex min-h-8 flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
+                    <Button variant="outline" size="sm" onClick={clear}>
+                        <X />
+                        Clear selection
+                    </Button>
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                setMoving(
+                                    chosen.map((row) => ({
+                                        item: row.item as Movable,
+                                        name: row.name,
+                                        from: folderId,
+                                    })),
+                                )
+                            }
+                        >
+                            <FolderInput />
+                            Move to…
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => setDeleting(chosen)}>
+                            <Trash2 />
+                            Delete
+                        </Button>
+                    </div>
+                </div>
+            )}
+            <DataGrid
+                columns={CONTENT_COLUMNS}
+                rows={rows}
+                getRowId={(row) => row.key}
+                sortable={false}
+                onOpen={(row) => onSelect(row.item)}
+                rowLabel={(row) => `${row.folder ? "Folder" : "Dataset"} ${row.name}`}
+                selectedIds={selected}
+                onSelectedIdsChange={setSelected}
+                empty={empty}
+            />
+            <MoveDialog
+                targets={moving}
+                index={index}
+                onOpenChange={(open) => !open && setMoving(null)}
+                onMoved={clear}
+            />
+            <DeleteContentsDialog
+                rows={deleting}
+                onOpenChange={(open) => !open && setDeleting(null)}
+                onDeleted={clear}
+            />
+        </div>
     );
 }
 
@@ -612,7 +796,7 @@ export function FolderDetail({
                 onOpenChange={(open) => setDialog(open ? "rename" : null)}
             />
             <MoveDialog
-                target={moving}
+                targets={moving ? [moving] : null}
                 index={index}
                 onOpenChange={(open) => !open && setMoving(null)}
             />

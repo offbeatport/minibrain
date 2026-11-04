@@ -365,7 +365,7 @@ export function DatasetDetail({
             <SnapshotsSection dataset={dataset} />
             <UsedBy dataset={dataset} />
             <MoveDialog
-                target={moving}
+                targets={moving ? [moving] : null}
                 index={index}
                 onOpenChange={(open) => !open && setMoving(null)}
             />

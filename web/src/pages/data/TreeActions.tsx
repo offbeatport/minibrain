@@ -206,7 +206,7 @@ export function TreeActionDialogs({
                 }}
             />
             <MoveDialog
-                target={action?.kind === "move" ? action.target : null}
+                targets={action?.kind === "move" ? [action.target] : null}
                 index={index}
                 onOpenChange={close}
             />
