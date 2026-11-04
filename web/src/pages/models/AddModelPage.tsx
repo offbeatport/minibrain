@@ -17,17 +17,13 @@ import {
     Card,
     Field,
     Input,
-    Label,
     Link,
-    RadioGroup,
-    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
     Textarea,
-    cn,
     useToast,
 } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
@@ -37,16 +33,10 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { TAGS_HINT } from "~/components/Tags";
 import { modelsHref } from "~/lib/modelsSearch";
-import { bytes } from "~/lib/time";
+import { AddModelSummary } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
-import {
-    FIT_TEXT,
-    type ImportPick,
-    type SourcePlan,
-    formatLabel,
-    useSourcePlan,
-} from "./BaseSource";
-import { BaseSummary, type CopySource, type DiskNeed, diskBlocks, diskNeed } from "./BaseSummary";
+import { type ImportPick, useSourcePlan } from "./BaseSource";
+import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
 import { useCacheCheck } from "./ModelCache";
 import {
     type BaseOption,
@@ -184,118 +174,6 @@ function chosenOption(
         return entry ? catalogueOption(entry, current.variant || undefined) : null;
     }
     return null;
-}
-
-const LOW_SPACE = 5 * 1024 ** 3;
-
-function hasFormatChoice(plan: SourcePlan): boolean {
-    return (
-        plan.target.kind === "catalogue" && !!plan.variant && plan.target.entry.variants.length > 1
-    );
-}
-
-function FormatChoice({
-    plan,
-    onVariant,
-}: {
-    plan: SourcePlan;
-    onVariant: (variant: string) => void;
-}) {
-    if (plan.target.kind !== "catalogue" || !plan.variant) {
-        return null;
-    }
-    return (
-        <RadioGroup
-            aria-label="Format"
-            value={plan.variant.id}
-            onValueChange={(value) => onVariant(String(value))}
-            className="gap-3"
-        >
-            {plan.target.entry.variants.map((variant) => {
-                const id = `format-${variant.id}`;
-                return (
-                    <div key={variant.id} className="flex items-start gap-2">
-                        <RadioGroupItem value={variant.id} id={id} className="mt-0.5" />
-                        <Label
-                            htmlFor={id}
-                            className="flex flex-col items-start gap-0.5 leading-snug font-normal"
-                        >
-                            <span>{formatLabel(variant)}</span>
-                            <span className="text-sm text-muted-foreground tabular-nums">
-                                {`${bytes(variant.size_bytes)} · ${FIT_TEXT[variant.fit.level] ?? ""}`}
-                            </span>
-                        </Label>
-                    </div>
-                );
-            })}
-        </RadioGroup>
-    );
-}
-
-function DiskPanel({
-    option,
-    plan,
-    need,
-    free,
-    onVariant,
-}: {
-    option: BaseOption | null;
-    plan: SourcePlan;
-    need: DiskNeed;
-    free: number | null | undefined;
-    onVariant: (variant: string) => void;
-}) {
-    const variant = plan.variant ?? option?.variant ?? null;
-    const known = free !== null && free !== undefined;
-    const after = need && known ? free - need.size : null;
-    const download = need
-        ? `${bytes(need.size)}${need.verb === "import" ? " to import" : ""}`
-        : option
-          ? "None, already on this install"
-          : "Pick a base model";
-    const disk = !known
-        ? "Unknown"
-        : after === null
-          ? `${bytes(free)} free`
-          : after < 0
-            ? `${bytes(free)} free, not enough`
-            : `${bytes(free)} free, ${bytes(after)} after`;
-    return (
-        <Card className="gap-3 px-panel text-sm">
-            <dl className="flex flex-col gap-3">
-                <div className="flex flex-col gap-0.5">
-                    <dt className="text-muted-foreground">Format</dt>
-                    <dd>
-                        {hasFormatChoice(plan) ? (
-                            <FormatChoice plan={plan} onVariant={onVariant} />
-                        ) : variant ? (
-                            formatLabel(variant)
-                        ) : option ? (
-                            "As installed"
-                        ) : (
-                            "Not chosen"
-                        )}
-                    </dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <dt className="text-muted-foreground">Download</dt>
-                    <dd className="tabular-nums">{download}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                    <dt className="text-muted-foreground">Disk</dt>
-                    <dd
-                        className={cn(
-                            "tabular-nums",
-                            after !== null && after < 0 && "text-destructive",
-                            after !== null && after >= 0 && after < LOW_SPACE && "text-warning",
-                        )}
-                    >
-                        {disk}
-                    </dd>
-                </div>
-            </dl>
-        </Card>
-    );
 }
 
 export function AddModelPage() {
@@ -481,7 +359,7 @@ export function AddModelPage() {
             <form
                 onSubmit={submit}
                 onKeyDown={shortcut}
-                className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_17rem]"
+                className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem]"
             >
                 <Card className="gap-field p-panel">
                     <TaskSelect value={task} onChange={setTask} />
@@ -549,7 +427,7 @@ export function AddModelPage() {
                     </Field>
                 </Card>
                 <aside className="lg:sticky lg:top-6">
-                    <DiskPanel
+                    <AddModelSummary
                         option={option}
                         plan={plan}
                         need={need}
