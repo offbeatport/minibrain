@@ -35,7 +35,7 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - TypeScript API client generated from FastAPI's OpenAPI schema.
 - obp-ui theme: the kit's Cobalt preset, applied from obp-ui in `web/src/lib/theme.ts` (`themePresetStyle`, re-applied
   when light/dark changes). Never copy or override its tokens in `web/src/styles.css` (2026-11-02). Cobalt's type
-  pairing (Inter, Space Grotesk, JetBrains Mono) needs `obp-ui/fonts-alt.css`.
+  pairing (Mona Sans, JetBrains Mono, since 2026-11-04) needs `obp-ui/fonts-alt.css`.
 - Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
   user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.
 - `PanelSection` (`web/src/components/Section.tsx`) puts an icon before each section title, with the title and
