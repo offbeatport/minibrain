@@ -1,5 +1,6 @@
 import logging
 import threading
+from datetime import date
 
 import httpx
 from fastapi import APIRouter, Depends, Request
@@ -124,6 +125,8 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         recommended=entry.recommended,
         recommendation=entry.recommendation,
         popularity=entry.popularity,
+        context_tokens=entry.context_tokens,
+        released=date.fromisoformat(entry.released) if entry.released else None,
         family=entry.family,
         generation=entry.generation,
         architecture=entry.architecture,

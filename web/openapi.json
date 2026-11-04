@@ -11096,6 +11096,29 @@
             "type": "integer",
             "title": "Popularity"
           },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "released": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released"
+          },
           "family": {
             "type": "string",
             "title": "Family"
@@ -11167,6 +11190,8 @@
           "recommended",
           "recommendation",
           "popularity",
+          "context_tokens",
+          "released",
           "family",
           "generation",
           "architecture",

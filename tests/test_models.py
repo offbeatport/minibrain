@@ -135,6 +135,7 @@ def test_bundled_catalogue_is_seeded_once_and_real(harness: Harness) -> None:
     llama = next(entry for entry in entries if entry["id"] == "llama-3.1-8b-instruct")
     assert llama["gated"] is True and llama["variants"][0]["size_bytes"] < 20_000_000_000
     assert (entries[0]["license_use"], llama["license_use"]) == ("commercial", "restricted")
+    assert (entries[0]["context_tokens"], entries[0]["released"]) == (40960, "2025-04-27")
     with harness.sessions() as session:
         assert seed(session) is False
     assert bundled()["snapshot"]
@@ -451,11 +452,14 @@ def test_add_from_hugging_face_by_link_or_id(harness: Harness, hub: Path, monkey
     with pytest.raises(HubAddError):
         parse_repo("not a repo")
     api = hub / "api" / "models" / REPO
-    api.write_text(json.dumps(json.loads(api.read_text()) | {"config": {"model_type": "qwen3"}}))
+    config = {"model_type": "qwen3", "text_config": {"max_position_embeddings": 32768}}
+    found = json.loads(api.read_text()) | {"config": config, "createdAt": "2025-04-27T08:00:00.000Z"}
+    api.write_text(json.dumps(found))
     response = harness.client.post("/api/catalog/hub", json={"repo": f"{os.environ['MINIBRAIN_HF_ENDPOINT']}/{REPO}"})
     assert response.status_code == 201
     entry = response.json()
     assert (entry["origin"], entry["architecture"]) == ("hub", "qwen3")
+    assert (entry["context_tokens"], entry["released"]) == (32768, "2025-04-27")
     assert entry["variants"][0]["revision"] == "b" * 40
     again = harness.client.post("/api/catalog/hub", json={"repo": REPO}).json()
     assert again["id"] == entry["id"]

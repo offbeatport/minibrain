@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
@@ -919,6 +919,8 @@ class CatalogEntry(BaseModel):
     recommended: bool
     recommendation: str | None
     popularity: int
+    context_tokens: int | None
+    released: date | None
     family: str
     generation: str
     architecture: str

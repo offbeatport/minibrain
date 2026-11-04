@@ -28,6 +28,8 @@ def test_bundled_catalogue_follows_the_rules() -> None:
         assert entry["tier"] in {"S", "M", "L", "XL"}
         assert entry["superseded_by"] is None or entry["superseded_by"] in ids
         assert "support" not in entry
+        assert entry["context_tokens"] >= 4096
+        assert re.fullmatch(r"20\d\d-\d\d-\d\d", entry["released"])
         for variant in entry["variants"]:
             assert re.fullmatch(r"[0-9a-f]{40}", variant["revision"])
             assert variant["files"] and all(item["size"] > 0 for item in variant["files"])

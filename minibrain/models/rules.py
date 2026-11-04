@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 PUBLISHERS = {
     "Qwen": "Qwen",
@@ -138,6 +138,19 @@ KEEP_FILES = {
 def needed(path: str) -> bool:
     duplicate = path.startswith("consolidated")
     return "/" not in path and not duplicate and (path in KEEP_FILES or path.endswith(".safetensors"))
+
+
+def context_of(config: dict[str, Any]) -> int | None:
+    for section in (config, config.get("text_config") or {}):
+        value = section.get("max_position_embeddings")
+        if isinstance(value, int) and value > 0:
+            return value
+    return None
+
+
+def released_of(info: dict[str, Any]) -> str | None:
+    created = info.get("createdAt")
+    return created[:10] if isinstance(created, str) and len(created) >= 10 else None
 
 
 def tier(params: float, moe: bool, weights_gb: float) -> str:

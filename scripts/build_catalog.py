@@ -12,7 +12,9 @@ from minibrain.models.rules import (
     LICENCES,
     PUBLISHERS,
     SUPPORTED_ARCHITECTURES,
+    context_of,
     needed,
+    released_of,
     tier,
 )
 
@@ -330,6 +332,8 @@ class Builder:
             ]
         return base | {
             "popularity": int(info.get("downloads") or 0),
+            "context_tokens": context_of(config) or (previous or {}).get("context_tokens"),
+            "released": released_of(info),
             "license": licence,
             "license_name": name,
             "license_summary": summary,

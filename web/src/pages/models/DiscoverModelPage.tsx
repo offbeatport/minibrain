@@ -21,6 +21,7 @@ import {
     discoverHref,
     memoryNeeded,
     parameters,
+    releasedText,
 } from "./Discover";
 import { useModelsRefresh } from "./dialogs";
 
@@ -52,6 +53,13 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
                         ["Repository", external(`${catalog.endpoint}/${entry.repo}`, entry.repo)],
                         ["Parameters", `${parameters(entry)} · size ${entry.tier}`],
                         ["Memory needed", memoryNeeded(entry)],
+                        [
+                            "Context",
+                            entry.context_tokens
+                                ? `${entry.context_tokens.toLocaleString()} tokens`
+                                : "Unknown",
+                        ],
+                        ["Released", releasedText(entry) ?? "Unknown"],
                         ["Architecture", `${entry.architecture} · generation ${entry.generation}`],
                         ["Tasks", entry.capabilities.join(", ")],
                         ["Downloads", `${DOWNLOADS.format(entry.popularity)} on Hugging Face`],

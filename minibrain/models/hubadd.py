@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 
 from minibrain.models import hub
-from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, needed, tier
+from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, context_of, needed, released_of, tier
 
 REPO = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")
 TIMEOUT = httpx.Timeout(20.0)
@@ -101,6 +101,8 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
         "template_kwargs": {},
         "stop_tokens": [],
         "popularity": int(info.get("downloads") or 0),
+        "context_tokens": context_of(config),
+        "released": released_of(info),
         "position": 10_000,
         "family": "",
         "generation": "",

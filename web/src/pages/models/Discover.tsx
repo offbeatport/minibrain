@@ -279,6 +279,10 @@ const SORTS: Record<
 > = {
     recommended: { label: "Recommended", compare: byRecommended },
     popular: { label: "Most popular", compare: (a, b) => b.popularity - a.popularity },
+    newest: {
+        label: "Newest",
+        compare: (a, b) => (b.released ?? "").localeCompare(a.released ?? ""),
+    },
     small: { label: "Smallest first", compare: (a, b) => smallest(a) - smallest(b) },
     large: { label: "Largest first", compare: (a, b) => smallest(b) - smallest(a) },
     name: { label: "Name", compare: (a, b) => a.name.localeCompare(b.name) },
@@ -310,6 +314,18 @@ const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
     maximumFractionDigits: 1,
 });
+
+const RELEASED = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" });
+
+export const CONTEXT_INFO = "The longest prompt plus answer the model takes, in tokens.";
+
+export function contextText(entry: CatalogEntry): string | null {
+    return entry.context_tokens ? `${Math.round(entry.context_tokens / 1024)}K` : null;
+}
+
+export function releasedText(entry: CatalogEntry): string | null {
+    return entry.released ? RELEASED.format(new Date(`${entry.released}T00:00:00`)) : null;
+}
 
 export function parameters(entry: CatalogEntry): string {
     return `${entry.params_b.toFixed(1)}B${entry.moe ? " MoE" : ""}`;
@@ -343,7 +359,7 @@ export function compareHref(ids: string[], pool?: string, onlyDifferences = fals
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-const COLUMNS_KEY = "minibrain.discover.columns.v2";
+const COLUMNS_KEY = "minibrain.discover.columns.v3";
 
 const HIDDEN_COLUMNS = [
     "newer",
@@ -403,6 +419,13 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             cell: ({ row }) => parameters(row.original),
         },
         {
+            id: "context",
+            header: "Context",
+            meta: { info: CONTEXT_INFO },
+            accessorFn: (entry) => entry.context_tokens ?? 0,
+            cell: ({ row }) => contextText(row.original) ?? muted("—"),
+        },
+        {
             id: "memory",
             header: "Memory",
             meta: { info: "Memory the model needs to run, in its smallest format." },
@@ -417,6 +440,12 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
                 row.original.variants.length > 1
                     ? `From ${bytes(smallestVariant(row.original))}`
                     : bytes(row.original.variants[0]?.size_bytes),
+        },
+        {
+            id: "released",
+            header: "Released",
+            accessorFn: (entry) => entry.released ?? "",
+            cell: ({ row }) => releasedText(row.original) ?? muted("—"),
         },
         {
             id: "licence",

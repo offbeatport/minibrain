@@ -34,8 +34,10 @@ import {
     EntryAction,
     addModelHref,
     compareHref,
+    contextText,
     discoverHref,
     parameters,
+    releasedText,
 } from "./Discover";
 import { TIERS, licenceOf, licenceUseLabel } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
@@ -244,6 +246,25 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     label: "Tasks",
                     key: (entry) => [...entry.capabilities].sort().join(", "),
                     render: (entry) => entry.capabilities.join(", "),
+                },
+                {
+                    id: "context",
+                    label: "Context",
+                    key: (entry) => String(entry.context_tokens ?? ""),
+                    amount: (entry) => entry.context_tokens ?? 0,
+                    formatDelta: (amount) => `${Math.round(amount / 1024)}K tokens`,
+                    better: "higher",
+                    render: (entry) => (
+                        <span className="tabular-nums">
+                            {contextText(entry) ? `${contextText(entry)} tokens` : "Unknown"}
+                        </span>
+                    ),
+                },
+                {
+                    id: "released",
+                    label: "Released",
+                    key: (entry) => entry.released ?? "",
+                    render: (entry) => releasedText(entry) ?? "Unknown",
                 },
                 {
                     id: "architecture",

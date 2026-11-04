@@ -483,6 +483,8 @@ class CatalogModel(Base):
     template_kwargs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     stop_tokens: Mapped[list[str]] = mapped_column(JSON, default=list)
     popularity: Mapped[int] = mapped_column(default=0)
+    context_tokens: Mapped[int | None] = mapped_column(default=None)
+    released: Mapped[str | None] = mapped_column(default=None)
     position: Mapped[int] = mapped_column(default=0)
     synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     family: Mapped[str] = mapped_column(default="", server_default="")

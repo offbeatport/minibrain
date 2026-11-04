@@ -3374,6 +3374,10 @@ export interface components {
             recommendation: string | null;
             /** Popularity */
             popularity: number;
+            /** Context Tokens */
+            context_tokens: number | null;
+            /** Released */
+            released: string | null;
             /** Family */
             family: string;
             /** Generation */

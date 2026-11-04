@@ -26,6 +26,8 @@ ENTRY_FIELDS = (
     "template_kwargs",
     "stop_tokens",
     "popularity",
+    "context_tokens",
+    "released",
     "position",
     "family",
     "generation",
