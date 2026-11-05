@@ -132,7 +132,7 @@ announces itself.
 | Reported | Example |
 |---|---|
 | Platform, architecture | `linux`, `x86_64` |
-| Accelerator | `cuda`, `rocm`, `mps`, `cpu`, with the GPU name |
+| Accelerator | `cuda`, `rocm`, `xpu`, `mps`, `cpu`, with the GPU name |
 | GPUs | Each with its memory |
 | Memory for models | Sum of GPU memory; Apple GPU-usable unified memory; RAM on CPU |
 | CPU, RAM | Cores, bytes |
