@@ -1,52 +1,5 @@
-from pathlib import Path
-
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import Engine, inspect, text
-
-from minibrain.registry.db import MIGRATIONS, make_engine
 from tests.conftest import Harness, tickets_csv
 from tests.test_shared_data import snapshot_hash, upload
-
-
-def migration_config(engine: Engine) -> Config:
-    config = Config()
-    config.set_main_option("script_location", str(MIGRATIONS))
-    config.attributes["engine"] = engine
-    return config
-
-
-def columns_of(engine: Engine, table: str) -> set[str]:
-    return {column["name"] for column in inspect(engine).get_columns(table)}
-
-
-def test_catalogue_migration_adds_nullable_fields_and_keeps_rows(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0016")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO artifacts (id, kind, packing, name, size, created_at) "
-                "VALUES ('a1', 'source', 'file', 'tickets.csv', 10, CURRENT_TIMESTAMP)"
-            )
-        )
-        connection.execute(
-            text(
-                "INSERT INTO sources (name, filename, artifact_id, size, created_at) "
-                "VALUES ('tickets.csv', 'tickets.csv', 'a1', 10, CURRENT_TIMESTAMP)"
-            )
-        )
-    command.upgrade(config, "0017")
-    for table in ("sources", "datasets"):
-        assert {"description", "tags"} <= columns_of(engine, table)
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT name, description, tags FROM sources")).all() == [
-            ("tickets.csv", None, None)
-        ]
-    command.downgrade(config, "0016")
-    assert "description" not in columns_of(engine, "sources")
-    assert "tags" not in columns_of(engine, "datasets")
 
 
 def test_description_and_tags_round_trip_on_sources_and_datasets(harness: Harness) -> None:

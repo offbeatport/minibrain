@@ -28,6 +28,9 @@ Repo rules on top of `~/Development/CLAUDE.md`.
   Non-security hashes pass `usedforsecurity=False`. All crypto goes through OpenSSL or the `cryptography` library;
   never hand-rolled.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
+- Schema changes are a new Alembic migration after `0001_baseline.py`; `tests/test_schema.py` checks the migrated schema
+  matches the ORM. Never edit a migration the dev server may have applied (it migrates from the working tree). Only a
+  squash into a fresh baseline rewrites them, and then the dev data (`.minibrain`) is reset once.
 
 ## Portfolio deviations
 

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, false
+from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
@@ -91,6 +91,7 @@ class AttemptOutcome(StrEnum):
 
 ACTIVE_JOB_STATUSES = (JobStatus.QUEUED, JobStatus.RUNNING)
 FINAL_JOB_STATUSES = (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED)
+ACTIVE_JOB = text("status IN ('queued', 'running')")
 
 
 class Artifact(Base):
@@ -120,7 +121,7 @@ class Source(Base):
     name: Mapped[str]
     filename: Mapped[str]
     table_name: Mapped[str] = mapped_column(unique=True)
-    kind: Mapped[str] = mapped_column(default="upload", server_default="upload")
+    kind: Mapped[str] = mapped_column(default="upload")
     path: Mapped[str | None] = mapped_column(default=None)
     format: Mapped[str | None] = mapped_column(default=None)
     artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
@@ -148,7 +149,7 @@ class Connection(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     secret: Mapped[str | None] = mapped_column(default=None)
     secret_ref: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
-    origin: Mapped[str] = mapped_column(default="ui", server_default="ui")
+    origin: Mapped[str] = mapped_column(default="ui")
     problem: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
@@ -203,17 +204,17 @@ class Minibrain(Base):
     preset: Mapped[str]
     base_model: Mapped[str]
     contract: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    breaking_confirmed: Mapped[bool] = mapped_column(default=False, server_default=false())
+    breaking_confirmed: Mapped[bool] = mapped_column(default=False)
     instructions: Mapped[str | None] = mapped_column(default=None)
     graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     promotion: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     current_version: Mapped[int | None] = mapped_column(default=None)
-    deployed: Mapped[bool] = mapped_column(default=False, server_default=false())
-    last_version: Mapped[int] = mapped_column(default=-1, server_default="-1")
-    description: Mapped[str] = mapped_column(default="", server_default="")
-    tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
-    request_bodies: Mapped[bool] = mapped_column(default=False, server_default=false())
+    deployed: Mapped[bool] = mapped_column(default=False)
+    last_version: Mapped[int] = mapped_column(default=-1)
+    description: Mapped[str] = mapped_column(default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    request_bodies: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
@@ -242,15 +243,15 @@ class Snapshot(Base):
     artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
     counts: Mapped[dict[str, int]] = mapped_column(JSON)
     labels: Mapped[list[str]] = mapped_column(JSON)
-    rows: Mapped[int] = mapped_column(default=0, server_default="0")
-    size: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    rows: Mapped[int] = mapped_column(default=0)
+    size: Mapped[int] = mapped_column(BigInteger, default=0)
     fingerprints: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
-    saved: Mapped[bool] = mapped_column(default=False, server_default=false())
+    saved: Mapped[bool] = mapped_column(default=False)
     checks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    feedback_rows: Mapped[int] = mapped_column(default=0, server_default="0")
+    feedback_rows: Mapped[int] = mapped_column(default=0)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
     versions: Mapped[list["Version"]] = relationship(back_populates="snapshot")
@@ -269,8 +270,8 @@ class Version(Base):
     kind: Mapped[str]
     status: Mapped[str]
     contract: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    contract_number: Mapped[int] = mapped_column(default=1, server_default="1")
-    instructions: Mapped[str] = mapped_column(default="", server_default="")
+    contract_number: Mapped[int] = mapped_column(default=1)
+    instructions: Mapped[str] = mapped_column(default="")
     shots: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
@@ -307,8 +308,8 @@ class Job(Base):
             "uq_jobs_active_key",
             "idempotency_key",
             unique=True,
-            sqlite_where="status IN ('queued', 'running')",
-            postgresql_where="status IN ('queued', 'running')",
+            sqlite_where=ACTIVE_JOB,
+            postgresql_where=ACTIVE_JOB,
         ),
         {"sqlite_autoincrement": True},
     )
@@ -475,7 +476,7 @@ class JudgeScore(Base):
     key: Mapped[str] = mapped_column(primary_key=True)
     score: Mapped[float]
     judge: Mapped[str]
-    judge_version: Mapped[str] = mapped_column(default="", server_default="")
+    judge_version: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
 
@@ -502,15 +503,15 @@ class CatalogModel(Base):
     released: Mapped[str | None] = mapped_column(default=None)
     position: Mapped[int] = mapped_column(default=0)
     synced_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    family: Mapped[str] = mapped_column(default="", server_default="")
-    generation: Mapped[str] = mapped_column(default="", server_default="")
-    architecture: Mapped[str] = mapped_column(default="", server_default="")
-    tier: Mapped[str] = mapped_column(default="S", server_default="S")
-    params_b: Mapped[float] = mapped_column(default=0.0, server_default="0")
-    moe: Mapped[bool] = mapped_column(default=False, server_default=false())
+    family: Mapped[str] = mapped_column(default="")
+    generation: Mapped[str] = mapped_column(default="")
+    architecture: Mapped[str] = mapped_column(default="")
+    tier: Mapped[str] = mapped_column(default="S")
+    params_b: Mapped[float] = mapped_column(default=0.0)
+    moe: Mapped[bool] = mapped_column(default=False)
     shape: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     superseded_by: Mapped[str | None] = mapped_column(default=None)
-    origin: Mapped[str] = mapped_column(default="catalogue", server_default="catalogue")
+    origin: Mapped[str] = mapped_column(default="catalogue")
 
     variants: Mapped[list["CatalogVariant"]] = relationship(
         back_populates="model", cascade="all, delete-orphan", order_by="CatalogVariant.position"
@@ -562,11 +563,11 @@ class Model(Base):
     license_ack_by: Mapped[str | None] = mapped_column(default=None)
     license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     deployed: Mapped[bool] = mapped_column(default=False)
-    verified: Mapped[bool] = mapped_column(default=False, server_default=false())
+    verified: Mapped[bool] = mapped_column(default=False)
     path: Mapped[str | None] = mapped_column(default=None)
-    store: Mapped[str] = mapped_column(default="folder", server_default="folder")
+    store: Mapped[str] = mapped_column(default="folder")
     health: Mapped[str | None] = mapped_column(default=None)
-    health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
+    health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
@@ -692,7 +693,7 @@ class EngineReplica(Base):
     engine: Mapped[str]
     url: Mapped[str]
     state: Mapped[str]
-    managed: Mapped[bool] = mapped_column(default=False, server_default=false())
+    managed: Mapped[bool] = mapped_column(default=False)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

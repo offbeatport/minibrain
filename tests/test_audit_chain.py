@@ -8,18 +8,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from alembic import command
 from sqlalchemy import ColumnElement, create_engine, select, text, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain import cli, maintenance
 from minibrain.maintenance import purge_audit_events
 from minibrain.registry.audit_chain import GENESIS, canonical, digest, head_of, seal, seal_all, verify, verify_records
-from minibrain.registry.db import make_engine, make_sessions, migrate
+from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.models import AuditEvent, now
 from tests.conftest import Harness
 from tests.test_audit import add_events
-from tests.test_data_catalogue import migration_config
 from tests.test_leader import POSTGRES, Toggle, needs_postgres
 
 
@@ -90,42 +88,6 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
     )
     listed = harness.client.get("/api/audit").json()["events"][0]
     assert (listed["seq"], listed["prev_hash"], listed["hash"]) == (3, events[1].hash, events[2].hash)
-
-
-def test_existing_events_are_chained_on_the_first_seal(tmp_path: Path) -> None:
-    url = f"sqlite:///{tmp_path / 'old.db'}"
-    engine = make_engine(url, foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0030")
-    with engine.begin() as connection:
-        for target in ("first", "second"):
-            connection.execute(
-                text(
-                    "INSERT INTO audit_events (at, actor, action, target, detail) "
-                    "VALUES (CURRENT_TIMESTAMP, 'admin@example.com', 'key.create', :target, '{}')"
-                ),
-                {"target": target},
-            )
-    command.upgrade(config, "0031")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT seq, hash FROM audit_events")).all() == [(None, None), (None, None)]
-        assert connection.execute(text("SELECT seq, hash, forwarded_seq FROM audit_chain")).all() == [(0, GENESIS, 0)]
-    engine.dispose()
-    with make_sessions(url)() as session:
-        assert seal_all(session) == 2
-        assert session.execute(select(AuditEvent.target, AuditEvent.seq).order_by(AuditEvent.id)).all() == [
-            ("first", 1),
-            ("second", 2),
-        ]
-        assert verify(session).verified
-    command.downgrade(config, "0030")
-    engine = make_engine(url, foreign_keys=False)
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT target FROM audit_events ORDER BY id")).scalars().all() == [
-            "first",
-            "second",
-        ]
-    engine.dispose()
 
 
 FORGED = (

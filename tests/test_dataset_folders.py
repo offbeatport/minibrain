@@ -1,12 +1,6 @@
-from pathlib import Path
 from typing import Any
 
-from alembic import command
-from sqlalchemy import inspect, text
-
-from minibrain.registry.db import make_engine
 from tests.conftest import Harness, tickets_csv
-from tests.test_data_catalogue import columns_of, migration_config
 from tests.test_datasets import upload
 
 
@@ -146,33 +140,3 @@ def test_datasets_move_between_folders_and_the_top_level(harness: Harness) -> No
         ("dataset.move", {"name": "Routing", "from": "/Support", "to": "/Support/Tickets"}),
         ("dataset.move", {"name": "Routing", "from": "/Support/Tickets", "to": "/"}),
     ]
-
-
-def test_migration_adds_dataset_folders_and_removes_them(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0027")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO datasets (slug, name, created_at, updated_at) "
-                "VALUES ('tickets', 'Tickets', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-            )
-        )
-    command.upgrade(config, "0028")
-    assert "folder_id" in columns_of(engine, "datasets")
-    keys = inspect(engine).get_foreign_keys("datasets")
-    assert {"name": "fk_datasets_folder", "ondelete": "SET NULL"} in [
-        {"name": key["name"], "ondelete": key.get("options", {}).get("ondelete")} for key in keys
-    ]
-    with engine.begin() as connection:
-        connection.execute(text("INSERT INTO dataset_folders (name, created_at) VALUES ('Support', CURRENT_TIMESTAMP)"))
-        connection.execute(text("UPDATE datasets SET folder_id = 1"))
-        assert connection.execute(text("SELECT slug, folder_id FROM datasets")).all() == [("tickets", 1)]
-        table = connection.execute(text("SELECT sql FROM sqlite_master WHERE name = 'dataset_folders'")).scalar_one()
-        assert "AUTOINCREMENT" in table
-    command.downgrade(config, "0027")
-    assert "dataset_folders" not in inspect(engine).get_table_names()
-    assert "folder_id" not in columns_of(engine, "datasets")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT slug FROM datasets")).scalars().all() == ["tickets"]

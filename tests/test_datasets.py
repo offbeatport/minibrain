@@ -1,11 +1,4 @@
-from pathlib import Path
-
-from alembic import command
-from sqlalchemy import text
-
-from minibrain.registry.db import make_engine
 from tests.conftest import Harness, tickets_csv
-from tests.test_data_catalogue import migration_config
 
 LABELS_CSV = b"label,team\nbilling,finance\nbug,engineering\naccount,support\nfeature,product\n"
 
@@ -88,41 +81,3 @@ def test_a_single_source_dataset_can_say_from_source(harness: Harness) -> None:
     assert mapped.json()["rows"] == 200
     queried = harness.client.post("/api/datasets/tickets/query", json={"sql": "SELECT count(*) AS n FROM source"})
     assert queried.json()["rows"] == [["200"]]
-
-
-def test_migration_names_tables_and_links_datasets_to_sources(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0017")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO artifacts (id, kind, packing, name, size, created_at) "
-                "VALUES ('a1', 'source', 'file', 'tickets.csv', 10, CURRENT_TIMESTAMP)"
-            )
-        )
-        for name in ("tickets.csv", "Tickets", "2025.csv"):
-            connection.execute(
-                text(
-                    "INSERT INTO sources (name, filename, artifact_id, size, created_at) "
-                    "VALUES (:name, 'tickets.csv', 'a1', 10, CURRENT_TIMESTAMP)"
-                ),
-                {"name": name},
-            )
-        connection.execute(
-            text(
-                "INSERT INTO datasets (slug, name, source_id, created_at, updated_at) "
-                "VALUES ('tickets', 'Tickets', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-            )
-        )
-    command.upgrade(config, "0018")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT table_name FROM sources ORDER BY id")).scalars().all() == [
-            "tickets",
-            "tickets_2",
-            "t_2025",
-        ]
-        assert connection.execute(text("SELECT dataset_id, source_id FROM dataset_sources")).all() == [(1, 2)]
-    command.downgrade(config, "0017")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT source_id FROM datasets")).scalars().all() == [2]

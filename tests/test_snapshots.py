@@ -1,15 +1,12 @@
 from pathlib import Path
 
 import pytest
-from alembic import command
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from minibrain.data import snapshot as splits
-from minibrain.registry.db import make_engine
 from minibrain.registry.files import store_for
 from minibrain.registry.models import Artifact, Snapshot
 from tests.conftest import Harness, tickets_csv
-from tests.test_data_catalogue import migration_config
 from tests.test_flow import SLUG, finish
 
 pytestmark = pytest.mark.both_stores
@@ -228,74 +225,6 @@ def test_feedback_copies_are_removed_with_their_versions(harness: Harness) -> No
     with harness.sessions() as session:
         assert session.get(Artifact, copy.hash) is None
     assert harness.client.get("/api/system/infrastructure").json()["snapshots"]["for_versions"] == 0
-
-
-def test_snapshot_migrations_round_trip(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0019")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO minibrains (slug, name, task, base_model, created_at) "
-                "VALUES ('m', 'M', 'classify', 'qwen3-0.6b', CURRENT_TIMESTAMP)"
-            )
-        )
-        connection.execute(
-            text(
-                "INSERT INTO snapshots (minibrain_id, hash, counts, labels, created_at) "
-                "VALUES (1, 'h', '{}', '[]', CURRENT_TIMESTAMP)"
-            )
-        )
-        connection.execute(
-            text(
-                "INSERT INTO jobs (kind, params, needs_gpu, status, priority, attempt, max_attempts, run_after, "
-                "cancel_requested, progress, outputs, created_at) VALUES ('prepare', '{}', 0, 'queued', 0, 0, 3, "
-                "CURRENT_TIMESTAMP, 0, 0, '{}', CURRENT_TIMESTAMP)"
-            )
-        )
-    command.upgrade(config, "0021")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT saved, rows, dataset_id FROM snapshots")).all() == [(0, 0, None)]
-        assert connection.execute(text("SELECT status FROM jobs")).scalars().all() == ["cancelled"]
-        assert connection.execute(text("SELECT snapshot_id FROM minibrains")).scalars().all() == [None]
-    command.downgrade(config, "0019")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT minibrain_id FROM snapshots")).scalars().all() == [1]
-
-
-def test_old_snapshots_become_numbered_dataset_versions(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0037")
-    rows = [
-        ("a", "2026-01-03 00:00:00", None, 0),
-        ("b", "2026-01-01 00:00:00", "2026-01-05 00:00:00", 0),
-        ("c", "2026-01-02 00:00:00", None, 0),
-        ("d", "2026-01-04 00:00:00", None, 3),
-    ]
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO datasets (slug, name, created_at, updated_at) "
-                "VALUES ('t', 'T', '2026-01-01', '2026-01-01')"
-            )
-        )
-        for digest, created, taken, feedback in rows:
-            connection.execute(
-                text(
-                    "INSERT INTO snapshots (dataset_id, hash, counts, labels, created_at, taken_at, feedback_rows) "
-                    "VALUES (1, :hash, '{}', '[]', :created, :taken, :feedback)"
-                ),
-                {"hash": digest, "created": created, "taken": taken, "feedback": feedback},
-            )
-    command.upgrade(config, "0038")
-    with engine.connect() as connection:
-        found = connection.execute(text("SELECT hash, number, saved FROM snapshots ORDER BY hash")).all()
-    assert found == [("a", 2, 1), ("b", 3, 1), ("c", 1, 1), ("d", None, 0)]
-    command.downgrade(config, "0037")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT count(*) FROM snapshots WHERE dataset_id = 1")).scalar() == 4
 
 
 def test_two_snapshots_diff_by_input_with_label_shift(harness: Harness) -> None:

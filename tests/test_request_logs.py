@@ -1,17 +1,13 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 
-from alembic import command
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect, select, text
+from sqlalchemy import select
 
 from minibrain.gateway.logs import LogEntry, database_sink
-from minibrain.registry.db import make_engine
 from minibrain.registry.models import ApiKey, Minibrain, RequestLog, now
 from tests.conftest import Harness
 from tests.test_access import team_of
-from tests.test_data_catalogue import columns_of, migration_config
 from tests.test_feedback import chat, send
 from tests.test_flow import SLUG, add_key
 from tests.test_gateway import CHAT, servable
@@ -185,29 +181,3 @@ def test_requests_without_kept_bodies_say_so(harness: Harness) -> None:
     request_id = listed(harness.client)["items"][0]["id"]
     detail = listed(harness.client, f"/api/requests/{request_id}")
     assert (detail["body"], detail["input"], detail["output"], detail["feedback"]) == ("off", None, None, [])
-
-
-def test_migration_adds_finish_reason_and_filter_indexes(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0032")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO request_logs (at, model, status, latency_ms, prompt_tokens, completion_tokens) "
-                "VALUES (CURRENT_TIMESTAMP, 'triage', 200, 12.5, 3, 1)"
-            )
-        )
-    command.upgrade(config, "0033")
-    assert "finish_reason" in columns_of(engine, "request_logs")
-    indexes = {index["name"] for index in inspect(engine).get_indexes("request_logs")}
-    assert {"ix_request_logs_at", "ix_request_logs_key", "ix_request_logs_response"} <= indexes
-    with engine.connect() as connection:
-        table = connection.execute(text("SELECT sql FROM sqlite_master WHERE name = 'request_logs'")).scalar_one()
-        assert "AUTOINCREMENT" in table
-        assert connection.execute(text("SELECT model, finish_reason FROM request_logs")).all() == [("triage", None)]
-    command.downgrade(config, "0032")
-    assert "finish_reason" not in columns_of(engine, "request_logs")
-    assert "ix_request_logs_at" not in {index["name"] for index in inspect(engine).get_indexes("request_logs")}
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT model FROM request_logs")).scalars().all() == ["triage"]

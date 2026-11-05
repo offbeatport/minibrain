@@ -9,9 +9,8 @@ from typing import Any, cast
 
 import pytest
 import uvicorn
-from alembic import command
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect, select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain import cli
@@ -28,11 +27,10 @@ from minibrain.auth.first_run import (
     setup_pending,
 )
 from minibrain.auth.passwords import hash_password, verify_password
-from minibrain.registry.db import make_engine, make_sessions, migrate
+from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.models import ApiKey, AuditEvent, LoginSession, Setting, User, now
 from minibrain.settings import Settings
 from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness
-from tests.test_data_catalogue import columns_of, migration_config
 
 PASSWORD = "correct horse battery"
 ADMIN = "ada@example.com"
@@ -571,27 +569,3 @@ def test_harness_signs_in_as_an_admin(harness: Harness) -> None:
     assert (
         harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 201
     )
-
-
-def test_accounts_migration_round_trip(tmp_path: Path) -> None:
-    engine = make_engine(f"sqlite:///{tmp_path / 'old.db'}", foreign_keys=False)
-    config = migration_config(engine)
-    command.upgrade(config, "0031")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "INSERT INTO api_keys (name, prefix, digest, created_at) VALUES ('app', 'mb_1', 'd', CURRENT_TIMESTAMP)"
-            )
-        )
-    command.upgrade(config, "0032")
-    assert {"users", "sessions"} <= set(inspect(engine).get_table_names())
-    assert "created_by" in columns_of(engine, "api_keys")
-    with engine.begin() as connection:
-        table = connection.execute(text("SELECT sql FROM sqlite_master WHERE name = 'users'")).scalar_one()
-        assert "AUTOINCREMENT" in table
-        assert connection.execute(text("SELECT name, created_by FROM api_keys")).all() == [("app", None)]
-    command.downgrade(config, "0031")
-    assert not {"users", "sessions"} & set(inspect(engine).get_table_names())
-    assert "created_by" not in columns_of(engine, "api_keys")
-    with engine.connect() as connection:
-        assert connection.execute(text("SELECT name FROM api_keys")).scalars().all() == ["app"]

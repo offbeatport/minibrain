@@ -499,8 +499,8 @@ the UI says version.
   assistant turn and is scored on the last one. Rows identical to the latest version make no new version (Update then only records
   the sources' new fingerprints); rows identical to an older one make the next version, sharing its file.
 - Versions are numbered per dataset (`snapshots.number`, unique per dataset) and listed newest first: number, saved,
-  rows, labels, checks, the model versions that use it, size and hash. Migration 0038 numbered the snapshots that
-  existed in the order they were taken; snapshots that had merged feedback became feedback copies with no number.
+  rows, labels, checks, the model versions that use it, size and hash. A copy with merged feedback has no number of
+  its own.
 - Saving a query and saving its version are one step: a query that cannot be saved as a version (over the row limit,
   no rows, a hard-stop check) is refused with the reason and nothing changes. Creating a dataset is refused the same
   way.
@@ -854,7 +854,7 @@ once it matches; only deleting a base removes its files.
   and for base models served through `/v1`; an admin can lock it for every model ("Lock for every model" under
   Settings → Security, or `request_bodies` in `minibrain.yaml` or the environment), and then each model's switch shows
   the locked value and cannot be changed. Gateways, standalone ones included, get each model's value in their config
-  snapshot. Migration 0034 turned it on for existing models only where the install kept inputs and answers before.
+  snapshot.
 - A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
@@ -1327,7 +1327,7 @@ Everything in the v1 scope below, after M1.
       time; derived splits, row limit, diff, retention
 - [x] Artifact store on a local folder or an S3-compatible bucket
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
-- [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
+- [x] Artifacts by SHA-256 ID; Alembic migrations from one baseline; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
 - [ ] Training memory: LoRA or QLoRA (bitsandbytes), gradient checkpointing, 8-bit optimisers and a fitted sequence
       length, chosen per run by the planner, with overrides stored on the version (built and measured with LoRA on
@@ -1353,9 +1353,9 @@ Everything in the v1 scope below, after M1.
 - [ ] Gateway: `response_format`, per-model request bodies, retrieval context step (`response_format`, response ids
       on request logs and per-model request inputs and answers done)
 - [x] Monitor → Requests: live `/v1` request log, server-paged, with filters and a summary, finish reasons recorded
-      (migration 0033), and a detail with the kept input and answer (Builder and up) and linked feedback
+      and a detail with the kept input and answer (Builder and up) and linked feedback
 - [x] Request metadata always logged; request inputs and answers kept per model, with an install default and an admin
-      lock (migration 0034)
+      lock
 - [x] Monitor → Overview (first tab): requests per minute, error rate, p50 / p95 latency and tokens by model (top 5
       and Other) in buckets sized to the range, a per-model table, live with Pause; SQL checked on SQLite and Postgres
 - [x] OpenTelemetry export, opt-in: OTLP over HTTP/protobuf to the customer's collector only; a GenAI-convention span
@@ -1470,6 +1470,9 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Deleted Copy to the bucket (moving bases from main's disk when Storage switches to S3) and the repair seed behind
   it; it only served older installs.
 - [x] Deleted the job format version check that turned away older workers; there are no older workers.
+- [x] Squashed the 42 migrations into one baseline, `0001_baseline.py`, that builds exactly the ORM schema
+  (`tests/test_schema.py` compares them clause by clause) and seeds the audit chain head; the tests of single old
+  migrations and the server defaults that only filled rows during them are gone. Reset `.minibrain` once.
 - [x] Deleted every path kept for old installs: the `evicted` base status with Download again and its Re-import
   restore (`evicted_at`, `evicted_by` and the unused `pinned` column), the move of `secrets/master.key` and the
   `aesgcm1` secret format, the startup backfill of snapshot folders (`snapshots.directory`, `versions.adapter_dir`)

@@ -2,14 +2,10 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import text
 
 from minibrain.app import hub_allowed
 from minibrain.maintenance import purge_request_logs
 from minibrain.policy import Policy, PolicyError
-from minibrain.registry.db import MIGRATIONS, make_engine
 from minibrain.registry.models import ApiKey, AuditEvent, RequestLog, now
 from tests.conftest import Harness
 from tests.test_flow import SLUG, bearer, create_on_data, deploy, finish
@@ -98,24 +94,6 @@ def test_any_licence_lets_unreviewed_and_unticked_licences_through() -> None:
     policy = Policy({"model_sources": "any", "licence_mode": "all", "licences": ["mit"]})
     policy.download("org/model", "apache-2.0", "hub")
     policy.download("org/model", "other", "hub")
-
-
-def test_unreviewed_switch_becomes_any_licence(tmp_path: Path) -> None:
-    url = f"sqlite:///{tmp_path / 'old.db'}"
-    engine = make_engine(url, foreign_keys=False)
-    config = Config()
-    config.set_main_option("script_location", str(MIGRATIONS))
-    config.attributes["engine"] = engine
-    command.upgrade(config, "0008")
-    with engine.begin() as connection:
-        connection.execute(
-            text("INSERT INTO app_settings (key, value, updated_at) VALUES (:key, 'true', CURRENT_TIMESTAMP)"),
-            {"key": "policy.allow_unreviewed_licences"},
-        )
-    command.upgrade(config, "head")
-    with engine.connect() as connection:
-        rows = dict(connection.execute(text("SELECT key, value FROM app_settings")).all())
-    assert rows == {"policy.licence_mode": '"all"'}
 
 
 def test_key_expiry_policy(harness: Harness) -> None:

@@ -2,16 +2,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from alembic import command
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from minibrain.gateway.standalone import create_gateway_app
-from minibrain.registry.db import make_engine
 from minibrain.registry.models import AuditEvent, RequestLog
 from tests.conftest import FakeBackend, Harness
 from tests.test_access import status, team_of
-from tests.test_data_catalogue import columns_of, migration_config
 from tests.test_feedback import chat, send
 from tests.test_flow import SLUG, add_key
 from tests.test_gateway import CHAT, config, servable
@@ -176,42 +173,3 @@ def test_the_standalone_gateway_follows_each_model(harness: Harness, tmp_path: P
         assert gateway.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 200
         assert app.state.request_logs.flush() == 2
     assert logged(harness) == [(None, None), ("I was charged twice", "billing")]
-
-
-def test_migration_keeps_what_existing_models_did(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MINIBRAIN_CONFIG", str(tmp_path / "absent.yaml"))
-    outcomes = []
-    for name, settings in (
-        ("on", {"policy.request_bodies": "true"}),
-        ("off", {}),
-        ("logs-off", {"policy.request_bodies": "true", "policy.request_logs": "false"}),
-    ):
-        engine = make_engine(f"sqlite:///{tmp_path / name}.db", foreign_keys=False)
-        alembic = migration_config(engine)
-        command.upgrade(alembic, "0033")
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "INSERT INTO minibrains (slug, name, task, base_model, deployed, last_version, description, tags, "
-                    "created_at) VALUES ('triage', 'Triage', 'classify', 'qwen3-0.6b', 1, -1, '', '[]', "
-                    "CURRENT_TIMESTAMP)"
-                )
-            )
-            for key, value in settings.items():
-                connection.execute(
-                    text("INSERT INTO app_settings (key, value, updated_at) VALUES (:key, :value, CURRENT_TIMESTAMP)"),
-                    {"key": key, "value": value},
-                )
-        command.upgrade(alembic, "0034")
-        with engine.connect() as connection:
-            kept = connection.execute(text("SELECT request_bodies FROM minibrains")).scalar_one()
-            keys = connection.execute(text("SELECT key FROM app_settings ORDER BY key")).scalars().all()
-            outcomes.append((name, bool(kept), keys))
-        command.downgrade(alembic, "0033")
-        assert "request_bodies" not in columns_of(engine, "minibrains")
-        engine.dispose()
-    assert outcomes == [
-        ("on", True, ["policy.request_bodies"]),
-        ("off", False, []),
-        ("logs-off", False, ["policy.request_bodies"]),
-    ]
