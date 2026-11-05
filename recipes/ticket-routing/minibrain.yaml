@@ -1,0 +1,14 @@
+name: Ticket routing
+preset: classify
+summary: Route support tickets to the right queue from their subject and body.
+base: qwen3-0.6b
+data: tickets.csv
+mapping:
+  user: "Subject: {subject}\n\n{body}"
+  assistant: "{queue}"
+graders:
+  - name: label_accuracy
+promotion:
+  thresholds:
+    - label_accuracy >= 0.85
+  beats_live: true

@@ -1,0 +1,29 @@
+key: custom
+label: Custom
+noun: Custom
+hint: Your contract and graders
+contract: choose
+mapping:
+  messages: messages
+prompt:
+  text: Answer the user's message.
+  json: |-
+    Answer with JSON only. It must match this JSON Schema:
+    {schema}
+  labels: |-
+    Answer with exactly one label from this list:
+    {labels}
+answer_tokens: 256
+graders:
+  text:
+    - name: exact_match
+    - name: text_similarity
+  json:
+    - name: json_valid
+    - name: json_field_match
+  labels:
+    - name: label_accuracy
+checks: []
+promotion:
+  thresholds: []
+  beats_live: true

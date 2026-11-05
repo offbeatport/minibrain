@@ -57,6 +57,7 @@ packages = ["minibrain"]
 "samples/travel_intents.jsonl" = "minibrain/samples/travel_intents.jsonl"
 "samples/banking77.csv" = "minibrain/samples/banking77.csv"
 "samples/clinc150.parquet" = "minibrain/samples/clinc150.parquet"
+"recipes" = "minibrain/bundled/recipes"
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 path = "hatch_build.py"

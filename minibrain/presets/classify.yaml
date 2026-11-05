@@ -1,0 +1,22 @@
+key: classify
+label: Classify
+noun: Classifier
+hint: Text → one label
+contract: labels
+mapping:
+  user: "{input}"
+  assistant: "{label}"
+prompt: |-
+  Classify the input into exactly one label from this list:
+  {labels}
+
+  Answer with the label only.
+trained_prompt: Classify the input. Answer with the label only.
+answer_tokens: 24
+graders:
+  - name: label_accuracy
+checks: [min_labels, label_balance]
+promotion:
+  thresholds: []
+  beats_live: true
+view: classify
