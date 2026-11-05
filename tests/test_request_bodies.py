@@ -17,7 +17,7 @@ from tests.test_keys import chat as chat_with
 from tests.test_keys import headers as key_headers
 from tests.test_policies import policies, set_policy
 
-PATH = f"/api/minibrains/{SLUG}/request-bodies"
+PATH = f"/api/models/{SLUG}/request-bodies"
 
 
 def keep(harness: Harness, kept: bool) -> Any:
@@ -25,7 +25,7 @@ def keep(harness: Harness, kept: bool) -> Any:
 
 
 def bodies_of(harness: Harness, slug: str = SLUG) -> dict[str, Any]:
-    return harness.client.get(f"/api/minibrains/{slug}").json()["request_bodies"]
+    return harness.client.get(f"/api/models/{slug}").json()["request_bodies"]
 
 
 def logged(harness: Harness) -> list[tuple[str | None, str | None]]:
@@ -69,7 +69,7 @@ def test_inputs_and_answers_are_kept_per_model_and_audited(harness: Harness) -> 
     assert status(people.viewer, "PUT", PATH, {"kept": True}) == 403
     assert status(people.builder, "PUT", PATH, {"kept": True}) == 200
     assert set_policy(harness, "request_bodies", True) == 200
-    harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"})
     assert bodies_of(harness, "other")["kept"] is True
     assert set_policy(harness, "request_bodies", False) == 200
     assert bodies_of(harness)["kept"] is True and bodies_of(harness, "other")["kept"] is True

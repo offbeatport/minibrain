@@ -2,13 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListChecks } from "lucide-react";
 import { Button, ConfirmDialog, Field, Input, Textarea, useToast } from "obp-ui";
 import { useState } from "react";
-import {
-    type ContractInfo,
-    type MinibrainDetail,
-    type PromotionInfo,
-    api,
-    unwrap,
-} from "~/api/client";
+import { type ContractInfo, type ModelDetail, type PromotionInfo, api, unwrap } from "~/api/client";
 import { usePresets } from "~/api/queries";
 import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
@@ -32,7 +26,7 @@ function draftContract(contract: ContractInfo, text: string): ContractInfo | nul
     return schemaProblem(text) ? null : { kind: "json", json_schema: JSON.parse(text) };
 }
 
-function ContractEditor({ detail }: { detail: MinibrainDetail }) {
+function ContractEditor({ detail }: { detail: ModelDetail }) {
     const client = useQueryClient();
     const toast = useToast();
     const slug = detail.slug;
@@ -47,7 +41,7 @@ function ContractEditor({ detail }: { detail: MinibrainDetail }) {
     const save = useMutation({
         mutationFn: (breaking: boolean) =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/contract", {
+                api.PUT("/api/models/{slug}/contract", {
                     params: { path: { slug } },
                     body: { contract: next ?? detail.contract, breaking },
                 }),
@@ -71,7 +65,7 @@ function ContractEditor({ detail }: { detail: MinibrainDetail }) {
     const check = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/contract/check", {
+                api.POST("/api/models/{slug}/contract/check", {
                     params: { path: { slug } },
                     body: next ?? detail.contract,
                 }),
@@ -142,14 +136,14 @@ function ContractEditor({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-function RuleEditor({ detail, metrics }: { detail: MinibrainDetail; metrics: string[] }) {
+function RuleEditor({ detail, metrics }: { detail: ModelDetail; metrics: string[] }) {
     const client = useQueryClient();
     const toast = useToast();
     const [rule, setRule] = useState<PromotionInfo>(detail.promotion);
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/promotion", {
+                api.PUT("/api/models/{slug}/promotion", {
                     params: { path: { slug: detail.slug } },
                     body: rule,
                 }),
@@ -183,7 +177,7 @@ function RuleEditor({ detail, metrics }: { detail: MinibrainDetail; metrics: str
     );
 }
 
-export function TaskSection({ detail }: { detail: MinibrainDetail }) {
+export function TaskSection({ detail }: { detail: ModelDetail }) {
     const presets = usePresets();
     const can = useCan();
     const preset = presets.data?.presets.find((item) => item.key === detail.preset);

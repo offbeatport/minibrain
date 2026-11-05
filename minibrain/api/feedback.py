@@ -12,8 +12,8 @@ from minibrain.api.deps import SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
 from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, Submission, suggestion
-from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Minibrain
-from minibrain.registry.service import NotFoundError, get_minibrain, latest_snapshot
+from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Model
+from minibrain.registry.service import NotFoundError, get_model, latest_snapshot
 from minibrain.tasks.service import contract_of
 
 router = APIRouter(prefix="/api", tags=["feedback"])
@@ -26,7 +26,7 @@ ME = "me"
 NOBODY = "none"
 
 Signal = Literal["conflict", "unsure", "none"]
-Facet = Literal["status", "minibrain"]
+Facet = Literal["status", "model"]
 
 
 class FeedbackInfo(BaseModel):
@@ -60,7 +60,7 @@ class FeedbackPage(BaseModel):
 class FeedbackFacets(BaseModel):
     total: int
     statuses: dict[str, int]
-    minibrains: dict[str, int]
+    models: dict[str, int]
 
 
 class LoggedRequest(BaseModel):
@@ -114,8 +114,8 @@ def signal_of(item: Feedback) -> Signal:
 def feedback_info(item: Feedback) -> FeedbackInfo:
     return FeedbackInfo(
         id=item.id,
-        model=item.minibrain.slug,
-        model_name=item.minibrain.name,
+        model=item.model.slug,
+        model_name=item.model.name,
         version=item.version,
         origin=item.origin,
         rating="up" if item.rating == store.UP else "down",
@@ -137,15 +137,15 @@ def feedback_info(item: Feedback) -> FeedbackInfo:
 
 @dataclass(frozen=True)
 class FeedbackFilter:
-    minibrains: list[str]
+    models: list[str]
     statuses: list[str]
     assignees: list[str]
     q: str
 
     def conditions(self, skip: Facet | None = None) -> list[ColumnElement[bool]]:
         where: list[ColumnElement[bool]] = []
-        if self.minibrains and skip != "minibrain":
-            where.append(Feedback.minibrain_id.in_(select(Minibrain.id).where(Minibrain.slug.in_(self.minibrains))))
+        if self.models and skip != "model":
+            where.append(Feedback.model_id.in_(select(Model.id).where(Model.slug.in_(self.models))))
         if self.statuses and skip != "status":
             where.append(Feedback.status.in_(self.statuses))
         people = [current_actor() if name == ME else name for name in self.assignees if name != NOBODY]
@@ -166,7 +166,7 @@ def feedback_filter(
     assignee: Annotated[list[str] | None, Query()] = None,
     q: Annotated[str, Query(max_length=200)] = "",
 ) -> FeedbackFilter:
-    return FeedbackFilter(minibrains=model or [], statuses=status or [], assignees=assignee or [], q=q.strip())
+    return FeedbackFilter(models=model or [], statuses=status or [], assignees=assignee or [], q=q.strip())
 
 
 FilterDep = Annotated[FeedbackFilter, Depends(feedback_filter)]
@@ -193,7 +193,7 @@ def list_feedback(
 ) -> FeedbackPage:
     where = filters.conditions()
     size = max(1, min(limit, PAGE_MAX))
-    query = select(Feedback).options(joinedload(Feedback.minibrain)).where(*where)
+    query = select(Feedback).options(joinedload(Feedback.model)).where(*where)
     if cursor is not None:
         query = query.where(after_cursor(cursor))
     found = list(session.scalars(query.order_by(Feedback.priority.desc(), Feedback.id.desc()).limit(size + 1)))
@@ -209,17 +209,17 @@ def list_feedback(
 @router.get("/feedback/facets", dependencies=[Depends(builder)])
 def feedback_facets(session: SessionDep, filters: FilterDep) -> FeedbackFacets:
     by_status = select(Feedback.status, func.count()).where(*filters.conditions("status")).group_by(Feedback.status)
-    by_minibrain = (
-        select(Minibrain.slug, func.count())
+    by_model = (
+        select(Model.slug, func.count())
         .select_from(Feedback)
-        .join(Minibrain, Feedback.minibrain_id == Minibrain.id)
-        .where(*filters.conditions("minibrain"))
-        .group_by(Minibrain.slug)
+        .join(Model, Feedback.model_id == Model.id)
+        .where(*filters.conditions("model"))
+        .group_by(Model.slug)
     )
     return FeedbackFacets(
         total=count(session, filters.conditions()),
         statuses={str(status): int(total) for status, total in session.execute(by_status).all()},
-        minibrains={str(slug): int(total) for slug, total in session.execute(by_minibrain).all()},
+        models={str(slug): int(total) for slug, total in session.execute(by_model).all()},
     )
 
 
@@ -230,21 +230,19 @@ def get_feedback(session: Session, feedback_id: int) -> Feedback:
     return item
 
 
-def labels_for(session: Session, minibrain: Minibrain) -> list[str]:
-    contract = contract_of(minibrain).labels
+def labels_for(session: Session, model: Model) -> list[str]:
+    contract = contract_of(model).labels
     if contract is None:
         return []
-    snapshot = latest_snapshot(minibrain)
+    snapshot = latest_snapshot(model)
     known = set(contract) | set(snapshot.labels if snapshot is not None else [])
-    accepted = select(Feedback.label).where(
-        Feedback.minibrain_id == minibrain.id, Feedback.status == FeedbackStatus.ACCEPTED
-    )
+    accepted = select(Feedback.label).where(Feedback.model_id == model.id, Feedback.status == FeedbackStatus.ACCEPTED)
     known |= {label for label in session.scalars(accepted.distinct()) if label}
     return sorted(known)
 
 
 def logged_info(session: Session, item: Feedback) -> LoggedRequest | None:
-    log = store.logged_request(session, item.minibrain_id, item.response_id)
+    log = store.logged_request(session, item.model_id, item.response_id)
     if log is None:
         return None
     key = session.get(ApiKey, log.key_id) if log.key_id is not None else None
@@ -254,7 +252,7 @@ def logged_info(session: Session, item: Feedback) -> LoggedRequest | None:
 def feedback_detail(session: Session, item: Feedback) -> FeedbackDetail:
     extra = {
         "related": [feedback_info(other) for other in store.related(session, item)],
-        "labels": labels_for(session, item.minibrain),
+        "labels": labels_for(session, item.model),
         "request": logged_info(session, item),
     }
     return FeedbackDetail.model_validate(feedback_info(item).model_dump() | extra)
@@ -281,11 +279,11 @@ def assign_feedback(feedback_id: int, body: AssignRequest, session: SessionDep) 
     return feedback_detail(session, item)
 
 
-@router.post("/minibrains/{slug}/feedback", status_code=201, dependencies=[Depends(viewer)])
+@router.post("/models/{slug}/feedback", status_code=201, dependencies=[Depends(viewer)])
 def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep) -> FeedbackInfo:
-    minibrain = get_minibrain(session, slug)
+    model = get_model(session, slug)
     submission = Submission(
-        minibrain_id=minibrain.id,
+        model_id=model.id,
         origin=ORIGIN_PLAYGROUND,
         rating=body.rating,
         response_id=body.response_id,
@@ -300,9 +298,9 @@ def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep
     return feedback_info(item)
 
 
-@router.get("/minibrains/{slug}/feedback/summary", dependencies=[Depends(viewer)])
+@router.get("/models/{slug}/feedback/summary", dependencies=[Depends(viewer)])
 def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
-    found = store.summary(session, get_minibrain(session, slug))
+    found = store.summary(session, get_model(session, slug))
     return FeedbackSummary(
         version=found.version,
         since=found.since,

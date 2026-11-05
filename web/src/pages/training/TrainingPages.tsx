@@ -24,9 +24,9 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { useMemo, useState } from "react";
-import type { JobInfo, MinibrainSummary } from "~/api/client";
+import type { JobInfo, ModelSummary } from "~/api/client";
 import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
-import { isActiveJob, useJob, useMinibrains } from "~/api/queries";
+import { isActiveJob, useJob, useModels } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
@@ -100,13 +100,13 @@ function jobColumns(href: (job: JobInfo) => string): ColumnDef<JobInfo, unknown>
             id: "model",
             header: "Model",
             enableHiding: false,
-            accessorFn: (job) => (job.minibrain_name ?? "").toLowerCase(),
+            accessorFn: (job) => (job.model_name ?? "").toLowerCase(),
             cell: ({ row }) => (
                 <Link
                     href={href(row.original)}
                     className="block truncate font-semibold text-foreground"
                 >
-                    {row.original.minibrain_name ?? "Deleted model"}
+                    {row.original.model_name ?? "Deleted model"}
                 </Link>
             ),
         },
@@ -192,21 +192,21 @@ function JobDialog({ id, onClose }: { id: number | null; onClose: () => void }) 
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>
-                        {data ? `${data.minibrain_name ?? "Job"} · ${jobName(data)}` : `Job #${id}`}
+                        {data ? `${data.model_name ?? "Job"} · ${jobName(data)}` : `Job #${id}`}
                     </DialogTitle>
                     <DialogDescription>{data ? jobCaption(data) : "Loading…"}</DialogDescription>
                 </DialogHeader>
                 <ErrorLine error={job.error} />
                 {data && (
                     <div className="min-w-0">
-                        <JobPanel job={data} slug={data.minibrain ?? ""} />
+                        <JobPanel job={data} slug={data.model ?? ""} />
                     </div>
                 )}
-                {data?.minibrain && (
+                {data?.model && (
                     <DialogFooter>
                         <Button variant="outline" asChild>
-                            <Link href={trainingHref(data.minibrain)}>
-                                {`Open ${data.minibrain_name ?? data.minibrain}`}
+                            <Link href={trainingHref(data.model)}>
+                                {`Open ${data.model_name ?? data.model}`}
                             </Link>
                         </Button>
                     </DialogFooter>
@@ -216,7 +216,7 @@ function JobDialog({ id, onClose }: { id: number | null; onClose: () => void }) 
     );
 }
 
-function ModelChoice({ item }: { item: MinibrainSummary }) {
+function ModelChoice({ item }: { item: ModelSummary }) {
     return (
         <>
             <span className="flex min-w-0 flex-1 flex-col">
@@ -237,8 +237,8 @@ function TrainPicker({
     onOpenChange,
 }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const router = useRouter();
-    const minibrains = useMinibrains();
-    const items = minibrains.data ?? [];
+    const models = useModels();
+    const items = models.data ?? [];
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
@@ -248,7 +248,7 @@ function TrainPicker({
                         Pick a custom model to add training data, score a prompt or train a version.
                     </DialogDescription>
                 </DialogHeader>
-                {minibrains.data && items.length === 0 ? (
+                {models.data && items.length === 0 ? (
                     <p className="text-base text-muted-foreground">
                         No custom models yet.{" "}
                         <Link href="/models/new" className="text-primary hover:underline">
@@ -283,14 +283,14 @@ function jobId(value: string | undefined): number | null {
 export function TrainingListPage() {
     const { search, update } = useListSearch(PATH, KEYS);
     const can = useCan();
-    const minibrains = useMinibrains();
+    const owned = useModels();
     const [picking, setPicking] = useState(false);
     const [order, setOrder] = useState<JobOrder>("newest");
     const models = splitList(search.model);
     const statuses = splitList(search.status);
     const filter = {
         kind: TRAINING_KINDS,
-        minibrain: models,
+        model: models,
         status: statuses,
         q: search.q,
         since: search.since,
@@ -303,10 +303,10 @@ export function TrainingListPage() {
         () => jobColumns((job) => listHref(PATH, { ...search, job: String(job.id) })),
         [search],
     );
-    const modelOptions = (minibrains.data ?? []).map((item) => ({
+    const modelOptions = (owned.data ?? []).map((item) => ({
         value: item.slug,
         label: item.name,
-        count: facets.data?.minibrains[item.slug] ?? 0,
+        count: facets.data?.models[item.slug] ?? 0,
     }));
     const statusOptions = JOB_STATUSES.map((status) => ({
         value: status,
@@ -388,7 +388,7 @@ export function TrainingListPage() {
                 total={jobs.total}
                 onOpen={(job) => update({ job: String(job.id) })}
                 rowLabel={(job) =>
-                    `${job.minibrain_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
+                    `${job.model_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
                 }
                 empty={
                     filtering ? (
@@ -414,8 +414,8 @@ export function TrainingListPage() {
 
 export function ModelTrainingPage() {
     const { slug = "" } = useParams({ strict: false }) as { slug?: string };
-    const minibrains = useMinibrains();
-    const model = minibrains.data?.find((item) => item.slug === slug);
+    const models = useModels();
+    const model = models.data?.find((item) => item.slug === slug);
     return (
         <Page>
             <Link
@@ -425,8 +425,8 @@ export function ModelTrainingPage() {
                 <ChevronLeft className="size-4" />
                 Training
             </Link>
-            <ErrorLine error={minibrains.error} />
-            {minibrains.data && !model && (
+            <ErrorLine error={models.error} />
+            {models.data && !model && (
                 <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
             )}
             {model && (

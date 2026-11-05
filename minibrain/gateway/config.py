@@ -24,9 +24,9 @@ from minibrain.registry.compute import GatewayReport, live_engines, record_gatew
 from minibrain.registry.files import ref
 from minibrain.registry.models import (
     ApiKey,
-    Minibrain,
+    BaseModel,
+    BaseModelStatus,
     Model,
-    ModelStatus,
     Teardown,
     TeardownKind,
     VersionKind,
@@ -43,8 +43,8 @@ log = logging.getLogger("minibrain.gateway")
 class Route:
     name: str
     owner: str
-    minibrain_id: int | None
-    model_id: str | None
+    model_id: int | None
+    base_model_id: str | None
     slug: str
     version: int | None
     kind: str
@@ -70,12 +70,11 @@ class Grant:
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> "Grant":
-        owners = data.get("owners") or [owner_of(data.get("minibrain_id"), data.get("model_id"))]
-        return Grant(key_id=data["key_id"], owners=tuple(owners), expires_at=data.get("expires_at"))
+        return Grant(key_id=data["key_id"], owners=tuple(data["owners"]), expires_at=data.get("expires_at"))
 
 
-def owner_of(minibrain_id: int | None, model_id: str | None) -> str:
-    return f"minibrain:{minibrain_id}" if minibrain_id is not None else f"model:{model_id}"
+def owner_of(model_id: int | None, base_model_id: str | None) -> str:
+    return f"model:{model_id}" if model_id is not None else f"base:{base_model_id}"
 
 
 @dataclass(frozen=True)
@@ -115,96 +114,96 @@ def replicas_of(found: Any) -> list[dict[str, str]]:
 EMPTY = GatewayConfig(version="empty")
 
 
-def routes_for(session: Session, minibrain: Minibrain, bodies: bool) -> list[Route]:
-    ready = sorted((v for v in minibrain.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
+def routes_for(session: Session, model: Model, bodies: bool) -> list[Route]:
+    ready = sorted((v for v in model.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
     for version in ready:
         adapter = None
         if version.kind == VersionKind.LORA and version.adapter_artifact_id is not None:
             adapter = {
-                "name": adapter_name(minibrain.slug, version.number),
+                "name": adapter_name(model.slug, version.number),
                 "artifact": ref(session, version.adapter_artifact_id),
                 "base_hash": version.base_hash,
             }
         route = Route(
-            name=f"{minibrain.slug}@{version.number}",
-            owner=owner_of(minibrain.id, None),
-            minibrain_id=minibrain.id,
-            model_id=None,
-            slug=minibrain.slug,
+            name=f"{model.slug}@{version.number}",
+            owner=owner_of(model.id, None),
+            model_id=model.id,
+            base_model_id=None,
+            slug=model.slug,
             version=version.number,
             kind=version.kind,
-            base_model=minibrain.base_model,
+            base_model=model.base_model,
             adapter=adapter,
             prompting=prompting_of(version).as_dict(),
             contract=version.contract_number,
-            preset=minibrain.preset,
+            preset=model.preset,
             request_bodies=bodies,
         )
         routes.append(route)
-        if minibrain.deployed and version.number == minibrain.current_version:
-            routes.append(replace(route, name=minibrain.slug))
-    if minibrain.deployed and not any(route.name == minibrain.slug for route in routes):
+        if model.deployed and version.number == model.current_version:
+            routes.append(replace(route, name=model.slug))
+    if model.deployed and not any(route.name == model.slug for route in routes):
         routes.append(
             replace(
-                base_route_for(minibrain.base_model),
-                name=minibrain.slug,
-                owner=owner_of(minibrain.id, None),
-                minibrain_id=minibrain.id,
-                model_id=None,
-                slug=minibrain.slug,
+                base_route_for(model.base_model),
+                name=model.slug,
+                owner=owner_of(model.id, None),
+                model_id=model.id,
+                base_model_id=None,
+                slug=model.slug,
                 request_bodies=bodies,
             )
         )
     return routes
 
 
-def base_route_for(model_id: str) -> Route:
+def base_route_for(base_model_id: str) -> Route:
     return Route(
-        name=model_id,
-        owner=owner_of(None, model_id),
-        minibrain_id=None,
-        model_id=model_id,
-        slug=model_id,
+        name=base_model_id,
+        owner=owner_of(None, base_model_id),
+        model_id=None,
+        base_model_id=base_model_id,
+        slug=base_model_id,
         version=None,
         kind="base",
-        base_model=model_id,
+        base_model=base_model_id,
         adapter=None,
     )
 
 
-def base_route(model: Model) -> Route:
-    return base_route_for(model.id)
+def base_route(base: BaseModel) -> Route:
+    return base_route_for(base.id)
 
 
 def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:
     policy = load_policy(session)
     teardowns = list(session.scalars(select(Teardown)))
-    deleting = {item.minibrain_id for item in teardowns if item.kind == TeardownKind.DELETE}
-    dropped = {item.model_id for item in teardowns if item.kind == TeardownKind.DELETE}
+    deleting = {item.model_id for item in teardowns if item.kind == TeardownKind.DELETE}
+    dropped = {item.base_model_id for item in teardowns if item.kind == TeardownKind.DELETE}
     routes: dict[str, Route] = {}
-    for minibrain in session.scalars(select(Minibrain).order_by(Minibrain.id)):
-        if minibrain.id in deleting:
+    for model in session.scalars(select(Model).order_by(Model.id)):
+        if model.id in deleting:
             continue
-        bodies = policy.keeps_bodies(minibrain.request_bodies)
-        routes |= {route.name: route for route in routes_for(session, minibrain, bodies)}
-    deployed = select(Model).where(Model.deployed.is_(True), Model.status == ModelStatus.AVAILABLE)
+        bodies = policy.keeps_bodies(model.request_bodies)
+        routes |= {route.name: route for route in routes_for(session, model, bodies)}
+    deployed = select(BaseModel).where(BaseModel.deployed.is_(True), BaseModel.status == BaseModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
     routes |= {
-        model.id: replace(base_route(model), request_bodies=default)
-        for model in session.scalars(deployed)
-        if model.id not in dropped
+        base.id: replace(base_route(base), request_bodies=default)
+        for base in session.scalars(deployed)
+        if base.id not in dropped
     }
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
-        model = session.get(Model, key)
+        base = session.get(BaseModel, key)
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()
         except NotFoundError:
             routes = {name: route for name, route in routes.items() if route.base_model != key}
             continue
-        problem = problem_of(model, missing_files(settings, model)) if model is not None else None
+        problem = problem_of(base, missing_files(settings, base)) if base is not None else None
         if problem is not None:
             problems[key] = problem
     models: dict[str, list[str]] = {}
@@ -214,7 +213,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     keys = {
         key.digest: Grant(
             key_id=key.id,
-            owners=tuple(owner_of(scope.minibrain_id, scope.model_id) for scope in key.scopes),
+            owners=tuple(owner_of(scope.model_id, scope.base_model_id) for scope in key.scopes),
             expires_at=key.expires_at.isoformat() if key.expires_at else None,
         )
         for key in session.scalars(select(ApiKey))

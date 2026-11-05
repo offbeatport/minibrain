@@ -3,8 +3,8 @@ import threading
 from datetime import date
 
 import httpx
+import pydantic
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -40,7 +40,7 @@ from minibrain.models.rules import licence_use
 from minibrain.models.train_facts import trainer_machines
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import Pool, find_pool, pools
-from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
+from minibrain.registry.models import BaseModel, CatalogModel, CatalogVariant, Job, JobKind, JobStatus, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
 from minibrain.settings import Settings
@@ -93,7 +93,7 @@ def ensure_reachable(session: Session, entry: CatalogModel, variant: CatalogVari
 
 def added_for(session: Session, settings: Settings, entry: CatalogModel) -> list[AddedInfo]:
     added: list[AddedInfo] = []
-    for model in session.scalars(select(Model).where(Model.catalog_id == entry.id)):
+    for model in session.scalars(select(BaseModel).where(BaseModel.catalog_id == entry.id)):
         availability = base_availability(model, model_job(session, model.id), settings)
         added.append(AddedInfo(key=model.id, variant_id=model.variant_id, availability=availability, error=model.error))
     return added
@@ -198,7 +198,7 @@ def catalogue(
 def download(
     catalog_id: str, body: DownloadRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> ModelRow:
-    from minibrain.api.models import row_of
+    from minibrain.api.base_models import row_of
 
     entry = session.get(CatalogModel, catalog_id)
     variant = session.get(CatalogVariant, body.variant)
@@ -212,7 +212,7 @@ def download(
     return row_of(session, settings, request, model)
 
 
-class HubAddRequest(BaseModel):
+class HubAddRequest(pydantic.BaseModel):
     repo: str
 
 
@@ -251,7 +251,7 @@ def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
         raise NotFoundError(f"{catalog_id} is not in the catalogue")
     if entry.origin != "hub":
         raise ConflictError("Only models added from Hugging Face can be removed from the catalogue")
-    if session.scalar(select(Model.id).where(Model.catalog_id == catalog_id).limit(1)) is not None:
+    if session.scalar(select(BaseModel.id).where(BaseModel.catalog_id == catalog_id).limit(1)) is not None:
         raise ConflictError(f"{entry.name} is on this install; delete the model first")
     session.delete(entry)
     session.commit()
@@ -270,7 +270,7 @@ def sync(session: SessionDep) -> JobInfo:
     return job_info(job)
 
 
-class CatalogSettings(BaseModel):
+class CatalogSettings(pydantic.BaseModel):
     daily_sync: bool
 
 

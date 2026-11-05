@@ -19,7 +19,7 @@ from tests.conftest import LABELS, Harness, fake_adapter, scored_answers
 from tests.test_flow import SLUG, create_on_data, create_with_dataset
 
 BATCH_SECONDS = 0.4
-VERSIONS = f"/api/minibrains/{SLUG}/versions"
+VERSIONS = f"/api/models/{SLUG}/versions"
 
 
 class FakeRuntime:
@@ -178,7 +178,7 @@ def test_prices_are_set_per_pool_audited_and_cleared_with_zero(harness: Harness)
 
 def test_versions_report_latency_and_cost_per_thousand_requests(harness: Harness) -> None:
     two_versions(harness)
-    row = next(item for item in harness.client.get("/api/models").json() if item["key"] == SLUG)
+    row = next(item for item in harness.client.get("/api/all-models").json() if item["key"] == SLUG)
     trained, prompt = row["versions"]
     assert (trained["latency_p50_ms"], trained["latency_p95_ms"]) == (40.0, 80.0)
     assert trained["cost"]["device_seconds_per_1k"] == pytest.approx(10.0)

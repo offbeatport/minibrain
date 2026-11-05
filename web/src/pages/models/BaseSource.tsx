@@ -101,10 +101,10 @@ export function useSourcePlan(state: SourceState): SourcePlan {
     const path = useDebounced(location, 400);
     const connection = path.startsWith("s3://") ? (state.connection ?? null) : null;
     const check = useQuery({
-        queryKey: ["models", "inspect", path, connection],
+        queryKey: ["all-models", "inspect", path, connection],
         queryFn: () =>
             unwrap(
-                api.POST("/api/models/inspect", {
+                api.POST("/api/base-models/inspect", {
                     body: { location: path, connection_id: connection },
                 }),
             ),
@@ -121,7 +121,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
             name: found?.name ?? undefined,
             run: async () => {
                 const imported = await unwrap(
-                    api.POST("/api/models/import", {
+                    api.POST("/api/base-models/import", {
                         body: {
                             name: found?.name || "Imported model",
                             location,

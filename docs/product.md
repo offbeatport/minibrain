@@ -12,7 +12,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
 - **Sample data** · shipped · product
   Try the whole flow on bundled sample data in minutes.
-  UI: Home › Get started, Models › Try with sample data, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/minibrains/sample
+  UI: Home › Get started, Models › Try with sample data, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
   UI: Data › Add source › Connect a folder · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders
@@ -48,7 +48,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
-  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, POST /api/minibrains/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots
+  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, POST /api/models/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
   UI: Data › dataset › Versions › Compare · API: GET /api/snapshots/{snapshot_id}/diff/{other_id}
@@ -119,25 +119,25 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Discover › model › Download · API: POST /api/catalog/{catalog_id}/download
 - **Import base models** · shipped · admin
   Import weights from a folder or S3 path, checked before copying.
-  UI: Models › Add model › Import · API: POST /api/models/inspect, POST /api/models/import · Config: MINIBRAIN_MODELS_S3_URL
+  UI: Models › Add model › Import · API: POST /api/base-models/inspect, POST /api/base-models/import · Config: MINIBRAIN_MODELS_S3_URL
 - **Models list** · shipped · product, ml
   See custom and base models with status, version and traffic.
-  UI: Models · API: GET /api/models
+  UI: Models · API: GET /api/all-models
 - **Base model page** · shipped · ml, admin
   See a base's files, revisions, usage and API, and rename it.
-  UI: Models › base model · API: GET /api/models/base/{key}, PATCH /api/models/base/{key}
+  UI: Models › base model · API: GET /api/base-models/{key}, PATCH /api/base-models/{key}
 - **Try a base model** · shipped · product, ml
   Send a prompt to a base model before building on it.
-  UI: Models › base model › Test · API: POST /api/models/base/{key}/test
+  UI: Models › base model › Test · API: POST /api/base-models/{key}/test
 - **Base model health** · shipped · admin
   Verify, repair, re-import or relocate damaged weights in one action.
-  UI: Models › base model › Files · API: POST /api/models/base/{key}/verify, POST /api/models/base/{key}/repair, POST /api/models/base/{key}/reimport, POST /api/models/base/{key}/relocate, POST /api/models/base/{key}/retry, POST /api/models/base/{key}/recheck
+  UI: Models › base model › Files · API: POST /api/base-models/{key}/verify, POST /api/base-models/{key}/repair, POST /api/base-models/{key}/reimport, POST /api/base-models/{key}/relocate, POST /api/base-models/{key}/retry, POST /api/base-models/{key}/recheck
 - **Delete base models** · shipped · admin
   Delete a base and its files, and its models once confirmed.
-  UI: Models › Delete · API: DELETE /api/models/base/{key}
+  UI: Models › Delete · API: DELETE /api/base-models/{key}
 - **Custom models** · shipped · product, ml
   Create a named model for a task on a chosen base.
-  UI: Models › Add model · API: GET /api/minibrains, POST /api/minibrains, GET /api/minibrains/name, GET /api/minibrains/{slug}, PATCH /api/minibrains/{slug}, DELETE /api/minibrains/{slug}
+  UI: Models › Add model · API: GET /api/models, POST /api/models, GET /api/models/name, GET /api/models/{slug}, PATCH /api/models/{slug}, DELETE /api/models/{slug}
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments
@@ -158,13 +158,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › Add model › Custom · API: PUT /api/minibrains/{slug}/graders, PUT /api/minibrains/{slug}/instructions
+  UI: Models › Add model › Custom · API: PUT /api/models/{slug}/graders, PUT /api/models/{slug}/instructions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
   UI: Models › model › Task
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema per version, extended without breaking apps.
-  UI: Models › model › Task · API: POST /api/minibrains/{slug}/contract/check, PUT /api/minibrains/{slug}/contract
+  UI: Models › model › Task · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
 - **Recipes** · partial · product, ml
   Start a model from a worked use case with sample data.
   UI: Models › Add model › Start from a recipe · API: GET /api/recipes, GET /api/recipes/{key}, POST /api/recipes/{key}/sample · Roadmap: Recipes
@@ -184,25 +184,25 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Training
 - **Training data per model** · shipped · product, ml
   Pick or map the dataset a model trains on.
-  UI: Training › model › Training data · API: PUT /api/minibrains/{slug}/dataset, PUT /api/minibrains/{slug}/mapping, POST /api/minibrains/{slug}/query, GET /api/minibrains/{slug}/preview
+  UI: Training › model › Training data · API: PUT /api/models/{slug}/dataset, PUT /api/models/{slug}/mapping, POST /api/models/{slug}/query, GET /api/models/{slug}/preview
 - **LoRA training** · shipped · product, ml
   Train a LoRA version on a picked dataset version.
-  UI: Training › model › New version · API: POST /api/minibrains/{slug}/versions
+  UI: Training › model › New version · API: POST /api/models/{slug}/versions
 - **Training list** · shipped · product, ml
   See every training and scoring job across models, filtered.
   UI: Training
 - **Versions** · shipped · product, ml
   Keep immutable prompt-only and trained versions per model.
-  UI: Evaluations · API: GET /api/minibrains/{slug}/versions, DELETE /api/minibrains/{slug}/versions/{number}
+  UI: Evaluations · API: GET /api/models/{slug}/versions, DELETE /api/models/{slug}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
-  UI: Training › model › Training plan · API: GET /api/minibrains/{slug}/training-plan
+  UI: Training › model › Training plan · API: GET /api/models/{slug}/training-plan
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
   UI: Training › model › Training plan · Roadmap: Training memory
 - **Training settings** · partial · ml
   Override strategy, batch, sequence length, rank, rate, epochs and rows per run.
-  UI: Training › model › Training plan › Settings, Settings › General › Default training recipe · API: POST /api/minibrains/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
+  UI: Training › model › Training plan › Settings, Settings › General › Default training recipe · API: POST /api/models/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE
@@ -228,10 +228,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Evaluation
 - **Prompt-only versions** · shipped · product, ml
   Get a scored version 0 the moment a model exists.
-  UI: Training › model › Score a prompt, Playground · API: POST /api/minibrains/{slug}/versions, POST /api/minibrains/{slug}/versions/{number}/test
+  UI: Training › model › Score a prompt, Playground · API: POST /api/models/{slug}/versions, POST /api/models/{slug}/versions/{number}/test
 - **Scores** · shipped · product, ml
   Score every version on the test set and held-out split.
-  UI: Evaluations · API: GET /api/minibrains/{slug}/golden
+  UI: Evaluations · API: GET /api/models/{slug}/golden
 - **Mistakes and side by side** · shipped · product, ml
   Read held-out mistakes and compare answers with the base.
   UI: Evaluations › version, Playground › Compare with
@@ -243,7 +243,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › General › Compute prices · API: GET /api/compute/prices, PUT /api/compute/prices · Config: compute
 - **Model card** · shipped · product, admin
   Generate a model card and validation report for each version.
-  UI: Models › model › version › Model card · API: GET /api/minibrains/{slug}/versions/{number}/card, PUT /api/minibrains/{slug}/versions/{number}/card, GET /api/minibrains/{slug}/versions/{number}/card.json, GET /api/minibrains/{slug}/versions/{number}/card.md
+  UI: Models › model › version › Model card · API: GET /api/models/{slug}/versions/{number}/card, PUT /api/models/{slug}/versions/{number}/card, GET /api/models/{slug}/versions/{number}/card.json, GET /api/models/{slug}/versions/{number}/card.md
 - **Golden set authoring** · planned · product
   Write 20 to 50 verified examples before any training.
   Roadmap: Eval and promote
@@ -255,7 +255,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Evaluations › version · Roadmap: Task types
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › Task, Evaluations › Deploy · API: PUT /api/minibrains/{slug}/promotion, POST /api/minibrains/{slug}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › Task, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · planned · product, ml
   Compare two versions' scores, not only their data.
   Roadmap: v2
@@ -263,10 +263,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Serving
 - **Deploy and roll back** · shipped · product, engineer
   Deploy a version that passes its rule; roll back any time.
-  UI: Deployments, Evaluations › Deploy · API: POST /api/minibrains/{slug}/deploy, POST /api/minibrains/{slug}/versions/{number}/promote
+  UI: Deployments, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
-  UI: Models › base model › Deploy · API: POST /api/models/base/{key}/deploy
+  UI: Models › base model › Deploy · API: POST /api/base-models/{key}/deploy
 - **OpenAI-compatible API** · shipped · engineer
   Call any model by name or pinned version, with streaming.
   UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
@@ -281,7 +281,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Deployments › model › Connect
 - **Playground** · shipped · product
   Chat with one model or version and compare with another.
-  UI: Playground · API: POST /api/minibrains/{slug}/complete
+  UI: Playground · API: POST /api/models/{slug}/complete
 - **Engines per machine** · shipped · admin
   Serve on SGLang, MLX, transformers or llama.cpp, on any machine.
   CLI: minibrain engine · Config: MINIBRAIN_SGLANG_PYTHON
@@ -321,13 +321,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Deployments › model › Feedback · API: POST /v1/feedback
 - **Playground feedback** · shipped · product
   Rate or correct any playground answer.
-  UI: Playground · API: POST /api/minibrains/{slug}/feedback
+  UI: Playground · API: POST /api/models/{slug}/feedback
 - **Review queue** · partial · product
   Accept, fix or reject feedback by keyboard, disagreements first.
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
-  UI: Models › model, Training › model · API: GET /api/minibrains/{slug}/feedback/summary
+  UI: Models › model, Training › model · API: GET /api/models/{slug}/feedback/summary
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2
@@ -397,7 +397,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Models · Policy: model_sources, licence_mode, licences, safetensors_only
 - **Request inputs and answers** · shipped · admin, engineer
   Keep or drop prompts and answers per model, lockable install-wide.
-  UI: Deployments › model, Settings › Security › Request logs and API keys · API: PUT /api/minibrains/{slug}/request-bodies · Policy: request_bodies, request_bodies_locked
+  UI: Deployments › model, Settings › Security › Request logs and API keys · API: PUT /api/models/{slug}/request-bodies · Policy: request_bodies, request_bodies_locked
 - **Audit log** · shipped · admin
   Search, filter and export every audited change.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
@@ -415,7 +415,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Encryption at rest · Policy: vault_address, vault_mount, vault_key, vault_namespace, vault_auth, vault_role_id, vault_auth_mount, vault_ca_bundle, hsm_library, hsm_token, hsm_key, kms_key, kms_region, kms_endpoint, kms_fips · Config: MINIBRAIN_VAULT_TOKEN, MINIBRAIN_VAULT_TOKEN_FILE, MINIBRAIN_VAULT_SECRET_ID, MINIBRAIN_VAULT_SECRET_ID_FILE, MINIBRAIN_HSM_PIN, MINIBRAIN_HSM_PIN_FILE
 - **AI bill of materials** · shipped · admin
   Download a CycloneDX ML-BOM for each version.
-  UI: Models › model › version › Model card · API: GET /api/minibrains/{slug}/versions/{number}/aibom.json
+  UI: Models › model › version › Model card · API: GET /api/models/{slug}/versions/{number}/aibom.json
 - **SBOMs** · shipped · admin
   CycloneDX SBOMs for the Python, web and image dependency sets.
 - **Signed releases** · partial · admin

@@ -29,14 +29,14 @@ from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    BaseModel,
+    BaseModelStatus,
     CatalogVariant,
     Job,
     JobKind,
     JobStatus,
     KeyScope,
-    Minibrain,
     Model,
-    ModelStatus,
     RequestLog,
     Teardown,
     TeardownKind,
@@ -108,13 +108,13 @@ def active_activity(job: Job) -> Activity:
     )
 
 
-def candidate(minibrain: Minibrain) -> Version | None:
-    current = minibrain.current_version if minibrain.current_version is not None else -1
-    ready = [v for v in minibrain.versions if v.status == VersionStatus.READY and v.number > current]
+def candidate(model: Model) -> Version | None:
+    current = model.current_version if model.current_version is not None else -1
+    ready = [v for v in model.versions if v.status == VersionStatus.READY and v.number > current]
     return max(ready, key=lambda v: v.number, default=None)
 
 
-def custom_activity(minibrain: Minibrain, jobs: list[Job]) -> Activity:
+def custom_activity(model: Model, jobs: list[Job]) -> Activity:
     active = next((job for job in jobs if job.status in ACTIVE_JOB_STATUSES), None)
     if active is not None:
         return active_activity(active)
@@ -123,27 +123,27 @@ def custom_activity(minibrain: Minibrain, jobs: list[Job]) -> Activity:
         version = latest.version.number if latest.version is not None else None
         label = FAILED_LABELS.get(latest.kind, "Job failed")
         return Activity(state="failed", label=label, kind=latest.kind, version=version, job_id=latest.id)
-    ready = candidate(minibrain)
+    ready = candidate(model)
     if ready is not None:
         return Activity(state="ready", label=f"v{ready.number} ready", version=ready.number)
-    if latest_snapshot(minibrain) is None:
+    if latest_snapshot(model) is None:
         return Activity(state="needs_examples", label="Needs examples")
     return Activity(state="idle", label="No active jobs")
 
 
-def scored(minibrain: Minibrain) -> list[Version]:
-    return [v for v in minibrain.versions if v.status == VersionStatus.READY and v.metrics]
+def scored(model: Model) -> list[Version]:
+    return [v for v in model.versions if v.status == VersionStatus.READY and v.metrics]
 
 
-def promotion_of(minibrain: Minibrain, version: Version) -> DecisionInfo | None:
+def promotion_of(model: Model, version: Version) -> DecisionInfo | None:
     if version.status != VersionStatus.READY:
         return None
-    return DecisionInfo.model_validate(decision(minibrain, version).as_dict())
+    return DecisionInfo.model_validate(decision(model, version).as_dict())
 
 
-def shown_version(minibrain: Minibrain) -> Version | None:
-    versions = scored(minibrain)
-    current = next((v for v in versions if v.number == minibrain.current_version), None)
+def shown_version(model: Model) -> Version | None:
+    versions = scored(model)
+    current = next((v for v in versions if v.number == model.current_version), None)
     return current or max(versions, key=lambda v: v.number, default=None)
 
 
@@ -208,10 +208,10 @@ class UsageIndex:
 
 
 def usage_index(session: Session) -> UsageIndex:
-    custom = usage_for(session, [RequestLog.minibrain_id], RequestLog.minibrain_id.is_not(None))
-    added = select(Model.created_at).where(Model.id == RequestLog.model).scalar_subquery()
-    base = usage_for(session, [RequestLog.model], RequestLog.minibrain_id.is_(None) & (RequestLog.at >= added))
-    versions = usage_for(session, [RequestLog.minibrain_id, RequestLog.version], RequestLog.minibrain_id.is_not(None))
+    custom = usage_for(session, [RequestLog.model_id], RequestLog.model_id.is_not(None))
+    added = select(BaseModel.created_at).where(BaseModel.id == RequestLog.model).scalar_subquery()
+    base = usage_for(session, [RequestLog.model], RequestLog.model_id.is_(None) & (RequestLog.at >= added))
+    versions = usage_for(session, [RequestLog.model_id, RequestLog.version], RequestLog.model_id.is_not(None))
     return UsageIndex(
         custom={target[0]: usage for target, usage in custom.items()},
         base={target[0]: usage for target, usage in base.items()},
@@ -220,14 +220,14 @@ def usage_index(session: Session) -> UsageIndex:
 
 
 def version_rows(
-    minibrain: Minibrain,
+    model: Model,
     jobs: list[Job],
     version_usage: dict[tuple[int, int], Usage],
     base_hash: str | None = None,
     prices: DevicePrices | None = None,
 ) -> list[VersionRow]:
     rows: list[VersionRow] = []
-    for version in sorted(minibrain.versions, key=lambda item: item.number, reverse=True):
+    for version in sorted(model.versions, key=lambda item: item.number, reverse=True):
         job = next((item for item in jobs if item.version_id == version.id), None)
         active = job is not None and job.status in ACTIVE_JOB_STATUSES
         latency = (version.metrics or {}).get("latency") or {}
@@ -236,17 +236,17 @@ def version_rows(
                 number=version.number,
                 kind=version.kind,
                 status=version.status,
-                live=minibrain.deployed and minibrain.current_version == version.number,
+                live=model.deployed and model.current_version == version.number,
                 score=held_out_score(version),
                 metric=version_metric(version),
-                promotion=promotion_of(minibrain, version),
+                promotion=promotion_of(model, version),
                 was_live=version.live_at is not None,
                 progress=running_progress(job) if job is not None and active else None,
                 job_id=job.id if job is not None else None,
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
-                usage=version_usage.get((minibrain.id, version.number)),
+                usage=version_usage.get((model.id, version.number)),
                 created_at=version.created_at,
-                health=version_health(minibrain, version, base_hash),
+                health=version_health(model, version, base_hash),
                 latency_p50_ms=latency.get("p50_ms"),
                 latency_p95_ms=latency.get("p95_ms"),
                 cost=cost_info(version.metrics, prices or DevicePrices()),
@@ -255,8 +255,8 @@ def version_rows(
     return rows
 
 
-def custom_availability(minibrain: Minibrain, store: ArtifactStore) -> Availability:
-    trained = [v for v in minibrain.versions if v.kind == VersionKind.LORA and v.adapter_artifact_id is not None]
+def custom_availability(model: Model, store: ArtifactStore) -> Availability:
+    trained = [v for v in model.versions if v.kind == VersionKind.LORA and v.adapter_artifact_id is not None]
     if not trained:
         return Availability(state="none")
     present = all(store.has(v.adapter_artifact_id or "") for v in trained if v.status == VersionStatus.READY)
@@ -293,7 +293,7 @@ def latest_moment(*moments: datetime | None) -> datetime:
 
 
 def custom_row(
-    minibrain: Minibrain,
+    model: Model,
     jobs: list[Job],
     store: ArtifactStore,
     health: EngineHealth,
@@ -304,44 +304,44 @@ def custom_row(
     prices: DevicePrices | None = None,
     teardown: tuple[Teardown | None, TeardownInfo | None] = (None, None),
 ) -> ModelRow:
-    base_name, broken, base_hash, base_state = base or (minibrain.base_model, None, None, None)
+    base_name, broken, base_hash, base_state = base or (model.base_model, None, None, None)
     found, info = teardown
-    availability = custom_availability(minibrain, store)
+    availability = custom_availability(model, store)
     if base_state is not None and base_state.state in ("downloading", "importing"):
         availability = base_state
-    latest_version = max(minibrain.versions, key=lambda v: v.number, default=None)
+    latest_version = max(model.versions, key=lambda v: v.number, default=None)
     latest_job = jobs[0] if jobs else None
-    current = minibrain.current_version
-    ready = candidate(minibrain)
+    current = model.current_version
+    ready = candidate(model)
     updated = latest_moment(
-        minibrain.created_at,
-        minibrain.updated_at,
+        model.created_at,
+        model.updated_at,
         latest_version.created_at if latest_version else None,
         latest_job.finished_at or latest_job.started_at or latest_job.created_at if latest_job else None,
     )
-    shown = shown_version(minibrain)
+    shown = shown_version(model)
     return ModelRow(
         kind="custom",
-        key=minibrain.slug,
-        name=minibrain.name,
-        description=minibrain.description,
-        tags=list(minibrain.tags or []),
-        base_model=minibrain.base_model,
+        key=model.slug,
+        name=model.name,
+        description=model.description,
+        tags=list(model.tags or []),
+        base_model=model.base_model,
         availability=availability,
-        activity=custom_activity(minibrain, jobs),
+        activity=custom_activity(model, jobs),
         deployment=deployment(
             f"v{current}" if current is not None else "Base model",
-            minibrain.deployed,
-            health(minibrain.base_model) if minibrain.deployed else None,
-            [current] if minibrain.deployed and current is not None else [],
+            model.deployed,
+            health(model.base_model) if model.deployed else None,
+            [current] if model.deployed and current is not None else [],
             found,
         ),
         updated_at=updated,
-        can_test=any(v.status == VersionStatus.READY for v in minibrain.versions),
+        can_test=any(v.status == VersionStatus.READY for v in model.versions),
         update_available=False,
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
-        versions=version_rows(minibrain, jobs, version_usage or {}, base_hash, prices),
+        versions=version_rows(model, jobs, version_usage or {}, base_hash, prices),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         score=held_out_score(shown) if shown is not None else None,
@@ -352,12 +352,12 @@ def custom_row(
     )
 
 
-def base_availability(model: Model, job: Job | None, settings: Settings) -> Availability:
-    if model.status in (ModelStatus.DOWNLOADING, ModelStatus.IMPORTING):
+def base_availability(model: BaseModel, job: Job | None, settings: Settings) -> Availability:
+    if model.status in (BaseModelStatus.DOWNLOADING, BaseModelStatus.IMPORTING):
         progress = running_progress(job) if job is not None else None
-        state: AvailabilityState = "downloading" if model.status == ModelStatus.DOWNLOADING else "importing"
+        state: AvailabilityState = "downloading" if model.status == BaseModelStatus.DOWNLOADING else "importing"
         return Availability(state=state, progress=progress, job_id=job.id if job else None)
-    if model.status == ModelStatus.AVAILABLE:
+    if model.status == BaseModelStatus.AVAILABLE:
         return Availability(state="available" if files_present(settings, model) else "missing")
     return Availability(state="not_downloaded", job_id=job.id if job else None)
 
@@ -371,7 +371,7 @@ def base_activity(job: Job | None) -> Activity:
 
 
 def base_row(
-    model: Model,
+    model: BaseModel,
     job: Job | None,
     settings: Settings,
     health: EngineHealth,
@@ -415,21 +415,21 @@ def base_row(
 
 
 def jobs_by(session: Session) -> tuple[dict[int, list[Job]], dict[str, Job]]:
-    by_minibrain: dict[int, list[Job]] = {}
-    by_model: dict[str, Job] = {}
+    by_model: dict[int, list[Job]] = {}
+    by_base: dict[str, Job] = {}
     for job in session.scalars(select(Job).order_by(Job.id.desc())):
-        if job.minibrain_id is not None:
-            by_minibrain.setdefault(job.minibrain_id, []).append(job)
-        if job.model_id is not None and job.model_id not in by_model:
-            by_model[job.model_id] = job
-    return by_minibrain, by_model
+        if job.model_id is not None:
+            by_model.setdefault(job.model_id, []).append(job)
+        if job.base_model_id is not None and job.base_model_id not in by_base:
+            by_base[job.base_model_id] = job
+    return by_model, by_base
 
 
 def base_weights(session: Session) -> dict[str, int]:
     weights: dict[str, int] = {}
     for variant in session.scalars(select(CatalogVariant).where(CatalogVariant.position == 0)):
         weights[variant.catalog_id] = variant.weights_bytes
-    for model in session.scalars(select(Model)):
+    for model in session.scalars(select(BaseModel)):
         weights[model.id] = sum(entry["size"] for entry in model.files if entry["path"].endswith(".safetensors"))
     return weights
 
@@ -437,71 +437,71 @@ def base_weights(session: Session) -> dict[str, int]:
 def all_rows(
     session: Session, settings: Settings, store: ArtifactStore, health: EngineHealth, context: HealthContext
 ) -> list[ModelRow]:
-    by_minibrain, by_model = jobs_by(session)
+    by_model, by_base = jobs_by(session)
     weights = base_weights(session)
     usage = usage_index(session)
     prices = load_prices(session)
     teardowns = list(session.scalars(select(Teardown)))
     parents = {teardown.id: teardown.name for teardown in teardowns}
-    custom_teardowns = {item.minibrain_id: item for item in teardowns if item.minibrain_id is not None}
-    base_teardowns = {item.model_id: item for item in teardowns if item.model_id is not None}
-    models = list(session.scalars(select(Model)))
+    custom_teardowns = {item.model_id: item for item in teardowns if item.model_id is not None}
+    base_teardowns = {item.base_model_id: item for item in teardowns if item.base_model_id is not None}
+    bases_found = list(session.scalars(select(BaseModel)))
     base_rows = [
         base_row(
-            model,
-            by_model.get(model.id),
+            base,
+            by_base.get(base.id),
             settings,
             health,
-            usage.base.get(model.id),
+            usage.base.get(base.id),
             context,
-            base_teardowns.get(model.id),
+            base_teardowns.get(base.id),
         )
-        for model in models
+        for base in bases_found
     ]
 
-    def custom_teardown(minibrain: Minibrain) -> tuple[Teardown | None, TeardownInfo | None]:
-        found = custom_teardowns.get(minibrain.id)
+    def custom_teardown(model: Model) -> tuple[Teardown | None, TeardownInfo | None]:
+        found = custom_teardowns.get(model.id)
         part_of = parents.get(found.parent_id) if found is not None and found.parent_id is not None else None
         return found, teardown_info(found, part_of)
 
     bases = {
-        model.id: (
-            model.name,
+        base.id: (
+            base.name,
             row.health,
-            content_hash(model.files) if model.status == ModelStatus.AVAILABLE else None,
+            content_hash(base.files) if base.status == BaseModelStatus.AVAILABLE else None,
             row.availability,
         )
-        for model, row in zip(models, base_rows, strict=True)
+        for base, row in zip(bases_found, base_rows, strict=True)
     }
     rows = [
         custom_row(
-            minibrain,
-            by_minibrain.get(minibrain.id, []),
+            model,
+            by_model.get(model.id, []),
             store,
             health,
-            weights.get(minibrain.base_model),
-            usage.custom.get(minibrain.id),
+            weights.get(model.base_model),
+            usage.custom.get(model.id),
             usage.versions,
-            bases.get(minibrain.base_model),
+            bases.get(model.base_model),
             prices,
-            custom_teardown(minibrain),
+            custom_teardown(model),
         )
-        for minibrain in session.scalars(select(Minibrain))
+        for model in session.scalars(select(Model))
     ]
     rows += base_rows
     custom_keys = dict(
         session.execute(
-            select(KeyScope.minibrain_id, func.count())
-            .where(KeyScope.minibrain_id.is_not(None))
-            .group_by(KeyScope.minibrain_id)
+            select(KeyScope.model_id, func.count()).where(KeyScope.model_id.is_not(None)).group_by(KeyScope.model_id)
         ).all()
     )
     base_keys = dict(
         session.execute(
-            select(KeyScope.model_id, func.count()).where(KeyScope.model_id.is_not(None)).group_by(KeyScope.model_id)
+            select(KeyScope.base_model_id, func.count())
+            .where(KeyScope.base_model_id.is_not(None))
+            .group_by(KeyScope.base_model_id)
         ).all()
     )
-    slugs = dict(session.execute(select(Minibrain.slug, Minibrain.id)).all())
+    slugs = dict(session.execute(select(Model.slug, Model.id)).all())
     rows = [
         row.model_copy(
             update={
@@ -515,5 +515,5 @@ def all_rows(
     return sorted(rows, key=lambda row: row.updated_at, reverse=True)
 
 
-def model_job(session: Session, model_id: str) -> Job | None:
-    return session.scalar(select(Job).where(Job.model_id == model_id).order_by(Job.id.desc()).limit(1))
+def model_job(session: Session, base_model_id: str) -> Job | None:
+    return session.scalar(select(Job).where(Job.base_model_id == base_model_id).order_by(Job.id.desc()).limit(1))

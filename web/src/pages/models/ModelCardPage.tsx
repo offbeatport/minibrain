@@ -17,7 +17,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
-import { useMinibrain, useVersions } from "~/api/queries";
+import { useModel, useVersions } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
@@ -45,7 +45,7 @@ const BUSY = new Set(["training", "evaluating"]);
 type Target = { slug: string; number: number };
 
 function cardKey(target: Target) {
-    return ["minibrain", target.slug, "card", target.number] as const;
+    return ["model", target.slug, "card", target.number] as const;
 }
 
 function cardPath(target: Target) {
@@ -56,7 +56,7 @@ function useModelCard(target: Target) {
     return useQuery({
         queryKey: cardKey(target),
         queryFn: () =>
-            unwrap(api.GET("/api/minibrains/{slug}/versions/{number}/card", cardPath(target))),
+            unwrap(api.GET("/api/models/{slug}/versions/{number}/card", cardPath(target))),
         refetchInterval: (query) =>
             BUSY.has(query.state.data?.card.version.status ?? "") ? 2000 : false,
     });
@@ -138,7 +138,7 @@ function EditDialog({
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/versions/{number}/card", {
+                api.PUT("/api/models/{slug}/versions/{number}/card", {
                     ...cardPath(target),
                     body: draft,
                 }),
@@ -248,9 +248,9 @@ function CardView({
     const [editing, setEditing] = useState<Focus | null>(null);
     const can = useCan();
     const versions = useVersions(target.slug);
-    const minibrain = useMinibrain(target.slug);
+    const model = useModel(target.slug);
     const current = versions.data?.find((item) => item.number === target.number)?.current ?? false;
-    const live = current && Boolean(minibrain.data?.deployed);
+    const live = current && Boolean(model.data?.deployed);
     return (
         <>
             <BackLink slug={target.slug} name={card.version.name} />

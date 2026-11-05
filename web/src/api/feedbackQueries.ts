@@ -102,9 +102,7 @@ export function useFeedbackSummary(slug: string) {
     return useQuery({
         queryKey: feedbackKeys.summary(slug),
         queryFn: () =>
-            unwrap(
-                api.GET("/api/minibrains/{slug}/feedback/summary", { params: { path: { slug } } }),
-            ),
+            unwrap(api.GET("/api/models/{slug}/feedback/summary", { params: { path: { slug } } })),
         enabled: Boolean(slug),
     });
 }
@@ -146,9 +144,7 @@ export function useSendFeedback(slug: string) {
     const refresh = useRefreshFeedback();
     return useMutation({
         mutationFn: (body: PlaygroundFeedback) =>
-            unwrap(
-                api.POST("/api/minibrains/{slug}/feedback", { params: { path: { slug } }, body }),
-            ),
+            unwrap(api.POST("/api/models/{slug}/feedback", { params: { path: { slug } }, body })),
         onSuccess: refresh,
     });
 }

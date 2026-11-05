@@ -3,7 +3,7 @@ import { useToast } from "obp-ui";
 import { useEffect, useRef } from "react";
 import { usePerson } from "~/api/authQueries";
 import type { ModelRow } from "~/api/client";
-import { MODELS_POLL_MS, keys, loadModels } from "~/api/queries";
+import { MODELS_POLL_MS, keys, loadAllModels } from "~/api/queries";
 import { busyTearingDown, outcomeOf, rowId } from "~/lib/teardown";
 
 export function TeardownToasts() {
@@ -12,8 +12,8 @@ export function TeardownToasts() {
     const tracked = useRef(new Map<string, ModelRow>());
     const me = person ? (person.email ?? person.name) : null;
     const models = useQuery({
-        queryKey: keys.models,
-        queryFn: loadModels,
+        queryKey: keys.allModels,
+        queryFn: loadAllModels,
         enabled: me !== null,
         refetchInterval: (query) =>
             query.state.data?.some(busyTearingDown) ? MODELS_POLL_MS : false,

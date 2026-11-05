@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
+import pydantic
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 from sqlalchemy import ColumnElement, and_, case, false, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ from minibrain.api.deps import SessionDep
 from minibrain.data.feedback import UP
 from minibrain.policy import bodies_choice
 from minibrain.policy import load as load_policy
-from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Minibrain, Model, RequestLog
+from minibrain.registry.models import ApiKey, BaseModel, Feedback, FeedbackStatus, Model, RequestLog
 from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["requests"])
@@ -33,7 +33,7 @@ Facet = Literal["model", "version", "key", "status"]
 STATUS_CLASSES: tuple[StatusClass, ...] = ("ok", "client_error", "server_error")
 
 
-class RequestRow(BaseModel):
+class RequestRow(pydantic.BaseModel):
     id: int
     at: datetime
     model: str
@@ -55,19 +55,19 @@ class RequestRow(BaseModel):
     feedback_down: int
 
 
-class RequestPage(BaseModel):
+class RequestPage(pydantic.BaseModel):
     items: list[RequestRow]
     next_cursor: str | None
     total: int
 
 
-class RequestFacet(BaseModel):
+class RequestFacet(pydantic.BaseModel):
     value: str
     label: str
     count: int
 
 
-class RequestFacets(BaseModel):
+class RequestFacets(pydantic.BaseModel):
     total: int
     statuses: dict[str, int]
     models: list[RequestFacet]
@@ -75,7 +75,7 @@ class RequestFacets(BaseModel):
     keys: list[RequestFacet]
 
 
-class RequestSummary(BaseModel):
+class RequestSummary(pydantic.BaseModel):
     requests: int
     errors: int
     error_rate: float | None
@@ -87,7 +87,7 @@ class RequestSummary(BaseModel):
     last_at: datetime | None
 
 
-class RequestFeedback(BaseModel):
+class RequestFeedback(pydantic.BaseModel):
     id: int
     rating: Literal["up", "down"]
     status: Literal["pending", "accepted", "rejected"]
@@ -120,15 +120,15 @@ def status_match(chosen: str) -> ColumnElement[bool]:
 
 
 def model_match(keys: list[str]) -> ColumnElement[bool]:
-    custom = select(Minibrain.id).where(Minibrain.slug.in_(keys))
-    return or_(RequestLog.minibrain_id.in_(custom), and_(RequestLog.minibrain_id.is_(None), RequestLog.model.in_(keys)))
+    custom = select(Model.id).where(Model.slug.in_(keys))
+    return or_(RequestLog.model_id.in_(custom), and_(RequestLog.model_id.is_(None), RequestLog.model.in_(keys)))
 
 
 def version_match(values: list[str]) -> ColumnElement[bool]:
     pairs = [value.rpartition("@") for value in values]
     chosen = [
         and_(
-            RequestLog.minibrain_id.in_(select(Minibrain.id).where(Minibrain.slug == slug)),
+            RequestLog.model_id.in_(select(Model.id).where(Model.slug == slug)),
             RequestLog.version == int(number),
         )
         for slug, _, number in pairs
@@ -212,24 +212,26 @@ def count_requests(session: Session, where: Sequence[ColumnElement[bool]]) -> in
 def base_names(session: Session, keys: set[str]) -> dict[str, str]:
     if not keys:
         return {}
-    return {key: name for key, name in session.execute(select(Model.id, Model.name).where(Model.id.in_(keys)))}
+    return {
+        key: name for key, name in session.execute(select(BaseModel.id, BaseModel.name).where(BaseModel.id.in_(keys)))
+    }
 
 
 Marks = dict[tuple[int | None, str | None], dict[str, int]]
 
 
 def feedback_marks(session: Session, logs: Sequence[RequestLog]) -> Marks:
-    ids = {log.response_id for log in logs if log.response_id and log.minibrain_id is not None}
+    ids = {log.response_id for log in logs if log.response_id and log.model_id is not None}
     if not ids:
         return {}
     query = (
-        select(Feedback.minibrain_id, Feedback.response_id, Feedback.rating, func.count())
+        select(Feedback.model_id, Feedback.response_id, Feedback.rating, func.count())
         .where(Feedback.response_id.in_(ids))
-        .group_by(Feedback.minibrain_id, Feedback.response_id, Feedback.rating)
+        .group_by(Feedback.model_id, Feedback.response_id, Feedback.rating)
     )
     marks: Marks = {}
-    for minibrain_id, response_id, rating, total in session.execute(query):
-        marks.setdefault((minibrain_id, response_id), {})[rating] = total
+    for model_id, response_id, rating, total in session.execute(query):
+        marks.setdefault((model_id, response_id), {})[rating] = total
     return marks
 
 
@@ -239,8 +241,8 @@ def aware(value: datetime) -> datetime:
 
 def rows_for(session: Session, where: Sequence[ColumnElement[bool]], size: int) -> list[Any]:
     query = (
-        select(RequestLog, Minibrain.slug, Minibrain.name, ApiKey.name)
-        .outerjoin(Minibrain, RequestLog.minibrain_id == Minibrain.id)
+        select(RequestLog, Model.slug, Model.name, ApiKey.name)
+        .outerjoin(Model, RequestLog.model_id == Model.id)
         .outerjoin(ApiKey, RequestLog.key_id == ApiKey.id)
         .where(*where)
     )
@@ -256,12 +258,12 @@ def identity(log: RequestLog, slug: str | None, name: str | None, names: dict[st
 def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
     logs = [row[0] for row in found]
     marks = feedback_marks(session, logs)
-    names = base_names(session, {log.model for log in logs if log.minibrain_id is None})
+    names = base_names(session, {log.model for log in logs if log.model_id is None})
     items: list[RequestRow] = []
     for log, slug, name, key_name in found:
         model_key, model_name = identity(log, slug, name, names)
         custom = slug is not None
-        mark = marks.get((log.minibrain_id, log.response_id), {}) if custom and log.response_id else {}
+        mark = marks.get((log.model_id, log.response_id), {}) if custom and log.response_id else {}
         items.append(
             RequestRow(
                 id=log.id,
@@ -314,16 +316,14 @@ def list_requests(
 
 def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
     custom = (
-        select(Minibrain.slug, Minibrain.name, func.count())
+        select(Model.slug, Model.name, func.count())
         .select_from(RequestLog)
-        .join(Minibrain, RequestLog.minibrain_id == Minibrain.id)
+        .join(Model, RequestLog.model_id == Model.id)
         .where(*where)
-        .group_by(Minibrain.slug, Minibrain.name)
+        .group_by(Model.slug, Model.name)
     )
     base = (
-        select(RequestLog.model, func.count())
-        .where(RequestLog.minibrain_id.is_(None), *where)
-        .group_by(RequestLog.model)
+        select(RequestLog.model, func.count()).where(RequestLog.model_id.is_(None), *where).group_by(RequestLog.model)
     )
     facets = [RequestFacet(value=slug, label=name, count=total) for slug, name, total in session.execute(custom)]
     found = list(session.execute(base))
@@ -334,11 +334,11 @@ def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[Req
 
 def version_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
     query = (
-        select(Minibrain.slug, Minibrain.name, RequestLog.version, func.count())
+        select(Model.slug, Model.name, RequestLog.version, func.count())
         .select_from(RequestLog)
-        .join(Minibrain, RequestLog.minibrain_id == Minibrain.id)
+        .join(Model, RequestLog.model_id == Model.id)
         .where(RequestLog.version.is_not(None), *where)
-        .group_by(Minibrain.slug, Minibrain.name, RequestLog.version)
+        .group_by(Model.slug, Model.name, RequestLog.version)
     )
     found = sorted(session.execute(query), key=lambda row: (row[1].lower(), -(row[2] or 0)))
     return [
@@ -416,9 +416,9 @@ def request_summary(session: SessionDep, filters: FilterDep) -> RequestSummary:
 
 
 def linked_feedback(session: Session, log: RequestLog, rows: bool) -> list[RequestFeedback]:
-    if log.minibrain_id is None or not log.response_id:
+    if log.model_id is None or not log.response_id:
         return []
-    query = select(Feedback).where(Feedback.minibrain_id == log.minibrain_id, Feedback.response_id == log.response_id)
+    query = select(Feedback).where(Feedback.model_id == log.model_id, Feedback.response_id == log.response_id)
     return [
         RequestFeedback(
             id=item.id,
@@ -434,8 +434,8 @@ def linked_feedback(session: Session, log: RequestLog, rows: bool) -> list[Reque
 
 
 def body_state(session: Session, log: RequestLog, rows: bool) -> tuple[BodyState, bool]:
-    minibrain = session.get(Minibrain, log.minibrain_id) if log.minibrain_id is not None else None
-    chosen = minibrain.request_bodies if minibrain is not None else bool(load_policy(session)["request_bodies"])
+    model = session.get(Model, log.model_id) if log.model_id is not None else None
+    chosen = model.request_bodies if model is not None else bool(load_policy(session)["request_bodies"])
     kept, lock = bodies_choice(session, chosen)
     if log.input is not None or log.output is not None:
         return ("kept" if rows else "hidden"), lock is not None

@@ -7,7 +7,7 @@ export type JobOrder = "newest" | "oldest";
 
 export type JobFilter = {
     kind?: string[];
-    minibrain?: string[];
+    model?: string[];
     status?: string[];
     q?: string;
     since?: string;
@@ -52,7 +52,7 @@ function sinceTime(token: string | undefined): string | undefined {
 function serverQuery(filter: JobFilter) {
     return {
         kind: listOrUndefined(filter.kind),
-        minibrain: listOrUndefined(filter.minibrain),
+        model: listOrUndefined(filter.model),
         status: listOrUndefined(filter.status),
         q: filter.q?.trim() || undefined,
         since: filter.since && filter.since in SINCE_MS ? filter.since : undefined,

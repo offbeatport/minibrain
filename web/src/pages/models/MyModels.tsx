@@ -39,7 +39,7 @@ import {
 } from "obp-ui";
 import { type CSSProperties, Fragment, type ReactNode, useMemo, useRef, useState } from "react";
 import { type ModelRow, api, removed, unwrap } from "~/api/client";
-import { useModels } from "~/api/queries";
+import { useAllModels } from "~/api/queries";
 import {
     type ColumnWidths,
     LeadingResizer,
@@ -267,7 +267,7 @@ function healthStep(row: ModelRow, action: HealthAction | undefined, on: Handler
 }
 
 function retry(row: ModelRow) {
-    return unwrap(api.POST("/api/models/base/{key}/retry", { params: { path: { key: row.key } } }));
+    return unwrap(api.POST("/api/base-models/{key}/retry", { params: { path: { key: row.key } } }));
 }
 
 function teardownStep(row: ModelRow, on: Handlers): { label: string; run: () => void } | null {
@@ -324,7 +324,7 @@ function DeployedWarning({ row }: { row: ModelRow }) {
 
 function promoteVersion(row: ModelRow, number: number) {
     return unwrap(
-        api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
+        api.POST("/api/models/{slug}/versions/{number}/promote", {
             params: { path: { slug: row.key, number } },
         }),
     );
@@ -332,7 +332,7 @@ function promoteVersion(row: ModelRow, number: number) {
 
 function deleteVersion(row: ModelRow, number: number) {
     return removed(
-        api.DELETE("/api/minibrains/{slug}/versions/{number}", {
+        api.DELETE("/api/models/{slug}/versions/{number}", {
             params: { path: { slug: row.key, number } },
         }),
     );
@@ -1404,7 +1404,7 @@ export function MyModels({
     const can = useCan();
     const router = useRouter();
     const refresh = useModelsRefresh();
-    const models = useModels();
+    const models = useAllModels();
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);

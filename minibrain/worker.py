@@ -189,8 +189,8 @@ class MainClient:
             extra=headers,
         )
 
-    def stored(self, model_id: str) -> list[dict[str, Any]]:
-        return list(self.call("GET", f"/internal/worker/models/{model_id}/stored").json()["files"])
+    def stored(self, base_model_id: str) -> list[dict[str, Any]]:
+        return list(self.call("GET", f"/internal/worker/bases/{base_model_id}/stored").json()["files"])
 
     def bases(self, key: str) -> dict[str, Any]:
         return dict(self.call("GET", f"/internal/worker/bases/{key}").json())
@@ -361,7 +361,7 @@ class Worker:
         params = claim["params"]
         if claim["kind"] != JobKind.VERIFY or params.get("store") != BUCKET:
             return None
-        return json.dumps(self.client.bases(str(params["model_id"]))).encode()
+        return json.dumps(self.client.bases(str(params["base_model_id"]))).encode()
 
     def publisher(self, claim: dict[str, Any]) -> Publisher | None:
         params = claim["params"]
@@ -379,7 +379,7 @@ class Worker:
         params = claim["params"]
         spec: dict[str, Any] = {"result": str(attempt_dir / "result.json")}
         if claim["kind"] in TRANSFER_KINDS and params.get("store") == BUCKET:
-            spec["stored"] = self.client.stored(str(params["model_id"]))
+            spec["stored"] = self.client.stored(str(params["base_model_id"]))
         if claim["kind"] in PASSTHROUGH_KINDS:
             return params | spec
         spec |= {key: params[key] for key in ("slug", "number", "base_model") if key in params}

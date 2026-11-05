@@ -20,9 +20,9 @@ from minibrain.api.schemas import (
     KeyModel,
     LabelScoreInfo,
     MappingInfo,
-    MinibrainDetail,
-    MinibrainSummary,
     Mistake,
+    ModelDetail,
+    ModelSummary,
     PromotionInfo,
     RequestBodiesInfo,
     ScoreInfo,
@@ -43,10 +43,10 @@ from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     ApiKey,
+    BaseModel,
     Dataset,
     Job,
     JobAttempt,
-    Minibrain,
     Model,
     Snapshot,
     Teardown,
@@ -124,8 +124,8 @@ def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> Tear
     )
 
 
-def source_info(settings: Settings, minibrain: Minibrain) -> SourceInfo | None:
-    dataset = minibrain.dataset
+def source_info(settings: Settings, model: Model) -> SourceInfo | None:
+    dataset = model.dataset
     source = None if dataset is None else dataset.source or next(iter(dataset.sources), None)
     if source is None:
         return None
@@ -157,7 +157,7 @@ def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
         counts=snapshot.counts,
         labels=snapshot.labels,
         saved=snapshot.saved,
-        versions=sorted({f"{version.minibrain.slug}@{version.number}" for version in users}),
+        versions=sorted({f"{version.model.slug}@{version.number}" for version in users}),
         created_at=snapshot.created_at,
         taken_at=snapshot.taken_at,
         checks=check_infos(snapshot),
@@ -177,11 +177,11 @@ def change_info(changes: Changes | None) -> ChangeInfo | None:
     return None if changes is None else ChangeInfo(data=changes.data, query=changes.query, dataset=changes.dataset)
 
 
-def model_changes(settings: Settings, minibrain: Minibrain) -> ChangeInfo | None:
-    if minibrain.dataset is None:
+def model_changes(settings: Settings, model: Model) -> ChangeInfo | None:
+    if model.dataset is None:
         return None
     try:
-        return change_info(changes_since(settings, minibrain.dataset, latest_snapshot(minibrain)))
+        return change_info(changes_since(settings, model.dataset, latest_snapshot(model)))
     except SourceError:
         return None
 
@@ -189,9 +189,9 @@ def model_changes(settings: Settings, minibrain: Minibrain) -> ChangeInfo | None
 def job_fields(job: Job) -> dict:
     return {
         "id": job.id,
-        "minibrain": job.minibrain.slug if job.minibrain else None,
-        "minibrain_name": job.minibrain.name if job.minibrain else None,
-        "model": job.model_id,
+        "model": job.model.slug if job.model else None,
+        "model_name": job.model.name if job.model else None,
+        "base_model": job.base_model_id,
         "version": job.version.number if job.version else None,
         "kind": job.kind,
         "status": job.status,
@@ -263,8 +263,8 @@ def split_score(metrics: dict | None, key: str) -> SplitScore | None:
     )
 
 
-def latest_job(minibrain: Minibrain, version: Version) -> Job | None:
-    jobs = [job for job in minibrain.jobs if job.version_id == version.id]
+def latest_job(model: Model, version: Version) -> Job | None:
+    jobs = [job for job in model.jobs if job.version_id == version.id]
     return max(jobs, key=lambda job: job.id, default=None)
 
 
@@ -273,17 +273,17 @@ def cost_info(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost 
     return None if found is None else EvalCost.model_validate(asdict(found))
 
 
-def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | None = None) -> VersionInfo:
+def version_info(model: Model, version: Version, prices: DevicePrices | None = None) -> VersionInfo:
     metrics = version.metrics or {}
     latency = metrics.get("latency") or {}
-    job = latest_job(minibrain, version)
+    job = latest_job(model, version)
     snapshot = version.snapshot
     ready = version.status == VersionStatus.READY
     return VersionInfo(
         number=version.number,
         kind=version.kind,
         status=version.status,
-        current=minibrain.current_version == version.number,
+        current=model.current_version == version.number,
         snapshot_hash=snapshot.hash if snapshot is not None else None,
         snapshot_id=snapshot.id if snapshot is not None else None,
         snapshot_dataset=snapshot.dataset.slug if snapshot is not None and snapshot.dataset is not None else None,
@@ -306,88 +306,90 @@ def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | 
         graders=grader_infos(version.graders),
         main_metric=version_metric(version),
         score=held_out_score(version),
-        promotion=DecisionInfo.model_validate(decision(minibrain, version).as_dict()) if ready else None,
+        promotion=DecisionInfo.model_validate(decision(model, version).as_dict()) if ready else None,
         live_at=version.live_at,
-        view=preset_of(minibrain).view,
+        view=preset_of(model).view,
     )
 
 
-def current_score(minibrain: Minibrain) -> float | None:
-    if minibrain.current_version is None:
+def current_score(model: Model) -> float | None:
+    if model.current_version is None:
         return None
-    version = find_version(minibrain, minibrain.current_version)
+    version = find_version(model, model.current_version)
     return held_out_score(version) if version is not None else None
 
 
-def model_metric(minibrain: Minibrain) -> str | None:
-    newest = latest_version_of(minibrain)
+def model_metric(model: Model) -> str | None:
+    newest = latest_version_of(model)
     return version_metric(newest) if newest is not None else None
 
 
-def current_contract(minibrain: Minibrain) -> int:
-    newest = latest_version_of(minibrain)
+def current_contract(model: Model) -> int:
+    newest = latest_version_of(model)
     return newest.contract_number if newest is not None else 1
 
 
-def summary(minibrain: Minibrain) -> MinibrainSummary:
-    return MinibrainSummary(
-        slug=minibrain.slug,
-        name=minibrain.name,
-        preset=minibrain.preset,
-        base_model=minibrain.base_model,
-        current_version=minibrain.current_version,
-        deployed=minibrain.deployed,
-        main_metric=model_metric(minibrain),
-        current_score=current_score(minibrain),
-        versions=len(minibrain.versions),
-        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
+def summary(model: Model) -> ModelSummary:
+    return ModelSummary(
+        slug=model.slug,
+        name=model.name,
+        preset=model.preset,
+        base_model=model.base_model,
+        current_version=model.current_version,
+        deployed=model.deployed,
+        main_metric=model_metric(model),
+        current_score=current_score(model),
+        versions=len(model.versions),
+        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in model.jobs),
     )
 
 
-def bodies_info(minibrain: Minibrain) -> RequestBodiesInfo:
-    session = object_session(minibrain)
-    kept, lock = bodies_choice(session, minibrain.request_bodies) if session else (minibrain.request_bodies, None)
+def bodies_info(model: Model) -> RequestBodiesInfo:
+    session = object_session(model)
+    kept, lock = bodies_choice(session, model.request_bodies) if session else (model.request_bodies, None)
     return RequestBodiesInfo(kept=kept, locked=lock is not None, source=lock or "model")
 
 
-def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
-    current = latest_snapshot(minibrain)
-    return MinibrainDetail(
-        slug=minibrain.slug,
-        name=minibrain.name,
-        preset=minibrain.preset,
-        base_model=minibrain.base_model,
-        current_version=minibrain.current_version,
-        deployed=minibrain.deployed,
-        main_metric=model_metric(minibrain),
-        current_score=current_score(minibrain),
-        versions=len(minibrain.versions),
-        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
-        source=source_info(settings, minibrain),
-        mapping=mapping_info(minibrain.dataset),
-        dataset=minibrain.dataset.slug if minibrain.dataset else None,
-        dataset_name=minibrain.dataset.name if minibrain.dataset else None,
+def detail(settings: Settings, model: Model) -> ModelDetail:
+    current = latest_snapshot(model)
+    return ModelDetail(
+        slug=model.slug,
+        name=model.name,
+        preset=model.preset,
+        base_model=model.base_model,
+        current_version=model.current_version,
+        deployed=model.deployed,
+        main_metric=model_metric(model),
+        current_score=current_score(model),
+        versions=len(model.versions),
+        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in model.jobs),
+        source=source_info(settings, model),
+        mapping=mapping_info(model.dataset),
+        dataset=model.dataset.slug if model.dataset else None,
+        dataset_name=model.dataset.name if model.dataset else None,
         snapshot=snapshot_info(current) if current is not None else None,
-        changed=model_changes(settings, minibrain),
-        models=model_names(minibrain),
-        request_bodies=bodies_info(minibrain),
-        teardown=teardown_info(minibrain.teardown),
-        contract=contract_info(contract_of(minibrain)),
-        contract_number=current_contract(minibrain),
-        instructions=minibrain.instructions or "",
-        graders=grader_infos(minibrain.graders),
-        promotion=PromotionInfo.model_validate(rule_of(minibrain).as_dict()),
+        changed=model_changes(settings, model),
+        models=model_names(model),
+        request_bodies=bodies_info(model),
+        teardown=teardown_info(model.teardown),
+        contract=contract_info(contract_of(model)),
+        contract_number=current_contract(model),
+        instructions=model.instructions or "",
+        graders=grader_infos(model.graders),
+        promotion=PromotionInfo.model_validate(rule_of(model).as_dict()),
     )
 
 
 def key_models(session: Session, key: ApiKey) -> list[KeyModel]:
     found: list[KeyModel] = []
     for scope in key.scopes:
-        if scope.minibrain is not None:
-            found.append(KeyModel(kind="custom", key=scope.minibrain.slug, name=scope.minibrain.name))
-        elif scope.model_id is not None:
-            model = session.get(Model, scope.model_id)
-            found.append(KeyModel(kind="base", key=scope.model_id, name=model.name if model else scope.model_id))
+        if scope.model is not None:
+            found.append(KeyModel(kind="custom", key=scope.model.slug, name=scope.model.name))
+        elif scope.base_model_id is not None:
+            model = session.get(BaseModel, scope.base_model_id)
+            found.append(
+                KeyModel(kind="base", key=scope.base_model_id, name=model.name if model else scope.base_model_id)
+            )
     return found
 
 

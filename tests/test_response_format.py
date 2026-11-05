@@ -142,7 +142,7 @@ def test_classify_answers_are_held_to_the_labels_by_default(harness: Harness) ->
     assert chat(harness, headers, response_format={"type": "text"}).status_code == 200
     constraints = [request.constraint for request in harness.backend.requests]
     assert constraints == [Constraint(choices=("account", "billing", "bug", "feature"))] * 2
-    played = harness.client.post(f"/api/minibrains/{SLUG}/complete", json={"text": "charged twice"}).json()
+    played = harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "charged twice"}).json()
     assert (played["answer"], played["valid"]) == ("billing", True)
     assert harness.backend.requests[-1].constraint == constraints[0]
     assert task_constraint(base_route_for("qwen3-0.6b")) is None

@@ -10,8 +10,8 @@ export function useInvalidate(slug: string) {
     const queryClient = useQueryClient();
     return () =>
         Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["minibrain", slug] }),
-            queryClient.invalidateQueries({ queryKey: keys.minibrains }),
+            queryClient.invalidateQueries({ queryKey: ["model", slug] }),
+            queryClient.invalidateQueries({ queryKey: keys.models }),
             queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         ]);
 }

@@ -4,21 +4,21 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from minibrain.jobs.queue import enqueue
-from minibrain.registry.models import Job, JobKind, JobStatus, Minibrain, now
+from minibrain.registry.models import Job, JobKind, JobStatus, Model, now
 from tests.conftest import Harness
 
 
-def minibrain_id(harness: Harness, name: str) -> int:
-    slug = harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": name}).json()["slug"]
+def model_id(harness: Harness, name: str) -> int:
+    slug = harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": name}).json()["slug"]
     with harness.sessions() as session:
-        return session.scalars(select(Minibrain.id).where(Minibrain.slug == slug)).one()
+        return session.scalars(select(Model.id).where(Model.slug == slug)).one()
 
 
 def add_jobs(
     harness: Harness, count: int, kind: str = JobKind.TRAIN, owner: int | None = None, status: str | None = None
 ) -> list[int]:
     with harness.sessions() as session:
-        jobs = [enqueue(session, kind, {"n": index}, minibrain_id=owner) for index in range(count)]
+        jobs = [enqueue(session, kind, {"n": index}, model_id=owner) for index in range(count)]
         if status is not None:
             for job in jobs:
                 job.status = status
@@ -80,27 +80,27 @@ def test_bad_cursor_is_rejected(harness: Harness) -> None:
     assert harness.client.get("/api/jobs?cursor=-1").status_code == 422
 
 
-def test_filters_by_minibrain_kind_status_and_ids(harness: Harness) -> None:
-    alpha = minibrain_id(harness, "Alpha")
-    beta = minibrain_id(harness, "Beta")
-    gamma = minibrain_id(harness, "Gamma")
+def test_filters_by_model_kind_status_and_ids(harness: Harness) -> None:
+    alpha = model_id(harness, "Alpha")
+    beta = model_id(harness, "Beta")
+    gamma = model_id(harness, "Gamma")
     alpha_train = add_jobs(harness, 3, JobKind.TRAIN, alpha)
     beta_eval = add_jobs(harness, 2, JobKind.EVAL, beta, JobStatus.FAILED)
     gamma_train = add_jobs(harness, 2, JobKind.TRAIN, gamma, JobStatus.SUCCEEDED)
     add_jobs(harness, 4, JobKind.DOWNLOAD)
-    both = page(harness, "minibrain=alpha&minibrain=beta")
+    both = page(harness, "model=alpha&model=beta")
     assert sorted(ids(both)) == sorted(alpha_train + beta_eval) and both["total"] == 5
     assert sorted(ids(page(harness, "kind=train&kind=eval"))) == sorted(alpha_train + beta_eval + gamma_train)
     assert sorted(ids(page(harness, "status=failed&status=succeeded"))) == sorted(beta_eval + gamma_train)
     assert ids(page(harness, "kind=train&status=failed")) == []
-    assert ids(page(harness, "minibrain=nobody")) == []
+    assert ids(page(harness, "model=nobody")) == []
     wanted = [alpha_train[0], gamma_train[1]]
     assert sorted(ids(page(harness, f"id={wanted[0]}&id={wanted[1]}"))) == wanted
 
 
 def test_search_matches_job_id_and_model_name(harness: Harness) -> None:
-    alpha = minibrain_id(harness, "Support triage")
-    beta = minibrain_id(harness, "Contract review")
+    alpha = model_id(harness, "Support triage")
+    beta = model_id(harness, "Contract review")
     triage = add_jobs(harness, 2, JobKind.TRAIN, alpha)
     review = add_jobs(harness, 1, JobKind.EVAL, beta)
     assert sorted(ids(page(harness, "q=TRIAGE"))) == triage
@@ -127,16 +127,16 @@ def test_date_range_filters_on_creation_time(harness: Harness) -> None:
 
 
 def test_facets_count_each_filter_without_itself(harness: Harness) -> None:
-    alpha = minibrain_id(harness, "Alpha")
-    beta = minibrain_id(harness, "Beta")
+    alpha = model_id(harness, "Alpha")
+    beta = model_id(harness, "Beta")
     add_jobs(harness, 3, JobKind.TRAIN, alpha)
     add_jobs(harness, 2, JobKind.EVAL, alpha, JobStatus.FAILED)
     add_jobs(harness, 4, JobKind.TRAIN, beta, JobStatus.SUCCEEDED)
     add_jobs(harness, 5, JobKind.DOWNLOAD)
-    facets = harness.client.get("/api/jobs/facets?kind=train&kind=eval&minibrain=alpha&status=failed").json()
+    facets = harness.client.get("/api/jobs/facets?kind=train&kind=eval&model=alpha&status=failed").json()
     assert facets["total"] == 2
     assert facets["statuses"] == {"queued": 3, "failed": 2}
-    assert facets["minibrains"] == {"alpha": 2}
+    assert facets["models"] == {"alpha": 2}
     everything = harness.client.get("/api/jobs/facets?kind=train&kind=eval").json()
-    assert everything["minibrains"] == {"alpha": 5, "beta": 4}
+    assert everything["models"] == {"alpha": 5, "beta": 4}
     assert everything["statuses"] == {"queued": 3, "failed": 2, "succeeded": 4}

@@ -19,7 +19,7 @@ def queued_training(harness: Harness) -> None:
 
 
 def train_job(harness: Harness) -> dict:
-    job_id = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()["items"][0]["id"]
+    job_id = harness.client.get(f"/api/jobs?model={SLUG}&kind=train").json()["items"][0]["id"]
     return harness.client.get(f"/api/jobs/{job_id}").json()
 
 
@@ -32,10 +32,10 @@ def test_worker_runs_training_and_hands_over_to_eval(harness: Harness) -> None:
     assert job["attempts"][0]["log"]
     log = harness.client.get(f"/api/artifacts/{job['attempts'][0]['log']}").text
     assert "half way" in log
-    versions = harness.client.get(f"/api/minibrains/{SLUG}/versions").json()
+    versions = harness.client.get(f"/api/models/{SLUG}/versions").json()
     assert versions[0]["status"] == "evaluating"
     assert harness.worker(kinds=["eval"], modules=FAKE).run_once()
-    assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "ready"
+    assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "ready"
 
 
 def test_final_exit_code_fails_without_retry(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -69,7 +69,7 @@ def test_cancel_stops_the_child_process(harness: Harness, monkeypatch: pytest.Mo
     runner.join(timeout=30)
     assert time.monotonic() - started < 25
     assert train_job(harness)["status"] == "cancelled"
-    assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "failed"
+    assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "failed"
 
 
 class Unreachable:

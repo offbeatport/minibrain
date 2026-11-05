@@ -17,7 +17,7 @@ from minibrain.tasks.service import prompting_of
 
 def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:
     if version.snapshot is None:
-        raise MissingArtifactError(f"{version.minibrain.slug}@{version.number} has no dataset version")
+        raise MissingArtifactError(f"{version.model.slug}@{version.number} has no dataset version")
     snapshot = ref(session, version.snapshot.artifact_id)
     if snapshot is None:
         raise MissingArtifactError(f"snapshot {version.snapshot.hash[:12]} has no artifact")
@@ -25,34 +25,34 @@ def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:
 
 
 def base_spec(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
-    touch(session, version.minibrain.base_model)
-    return resolve_spec(session, settings, version.minibrain.base_model).as_dict()
+    touch(session, version.model.base_model)
+    return resolve_spec(session, settings, version.model.base_model).as_dict()
 
 
 def train_params(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
     return {
-        "slug": version.minibrain.slug,
+        "slug": version.model.slug,
         "number": version.number,
-        "base_model": version.minibrain.base_model,
+        "base_model": version.model.base_model,
         "base_spec": base_spec(session, settings, version),
         "snapshot": snapshot_ref(session, version),
         "recipe": DEFAULT_RECIPE | dict(version.recipe),
-        "plan_base": base_facts(session, settings, version.minibrain.base_model).as_dict(),
+        "plan_base": base_facts(session, settings, version.model.base_model).as_dict(),
         "prompting": prompting_of(version).as_dict(),
     }
 
 
 def eval_params(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
     return {
-        "slug": version.minibrain.slug,
+        "slug": version.model.slug,
         "number": version.number,
-        "base_model": version.minibrain.base_model,
+        "base_model": version.model.base_model,
         "base_spec": base_spec(session, settings, version),
         "version_kind": version.kind,
         "snapshot": snapshot_ref(session, version),
         "adapter": ref(session, version.adapter_artifact_id),
         "prompting": prompting_of(version).as_dict(),
-        "answer_tokens": preset(version.minibrain.preset).answer_tokens,
+        "answer_tokens": preset(version.model.preset).answer_tokens,
     }
 
 
@@ -61,7 +61,7 @@ def judge_params(
 ) -> dict[str, Any]:
     touch(session, judge.model)
     return {
-        "slug": version.minibrain.slug,
+        "slug": version.model.slug,
         "number": version.number,
         "base_model": judge.model,
         "base_spec": resolve_spec(session, settings, judge.model).as_dict(),

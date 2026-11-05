@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.registry.models import Model, ModelStatus, now
+from minibrain.registry.models import BaseModel, BaseModelStatus, now
 
 CORRUPT = "corrupt"
 MISSING = "missing"
@@ -55,17 +55,17 @@ def missing_message(problems: dict[str, str]) -> str:
     return f"{listed(paths)} {verb(paths, 'is', 'are')} missing or the wrong size"
 
 
-def set_health(model: Model, state: str | None, message: str | None = None, **detail: Any) -> None:
+def set_health(model: BaseModel, state: str | None, message: str | None = None, **detail: Any) -> None:
     model.health = state
     model.health_detail = {"message": message, **detail} if state else {}
     model.updated_at = now()
 
 
-def file_states(model: Model) -> dict[str, str]:
+def file_states(model: BaseModel) -> dict[str, str]:
     return dict((model.health_detail or {}).get("files") or {})
 
 
-def apply_check(model: Model, checked: list[dict[str, Any]]) -> None:
+def apply_check(model: BaseModel, checked: list[dict[str, Any]]) -> None:
     states = {entry["path"]: entry["status"] for entry in checked if entry["status"] != "ok"}
     hashes = {entry["path"]: entry.get("sha256") for entry in checked if entry["status"] == "ok"}
     model.files = [entry | {"sha256": entry.get("sha256") or hashes.get(entry["path"])} for entry in model.files]
@@ -82,7 +82,7 @@ def apply_check(model: Model, checked: list[dict[str, Any]]) -> None:
     set_health(model, CORRUPT, message + ".", files=states)
 
 
-def apply_repair(model: Model, recorded: list[dict[str, Any]]) -> None:
+def apply_repair(model: BaseModel, recorded: list[dict[str, Any]]) -> None:
     hashes = {entry["path"]: entry.get("sha256") for entry in recorded}
     model.files = [entry | {"sha256": entry.get("sha256") or hashes.get(entry["path"])} for entry in model.files]
     model.verified_at = now()
@@ -90,8 +90,8 @@ def apply_repair(model: Model, recorded: list[dict[str, Any]]) -> None:
         set_health(model, None)
 
 
-def problem_of(model: Model, problems: dict[str, str]) -> str | None:
-    if model.status != ModelStatus.AVAILABLE:
+def problem_of(model: BaseModel, problems: dict[str, str]) -> str | None:
+    if model.status != BaseModelStatus.AVAILABLE:
         return None
     if model.health:
         message = (model.health_detail or {}).get("message")
@@ -102,7 +102,7 @@ def problem_of(model: Model, problems: dict[str, str]) -> str | None:
 
 
 def record_load_failure(session: Session, key: str, code: str | None, message: str | None, host: str) -> None:
-    model = session.get(Model, key)
+    model = session.get(BaseModel, key)
     if model is None or code not in LOAD_PROBLEMS:
         return
     if model.health == code and (model.health_detail or {}).get("message") == message:
@@ -111,14 +111,14 @@ def record_load_failure(session: Session, key: str, code: str | None, message: s
 
 
 def record_loaded(session: Session, key: str) -> None:
-    model = session.get(Model, key)
+    model = session.get(BaseModel, key)
     if model is not None and model.health in LOAD_PROBLEMS:
         set_health(model, None)
 
 
-def report_problems(session: Session, problems_of: Callable[[Model], dict[str, str]]) -> int:
+def report_problems(session: Session, problems_of: Callable[[BaseModel], dict[str, str]]) -> int:
     found = 0
-    for model in session.scalars(select(Model).where(Model.status == ModelStatus.AVAILABLE)):
+    for model in session.scalars(select(BaseModel).where(BaseModel.status == BaseModelStatus.AVAILABLE)):
         problem = problem_of(model, problems_of(model))
         if problem is not None:
             found += 1

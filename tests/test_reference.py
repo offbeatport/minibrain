@@ -37,8 +37,8 @@ def test_the_management_reference_names_roles_and_csrf(harness: Harness) -> None
     document = harness.client.get("/api/openapi/api.json").json()
     assert all(path.startswith("/api/") for path in document["paths"])
     paths = document["paths"]
-    assert paths["/api/minibrains"]["post"]["description"].startswith("Needs the Builder role.")
-    assert paths["/api/minibrains"]["get"]["description"].startswith("Needs the Viewer role.")
+    assert paths["/api/models"]["post"]["description"].startswith("Needs the Builder role.")
+    assert paths["/api/models"]["get"]["description"].startswith("Needs the Viewer role.")
     assert paths["/api/policies"]["get"]["description"].startswith("Needs the Admin role.")
     assert paths["/api/auth/login"]["post"]["description"] == "No sign-in needed."
     assert "security" not in paths["/api/auth/login"]["post"]

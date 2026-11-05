@@ -32,7 +32,7 @@ def job(harness: Harness, job_id: int) -> dict:
 
 
 def version_status(harness: Harness) -> str:
-    return harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"]
+    return harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"]
 
 
 def fail(harness: Harness, claim: dict, error: str = "boom", retryable: bool = True) -> int:
@@ -128,7 +128,7 @@ def test_duplicate_complete_is_rejected_and_harmless(harness: Harness) -> None:
     body = {"token": claim["token"], "result": {"summary": {}}, "outputs": {"adapter": adapter}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 409
-    evals = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=eval").json()["items"]
+    evals = harness.client.get(f"/api/jobs?model={SLUG}&kind=eval").json()["items"]
     assert len(evals) == 1
 
 
@@ -227,12 +227,12 @@ def test_events_stream_until_the_job_ends(harness: Harness) -> None:
     assert "step 1" in stream and stream.rstrip().endswith(f'data: {{"job": {claim["job_id"]}}}')
 
 
-def test_job_rows_cascade_with_the_minibrain(harness: Harness) -> None:
+def test_job_rows_cascade_with_the_model(harness: Harness) -> None:
     lora_job(harness)
     claim = harness.claim(["train"])
     assert claim is not None
     fail(harness, claim, "x", retryable=False)
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
     harness.settle()
     with harness.sessions() as session:
         assert session.get(Job, claim["job_id"]) is None

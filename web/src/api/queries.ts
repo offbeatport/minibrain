@@ -7,16 +7,16 @@ const POLL_MS = 2000;
 export const MODELS_POLL_MS = POLL_MS;
 
 export const keys = {
-    minibrains: ["minibrains"] as const,
-    minibrain: (slug: string) => ["minibrain", slug] as const,
-    preview: (slug: string) => ["minibrain", slug, "preview"] as const,
-    golden: (slug: string) => ["minibrain", slug, "golden"] as const,
-    versions: (slug: string) => ["minibrain", slug, "versions"] as const,
-    jobs: (slug: string) => ["minibrain", slug, "jobs"] as const,
-    apiKeys: ["keys"] as const,
     models: ["models"] as const,
+    model: (slug: string) => ["model", slug] as const,
+    preview: (slug: string) => ["model", slug, "preview"] as const,
+    golden: (slug: string) => ["model", slug, "golden"] as const,
+    versions: (slug: string) => ["model", slug, "versions"] as const,
+    jobs: (slug: string) => ["model", slug, "jobs"] as const,
+    apiKeys: ["keys"] as const,
+    allModels: ["all-models"] as const,
     catalog: ["catalog"] as const,
-    baseModel: (key: string) => ["models", "base", key] as const,
+    baseModel: (key: string) => ["all-models", "base", key] as const,
     datasets: ["datasets"] as const,
     dataset: (slug: string) => ["datasets", slug] as const,
     datasetPreview: (slug: string) => ["datasets", slug, "preview"] as const,
@@ -39,8 +39,8 @@ export function isModelMoving(row: ModelRow): boolean {
     );
 }
 
-export function loadModels() {
-    return unwrap(api.GET("/api/models"));
+export function loadAllModels() {
+    return unwrap(api.GET("/api/all-models"));
 }
 
 const path = (slug: string) => ({ params: { path: { slug } } });
@@ -53,19 +53,19 @@ export function isActiveVersion(version: VersionInfo): boolean {
     return ACTIVE_VERSION.has(version.status);
 }
 
-export function useMinibrains() {
+export function useModels() {
     return useQuery({
-        queryKey: keys.minibrains,
-        queryFn: () => unwrap(api.GET("/api/minibrains")),
+        queryKey: keys.models,
+        queryFn: () => unwrap(api.GET("/api/models")),
         refetchInterval: (query) =>
             query.state.data?.some((item) => item.active_jobs > 0) ? POLL_MS : false,
     });
 }
 
-export function useMinibrain(slug: string) {
+export function useModel(slug: string) {
     return useQuery({
-        queryKey: keys.minibrain(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}", path(slug))),
+        queryKey: keys.model(slug),
+        queryFn: () => unwrap(api.GET("/api/models/{slug}", path(slug))),
         refetchInterval: (query) => ((query.state.data?.active_jobs ?? 0) > 0 ? POLL_MS : false),
     });
 }
@@ -73,7 +73,7 @@ export function useMinibrain(slug: string) {
 export function usePreview(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.preview(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/preview", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{slug}/preview", path(slug))),
         enabled,
         retry: false,
     });
@@ -132,7 +132,7 @@ export function useDatasetPreview(slug: string, enabled: boolean) {
 export function useGolden(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.golden(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/golden", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{slug}/golden", path(slug))),
         enabled,
     });
 }
@@ -140,7 +140,7 @@ export function useGolden(slug: string, enabled: boolean) {
 export function useVersions(slug: string) {
     return useQuery({
         queryKey: keys.versions(slug),
-        queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/versions", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{slug}/versions", path(slug))),
         refetchInterval: (query) => (query.state.data?.some(isActiveVersion) ? POLL_MS : false),
     });
 }
@@ -149,7 +149,7 @@ export function useJobs(slug: string) {
     return useQuery({
         queryKey: keys.jobs(slug),
         queryFn: () =>
-            unwrap(api.GET("/api/jobs", { params: { query: { minibrain: [slug] } } })).then(
+            unwrap(api.GET("/api/jobs", { params: { query: { model: [slug] } } })).then(
                 (page) => page.items,
             ),
         refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
@@ -213,10 +213,10 @@ export function useInstallSettings() {
     });
 }
 
-export function useModels() {
+export function useAllModels() {
     return useQuery({
-        queryKey: keys.models,
-        queryFn: loadModels,
+        queryKey: keys.allModels,
+        queryFn: loadAllModels,
         refetchInterval: (query) => (query.state.data?.some(isModelMoving) ? POLL_MS : 15000),
     });
 }
@@ -238,7 +238,7 @@ export function useCatalog(pool?: string) {
 export function useBaseModel(key: string) {
     return useQuery({
         queryKey: keys.baseModel(key),
-        queryFn: () => unwrap(api.GET("/api/models/base/{key}", { params: { path: { key } } })),
+        queryFn: () => unwrap(api.GET("/api/base-models/{key}", { params: { path: { key } } })),
         refetchInterval: (query) =>
             query.state.data && isModelMoving(query.state.data) ? POLL_MS : 15000,
     });

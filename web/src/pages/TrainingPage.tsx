@@ -14,9 +14,9 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
-import { type MinibrainDetail, type VersionCreate, api, unwrap } from "~/api/client";
+import { type ModelDetail, type VersionCreate, api, unwrap } from "~/api/client";
 import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
-import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
+import { isActiveJob, useDatasets, useJobs, useModel } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
 import { ErrorLine, PanelSection, Section, errorMessage } from "~/components/Section";
@@ -40,7 +40,7 @@ function DataLine({
     detail,
     snapshot,
 }: {
-    detail: MinibrainDetail;
+    detail: ModelDetail;
     snapshot: SnapshotInfo | null | undefined;
 }) {
     if (!snapshot) {
@@ -55,7 +55,7 @@ function DataLine({
         <p className="text-sm text-muted-foreground tabular-nums">
             {`${name}${version}: ${count(snapshot.counts.train)} training rows, ${count(snapshot.counts.golden)} in the test set, ${count(snapshot.labels.length)} labels. Accepted feedback joins these rows when a version starts. `}
             <Link
-                href={`/data?minibrain=${encodeURIComponent(detail.slug)}`}
+                href={`/data?model=${encodeURIComponent(detail.slug)}`}
                 className="text-primary hover:underline"
             >
                 Data and test set
@@ -97,7 +97,7 @@ function VersionPicker({
     );
 }
 
-function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusTrain: boolean }) {
+function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain: boolean }) {
     const slug = detail.slug;
     const invalidate = useInvalidate(slug);
     const trainButton = useRef<HTMLButtonElement>(null);
@@ -123,7 +123,7 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     const create = useMutation({
         mutationFn: (body: VersionCreate) =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/versions", {
+                api.POST("/api/models/{slug}/versions", {
                     params: { path: { slug } },
                     body: chosen ? { ...body, snapshot_id: chosen.id } : body,
                 }),
@@ -240,7 +240,7 @@ function AddTrainingData({
     detail,
     onPrepared,
 }: {
-    detail: MinibrainDetail;
+    detail: ModelDetail;
     onPrepared: () => void;
 }) {
     const slug = detail.slug;
@@ -251,8 +251,8 @@ function AddTrainingData({
     const prepare = useMutation({
         mutationFn: async () => {
             const path = { params: { path: { slug } } };
-            await unwrap(api.PUT("/api/minibrains/{slug}/dataset", { ...path, body: { dataset } }));
-            return unwrap(api.POST("/api/minibrains/{slug}/snapshots", path));
+            await unwrap(api.PUT("/api/models/{slug}/dataset", { ...path, body: { dataset } }));
+            return unwrap(api.POST("/api/models/{slug}/snapshots", path));
         },
         onSuccess: onPrepared,
         onSettled: invalidate,
@@ -286,7 +286,7 @@ function AddTrainingData({
 }
 
 export function Training({ slug }: { slug: string }) {
-    const { data: detail } = useMinibrain(slug);
+    const { data: detail } = useModel(slug);
     const { data: jobs } = useJobs(slug);
     const [prepared, setPrepared] = useState(false);
     if (!detail) {

@@ -2,13 +2,13 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from minibrain.registry.models import Model, now
+from minibrain.registry.models import BaseModel, now
 
 TOUCH_EVERY = timedelta(minutes=5)
 
 
 def touch(session: Session, key: str) -> None:
-    model = session.get(Model, key)
+    model = session.get(BaseModel, key)
     if model is None:
         return
     moment = now()

@@ -31,8 +31,8 @@ from minibrain.models.hardware import NodeReport
 from minibrain.models.train_facts import base_facts, catalogue_base, longest_example, trainer_machines
 from minibrain.registry.compute import pools
 from minibrain.registry.files import snapshot_location, store_for
-from minibrain.registry.models import CatalogModel, CatalogVariant, Minibrain, Snapshot
-from minibrain.registry.service import ConflictError, get_minibrain
+from minibrain.registry.models import CatalogModel, CatalogVariant, Model, Snapshot
+from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 
 router = APIRouter(prefix="/api", tags=["training"])
@@ -53,13 +53,13 @@ def planner_settings(body: TrainingSettings) -> Settings:
     )
 
 
-def model_base(session: Session, settings: InstallSettings, minibrain: Minibrain) -> Base:
-    return base_facts(session, settings, minibrain.base_model)
+def model_base(session: Session, settings: InstallSettings, model: Model) -> Base:
+    return base_facts(session, settings, model.base_model)
 
 
-def require_trainable(session: Session, settings: InstallSettings, minibrain: Minibrain) -> None:
+def require_trainable(session: Session, settings: InstallSettings, model: Model) -> None:
     try:
-        validate(model_base(session, settings, minibrain), Settings())
+        validate(model_base(session, settings, model), Settings())
     except PlanError as error:
         raise ConflictError(str(error)) from error
 
@@ -68,7 +68,7 @@ def training_plan(
     session: Session,
     settings: InstallSettings,
     node: NodeReport,
-    minibrain: Minibrain,
+    model: Model,
     snapshot: Snapshot,
     body: TrainingSettings,
 ) -> tuple[Plan, int]:
@@ -78,7 +78,7 @@ def training_plan(
     rows, longest = longest_example(location, chosen.max_rows)
     machines = trainer_machines(pools(session, node))
     try:
-        return plan(model_base(session, settings, minibrain), machines, chosen, longest, rows), longest
+        return plan(model_base(session, settings, model), machines, chosen, longest, rows), longest
     except PlanError as error:
         raise ConflictError(str(error)) from error
 
@@ -146,7 +146,7 @@ def plan_info(found: Plan, default: Plan, longest: int) -> TrainingPlanInfo:
     )
 
 
-@router.get("/minibrains/{slug}/training-plan", dependencies=[Depends(viewer)])
+@router.get("/models/{slug}/training-plan", dependencies=[Depends(viewer)])
 def get_training_plan(
     slug: str,
     query: Annotated[TrainingPlanQuery, Query()],
@@ -154,12 +154,12 @@ def get_training_plan(
     settings: SettingsDep,
     node: LocalNodeDep,
 ) -> TrainingPlanInfo:
-    minibrain = get_minibrain(session, slug)
-    snapshot = dataset_version(session, minibrain, query.snapshot_id)
-    found, longest = training_plan(session, settings, node, minibrain, snapshot, query)
+    model = get_model(session, slug)
+    snapshot = dataset_version(session, model, query.snapshot_id)
+    found, longest = training_plan(session, settings, node, model, snapshot, query)
     default = found
     if found.settings.overrides():
-        default, _ = training_plan(session, settings, node, minibrain, snapshot, TrainingSettings())
+        default, _ = training_plan(session, settings, node, model, snapshot, TrainingSettings())
     return plan_info(found, default, longest)
 
 

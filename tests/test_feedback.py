@@ -28,7 +28,7 @@ def send(harness: Harness, headers: dict[str, str], **body: Any) -> Any:
 
 def played(harness: Harness, text: str, rating: str, output: str = "billing", **extra: Any) -> dict:
     body = {"rating": rating, "input": text, "output": output, "version": 0} | extra
-    response = harness.client.post(f"/api/minibrains/{SLUG}/feedback", json=body)
+    response = harness.client.post(f"/api/models/{SLUG}/feedback", json=body)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -42,7 +42,7 @@ def test_feedback_needs_a_key_that_covers_the_model(harness: Harness) -> None:
     response_id = chat(harness, headers)
     body = {"response_id": response_id, "rating": "down", "input": "I was charged twice"}
     assert harness.client.post("/v1/feedback", json={"model": SLUG} | body).status_code == 401
-    harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"})
     other = bearer(harness, ("custom", "other"))
     assert send(harness, other, **body).status_code == 403
     assert send(harness, headers, **(body | {"model": "nope"})).status_code == 404
@@ -63,7 +63,7 @@ def test_without_kept_inputs_the_call_must_carry_the_input(harness: Harness) -> 
 
 def test_kept_inputs_let_feedback_name_a_response_by_id(harness: Harness) -> None:
     headers = servable(harness)
-    assert harness.client.put(f"/api/minibrains/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
+    assert harness.client.put(f"/api/models/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
     response_id = chat(harness, headers)
     first = send(harness, headers, response_id=response_id, rating="down")
     assert first.status_code == 201, first.text
@@ -104,7 +104,7 @@ def test_the_queue_puts_disagreement_then_unsure_items_first_and_pages(harness: 
     detail = harness.client.get(f"/api/feedback/{first['id']}").json()
     assert [item["id"] for item in detail["related"]] == [second["id"]]
     facets = harness.client.get("/api/feedback/facets", params={"status": "pending"}).json()
-    assert facets["statuses"] == {"pending": 4} and facets["minibrains"] == {SLUG: 4}
+    assert facets["statuses"] == {"pending": 4} and facets["models"] == {SLUG: 4}
     assert harness.client.get("/api/feedback", params={"model": "nope"}).json()["total"] == 0
 
 
@@ -161,9 +161,9 @@ def test_accepted_feedback_joins_the_rows_a_new_version_trains_on(harness: Harne
     for item in (relabel, added, agrees):
         assert review(harness, item, "accept").status_code == 200
     review(harness, rejected, "reject")
-    summary = harness.client.get(f"/api/minibrains/{SLUG}/feedback/summary").json()
+    summary = harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()
     assert summary == summary | {"version": 0, "total": 5, "accepted": 3, "pending": 1, "rows": 3}
-    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
+    detail = harness.client.get(f"/api/models/{SLUG}").json()
     assert (detail["snapshot"]["id"], detail["snapshot"]["feedback_rows"]) == (before["id"], 0)
     version = add_version(harness, "prompt")
     assert (version["snapshot_number"], version["snapshot_rows"]) == (before["number"], 201)
@@ -179,7 +179,7 @@ def test_accepted_feedback_joins_the_rows_a_new_version_trains_on(harness: Harne
     finish(harness, "eval")
     again = add_version(harness, "prompt")
     assert again["snapshot_id"] == version["snapshot_id"]
-    later = harness.client.get(f"/api/minibrains/{SLUG}/feedback/summary").json()
+    later = harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()
     assert (later["version"], later["total"], later["accepted"], later["rows"]) == (2, 0, 0, 3)
 
 
@@ -217,7 +217,7 @@ def test_standalone_gateway_forwards_feedback_to_main(harness: Harness, tmp_path
 def test_feedback_is_deleted_with_its_model(harness: Harness) -> None:
     create_with_dataset(harness)
     played(harness, "charged twice", "down", correction="billing")
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
     harness.settle()
     with harness.sessions() as session:
         assert session.scalars(select(Feedback)).all() == []

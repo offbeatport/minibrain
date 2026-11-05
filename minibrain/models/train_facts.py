@@ -7,7 +7,7 @@ from minibrain.ml.planner import Base, Machine, estimated_tokens
 from minibrain.models.registry import base_config, quantization
 from minibrain.models.rules import context_of, shape_of
 from minibrain.registry.compute import Pool
-from minibrain.registry.models import CatalogModel, CatalogVariant, Model
+from minibrain.registry.models import BaseModel, CatalogModel, CatalogVariant
 from minibrain.settings import Settings
 
 FULL_PRECISION = {"bf16", "fp16", "fp32", "bfloat16", "float16", "float32"}
@@ -33,11 +33,11 @@ def catalogue_base(entry: CatalogModel, variant: CatalogVariant) -> Base:
     )
 
 
-def safetensors_bytes(model: Model) -> int:
+def safetensors_bytes(model: BaseModel) -> int:
     return sum(int(item.get("size") or 0) for item in model.files if str(item.get("path", "")).endswith(".safetensors"))
 
 
-def imported_base(settings: Settings, model: Model, quantized: str | None) -> Base:
+def imported_base(settings: Settings, model: BaseModel, quantized: str | None) -> Base:
     config = base_config(settings, model) or {}
     weights = safetensors_bytes(model) or model.size_bytes
     dtype = str(config.get("torch_dtype") or config.get("dtype") or "bf16")
@@ -47,7 +47,7 @@ def imported_base(settings: Settings, model: Model, quantized: str | None) -> Ba
 
 def base_facts(session: Session, settings: Settings, key: str) -> Base:
     quantized = quantization(session, settings, key)
-    model = session.get(Model, key)
+    model = session.get(BaseModel, key)
     entry = session.get(CatalogModel, model.catalog_id if model and model.catalog_id else key)
     if entry is not None and entry.variants:
         variant = (model.variant if model else None) or entry.variants[0]

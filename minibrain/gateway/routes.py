@@ -504,7 +504,7 @@ def chat_completions(
             LogEntry(
                 at=now(),
                 key_id=grant.key_id,
-                minibrain_id=route.minibrain_id if route else None,
+                model_id=route.model_id if route else None,
                 model=body.model,
                 version=route.version if route else None,
                 contract=route.contract if route else None,
@@ -565,14 +565,14 @@ def feedback(body: FeedbackRequest, grant: GrantDep, config: ConfigDep, request:
         raise HTTPException(status_code=404, detail=f"model {body.model} not found")
     if not grant.covers(route):
         raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
-    if route.minibrain_id is None:
+    if route.model_id is None:
         raise HTTPException(status_code=422, detail="feedback is collected for custom models only")
     logs: LogBuffer = request.app.state.request_logs
     with contextlib.suppress(Exception):
         logs.flush()
     sink: FeedbackSink = request.app.state.feedback
     submission = Submission(
-        minibrain_id=route.minibrain_id,
+        model_id=route.model_id,
         origin=ORIGIN_API,
         rating=body.rating,
         response_id=body.response_id,

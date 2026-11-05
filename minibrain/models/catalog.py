@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from minibrain import provision
-from minibrain.registry.models import CatalogModel, CatalogVariant, Model, now
+from minibrain.registry.models import BaseModel, CatalogModel, CatalogVariant, now
 from minibrain.registry.settings_store import read, write
 
 BUNDLED = Path(__file__).resolve().parent.parent / "catalog" / "catalog.json"
@@ -62,7 +62,7 @@ def bundled() -> dict[str, Any]:
 
 
 def variant_in_use(session: Session, variant_id: str) -> bool:
-    return session.scalar(select(Model.id).where(Model.variant_id == variant_id).limit(1)) is not None
+    return session.scalar(select(BaseModel.id).where(BaseModel.variant_id == variant_id).limit(1)) is not None
 
 
 def refresh_variant(session: Session, variant: CatalogVariant, data: dict[str, Any]) -> None:
@@ -99,7 +99,7 @@ def upsert(session: Session, entry: dict[str, Any]) -> None:
         renamed = same.get((stale.repo, stale.revision))
         if renamed is not None:
             session.flush()
-            session.execute(update(Model).where(Model.variant_id == stale.id).values(variant_id=renamed.id))
+            session.execute(update(BaseModel).where(BaseModel.variant_id == stale.id).values(variant_id=renamed.id))
         if not variant_in_use(session, stale.id):
             model.variants.remove(stale)
 

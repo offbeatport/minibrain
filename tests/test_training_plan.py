@@ -192,10 +192,10 @@ def register(harness: Harness, hardware: dict[str, Any], host: str = "gpu-box") 
 
 def test_training_plan_reads_the_data_and_the_worker(harness: Harness) -> None:
     create_with_dataset(harness)
-    unknown = harness.client.get(f"/api/minibrains/{SLUG}/training-plan").json()
+    unknown = harness.client.get(f"/api/models/{SLUG}/training-plan").json()
     assert (unknown["level"], unknown["chosen"], unknown["machine"]) == ("unknown", None, None)
     register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
-    found = harness.client.get(f"/api/minibrains/{SLUG}/training-plan").json()
+    found = harness.client.get(f"/api/models/{SLUG}/training-plan").json()
     assert (found["level"], found["machine"], found["rows"]) == ("fits", "Test GPU", 146)
     assert found["chosen"]["label"] == "LoRA bf16"
     assert found["basis"].startswith("LoRA bf16 · fits in ")
@@ -206,7 +206,7 @@ def test_training_plan_reads_the_data_and_the_worker(harness: Harness) -> None:
         "QLoRA 4-bit with checkpointing",
     ]
     assert found["defaults"] == found["defaults"] | {"strategy": "lora", "rank": 16, "max_rows": 3000}
-    pinned = harness.client.get(f"/api/minibrains/{SLUG}/training-plan?strategy=qlora&micro_batch=2").json()
+    pinned = harness.client.get(f"/api/models/{SLUG}/training-plan?strategy=qlora&micro_batch=2").json()
     assert pinned["chosen"]["strategy"] == "qlora"
     assert pinned["chosen"]["micro_batch"] == 2
     assert pinned["overrides"] == ["strategy", "micro_batch"]
@@ -215,7 +215,7 @@ def test_training_plan_reads_the_data_and_the_worker(harness: Harness) -> None:
 
 def test_overrides_are_validated(harness: Harness) -> None:
     create_with_dataset(harness)
-    url = f"/api/minibrains/{SLUG}/versions"
+    url = f"/api/models/{SLUG}/versions"
     for body in ({"micro_batch": 0}, {"learning_rate": 1}, {"strategy": "dora"}, {"rank": 512}, {"seq_len": 8}):
         assert harness.client.post(url, json={"kind": "lora", **body}).status_code == 422, body
     response = harness.client.post(url, json={"kind": "lora", "seq_len": 50_000})
@@ -226,7 +226,7 @@ def test_overrides_are_validated(harness: Harness) -> None:
 def test_a_version_that_cannot_fit_is_refused_up_front(harness: Harness) -> None:
     create_with_dataset(harness)
     register(harness, worker_hardware(2 * GIB, accelerator="cpu"))
-    response = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": "lora"})
+    response = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora"})
     assert response.status_code == 409
     assert response.json()["detail"].startswith("Qwen3 0.6B does not fit for training on Test CPU")
     assert harness.claim(["train"]) is None
@@ -236,7 +236,7 @@ def test_the_chosen_settings_reach_the_training_job(harness: Harness) -> None:
     create_with_dataset(harness)
     register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
     body = {"kind": "lora", "strategy": "qlora", "rank": 8, "epochs": 2, "max_rows": 100, "seq_len": 128}
-    version = harness.client.post(f"/api/minibrains/{SLUG}/versions", json=body)
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json=body)
     assert version.status_code == 201, version.text
     stored = version.json()["recipe"]
     assert (stored["strategy"], stored["rank"], stored["alpha"], stored["seq_len"]) == ("qlora", 8, 16, 128)

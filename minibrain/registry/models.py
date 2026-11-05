@@ -50,7 +50,7 @@ class JobKind(StrEnum):
     JUDGE = "judge"
 
 
-class ModelStatus(StrEnum):
+class BaseModelStatus(StrEnum):
     DOWNLOADING = "downloading"
     IMPORTING = "importing"
     AVAILABLE = "available"
@@ -190,12 +190,12 @@ class Dataset(Base):
     sources: Mapped[list[Source]] = relationship(
         secondary=dataset_sources, back_populates="datasets", order_by="Source.name"
     )
-    minibrains: Mapped[list["Minibrain"]] = relationship(back_populates="dataset")
+    models: Mapped[list["Model"]] = relationship(back_populates="dataset")
     snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="dataset", order_by="Snapshot.id")
 
 
-class Minibrain(Base):
-    __tablename__ = "minibrains"
+class Model(Base):
+    __tablename__ = "models"
     __table_args__ = ({"sqlite_autoincrement": True},)
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -218,10 +218,10 @@ class Minibrain(Base):
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    dataset: Mapped["Dataset | None"] = relationship(back_populates="minibrains")
-    versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
-    jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
-    key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
+    dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
+    versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
+    jobs: Mapped[list["Job"]] = relationship(back_populates="model", cascade="all, delete-orphan")
+    key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="model", cascade="all, delete-orphan")
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
 
@@ -261,10 +261,10 @@ class Snapshot(Base):
 
 class Version(Base):
     __tablename__ = "versions"
-    __table_args__ = (UniqueConstraint("minibrain_id", "number"), {"sqlite_autoincrement": True})
+    __table_args__ = (UniqueConstraint("model_id", "number"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
+    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"))
     snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("snapshots.id"), default=None)
     number: Mapped[int]
     kind: Mapped[str]
@@ -283,7 +283,7 @@ class Version(Base):
     known_limits: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    minibrain: Mapped[Minibrain] = relationship(back_populates="versions")
+    model: Mapped[Model] = relationship(back_populates="versions")
     snapshot: Mapped[Snapshot | None] = relationship(back_populates="versions")
 
 
@@ -303,7 +303,7 @@ class Job(Base):
     __table_args__ = (
         Index("ix_jobs_claim", "status", "priority", "id"),
         Index("ix_jobs_kind", "kind", "id"),
-        Index("ix_jobs_minibrain", "minibrain_id", "id"),
+        Index("ix_jobs_model", "model_id", "id"),
         Index(
             "uq_jobs_active_key",
             "idempotency_key",
@@ -316,9 +316,9 @@ class Job(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str]
-    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
     version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id", ondelete="CASCADE"), default=None)
-    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), default=None)
+    base_model_id: Mapped[str | None] = mapped_column(ForeignKey("base_models.id", ondelete="SET NULL"), default=None)
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     needs_gpu: Mapped[bool] = mapped_column(default=False)
     status: Mapped[str] = mapped_column(default=JobStatus.QUEUED)
@@ -341,7 +341,7 @@ class Job(Base):
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
-    minibrain: Mapped[Minibrain | None] = relationship(back_populates="jobs")
+    model: Mapped[Model | None] = relationship(back_populates="jobs")
     version: Mapped[Version | None] = relationship()
     attempts: Mapped[list["JobAttempt"]] = relationship(
         back_populates="job", cascade="all, delete-orphan", order_by="JobAttempt.number"
@@ -399,21 +399,21 @@ class ApiKey(Base):
 
 class KeyScope(Base):
     __tablename__ = "api_key_scopes"
-    __table_args__ = (UniqueConstraint("key_id", "minibrain_id", "model_id"), {"sqlite_autoincrement": True})
+    __table_args__ = (UniqueConstraint("key_id", "model_id", "base_model_id"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key_id: Mapped[int] = mapped_column(ForeignKey("api_keys.id", ondelete="CASCADE"))
-    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
-    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
+    base_model_id: Mapped[str | None] = mapped_column(ForeignKey("base_models.id", ondelete="CASCADE"), default=None)
 
     key: Mapped[ApiKey] = relationship(back_populates="scopes")
-    minibrain: Mapped[Minibrain | None] = relationship(back_populates="key_scopes")
+    model: Mapped[Model | None] = relationship(back_populates="key_scopes")
 
 
 class RequestLog(Base):
     __tablename__ = "request_logs"
     __table_args__ = (
-        Index("ix_request_logs_minibrain", "minibrain_id", "id"),
+        Index("ix_request_logs_model", "model_id", "id"),
         Index("ix_request_logs_response", "response_id"),
         Index("ix_request_logs_at", "at"),
         Index("ix_request_logs_key", "key_id", "id"),
@@ -423,7 +423,7 @@ class RequestLog(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     at: Mapped[datetime] = mapped_column(UtcDateTime)
     key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"), default=None)
-    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
     model: Mapped[str]
     version: Mapped[int | None] = mapped_column(default=None)
     contract: Mapped[int | None] = mapped_column(default=None)
@@ -441,13 +441,13 @@ class Feedback(Base):
     __tablename__ = "feedback"
     __table_args__ = (
         Index("ix_feedback_queue", "priority", "id"),
-        Index("ix_feedback_input", "minibrain_id", "input_key"),
+        Index("ix_feedback_input", "model_id", "input_key"),
         Index("ix_feedback_response", "response_id"),
         {"sqlite_autoincrement": True},
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
+    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"))
     version: Mapped[int | None] = mapped_column(default=None)
     response_id: Mapped[str | None] = mapped_column(default=None)
     origin: Mapped[str]
@@ -467,7 +467,7 @@ class Feedback(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    minibrain: Mapped[Minibrain] = relationship()
+    model: Mapped[Model] = relationship()
 
 
 class JudgeScore(Base):
@@ -539,8 +539,8 @@ class CatalogVariant(Base):
     model: Mapped[CatalogModel] = relationship(back_populates="variants")
 
 
-class Model(Base):
-    __tablename__ = "models"
+class BaseModel(Base):
+    __tablename__ = "base_models"
 
     id: Mapped[str] = mapped_column(primary_key=True)
     source: Mapped[str]
@@ -717,10 +717,10 @@ class Teardown(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str]
-    minibrain_id: Mapped[int | None] = mapped_column(
-        ForeignKey("minibrains.id", ondelete="CASCADE"), unique=True, default=None
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), unique=True, default=None)
+    base_model_id: Mapped[str | None] = mapped_column(
+        ForeignKey("base_models.id", ondelete="CASCADE"), unique=True, default=None
     )
-    model_id: Mapped[str | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), unique=True, default=None)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("teardowns.id", ondelete="SET NULL"), default=None)
     name: Mapped[str]
     status: Mapped[str] = mapped_column(default=TeardownStatus.RUNNING)
@@ -732,5 +732,5 @@ class Teardown(Base):
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
-    minibrain: Mapped[Minibrain | None] = relationship(viewonly=True)
     model: Mapped[Model | None] = relationship(viewonly=True)
+    base_model: Mapped[BaseModel | None] = relationship(viewonly=True)

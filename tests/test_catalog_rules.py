@@ -86,7 +86,7 @@ def test_reseeding_drops_variants_that_left_the_snapshot(harness) -> None:
 
 def test_downloaded_models_follow_a_renamed_variant(harness) -> None:
     from minibrain.models.catalog import upsert
-    from minibrain.registry.models import CatalogModel, CatalogVariant, Model
+    from minibrain.registry.models import BaseModel, CatalogModel, CatalogVariant
 
     entry = bundled()["entries"][0]
     current = entry["variants"][0]
@@ -97,7 +97,7 @@ def test_downloaded_models_follow_a_renamed_variant(harness) -> None:
         model.variants.append(CatalogVariant(**{k: v for k, v in current.items() if k != "id"}, id=renamed, position=9))
         session.flush()
         session.add(
-            Model(
+            BaseModel(
                 id="pinned", source="catalog", catalog_id=entry["id"], variant_id=renamed, name="x", status="available"
             )
         )
@@ -105,5 +105,5 @@ def test_downloaded_models_follow_a_renamed_variant(harness) -> None:
         upsert(session, entry)
         session.commit()
         assert session.get(CatalogVariant, renamed) is None
-        pinned = session.get(Model, "pinned")
+        pinned = session.get(BaseModel, "pinned")
         assert pinned is not None and pinned.variant_id == current["id"]

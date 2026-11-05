@@ -16,8 +16,8 @@ import {
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
 import { type FormEvent, useState } from "react";
-import { type CompleteResponse, type MinibrainSummary, api, unwrap } from "~/api/client";
-import { useGolden, useMinibrain, useMinibrains, useVersions } from "~/api/queries";
+import { type CompleteResponse, type ModelSummary, api, unwrap } from "~/api/client";
+import { useGolden, useModel, useModels, useVersions } from "~/api/queries";
 import { AnswerFeedback } from "~/components/AnswerFeedback";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
@@ -89,7 +89,7 @@ function Reply({
 }
 
 function Playground({ slug }: { slug: string }) {
-    const { data: detail } = useMinibrain(slug);
+    const { data: detail } = useModel(slug);
     const { data: versions } = useVersions(slug);
     const can = useCan();
     const golden = useGolden(slug, can.build && Boolean(detail?.snapshot));
@@ -108,7 +108,7 @@ function Playground({ slug }: { slug: string }) {
             const replies = await Promise.all(
                 targets.map((version) =>
                     unwrap(
-                        api.POST("/api/minibrains/{slug}/complete", {
+                        api.POST("/api/models/{slug}/complete", {
                             params: { path: { slug } },
                             body: { text: input, version: Number(version) },
                         }),
@@ -235,19 +235,19 @@ function rememberModel(slug: string): void {
     }
 }
 
-function chooseModel(requested: string | null, minibrains: MinibrainSummary[]): string | null {
-    const known = new Set(minibrains.map((item) => item.slug));
-    const candidates = [requested, rememberedModel(), minibrains[0]?.slug];
+function chooseModel(requested: string | null, models: ModelSummary[]): string | null {
+    const known = new Set(models.map((item) => item.slug));
+    const candidates = [requested, rememberedModel(), models[0]?.slug];
     return candidates.find((slug): slug is string => Boolean(slug && known.has(slug))) ?? null;
 }
 
 function ModelPicker({
     slug,
-    minibrains,
+    models,
     onSelect,
 }: {
     slug: string;
-    minibrains: MinibrainSummary[];
+    models: ModelSummary[];
     onSelect: (slug: string) => void;
 }) {
     return (
@@ -256,7 +256,7 @@ function ModelPicker({
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
-                {minibrains.map((item) => (
+                {models.map((item) => (
                     <SelectItem key={item.slug} value={item.slug}>
                         {item.name}
                     </SelectItem>
@@ -269,9 +269,9 @@ function ModelPicker({
 export function PlaygroundPage() {
     const router = useRouter();
     const requested = useSearchParam("model");
-    const { data, isLoading } = useMinibrains();
-    const minibrains = data ?? [];
-    const slug = data ? chooseModel(requested, minibrains) : null;
+    const { data, isLoading } = useModels();
+    const models = data ?? [];
+    const slug = data ? chooseModel(requested, models) : null;
     const select = (next: string) => {
         rememberModel(next);
         router.history.replace(playgroundHref(next));
@@ -281,9 +281,7 @@ export function PlaygroundPage() {
             <PageHeader
                 title="Playground"
                 caption="Try a version on your own inputs, or compare two side by side."
-                actions={
-                    slug && <ModelPicker slug={slug} minibrains={minibrains} onSelect={select} />
-                }
+                actions={slug && <ModelPicker slug={slug} models={models} onSelect={select} />}
             />
             {!isLoading && !slug && (
                 <EmptyState

@@ -1,6 +1,6 @@
 # Sample data
 
-Ready-to-upload files for the Classify task. Upload one on a minibrain's Data tab; the input and label columns are
+Ready-to-upload files for the Classify task. Upload one on a model's Data tab; the input and label columns are
 detected automatically.
 
 | File | Rows | Labels | Format | What it shows |

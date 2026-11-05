@@ -8,7 +8,7 @@ from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
-    MinibrainDetail,
+    ModelDetail,
     ScoreInfo,
     VersionCreate,
     VersionInfo,
@@ -32,8 +32,8 @@ from minibrain.presets import presets
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     AuditEvent,
+    BaseModel,
     JobKind,
-    Minibrain,
     Model,
     Snapshot,
     Version,
@@ -42,7 +42,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.prices import load_prices
-from minibrain.registry.service import ConflictError, get_minibrain, get_version
+from minibrain.registry.service import ConflictError, get_model, get_version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.tasks.contracts import answer_of
@@ -57,27 +57,25 @@ DEFAULT_ANSWER_TOKENS = 256
 ANSWER_TOKENS = {key: item.answer_tokens for key, item in presets().items()}
 
 
-def audit_version(session: Session, minibrain: Minibrain, number: int, action: str, **detail: Any) -> None:
-    target = f"{minibrain.slug}@{number}"
-    session.add(
-        AuditEvent(actor=current_actor(), action=action, target=target, detail={"name": minibrain.name, **detail})
-    )
+def audit_version(session: Session, model: Model, number: int, action: str, **detail: Any) -> None:
+    target = f"{model.slug}@{number}"
+    session.add(AuditEvent(actor=current_actor(), action=action, target=target, detail={"name": model.name, **detail}))
 
 
 def start_version(
     session: Session,
     settings: Settings,
     store: ArtifactStore,
-    minibrain: Minibrain,
+    model: Model,
     kind: VersionKind,
     snapshot: Snapshot | None,
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
 ) -> Version:
-    version = new_version(session, store, minibrain, kind, snapshot, recipe, breaking)
+    version = new_version(session, store, model, kind, snapshot, recipe, breaking)
     audit_version(
         session,
-        minibrain,
+        model,
         number=version.number,
         action="version.create",
         kind=str(kind),
@@ -86,28 +84,28 @@ def start_version(
         contract=version.contract_number,
     )
     if kind == VersionKind.LORA:
-        version.base_hash = base_hash(session, minibrain.base_model)
+        version.base_hash = base_hash(session, model.base_model)
         params = train_params(session, settings, version)
-        enqueue(session, JobKind.TRAIN, params, minibrain.id, version.id, f"train:{version.id}")
+        enqueue(session, JobKind.TRAIN, params, model.id, version.id, f"train:{version.id}")
     elif version.status == VersionStatus.EVALUATING:
-        if base_readiness(session, minibrain.base_model) != "ready":
+        if base_readiness(session, model.base_model) != "ready":
             version.status = VersionStatus.READY
             return version
         params = eval_params(session, settings, version)
-        enqueue(session, JobKind.EVAL, params, minibrain.id, version.id, f"eval:{version.id}")
+        enqueue(session, JobKind.EVAL, params, model.id, version.id, f"eval:{version.id}")
     return version
 
 
-@router.get("/minibrains/{slug}/versions", dependencies=[Depends(viewer)])
+@router.get("/models/{slug}/versions", dependencies=[Depends(viewer)])
 def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
-    minibrain = get_minibrain(session, slug)
-    versions = sorted(minibrain.versions, key=lambda version: version.number, reverse=True)
+    model = get_model(session, slug)
+    versions = sorted(model.versions, key=lambda version: version.number, reverse=True)
     prices = load_prices(session)
-    found = [version_info(minibrain, version, prices) for version in versions]
+    found = [version_info(model, version, prices) for version in versions]
     return found if sees_rows() else [info.model_copy(update={"mistakes": []}) for info in found]
 
 
-@router.post("/minibrains/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
+@router.post("/models/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
 def add_version(
     slug: str,
     body: VersionCreate,
@@ -116,48 +114,48 @@ def add_version(
     store: StoreDep,
     node: LocalNodeDep,
 ) -> VersionInfo:
-    minibrain = get_minibrain(session, slug)
-    require_idle(minibrain.teardown, minibrain.name)
-    base = session.get(Model, minibrain.base_model)
+    model = get_model(session, slug)
+    require_idle(model.teardown, model.name)
+    base = session.get(BaseModel, model.base_model)
     if base is not None:
         require_idle(base.teardown, base.name)
     kind = VersionKind(body.kind)
-    readiness = base_readiness(session, minibrain.base_model)
+    readiness = base_readiness(session, model.base_model)
     if readiness == "pending":
-        raise ConflictError(f"{minibrain.base_model} is still being imported or downloaded; try once it is available")
+        raise ConflictError(f"{model.base_model} is still being imported or downloaded; try once it is available")
     if readiness == "missing":
-        raise ConflictError(f"{minibrain.base_model} is no longer on this install")
-    require_usable(session, settings, minibrain.base_model)
+        raise ConflictError(f"{model.base_model} is no longer on this install")
+    require_usable(session, settings, model.base_model)
     if kind == VersionKind.LORA:
-        require_trainable(session, settings, minibrain)
-    snapshot = training_snapshot(session, settings, minibrain, body.snapshot_id)
+        require_trainable(session, settings, model)
+    snapshot = training_snapshot(session, settings, model, body.snapshot_id)
     require_splits(snapshot)
     recipe: dict[str, Any] = {}
     if kind == VersionKind.LORA:
-        found, _ = training_plan(session, settings, node, minibrain, snapshot, body)
+        found, _ = training_plan(session, settings, node, model, snapshot, body)
         refuse(found)
         recipe = found.recipe()
-    version = start_version(session, settings, store, minibrain, kind, snapshot, recipe, body.breaking)
+    version = start_version(session, settings, store, model, kind, snapshot, recipe, body.breaking)
     session.commit()
-    return version_info(minibrain, version)
+    return version_info(model, version)
 
 
-@router.delete("/minibrains/{slug}/versions/{number}", status_code=204, dependencies=[Depends(builder)])
+@router.delete("/models/{slug}/versions/{number}", status_code=204, dependencies=[Depends(builder)])
 def delete_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> None:
-    minibrain = get_minibrain(session, slug)
-    version = get_version(minibrain, number)
-    if minibrain.deployed and minibrain.current_version == number:
+    model = get_model(session, slug)
+    version = get_version(model, number)
+    if model.deployed and model.current_version == number:
         raise ConflictError(f"{slug}@{number} is deployed; undeploy it first")
-    if any(job.version_id == version.id and job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs):
+    if any(job.version_id == version.id and job.status in ACTIVE_JOB_STATUSES for job in model.jobs):
         raise ConflictError(f"{slug}@{number} has a job running; cancel it first")
-    if minibrain.current_version == number:
-        minibrain.current_version = None
+    if model.current_version == number:
+        model.current_version = None
     session.add(
         AuditEvent(
             actor=current_actor(),
             action="version.delete",
             target=f"{slug}@{number}",
-            detail={"name": minibrain.name, "kind": version.kind, "status": version.status},
+            detail={"name": model.name, "kind": version.kind, "status": version.status},
         )
     )
     session.delete(version)
@@ -166,36 +164,36 @@ def delete_version(slug: str, number: int, session: SessionDep, settings: Settin
     session.commit()
 
 
-@router.post("/minibrains/{slug}/versions/{number}/promote", dependencies=[Depends(builder)])
-def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> MinibrainDetail:
-    minibrain = get_minibrain(session, slug)
-    version = get_version(minibrain, number)
+@router.post("/models/{slug}/versions/{number}/promote", dependencies=[Depends(builder)])
+def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    version = get_version(model, number)
     mismatch = base_changed(
-        f"{slug}@{number}", minibrain.base_model, version.base_hash, base_hash(session, minibrain.base_model)
+        f"{slug}@{number}", model.base_model, version.base_hash, base_hash(session, model.base_model)
     )
     if mismatch is not None:
         raise ConflictError(mismatch)
     if version.status != VersionStatus.READY:
         raise ConflictError(f"{slug}@{number} is not ready")
     if version.live_at is None:
-        found = decision(minibrain, version)
+        found = decision(model, version)
         if not found.passed:
             raise ConflictError(f"{slug}@{number} does not pass the promotion rule: {found.reason()}")
-    previous, was_deployed = minibrain.current_version, minibrain.deployed
-    cancel_stop(session, minibrain.teardown, minibrain.name)
-    minibrain.current_version = version.number
-    minibrain.deployed = True
+    previous, was_deployed = model.current_version, model.deployed
+    cancel_stop(session, model.teardown, model.name)
+    model.current_version = version.number
+    model.deployed = True
     version.live_at = version.live_at or now()
     if (previous, was_deployed) != (number, True):
         audit_version(
-            session, minibrain, number=number, action="version.promote", previous=previous, was_deployed=was_deployed
+            session, model, number=number, action="version.promote", previous=previous, was_deployed=was_deployed
         )
     session.commit()
-    return detail(settings, minibrain)
+    return detail(settings, model)
 
 
-def routed(config: GatewayConfig, minibrain: Minibrain, number: int | None) -> Route:
-    name = minibrain.slug if number is None else f"{minibrain.slug}@{number}"
+def routed(config: GatewayConfig, model: Model, number: int | None) -> Route:
+    name = model.slug if number is None else f"{model.slug}@{number}"
     route = config.routes.get(name)
     if route is None:
         raise ConflictError("no ready version to run; score or train one first")
@@ -223,15 +221,15 @@ def answered(
         return completion
 
 
-@router.post("/minibrains/{slug}/complete", dependencies=[Depends(viewer)])
+@router.post("/models/{slug}/complete", dependencies=[Depends(viewer)])
 def complete(
     slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, request: Request
 ) -> CompleteResponse:
-    minibrain = get_minibrain(session, slug)
+    model = get_model(session, slug)
     config = request.app.state.gateway_config.current()
-    route = routed(config, minibrain, body.version)
+    route = routed(config, model, body.version)
     completion = answered(backend, config, route, [{"role": "user", "content": body.text}], body.max_tokens)
-    touch(session, minibrain.base_model)
+    touch(session, model.base_model)
     session.commit()
     answer, valid = answer_text(route, completion.text)
     return CompleteResponse(
@@ -263,17 +261,17 @@ def test_scores(version: Version, output: str, expected: str | None, messages: l
     ]
 
 
-@router.post("/minibrains/{slug}/versions/{number}/test", dependencies=[Depends(viewer)])
+@router.post("/models/{slug}/versions/{number}/test", dependencies=[Depends(viewer)])
 def test_version(
     slug: str, number: int, body: VersionTest, session: SessionDep, backend: BackendDep, request: Request
 ) -> VersionTestResult:
-    minibrain = get_minibrain(session, slug)
-    version = get_version(minibrain, number)
+    model = get_model(session, slug)
+    version = get_version(model, number)
     config = request.app.state.gateway_config.current()
-    route = routed(config, minibrain, number)
+    route = routed(config, model, number)
     messages = [message.model_dump() for message in body.messages]
     completion = answered(backend, config, route, messages, body.max_tokens)
-    touch(session, minibrain.base_model)
+    touch(session, model.base_model)
     session.commit()
     answer = answer_of(version_contract(version), completion.text)
     shown, _ = answer_text(route, completion.text)

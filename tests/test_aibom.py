@@ -141,7 +141,7 @@ def test_aibom_is_deterministic_and_carries_its_sha256(harness: Harness) -> None
     sha256 = sealed["minibrain:aibom:sha256"]
     assert recomputed(bom) == sha256
     assert bom["serialNumber"].startswith(f"urn:uuid:{sha256[:8]}-{sha256[8:12]}-8")
-    assert harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False}).status_code == 202
+    assert harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False}).status_code == 202
     assert harness.client.get(f"{CARD}/1/aibom.json").content == first.content
     edited = harness.client.put(f"{CARD}/1/card", json={"known_limits": "English tickets only."})
     assert edited.status_code == 200

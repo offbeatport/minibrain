@@ -314,14 +314,14 @@ def test_s3_imports_use_the_matching_connection(
     monkeypatch.setitem(connection_s3.FILESYSTEMS, "s3", recording)
     s3_connection(harness, bucket, name="Other bucket", bucket="elsewhere")
     connection = s3_connection(harness, bucket, name="Models", bucket="models")
-    inspected = harness.client.post("/api/models/inspect", json={"location": "s3://models/qwen"}).json()
+    inspected = harness.client.post("/api/base-models/inspect", json={"location": "s3://models/qwen"}).json()
     assert inspected["ok"] is True, inspected
     assert (inspected["connection"], inspected["files"]) == ("Models", 3)
     assert used == [(bucket.endpoint, SECRET_KEY)]
-    row = harness.client.post("/api/models/import", json={"name": "Qwen copy", "location": "s3://models/qwen"})
+    row = harness.client.post("/api/base-models/import", json={"name": "Qwen copy", "location": "s3://models/qwen"})
     assert row.status_code == 202, row.text
     with harness.sessions() as session:
-        job = session.query(Job).filter(Job.model_id == row.json()["key"]).one()
+        job = session.query(Job).filter(Job.base_model_id == row.json()["key"]).one()
         assert job.params["connection_id"] == connection["id"]
         assert SECRET_KEY not in json.dumps(job.params)
     claimed = harness.claim(["import"])
@@ -341,14 +341,14 @@ def test_import_jobs_read_the_bucket_with_the_connection_keys(
     monkeypatch.setenv("AWS_CONFIG_FILE", os.devnull)
     connection = s3_connection(harness, bucket, name="Models", bucket="models")
     body = {"name": "Qwen copy", "location": "s3://models/qwen", "connection_id": connection["id"]}
-    row = harness.client.post("/api/models/import", json=body).json()
+    row = harness.client.post("/api/base-models/import", json=body).json()
     assert harness.worker(kinds=["import"]).run_once()
-    detail = harness.client.get(f"/api/models/base/{row['key']}").json()
+    detail = harness.client.get(f"/api/base-models/{row['key']}").json()
     assert detail["availability"]["state"] == "available", detail
     assert len(detail["files"]) == 3
     assert SECRET_KEY not in harness.client.get("/api/jobs").text
     with harness.sessions() as session:
-        job = session.query(Job).filter(Job.model_id == row["key"]).one()
+        job = session.query(Job).filter(Job.base_model_id == row["key"]).one()
         assert job.status == "succeeded" and SECRET_KEY not in json.dumps(job.params)
 
 

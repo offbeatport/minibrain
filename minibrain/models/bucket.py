@@ -9,7 +9,7 @@ from minibrain.encryption.envelope import is_sealed, parse_header
 from minibrain.encryption.sealed import artifact_context, unwrap_any
 from minibrain.models.copies import file_entry
 from minibrain.models.health import CORRUPT, MISSING, WRONG_SIZE, content_hash
-from minibrain.registry.models import ACTIVE_JOB_STATUSES, Artifact, Job, JobKind, Model, ModelStatus
+from minibrain.registry.models import ACTIVE_JOB_STATUSES, Artifact, BaseModel, BaseModelStatus, Job, JobKind
 
 WEIGHTS = "weights"
 PRESIGN_SECONDS = 900
@@ -24,7 +24,7 @@ def writes_bucket(store: ArtifactStore) -> bool:
     return store.writes_remote and store.remote is not None
 
 
-def hashes_of(model: Model) -> list[str]:
+def hashes_of(model: BaseModel) -> list[str]:
     return [str(entry["sha256"]) for entry in model.files if entry.get("sha256")]
 
 
@@ -34,7 +34,7 @@ def registered(session: Session, ids: list[str]) -> set[str]:
     return set(session.scalars(select(Artifact.id).where(Artifact.id.in_(ids))))
 
 
-def missing_objects(session: Session, model: Model) -> dict[str, str]:
+def missing_objects(session: Session, model: BaseModel) -> dict[str, str]:
     found = registered(session, hashes_of(model))
     return {
         str(entry["path"]): MISSING
@@ -43,7 +43,7 @@ def missing_objects(session: Session, model: Model) -> dict[str, str]:
     }
 
 
-def stored_files(session: Session, store: ArtifactStore, model: Model) -> list[dict[str, Any]]:
+def stored_files(session: Session, store: ArtifactStore, model: BaseModel) -> list[dict[str, Any]]:
     if not writes_bucket(store) or store.remote is None:
         return []
     states = dict((model.health_detail or {}).get("files") or {})
@@ -70,7 +70,7 @@ def data_key(store: ArtifactStore, artifact_id: str) -> str | None:
     return base64.b64encode(key).decode()
 
 
-def signed_files(session: Session, store: ArtifactStore, model: Model) -> list[dict[str, Any]]:
+def signed_files(session: Session, store: ArtifactStore, model: BaseModel) -> list[dict[str, Any]]:
     remote = store.remote
     missing = missing_objects(session, model)
     if remote is None or missing:
@@ -86,12 +86,12 @@ def signed_files(session: Session, store: ArtifactStore, model: Model) -> list[d
 
 
 def live_bases(session: Session) -> dict[str, str | None]:
-    models = session.scalars(select(Model).where(Model.status == ModelStatus.AVAILABLE))
+    models = session.scalars(select(BaseModel).where(BaseModel.status == BaseModelStatus.AVAILABLE))
     return {model.id: content_hash(model.files) for model in models}
 
 
 def referenced(session: Session, skip: str | None = None) -> set[str]:
-    query = select(Model) if skip is None else select(Model).where(Model.id != skip)
+    query = select(BaseModel) if skip is None else select(BaseModel).where(BaseModel.id != skip)
     return {str(entry["sha256"]) for model in session.scalars(query) for entry in model.files if entry.get("sha256")}
 
 
@@ -107,7 +107,7 @@ def drop_objects(session: Session, store: ArtifactStore, ids: set[str]) -> int:
     return dropped
 
 
-def drop_weights(session: Session, store: ArtifactStore, model: Model) -> int:
+def drop_weights(session: Session, store: ArtifactStore, model: BaseModel) -> int:
     return drop_objects(session, store, set(hashes_of(model)) - referenced(session, skip=model.id))
 
 

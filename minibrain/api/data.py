@@ -266,8 +266,8 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         columns=columns,
         error=problem,
         mapping=mapping_info(dataset),
-        models=[minibrain.slug for minibrain in dataset.minibrains],
-        model_names=[minibrain.name for minibrain in dataset.minibrains],
+        models=[model.slug for model in dataset.models],
+        model_names=[model.name for model in dataset.models],
         splits=known_splits(latest, changed),
         snapshot=snapshot_info(latest) if latest is not None else None,
         changed=changed,
@@ -571,9 +571,9 @@ def dataset_query(
 @router.delete("/datasets/{slug}", status_code=204, dependencies=[Depends(builder)])
 def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     dataset = get_dataset(session, slug)
-    released = sorted(minibrain.slug for minibrain in dataset.minibrains)
-    for minibrain in list(dataset.minibrains):
-        minibrain.dataset_id = None
+    released = sorted(model.slug for model in dataset.models)
+    for model in list(dataset.models):
+        model.dataset_id = None
     for snapshot in dataset.snapshots:
         snapshot.dataset = None
     session.add(

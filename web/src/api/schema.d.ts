@@ -175,7 +175,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains": {
+    "/api/models": {
         parameters: {
             query?: never;
             header?: never;
@@ -183,17 +183,17 @@ export interface paths {
             cookie?: never;
         };
         /** List All */
-        get: operations["list_all_api_minibrains_get"];
+        get: operations["list_all_api_models_get"];
         put?: never;
         /** Create */
-        post: operations["create_api_minibrains_post"];
+        post: operations["create_api_models_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/name": {
+    "/api/models/name": {
         parameters: {
             query?: never;
             header?: never;
@@ -201,7 +201,7 @@ export interface paths {
             cookie?: never;
         };
         /** Default Name */
-        get: operations["default_name_api_minibrains_name_get"];
+        get: operations["default_name_api_models_name_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -210,7 +210,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}": {
+    "/api/models/{slug}": {
         parameters: {
             query?: never;
             header?: never;
@@ -218,18 +218,18 @@ export interface paths {
             cookie?: never;
         };
         /** Read */
-        get: operations["read_api_minibrains__slug__get"];
+        get: operations["read_api_models__slug__get"];
         put?: never;
         post?: never;
         /** Delete */
-        delete: operations["delete_api_minibrains__slug__delete"];
+        delete: operations["delete_api_models__slug__delete"];
         options?: never;
         head?: never;
         /** Update */
-        patch: operations["update_api_minibrains__slug__patch"];
+        patch: operations["update_api_models__slug__patch"];
         trace?: never;
     };
-    "/api/minibrains/{slug}/deploy": {
+    "/api/models/{slug}/deploy": {
         parameters: {
             query?: never;
             header?: never;
@@ -239,14 +239,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Deploy */
-        post: operations["deploy_api_minibrains__slug__deploy_post"];
+        post: operations["deploy_api_models__slug__deploy_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/request-bodies": {
+    "/api/models/{slug}/request-bodies": {
         parameters: {
             query?: never;
             header?: never;
@@ -255,7 +255,7 @@ export interface paths {
         };
         get?: never;
         /** Keep Request Bodies */
-        put: operations["keep_request_bodies_api_minibrains__slug__request_bodies_put"];
+        put: operations["keep_request_bodies_api_models__slug__request_bodies_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -263,7 +263,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/sample": {
+    "/api/models/sample": {
         parameters: {
             query?: never;
             header?: never;
@@ -273,14 +273,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Create Sample */
-        post: operations["create_sample_api_minibrains_sample_post"];
+        post: operations["create_sample_api_models_sample_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/dataset": {
+    "/api/models/{slug}/dataset": {
         parameters: {
             query?: never;
             header?: never;
@@ -289,7 +289,7 @@ export interface paths {
         };
         get?: never;
         /** Choose Dataset */
-        put: operations["choose_dataset_api_minibrains__slug__dataset_put"];
+        put: operations["choose_dataset_api_models__slug__dataset_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -297,7 +297,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/mapping": {
+    "/api/models/{slug}/mapping": {
         parameters: {
             query?: never;
             header?: never;
@@ -306,7 +306,7 @@ export interface paths {
         };
         get?: never;
         /** Update Mapping */
-        put: operations["update_mapping_api_minibrains__slug__mapping_put"];
+        put: operations["update_mapping_api_models__slug__mapping_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -314,7 +314,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/query": {
+    "/api/models/{slug}/query": {
         parameters: {
             query?: never;
             header?: never;
@@ -324,14 +324,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Query */
-        post: operations["query_api_minibrains__slug__query_post"];
+        post: operations["query_api_models__slug__query_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/preview": {
+    "/api/models/{slug}/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -339,7 +339,7 @@ export interface paths {
             cookie?: never;
         };
         /** Preview */
-        get: operations["preview_api_minibrains__slug__preview_get"];
+        get: operations["preview_api_models__slug__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -348,7 +348,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/snapshots": {
+    "/api/models/{slug}/snapshots": {
         parameters: {
             query?: never;
             header?: never;
@@ -358,14 +358,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Build Snapshot */
-        post: operations["build_snapshot_api_minibrains__slug__snapshots_post"];
+        post: operations["build_snapshot_api_models__slug__snapshots_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/golden": {
+    "/api/models/{slug}/golden": {
         parameters: {
             query?: never;
             header?: never;
@@ -373,7 +373,7 @@ export interface paths {
             cookie?: never;
         };
         /** Golden */
-        get: operations["golden_api_minibrains__slug__golden_get"];
+        get: operations["golden_api_models__slug__golden_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -382,7 +382,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/contract/check": {
+    "/api/models/{slug}/contract/check": {
         parameters: {
             query?: never;
             header?: never;
@@ -392,14 +392,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Check Contract */
-        post: operations["check_contract_api_minibrains__slug__contract_check_post"];
+        post: operations["check_contract_api_models__slug__contract_check_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/contract": {
+    "/api/models/{slug}/contract": {
         parameters: {
             query?: never;
             header?: never;
@@ -408,7 +408,7 @@ export interface paths {
         };
         get?: never;
         /** Update Contract */
-        put: operations["update_contract_api_minibrains__slug__contract_put"];
+        put: operations["update_contract_api_models__slug__contract_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -416,7 +416,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/graders": {
+    "/api/models/{slug}/graders": {
         parameters: {
             query?: never;
             header?: never;
@@ -425,7 +425,7 @@ export interface paths {
         };
         get?: never;
         /** Update Graders */
-        put: operations["update_graders_api_minibrains__slug__graders_put"];
+        put: operations["update_graders_api_models__slug__graders_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -433,7 +433,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/promotion": {
+    "/api/models/{slug}/promotion": {
         parameters: {
             query?: never;
             header?: never;
@@ -442,7 +442,7 @@ export interface paths {
         };
         get?: never;
         /** Update Promotion */
-        put: operations["update_promotion_api_minibrains__slug__promotion_put"];
+        put: operations["update_promotion_api_models__slug__promotion_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -450,7 +450,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/instructions": {
+    "/api/models/{slug}/instructions": {
         parameters: {
             query?: never;
             header?: never;
@@ -459,7 +459,7 @@ export interface paths {
         };
         get?: never;
         /** Update Instructions */
-        put: operations["update_instructions_api_minibrains__slug__instructions_put"];
+        put: operations["update_instructions_api_models__slug__instructions_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1041,15 +1041,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models": {
+    "/api/all-models": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Models */
-        get: operations["list_models_api_models_get"];
+        /** List All Models */
+        get: operations["list_all_models_api_all_models_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1058,7 +1058,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/inspect": {
+    "/api/base-models/inspect": {
         parameters: {
             query?: never;
             header?: never;
@@ -1068,14 +1068,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Inspect */
-        post: operations["inspect_api_models_inspect_post"];
+        post: operations["inspect_api_base_models_inspect_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/import": {
+    "/api/base-models/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -1085,14 +1085,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Import Model */
-        post: operations["import_model_api_models_import_post"];
+        post: operations["import_model_api_base_models_import_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}": {
+    "/api/base-models/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1100,18 +1100,18 @@ export interface paths {
             cookie?: never;
         };
         /** Read Base */
-        get: operations["read_base_api_models_base__key__get"];
+        get: operations["read_base_api_base_models__key__get"];
         put?: never;
         post?: never;
         /** Delete Base Model */
-        delete: operations["delete_base_model_api_models_base__key__delete"];
+        delete: operations["delete_base_model_api_base_models__key__delete"];
         options?: never;
         head?: never;
         /** Update Base */
-        patch: operations["update_base_api_models_base__key__patch"];
+        patch: operations["update_base_api_base_models__key__patch"];
         trace?: never;
     };
-    "/api/models/base/{key}/verify": {
+    "/api/base-models/{key}/verify": {
         parameters: {
             query?: never;
             header?: never;
@@ -1121,14 +1121,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Verify Base */
-        post: operations["verify_base_api_models_base__key__verify_post"];
+        post: operations["verify_base_api_base_models__key__verify_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/repair": {
+    "/api/base-models/{key}/repair": {
         parameters: {
             query?: never;
             header?: never;
@@ -1138,14 +1138,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Repair Base */
-        post: operations["repair_base_api_models_base__key__repair_post"];
+        post: operations["repair_base_api_base_models__key__repair_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/reimport": {
+    "/api/base-models/{key}/reimport": {
         parameters: {
             query?: never;
             header?: never;
@@ -1155,14 +1155,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Reimport Base */
-        post: operations["reimport_base_api_models_base__key__reimport_post"];
+        post: operations["reimport_base_api_base_models__key__reimport_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/relocate": {
+    "/api/base-models/{key}/relocate": {
         parameters: {
             query?: never;
             header?: never;
@@ -1172,14 +1172,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Relocate Base */
-        post: operations["relocate_base_api_models_base__key__relocate_post"];
+        post: operations["relocate_base_api_base_models__key__relocate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/recheck": {
+    "/api/base-models/{key}/recheck": {
         parameters: {
             query?: never;
             header?: never;
@@ -1189,14 +1189,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Recheck Base */
-        post: operations["recheck_base_api_models_base__key__recheck_post"];
+        post: operations["recheck_base_api_base_models__key__recheck_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/retry": {
+    "/api/base-models/{key}/retry": {
         parameters: {
             query?: never;
             header?: never;
@@ -1206,14 +1206,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Retry Base */
-        post: operations["retry_base_api_models_base__key__retry_post"];
+        post: operations["retry_base_api_base_models__key__retry_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/deploy": {
+    "/api/base-models/{key}/deploy": {
         parameters: {
             query?: never;
             header?: never;
@@ -1223,14 +1223,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Deploy Base */
-        post: operations["deploy_base_api_models_base__key__deploy_post"];
+        post: operations["deploy_base_api_base_models__key__deploy_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/base/{key}/test": {
+    "/api/base-models/{key}/test": {
         parameters: {
             query?: never;
             header?: never;
@@ -1240,7 +1240,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Test Base */
-        post: operations["test_base_api_models_base__key__test_post"];
+        post: operations["test_base_api_base_models__key__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1556,7 +1556,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions": {
+    "/api/models/{slug}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1564,17 +1564,17 @@ export interface paths {
             cookie?: never;
         };
         /** List Versions */
-        get: operations["list_versions_api_minibrains__slug__versions_get"];
+        get: operations["list_versions_api_models__slug__versions_get"];
         put?: never;
         /** Add Version */
-        post: operations["add_version_api_minibrains__slug__versions_post"];
+        post: operations["add_version_api_models__slug__versions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}": {
+    "/api/models/{slug}/versions/{number}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1585,13 +1585,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete Version */
-        delete: operations["delete_version_api_minibrains__slug__versions__number__delete"];
+        delete: operations["delete_version_api_models__slug__versions__number__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/promote": {
+    "/api/models/{slug}/versions/{number}/promote": {
         parameters: {
             query?: never;
             header?: never;
@@ -1601,14 +1601,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Promote Version */
-        post: operations["promote_version_api_minibrains__slug__versions__number__promote_post"];
+        post: operations["promote_version_api_models__slug__versions__number__promote_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/complete": {
+    "/api/models/{slug}/complete": {
         parameters: {
             query?: never;
             header?: never;
@@ -1618,14 +1618,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Complete */
-        post: operations["complete_api_minibrains__slug__complete_post"];
+        post: operations["complete_api_models__slug__complete_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/test": {
+    "/api/models/{slug}/versions/{number}/test": {
         parameters: {
             query?: never;
             header?: never;
@@ -1635,7 +1635,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Test Version */
-        post: operations["test_version_api_minibrains__slug__versions__number__test_post"];
+        post: operations["test_version_api_models__slug__versions__number__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1710,7 +1710,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/training-plan": {
+    "/api/models/{slug}/training-plan": {
         parameters: {
             query?: never;
             header?: never;
@@ -1718,7 +1718,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Training Plan */
-        get: operations["get_training_plan_api_minibrains__slug__training_plan_get"];
+        get: operations["get_training_plan_api_models__slug__training_plan_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1727,7 +1727,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/card": {
+    "/api/models/{slug}/versions/{number}/card": {
         parameters: {
             query?: never;
             header?: never;
@@ -1735,9 +1735,9 @@ export interface paths {
             cookie?: never;
         };
         /** Read Card */
-        get: operations["read_card_api_minibrains__slug__versions__number__card_get"];
+        get: operations["read_card_api_models__slug__versions__number__card_get"];
         /** Edit Card */
-        put: operations["edit_card_api_minibrains__slug__versions__number__card_put"];
+        put: operations["edit_card_api_models__slug__versions__number__card_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1745,7 +1745,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/card.json": {
+    "/api/models/{slug}/versions/{number}/card.json": {
         parameters: {
             query?: never;
             header?: never;
@@ -1753,7 +1753,7 @@ export interface paths {
             cookie?: never;
         };
         /** Card Json */
-        get: operations["card_json_api_minibrains__slug__versions__number__card_json_get"];
+        get: operations["card_json_api_models__slug__versions__number__card_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1762,7 +1762,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/card.md": {
+    "/api/models/{slug}/versions/{number}/card.md": {
         parameters: {
             query?: never;
             header?: never;
@@ -1770,7 +1770,7 @@ export interface paths {
             cookie?: never;
         };
         /** Card Markdown */
-        get: operations["card_markdown_api_minibrains__slug__versions__number__card_md_get"];
+        get: operations["card_markdown_api_models__slug__versions__number__card_md_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1779,7 +1779,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/versions/{number}/aibom.json": {
+    "/api/models/{slug}/versions/{number}/aibom.json": {
         parameters: {
             query?: never;
             header?: never;
@@ -1787,7 +1787,7 @@ export interface paths {
             cookie?: never;
         };
         /** Aibom Json */
-        get: operations["aibom_json_api_minibrains__slug__versions__number__aibom_json_get"];
+        get: operations["aibom_json_api_models__slug__versions__number__aibom_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1881,7 +1881,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/feedback": {
+    "/api/models/{slug}/feedback": {
         parameters: {
             query?: never;
             header?: never;
@@ -1891,14 +1891,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Playground Feedback */
-        post: operations["playground_feedback_api_minibrains__slug__feedback_post"];
+        post: operations["playground_feedback_api_models__slug__feedback_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/{slug}/feedback/summary": {
+    "/api/models/{slug}/feedback/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -1906,7 +1906,7 @@ export interface paths {
             cookie?: never;
         };
         /** Feedback Summary */
-        get: operations["feedback_summary_api_minibrains__slug__feedback_summary_get"];
+        get: operations["feedback_summary_api_models__slug__feedback_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2505,7 +2505,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/worker/models/{model_id}/stored": {
+    "/internal/worker/bases/{base_model_id}/stored": {
         parameters: {
             query?: never;
             header?: never;
@@ -2513,7 +2513,7 @@ export interface paths {
             cookie?: never;
         };
         /** Stored */
-        get: operations["stored_internal_worker_models__model_id__stored_get"];
+        get: operations["stored_internal_worker_bases__base_model_id__stored_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4663,8 +4663,8 @@ export interface components {
         };
         /** FeedbackBody */
         FeedbackBody: {
-            /** Minibrain Id */
-            minibrain_id: number;
+            /** Model Id */
+            model_id: number;
             /** Origin */
             origin: string;
             /** Rating */
@@ -4750,8 +4750,8 @@ export interface components {
             statuses: {
                 [key: string]: number;
             };
-            /** Minibrains */
-            minibrains: {
+            /** Models */
+            models: {
                 [key: string]: number;
             };
         };
@@ -5303,12 +5303,12 @@ export interface components {
         JobDetail: {
             /** Id */
             id: number;
-            /** Minibrain */
-            minibrain: string | null;
-            /** Minibrain Name */
-            minibrain_name: string | null;
             /** Model */
-            model?: string | null;
+            model: string | null;
+            /** Model Name */
+            model_name: string | null;
+            /** Base Model */
+            base_model?: string | null;
             /** Version */
             version: number | null;
             /** Kind */
@@ -5360,8 +5360,8 @@ export interface components {
             statuses: {
                 [key: string]: number;
             };
-            /** Minibrains */
-            minibrains: {
+            /** Models */
+            models: {
                 [key: string]: number;
             };
         };
@@ -5369,12 +5369,12 @@ export interface components {
         JobInfo: {
             /** Id */
             id: number;
-            /** Minibrain */
-            minibrain: string | null;
-            /** Minibrain Name */
-            minibrain_name: string | null;
             /** Model */
-            model?: string | null;
+            model: string | null;
+            /** Model Name */
+            model_name: string | null;
+            /** Base Model */
+            base_model?: string | null;
             /** Version */
             version: number | null;
             /** Kind */
@@ -5551,8 +5551,8 @@ export interface components {
             at: string;
             /** Key Id */
             key_id: number | null;
-            /** Minibrain Id */
-            minibrain_id: number | null;
+            /** Model Id */
+            model_id: number | null;
             /** Model */
             model: string;
             /** Version */
@@ -5641,108 +5641,6 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        /** MinibrainCreate */
-        MinibrainCreate: {
-            /** Name */
-            name: string;
-            /**
-             * Description
-             * @default
-             */
-            description?: string;
-            /** Tags */
-            tags?: string[];
-            /** Base Model */
-            base_model?: string | null;
-            /**
-             * Preset
-             * @default classify
-             * @enum {string}
-             */
-            preset?: "classify" | "custom";
-            /** Labels */
-            labels?: string[];
-            contract?: components["schemas"]["ContractInfo"] | null;
-            /** Instructions */
-            instructions?: string | null;
-            /** Graders */
-            graders?: components["schemas"]["GraderConfig"][] | null;
-            promotion?: components["schemas"]["PromotionInfo"] | null;
-            /** Dataset */
-            dataset?: string | null;
-        };
-        /** MinibrainDetail */
-        MinibrainDetail: {
-            /** Slug */
-            slug: string;
-            /** Name */
-            name: string;
-            /** Preset */
-            preset: string;
-            /** Base Model */
-            base_model: string;
-            /** Current Version */
-            current_version: number | null;
-            /**
-             * Deployed
-             * @default false
-             */
-            deployed?: boolean;
-            /** Main Metric */
-            main_metric?: string | null;
-            /** Current Score */
-            current_score: number | null;
-            /** Versions */
-            versions: number;
-            /** Active Jobs */
-            active_jobs: number;
-            source: components["schemas"]["SourceInfo"] | null;
-            mapping: components["schemas"]["MappingInfo"];
-            /** Dataset */
-            dataset?: string | null;
-            /** Dataset Name */
-            dataset_name?: string | null;
-            snapshot: components["schemas"]["SnapshotInfo"] | null;
-            changed?: components["schemas"]["ChangeInfo"] | null;
-            /** Models */
-            models: string[];
-            request_bodies: components["schemas"]["RequestBodiesInfo"];
-            teardown?: components["schemas"]["TeardownInfo"] | null;
-            contract: components["schemas"]["ContractInfo"];
-            /** Contract Number */
-            contract_number: number;
-            /** Instructions */
-            instructions: string;
-            /** Graders */
-            graders: components["schemas"]["GraderConfig"][];
-            promotion: components["schemas"]["PromotionInfo"];
-        };
-        /** MinibrainSummary */
-        MinibrainSummary: {
-            /** Slug */
-            slug: string;
-            /** Name */
-            name: string;
-            /** Preset */
-            preset: string;
-            /** Base Model */
-            base_model: string;
-            /** Current Version */
-            current_version: number | null;
-            /**
-             * Deployed
-             * @default false
-             */
-            deployed?: boolean;
-            /** Main Metric */
-            main_metric?: string | null;
-            /** Current Score */
-            current_score: number | null;
-            /** Versions */
-            versions: number;
-            /** Active Jobs */
-            active_jobs: number;
-        };
         /** Mistake */
         Mistake: {
             /** Input */
@@ -5794,6 +5692,82 @@ export interface components {
              * @default SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it
              */
             canonical_form?: string;
+        };
+        /** ModelCreate */
+        ModelCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Tags */
+            tags?: string[];
+            /** Base Model */
+            base_model?: string | null;
+            /**
+             * Preset
+             * @default classify
+             * @enum {string}
+             */
+            preset?: "classify" | "custom";
+            /** Labels */
+            labels?: string[];
+            contract?: components["schemas"]["ContractInfo"] | null;
+            /** Instructions */
+            instructions?: string | null;
+            /** Graders */
+            graders?: components["schemas"]["GraderConfig"][] | null;
+            promotion?: components["schemas"]["PromotionInfo"] | null;
+            /** Dataset */
+            dataset?: string | null;
+        };
+        /** ModelDetail */
+        ModelDetail: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Base Model */
+            base_model: string;
+            /** Current Version */
+            current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
+            /** Versions */
+            versions: number;
+            /** Active Jobs */
+            active_jobs: number;
+            source: components["schemas"]["SourceInfo"] | null;
+            mapping: components["schemas"]["MappingInfo"];
+            /** Dataset */
+            dataset?: string | null;
+            /** Dataset Name */
+            dataset_name?: string | null;
+            snapshot: components["schemas"]["SnapshotInfo"] | null;
+            changed?: components["schemas"]["ChangeInfo"] | null;
+            /** Models */
+            models: string[];
+            request_bodies: components["schemas"]["RequestBodiesInfo"];
+            teardown?: components["schemas"]["TeardownInfo"] | null;
+            contract: components["schemas"]["ContractInfo"];
+            /** Contract Number */
+            contract_number: number;
+            /** Instructions */
+            instructions: string;
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            promotion: components["schemas"]["PromotionInfo"];
         };
         /** ModelFile */
         ModelFile: {
@@ -5913,6 +5887,32 @@ export interface components {
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
+        };
+        /** ModelSummary */
+        ModelSummary: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Base Model */
+            base_model: string;
+            /** Current Version */
+            current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
+            /** Versions */
+            versions: number;
+            /** Active Jobs */
+            active_jobs: number;
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -7851,7 +7851,7 @@ export interface operations {
             };
         };
     };
-    list_all_api_minibrains_get: {
+    list_all_api_models_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -7866,12 +7866,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainSummary"][];
+                    "application/json": components["schemas"]["ModelSummary"][];
                 };
             };
         };
     };
-    create_api_minibrains_post: {
+    create_api_models_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7880,7 +7880,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MinibrainCreate"];
+                "application/json": components["schemas"]["ModelCreate"];
             };
         };
         responses: {
@@ -7890,7 +7890,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -7904,7 +7904,7 @@ export interface operations {
             };
         };
     };
-    default_name_api_minibrains_name_get: {
+    default_name_api_models_name_get: {
         parameters: {
             query?: {
                 preset?: string;
@@ -7935,7 +7935,7 @@ export interface operations {
             };
         };
     };
-    read_api_minibrains__slug__get: {
+    read_api_models__slug__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -7952,7 +7952,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -7966,7 +7966,7 @@ export interface operations {
             };
         };
     };
-    delete_api_minibrains__slug__delete: {
+    delete_api_models__slug__delete: {
         parameters: {
             query?: {
                 undeploy?: boolean;
@@ -7999,7 +7999,7 @@ export interface operations {
             };
         };
     };
-    update_api_minibrains__slug__patch: {
+    update_api_models__slug__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -8020,7 +8020,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8034,7 +8034,7 @@ export interface operations {
             };
         };
     };
-    deploy_api_minibrains__slug__deploy_post: {
+    deploy_api_models__slug__deploy_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8055,7 +8055,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8069,7 +8069,7 @@ export interface operations {
             };
         };
     };
-    keep_request_bodies_api_minibrains__slug__request_bodies_put: {
+    keep_request_bodies_api_models__slug__request_bodies_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8090,7 +8090,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8104,7 +8104,7 @@ export interface operations {
             };
         };
     };
-    create_sample_api_minibrains_sample_post: {
+    create_sample_api_models_sample_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8124,7 +8124,7 @@ export interface operations {
             };
         };
     };
-    choose_dataset_api_minibrains__slug__dataset_put: {
+    choose_dataset_api_models__slug__dataset_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8145,7 +8145,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8159,7 +8159,7 @@ export interface operations {
             };
         };
     };
-    update_mapping_api_minibrains__slug__mapping_put: {
+    update_mapping_api_models__slug__mapping_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8180,7 +8180,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8194,7 +8194,7 @@ export interface operations {
             };
         };
     };
-    query_api_minibrains__slug__query_post: {
+    query_api_models__slug__query_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8229,7 +8229,7 @@ export interface operations {
             };
         };
     };
-    preview_api_minibrains__slug__preview_get: {
+    preview_api_models__slug__preview_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8260,7 +8260,7 @@ export interface operations {
             };
         };
     };
-    build_snapshot_api_minibrains__slug__snapshots_post: {
+    build_snapshot_api_models__slug__snapshots_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8277,7 +8277,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8291,7 +8291,7 @@ export interface operations {
             };
         };
     };
-    golden_api_minibrains__slug__golden_get: {
+    golden_api_models__slug__golden_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8322,7 +8322,7 @@ export interface operations {
             };
         };
     };
-    check_contract_api_minibrains__slug__contract_check_post: {
+    check_contract_api_models__slug__contract_check_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8357,7 +8357,7 @@ export interface operations {
             };
         };
     };
-    update_contract_api_minibrains__slug__contract_put: {
+    update_contract_api_models__slug__contract_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8378,7 +8378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8392,7 +8392,7 @@ export interface operations {
             };
         };
     };
-    update_graders_api_minibrains__slug__graders_put: {
+    update_graders_api_models__slug__graders_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8413,7 +8413,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8427,7 +8427,7 @@ export interface operations {
             };
         };
     };
-    update_promotion_api_minibrains__slug__promotion_put: {
+    update_promotion_api_models__slug__promotion_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8448,7 +8448,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8462,7 +8462,7 @@ export interface operations {
             };
         };
     };
-    update_instructions_api_minibrains__slug__instructions_put: {
+    update_instructions_api_models__slug__instructions_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -8483,7 +8483,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -10047,7 +10047,7 @@ export interface operations {
             };
         };
     };
-    list_models_api_models_get: {
+    list_all_models_api_all_models_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -10067,7 +10067,7 @@ export interface operations {
             };
         };
     };
-    inspect_api_models_inspect_post: {
+    inspect_api_base_models_inspect_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10100,7 +10100,7 @@ export interface operations {
             };
         };
     };
-    import_model_api_models_import_post: {
+    import_model_api_base_models_import_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10133,7 +10133,7 @@ export interface operations {
             };
         };
     };
-    read_base_api_models_base__key__get: {
+    read_base_api_base_models__key__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -10164,7 +10164,7 @@ export interface operations {
             };
         };
     };
-    delete_base_model_api_models_base__key__delete: {
+    delete_base_model_api_base_models__key__delete: {
         parameters: {
             query?: {
                 cascade?: boolean;
@@ -10198,7 +10198,7 @@ export interface operations {
             };
         };
     };
-    update_base_api_models_base__key__patch: {
+    update_base_api_base_models__key__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -10233,7 +10233,7 @@ export interface operations {
             };
         };
     };
-    verify_base_api_models_base__key__verify_post: {
+    verify_base_api_base_models__key__verify_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10264,7 +10264,7 @@ export interface operations {
             };
         };
     };
-    repair_base_api_models_base__key__repair_post: {
+    repair_base_api_base_models__key__repair_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10295,7 +10295,7 @@ export interface operations {
             };
         };
     };
-    reimport_base_api_models_base__key__reimport_post: {
+    reimport_base_api_base_models__key__reimport_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10330,7 +10330,7 @@ export interface operations {
             };
         };
     };
-    relocate_base_api_models_base__key__relocate_post: {
+    relocate_base_api_base_models__key__relocate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10365,7 +10365,7 @@ export interface operations {
             };
         };
     };
-    recheck_base_api_models_base__key__recheck_post: {
+    recheck_base_api_base_models__key__recheck_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10396,7 +10396,7 @@ export interface operations {
             };
         };
     };
-    retry_base_api_models_base__key__retry_post: {
+    retry_base_api_base_models__key__retry_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10427,7 +10427,7 @@ export interface operations {
             };
         };
     };
-    deploy_base_api_models_base__key__deploy_post: {
+    deploy_base_api_base_models__key__deploy_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -10462,7 +10462,7 @@ export interface operations {
             };
         };
     };
-    test_base_api_models_base__key__test_post: {
+    test_base_api_base_models__key__test_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11090,7 +11090,7 @@ export interface operations {
             };
         };
     };
-    list_versions_api_minibrains__slug__versions_get: {
+    list_versions_api_models__slug__versions_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11121,7 +11121,7 @@ export interface operations {
             };
         };
     };
-    add_version_api_minibrains__slug__versions_post: {
+    add_version_api_models__slug__versions_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11156,7 +11156,7 @@ export interface operations {
             };
         };
     };
-    delete_version_api_minibrains__slug__versions__number__delete: {
+    delete_version_api_models__slug__versions__number__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -11186,7 +11186,7 @@ export interface operations {
             };
         };
     };
-    promote_version_api_minibrains__slug__versions__number__promote_post: {
+    promote_version_api_models__slug__versions__number__promote_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11204,7 +11204,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -11218,7 +11218,7 @@ export interface operations {
             };
         };
     };
-    complete_api_minibrains__slug__complete_post: {
+    complete_api_models__slug__complete_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11253,7 +11253,7 @@ export interface operations {
             };
         };
     };
-    test_version_api_minibrains__slug__versions__number__test_post: {
+    test_version_api_models__slug__versions__number__test_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11391,7 +11391,7 @@ export interface operations {
             };
         };
     };
-    get_training_plan_api_minibrains__slug__training_plan_get: {
+    get_training_plan_api_models__slug__training_plan_get: {
         parameters: {
             query?: {
                 strategy?: ("lora" | "qlora") | null;
@@ -11432,7 +11432,7 @@ export interface operations {
             };
         };
     };
-    read_card_api_minibrains__slug__versions__number__card_get: {
+    read_card_api_models__slug__versions__number__card_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11464,7 +11464,7 @@ export interface operations {
             };
         };
     };
-    edit_card_api_minibrains__slug__versions__number__card_put: {
+    edit_card_api_models__slug__versions__number__card_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -11500,7 +11500,7 @@ export interface operations {
             };
         };
     };
-    card_json_api_minibrains__slug__versions__number__card_json_get: {
+    card_json_api_models__slug__versions__number__card_json_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11530,7 +11530,7 @@ export interface operations {
             };
         };
     };
-    card_markdown_api_minibrains__slug__versions__number__card_md_get: {
+    card_markdown_api_models__slug__versions__number__card_md_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11560,7 +11560,7 @@ export interface operations {
             };
         };
     };
-    aibom_json_api_minibrains__slug__versions__number__aibom_json_get: {
+    aibom_json_api_models__slug__versions__number__aibom_json_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11761,7 +11761,7 @@ export interface operations {
             };
         };
     };
-    playground_feedback_api_minibrains__slug__feedback_post: {
+    playground_feedback_api_models__slug__feedback_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11796,7 +11796,7 @@ export interface operations {
             };
         };
     };
-    feedback_summary_api_minibrains__slug__feedback_summary_get: {
+    feedback_summary_api_models__slug__feedback_summary_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11950,7 +11950,7 @@ export interface operations {
                 limit?: number;
                 cursor?: string | null;
                 order?: "newest" | "oldest";
-                minibrain?: string[] | null;
+                model?: string[] | null;
                 kind?: string[] | null;
                 status?: string[] | null;
                 id?: number[] | null;
@@ -11987,7 +11987,7 @@ export interface operations {
     job_facets_api_jobs_facets_get: {
         parameters: {
             query?: {
-                minibrain?: string[] | null;
+                model?: string[] | null;
                 kind?: string[] | null;
                 status?: string[] | null;
                 id?: number[] | null;
@@ -13040,14 +13040,14 @@ export interface operations {
             };
         };
     };
-    stored_internal_worker_models__model_id__stored_get: {
+    stored_internal_worker_bases__base_model_id__stored_get: {
         parameters: {
             query?: never;
             header?: {
                 authorization?: string;
             };
             path: {
-                model_id: string;
+                base_model_id: string;
             };
             cookie?: never;
         };

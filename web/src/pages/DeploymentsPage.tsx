@@ -6,13 +6,13 @@ import { Badge, Button, DataGrid, Link } from "obp-ui";
 import { useState } from "react";
 import {
     type KeyCreated,
-    type MinibrainDetail,
+    type ModelDetail,
     type ModelRow,
     type ModelVersionRow,
     api,
     unwrap,
 } from "~/api/client";
-import { useMinibrain, useModels } from "~/api/queries";
+import { useAllModels, useModel } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
 import { FeedbackApi } from "~/components/FeedbackApi";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
@@ -30,7 +30,7 @@ import { metricName } from "~/lib/metrics";
 import { RETRY_LABELS, busyTearingDown, retryTeardown, setDeployed } from "~/lib/teardown";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
-function serving(detail: MinibrainDetail): string {
+function serving(detail: ModelDetail): string {
     if (!detail.deployed) {
         return "Not deployed";
     }
@@ -76,7 +76,7 @@ function DeployToggle({ row, deployed }: { row: ModelRow; deployed: boolean }) {
 }
 
 function Connect({ slug }: { slug: string }) {
-    const { data: detail } = useMinibrain(slug);
+    const { data: detail } = useModel(slug);
     const [created, setCreated] = useState<KeyCreated | null>(null);
     const can = useCan();
     if (!detail) {
@@ -233,7 +233,7 @@ const LIVE_COLUMNS: ColumnDef<ModelRow, unknown>[] = [
 
 export function DeploymentsPage() {
     const router = useRouter();
-    const models = useModels();
+    const models = useAllModels();
     const can = useCan();
     const live = (models.data ?? []).filter((row) => row.deployment.state !== "not_deployed");
     return (
@@ -279,7 +279,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
     const deploy = useMutation({
         mutationFn: (number: number) =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
+                api.POST("/api/models/{slug}/versions/{number}/promote", {
                     params: { path: { slug: row.key, number } },
                 }),
             ),
@@ -359,7 +359,7 @@ function VersionHistory({ row }: { row: ModelRow }) {
 }
 
 function DeploymentHeader({ row }: { row: ModelRow }) {
-    const { data: detail } = useMinibrain(row.key);
+    const { data: detail } = useModel(row.key);
     const status = detail ? ` · ${serving(detail)}` : "";
     return (
         <PageHeader
@@ -373,7 +373,7 @@ function DeploymentHeader({ row }: { row: ModelRow }) {
 
 export function DeploymentPage() {
     const { slug } = useParams({ strict: false }) as { slug?: string };
-    const models = useModels();
+    const models = useAllModels();
     const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
     return (
         <Page>

@@ -279,30 +279,7 @@ def upgrade() -> None:
         sqlite_autoincrement=True,
     )
     op.create_table(
-        "datasets",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("slug", sa.String(), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column("source_id", sa.Integer(), nullable=True),
-        sa.Column("folder_id", sa.Integer(), nullable=True),
-        sa.Column("template", sa.JSON(), nullable=True),
-        sa.Column("sql", sa.String(), nullable=True),
-        sa.Column("description", sa.String(), nullable=True),
-        sa.Column("tags", sa.JSON(), nullable=True),
-        sa.Column("dismissed", sa.JSON(), nullable=True),
-        sa.Column("created_at", TIMESTAMP, nullable=False),
-        sa.Column("updated_at", TIMESTAMP, nullable=False),
-        sa.ForeignKeyConstraint(["folder_id"], ["dataset_folders.id"], name="fk_datasets_folder", ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(
-            ["source_id"],
-            ["sources.id"],
-        ),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("slug"),
-        sqlite_autoincrement=True,
-    )
-    op.create_table(
-        "models",
+        "base_models",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("source", sa.String(), nullable=False),
         sa.Column("catalog_id", sa.String(), nullable=True),
@@ -339,6 +316,29 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
+        "datasets",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("slug", sa.String(), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("source_id", sa.Integer(), nullable=True),
+        sa.Column("folder_id", sa.Integer(), nullable=True),
+        sa.Column("template", sa.JSON(), nullable=True),
+        sa.Column("sql", sa.String(), nullable=True),
+        sa.Column("description", sa.String(), nullable=True),
+        sa.Column("tags", sa.JSON(), nullable=True),
+        sa.Column("dismissed", sa.JSON(), nullable=True),
+        sa.Column("created_at", TIMESTAMP, nullable=False),
+        sa.Column("updated_at", TIMESTAMP, nullable=False),
+        sa.ForeignKeyConstraint(["folder_id"], ["dataset_folders.id"], name="fk_datasets_folder", ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["source_id"],
+            ["sources.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("slug"),
+        sqlite_autoincrement=True,
+    )
+    op.create_table(
         "dataset_sources",
         sa.Column("dataset_id", sa.Integer(), nullable=False),
         sa.Column("source_id", sa.Integer(), nullable=False),
@@ -350,7 +350,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("dataset_id", "source_id"),
     )
     op.create_table(
-        "minibrains",
+        "models",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("slug", sa.String(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
@@ -409,19 +409,19 @@ def upgrade() -> None:
         "api_key_scopes",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("key_id", sa.Integer(), nullable=False),
-        sa.Column("minibrain_id", sa.Integer(), nullable=True),
-        sa.Column("model_id", sa.String(), nullable=True),
+        sa.Column("model_id", sa.Integer(), nullable=True),
+        sa.Column("base_model_id", sa.String(), nullable=True),
+        sa.ForeignKeyConstraint(["base_model_id"], ["base_models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["key_id"], ["api_keys.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("key_id", "minibrain_id", "model_id"),
+        sa.UniqueConstraint("key_id", "model_id", "base_model_id"),
         sqlite_autoincrement=True,
     )
     op.create_table(
         "feedback",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("minibrain_id", sa.Integer(), nullable=False),
+        sa.Column("model_id", sa.Integer(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=True),
         sa.Column("response_id", sa.String(), nullable=True),
         sa.Column("origin", sa.String(), nullable=False),
@@ -441,11 +441,11 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("updated_at", TIMESTAMP, nullable=False),
         sa.ForeignKeyConstraint(["key_id"], ["api_keys.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sqlite_autoincrement=True,
     )
-    op.create_index("ix_feedback_input", "feedback", ["minibrain_id", "input_key"], unique=False)
+    op.create_index("ix_feedback_input", "feedback", ["model_id", "input_key"], unique=False)
     op.create_index("ix_feedback_queue", "feedback", ["priority", "id"], unique=False)
     op.create_index("ix_feedback_response", "feedback", ["response_id"], unique=False)
     op.create_table(
@@ -453,7 +453,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("at", TIMESTAMP, nullable=False),
         sa.Column("key_id", sa.Integer(), nullable=True),
-        sa.Column("minibrain_id", sa.Integer(), nullable=True),
+        sa.Column("model_id", sa.Integer(), nullable=True),
         sa.Column("model", sa.String(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=True),
         sa.Column("contract", sa.Integer(), nullable=True),
@@ -466,20 +466,20 @@ def upgrade() -> None:
         sa.Column("output", sa.String(), nullable=True),
         sa.Column("finish_reason", sa.String(), nullable=True),
         sa.ForeignKeyConstraint(["key_id"], ["api_keys.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sqlite_autoincrement=True,
     )
     op.create_index("ix_request_logs_at", "request_logs", ["at"], unique=False)
     op.create_index("ix_request_logs_key", "request_logs", ["key_id", "id"], unique=False)
-    op.create_index("ix_request_logs_minibrain", "request_logs", ["minibrain_id", "id"], unique=False)
+    op.create_index("ix_request_logs_model", "request_logs", ["model_id", "id"], unique=False)
     op.create_index("ix_request_logs_response", "request_logs", ["response_id"], unique=False)
     op.create_table(
         "teardowns",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("kind", sa.String(), nullable=False),
-        sa.Column("minibrain_id", sa.Integer(), nullable=True),
-        sa.Column("model_id", sa.String(), nullable=True),
+        sa.Column("model_id", sa.Integer(), nullable=True),
+        sa.Column("base_model_id", sa.String(), nullable=True),
         sa.Column("parent_id", sa.Integer(), nullable=True),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("status", sa.String(), nullable=False),
@@ -490,18 +490,18 @@ def upgrade() -> None:
         sa.Column("attempt", sa.Integer(), nullable=False),
         sa.Column("started_at", TIMESTAMP, nullable=False),
         sa.Column("updated_at", TIMESTAMP, nullable=False),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["base_model_id"], ["base_models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["parent_id"], ["teardowns.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("minibrain_id"),
+        sa.UniqueConstraint("base_model_id"),
         sa.UniqueConstraint("model_id"),
         sqlite_autoincrement=True,
     )
     op.create_table(
         "versions",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("minibrain_id", sa.Integer(), nullable=False),
+        sa.Column("model_id", sa.Integer(), nullable=False),
         sa.Column("snapshot_id", sa.Integer(), nullable=True),
         sa.Column("number", sa.Integer(), nullable=False),
         sa.Column("kind", sa.String(), nullable=False),
@@ -523,22 +523,22 @@ def upgrade() -> None:
             ["adapter_artifact_id"],
             ["artifacts.id"],
         ),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["snapshot_id"],
             ["snapshots.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("minibrain_id", "number"),
+        sa.UniqueConstraint("model_id", "number"),
         sqlite_autoincrement=True,
     )
     op.create_table(
         "jobs",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("kind", sa.String(), nullable=False),
-        sa.Column("minibrain_id", sa.Integer(), nullable=True),
+        sa.Column("model_id", sa.Integer(), nullable=True),
         sa.Column("version_id", sa.Integer(), nullable=True),
-        sa.Column("model_id", sa.String(), nullable=True),
+        sa.Column("base_model_id", sa.String(), nullable=True),
         sa.Column("params", sa.JSON(), nullable=False),
         sa.Column("needs_gpu", sa.Boolean(), nullable=False),
         sa.Column("status", sa.String(), nullable=False),
@@ -560,8 +560,8 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("started_at", TIMESTAMP, nullable=True),
         sa.Column("finished_at", TIMESTAMP, nullable=True),
-        sa.ForeignKeyConstraint(["minibrain_id"], ["minibrains.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["base_model_id"], ["base_models.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["retry_of"],
             ["jobs.id"],
@@ -572,7 +572,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_jobs_claim", "jobs", ["status", "priority", "id"], unique=False)
     op.create_index("ix_jobs_kind", "jobs", ["kind", "id"], unique=False)
-    op.create_index("ix_jobs_minibrain", "jobs", ["minibrain_id", "id"], unique=False)
+    op.create_index("ix_jobs_model", "jobs", ["model_id", "id"], unique=False)
     op.create_index(
         "uq_jobs_active_key",
         "jobs",
@@ -629,10 +629,10 @@ def downgrade() -> None:
     op.drop_table("feedback")
     op.drop_table("api_key_scopes")
     op.drop_table("snapshots")
-    op.drop_table("minibrains")
-    op.drop_table("dataset_sources")
     op.drop_table("models")
+    op.drop_table("dataset_sources")
     op.drop_table("datasets")
+    op.drop_table("base_models")
     op.drop_table("sources")
     op.drop_table("sessions")
     op.drop_table("catalog_variants")

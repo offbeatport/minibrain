@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import CLIENT_ERROR, aware, base_names, model_match
-from minibrain.registry.models import Minibrain, RequestLog, now
+from minibrain.registry.models import Model, RequestLog, now
 
 router = APIRouter(prefix="/api", tags=["requests"])
 
@@ -74,7 +74,7 @@ class RequestOverview(BaseModel):
 
 @dataclass(frozen=True)
 class Identity:
-    minibrain_id: int | None
+    model_id: int | None
     base: str | None
 
 
@@ -114,13 +114,13 @@ def bucket_of(column: Any, edges: Sequence[datetime], low: int, high: int) -> Co
 
 
 def base_of() -> ColumnElement[Any]:
-    return case((RequestLog.minibrain_id.is_(None), RequestLog.model), else_=None)
+    return case((RequestLog.model_id.is_(None), RequestLog.model), else_=None)
 
 
 def same_model(item: Identity) -> ColumnElement[bool]:
-    if item.minibrain_id is not None:
-        return RequestLog.minibrain_id == item.minibrain_id
-    return and_(RequestLog.minibrain_id.is_(None), RequestLog.model == item.base)
+    if item.model_id is not None:
+        return RequestLog.model_id == item.model_id
+    return and_(RequestLog.model_id.is_(None), RequestLog.model == item.base)
 
 
 def series_of(top: Sequence[Identity]) -> ColumnElement[int]:
@@ -173,11 +173,11 @@ def shared_columns() -> list[Any]:
 
 
 def model_rows(session: Session, where: Sequence[ColumnElement[bool]]) -> list[tuple[Identity, Partition]]:
-    identity = [RequestLog.minibrain_id.label("minibrain_id"), base_of().label("base"), RequestLog.at.label("at")]
+    identity = [RequestLog.model_id.label("model_id"), base_of().label("base"), RequestLog.at.label("at")]
     sub = select(*identity, *shared_columns()).where(*where).subquery()
-    query = ranked(sub, [sub.c.minibrain_id, sub.c.base], {"last_at": func.max(sub.c.at)})
-    found = partitions(list(session.execute(query)), lambda row: Identity(row.minibrain_id, row.base))
-    return sorted(found.items(), key=lambda item: (-item[1].total, str(item[0].base or item[0].minibrain_id)))
+    query = ranked(sub, [sub.c.model_id, sub.c.base], {"last_at": func.max(sub.c.at)})
+    found = partitions(list(session.execute(query)), lambda row: Identity(row.model_id, row.base))
+    return sorted(found.items(), key=lambda item: (-item[1].total, str(item[0].base or item[0].model_id)))
 
 
 def series_points(
@@ -203,16 +203,16 @@ def series_points(
 
 
 def names_for(session: Session, identities: Sequence[Identity]) -> dict[Identity, OverviewSeries]:
-    wanted = {item.minibrain_id for item in identities if item.minibrain_id is not None}
+    wanted = {item.model_id for item in identities if item.model_id is not None}
     custom = dict.fromkeys(wanted, ("", ""))
     if wanted:
-        query = select(Minibrain.id, Minibrain.slug, Minibrain.name).where(Minibrain.id.in_(wanted))
+        query = select(Model.id, Model.slug, Model.name).where(Model.id.in_(wanted))
         custom |= {row.id: (row.slug, row.name) for row in session.execute(query)}
     bases = base_names(session, {item.base for item in identities if item.base is not None})
     found: dict[Identity, OverviewSeries] = {}
     for item in identities:
-        if item.minibrain_id is not None:
-            slug, name = custom[item.minibrain_id]
+        if item.model_id is not None:
+            slug, name = custom[item.model_id]
             found[item] = OverviewSeries(key=slug, label=name or slug, custom=True)
         else:
             base = item.base or ""

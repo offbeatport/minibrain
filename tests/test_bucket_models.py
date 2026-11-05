@@ -12,7 +12,7 @@ from minibrain.encryption import envelope
 from minibrain.encryption.envelope import HEADER
 from minibrain.models.bucket import WEIGHTS
 from minibrain.models.copies import MANIFEST, bucket_chunks, read_manifest
-from minibrain.registry.models import Artifact, AuditEvent, Model
+from minibrain.registry.models import Artifact, AuditEvent, BaseModel
 from minibrain.serve.engine import local_copy, prune_engines, pull_base
 from minibrain.storage import GIB, Space
 from tests.conftest import BUCKET, FOLDER, Harness, use_bucket
@@ -45,7 +45,7 @@ def installed(harness: Harness) -> dict[str, Any]:
     add_tiny(harness)
     download_tiny(harness)
     assert harness.worker(kinds=["download"]).run_once()
-    return harness.client.get("/api/models/base/tiny").json()
+    return harness.client.get("/api/base-models/tiny").json()
 
 
 def listing(harness: Harness) -> Any:
@@ -76,7 +76,7 @@ def test_a_download_goes_to_the_bucket_encrypted_and_leaves_nothing_on_main(harn
     assert catalog["store_free_bytes"] is None and catalog["staging_free_bytes"] > 0
     stores = {item["name"]: item for item in harness.client.get("/api/system/infrastructure").json()["stores"]}
     assert stores["Model files"]["kind"] == "s3" and stores["Model files"]["used_bytes"] == detail["size_bytes"]
-    assert harness.client.get("/api/models").json()[0]["health"] is None
+    assert harness.client.get("/api/all-models").json()[0]["health"] is None
 
 
 @pytest.mark.parametrize("store_kind", [BUCKET])
@@ -97,13 +97,13 @@ def test_machines_fetch_from_the_bucket_with_signed_links_and_check_every_file(
     copy = read_manifest(tmp_path / "engine" / "weights")
     assert copy["working_copy"] and copy["content_hash"] == spec.content_hash
     worker = harness.worker(kinds=["train"])
-    base = harness.client.get("/api/models/base/tiny").json()
+    base = harness.client.get("/api/base-models/tiny").json()
     shaped = worker.base_copy({"key": "tiny", "path": base["storage_path"], "content_hash": spec.content_hash})
     assert Path(shaped["path"]) == harness.settings.home / "worker" / "models" / "tiny"
     assert (Path(shaped["path"]) / WEIGHTS_FILE).read_bytes() == FILES[WEIGHTS_FILE]
     local_copy(harness.client, gateway_token(harness), replace(spec, path=base["storage_path"]))
     assert (Path(base["storage_path"]) / WEIGHTS_FILE).read_bytes() == FILES[WEIGHTS_FILE]
-    assert harness.client.get("/api/models/base/tiny").json()["store"] == "s3"
+    assert harness.client.get("/api/base-models/tiny").json()["store"] == "s3"
     damaged = found["files"][0] | {"key": base64.b64encode(b"\0" * 32).decode()}
     with httpx.Client() as http, pytest.raises(envelope.EnvelopeError), bucket_chunks(http, damaged) as chunks:
         b"".join(chunks)
@@ -128,7 +128,7 @@ def test_stale_working_copies_are_fetched_again_and_deleted_with_the_model(
     pull_base(harness.client, token, "tiny", weights)
     assert not (weights / "leftover.safetensors").exists() and (weights / WEIGHTS_FILE).is_file()
     assert prune_engines(harness.client, token, engines) == []
-    assert harness.client.delete("/api/models/base/tiny").status_code == 202
+    assert harness.client.delete("/api/base-models/tiny").status_code == 202
     harness.settle()
     assert not any(in_bucket(moto, harness, sha) for sha in SHA.values())
     with harness.sessions() as session:
@@ -143,16 +143,16 @@ def test_stale_working_copies_are_fetched_again_and_deleted_with_the_model(
 def test_verify_reads_the_bucket_and_repair_replaces_a_damaged_object(harness: Harness, moto: FakeS3) -> None:
     installed(harness)
     moto.put(bucket_of(harness), object_key(SHA[WEIGHTS_FILE]), b"x" * 9000)
-    assert harness.client.post("/api/models/base/tiny/verify").status_code == 202
+    assert harness.client.post("/api/base-models/tiny/verify").status_code == 202
     assert harness.worker(kinds=["verify"]).run_once()
-    row = next(item for item in harness.client.get("/api/models").json() if item["key"] == "tiny")
+    row = next(item for item in harness.client.get("/api/all-models").json() if item["key"] == "tiny")
     assert row["health"]["state"] == "corrupt" and row["health"]["files"] == [WEIGHTS_FILE]
-    assert harness.client.post("/api/models/base/tiny/repair").status_code == 202
+    assert harness.client.post("/api/base-models/tiny/repair").status_code == 202
     assert harness.worker(kinds=["repair"]).run_once()
     assert envelope.is_sealed(blob(moto, harness, SHA[WEIGHTS_FILE])[:HEADER])
-    assert harness.client.post("/api/models/base/tiny/verify").status_code == 202
+    assert harness.client.post("/api/base-models/tiny/verify").status_code == 202
     assert harness.worker(kinds=["verify"]).run_once()
-    row = next(item for item in harness.client.get("/api/models").json() if item["key"] == "tiny")
+    row = next(item for item in harness.client.get("/api/all-models").json() if item["key"] == "tiny")
     assert row["health"] is None
 
 
@@ -164,11 +164,11 @@ def test_models_on_main_stay_usable_after_storage_switches_to_the_bucket(harness
     assert detail["store"] == "folder" and (folder / WEIGHTS_FILE).is_file()
     use_bucket(harness, moto)
     assert listing(harness).json()["store"] == "folder"
-    after = harness.client.get("/api/models/base/tiny").json()
+    after = harness.client.get("/api/base-models/tiny").json()
     assert after["store"] == "folder" and after["availability"]["state"] == "available"
     assert not any(in_bucket(moto, harness, sha) for sha in SHA.values())
     with harness.sessions() as session:
-        model = session.get(Model, "tiny")
+        model = session.get(BaseModel, "tiny")
         assert model is not None and model.store == FOLDER
 
 
@@ -182,9 +182,9 @@ def test_an_import_goes_to_the_bucket_and_main_needs_room_for_one_file(
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     body = {"name": "Corp", "source_type": "folder", "location": str(folder)}
-    assert harness.client.post("/api/models/import", json=body).status_code == 202
+    assert harness.client.post("/api/base-models/import", json=body).status_code == 202
     assert harness.worker(kinds=["import"]).run_once()
-    imported = harness.client.get("/api/models/base/corp").json()
+    imported = harness.client.get("/api/base-models/corp").json()
     assert imported["availability"]["state"] == "available" and imported["store"] == "s3"
     assert all(in_bucket(moto, harness, hashlib.sha256(data).hexdigest()) for data in FILES.values())
     assert not Path(imported["storage_path"]).exists()
@@ -203,12 +203,12 @@ def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness
         (folder / name).write_bytes(data)
     config = {"architectures": ["Qwen3ForCausalLM"], "quantization_config": {"quant_method": "fp8"}}
     (folder / "config.json").write_text(json.dumps(config))
-    base = harness.client.post("/api/models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
+    base = harness.client.post("/api/base-models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
     assert harness.worker(kinds=["import"]).run_once()
-    imported = harness.client.get(f"/api/models/base/{base['key']}").json()
+    imported = harness.client.get(f"/api/base-models/{base['key']}").json()
     assert imported["store"] == "s3" and not Path(imported["storage_path"]).exists()
     body = {"name": "On FP8", "labels": ["billing", "bug"], "base_model": base["key"]}
-    assert harness.client.post("/api/minibrains", json=body).status_code == 201
-    trained = harness.client.post("/api/minibrains/on-fp8/versions", json={"kind": "lora"})
+    assert harness.client.post("/api/models", json=body).status_code == 201
+    trained = harness.client.post("/api/models/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
     assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]

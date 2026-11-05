@@ -24,9 +24,9 @@ export function useModelsRefresh() {
     const queryClient = useQueryClient();
     return () =>
         Promise.all([
-            queryClient.invalidateQueries({ queryKey: keys.models }),
+            queryClient.invalidateQueries({ queryKey: keys.allModels }),
             queryClient.invalidateQueries({ queryKey: keys.catalog }),
-            queryClient.invalidateQueries({ queryKey: keys.minibrains }),
+            queryClient.invalidateQueries({ queryKey: keys.models }),
             queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         ]);
 }
@@ -68,14 +68,14 @@ export function EditModelDialog({
             };
             if (row.kind === "base") {
                 await unwrap(
-                    api.PATCH("/api/models/base/{key}", {
+                    api.PATCH("/api/base-models/{key}", {
                         params: { path: { key: row.key } },
                         body,
                     }),
                 );
             } else {
                 await unwrap(
-                    api.PATCH("/api/minibrains/{slug}", {
+                    api.PATCH("/api/models/{slug}", {
                         params: { path: { slug: row.key } },
                         body,
                     }),
@@ -209,7 +209,7 @@ export function TestBaseDialog({
     const test = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/models/base/{key}/test", {
+                api.POST("/api/base-models/{key}/test", {
                     params: { path: { key: row?.key ?? "" } },
                     body: { text, max_tokens: 128 },
                 }),

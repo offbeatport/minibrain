@@ -31,7 +31,7 @@ def upload(harness: Harness, slug: str, name: str, data: bytes) -> dict[str, Any
 
 
 def versions(harness: Harness, slug: str) -> list[dict[str, Any]]:
-    return harness.client.get(f"/api/minibrains/{slug}/versions").json()
+    return harness.client.get(f"/api/models/{slug}/versions").json()
 
 
 def complete_job(harness: Harness, kind: str, result: dict[str, Any]) -> dict[str, Any]:
@@ -53,7 +53,7 @@ def test_a_new_model_starts_with_a_prompt_only_v0_ready_to_test(harness: Harness
     assert "billing" in v0["instructions"]
     assert v0["graders"] == [{"name": "label_accuracy", "rubric": None, "model": None, "fields": None}]
     tested = harness.client.post(
-        "/api/minibrains/support-triage/versions/0/test",
+        "/api/models/support-triage/versions/0/test",
         json={"messages": [{"role": "user", "content": "I was charged twice"}], "expected": "billing"},
     )
     assert tested.status_code == 200, tested.text
@@ -70,18 +70,18 @@ def test_a_new_model_starts_with_a_prompt_only_v0_ready_to_test(harness: Harness
 
 
 def test_classify_needs_labels_or_data(harness: Harness) -> None:
-    refused = harness.client.post("/api/minibrains", json={"name": "Router"})
+    refused = harness.client.post("/api/models", json={"name": "Router"})
     assert refused.status_code == 409
     assert "at least two labels" in refused.json()["detail"]
-    assert harness.client.get("/api/minibrains").json() == []
+    assert harness.client.get("/api/models").json() == []
 
 
 def test_v0_is_scored_at_once_when_the_model_starts_with_data(harness: Harness) -> None:
     create_model(harness, "Seed")
     upload(harness, "seed", "tickets.csv", tickets_csv())
-    dataset = harness.client.get("/api/minibrains/seed").json()["dataset"]
+    dataset = harness.client.get("/api/models/seed").json()["dataset"]
     body = {"name": "Router", "dataset": dataset}
-    created = harness.client.post("/api/minibrains", json=body)
+    created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
     [v0] = versions(harness, "router")
     assert (v0["status"], v0["shots"], v0["snapshot_dataset"]) == ("evaluating", 4, dataset)
@@ -99,32 +99,32 @@ def test_new_labels_in_data_extend_the_contract_but_removing_one_needs_a_confirm
     create_model(harness)
     upload(harness, "support-triage", "tickets.csv", tickets_csv())
     fewer = "SELECT text AS input, CASE WHEN category = 'feature' THEN 'refund' ELSE category END AS label FROM source"
-    harness.client.put("/api/minibrains/support-triage/mapping", json={"sql": fewer})
-    widened = harness.client.post("/api/minibrains/support-triage/versions", json={"kind": "prompt"})
+    harness.client.put("/api/models/support-triage/mapping", json={"sql": fewer})
+    widened = harness.client.post("/api/models/support-triage/versions", json={"kind": "prompt"})
     assert widened.status_code == 201, widened.text
     assert widened.json()["contract"]["labels"] == [*LABELS, "refund"]
     assert widened.json()["contract_number"] == 2
     check = harness.client.post(
-        "/api/minibrains/support-triage/contract/check", json={"kind": "json", "labels": ["billing", "bug"]}
+        "/api/models/support-triage/contract/check", json={"kind": "json", "labels": ["billing", "bug"]}
     ).json()
     assert check["breaking"] is True and check["against"] == 2
     assert {item["detail"] for item in check["changes"]} >= {'removes "account"', 'removes "refund"'}
     body = {"contract": {"kind": "json", "labels": ["billing", "bug", "account", "feature", "refund", "other"]}}
-    additive = harness.client.put("/api/minibrains/support-triage/contract", json=body)
+    additive = harness.client.put("/api/models/support-triage/contract", json=body)
     assert additive.status_code == 200, additive.text
     narrower = {"contract": {"kind": "json", "labels": ["billing", "bug"]}}
-    assert harness.client.put("/api/minibrains/support-triage/contract", json=narrower).status_code == 409
-    confirmed = harness.client.put("/api/minibrains/support-triage/contract", json=narrower | {"breaking": True})
+    assert harness.client.put("/api/models/support-triage/contract", json=narrower).status_code == 409
+    confirmed = harness.client.put("/api/models/support-triage/contract", json=narrower | {"breaking": True})
     assert confirmed.status_code == 200
-    narrowed = harness.client.post("/api/minibrains/support-triage/versions", json={"kind": "prompt"})
+    narrowed = harness.client.post("/api/models/support-triage/versions", json={"kind": "prompt"})
     assert narrowed.status_code == 201, narrowed.text
     assert narrowed.json()["contract"]["labels"] == ["billing", "bug", "account", "refund"]
     assert narrowed.json()["contract_number"] == 3
     wider = {"contract": {"kind": "json", "labels": ["billing", "bug", "account", "refund", "feature"]}}
-    harness.client.put("/api/minibrains/support-triage/contract", json=wider)
+    harness.client.put("/api/models/support-triage/contract", json=wider)
     renamed = "SELECT text AS input, CASE WHEN category = 'bug' THEN 'defect' ELSE category END AS label FROM source"
-    harness.client.put("/api/minibrains/support-triage/mapping", json={"sql": renamed})
-    assert harness.client.post("/api/minibrains/support-triage/versions", json={"kind": "prompt"}).status_code == 201
+    harness.client.put("/api/models/support-triage/mapping", json={"sql": renamed})
+    assert harness.client.post("/api/models/support-triage/versions", json={"kind": "prompt"}).status_code == 201
 
 
 def test_custom_models_take_a_json_schema_chat_data_and_json_graders(harness: Harness) -> None:
@@ -134,15 +134,15 @@ def test_custom_models_take_a_json_schema_chat_data_and_json_graders(harness: Ha
         "contract": {"kind": "json", "json_schema": INVOICE},
         "promotion": {"thresholds": [{"metric": "json_valid", "op": "==", "value": 1}], "beats_live": True},
     }
-    created = harness.client.post("/api/minibrains", json=body)
+    created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
     detail = upload(harness, "invoices", "invoices.jsonl", chat_jsonl())
     assert detail["mapping"]["template"] == {"messages": "messages"}
-    preview = harness.client.get("/api/minibrains/invoices/preview").json()
+    preview = harness.client.get("/api/models/invoices/preview").json()
     assert preview["rows"][0]["input"].startswith("Invoice")
     assert json.loads(preview["rows"][0]["label"])["currency"] == "EUR"
     assert [message["role"] for message in preview["example"]] == ["user", "assistant"]
-    version = harness.client.post("/api/minibrains/invoices/versions", json={"kind": "prompt"})
+    version = harness.client.post("/api/models/invoices/versions", json={"kind": "prompt"})
     assert version.status_code == 201, version.text
     found = version.json()
     assert found["contract"] == {"kind": "json", "json_schema": INVOICE, "labels": None}
@@ -181,11 +181,11 @@ def test_custom_free_text_with_a_judge_caches_its_scores(harness: Harness) -> No
         "preset": "custom",
         "graders": [{"name": "judge", "rubric": "Is the answer correct and polite?", "model": "qwen3-0.6b"}],
     }
-    assert harness.client.post("/api/minibrains", json=body).status_code == 201
+    assert harness.client.post("/api/models", json=body).status_code == 201
     upload(harness, "helper", "help.csv", ("question,answer\n" + rows).encode())
     sql = "SELECT question AS input, answer AS label FROM source"
-    assert harness.client.put("/api/minibrains/helper/mapping", json={"sql": sql}).status_code == 200
-    first = harness.client.post("/api/minibrains/helper/versions", json={"kind": "prompt"}).json()
+    assert harness.client.put("/api/models/helper/mapping", json={"sql": sql}).status_code == 200
+    first = harness.client.post("/api/models/helper/versions", json={"kind": "prompt"}).json()
     assert first["contract"]["kind"] == "text"
     claim = harness.claim([JobKind.EVAL])
     assert claim is not None
@@ -209,7 +209,7 @@ def test_custom_free_text_with_a_judge_caches_its_scores(harness: Harness) -> No
     assert (scored["status"], values["judge"], scored["held_out"]["judge_pending"]) == ("ready", 0.75, 0)
     with harness.sessions() as session:
         assert session.query(JudgeScore).count() == len(items)
-    harness.client.post("/api/minibrains/helper/versions", json={"kind": "prompt"})
+    harness.client.post("/api/models/helper/versions", json={"kind": "prompt"})
     again = harness.claim([JobKind.EVAL])
     assert again is not None
     result = {"metrics": TIMING, "answers": scored_answers(harness, again["job_id"], 1.0)}
@@ -225,17 +225,17 @@ def test_custom_free_text_with_a_judge_caches_its_scores(harness: Harness) -> No
 
 def test_graders_must_fit_the_contract(harness: Harness) -> None:
     body = {"name": "Text", "preset": "custom", "graders": [{"name": "label_accuracy"}]}
-    refused = harness.client.post("/api/minibrains", json=body)
+    refused = harness.client.post("/api/models", json=body)
     assert refused.status_code == 409
     assert "label set" in refused.json()["detail"]
 
 
 def test_default_names_count_up_and_names_are_unique_across_base_and_custom_models(harness: Harness) -> None:
-    assert harness.client.get("/api/minibrains/name?preset=classify").json() == {"name": "Classifier 1"}
-    assert harness.client.get("/api/minibrains/name?preset=custom").json() == {"name": "Custom 1"}
+    assert harness.client.get("/api/models/name?preset=classify").json() == {"name": "Classifier 1"}
+    assert harness.client.get("/api/models/name?preset=custom").json() == {"name": "Custom 1"}
     create_model(harness, "Classifier 1")
-    assert harness.client.get("/api/minibrains/name?preset=classify").json() == {"name": "Classifier 2"}
-    taken = harness.client.post("/api/minibrains", json={"name": "classifier 1", "labels": list(LABELS)})
+    assert harness.client.get("/api/models/name?preset=classify").json() == {"name": "Classifier 2"}
+    taken = harness.client.post("/api/models", json={"name": "classifier 1", "labels": list(LABELS)})
     assert taken.status_code == 409
 
 
@@ -266,7 +266,7 @@ def test_start_from_a_recipe_loads_its_sample_and_fills_the_model(harness: Harne
         "dataset": sample["dataset"],
         "promotion": {"thresholds": [{"metric": "label_accuracy", "op": ">=", "value": 0.85}]},
     }
-    created = harness.client.post("/api/minibrains", json=body)
+    created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
     [v0] = versions(harness, "ticket-routing")
     assert v0["status"] == "evaluating"
@@ -274,11 +274,11 @@ def test_start_from_a_recipe_loads_its_sample_and_fills_the_model(harness: Harne
     finish(harness, "eval", accuracy=0.8)
     [v0] = versions(harness, "ticket-routing")
     assert v0["promotion"]["passed"] is False
-    assert harness.client.post("/api/minibrains/ticket-routing/versions/0/promote").status_code == 409
+    assert harness.client.post("/api/models/ticket-routing/versions/0/promote").status_code == 409
 
 
 def test_try_with_sample_data_is_the_ticket_routing_recipe(harness: Harness) -> None:
-    created = harness.client.post("/api/minibrains/sample")
+    created = harness.client.post("/api/models/sample")
     assert created.status_code == 201, created.text
     found = created.json()
     assert (found["name"], found["preset"], found["dataset_name"]) == (
@@ -288,4 +288,4 @@ def test_try_with_sample_data_is_the_ticket_routing_recipe(harness: Harness) -> 
     )
     assert found["promotion"]["thresholds"][0]["value"] == 0.85
     assert sorted(found["contract"]["labels"]) == ["account", "billing", "returns", "shipping", "technical"]
-    assert harness.client.post("/api/minibrains/sample").json()["name"] == "Ticket routing 2"
+    assert harness.client.post("/api/models/sample").json()["name"] == "Ticket routing 2"

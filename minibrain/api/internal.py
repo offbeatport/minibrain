@@ -2,9 +2,10 @@ import hmac
 import time
 from typing import Annotated, Any
 
+import pydantic
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from minibrain.api.bases import BaseWeights, LiveBases, live
 from minibrain.api.bases import base_file as file_of
@@ -22,7 +23,7 @@ from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
 from minibrain.registry.compute import record_node
 from minibrain.registry.files import register
-from minibrain.registry.models import Artifact, Job, JobKind, Model
+from minibrain.registry.models import Artifact, BaseModel, Job, JobKind
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 
@@ -40,7 +41,7 @@ def worker_token(request: Request, authorization: Annotated[str, Header()] = "")
 router = APIRouter(prefix="/internal/worker", tags=["worker"], dependencies=[Depends(worker_token)])
 
 
-class WorkerBody(BaseModel):
+class WorkerBody(pydantic.BaseModel):
     id: str
     host: str
     kinds: list[str]
@@ -52,12 +53,12 @@ class WorkerBody(BaseModel):
         return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus)
 
 
-class ClaimRequest(BaseModel):
+class ClaimRequest(pydantic.BaseModel):
     worker: WorkerBody
     wait: float = 0.0
 
 
-class ClaimResponse(BaseModel):
+class ClaimResponse(pydantic.BaseModel):
     job_id: int
     kind: str
     attempt: int
@@ -67,16 +68,16 @@ class ClaimResponse(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
 
 
-class TokenBody(BaseModel):
+class TokenBody(pydantic.BaseModel):
     token: str
 
 
-class HeartbeatResponse(BaseModel):
+class HeartbeatResponse(pydantic.BaseModel):
     cancel: bool
     lease_expires_at: str
 
 
-class EventBody(BaseModel):
+class EventBody(pydantic.BaseModel):
     kind: str
     message: str = ""
     data: dict[str, Any] | None = None
@@ -99,7 +100,7 @@ class FailBody(TokenBody):
     code: str | None = None
 
 
-class StoredArtifact(BaseModel):
+class StoredArtifact(pydantic.BaseModel):
     id: str
     size: int
 
@@ -219,15 +220,15 @@ def download_artifact(artifact_id: str, store: StoreDep) -> StreamingResponse:
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")
 
 
-class StoredFiles(BaseModel):
+class StoredFiles(pydantic.BaseModel):
     files: list[dict[str, Any]]
 
 
-@router.get("/models/{model_id}/stored")
-def stored(model_id: str, session: SessionDep, store: StoreDep) -> StoredFiles:
-    model = session.get(Model, model_id)
+@router.get("/bases/{base_model_id}/stored")
+def stored(base_model_id: str, session: SessionDep, store: StoreDep) -> StoredFiles:
+    model = session.get(BaseModel, base_model_id)
     if model is None:
-        raise HTTPException(status_code=404, detail=f"model {model_id} not found")
+        raise HTTPException(status_code=404, detail=f"model {base_model_id} not found")
     return StoredFiles(files=stored_files(session, store, model))
 
 

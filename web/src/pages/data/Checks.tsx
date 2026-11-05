@@ -26,7 +26,7 @@ function useDismiss(dataset: string) {
     const refresh = () =>
         Promise.all([
             client.invalidateQueries({ queryKey: ["datasets"] }),
-            client.invalidateQueries({ queryKey: ["minibrain"] }),
+            client.invalidateQueries({ queryKey: ["model"] }),
         ]);
     const dismiss = useMutation({
         mutationFn: (check: CheckInfo) =>

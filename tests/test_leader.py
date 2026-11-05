@@ -105,6 +105,6 @@ def test_two_mains_share_postgres_and_one_runs_the_loops(postgres: str, tmp_path
         first.state.leader.held()
         second.state.leader.held()
         assert {a.get("/api/system").json()["loops"], b.get("/api/system").json()["loops"]} == {"leader", "standby"}
-        assert a.get("/api/catalog").status_code == 200 and b.get("/api/minibrains").status_code == 200
+        assert a.get("/api/catalog").status_code == 200 and b.get("/api/models").status_code == 200
         first.state.leader.release()
         second.state.leader.release()

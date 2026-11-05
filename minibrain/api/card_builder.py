@@ -41,12 +41,12 @@ from minibrain.registry.files import MissingArtifactError, snapshot_location, st
 from minibrain.registry.models import (
     AttemptOutcome,
     AuditEvent,
+    BaseModel,
+    BaseModelStatus,
     Job,
     JobKind,
     JobStatus,
-    Minibrain,
     Model,
-    ModelStatus,
     Snapshot,
     Source,
     Version,
@@ -81,13 +81,11 @@ def whole(value: Any) -> int | None:
     return None if value is None else int(value)
 
 
-def card_events(session: Session, minibrain: Minibrain) -> list[AuditEvent]:
-    targets = or_(
-        AuditEvent.target == minibrain.slug, AuditEvent.target.startswith(f"{minibrain.slug}@", autoescape=True)
-    )
+def card_events(session: Session, model: Model) -> list[AuditEvent]:
+    targets = or_(AuditEvent.target == model.slug, AuditEvent.target.startswith(f"{model.slug}@", autoescape=True))
     query = (
         select(AuditEvent)
-        .where(AuditEvent.action.in_(CARD_ACTIONS), targets, AuditEvent.at >= minibrain.created_at)
+        .where(AuditEvent.action.in_(CARD_ACTIONS), targets, AuditEvent.at >= model.created_at)
         .order_by(AuditEvent.id)
     )
     return list(session.scalars(query))
@@ -111,8 +109,8 @@ def promoted_entry(event: AuditEvent, number: int) -> CardEvent:
     return history_entry(event, "deployed", summary)
 
 
-def history_of(events: list[AuditEvent], minibrain: Minibrain, number: int) -> list[CardEvent]:
-    target = f"{minibrain.slug}@{number}"
+def history_of(events: list[AuditEvent], model: Model, number: int) -> list[CardEvent]:
+    target = f"{model.slug}@{number}"
     found: list[CardEvent] = []
     for event in events:
         detail = event.detail or {}
@@ -120,7 +118,7 @@ def history_of(events: list[AuditEvent], minibrain: Minibrain, number: int) -> l
             found.append(promoted_entry(event, number))
         elif event.action == "version.promote" and detail.get("previous") == number and detail.get("was_deployed"):
             found.append(history_entry(event, "replaced", f"Replaced by v{event.target.rsplit('@', 1)[-1]}"))
-        elif event.target == minibrain.slug and detail.get("version") == number:
+        elif event.target == model.slug and detail.get("version") == number:
             if event.action == "model.deploy":
                 found.append(history_entry(event, "deployed", f"Deployed v{number} again"))
             elif event.action == "model.undeploy":
@@ -128,8 +126,8 @@ def history_of(events: list[AuditEvent], minibrain: Minibrain, number: int) -> l
     return found
 
 
-def creator_of(events: list[AuditEvent], minibrain: Minibrain, number: int) -> str | None:
-    target = f"{minibrain.slug}@{number}"
+def creator_of(events: list[AuditEvent], model: Model, number: int) -> str | None:
+    target = f"{model.slug}@{number}"
     return next((e.actor for e in events if e.action == "version.create" and e.target == target), None)
 
 
@@ -137,24 +135,24 @@ def licence_key(licence: str | None) -> str | None:
     return licence.strip().lower() if licence else None
 
 
-def base_card(session: Session, minibrain: Minibrain, version: Version) -> CardBaseModel:
-    key = minibrain.base_model
-    model = session.get(Model, key)
+def base_card(session: Session, model: Model, version: Version) -> CardBaseModel:
+    key = model.base_model
+    base = session.get(BaseModel, key)
     builtin = BASE_MODELS.get(key)
-    repo = model.repo if model is not None else builtin.repo if builtin is not None else None
-    revision = model.revision if model is not None else builtin.revision if builtin is not None else None
-    licence = model.license if model is not None else builtin.license if builtin is not None else None
+    repo = base.repo if base is not None else builtin.repo if builtin is not None else None
+    revision = base.revision if base is not None else builtin.revision if builtin is not None else None
+    licence = base.license if base is not None else builtin.license if builtin is not None else None
     current = None
-    if model is not None and model.status == ModelStatus.AVAILABLE:
-        current = content_hash(model.files)
+    if base is not None and base.status == BaseModelStatus.AVAILABLE:
+        current = content_hash(base.files)
     elif builtin is not None:
         current = builtin.content_hash
-    variant = model.variant if model is not None else None
+    variant = base.variant if base is not None else None
     publisher = variant.model.provider if variant is not None else publisher_of(repo)
     found = licence_key(licence)
     return CardBaseModel(
         key=key,
-        name=model.name if model is not None else key,
+        name=base.name if base is not None else key,
         publisher=publisher,
         repo=repo,
         revision=revision,
@@ -163,8 +161,8 @@ def base_card(session: Session, minibrain: Minibrain, version: Version) -> CardB
         licence=licence,
         licence_name=LICENCES[found][0] if found in LICENCES else None,
         licence_use=licence_use(found) if found else "unknown",
-        licence_accepted_by=model.license_ack_by if model is not None else None,
-        licence_accepted_at=stamp(model.license_ack_at) if model is not None else None,
+        licence_accepted_by=base.license_ack_by if base is not None else None,
+        licence_accepted_at=stamp(base.license_ack_at) if base is not None else None,
     )
 
 
@@ -242,8 +240,8 @@ def data_card(session: Session, snapshot: Snapshot, splits: dict[str, list[Examp
     )
 
 
-def version_job(minibrain: Minibrain, version: Version, kind: JobKind) -> Job | None:
-    jobs = [job for job in minibrain.jobs if job.version_id == version.id and job.kind == kind]
+def version_job(model: Model, version: Version, kind: JobKind) -> Job | None:
+    jobs = [job for job in model.jobs if job.version_id == version.id and job.kind == kind]
     done = [job for job in jobs if job.status == JobStatus.SUCCEEDED]
     return max(done or jobs, key=lambda job: job.id, default=None)
 
@@ -289,13 +287,13 @@ def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
     )
 
 
-def training_card(session: Session, minibrain: Minibrain, version: Version) -> CardTraining:
+def training_card(session: Session, model: Model, version: Version) -> CardTraining:
     if version.kind != VersionKind.LORA:
         shots = len(version.shots or [])
         return CardTraining(
             method="prompt", recipe=None, examples=None, few_shot_examples=shots, train_loss=None, run=None
         )
-    job = version_job(minibrain, version, JobKind.TRAIN)
+    job = version_job(model, version, JobKind.TRAIN)
     recipe = dict((job.params.get("recipe") if job is not None else None) or {}) | dict(version.recipe or {})
     return CardTraining(
         method="lora",
@@ -399,28 +397,28 @@ def comparison(version: Version, other: Version, prices: DevicePrices) -> CardCo
     )
 
 
-def prompt_baseline(minibrain: Minibrain, version: Version) -> Version | None:
+def prompt_baseline(model: Model, version: Version) -> Version | None:
     if version.kind == VersionKind.PROMPT:
         return None
     earlier = [
         other
-        for other in minibrain.versions
+        for other in model.versions
         if other.kind == VersionKind.PROMPT and other.number < version.number and is_scored(other)
     ]
     return max(earlier, key=lambda other: (other.snapshot_id == version.snapshot_id, other.number), default=None)
 
 
-def previous_version(minibrain: Minibrain, version: Version) -> Version | None:
-    earlier = [other for other in minibrain.versions if other.number < version.number and is_scored(other)]
+def previous_version(model: Model, version: Version) -> Version | None:
+    earlier = [other for other in model.versions if other.number < version.number and is_scored(other)]
     return max(earlier, key=lambda other: other.number, default=None)
 
 
-def evaluation_card(session: Session, minibrain: Minibrain, version: Version) -> CardEvaluation:
+def evaluation_card(session: Session, model: Model, version: Version) -> CardEvaluation:
     metrics = version.metrics or {}
     split = held_out(version)
     latency = metrics.get("latency") or {}
-    baseline = prompt_baseline(minibrain, version)
-    previous = previous_version(minibrain, version)
+    baseline = prompt_baseline(model, version)
+    previous = previous_version(model, version)
     labels = label_report(split).get("labels")
     confusions = label_report(split).get("confusion")
     prices = load_prices(session)
@@ -433,7 +431,7 @@ def evaluation_card(session: Session, minibrain: Minibrain, version: Version) ->
         latency_p95_ms=rounded(latency.get("p95_ms"), 1),
         per_label=None if labels is None else [label_score(item) for item in labels],
         confusion=None if confusions is None else [confusion_card(item) for item in confusions],
-        run=run_card(session, version_job(minibrain, version, JobKind.EVAL), metrics.get("device")),
+        run=run_card(session, version_job(model, version, JobKind.EVAL), metrics.get("device")),
         prompt_only=comparison(version, baseline, prices) if baseline is not None else None,
         previous=comparison(version, previous, prices) if previous is not None else None,
         cost=cost_card(metrics, prices),
@@ -535,31 +533,29 @@ def derived_limits(version: Version, data: CardData, evaluation: CardEvaluation)
     return found
 
 
-def build_card(session: Session, settings: Settings, minibrain: Minibrain, version: Version, owner: str) -> ModelCard:
-    events = card_events(session, minibrain)
-    history = history_of(events, minibrain, version.number)
-    creator = creator_of(events, minibrain, version.number)
+def build_card(session: Session, settings: Settings, model: Model, version: Version, owner: str) -> ModelCard:
+    events = card_events(session, model)
+    history = history_of(events, model, version.number)
+    creator = creator_of(events, model, version.number)
     if version.snapshot is None:
-        raise ConflictError(f"{minibrain.slug}@{version.number} has no data yet, so there is nothing to put on a card")
+        raise ConflictError(f"{model.slug}@{version.number} has no data yet, so there is nothing to put on a card")
     data = data_card(session, version.snapshot, snapshot_splits(session, settings, version.snapshot))
-    evaluation = evaluation_card(session, minibrain, version)
+    evaluation = evaluation_card(session, model, version)
     return ModelCard(
         version=CardVersion(
-            id=f"{minibrain.slug}@{version.number}",
-            slug=minibrain.slug,
-            name=minibrain.name,
+            id=f"{model.slug}@{version.number}",
+            slug=model.slug,
+            name=model.name,
             number=version.number,
             kind=version.kind,
             status=version.status,
             created_at=stamp(version.created_at) or "",
             created_by=creator,
         ),
-        purpose=CardPurpose(
-            description=minibrain.description, task=minibrain.preset, labels=sorted(version.snapshot.labels)
-        ),
-        base_model=base_card(session, minibrain, version),
+        purpose=CardPurpose(description=model.description, task=model.preset, labels=sorted(version.snapshot.labels)),
+        base_model=base_card(session, model, version),
         training_data=data,
-        training=training_card(session, minibrain, version),
+        training=training_card(session, model, version),
         evaluation=evaluation,
         limits=CardLimits(derived=derived_limits(version, data, evaluation), known_limits=version.known_limits or ""),
         use=CardUse(intended_use=version.intended_use or "", owner=creator or owner),

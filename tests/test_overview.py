@@ -23,7 +23,7 @@ def overview(harness: Harness, **params: Any) -> dict[str, Any]:
 
 
 def base(model: str, minutes: float, **extra: Any) -> dict[str, Any]:
-    return {"at": now() - timedelta(minutes=minutes), "minibrain_id": None, "model": model, "version": None} | extra
+    return {"at": now() - timedelta(minutes=minutes), "model_id": None, "model": model, "version": None} | extra
 
 
 def seeded(harness: Harness) -> datetime:

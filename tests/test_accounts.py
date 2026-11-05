@@ -101,9 +101,9 @@ def test_everyone_signs_in_even_on_loopback(install: Install) -> None:
         browser = install.browser(base)
         info = browser.get("/api/auth/session").json()
         assert (info["setup"], info["person"], info["csrf_token"]) == (True, None, None)
-        refused = browser.get("/api/minibrains")
+        refused = browser.get("/api/models")
         assert refused.status_code == 401 and refused.json()["detail"] == "Sign in to use minibrain"
-        assert browser.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 401
+        assert browser.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 401
 
 
 def test_setup_needs_the_one_time_token(install: Install) -> None:
@@ -194,16 +194,16 @@ def test_setup_checks_the_password_and_email(install: Install) -> None:
 
 def test_state_changing_calls_need_the_csrf_token(install: Install) -> None:
     admin = set_up(install)
-    refused = admin.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"})
+    refused = admin.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"})
     assert refused.status_code == 403 and "CSRF" in refused.json()["detail"]
     wrong = admin.post(
-        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers={"X-CSRF-Token": "0" * 64}
+        "/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers={"X-CSRF-Token": "0" * 64}
     )
     assert wrong.status_code == 403
-    assert admin.get("/api/minibrains").status_code == 200
-    created = admin.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(admin))
+    assert admin.get("/api/models").status_code == 200
+    created = admin.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(admin))
     assert created.status_code == 201
-    assert admin.delete("/api/minibrains/triage", headers=csrf(admin)).status_code == 202
+    assert admin.delete("/api/models/triage", headers=csrf(admin)).status_code == 202
     [event] = install.events("model.delete")
     assert (event.actor, event.detail["sign_in"]) == (ADMIN, "local")
 
@@ -215,7 +215,7 @@ def test_the_csrf_token_belongs_to_one_session(install: Install) -> None:
     assert other.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
     assert csrf(other) != first
     assert (
-        other.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=first).status_code
+        other.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=first).status_code
         == 403
     )
 
@@ -229,10 +229,10 @@ def test_sign_in_and_out(install: Install) -> None:
     assert unknown.status_code == 401 and unknown.json()["detail"] == "Wrong email or password"
     signed = browser.post("/api/auth/login", json={"email": " ADA@example.com ", "password": PASSWORD})
     assert signed.status_code == 200 and signed.json()["person"]["email"] == ADMIN
-    assert browser.get("/api/minibrains").status_code == 200
+    assert browser.get("/api/models").status_code == 200
     assert browser.post("/api/auth/logout").status_code == 403
     assert browser.post("/api/auth/logout", headers=csrf(browser)).status_code == 204
-    assert browser.get("/api/minibrains").status_code == 401
+    assert browser.get("/api/models").status_code == 401
     failed = install.events("auth.sign_in_failed")
     assert [(event.actor, event.detail["sign_in"]) for event in failed] == [
         (ADMIN, "local"),
@@ -247,7 +247,7 @@ def test_a_signed_out_cookie_stops_working(install: Install) -> None:
     assert admin.post("/api/auth/logout", headers=csrf(admin)).status_code == 204
     replay = install.browser()
     replay.cookies.set(SESSION_COOKIE, stolen or "")
-    assert replay.get("/api/minibrains").status_code == 401
+    assert replay.get("/api/models").status_code == 401
 
 
 def test_repeated_failures_lock_the_account_for_a_while(install: Install) -> None:
@@ -270,11 +270,11 @@ def test_sessions_end_after_the_idle_and_absolute_lifetimes(install: Install) ->
     with install.sessions() as session:
         session.execute(update(LoginSession).values(last_seen_at=now() - timedelta(minutes=7 * 60)))
         session.commit()
-    assert admin.get("/api/minibrains").status_code == 200
+    assert admin.get("/api/models").status_code == 200
     with install.sessions() as session:
         session.execute(update(LoginSession).values(last_seen_at=now() - timedelta(minutes=8 * 60 + 1)))
         session.commit()
-    idle = admin.get("/api/minibrains")
+    idle = admin.get("/api/models")
     assert (idle.status_code, idle.headers["x-signed-out"]) == (401, "idle:480")
     browser = install.browser()
     assert browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
@@ -283,7 +283,7 @@ def test_sessions_end_after_the_idle_and_absolute_lifetimes(install: Install) ->
         session.commit()
     expired = browser.get("/api/auth/session")
     assert (expired.status_code, expired.headers["x-signed-out"]) == (200, "expired:168")
-    assert browser.get("/api/minibrains").status_code == 401
+    assert browser.get("/api/models").status_code == 401
     with install.sessions() as session:
         assert session.scalars(select(LoginSession)).all() == []
 
@@ -326,9 +326,9 @@ def test_a_reset_link_replaces_the_password_and_ends_old_sessions(install: Insta
     bea = redeem(install, invite(admin, "bea@example.com"))
     account = next(person for person in admin.get("/api/accounts").json()["people"] if person["email"] != ADMIN)
     link = admin.post(f"/api/accounts/{account['id']}/password-link", headers=csrf(admin)).json()
-    assert bea.get("/api/minibrains").status_code == 200
+    assert bea.get("/api/models").status_code == 200
     redeem(install, link, "a brand new passphrase")
-    assert bea.get("/api/minibrains").status_code == 401
+    assert bea.get("/api/models").status_code == 401
     old = install.browser().post("/api/auth/login", json={"email": "bea@example.com", "password": PASSWORD})
     assert old.status_code == 401
     with install.sessions() as session:
@@ -357,7 +357,7 @@ def test_turning_an_account_off_ends_its_sessions_at_once(install: Install) -> N
     bea_id = bea.get("/api/auth/session").json()["person"]["id"]
     off = admin.patch(f"/api/accounts/{bea_id}", json={"disabled": True}, headers=csrf(admin))
     assert off.status_code == 200 and off.json()["disabled"] is True and off.json()["sessions"] == 0
-    assert bea.get("/api/minibrains").status_code == 401
+    assert bea.get("/api/models").status_code == 401
     refused = install.browser().post("/api/auth/login", json={"email": "bea@example.com", "password": PASSWORD})
     assert refused.status_code == 401 and "turned off" in refused.json()["detail"]
     on = admin.patch(f"/api/accounts/{bea_id}", json={"disabled": False, "role": "viewer"}, headers=csrf(admin))
@@ -382,9 +382,7 @@ def test_signed_in_people_are_recorded_on_reviews_and_keys(install: Install) -> 
     admin = set_up(install)
     headers = csrf(admin)
     assert (
-        admin.post(
-            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=headers
-        ).status_code
+        admin.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=headers).status_code
         == 201
     )
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}
@@ -393,7 +391,7 @@ def test_signed_in_people_are_recorded_on_reviews_and_keys(install: Install) -> 
     with install.sessions() as session:
         assert session.scalars(select(ApiKey.created_by)).one() == ADMIN
     body = {"rating": "down", "input": "charged twice", "output": "bug", "version": 0}
-    item = admin.post("/api/minibrains/triage/feedback", json=body, headers=headers).json()
+    item = admin.post("/api/models/triage/feedback", json=body, headers=headers).json()
     assigned = admin.post(f"/api/feedback/{item['id']}/assign", json={"mine": True}, headers=headers).json()
     assert assigned["assignee"] == ADMIN
     mine = admin.get("/api/feedback", params={"assignee": "me"}).json()
@@ -445,7 +443,7 @@ def test_reset_password_on_the_command_line(
         reset = ("admin", "reset-password", "--email", " ADA@example.com ", "--password-stdin")
         run_cli(monkeypatch, *reset, stdin="a brand new passphrase\n")
         assert "Set a new password for ada@example.com" in capsys.readouterr().out
-        assert browser.get("/api/minibrains").status_code == 401
+        assert browser.get("/api/models").status_code == 401
         old = install.browser().post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
         assert old.status_code == 401
         new = install.browser().post("/api/auth/login", json={"email": ADMIN, "password": "a brand new passphrase"})
@@ -565,7 +563,5 @@ def test_harness_signs_in_as_an_admin(harness: Harness) -> None:
     info = harness.client.get("/api/auth/session").json()
     assert (info["setup"], info["person"]["email"], info["person"]["role"]) == (False, ADMIN_EMAIL, "admin")
     viewer = harness.person(None)
-    assert viewer.get("/api/minibrains").status_code == 403
-    assert (
-        harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 201
-    )
+    assert viewer.get("/api/models").status_code == 403
+    assert harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 201

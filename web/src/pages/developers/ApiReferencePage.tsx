@@ -7,7 +7,7 @@ import { Button, Link, TabNav, type TabNavItem, getTheme, onThemeChange } from "
 import { type ComponentProps, useMemo, useSyncExternalStore } from "react";
 import { usePerson } from "~/api/authQueries";
 import { type ModelRow, api, unwrap, withCsrf } from "~/api/client";
-import { useModels } from "~/api/queries";
+import { useAllModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ROLE_LABELS, useCan } from "~/lib/access";
@@ -91,7 +91,7 @@ function useSource(kind: Kind) {
 
 function useDocument(kind: Kind): { document: ApiDocument | null; error: unknown } {
     const source = useSource(kind);
-    const models = useModels();
+    const models = useAllModels();
     const role = usePerson()?.role;
     const origin = window.location.origin;
     const names = useMemo(() => deployedNames(models.data), [models.data]);

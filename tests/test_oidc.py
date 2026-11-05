@@ -93,7 +93,7 @@ def test_single_sign_on_signs_people_in_with_pkce(sso: Sso) -> None:
     assert browser.get("/api/sources").status_code == 200
     assert (
         browser.post(
-            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(browser)
+            "/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(browser)
         ).status_code
         == 201
     )
@@ -169,7 +169,7 @@ def test_unmapped_people_wait_for_an_admin(sso: Sso) -> None:
     sso.provider.claims["groups"] = ["sales"]
     browser = sso.browser()
     sign_in(sso, browser)
-    assert browser.get("/api/minibrains").status_code == 403
+    assert browser.get("/api/models").status_code == 403
 
 
 def test_a_provider_that_names_another_issuer_is_refused(sso: Sso) -> None:

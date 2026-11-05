@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from minibrain.registry.models import Minibrain, Version
+from minibrain.registry.models import Model, Version
 from tests.conftest import LABELS, Harness, fake_adapter, give_data, scored_answers, tickets_csv
 
 pytestmark = pytest.mark.both_stores
@@ -12,13 +12,13 @@ SLUG = "support-triage"
 
 
 def build_dataset(harness: Harness) -> dict[str, Any]:
-    response = harness.client.post(f"/api/minibrains/{SLUG}/snapshots")
+    response = harness.client.post(f"/api/models/{SLUG}/snapshots")
     assert response.status_code == 201, response.text
     return response.json()["snapshot"]
 
 
 def create_model(harness: Harness, name: str = "Support Triage") -> dict[str, Any]:
-    response = harness.client.post("/api/minibrains", json={"name": name, "labels": list(LABELS)})
+    response = harness.client.post("/api/models", json={"name": name, "labels": list(LABELS)})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -37,16 +37,14 @@ def create_on_data(harness: Harness, name: str = "Support Triage") -> dict[str, 
     source = harness.client.post("/api/sources", files=files).json()
     dataset = harness.client.post("/api/datasets", json={"name": name, "source_id": source["id"]})
     assert dataset.status_code == 201, dataset.text
-    created = harness.client.post("/api/minibrains", json={"name": name, "dataset": dataset.json()["slug"]})
+    created = harness.client.post("/api/models", json={"name": name, "dataset": dataset.json()["slug"]})
     assert created.status_code == 201, created.text
     return created.json()
 
 
 def store_metrics(harness: Harness, slug: str, number: int, metrics: dict[str, Any]) -> None:
     with harness.sessions() as session:
-        version = session.scalar(
-            select(Version).join(Minibrain).where(Minibrain.slug == slug, Version.number == number)
-        )
+        version = session.scalar(select(Version).join(Model).where(Model.slug == slug, Version.number == number))
         assert version is not None
         version.metrics = metrics
         session.commit()
@@ -67,13 +65,13 @@ def finish(harness: Harness, kind: str, accuracy: float = 0.5) -> int:
 
 
 def add_version(harness: Harness, kind: str) -> dict[str, Any]:
-    response = harness.client.post(f"/api/minibrains/{SLUG}/versions", json={"kind": kind, "max_rows": 100})
+    response = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": kind, "max_rows": 100})
     assert response.status_code == 201
     return response.json()
 
 
 def deploy(harness: Harness, number: int = 0) -> None:
-    response = harness.client.post(f"/api/minibrains/{SLUG}/versions/{number}/promote")
+    response = harness.client.post(f"/api/models/{SLUG}/versions/{number}/promote")
     assert response.status_code == 200, response.text
 
 
@@ -94,7 +92,7 @@ def test_upload_guesses_mapping_and_previews(harness: Harness) -> None:
     assert detail["mapping"]["input_column"] == "text"
     assert detail["mapping"]["label_column"] == "category"
     assert detail["source"]["rows"] == 200
-    preview = harness.client.get(f"/api/minibrains/{SLUG}/preview").json()
+    preview = harness.client.get(f"/api/models/{SLUG}/preview").json()
     assert preview["quality"]["labels"] == 4
     assert preview["quality"]["empty"] == 0
     assert len(preview["rows"]) == 20
@@ -107,9 +105,9 @@ def test_snapshot_is_taken_from_the_dataset_without_a_job(harness: Harness) -> N
     assert (snapshot["rows"], snapshot["saved"], snapshot["dataset"]) == (200, True, SLUG)
     again = build_dataset(harness)
     assert (again["hash"], again["id"]) == (snapshot["hash"], snapshot["id"])
-    golden = harness.client.get(f"/api/minibrains/{SLUG}/golden").json()
+    golden = harness.client.get(f"/api/models/{SLUG}/golden").json()
     assert len(golden) == 20
-    assert harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=prepare").json()["items"] == []
+    assert harness.client.get(f"/api/jobs?model={SLUG}&kind=prepare").json()["items"] == []
 
 
 def test_scored_versions_go_live_only_when_deployed(harness: Harness) -> None:
@@ -117,11 +115,11 @@ def test_scored_versions_go_live_only_when_deployed(harness: Harness) -> None:
     version = add_version(harness, "prompt")
     assert (version["number"], version["status"]) == (1, "evaluating")
     finish(harness, "eval", accuracy=0.4)
-    versions = harness.client.get(f"/api/minibrains/{SLUG}/versions").json()
+    versions = harness.client.get(f"/api/models/{SLUG}/versions").json()
     assert (versions[0]["status"], versions[0]["current"], versions[0]["score"]) == ("ready", False, 0.4)
     assert versions[0]["main_metric"] == "label_accuracy"
     deploy(harness, 1)
-    detail = harness.client.get(f"/api/minibrains/{SLUG}").json()
+    detail = harness.client.get(f"/api/models/{SLUG}").json()
     assert (detail["current_version"], detail["deployed"]) == (1, True)
 
 
@@ -132,21 +130,21 @@ def test_a_version_goes_live_only_when_it_passes_the_promotion_rule(harness: Har
     deploy(harness, 1)
     add_version(harness, "lora")
     finish(harness, "train")
-    assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "evaluating"
+    assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "evaluating"
     finish(harness, "eval", accuracy=0.4)
-    worse = harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]
+    worse = harness.client.get(f"/api/models/{SLUG}/versions").json()[0]
     assert worse["promotion"]["passed"] is False
-    refused = harness.client.post(f"/api/minibrains/{SLUG}/versions/2/promote")
+    refused = harness.client.post(f"/api/models/{SLUG}/versions/2/promote")
     assert refused.status_code == 409
     assert "label_accuracy 0.4 against 0.8 for v1" in refused.json()["detail"]
-    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["current_version"] == 1
+    assert harness.client.get(f"/api/models/{SLUG}").json()["current_version"] == 1
     add_version(harness, "lora")
     finish(harness, "train")
     finish(harness, "eval", accuracy=0.9)
     deploy(harness, 3)
-    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["current_version"] == 3
+    assert harness.client.get(f"/api/models/{SLUG}").json()["current_version"] == 3
     deploy(harness, 1)
-    assert harness.client.get(f"/api/minibrains/{SLUG}").json()["current_version"] == 1
+    assert harness.client.get(f"/api/models/{SLUG}").json()["current_version"] == 1
 
 
 def test_a_new_custom_model_can_be_deployed_and_serves_its_base_model(harness: Harness) -> None:
@@ -154,11 +152,11 @@ def test_a_new_custom_model_can_be_deployed_and_serves_its_base_model(harness: H
     headers = bearer(harness)
     chat = {"model": SLUG, "messages": [{"role": "user", "content": "hi"}]}
     assert harness.client.post("/v1/chat/completions", headers=headers, json=chat).status_code == 404
-    response = harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": True})
+    response = harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": True})
     assert response.json()["deployed"] is True
     served = harness.client.post("/v1/chat/completions", headers=headers, json=chat)
     assert served.status_code == 200, served.text
-    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
+    harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False})
     assert harness.client.post("/v1/chat/completions", headers=headers, json=chat).status_code == 404
 
 
@@ -169,7 +167,7 @@ def test_gateway_routes_by_name_and_version(harness: Harness) -> None:
     add_version(harness, "lora")
     finish(harness, "train")
     finish(harness, "eval", accuracy=0.9)
-    harness.client.post(f"/api/minibrains/{SLUG}/versions/2/promote", json={})
+    harness.client.post(f"/api/models/{SLUG}/versions/2/promote", json={})
     headers = bearer(harness)
     models = harness.client.get("/v1/models", headers=headers).json()
     assert [model["id"] for model in models["data"]] == [SLUG, f"{SLUG}@0", f"{SLUG}@1", f"{SLUG}@2"]
@@ -221,10 +219,10 @@ def test_gateway_streams(harness: Harness) -> None:
 def test_playground_parses_label(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
-    assert harness.client.post(f"/api/minibrains/{SLUG}/complete", json={"text": "x"}).status_code == 409
+    assert harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "x"}).status_code == 409
     finish(harness, "eval", accuracy=0.4)
     deploy(harness, 1)
-    reply = harness.client.post(f"/api/minibrains/{SLUG}/complete", json={"text": "charged twice"}).json()
+    reply = harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "charged twice"}).json()
     assert (reply["answer"], reply["valid"], reply["contract"]) == ("billing", True, 1)
     assert reply["model"] == f"{SLUG}@1"
 
@@ -232,29 +230,29 @@ def test_playground_parses_label(harness: Harness) -> None:
 def test_cancel_queued_job_and_delete_guard(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "lora")
-    job = harness.client.get(f"/api/jobs?minibrain={SLUG}&kind=train").json()["items"][0]
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 409
+    job = harness.client.get(f"/api/jobs?model={SLUG}&kind=train").json()["items"][0]
+    assert harness.client.delete(f"/api/models/{SLUG}").status_code == 409
     assert harness.client.post(f"/api/jobs/{job['id']}/cancel").json()["status"] == "cancelled"
-    assert harness.client.get(f"/api/minibrains/{SLUG}/versions").json()[0]["status"] == "failed"
+    assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "failed"
     assert harness.claim(["train"]) is None
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
 
 
 def test_bad_sql_is_rejected(harness: Harness) -> None:
     create_with_dataset(harness)
-    response = harness.client.put(f"/api/minibrains/{SLUG}/mapping", json={"sql": "SELECT nope FROM source"})
+    response = harness.client.put(f"/api/models/{SLUG}/mapping", json={"sql": "SELECT nope FROM source"})
     assert response.status_code == 422
 
 
-def test_recent_jobs_span_minibrains(harness: Harness) -> None:
+def test_recent_jobs_span_models(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.4)
     deploy(harness, 1)
     create_model(harness, "Other")
     jobs = harness.client.get("/api/jobs?limit=5").json()["items"]
-    assert {(job["minibrain"], job["minibrain_name"]) for job in jobs} == {(SLUG, "Support Triage")}
-    summaries = {item["slug"]: item for item in harness.client.get("/api/minibrains").json()}
+    assert {(job["model"], job["model_name"]) for job in jobs} == {(SLUG, "Support Triage")}
+    summaries = {item["slug"]: item for item in harness.client.get("/api/models").json()}
     assert summaries[SLUG]["current_score"] == 0.4
     assert summaries[SLUG]["main_metric"] == "label_accuracy"
     assert summaries["other"]["current_score"] is None
@@ -281,8 +279,8 @@ def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:
 
 
 def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness) -> None:
-    blank = harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "**** "})
+    blank = harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "**** "})
     assert blank.status_code == 422 and "letter or number" in blank.json()["detail"]
     assert create_model(harness)["slug"] == SLUG
-    taken = harness.client.post("/api/minibrains", json={"name": "support  triage!", "labels": list(LABELS)})
+    taken = harness.client.post("/api/models", json={"name": "support  triage!", "labels": list(LABELS)})
     assert taken.status_code == 409 and "support  triage!" in taken.json()["detail"]

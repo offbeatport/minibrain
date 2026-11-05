@@ -12,7 +12,7 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { useEffect } from "react";
-import { type MinibrainDetail, api, unwrap } from "~/api/client";
+import { type ModelDetail, api, unwrap } from "~/api/client";
 import { keys } from "~/api/queries";
 import { PanelSection, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
@@ -63,20 +63,20 @@ function useHashTarget(id: string) {
     }, [hash, id]);
 }
 
-export function RequestBodies({ detail }: { detail: MinibrainDetail }) {
+export function RequestBodies({ detail }: { detail: ModelDetail }) {
     const client = useQueryClient();
     const can = useCan();
     const bodies = detail.request_bodies;
     const change = useMutation({
         mutationFn: (kept: boolean) =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/request-bodies", {
+                api.PUT("/api/models/{slug}/request-bodies", {
                     params: { path: { slug: detail.slug } },
                     body: { kept },
                 }),
             ),
         onSuccess: async (next) => {
-            client.setQueryData(keys.minibrain(detail.slug), next);
+            client.setQueryData(keys.model(detail.slug), next);
             await client.invalidateQueries({ queryKey: ["audit"] });
         },
     });

@@ -515,7 +515,7 @@ made: [Releasing → Signing and provenance](releasing.md#signing-and-provenance
 
 ### AI bill of materials (AI-BOM)
 
-Every version has a CycloneDX 1.6 ML-BOM: `GET /api/minibrains/{slug}/versions/{n}/aibom.json`, or **Download
+Every version has a CycloneDX 1.6 ML-BOM: `GET /api/models/{slug}/versions/{n}/aibom.json`, or **Download
 AI-BOM** on the model card page (`{slug}-v{n}-aibom.cdx.json`, `application/vnd.cyclonedx+json`). It is built from
 the same data as the model card, without the deployment history, so deploying or undeploying a version does not
 change it.

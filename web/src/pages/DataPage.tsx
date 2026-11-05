@@ -17,21 +17,14 @@ import { type ChangeEvent, type ReactNode, useCallback, useEffect, useState } fr
 import {
     type ExampleInfo,
     type MappingInfo,
-    type MinibrainDetail,
+    type ModelDetail,
     type PreviewResponse,
     type QueryResponse,
     api,
     unwrap,
     uploadSource,
 } from "~/api/client";
-import {
-    keys,
-    useDatasets,
-    useGolden,
-    useMinibrain,
-    useMinibrains,
-    usePreview,
-} from "~/api/queries";
+import { keys, useDatasets, useGolden, useModel, useModels, usePreview } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
@@ -58,18 +51,18 @@ function Clamp({ text }: { text: unknown }) {
 function useRefresh(slug: string) {
     const queryClient = useQueryClient();
     return useCallback(
-        async (detail?: MinibrainDetail) => {
+        async (detail?: ModelDetail) => {
             if (detail) {
-                queryClient.setQueryData(keys.minibrain(slug), detail);
+                queryClient.setQueryData(keys.model(slug), detail);
             }
-            await queryClient.invalidateQueries({ queryKey: ["minibrain", slug] });
-            await queryClient.invalidateQueries({ queryKey: keys.minibrains });
+            await queryClient.invalidateQueries({ queryKey: ["model", slug] });
+            await queryClient.invalidateQueries({ queryKey: keys.models });
         },
         [queryClient, slug],
     );
 }
 
-function SourceSection({ detail }: { detail: MinibrainDetail }) {
+function SourceSection({ detail }: { detail: ModelDetail }) {
     const refresh = useRefresh(detail.slug);
     const upload = useMutation({
         mutationFn: (file: File) => uploadSource(detail.slug, file),
@@ -349,12 +342,12 @@ const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
     },
 ];
 
-function DatasetSection({ detail }: { detail: MinibrainDetail }) {
+function DatasetSection({ detail }: { detail: ModelDetail }) {
     const refresh = useRefresh(detail.slug);
     const build = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/snapshots", {
+                api.POST("/api/models/{slug}/snapshots", {
                     params: { path: { slug: detail.slug } },
                 }),
             ),
@@ -417,13 +410,13 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     );
 }
 
-function DatasetPicker({ detail }: { detail: MinibrainDetail }) {
+function DatasetPicker({ detail }: { detail: ModelDetail }) {
     const refresh = useRefresh(detail.slug);
     const datasets = useDatasets();
     const choose = useMutation({
         mutationFn: (dataset: string) =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/dataset", {
+                api.PUT("/api/models/{slug}/dataset", {
                     params: { path: { slug: detail.slug } },
                     body: { dataset },
                 }),
@@ -475,7 +468,7 @@ function DatasetPicker({ detail }: { detail: MinibrainDetail }) {
 }
 
 export function DataSections({ slug }: { slug: string }) {
-    const { data } = useMinibrain(slug);
+    const { data } = useModel(slug);
     const refresh = useRefresh(slug);
     const mapped = Boolean(data?.mapping.sql);
     const preview = usePreview(slug, mapped);
@@ -492,12 +485,12 @@ export function DataSections({ slug }: { slug: string }) {
                     columns={data.source.columns.map((column) => column.name)}
                     mapping={data.mapping}
                     onSave={(body) =>
-                        unwrap(api.PUT("/api/minibrains/{slug}/mapping", { ...path, body })).then(
+                        unwrap(api.PUT("/api/models/{slug}/mapping", { ...path, body })).then(
                             refresh,
                         )
                     }
                     onRun={(sql) =>
-                        unwrap(api.POST("/api/minibrains/{slug}/query", { ...path, body: { sql } }))
+                        unwrap(api.POST("/api/models/{slug}/query", { ...path, body: { sql } }))
                     }
                 />
             )}
@@ -508,16 +501,16 @@ export function DataSections({ slug }: { slug: string }) {
 }
 
 function ModelData({ slug }: { slug: string }) {
-    const minibrains = useMinibrains();
-    const model = minibrains.data?.find((item) => item.slug === slug);
+    const models = useModels();
+    const model = models.data?.find((item) => item.slug === slug);
     return (
         <Page>
             <PageHeader
                 title="Data"
                 caption={`The dataset ${model?.name ?? "this model"} trains on, its mapping and its latest version.`}
             />
-            <ErrorLine error={minibrains.error} />
-            {minibrains.data && !model && (
+            <ErrorLine error={models.error} />
+            {models.data && !model && (
                 <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
             )}
             {model && <DataSections key={slug} slug={slug} />}
@@ -526,6 +519,6 @@ function ModelData({ slug }: { slug: string }) {
 }
 
 export function DataPage() {
-    const requested = useSearchParam("minibrain");
+    const requested = useSearchParam("model");
     return requested ? <ModelData slug={requested} /> : <DataExplorer />;
 }

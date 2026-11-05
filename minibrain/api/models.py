@@ -1,185 +1,182 @@
-import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
-from minibrain.api.access import admin, builder, viewer
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep, get_local_node
-from minibrain.api.model_health import HealthContext, health_context
-from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
+from minibrain.api.access import builder, sees_rows, viewer
+from minibrain.api.base_models import model_row, wake_teardowns
+from minibrain.api.catalog import ensure_reachable
+from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
+from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
-    BaseModelDetail,
+    ContractChange,
+    ContractCheck,
+    ContractInfo,
+    ContractUpdate,
+    DatasetChoice,
     DeployRequest,
-    FileState,
-    ImportCheck,
-    ImportRequest,
-    InspectRequest,
-    LocationRequest,
-    ModelFile,
+    ExampleInfo,
+    GraderConfig,
+    GradersUpdate,
+    InstructionsUpdate,
+    MappingUpdate,
+    ModelCreate,
+    ModelDetail,
     ModelRow,
+    ModelSummary,
     ModelUpdate,
-    TestRequest,
-    TestResponse,
+    NameSuggestion,
+    PreviewResponse,
+    PromotionInfo,
+    QueryRequest,
+    QueryResponse,
+    RequestBodiesUpdate,
+    SampleDetail,
 )
+from minibrain.api.versions import start_version
+from minibrain.api.views import detail, summary
 from minibrain.artifacts import ArtifactStore
-from minibrain.auth.identity import current_actor
-from minibrain.ml.context import FinalError
-from minibrain.models.copies import BUCKET
-from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health
-from minibrain.models.inspect import inspect_location, source_type_of
-from minibrain.models.registry import (
-    missing_files,
-    model_folder,
-    relocate,
-    require_usable,
-    resolve_spec,
-    retry,
-    start_import,
-    start_reimport,
-    start_repair,
-    start_verify,
-    store_label,
+from minibrain.auth.identity import current_actor, current_role
+from minibrain.auth.roles import Role, allows
+from minibrain.base_models import DEFAULT_BASE_MODEL
+from minibrain.data import snapshot
+from minibrain.data.samples import load_recipe_sample
+from minibrain.data.shared import (
+    aliases_for,
+    dataset_of,
+    get_dataset,
+    sources_in,
+    tables_of,
 )
-from minibrain.models.usage import touch
-from minibrain.registry.models import AuditEvent, CatalogModel, Model, ModelStatus, now
-from minibrain.registry.service import ConflictError, NotFoundError
-from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
+from minibrain.data.snapshots import cleanup, take_version, version_if_mapped
+from minibrain.models.registry import ACTIVE_STATUSES, base_hash, base_readiness, start_download
+from minibrain.policy import LockedError, PolicyError, bodies_choice
+from minibrain.presets import Preset, preset
+from minibrain.presets.recipes import Recipe, recipe
+from minibrain.registry.files import snapshot_location
+from minibrain.registry.models import (
+    AuditEvent,
+    BaseModel,
+    BaseModelStatus,
+    CatalogModel,
+    Dataset,
+    Model,
+    VersionKind,
+    now,
+)
+from minibrain.registry.service import (
+    ConflictError,
+    create_model,
+    free_model_name,
+    get_model,
+    latest_snapshot,
+    list_models,
+)
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
-from minibrain.teardown import cancel_stop, delete_base, require_idle, undeploy_base
+from minibrain.tasks.contracts import FREE_TEXT, Contract, ContractError, changes, json_contract, label_set
+from minibrain.tasks.promotion import Rule, RuleError
+from minibrain.tasks.service import checked_graders, contract_of, latest_version_of, version_contract
+from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
 
-def health_for(request: Request) -> EngineHealth:
-    if request.app.state.engines is None:
-        return lambda _key: "running"
-    backend = request.app.state.backend
-    return lambda key: backend.health(key)
+@router.get("", dependencies=[Depends(viewer)])
+def list_all(session: SessionDep) -> list[ModelSummary]:
+    return [summary(model) for model in list_models(session)]
 
 
-def get_model(session: Session, key: str) -> Model:
-    model = session.get(Model, key)
-    if model is None:
-        raise NotFoundError(f"model {key} not found")
-    return model
+def contract_from(info: ContractInfo | None) -> Contract:
+    try:
+        if info is None or info.kind == "text":
+            return FREE_TEXT
+        if info.labels is not None:
+            return label_set(info.labels)
+        return json_contract(info.json_schema)
+    except ContractError as error:
+        raise ConflictError(str(error)) from error
 
 
-def idle_model(session: Session, key: str) -> Model:
-    model = get_model(session, key)
-    require_idle(model.teardown, model.name)
-    return model
+def starting_contract(chosen: Preset, body: ModelCreate) -> Contract:
+    if not chosen.labels_from_data:
+        return contract_from(body.contract)
+    labels = body.labels or (body.contract.labels if body.contract and body.contract.labels else [])
+    if not labels:
+        return FREE_TEXT
+    try:
+        return label_set(labels)
+    except ContractError as error:
+        raise ConflictError(str(error)) from error
 
 
-def context_for(session: Session, settings: Settings, request: Request) -> HealthContext:
-    return health_context(session, settings, get_local_node(request))
-
-
-def row_of(session: Session, settings: Settings, request: Request, model: Model) -> ModelRow:
-    context = context_for(session, settings, request)
-    job = model_job(session, model.id)
-    return base_row(model, job, settings, health_for(request), context=context, teardown=model.teardown)
-
-
-def model_row(
-    request: Request, session: Session, settings: Settings, store: ArtifactStore, kind: str, key: str
-) -> ModelRow:
-    rows = all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
-    found = next((row for row in rows if row.kind == kind and row.key == key), None)
-    if found is None:
-        raise NotFoundError(f"model {key} not found")
+def pinned(session: Session, configs: list[GraderConfig]) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    for config in configs:
+        item = config.model_dump(exclude_none=True)
+        if item["name"] == "judge" and item.get("model"):
+            if base_readiness(session, str(item["model"])) == "missing":
+                raise ConflictError(f"the judge model {item['model']} is not on this install")
+            item["model_version"] = base_hash(session, str(item["model"])) or str(item["model"])
+        found.append(item)
     return found
 
 
-def wake_teardowns(request: Request) -> None:
-    request.app.state.teardowns.wake()
-
-
-def file_rows(settings: Settings, model: Model) -> list[ModelFile]:
-    sizes = missing_files(settings, model) if model.status == ModelStatus.AVAILABLE else {}
-    flagged = file_states(model) if model.health == CORRUPT else {}
-    checked = model.verified_at is not None
-    rows: list[ModelFile] = []
-    for entry in model.files:
-        path = str(entry["path"])
-        state: FileState = "ok" if checked and entry.get("sha256") else "unchecked"
-        found = sizes.get(path) or flagged.get(path)
-        if found in ("corrupt", "missing", "wrong_size"):
-            state = found
-        rows.append(ModelFile(path=path, size=int(entry["size"]), sha256=entry.get("sha256"), state=state))
-    return rows
-
-
-def detail_of(session: Session, settings: Settings, request: Request, model: Model) -> BaseModelDetail:
-    row = row_of(session, settings, request, model)
-    entry = session.get(CatalogModel, model.catalog_id) if model.catalog_id else None
-    return BaseModelDetail(
-        **row.model_dump(),
-        source=model.source,
-        repo=model.repo,
-        latest_revision=model.variant.latest_revision if model.variant else None,
-        source_path=model.source_path,
-        storage_path=str(model_folder(settings, model)),
-        store="s3" if model.store == BUCKET else "folder",
-        store_label=store_label(session, model),
-        files=file_rows(settings, model),
-        license=model.license,
-        license_name=entry.license_name if entry else None,
-        license_url=entry.license_url if entry else None,
-        license_ack_by=model.license_ack_by,
-        license_ack_at=model.license_ack_at,
-        variant_id=model.variant_id,
-        deployed=model.deployed,
-        verified=model.verified,
-        verified_at=model.verified_at,
-        content_hash=content_hash(model.files),
-        relocated=model.path is not None,
-    )
-
-
-@router.get("", dependencies=[Depends(viewer)])
-def list_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
-    return all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
-
-
-@router.post("/inspect", dependencies=[Depends(admin)])
-def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep) -> ImportCheck:
-    return ImportCheck(**inspect_location(session, settings, body.location, body.connection_id))
-
-
-@router.post("/import", status_code=202, dependencies=[Depends(admin)])
-def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
-    tags = user_tags(body.tags)
+def rule_from(info: PromotionInfo | None, fallback: Rule) -> dict[str, Any]:
+    if info is None:
+        return fallback.as_dict()
     try:
-        kind = body.source_type or source_type_of(body.location)
-    except FinalError as error:
+        return Rule.from_dict(info.model_dump()).as_dict()
+    except RuleError as error:
         raise ConflictError(str(error)) from error
-    model = start_import(
-        session,
-        settings,
-        body.name,
-        kind,
-        body.location.strip(),
-        body.description,
-        tags,
-        body.variant_id,
-        body.connection_id,
-    )
+
+
+def first_version(session: Session, settings: Settings, store: ArtifactStore, model: Model) -> None:
+    dataset = model.dataset
+    snapshot = latest_snapshot(model)
+    if dataset is not None and snapshot is None:
+        snapshot = version_if_mapped(session, settings, dataset)
+    start_version(session, settings, store, model, VersionKind.PROMPT, snapshot)
+
+
+def configured(session: Session, settings: Settings, store: ArtifactStore, body: ModelCreate, base: str) -> Model:
+    chosen = preset(body.preset)
+    if base_readiness(session, base) == "missing":
+        raise ConflictError(f"{base} is not a base model on this install")
+    model = create_model(session, body.name, body.preset, base)
+    model.description = body.description.strip()
+    model.tags = user_tags(body.tags)
+    contract = starting_contract(chosen, body)
+    model.contract = contract.as_dict() if contract != FREE_TEXT or not chosen.labels_from_data else {}
+    model.instructions = (body.instructions or "").strip() or None
+    model.graders = pinned(session, body.graders) if body.graders else []
+    model.promotion = rule_from(body.promotion, chosen.promotion)
+    if body.dataset:
+        model.dataset = get_dataset(session, body.dataset)
+    first_version(session, settings, store, model)
+    return model
+
+
+@router.post("", status_code=201, dependencies=[Depends(builder)])
+def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> ModelDetail:
+    model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
+    session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     session.commit()
-    return row_of(session, settings, request, model)
+    return detail(settings, model)
 
 
-@router.get("/base/{key}", dependencies=[Depends(viewer)])
-def read_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    return detail_of(session, settings, request, get_model(session, key))
+def created(model: Model) -> dict[str, Any]:
+    return {"name": model.name, "preset": model.preset, "base": model.base_model}
 
 
-@router.patch("/base/{key}", dependencies=[Depends(admin)])
-def update_base(
-    key: str, body: ModelUpdate, request: Request, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = get_model(session, key)
+@router.get("/name", dependencies=[Depends(viewer)])
+def default_name(session: SessionDep, preset_key: str = Query(default="classify", alias="preset")) -> NameSuggestion:
+    return NameSuggestion(name=free_model_name(session, preset(preset_key).noun))
+
+
+@router.patch("/{slug}", dependencies=[Depends(builder)])
+def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
     if body.name is not None:
         model.name = body.name.strip()
     if body.description is not None:
@@ -188,136 +185,247 @@ def update_base(
         model.tags = merged_tags(model.tags, body.tags)
     model.updated_at = now()
     session.commit()
-    return detail_of(session, settings, request, model)
+    return detail(settings, model)
 
 
-@router.delete("/base/{key}", status_code=202, dependencies=[Depends(admin)])
-def delete_base_model(
-    key: str,
-    request: Request,
-    session: SessionDep,
-    settings: SettingsDep,
-    store: StoreDep,
-    cascade: bool = False,
-    undeploy: bool = False,
+@router.get("/{slug}", dependencies=[Depends(viewer)])
+def read(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    found = detail(settings, get_model(session, slug))
+    if sees_rows() or found.snapshot is None:
+        return found
+    checks = [check.model_copy(update={"examples": []}) for check in found.snapshot.checks]
+    return found.model_copy(update={"snapshot": found.snapshot.model_copy(update={"checks": checks})})
+
+
+@router.delete("/{slug}", status_code=202, dependencies=[Depends(builder)])
+def delete(
+    slug: str, request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep, undeploy: bool = False
 ) -> ModelRow:
-    delete_base(session, get_model(session, key), current_actor(), cascade=cascade, undeploy=undeploy)
+    delete_custom(session, get_model(session, slug), current_actor(), undeploy=undeploy)
     session.commit()
     wake_teardowns(request)
-    return model_row(request, session, settings, store, "base", key)
+    return model_row(request, session, settings, store, "custom", slug)
 
 
-def audit(session: Session, action: str, model: Model, **detail: Any) -> None:
-    session.add(
-        AuditEvent(actor=current_actor(), action=action, target=model.id, detail={"name": model.name, **detail})
-    )
+SAMPLE_RECIPE = "ticket-routing"
 
 
-@router.post("/base/{key}/verify", status_code=202, dependencies=[Depends(admin)])
-def verify_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = idle_model(session, key)
-    job = start_verify(session, settings, model)
-    audit(session, "model.verify", model, job=job.id, files=len(model.files))
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/repair", status_code=202, dependencies=[Depends(admin)])
-def repair_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = idle_model(session, key)
-    job = start_repair(session, settings, model)
-    audit(session, "model.repair", model, job=job.id, source=f"{model.repo}@{model.revision}")
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/reimport", status_code=202, dependencies=[Depends(admin)])
-def reimport_base(
-    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = idle_model(session, key)
-    job = start_reimport(session, settings, model, body.location, body.connection_id)
-    audit(session, "model.reimport", model, job=job.id, source=body.location.strip())
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/relocate", dependencies=[Depends(admin)])
-def relocate_base(
-    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = idle_model(session, key)
-    before = str(model_folder(settings, model))
-    job = relocate(session, settings, model, body.location)
-    audit(session, "model.relocate", model, job=job.id, **{"from": before, "to": str(model_folder(settings, model))})
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/recheck", dependencies=[Depends(admin)])
-def recheck_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = get_model(session, key)
-    if model.health not in LOAD_PROBLEMS:
-        raise ConflictError(f"{model.name} has no start-up failure to clear")
-    set_health(model, None)
-    session.commit()
-    if request.app.state.engines is not None:
-        request.app.state.engines.stop_one(model.id)
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/retry", status_code=202, dependencies=[Depends(admin)])
-def retry_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = retry(session, settings, idle_model(session, key))
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.post("/base/{key}/deploy", dependencies=[Depends(builder)])
-def deploy_base(
-    key: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = get_model(session, key)
+@router.post("/{slug}/deploy", dependencies=[Depends(builder)])
+def deploy(
+    slug: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
+) -> ModelDetail:
+    model = get_model(session, slug)
     if not body.deployed:
-        if undeploy_base(session, model, current_actor()) is not None:
+        if undeploy_custom(session, model, current_actor()) is not None:
             response.status_code = 202
         session.commit()
         wake_teardowns(request)
-        return detail_of(session, settings, request, model)
-    if model.status != ModelStatus.AVAILABLE:
-        raise ConflictError(f"{model.name} is {model.status}; deploy it once its files are available")
-    require_usable(session, settings, model.id)
+        return detail(settings, model)
     cancel_stop(session, model.teardown, model.name)
     if not model.deployed:
-        audit(session, "model.deploy", model)
+        facts = {"name": model.name, "version": model.current_version}
+        session.add(AuditEvent(actor=current_actor(), action="model.deploy", target=model.slug, detail=facts))
     model.deployed = True
     model.updated_at = now()
     session.commit()
-    return detail_of(session, settings, request, model)
+    return detail(settings, model)
 
 
-@router.post("/base/{key}/test", dependencies=[Depends(viewer)])
-def test_base(
-    key: str, body: TestRequest, session: SessionDep, settings: SettingsDep, backend: BackendDep
-) -> TestResponse:
-    model = get_model(session, key)
-    if model.status != ModelStatus.AVAILABLE:
-        raise ConflictError(f"{model.name} is {model.status}; test it once its files are available")
-    require_usable(session, settings, model.id)
-    touch(session, model.id)
+LOCKED_BY = {
+    "ui": "locked for every model under Settings, Security",
+    "config file": "set for every model in minibrain.yaml",
+    "environment": "set for every model by the server's environment",
+}
+
+
+@router.put("/{slug}/request-bodies", dependencies=[Depends(builder)])
+def keep_request_bodies(
+    slug: str, body: RequestBodiesUpdate, session: SessionDep, settings: SettingsDep
+) -> ModelDetail:
+    model = get_model(session, slug)
+    _, lock = bodies_choice(session, model.request_bodies)
+    if lock is not None:
+        raise LockedError(f"Keep request inputs and answers is {LOCKED_BY.get(lock, lock)}")
+    if model.request_bodies != body.kept:
+        facts = {"name": model.name, "from": model.request_bodies, "to": body.kept}
+        session.add(AuditEvent(actor=current_actor(), action="model.request_bodies", target=model.slug, detail=facts))
+    model.request_bodies = body.kept
+    model.updated_at = now()
     session.commit()
-    spec = resolve_spec(session, settings, key)
-    started = time.monotonic()
+    return detail(settings, model)
+
+
+def fetch_sample_base(session: Session, settings: Settings, key: str) -> tuple[str, int | None]:
+    entry = session.get(CatalogModel, key)
+    if entry is None or not entry.variants:
+        raise ConflictError(f"The sample needs {key}, which is missing from the model catalogue")
+    model = session.get(BaseModel, key)
+    if model is not None and model.status in (BaseModelStatus.AVAILABLE, *ACTIVE_STATUSES):
+        return entry.name, None
+    variant = entry.variants[0]
     try:
-        completion = backend.complete(
-            CompletionRequest(spec, [{"role": "user", "content": body.text}], None, body.max_tokens)
-        )
-    except EngineUnavailableError as error:
-        raise ConflictError(str(error)) from error
-    return TestResponse(
-        model=key,
-        output=completion.text,
-        latency_ms=(time.monotonic() - started) * 1000,
-        prompt_tokens=completion.prompt_tokens,
-        completion_tokens=completion.completion_tokens,
+        if not allows(current_role(), Role.ADMIN):
+            raise ConflictError("Ask an admin to add it from Discover first.")
+        ensure_reachable(session, entry, variant)
+        start_download(session, settings, entry, variant, current_actor())
+    except (ConflictError, PolicyError) as error:
+        raise ConflictError(f"The sample needs {entry.name}, which is not on this install. {error}") from error
+    return entry.name, variant.size_bytes
+
+
+def recipe_body(session: Session, settings: Settings, store: ArtifactStore, found: Recipe) -> ModelCreate:
+    dataset: Dataset = load_recipe_sample(session, settings, store, found)
+    return ModelCreate.model_validate(
+        {
+            "name": free_model_name(session, found.name, numbered=False),
+            "description": found.summary,
+            "base_model": found.base,
+            "preset": found.preset,
+            "labels": list(found.labels),
+            "contract": found.contract,
+            "instructions": found.instructions,
+            "graders": list(found.graders) or None,
+            "promotion": found.promotion.as_dict(),
+            "dataset": dataset.slug,
+        }
     )
+
+
+@router.post("/sample", status_code=201, dependencies=[Depends(builder)])
+def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> SampleDetail:
+    found = recipe(SAMPLE_RECIPE)
+    base_name, download_bytes = fetch_sample_base(session, settings, found.base or DEFAULT_BASE_MODEL)
+    body = recipe_body(session, settings, store, found)
+    model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
+    session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
+    session.commit()
+    return SampleDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
+
+
+@router.put("/{slug}/dataset", dependencies=[Depends(builder)])
+def choose_dataset(slug: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    model.dataset = get_dataset(session, body.dataset) if body.dataset else None
+    model.updated_at = now()
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/mapping", dependencies=[Depends(builder)])
+def update_mapping(
+    slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> ModelDetail:
+    model = get_model(session, slug)
+    dataset = dataset_of(model)
+    apply_mapping(session, settings, store, dataset, body)
+    take_version(session, settings, dataset)
+    cleanup(session, settings)
+    session.commit()
+    return detail(settings, model)
+
+
+@router.post("/{slug}/query", dependencies=[Depends(builder)])
+def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
+    dataset = dataset_of(get_model(session, slug))
+    sources = sources_in(session, body.sql, dataset.sources)
+    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
+
+
+@router.get("/{slug}/preview", dependencies=[Depends(builder)])
+def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
+    return dataset_preview_of(settings, store, dataset_of(get_model(session, slug)))
+
+
+@router.post("/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
+def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    take_version(session, settings, dataset_of(model))
+    cleanup(session, settings)
+    session.commit()
+    return detail(settings, model)
+
+
+@router.get("/{slug}/golden", dependencies=[Depends(builder)])
+def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
+    current = latest_snapshot(get_model(session, slug))
+    if current is None or not current.counts:
+        return []
+    examples = snapshot.read_split(snapshot_location(session, store, current), "golden")
+    return [ExampleInfo(input=example.input, expected=example.expected) for example in examples]
+
+
+def contract_check(model: Model, contract: Contract) -> ContractCheck:
+    newest = latest_version_of(model)
+    if newest is None:
+        return ContractCheck(changes=[], breaking=False, against=None)
+    found = [ContractChange(**change.as_dict()) for change in changes(version_contract(newest), contract)]
+    return ContractCheck(changes=found, breaking=any(item.breaking for item in found), against=newest.contract_number)
+
+
+@router.post("/{slug}/contract/check", dependencies=[Depends(builder)])
+def check_contract(slug: str, body: ContractInfo, session: SessionDep) -> ContractCheck:
+    return contract_check(get_model(session, slug), contract_from(body))
+
+
+@router.put("/{slug}/contract", dependencies=[Depends(builder)])
+def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    contract = contract_from(body.contract)
+    found = contract_check(model, contract)
+    if found.breaking and not body.breaking:
+        raise ConflictError("This contract removes or renames what apps rely on; confirm it as a breaking change")
+    if preset(model.preset).labels_from_data and contract.labels is None:
+        raise ConflictError(f"{model.name} answers with one label from a set; send labels")
+    checked_graders(model.graders or preset(model.preset).default_graders(contract), contract)
+    before = contract_of(model).as_dict()
+    model.contract = contract.as_dict()
+    model.breaking_confirmed = found.breaking
+    model.updated_at = now()
+    facts = {
+        "name": model.name,
+        "breaking": found.breaking,
+        "changes": [item.model_dump() for item in found.changes],
+    }
+    session.add(
+        AuditEvent(actor=current_actor(), action="model.contract", target=slug, detail=facts | {"from": before})
+    )
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/graders", dependencies=[Depends(builder)])
+def update_graders(slug: str, body: GradersUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    configs = checked_graders(pinned(session, body.graders), contract_of(model))
+    facts = {"name": model.name, "from": [item.get("name") for item in model.graders]}
+    model.graders = configs
+    model.updated_at = now()
+    facts["to"] = [item["name"] for item in configs]
+    session.add(AuditEvent(actor=current_actor(), action="model.graders", target=slug, detail=facts))
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/promotion", dependencies=[Depends(builder)])
+def update_promotion(slug: str, body: PromotionInfo, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    facts = {"name": model.name, "from": dict(model.promotion)}
+    model.promotion = rule_from(body, Rule())
+    model.updated_at = now()
+    session.add(
+        AuditEvent(actor=current_actor(), action="model.promotion", target=slug, detail=facts | {"to": model.promotion})
+    )
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/instructions", dependencies=[Depends(builder)])
+def update_instructions(slug: str, body: InstructionsUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    model.instructions = body.instructions.strip() or None
+    model.updated_at = now()
+    session.add(
+        AuditEvent(actor=current_actor(), action="model.instructions", target=slug, detail={"name": model.name})
+    )
+    session.commit()
+    return detail(settings, model)

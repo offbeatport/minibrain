@@ -18,7 +18,7 @@ import {
 } from "obp-ui";
 import { useMemo } from "react";
 import { type ModelRow, type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
-import { useModels, useVersions } from "~/api/queries";
+import { useAllModels, useVersions } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Stat } from "~/components/Section";
 import {
@@ -291,7 +291,7 @@ function usePromote() {
     return useMutation({
         mutationFn: (target: Target) =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/versions/{number}/promote", {
+                api.POST("/api/models/{slug}/versions/{number}/promote", {
                     params: { path: target },
                 }),
             ),
@@ -453,7 +453,7 @@ function VersionDialog({
 
 export function EvaluationsPage() {
     const { search, update } = useListSearch(PATH, KEYS);
-    const models = useModels();
+    const models = useAllModels();
     const promote = usePromote();
     const can = useCan();
     const all = useMemo(() => linesOf(models.data ?? []), [models.data]);

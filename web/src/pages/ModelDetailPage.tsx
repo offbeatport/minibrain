@@ -28,10 +28,10 @@ import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } fr
 import {
     isActiveJob,
     keys,
+    useAllModels,
     useBaseModel,
     useJobs,
-    useMinibrain,
-    useModels,
+    useModel,
     useVersions,
 } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
@@ -252,7 +252,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
-    const models = useModels();
+    const models = useAllModels();
     const job = useJob(model.activity.job_id ?? model.availability.job_id);
     const reload = async () => {
         await refresh();
@@ -554,7 +554,7 @@ const VERSION_COLUMNS: ColumnDef<VersionInfo, unknown>[] = [
 
 function CustomModelView({ row }: { row: ModelRow }) {
     const versions = useVersions(row.key);
-    const detail = useMinibrain(row.key);
+    const detail = useModel(row.key);
     const can = useCan();
     const refresh = useModelsRefresh();
     const jobs = useJobs(row.key);
@@ -685,7 +685,7 @@ export function BaseModelPage() {
 
 export function CustomModelPage() {
     const { slug } = useParams({ strict: false }) as { slug?: string };
-    const models = useModels();
+    const models = useAllModels();
     const row = models.data?.find((item) => item.kind === "custom" && item.key === slug);
     return (
         <Page>

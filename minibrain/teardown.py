@@ -21,9 +21,9 @@ from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     Artifact,
     AuditEvent,
+    BaseModel,
     Job,
     KeyScope,
-    Minibrain,
     Model,
     Snapshot,
     Teardown,
@@ -78,7 +78,7 @@ def record_of(teardown: Teardown) -> Record:
         kind=TeardownKind(teardown.kind),
         name=teardown.name,
         actor=teardown.actor,
-        target=str(teardown.detail.get("slug") or teardown.model_id or teardown.name),
+        target=str(teardown.detail.get("slug") or teardown.base_model_id or teardown.name),
         custom=bool(teardown.detail.get("custom")),
         started_at=teardown.started_at,
         attempt=teardown.attempt,
@@ -95,40 +95,40 @@ def host_of(node_id: str) -> str:
     return node_id.split("/", 1)[-1]
 
 
-def lora_adapters(minibrain: Minibrain, numbers: set[int] | None = None) -> list[str]:
+def lora_adapters(model: Model, numbers: set[int] | None = None) -> list[str]:
     return [
-        adapter_name(minibrain.slug, version.number)
-        for version in minibrain.versions
+        adapter_name(model.slug, version.number)
+        for version in model.versions
         if version.kind == VersionKind.LORA
         and version.adapter_artifact_id is not None
         and (numbers is None or version.number in numbers)
     ]
 
 
-def custom_targets(minibrain: Minibrain, everything: bool) -> dict[str, Any]:
-    current = minibrain.current_version
+def custom_targets(model: Model, everything: bool) -> dict[str, Any]:
+    current = model.current_version
     if everything:
-        routes = [minibrain.slug, *(f"{minibrain.slug}@{version.number}" for version in minibrain.versions)]
-        adapters = lora_adapters(minibrain)
+        routes = [model.slug, *(f"{model.slug}@{version.number}" for version in model.versions)]
+        adapters = lora_adapters(model)
     else:
-        routes = [minibrain.slug]
-        adapters = lora_adapters(minibrain, {current}) if current is not None else []
+        routes = [model.slug]
+        adapters = lora_adapters(model, {current}) if current is not None else []
     return {
         "custom": True,
-        "slug": minibrain.slug,
+        "slug": model.slug,
         "routes": routes,
         "adapters": adapters,
-        "base": minibrain.base_model,
+        "base": model.base_model,
         "version": current,
     }
 
 
-def base_targets(model: Model) -> dict[str, Any]:
-    return {"custom": False, "slug": model.id, "routes": [model.id], "adapters": [], "base": model.id}
+def base_targets(base: BaseModel) -> dict[str, Any]:
+    return {"custom": False, "slug": base.id, "routes": [base.id], "adapters": [], "base": base.id}
 
 
-def running_jobs(minibrain: Minibrain) -> bool:
-    return any(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs)
+def running_jobs(model: Model) -> bool:
+    return any(job.status in ACTIVE_JOB_STATUSES for job in model.jobs)
 
 
 def begin(
@@ -137,14 +137,14 @@ def begin(
     actor: str,
     name: str,
     detail: dict[str, Any],
-    minibrain: Minibrain | None = None,
     model: Model | None = None,
+    base_model: BaseModel | None = None,
     parent: Teardown | None = None,
 ) -> Teardown:
     teardown = Teardown(
         kind=kind,
-        minibrain_id=minibrain.id if minibrain is not None else None,
         model_id=model.id if model is not None else None,
+        base_model_id=base_model.id if base_model is not None else None,
         parent_id=parent.id if parent is not None else None,
         name=name,
         actor=actor,
@@ -154,7 +154,7 @@ def begin(
     )
     session.add(teardown)
     session.flush()
-    for owner in (minibrain, model):
+    for owner in (model, base_model):
         if owner is not None:
             session.expire(owner, ["teardown"])
     return teardown
@@ -178,8 +178,8 @@ def restart(session: Session, teardown: Teardown, actor: str) -> Teardown:
 
 def drop(session: Session, teardown: Teardown) -> None:
     owners = (
-        session.get(Minibrain, teardown.minibrain_id) if teardown.minibrain_id is not None else None,
         session.get(Model, teardown.model_id) if teardown.model_id is not None else None,
+        session.get(BaseModel, teardown.base_model_id) if teardown.base_model_id is not None else None,
     )
     session.delete(teardown)
     session.flush()
@@ -198,36 +198,36 @@ def require_idle(teardown: Teardown | None, name: str) -> None:
     raise being_deleted(name)
 
 
-def undeploy_custom(session: Session, minibrain: Minibrain, actor: str) -> Teardown | None:
-    existing = minibrain.teardown
-    if existing is not None and existing.kind != TeardownKind.UNDEPLOY:
-        raise being_deleted(minibrain.name)
-    if existing is not None:
-        return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
-    if not minibrain.deployed:
-        return None
-    detail = custom_targets(minibrain, everything=False)
-    minibrain.deployed = False
-    minibrain.updated_at = now()
-    facts = {"name": minibrain.name, "version": minibrain.current_version}
-    session.add(AuditEvent(actor=actor, action="model.undeploy", target=minibrain.slug, detail=facts))
-    return begin(session, TeardownKind.UNDEPLOY, actor, minibrain.name, detail, minibrain=minibrain)
-
-
-def undeploy_base(session: Session, model: Model, actor: str) -> Teardown | None:
+def undeploy_custom(session: Session, model: Model, actor: str) -> Teardown | None:
     existing = model.teardown
-    if existing is not None and existing.kind == TeardownKind.DELETE:
+    if existing is not None and existing.kind != TeardownKind.UNDEPLOY:
         raise being_deleted(model.name)
-    if existing is not None and existing.kind == TeardownKind.UNDEPLOY:
+    if existing is not None:
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
     if not model.deployed:
         return None
+    detail = custom_targets(model, everything=False)
     model.deployed = False
     model.updated_at = now()
-    session.add(AuditEvent(actor=actor, action="model.undeploy", target=model.id, detail={"name": model.name}))
+    facts = {"name": model.name, "version": model.current_version}
+    session.add(AuditEvent(actor=actor, action="model.undeploy", target=model.slug, detail=facts))
+    return begin(session, TeardownKind.UNDEPLOY, actor, model.name, detail, model=model)
+
+
+def undeploy_base(session: Session, base: BaseModel, actor: str) -> Teardown | None:
+    existing = base.teardown
+    if existing is not None and existing.kind == TeardownKind.DELETE:
+        raise being_deleted(base.name)
+    if existing is not None and existing.kind == TeardownKind.UNDEPLOY:
+        return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
+    if not base.deployed:
+        return None
+    base.deployed = False
+    base.updated_at = now()
+    session.add(AuditEvent(actor=actor, action="model.undeploy", target=base.id, detail={"name": base.name}))
     if existing is not None:
         return existing
-    return begin(session, TeardownKind.UNDEPLOY, actor, model.name, base_targets(model), model=model)
+    return begin(session, TeardownKind.UNDEPLOY, actor, base.name, base_targets(base), base_model=base)
 
 
 def cancel_stop(session: Session, teardown: Teardown | None, name: str) -> None:
@@ -239,9 +239,9 @@ def cancel_stop(session: Session, teardown: Teardown | None, name: str) -> None:
 
 
 def delete_custom(
-    session: Session, minibrain: Minibrain, actor: str, undeploy: bool = False, parent: Teardown | None = None
+    session: Session, model: Model, actor: str, undeploy: bool = False, parent: Teardown | None = None
 ) -> Teardown:
-    existing = minibrain.teardown
+    existing = model.teardown
     if existing is not None and existing.kind == TeardownKind.DELETE:
         if parent is not None:
             existing.parent_id = parent.id
@@ -249,77 +249,79 @@ def delete_custom(
             return restart(session, existing, actor)
         return existing
     stopping = existing is not None and existing.status == TeardownStatus.RUNNING
-    if minibrain.deployed and not undeploy:
-        raise ConflictError(f"{minibrain.name} is deployed; undeploy it first")
-    if running_jobs(minibrain):
+    if model.deployed and not undeploy:
+        raise ConflictError(f"{model.name} is deployed; undeploy it first")
+    if running_jobs(model):
         raise ConflictError("cancel the running jobs first")
-    live = minibrain.deployed or stopping
+    live = model.deployed or stopping
     if existing is not None:
         drop(session, existing)
-    detail = custom_targets(minibrain, everything=True) | {"live": live}
-    minibrain.deployed = False
-    minibrain.updated_at = now()
-    facts = {"name": minibrain.name, "kind": "custom", "versions": len(minibrain.versions), "undeploy": live}
+    detail = custom_targets(model, everything=True) | {"live": live}
+    model.deployed = False
+    model.updated_at = now()
+    facts = {"name": model.name, "kind": "custom", "versions": len(model.versions), "undeploy": live}
     if parent is not None:
         facts["with_base"] = parent.name
-    session.add(AuditEvent(actor=actor, action="model.delete", target=minibrain.slug, detail=facts))
-    return begin(session, TeardownKind.DELETE, actor, minibrain.name, detail, minibrain=minibrain, parent=parent)
+    session.add(AuditEvent(actor=actor, action="model.delete", target=model.slug, detail=facts))
+    return begin(session, TeardownKind.DELETE, actor, model.name, detail, model=model, parent=parent)
 
 
-def dependents_of(session: Session, model: Model) -> list[Minibrain]:
-    return list(session.scalars(select(Minibrain).where(Minibrain.base_model == model.id).order_by(Minibrain.name)))
+def dependents_of(session: Session, base: BaseModel) -> list[Model]:
+    return list(session.scalars(select(Model).where(Model.base_model == base.id).order_by(Model.name)))
 
 
-def base_job_running(session: Session, model: Model) -> bool:
-    query = select(Job.id).where(Job.model_id == model.id, Job.status.in_(ACTIVE_JOB_STATUSES)).limit(1)
+def base_job_running(session: Session, base: BaseModel) -> bool:
+    query = select(Job.id).where(Job.base_model_id == base.id, Job.status.in_(ACTIVE_JOB_STATUSES)).limit(1)
     return session.scalar(query) is not None
 
 
-def delete_base(session: Session, model: Model, actor: str, cascade: bool = False, undeploy: bool = False) -> Teardown:
-    existing = model.teardown
+def delete_base(
+    session: Session, base: BaseModel, actor: str, cascade: bool = False, undeploy: bool = False
+) -> Teardown:
+    existing = base.teardown
     if existing is not None and existing.kind == TeardownKind.DELETE:
         if existing.status != TeardownStatus.FAILED:
             return existing
         if bool(existing.detail.get("cascade")) != cascade:
-            raise ConflictError(f"deleting {model.name} with the models built on it failed; retry it with cascade=true")
+            raise ConflictError(f"deleting {base.name} with the models built on it failed; retry it with cascade=true")
         return restart(session, existing, actor)
     running = existing is not None and existing.status == TeardownStatus.RUNNING
-    if base_job_running(session, model):
-        raise ConflictError(f"{model.name} has a download or import running; cancel it first")
-    dependents = dependents_of(session, model)
-    built = [minibrain.name for minibrain in dependents]
+    if base_job_running(session, base):
+        raise ConflictError(f"{base.name} has a download or import running; cancel it first")
+    dependents = dependents_of(session, base)
+    built = [model.name for model in dependents]
     if built and not cascade:
         raise ConflictError(
-            f"{names(built)} {are(built)} trained on {model.name}; delete them first, or delete them with it "
+            f"{names(built)} {are(built)} trained on {base.name}; delete them first, or delete them with it "
             "(cascade=true)"
         )
-    busy = [minibrain.name for minibrain in dependents if running_jobs(minibrain)]
+    busy = [model.name for model in dependents if running_jobs(model)]
     if busy:
         raise ConflictError(f"{names(busy)} {'has' if len(busy) == 1 else 'have'} a job running; cancel it first")
-    live = [minibrain.name for minibrain in dependents if minibrain.deployed]
-    if model.deployed and not undeploy:
-        raise ConflictError(f"{model.name} is deployed; undeploy it first")
+    live = [model.name for model in dependents if model.deployed]
+    if base.deployed and not undeploy:
+        raise ConflictError(f"{base.name} is deployed; undeploy it first")
     if live and not undeploy:
         them = "it" if len(live) == 1 else "them"
         raise ConflictError(f"{names(live)} {are(live)} live; pass undeploy=true to stop {them}")
     stopping = existing is not None and running and existing.kind == TeardownKind.UNDEPLOY
     if existing is not None:
         drop(session, existing)
-    detail = base_targets(model) | {
+    detail = base_targets(base) | {
         "cascade": cascade,
         "models": built,
-        "live": len(live) + int(model.deployed or stopping),
+        "live": len(live) + int(base.deployed or stopping),
         "undeploy": undeploy,
     }
-    facts: dict[str, Any] = {"name": model.name, "kind": "base", "size_bytes": model.size_bytes}
-    facts |= {"kept": model.path} if model.path else {}
-    facts |= {"cascade": [minibrain.slug for minibrain in dependents]} if cascade else {}
-    model.deployed = False
-    model.updated_at = now()
-    session.add(AuditEvent(actor=actor, action="model.delete", target=model.id, detail=facts))
-    teardown = begin(session, TeardownKind.DELETE, actor, model.name, detail, model=model)
-    for minibrain in dependents:
-        delete_custom(session, minibrain, actor, undeploy=True, parent=teardown)
+    facts: dict[str, Any] = {"name": base.name, "kind": "base", "size_bytes": base.size_bytes}
+    facts |= {"kept": base.path} if base.path else {}
+    facts |= {"cascade": [model.slug for model in dependents]} if cascade else {}
+    base.deployed = False
+    base.updated_at = now()
+    session.add(AuditEvent(actor=actor, action="model.delete", target=base.id, detail=facts))
+    teardown = begin(session, TeardownKind.DELETE, actor, base.name, detail, base_model=base)
+    for model in dependents:
+        delete_custom(session, model, actor, undeploy=True, parent=teardown)
     return teardown
 
 
@@ -487,22 +489,22 @@ class Teardowns:
         return waiting
 
     def remove(self, session: Session, teardown: Teardown) -> None:
-        if teardown.minibrain_id is not None:
+        if teardown.model_id is not None:
             self.delete_custom(session, teardown)
         else:
             self.delete_base(session, teardown)
 
     def delete_custom(self, session: Session, teardown: Teardown) -> None:
         record = record_of(teardown)
-        minibrain = session.get(Minibrain, teardown.minibrain_id)
-        if minibrain is None:
+        model = session.get(Model, teardown.model_id)
+        if model is None:
             drop(session, teardown)
             self.finish(session, record)
             return
-        adapters = {version.adapter_artifact_id for version in minibrain.versions if version.adapter_artifact_id}
-        removed = {"versions": len(minibrain.versions), "key_scopes": len(minibrain.key_scopes)}
+        adapters = {version.adapter_artifact_id for version in model.versions if version.adapter_artifact_id}
+        removed = {"versions": len(model.versions), "key_scopes": len(model.key_scopes)}
         drop(session, teardown)
-        session.delete(minibrain)
+        session.delete(model)
         session.flush()
         drop_orphan_keys(session)
         removed["snapshots"] = cleanup(session, self.settings)
@@ -511,22 +513,22 @@ class Teardowns:
 
     def delete_base(self, session: Session, teardown: Teardown) -> None:
         record = record_of(teardown)
-        model = session.get(Model, teardown.model_id)
-        if model is None:
+        base = session.get(BaseModel, teardown.base_model_id)
+        if base is None:
             drop(session, teardown)
             self.finish(session, record)
             return
-        added = [minibrain.name for minibrain in dependents_of(session, model)]
+        added = [model.name for model in dependents_of(session, base)]
         if added:
-            raise ConflictError(f"{names(added)} {are(added)} built on {model.name} now; delete them first")
-        remove_folder(model_dir(self.settings, model.id))
+            raise ConflictError(f"{names(added)} {are(added)} built on {base.name} now; delete them first")
+        remove_folder(model_dir(self.settings, base.id))
         store = store_for(self.settings)
-        objects = drop_weights(session, store, model)
-        scopes = session.query(KeyScope).filter(KeyScope.model_id == model.id).delete()
-        removed = {"size_bytes": model.size_bytes, "key_scopes": scopes, "models": teardown.detail.get("models", [])}
-        removed |= {"kept": model.path} if model.path else {}
+        objects = drop_weights(session, store, base)
+        scopes = session.query(KeyScope).filter(KeyScope.base_model_id == base.id).delete()
+        removed = {"size_bytes": base.size_bytes, "key_scopes": scopes, "models": teardown.detail.get("models", [])}
+        removed |= {"kept": base.path} if base.path else {}
         drop(session, teardown)
-        session.delete(model)
+        session.delete(base)
         session.flush()
         objects += sweep_weights(session, store)
         removed |= {"bucket_objects": objects} if objects else {}

@@ -169,7 +169,7 @@ def give_data(harness: "Harness", slug: str, data: bytes | None = None, name: st
     files = {"file": (name, data if data is not None else tickets_csv(), "text/csv")}
     source = harness.client.post("/api/sources", files=files).json()
     dataset = harness.client.post("/api/datasets", json={"name": slug, "source_id": source["id"]}).json()
-    chosen = harness.client.put(f"/api/minibrains/{slug}/dataset", json={"dataset": dataset["slug"]})
+    chosen = harness.client.put(f"/api/models/{slug}/dataset", json={"dataset": dataset["slug"]})
     chosen.raise_for_status()
     return chosen.json()
 

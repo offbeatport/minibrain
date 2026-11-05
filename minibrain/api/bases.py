@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Any
 
+import pydantic
 from fastapi import HTTPException, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
@@ -11,14 +11,14 @@ from minibrain.models.bucket import BucketError, live_bases, signed_files
 from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import content_hash
 from minibrain.models.registry import resolve_spec
-from minibrain.registry.models import Model, ModelStatus
+from minibrain.registry.models import BaseModel, BaseModelStatus
 from minibrain.serve.weights import local_dir
 from minibrain.settings import Settings
 
 NO_STORE = {"Cache-Control": "no-store"}
 
 
-class BaseFile(BaseModel):
+class BaseFile(pydantic.BaseModel):
     path: str
     size: int
     sha256: str | None = None
@@ -26,14 +26,14 @@ class BaseFile(BaseModel):
     key: str | None = None
 
 
-class BaseWeights(BaseModel):
+class BaseWeights(pydantic.BaseModel):
     spec: dict[str, Any]
     store: str = FOLDER
     content_hash: str | None = None
     files: list[BaseFile]
 
 
-class LiveBases(BaseModel):
+class LiveBases(pydantic.BaseModel):
     bases: dict[str, str | None]
 
 
@@ -54,7 +54,7 @@ def listed_files(folder: Path) -> list[BaseFile]:
 
 
 def shareable(session: Session, key: str, folder: Path) -> list[BaseFile]:
-    model = session.get(Model, key)
+    model = session.get(BaseModel, key)
     if model is None or not model.files:
         return listed_files(folder)
     return [
@@ -62,9 +62,9 @@ def shareable(session: Session, key: str, folder: Path) -> list[BaseFile]:
     ]
 
 
-def in_bucket(session: Session, key: str) -> Model | None:
-    model = session.get(Model, key)
-    if model is None or model.store != BUCKET or model.status != ModelStatus.AVAILABLE:
+def in_bucket(session: Session, key: str) -> BaseModel | None:
+    model = session.get(BaseModel, key)
+    if model is None or model.store != BUCKET or model.status != BaseModelStatus.AVAILABLE:
         return None
     return model
 
@@ -75,7 +75,7 @@ def base_weights(
     model = in_bucket(session, key)
     if model is None:
         spec, folder = weights_folder(session, settings, key)
-        found = session.get(Model, key)
+        found = session.get(BaseModel, key)
         content = content_hash(found.files) if found is not None else None
         return BaseWeights(spec=spec | {"path": None}, content_hash=content, files=shareable(session, key, folder))
     try:

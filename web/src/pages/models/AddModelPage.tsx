@@ -4,7 +4,7 @@ import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
 import { type CatalogEntry, type ModelRow, type RecipeSample, api, unwrap } from "~/api/client";
-import { keys, useCatalog, useModels, usePresets, useRecipes } from "~/api/queries";
+import { keys, useAllModels, useCatalog, usePresets, useRecipes } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
@@ -161,7 +161,7 @@ export function AddModelPage() {
     const refresh = useModelsRefresh();
     const toast = useToast();
     const params = useRouterState({ select: (state) => state.location.search as Search });
-    const models = useModels();
+    const models = useAllModels();
     const catalog = useCatalog();
     const presets = usePresets();
     const recipes = useRecipes();
@@ -258,12 +258,12 @@ export function AddModelPage() {
             const path = { params: { path: { slug: row.key } } };
             const [detail, versions] = await Promise.all([
                 client.fetchQuery({
-                    queryKey: keys.minibrain(row.key),
-                    queryFn: () => unwrap(api.GET("/api/minibrains/{slug}", path)),
+                    queryKey: keys.model(row.key),
+                    queryFn: () => unwrap(api.GET("/api/models/{slug}", path)),
                 }),
                 client.fetchQuery({
                     queryKey: keys.versions(row.key),
-                    queryFn: () => unwrap(api.GET("/api/minibrains/{slug}/versions", path)),
+                    queryFn: () => unwrap(api.GET("/api/models/{slug}/versions", path)),
                 }),
             ]);
             return { detail, versions };
@@ -344,7 +344,7 @@ export function AddModelPage() {
             const baseModel =
                 option?.kind === "local" && option.baseKey ? option.baseKey : await plan.run();
             return unwrap(
-                api.POST("/api/minibrains", {
+                api.POST("/api/models", {
                     body: {
                         name: name.trim(),
                         description: description.trim(),

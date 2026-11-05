@@ -84,7 +84,7 @@ Catalogue updates are fetched only when you press **Check for updates**, or dail
 
 ## Use the endpoint
 
-Create a key on a minibrain's Endpoint tab, then:
+Create a key on a model's Endpoint tab, then:
 
 ```python
 from openai import OpenAI

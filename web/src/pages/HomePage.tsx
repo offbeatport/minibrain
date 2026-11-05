@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
-import { useMinibrains, useRecentJobs } from "~/api/queries";
+import { useModels, useRecentJobs } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
@@ -10,16 +10,16 @@ import { jobHref } from "~/lib/modelLinks";
 
 const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
-        header: "minibrain",
-        id: "minibrain",
+        header: "Model",
+        id: "model",
         cell: ({ row }) => {
             const href = jobHref(row.original);
             return href ? (
                 <Link className="text-primary" href={href}>
-                    {row.original.minibrain_name ?? row.original.model}
+                    {row.original.model_name ?? row.original.base_model}
                 </Link>
             ) : (
-                (row.original.minibrain_name ?? row.original.model)
+                (row.original.model_name ?? row.original.base_model)
             );
         },
     },
@@ -39,7 +39,7 @@ function GetStarted() {
         <Section title="Get started" caption="Five minutes with the sample data in this repo.">
             <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
                 <li>
-                    Create a minibrain on{" "}
+                    Create a model on{" "}
                     <Link className="text-primary" href="/models">
                         Models
                     </Link>
@@ -60,10 +60,10 @@ function GetStarted() {
 }
 
 export function HomePage() {
-    const { data: minibrains } = useMinibrains();
+    const { data: models } = useModels();
     const { data: jobs } = useRecentJobs(10);
-    const serving = (minibrains ?? []).filter((item) => item.current_version !== null).length;
-    const running = (minibrains ?? []).reduce((total, item) => total + item.active_jobs, 0);
+    const serving = (models ?? []).filter((item) => item.current_version !== null).length;
+    const running = (models ?? []).reduce((total, item) => total + item.active_jobs, 0);
     return (
         <Page>
             <PageHeader
@@ -72,12 +72,12 @@ export function HomePage() {
             />
             <Section title="Overview">
                 <div className="flex flex-wrap gap-8">
-                    <Stat label="Minibrains" value={count(minibrains?.length)} />
+                    <Stat label="Models" value={count(models?.length)} />
                     <Stat label="Serving" value={count(serving)} />
                     <Stat label="Jobs running" value={count(running)} />
                 </div>
             </Section>
-            {minibrains?.length === 0 && <GetStarted />}
+            {models?.length === 0 && <GetStarted />}
             <Section title="Recent jobs" flush>
                 <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
             </Section>

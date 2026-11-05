@@ -419,13 +419,13 @@
         }
       }
     },
-    "/api/minibrains": {
+    "/api/models": {
       "get": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "List All",
-        "operationId": "list_all_api_minibrains_get",
+        "operationId": "list_all_api_models_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -433,10 +433,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MinibrainSummary"
+                    "$ref": "#/components/schemas/ModelSummary"
                   },
                   "type": "array",
-                  "title": "Response List All Api Minibrains Get"
+                  "title": "Response List All Api Models Get"
                 }
               }
             }
@@ -445,15 +445,15 @@
       },
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Create",
-        "operationId": "create_api_minibrains_post",
+        "operationId": "create_api_models_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MinibrainCreate"
+                "$ref": "#/components/schemas/ModelCreate"
               }
             }
           },
@@ -465,7 +465,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -483,13 +483,13 @@
         }
       }
     },
-    "/api/minibrains/name": {
+    "/api/models/name": {
       "get": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Default Name",
-        "operationId": "default_name_api_minibrains_name_get",
+        "operationId": "default_name_api_models_name_get",
         "parameters": [
           {
             "name": "preset",
@@ -526,13 +526,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}": {
+    "/api/models/{slug}": {
       "patch": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update",
-        "operationId": "update_api_minibrains__slug__patch",
+        "operationId": "update_api_models__slug__patch",
         "parameters": [
           {
             "name": "slug",
@@ -560,7 +560,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -579,10 +579,10 @@
       },
       "get": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Read",
-        "operationId": "read_api_minibrains__slug__get",
+        "operationId": "read_api_models__slug__get",
         "parameters": [
           {
             "name": "slug",
@@ -600,7 +600,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -619,10 +619,10 @@
       },
       "delete": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Delete",
-        "operationId": "delete_api_minibrains__slug__delete",
+        "operationId": "delete_api_models__slug__delete",
         "parameters": [
           {
             "name": "slug",
@@ -668,13 +668,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/deploy": {
+    "/api/models/{slug}/deploy": {
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Deploy",
-        "operationId": "deploy_api_minibrains__slug__deploy_post",
+        "operationId": "deploy_api_models__slug__deploy_post",
         "parameters": [
           {
             "name": "slug",
@@ -702,7 +702,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -720,13 +720,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/request-bodies": {
+    "/api/models/{slug}/request-bodies": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Keep Request Bodies",
-        "operationId": "keep_request_bodies_api_minibrains__slug__request_bodies_put",
+        "operationId": "keep_request_bodies_api_models__slug__request_bodies_put",
         "parameters": [
           {
             "name": "slug",
@@ -754,7 +754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -772,13 +772,13 @@
         }
       }
     },
-    "/api/minibrains/sample": {
+    "/api/models/sample": {
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Create Sample",
-        "operationId": "create_sample_api_minibrains_sample_post",
+        "operationId": "create_sample_api_models_sample_post",
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -793,13 +793,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/dataset": {
+    "/api/models/{slug}/dataset": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Choose Dataset",
-        "operationId": "choose_dataset_api_minibrains__slug__dataset_put",
+        "operationId": "choose_dataset_api_models__slug__dataset_put",
         "parameters": [
           {
             "name": "slug",
@@ -827,7 +827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -845,13 +845,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/mapping": {
+    "/api/models/{slug}/mapping": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update Mapping",
-        "operationId": "update_mapping_api_minibrains__slug__mapping_put",
+        "operationId": "update_mapping_api_models__slug__mapping_put",
         "parameters": [
           {
             "name": "slug",
@@ -879,7 +879,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -897,13 +897,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/query": {
+    "/api/models/{slug}/query": {
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Query",
-        "operationId": "query_api_minibrains__slug__query_post",
+        "operationId": "query_api_models__slug__query_post",
         "parameters": [
           {
             "name": "slug",
@@ -949,13 +949,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/preview": {
+    "/api/models/{slug}/preview": {
       "get": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Preview",
-        "operationId": "preview_api_minibrains__slug__preview_get",
+        "operationId": "preview_api_models__slug__preview_get",
         "parameters": [
           {
             "name": "slug",
@@ -991,13 +991,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/snapshots": {
+    "/api/models/{slug}/snapshots": {
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Build Snapshot",
-        "operationId": "build_snapshot_api_minibrains__slug__snapshots_post",
+        "operationId": "build_snapshot_api_models__slug__snapshots_post",
         "parameters": [
           {
             "name": "slug",
@@ -1015,7 +1015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -1033,13 +1033,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/golden": {
+    "/api/models/{slug}/golden": {
       "get": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Golden",
-        "operationId": "golden_api_minibrains__slug__golden_get",
+        "operationId": "golden_api_models__slug__golden_get",
         "parameters": [
           {
             "name": "slug",
@@ -1061,7 +1061,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ExampleInfo"
                   },
-                  "title": "Response Golden Api Minibrains  Slug  Golden Get"
+                  "title": "Response Golden Api Models  Slug  Golden Get"
                 }
               }
             }
@@ -1079,13 +1079,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/contract/check": {
+    "/api/models/{slug}/contract/check": {
       "post": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Check Contract",
-        "operationId": "check_contract_api_minibrains__slug__contract_check_post",
+        "operationId": "check_contract_api_models__slug__contract_check_post",
         "parameters": [
           {
             "name": "slug",
@@ -1131,13 +1131,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/contract": {
+    "/api/models/{slug}/contract": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update Contract",
-        "operationId": "update_contract_api_minibrains__slug__contract_put",
+        "operationId": "update_contract_api_models__slug__contract_put",
         "parameters": [
           {
             "name": "slug",
@@ -1165,7 +1165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -1183,13 +1183,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/graders": {
+    "/api/models/{slug}/graders": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update Graders",
-        "operationId": "update_graders_api_minibrains__slug__graders_put",
+        "operationId": "update_graders_api_models__slug__graders_put",
         "parameters": [
           {
             "name": "slug",
@@ -1217,7 +1217,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -1235,13 +1235,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/promotion": {
+    "/api/models/{slug}/promotion": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update Promotion",
-        "operationId": "update_promotion_api_minibrains__slug__promotion_put",
+        "operationId": "update_promotion_api_models__slug__promotion_put",
         "parameters": [
           {
             "name": "slug",
@@ -1269,7 +1269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -1287,13 +1287,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/instructions": {
+    "/api/models/{slug}/instructions": {
       "put": {
         "tags": [
-          "minibrains"
+          "models"
         ],
         "summary": "Update Instructions",
-        "operationId": "update_instructions_api_minibrains__slug__instructions_put",
+        "operationId": "update_instructions_api_models__slug__instructions_put",
         "parameters": [
           {
             "name": "slug",
@@ -1321,7 +1321,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -3380,13 +3380,13 @@
         }
       }
     },
-    "/api/models": {
+    "/api/all-models": {
       "get": {
         "tags": [
-          "models"
+          "base models"
         ],
-        "summary": "List Models",
-        "operationId": "list_models_api_models_get",
+        "summary": "List All Models",
+        "operationId": "list_all_models_api_all_models_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3397,7 +3397,7 @@
                     "$ref": "#/components/schemas/ModelRow"
                   },
                   "type": "array",
-                  "title": "Response List Models Api Models Get"
+                  "title": "Response List All Models Api All Models Get"
                 }
               }
             }
@@ -3405,13 +3405,13 @@
         }
       }
     },
-    "/api/models/inspect": {
+    "/api/base-models/inspect": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Inspect",
-        "operationId": "inspect_api_models_inspect_post",
+        "operationId": "inspect_api_base_models_inspect_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3446,13 +3446,13 @@
         }
       }
     },
-    "/api/models/import": {
+    "/api/base-models/import": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Import Model",
-        "operationId": "import_model_api_models_import_post",
+        "operationId": "import_model_api_base_models_import_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3487,13 +3487,13 @@
         }
       }
     },
-    "/api/models/base/{key}": {
+    "/api/base-models/{key}": {
       "get": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Read Base",
-        "operationId": "read_base_api_models_base__key__get",
+        "operationId": "read_base_api_base_models__key__get",
         "parameters": [
           {
             "name": "key",
@@ -3530,10 +3530,10 @@
       },
       "patch": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Update Base",
-        "operationId": "update_base_api_models_base__key__patch",
+        "operationId": "update_base_api_base_models__key__patch",
         "parameters": [
           {
             "name": "key",
@@ -3580,10 +3580,10 @@
       },
       "delete": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Delete Base Model",
-        "operationId": "delete_base_model_api_models_base__key__delete",
+        "operationId": "delete_base_model_api_base_models__key__delete",
         "parameters": [
           {
             "name": "key",
@@ -3639,13 +3639,13 @@
         }
       }
     },
-    "/api/models/base/{key}/verify": {
+    "/api/base-models/{key}/verify": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Verify Base",
-        "operationId": "verify_base_api_models_base__key__verify_post",
+        "operationId": "verify_base_api_base_models__key__verify_post",
         "parameters": [
           {
             "name": "key",
@@ -3681,13 +3681,13 @@
         }
       }
     },
-    "/api/models/base/{key}/repair": {
+    "/api/base-models/{key}/repair": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Repair Base",
-        "operationId": "repair_base_api_models_base__key__repair_post",
+        "operationId": "repair_base_api_base_models__key__repair_post",
         "parameters": [
           {
             "name": "key",
@@ -3723,13 +3723,13 @@
         }
       }
     },
-    "/api/models/base/{key}/reimport": {
+    "/api/base-models/{key}/reimport": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Reimport Base",
-        "operationId": "reimport_base_api_models_base__key__reimport_post",
+        "operationId": "reimport_base_api_base_models__key__reimport_post",
         "parameters": [
           {
             "name": "key",
@@ -3775,13 +3775,13 @@
         }
       }
     },
-    "/api/models/base/{key}/relocate": {
+    "/api/base-models/{key}/relocate": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Relocate Base",
-        "operationId": "relocate_base_api_models_base__key__relocate_post",
+        "operationId": "relocate_base_api_base_models__key__relocate_post",
         "parameters": [
           {
             "name": "key",
@@ -3827,13 +3827,13 @@
         }
       }
     },
-    "/api/models/base/{key}/recheck": {
+    "/api/base-models/{key}/recheck": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Recheck Base",
-        "operationId": "recheck_base_api_models_base__key__recheck_post",
+        "operationId": "recheck_base_api_base_models__key__recheck_post",
         "parameters": [
           {
             "name": "key",
@@ -3869,13 +3869,13 @@
         }
       }
     },
-    "/api/models/base/{key}/retry": {
+    "/api/base-models/{key}/retry": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Retry Base",
-        "operationId": "retry_base_api_models_base__key__retry_post",
+        "operationId": "retry_base_api_base_models__key__retry_post",
         "parameters": [
           {
             "name": "key",
@@ -3911,13 +3911,13 @@
         }
       }
     },
-    "/api/models/base/{key}/deploy": {
+    "/api/base-models/{key}/deploy": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Deploy Base",
-        "operationId": "deploy_base_api_models_base__key__deploy_post",
+        "operationId": "deploy_base_api_base_models__key__deploy_post",
         "parameters": [
           {
             "name": "key",
@@ -3963,13 +3963,13 @@
         }
       }
     },
-    "/api/models/base/{key}/test": {
+    "/api/base-models/{key}/test": {
       "post": {
         "tags": [
-          "models"
+          "base models"
         ],
         "summary": "Test Base",
-        "operationId": "test_base_api_models_base__key__test_post",
+        "operationId": "test_base_api_base_models__key__test_post",
         "parameters": [
           {
             "name": "key",
@@ -4947,13 +4947,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions": {
+    "/api/models/{slug}/versions": {
       "get": {
         "tags": [
           "versions"
         ],
         "summary": "List Versions",
-        "operationId": "list_versions_api_minibrains__slug__versions_get",
+        "operationId": "list_versions_api_models__slug__versions_get",
         "parameters": [
           {
             "name": "slug",
@@ -4975,7 +4975,7 @@
                   "items": {
                     "$ref": "#/components/schemas/VersionInfo"
                   },
-                  "title": "Response List Versions Api Minibrains  Slug  Versions Get"
+                  "title": "Response List Versions Api Models  Slug  Versions Get"
                 }
               }
             }
@@ -4997,7 +4997,7 @@
           "versions"
         ],
         "summary": "Add Version",
-        "operationId": "add_version_api_minibrains__slug__versions_post",
+        "operationId": "add_version_api_models__slug__versions_post",
         "parameters": [
           {
             "name": "slug",
@@ -5043,13 +5043,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}": {
+    "/api/models/{slug}/versions/{number}": {
       "delete": {
         "tags": [
           "versions"
         ],
         "summary": "Delete Version",
-        "operationId": "delete_version_api_minibrains__slug__versions__number__delete",
+        "operationId": "delete_version_api_models__slug__versions__number__delete",
         "parameters": [
           {
             "name": "slug",
@@ -5087,13 +5087,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/promote": {
+    "/api/models/{slug}/versions/{number}/promote": {
       "post": {
         "tags": [
           "versions"
         ],
         "summary": "Promote Version",
-        "operationId": "promote_version_api_minibrains__slug__versions__number__promote_post",
+        "operationId": "promote_version_api_models__slug__versions__number__promote_post",
         "parameters": [
           {
             "name": "slug",
@@ -5120,7 +5120,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
+                  "$ref": "#/components/schemas/ModelDetail"
                 }
               }
             }
@@ -5138,13 +5138,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/complete": {
+    "/api/models/{slug}/complete": {
       "post": {
         "tags": [
           "versions"
         ],
         "summary": "Complete",
-        "operationId": "complete_api_minibrains__slug__complete_post",
+        "operationId": "complete_api_models__slug__complete_post",
         "parameters": [
           {
             "name": "slug",
@@ -5190,13 +5190,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/test": {
+    "/api/models/{slug}/versions/{number}/test": {
       "post": {
         "tags": [
           "versions"
         ],
         "summary": "Test Version",
-        "operationId": "test_version_api_minibrains__slug__versions__number__test_post",
+        "operationId": "test_version_api_models__slug__versions__number__test_post",
         "parameters": [
           {
             "name": "slug",
@@ -5381,13 +5381,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/training-plan": {
+    "/api/models/{slug}/training-plan": {
       "get": {
         "tags": [
           "training"
         ],
         "summary": "Get Training Plan",
-        "operationId": "get_training_plan_api_minibrains__slug__training_plan_get",
+        "operationId": "get_training_plan_api_models__slug__training_plan_get",
         "parameters": [
           {
             "name": "slug",
@@ -5582,13 +5582,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/card": {
+    "/api/models/{slug}/versions/{number}/card": {
       "get": {
         "tags": [
           "model cards"
         ],
         "summary": "Read Card",
-        "operationId": "read_card_api_minibrains__slug__versions__number__card_get",
+        "operationId": "read_card_api_models__slug__versions__number__card_get",
         "parameters": [
           {
             "name": "slug",
@@ -5637,7 +5637,7 @@
           "model cards"
         ],
         "summary": "Edit Card",
-        "operationId": "edit_card_api_minibrains__slug__versions__number__card_put",
+        "operationId": "edit_card_api_models__slug__versions__number__card_put",
         "parameters": [
           {
             "name": "slug",
@@ -5692,13 +5692,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/card.json": {
+    "/api/models/{slug}/versions/{number}/card.json": {
       "get": {
         "tags": [
           "model cards"
         ],
         "summary": "Card Json",
-        "operationId": "card_json_api_minibrains__slug__versions__number__card_json_get",
+        "operationId": "card_json_api_models__slug__versions__number__card_json_get",
         "parameters": [
           {
             "name": "slug",
@@ -5736,13 +5736,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/card.md": {
+    "/api/models/{slug}/versions/{number}/card.md": {
       "get": {
         "tags": [
           "model cards"
         ],
         "summary": "Card Markdown",
-        "operationId": "card_markdown_api_minibrains__slug__versions__number__card_md_get",
+        "operationId": "card_markdown_api_models__slug__versions__number__card_md_get",
         "parameters": [
           {
             "name": "slug",
@@ -5780,13 +5780,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/versions/{number}/aibom.json": {
+    "/api/models/{slug}/versions/{number}/aibom.json": {
       "get": {
         "tags": [
           "model cards"
         ],
         "summary": "Aibom Json",
-        "operationId": "aibom_json_api_minibrains__slug__versions__number__aibom_json_get",
+        "operationId": "aibom_json_api_models__slug__versions__number__aibom_json_get",
         "parameters": [
           {
             "name": "slug",
@@ -6199,13 +6199,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/feedback": {
+    "/api/models/{slug}/feedback": {
       "post": {
         "tags": [
           "feedback"
         ],
         "summary": "Playground Feedback",
-        "operationId": "playground_feedback_api_minibrains__slug__feedback_post",
+        "operationId": "playground_feedback_api_models__slug__feedback_post",
         "parameters": [
           {
             "name": "slug",
@@ -6251,13 +6251,13 @@
         }
       }
     },
-    "/api/minibrains/{slug}/feedback/summary": {
+    "/api/models/{slug}/feedback/summary": {
       "get": {
         "tags": [
           "feedback"
         ],
         "summary": "Feedback Summary",
-        "operationId": "feedback_summary_api_minibrains__slug__feedback_summary_get",
+        "operationId": "feedback_summary_api_models__slug__feedback_summary_get",
         "parameters": [
           {
             "name": "slug",
@@ -6494,7 +6494,7 @@
             }
           },
           {
-            "name": "minibrain",
+            "name": "model",
             "in": "query",
             "required": false,
             "schema": {
@@ -6509,7 +6509,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Minibrain"
+              "title": "Model"
             }
           },
           {
@@ -6648,7 +6648,7 @@
         "operationId": "job_facets_api_jobs_facets_get",
         "parameters": [
           {
-            "name": "minibrain",
+            "name": "model",
             "in": "query",
             "required": false,
             "schema": {
@@ -6663,7 +6663,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Minibrain"
+              "title": "Model"
             }
           },
           {
@@ -8595,21 +8595,21 @@
         }
       }
     },
-    "/internal/worker/models/{model_id}/stored": {
+    "/internal/worker/bases/{base_model_id}/stored": {
       "get": {
         "tags": [
           "worker"
         ],
         "summary": "Stored",
-        "operationId": "stored_internal_worker_models__model_id__stored_get",
+        "operationId": "stored_internal_worker_bases__base_model_id__stored_get",
         "parameters": [
           {
-            "name": "model_id",
+            "name": "base_model_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Model Id"
+              "title": "Base Model Id"
             }
           },
           {
@@ -15270,9 +15270,9 @@
       },
       "FeedbackBody": {
         "properties": {
-          "minibrain_id": {
+          "model_id": {
             "type": "integer",
-            "title": "Minibrain Id"
+            "title": "Model Id"
           },
           "origin": {
             "type": "string",
@@ -15362,7 +15362,7 @@
         },
         "type": "object",
         "required": [
-          "minibrain_id",
+          "model_id",
           "origin",
           "rating"
         ],
@@ -15597,19 +15597,19 @@
             "type": "object",
             "title": "Statuses"
           },
-          "minibrains": {
+          "models": {
             "additionalProperties": {
               "type": "integer"
             },
             "type": "object",
-            "title": "Minibrains"
+            "title": "Models"
           }
         },
         "type": "object",
         "required": [
           "total",
           "statuses",
-          "minibrains"
+          "models"
         ],
         "title": "FeedbackFacets"
       },
@@ -17315,28 +17315,6 @@
             "type": "integer",
             "title": "Id"
           },
-          "minibrain": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minibrain"
-          },
-          "minibrain_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minibrain Name"
-          },
           "model": {
             "anyOf": [
               {
@@ -17347,6 +17325,28 @@
               }
             ],
             "title": "Model"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "base_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model"
           },
           "version": {
             "anyOf": [
@@ -17469,8 +17469,8 @@
         "type": "object",
         "required": [
           "id",
-          "minibrain",
-          "minibrain_name",
+          "model",
+          "model_name",
           "version",
           "kind",
           "status",
@@ -17503,19 +17503,19 @@
             "type": "object",
             "title": "Statuses"
           },
-          "minibrains": {
+          "models": {
             "additionalProperties": {
               "type": "integer"
             },
             "type": "object",
-            "title": "Minibrains"
+            "title": "Models"
           }
         },
         "type": "object",
         "required": [
           "total",
           "statuses",
-          "minibrains"
+          "models"
         ],
         "title": "JobFacets"
       },
@@ -17524,28 +17524,6 @@
           "id": {
             "type": "integer",
             "title": "Id"
-          },
-          "minibrain": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minibrain"
-          },
-          "minibrain_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Minibrain Name"
           },
           "model": {
             "anyOf": [
@@ -17557,6 +17535,28 @@
               }
             ],
             "title": "Model"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "base_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model"
           },
           "version": {
             "anyOf": [
@@ -17653,8 +17653,8 @@
         "type": "object",
         "required": [
           "id",
-          "minibrain",
-          "minibrain_name",
+          "model",
+          "model_name",
           "version",
           "kind",
           "status",
@@ -18100,7 +18100,7 @@
             ],
             "title": "Key Id"
           },
-          "minibrain_id": {
+          "model_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -18109,7 +18109,7 @@
                 "type": "null"
               }
             ],
-            "title": "Minibrain Id"
+            "title": "Model Id"
           },
           "model": {
             "type": "string",
@@ -18204,7 +18204,7 @@
         "required": [
           "at",
           "key_id",
-          "minibrain_id",
+          "model_id",
           "model",
           "version",
           "status",
@@ -18412,7 +18412,148 @@
         ],
         "title": "Message"
       },
-      "MinibrainCreate": {
+      "Mistake": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "title": "Input"
+          },
+          "gold": {
+            "type": "string",
+            "title": "Gold"
+          },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input",
+          "gold",
+          "output"
+        ],
+        "title": "Mistake"
+      },
+      "ModelCard": {
+        "properties": {
+          "schema_name": {
+            "type": "string",
+            "title": "Schema Name",
+            "default": "minibrain.model_card"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "version": {
+            "$ref": "#/components/schemas/CardVersion"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/CardPurpose"
+          },
+          "base_model": {
+            "$ref": "#/components/schemas/CardBaseModel"
+          },
+          "training_data": {
+            "$ref": "#/components/schemas/CardData"
+          },
+          "training": {
+            "$ref": "#/components/schemas/CardTraining"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/CardEvaluation"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CardLimits"
+          },
+          "use": {
+            "$ref": "#/components/schemas/CardUse"
+          },
+          "approvals": {
+            "items": {
+              "$ref": "#/components/schemas/CardEvent"
+            },
+            "type": "array",
+            "title": "Approvals"
+          },
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/CardEvent"
+            },
+            "type": "array",
+            "title": "Deployments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "purpose",
+          "base_model",
+          "training_data",
+          "training",
+          "evaluation",
+          "limits",
+          "use",
+          "approvals",
+          "deployments"
+        ],
+        "title": "ModelCard"
+      },
+      "ModelCardEdit": {
+        "properties": {
+          "intended_use": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intended Use"
+          },
+          "known_limits": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Limits"
+          }
+        },
+        "type": "object",
+        "title": "ModelCardEdit"
+      },
+      "ModelCardExport": {
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/ModelCard"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "canonical_form": {
+            "type": "string",
+            "title": "Canonical Form",
+            "default": "SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card",
+          "sha256"
+        ],
+        "title": "ModelCardExport"
+      },
+      "ModelCreate": {
         "properties": {
           "name": {
             "type": "string",
@@ -18522,9 +18663,9 @@
         "required": [
           "name"
         ],
-        "title": "MinibrainCreate"
+        "title": "ModelCreate"
       },
-      "MinibrainDetail": {
+      "ModelDetail": {
         "properties": {
           "slug": {
             "type": "string",
@@ -18706,226 +18847,7 @@
           "graders",
           "promotion"
         ],
-        "title": "MinibrainDetail"
-      },
-      "MinibrainSummary": {
-        "properties": {
-          "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "preset": {
-            "type": "string",
-            "title": "Preset"
-          },
-          "base_model": {
-            "type": "string",
-            "title": "Base Model"
-          },
-          "current_version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Version"
-          },
-          "deployed": {
-            "type": "boolean",
-            "title": "Deployed",
-            "default": false
-          },
-          "main_metric": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Main Metric"
-          },
-          "current_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Score"
-          },
-          "versions": {
-            "type": "integer",
-            "title": "Versions"
-          },
-          "active_jobs": {
-            "type": "integer",
-            "title": "Active Jobs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "slug",
-          "name",
-          "preset",
-          "base_model",
-          "current_version",
-          "current_score",
-          "versions",
-          "active_jobs"
-        ],
-        "title": "MinibrainSummary"
-      },
-      "Mistake": {
-        "properties": {
-          "input": {
-            "type": "string",
-            "title": "Input"
-          },
-          "gold": {
-            "type": "string",
-            "title": "Gold"
-          },
-          "output": {
-            "type": "string",
-            "title": "Output"
-          }
-        },
-        "type": "object",
-        "required": [
-          "input",
-          "gold",
-          "output"
-        ],
-        "title": "Mistake"
-      },
-      "ModelCard": {
-        "properties": {
-          "schema_name": {
-            "type": "string",
-            "title": "Schema Name",
-            "default": "minibrain.model_card"
-          },
-          "schema_version": {
-            "type": "integer",
-            "title": "Schema Version",
-            "default": 1
-          },
-          "version": {
-            "$ref": "#/components/schemas/CardVersion"
-          },
-          "purpose": {
-            "$ref": "#/components/schemas/CardPurpose"
-          },
-          "base_model": {
-            "$ref": "#/components/schemas/CardBaseModel"
-          },
-          "training_data": {
-            "$ref": "#/components/schemas/CardData"
-          },
-          "training": {
-            "$ref": "#/components/schemas/CardTraining"
-          },
-          "evaluation": {
-            "$ref": "#/components/schemas/CardEvaluation"
-          },
-          "limits": {
-            "$ref": "#/components/schemas/CardLimits"
-          },
-          "use": {
-            "$ref": "#/components/schemas/CardUse"
-          },
-          "approvals": {
-            "items": {
-              "$ref": "#/components/schemas/CardEvent"
-            },
-            "type": "array",
-            "title": "Approvals"
-          },
-          "deployments": {
-            "items": {
-              "$ref": "#/components/schemas/CardEvent"
-            },
-            "type": "array",
-            "title": "Deployments"
-          }
-        },
-        "type": "object",
-        "required": [
-          "version",
-          "purpose",
-          "base_model",
-          "training_data",
-          "training",
-          "evaluation",
-          "limits",
-          "use",
-          "approvals",
-          "deployments"
-        ],
-        "title": "ModelCard"
-      },
-      "ModelCardEdit": {
-        "properties": {
-          "intended_use": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Intended Use"
-          },
-          "known_limits": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Known Limits"
-          }
-        },
-        "type": "object",
-        "title": "ModelCardEdit"
-      },
-      "ModelCardExport": {
-        "properties": {
-          "card": {
-            "$ref": "#/components/schemas/ModelCard"
-          },
-          "sha256": {
-            "type": "string",
-            "title": "Sha256"
-          },
-          "canonical_form": {
-            "type": "string",
-            "title": "Canonical Form",
-            "default": "SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it"
-          }
-        },
-        "type": "object",
-        "required": [
-          "card",
-          "sha256"
-        ],
-        "title": "ModelCardExport"
+        "title": "ModelDetail"
       },
       "ModelFile": {
         "properties": {
@@ -19290,6 +19212,84 @@
           "needed_bytes"
         ],
         "title": "ModelRow"
+      },
+      "ModelSummary": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "preset": {
+            "type": "string",
+            "title": "Preset"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
+          },
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "current_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Score"
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "active_jobs": {
+            "type": "integer",
+            "title": "Active Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "preset",
+          "base_model",
+          "current_version",
+          "current_score",
+          "versions",
+          "active_jobs"
+        ],
+        "title": "ModelSummary"
       },
       "ModelUpdate": {
         "properties": {

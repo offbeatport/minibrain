@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Link } from "obp-ui";
 import type { VersionInfo } from "~/api/client";
-import { useMinibrain } from "~/api/queries";
+import { useModel } from "~/api/queries";
 import { ChangeNotice } from "./DatasetVersions";
 import { compareParam } from "./VersionDiff";
 import { itemHref } from "./catalogue";
@@ -83,7 +83,7 @@ export function withDataColumns(
 }
 
 export function ModelDataNotice({ slug }: { slug: string }) {
-    const detail = useMinibrain(slug);
+    const detail = useModel(slug);
     return (
         <ChangeNotice
             changed={detail.data?.changed}

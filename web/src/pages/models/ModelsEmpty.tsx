@@ -10,7 +10,7 @@ export function ModelsEmpty() {
     const refresh = useModelsRefresh();
     const toast = useToast();
     const sample = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/minibrains/sample")),
+        mutationFn: () => unwrap(api.POST("/api/models/sample")),
         onSuccess: async (created) => {
             await refresh();
             const rows = `${created.name}: ${created.snapshot?.rows ?? 0} sample tickets`;

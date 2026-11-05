@@ -7,24 +7,24 @@ from minibrain.api.deps import SessionDep
 from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate, ModelRef
 from minibrain.api.views import key_info
 from minibrain.auth.identity import current_actor
-from minibrain.registry.models import ApiKey, AuditEvent, Minibrain, Model
-from minibrain.registry.service import NotFoundError, create_key, get_minibrain, set_scopes
+from minibrain.registry.models import ApiKey, AuditEvent, BaseModel, Model
+from minibrain.registry.service import NotFoundError, create_key, get_model, set_scopes
 
 router = APIRouter(prefix="/api/keys", tags=["keys"])
 
 
-def resolve(session: Session, refs: list[ModelRef]) -> tuple[list[Minibrain], list[str]]:
-    minibrains: dict[int, Minibrain] = {}
+def resolve(session: Session, refs: list[ModelRef]) -> tuple[list[Model], list[str]]:
+    models: dict[int, Model] = {}
     model_ids: list[str] = []
     for ref in refs:
         if ref.kind == "custom":
-            minibrain = get_minibrain(session, ref.key)
-            minibrains[minibrain.id] = minibrain
-        elif session.get(Model, ref.key) is None:
+            model = get_model(session, ref.key)
+            models[model.id] = model
+        elif session.get(BaseModel, ref.key) is None:
             raise NotFoundError(f"model {ref.key} not found")
         else:
             model_ids.append(ref.key)
-    return list(minibrains.values()), model_ids
+    return list(models.values()), model_ids
 
 
 def get_key(session: Session, key_id: int) -> ApiKey:
@@ -48,8 +48,8 @@ def list_keys(session: SessionDep) -> list[KeyInfo]:
 
 @router.post("", status_code=201, dependencies=[Depends(builder)])
 def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
-    minibrains, model_ids = resolve(session, body.models)
-    key, secret = create_key(session, body.name, minibrains, model_ids)
+    models, model_ids = resolve(session, body.models)
+    key, secret = create_key(session, body.name, models, model_ids)
     key.created_by = current_actor()
     audit(session, "key.create", key)
     session.commit()
@@ -59,8 +59,8 @@ def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
 @router.put("/{key_id}/models", dependencies=[Depends(builder)])
 def update_models(key_id: int, body: KeyScopeUpdate, session: SessionDep) -> KeyInfo:
     key = get_key(session, key_id)
-    minibrains, model_ids = resolve(session, body.models)
-    set_scopes(session, key, minibrains, model_ids)
+    models, model_ids = resolve(session, body.models)
+    set_scopes(session, key, models, model_ids)
     audit(session, "key.update", key)
     session.commit()
     return key_info(session, key)

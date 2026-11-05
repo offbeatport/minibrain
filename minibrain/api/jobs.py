@@ -15,7 +15,7 @@ from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import QueueDep, SessionDep, StoreDep
 from minibrain.api.schemas import JobDetail, JobEventInfo, JobFacets, JobInfo, JobPage
 from minibrain.api.views import job_detail, job_info
-from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, Job, JobEvent, Minibrain
+from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, Job, JobEvent, Model
 from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -26,7 +26,7 @@ JOB_PAGE = 50
 JOB_PAGE_MAX = 200
 
 JobOrder = Literal["newest", "oldest"]
-Facet = Literal["status", "minibrain"]
+Facet = Literal["status", "model"]
 
 
 def get_job(session: SessionDep, job_id: int) -> Job:
@@ -38,7 +38,7 @@ def get_job(session: SessionDep, job_id: int) -> Job:
 
 @dataclass(frozen=True)
 class JobFilter:
-    minibrains: list[str]
+    models: list[str]
     kinds: list[str]
     statuses: list[str]
     ids: list[int]
@@ -48,7 +48,7 @@ class JobFilter:
 
 
 def job_filter(
-    minibrain: Annotated[list[str] | None, Query()] = None,
+    model: Annotated[list[str] | None, Query()] = None,
     kind: Annotated[list[str] | None, Query()] = None,
     status: Annotated[list[str] | None, Query()] = None,
     ids: Annotated[list[int] | None, Query(alias="id")] = None,
@@ -57,7 +57,7 @@ def job_filter(
     until: datetime | None = None,
 ) -> JobFilter:
     return JobFilter(
-        minibrains=minibrain or [],
+        models=model or [],
         kinds=kind or [],
         statuses=status or [],
         ids=ids or [],
@@ -72,10 +72,10 @@ FilterDep = Annotated[JobFilter, Depends(job_filter)]
 
 def text_match(text: str) -> ColumnElement[bool]:
     term = text.removeprefix("#")
-    named = select(Minibrain.id).where(
-        or_(Minibrain.name.icontains(term, autoescape=True), Minibrain.slug.icontains(term, autoescape=True))
+    named = select(Model.id).where(
+        or_(Model.name.icontains(term, autoescape=True), Model.slug.icontains(term, autoescape=True))
     )
-    matches = [Job.minibrain_id.in_(named), Job.model_id.icontains(term, autoescape=True)]
+    matches = [Job.model_id.in_(named), Job.base_model_id.icontains(term, autoescape=True)]
     if term.isdigit():
         matches.append(Job.id == int(term))
     return or_(*matches)
@@ -83,9 +83,9 @@ def text_match(text: str) -> ColumnElement[bool]:
 
 def conditions(filters: JobFilter, skip: Facet | None = None) -> list[ColumnElement[bool]]:
     where: list[ColumnElement[bool]] = []
-    if filters.minibrains and skip != "minibrain":
-        chosen = select(Minibrain.id).where(Minibrain.slug.in_(filters.minibrains))
-        where.append(Job.minibrain_id.in_(chosen))
+    if filters.models and skip != "model":
+        chosen = select(Model.id).where(Model.slug.in_(filters.models))
+        where.append(Job.model_id.in_(chosen))
     if filters.statuses and skip != "status":
         where.append(Job.status.in_(filters.statuses))
     if filters.kinds:
@@ -116,7 +116,7 @@ def list_jobs(
     where = conditions(filters)
     size = max(1, min(limit, JOB_PAGE_MAX))
     newest = order == "newest"
-    query = select(Job).options(joinedload(Job.minibrain), joinedload(Job.version)).where(*where)
+    query = select(Job).options(joinedload(Job.model), joinedload(Job.version)).where(*where)
     if cursor is not None:
         query = query.where(Job.id < int(cursor) if newest else Job.id > int(cursor))
     query = query.order_by(Job.id.desc() if newest else Job.id.asc()).limit(size + 1)
@@ -133,17 +133,17 @@ def list_jobs(
 @router.get("/jobs/facets", dependencies=[Depends(viewer)])
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
-    by_minibrain = (
-        select(Minibrain.slug, func.count())
+    by_model = (
+        select(Model.slug, func.count())
         .select_from(Job)
-        .join(Minibrain, Job.minibrain_id == Minibrain.id)
-        .where(*conditions(filters, "minibrain"))
-        .group_by(Minibrain.slug)
+        .join(Model, Job.model_id == Model.id)
+        .where(*conditions(filters, "model"))
+        .group_by(Model.slug)
     )
     return JobFacets(
         total=count_jobs(session, conditions(filters)),
         statuses={status: count for status, count in session.execute(by_status)},
-        minibrains={slug: count for slug, count in session.execute(by_minibrain)},
+        models={slug: count for slug, count in session.execute(by_model)},
     )
 
 

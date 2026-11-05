@@ -21,7 +21,7 @@ import {
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { LabelCount } from "~/api/client";
 import { dataKeys } from "~/api/dataQueries";
-import { keys, useModels, useSources } from "~/api/queries";
+import { keys, useAllModels, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { splitTags } from "../models/dialogs";
@@ -38,8 +38,8 @@ export function useDataRefresh() {
             client.invalidateQueries({ queryKey: keys.datasets, exact: true }),
             client.invalidateQueries({ queryKey: keys.sources, exact: true }),
             client.invalidateQueries({ queryKey: dataKeys.datasetFolders }),
-            client.invalidateQueries({ queryKey: keys.models }),
-            client.invalidateQueries({ queryKey: ["minibrain"] }),
+            client.invalidateQueries({ queryKey: keys.allModels }),
+            client.invalidateQueries({ queryKey: ["model"] }),
         ]);
 }
 
@@ -49,7 +49,7 @@ export function useSourceNameProblem(name: string, except?: number): string | nu
 }
 
 export function useModelNames() {
-    const models = useModels();
+    const models = useAllModels();
     const names = new Map((models.data ?? []).map((row) => [row.key, row.name]));
     return (slug: string) => names.get(slug) ?? slug;
 }

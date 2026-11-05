@@ -10,18 +10,18 @@ from minibrain.api.card_export import card_data, digest, export_json, export_mar
 from minibrain.api.card_schemas import ModelCard, ModelCardEdit, ModelCardExport
 from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.auth.identity import current_actor
-from minibrain.registry.models import AuditEvent, Minibrain, Version
-from minibrain.registry.service import get_minibrain, get_version
+from minibrain.registry.models import AuditEvent, Model, Version
+from minibrain.registry.service import get_model, get_version
 from minibrain.settings import Settings
 from minibrain.versions import library_version
 
-router = APIRouter(prefix="/api/minibrains", tags=["model cards"])
+router = APIRouter(prefix="/api/models", tags=["model cards"])
 
 EDITABLE = ("intended_use", "known_limits")
 
 
-def card_of(session: Session, settings: Settings, minibrain: Minibrain, version: Version) -> ModelCard:
-    return build_card(session, settings, minibrain, version, current_actor())
+def card_of(session: Session, settings: Settings, model: Model, version: Version) -> ModelCard:
+    return build_card(session, settings, model, version, current_actor())
 
 
 def exported(card: ModelCard) -> ModelCardExport:
@@ -48,30 +48,30 @@ def edits(version: Version, body: ModelCardEdit) -> dict[str, tuple[str, str]]:
 
 @router.get("/{slug}/versions/{number}/card", dependencies=[Depends(viewer)])
 def read_card(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelCardExport:
-    minibrain = get_minibrain(session, slug)
-    return exported(card_of(session, settings, minibrain, get_version(minibrain, number)))
+    model = get_model(session, slug)
+    return exported(card_of(session, settings, model, get_version(model, number)))
 
 
 @router.get("/{slug}/versions/{number}/card.json", response_class=Response, dependencies=[Depends(viewer)])
 def card_json(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
-    minibrain = get_minibrain(session, slug)
-    card = card_of(session, settings, minibrain, get_version(minibrain, number))
+    model = get_model(session, slug)
+    card = card_of(session, settings, model, get_version(model, number))
     return download(export_json(card_data(card)), "application/json", f"{slug}-v{number}-model-card.json")
 
 
 @router.get("/{slug}/versions/{number}/card.md", response_class=Response, dependencies=[Depends(viewer)])
 def card_markdown(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
-    minibrain = get_minibrain(session, slug)
-    card = card_of(session, settings, minibrain, get_version(minibrain, number))
+    model = get_model(session, slug)
+    card = card_of(session, settings, model, get_version(model, number))
     body = export_markdown(card, digest(card_data(card)))
     return download(body, "text/markdown; charset=utf-8", f"{slug}-v{number}-model-card.md")
 
 
 @router.get("/{slug}/versions/{number}/aibom.json", response_class=Response, dependencies=[Depends(viewer)])
 def aibom_json(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> Response:
-    minibrain = get_minibrain(session, slug)
-    version = get_version(minibrain, number)
-    card = card_of(session, settings, minibrain, version)
+    model = get_model(session, slug)
+    version = get_version(model, number)
+    card = card_of(session, settings, model, version)
     edited = edited_at(session, card.version.id)
     bom = build_aibom(card, adapter_of(session, version), edited, library_version("minibrain") or "unknown")
     return download(export_aibom(bom), MEDIA_TYPE, f"{slug}-v{number}-aibom.cdx.json")
@@ -81,17 +81,17 @@ def aibom_json(slug: str, number: int, session: SessionDep, settings: SettingsDe
 def edit_card(
     slug: str, number: int, body: ModelCardEdit, session: SessionDep, settings: SettingsDep
 ) -> ModelCardExport:
-    minibrain = get_minibrain(session, slug)
-    version = get_version(minibrain, number)
+    model = get_model(session, slug)
+    version = get_version(model, number)
     changed = edits(version, body)
     for field, (_, after) in changed.items():
         setattr(version, field, after or None)
     if changed:
         detail = {
-            "name": minibrain.name,
+            "name": model.name,
             "from": {field: before for field, (before, _) in changed.items()},
             "to": {field: after for field, (_, after) in changed.items()},
         }
         session.add(AuditEvent(actor=current_actor(), action="version.card", target=f"{slug}@{number}", detail=detail))
     session.commit()
-    return exported(card_of(session, settings, minibrain, version))
+    return exported(card_of(session, settings, model, version))

@@ -72,10 +72,10 @@ export function useTrainingPlan(slug: string, snapshot: number | null, choices: 
         ...(snapshot === null ? {} : { snapshot_id: snapshot }),
     };
     return useQuery({
-        queryKey: [...keys.minibrain(slug), "training-plan", query],
+        queryKey: [...keys.model(slug), "training-plan", query],
         queryFn: () =>
             unwrap(
-                api.GET("/api/minibrains/{slug}/training-plan", {
+                api.GET("/api/models/{slug}/training-plan", {
                     params: { path: { slug }, query },
                 }),
             ),

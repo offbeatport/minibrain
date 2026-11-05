@@ -37,7 +37,7 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, Job, Model, ModelStatus, Snapshot, Version
+from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, Job, Snapshot, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -147,9 +147,9 @@ def secret_reference(found: provision.Provided) -> str | None:
 
 def model_store(session: Session, settings: Settings, store: ArtifactStore) -> StoreInfo:
     if not writes_bucket(store) or store.remote is None:
-        used = session.scalar(select(func.sum(Model.size_bytes)).where(*on_main()))
+        used = session.scalar(select(func.sum(BaseModel.size_bytes)).where(*on_main()))
         return folder_store("Model files", models_dir(settings), int(used or 0))
-    used = session.scalar(select(func.sum(Model.size_bytes)).where(*available(), Model.store == BUCKET))
+    used = session.scalar(select(func.sum(BaseModel.size_bytes)).where(*available(), BaseModel.store == BUCKET))
     location = store.remote.describe()
     return StoreInfo(
         name="Model files", kind="s3", location=location, used_bytes=int(used or 0), free_bytes=None, total_bytes=None
@@ -157,11 +157,11 @@ def model_store(session: Session, settings: Settings, store: ArtifactStore) -> S
 
 
 def available() -> tuple[ColumnElement[bool], ...]:
-    return (Model.status == ModelStatus.AVAILABLE,)
+    return (BaseModel.status == BaseModelStatus.AVAILABLE,)
 
 
 def on_main() -> tuple[ColumnElement[bool], ...]:
-    return (*available(), Model.store != BUCKET)
+    return (*available(), BaseModel.store != BUCKET)
 
 
 def storage_settings(session: Session, settings: Settings, store: ArtifactStore) -> StorageSettings:

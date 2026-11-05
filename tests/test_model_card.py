@@ -8,7 +8,7 @@ from minibrain.tasks.graders import LabelAccuracy, grade
 from tests.conftest import LABELS, Harness, fake_adapter, scored_answers
 from tests.test_flow import SLUG, TIMING, create_on_data, store_metrics
 
-CARD = f"/api/minibrains/{SLUG}/versions"
+CARD = f"/api/models/{SLUG}/versions"
 
 
 def examples(count: int) -> list[Example]:
@@ -148,7 +148,7 @@ def test_json_export_is_deterministic_and_carries_the_canonical_hash(harness: Ha
     canonical = json.dumps(envelope["card"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     assert hashlib.sha256(canonical.encode()).hexdigest() == envelope["sha256"] == exported["sha256"]
     assert envelope["card"]["training"]["recipe"]["epochs"] == 2
-    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
+    harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False})
     after = harness.client.get(f"{CARD}/1/card.json").json()
     assert after["sha256"] != envelope["sha256"]
     assert after["card"]["deployments"][-1]["summary"] == "Undeployed v1"

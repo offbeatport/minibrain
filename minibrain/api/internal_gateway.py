@@ -35,7 +35,7 @@ router = APIRouter(prefix="/internal/gateway", tags=["gateway"], dependencies=[D
 class LogBody(BaseModel):
     at: datetime
     key_id: int | None
-    minibrain_id: int | None
+    model_id: int | None
     model: str
     version: int | None
     status: int
@@ -54,7 +54,7 @@ class LogsBody(BaseModel):
 
 
 class FeedbackBody(BaseModel):
-    minibrain_id: int
+    model_id: int
     origin: str
     rating: str
     response_id: str | None = None

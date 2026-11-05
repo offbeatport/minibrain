@@ -357,7 +357,7 @@ def version_values(card: ModelCard) -> Values:
 
 def version_component(card: ModelCard, refs: Refs) -> dict[str, Any]:
     version = card.version
-    card_url = f"/api/minibrains/{quote(version.slug, safe='')}/versions/{version.number}/card.json"
+    card_url = f"/api/models/{quote(version.slug, safe='')}/versions/{version.number}/card.json"
     reference = {"type": "model-card", "url": card_url, "comment": "minibrain model card and validation report"}
     return kept(
         {

@@ -25,7 +25,7 @@ from minibrain.data.snapshot import (
 )
 from minibrain.data.sources import copy_rows, merge_rows
 from minibrain.registry.files import ArtifactKind, store_file, store_for
-from minibrain.registry.models import Artifact, Dataset, Minibrain, Snapshot, Version, now
+from minibrain.registry.models import Artifact, Dataset, Model, Snapshot, Version, now
 from minibrain.registry.service import ConflictError, latest_snapshot, latest_version
 from minibrain.settings import Settings
 from minibrain.tasks.examples import Example, encode_turns
@@ -135,8 +135,8 @@ def plain_copy(settings: Settings, snapshot: Snapshot, target: Path) -> None:
         shutil.copyfileobj(stream, sink)
 
 
-def with_feedback(session: Session, settings: Settings, minibrain: Minibrain, version: Snapshot) -> Snapshot:
-    extra = training_rows(session, minibrain)
+def with_feedback(session: Session, settings: Settings, model: Model, version: Snapshot) -> Snapshot:
+    extra = training_rows(session, model)
     if not extra:
         return version
     settings.work_dir().mkdir(parents=True, exist_ok=True)
@@ -162,14 +162,14 @@ def with_feedback(session: Session, settings: Settings, minibrain: Minibrain, ve
     return found
 
 
-def dataset_version(session: Session, minibrain: Minibrain, snapshot_id: int | None) -> Snapshot:
-    dataset = minibrain.dataset
+def dataset_version(session: Session, model: Model, snapshot_id: int | None) -> Snapshot:
+    dataset = model.dataset
     if snapshot_id is not None:
         found = session.get(Snapshot, snapshot_id)
         if found is None or found.number is None or dataset is None or found.dataset_id != dataset.id:
-            raise ConflictError(f"pick a version of the dataset {minibrain.name} trains on")
+            raise ConflictError(f"pick a version of the dataset {model.name} trains on")
         return found
-    found = latest_snapshot(minibrain)
+    found = latest_snapshot(model)
     if found is not None:
         return found
     if dataset is None:
@@ -177,10 +177,8 @@ def dataset_version(session: Session, minibrain: Minibrain, snapshot_id: int | N
     raise ConflictError(f"{dataset.name} has no saved version yet; update it on the Data page first")
 
 
-def training_snapshot(
-    session: Session, settings: Settings, minibrain: Minibrain, snapshot_id: int | None = None
-) -> Snapshot:
-    return with_feedback(session, settings, minibrain, dataset_version(session, minibrain, snapshot_id))
+def training_snapshot(session: Session, settings: Settings, model: Model, snapshot_id: int | None = None) -> Snapshot:
+    return with_feedback(session, settings, model, dataset_version(session, model, snapshot_id))
 
 
 def require_splits(snapshot: Snapshot) -> None:

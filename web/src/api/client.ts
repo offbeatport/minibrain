@@ -3,8 +3,8 @@ import type { components, paths } from "./schema";
 
 type Schemas = components["schemas"];
 
-export type MinibrainSummary = Schemas["MinibrainSummary"];
-export type MinibrainDetail = Schemas["MinibrainDetail"];
+export type ModelSummary = Schemas["ModelSummary"];
+export type ModelDetail = Schemas["ModelDetail"];
 export type VersionInfo = Schemas["VersionInfo"];
 export type JobInfo = Schemas["JobInfo"];
 export type PreviewResponse = Schemas["PreviewResponse"];
@@ -166,10 +166,10 @@ export async function removed(request: Promise<Outcome<unknown>>): Promise<void>
     }
 }
 
-export async function uploadSource(slug: string, file: File): Promise<MinibrainDetail> {
+export async function uploadSource(slug: string, file: File): Promise<ModelDetail> {
     const form = new FormData();
     form.append("file", file);
-    const response = await apiFetch(`/api/minibrains/${encodeURIComponent(slug)}/source`, {
+    const response = await apiFetch(`/api/models/${encodeURIComponent(slug)}/source`, {
         method: "POST",
         body: form,
     });
@@ -177,7 +177,7 @@ export async function uploadSource(slug: string, file: File): Promise<MinibrainD
     if (!response.ok) {
         throw new Error(describeError(body, response.status));
     }
-    return body as MinibrainDetail;
+    return body as ModelDetail;
 }
 
 function isNameTaken(body: unknown): body is NameTakenInfo {

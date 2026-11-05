@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.registry.models import ApiKey, Minibrain, RequestLog
+from minibrain.registry.models import ApiKey, Model, RequestLog
 
 FLUSH_SECONDS = 2.0
 MAX_BUFFERED = 10_000
@@ -19,7 +19,7 @@ log = logging.getLogger("minibrain.gateway")
 class LogEntry:
     at: datetime
     key_id: int | None
-    minibrain_id: int | None
+    model_id: int | None
     model: str
     version: int | None
     status: int
@@ -78,12 +78,12 @@ class LogBuffer:
 def existing(session: Session, batch: list[LogEntry]) -> Callable[[LogEntry], LogEntry]:
     def keep(entry: LogEntry) -> LogEntry:
         key_id = entry.key_id if entry.key_id in keys else None
-        minibrain_id = entry.minibrain_id if entry.minibrain_id in minibrains else None
-        return replace(entry, key_id=key_id, minibrain_id=minibrain_id)
+        model_id = entry.model_id if entry.model_id in models else None
+        return replace(entry, key_id=key_id, model_id=model_id)
 
     keys = set(session.scalars(select(ApiKey.id).where(ApiKey.id.in_({e.key_id for e in batch if e.key_id}))))
-    wanted = {entry.minibrain_id for entry in batch if entry.minibrain_id}
-    minibrains = set(session.scalars(select(Minibrain.id).where(Minibrain.id.in_(wanted))))
+    wanted = {entry.model_id for entry in batch if entry.model_id}
+    models = set(session.scalars(select(Model.id).where(Model.id.in_(wanted))))
     return keep
 
 

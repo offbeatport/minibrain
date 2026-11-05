@@ -9,15 +9,15 @@ from minibrain.models.health import apply_check, apply_repair, set_health
 from minibrain.models.registry import apply_catalogue
 from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import (
+    BaseModel,
+    BaseModelStatus,
     CatalogModel,
     CatalogVariant,
     Job,
     JobKind,
     JobStatus,
     JudgeScore,
-    Minibrain,
     Model,
-    ModelStatus,
     Version,
     VersionKind,
     VersionStatus,
@@ -55,9 +55,9 @@ class DomainEffects:
             job.version.status = VersionStatus.FAILED
         if job.version is not None and job.kind == JobKind.JUDGE:
             job.version.status = VersionStatus.READY
-        model = session.get(Model, job.model_id) if job.model_id else None
+        model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is not None and job.kind in TRANSFERS:
-            model.status = ModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else ModelStatus.FAILED
+            model.status = BaseModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else BaseModelStatus.FAILED
             model.error = job.error
             model.updated_at = now()
         if model is not None and job.kind in (JobKind.REPAIR, JobKind.VERIFY):
@@ -65,9 +65,9 @@ class DomainEffects:
             model.updated_at = now()
 
     def on_retry(self, session: Session, job: Job) -> None:
-        model = session.get(Model, job.model_id) if job.model_id else None
+        model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is not None and job.kind in TRANSFERS:
-            model.status = ModelStatus.DOWNLOADING if job.kind == JobKind.DOWNLOAD else ModelStatus.IMPORTING
+            model.status = BaseModelStatus.DOWNLOADING if job.kind == JobKind.DOWNLOAD else BaseModelStatus.IMPORTING
             model.error = None
             model.updated_at = now()
         if job.version is None:
@@ -78,7 +78,7 @@ class DomainEffects:
             job.version.status = VersionStatus.EVALUATING
 
     def transferred(self, session: Session, job: Job) -> None:
-        model = session.get(Model, job.model_id) if job.model_id else None
+        model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is None:
             return
         result = job.result or {}
@@ -91,7 +91,7 @@ class DomainEffects:
                 apply_catalogue(model, entry, variant)
         model.verified = job.kind == JobKind.DOWNLOAD or variant is not None
         model.store = str(job.params.get("store") or FOLDER)
-        model.status = ModelStatus.AVAILABLE
+        model.status = BaseModelStatus.AVAILABLE
         model.error = None
         model.verified_at = now()
         model.last_used_at = now()
@@ -101,9 +101,9 @@ class DomainEffects:
     def score_waiting(self, session: Session, base: str) -> None:
         waiting = session.scalars(
             select(Version)
-            .join(Minibrain)
+            .join(Model)
             .where(
-                Minibrain.base_model == base,
+                Model.base_model == base,
                 Version.kind == VersionKind.PROMPT,
                 Version.status == VersionStatus.READY,
                 Version.metrics.is_(None),
@@ -116,22 +116,22 @@ class DomainEffects:
             version.status = VersionStatus.EVALUATING
             session.flush()
             params = eval_params(session, self.settings, version)
-            enqueue(session, JobKind.EVAL, params, version.minibrain_id, version.id, f"eval:{version.id}")
+            enqueue(session, JobKind.EVAL, params, version.model_id, version.id, f"eval:{version.id}")
 
     def verified(self, session: Session, job: Job) -> None:
-        model = session.get(Model, job.model_id) if job.model_id else None
+        model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is None:
             return
         apply_check(model, list((job.result or {}).get("files", [])))
         model.error = None
 
     def repaired(self, session: Session, job: Job) -> None:
-        model = session.get(Model, job.model_id) if job.model_id else None
+        model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is None:
             return
         apply_repair(model, list((job.result or {}).get("files", [])))
         model.store = str(job.params.get("store") or model.store)
-        model.status = ModelStatus.AVAILABLE
+        model.status = BaseModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()
 
@@ -148,7 +148,7 @@ class DomainEffects:
             session,
             JobKind.EVAL,
             eval_params(session, self.settings, version),
-            minibrain_id=version.minibrain_id,
+            model_id=version.model_id,
             version_id=version.id,
             idempotency_key=f"eval:{version.id}",
         )
@@ -173,7 +173,7 @@ class DomainEffects:
             return
         unique = list({item.key: item for item in items}.values())
         params = judge_params(session, self.settings, version, judge, unique) | {"eval_job": job.id}
-        enqueue(session, JobKind.JUDGE, params, version.minibrain_id, version.id, f"judge:{version.id}:{job.id}")
+        enqueue(session, JobKind.JUDGE, params, version.model_id, version.id, f"judge:{version.id}:{job.id}")
 
     def judged(self, session: Session, job: Job) -> None:
         version = job.version

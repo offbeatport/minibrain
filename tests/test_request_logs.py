@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from minibrain.gateway.logs import LogEntry, database_sink
-from minibrain.registry.models import ApiKey, Minibrain, RequestLog, now
+from minibrain.registry.models import ApiKey, Model, RequestLog, now
 from tests.conftest import Harness
 from tests.test_access import team_of
 from tests.test_feedback import chat, send
@@ -27,14 +27,14 @@ def ids_of(page: dict[str, Any]) -> list[int]:
 
 def owners(harness: Harness) -> tuple[int, int]:
     with harness.sessions() as session:
-        minibrain = session.scalars(select(Minibrain.id).where(Minibrain.slug == SLUG)).one()
+        model = session.scalars(select(Model.id).where(Model.slug == SLUG)).one()
         key = session.scalars(select(ApiKey.id).where(ApiKey.name == "ci")).one()
-        return minibrain, key
+        return model, key
 
 
 def seed(harness: Harness, *entries: dict[str, Any]) -> list[int]:
-    minibrain, key = owners(harness)
-    defaults = {"at": now(), "key_id": key, "minibrain_id": minibrain, "model": SLUG, "version": 0}
+    model, key = owners(harness)
+    defaults = {"at": now(), "key_id": key, "model_id": model, "model": SLUG, "version": 0}
     defaults |= {"status": 200, "latency_ms": 100.0, "prompt_tokens": 12, "completion_tokens": 2}
     database_sink(harness.sessions)([LogEntry(**(defaults | entry)) for entry in entries])
     with harness.sessions() as session:
@@ -67,9 +67,9 @@ def test_filters_narrow_the_list_and_facets_skip_their_own(harness: Harness) -> 
         {"at": moment - timedelta(hours=2), "response_id": RESPONSE},
         {"at": moment - timedelta(minutes=10), "version": 1, "response_id": "chatcmpl-" + "cd" * 16},
         {"at": moment - timedelta(minutes=5), "version": 1, "key_id": batch, "status": 422},
-        {"at": moment - timedelta(minutes=1), "minibrain_id": None, "model": "nope", "version": None, "status": 404}
+        {"at": moment - timedelta(minutes=1), "model_id": None, "model": "nope", "version": None, "status": 404}
         | {"key_id": batch},
-        {"at": moment - timedelta(days=3), "minibrain_id": None, "model": "base-x", "version": None, "status": 503},
+        {"at": moment - timedelta(days=3), "model_id": None, "model": "base-x", "version": None, "status": 503},
     )
     client = harness.client
     assert ids_of(listed(client, model=SLUG)) == [c, b, a]
@@ -131,7 +131,7 @@ def test_the_gateway_records_finish_reasons(harness: Harness) -> None:
     items = listed(harness.client)["items"]
     assert [(item["status"], item["finish_reason"]) for item in items] == [(404, None), (200, "length"), (200, "stop")]
     assert items[0]["response_id"] is None and items[1]["response_id"].startswith("chatcmpl-")
-    entry = {"at": now().isoformat(), "key_id": None, "minibrain_id": None, "model": "remote", "version": None}
+    entry = {"at": now().isoformat(), "key_id": None, "model_id": None, "model": "remote", "version": None}
     entry |= {"status": 200, "latency_ms": 5.0, "finish_reason": "stop"}
     shipped = harness.client.post("/internal/gateway/logs", json={"entries": [entry]}, headers=harness.gateway_headers)
     assert shipped.status_code == 204
@@ -142,7 +142,7 @@ def test_the_gateway_records_finish_reasons(harness: Harness) -> None:
 def test_bodies_need_the_builder_role_and_feedback_is_linked(harness: Harness) -> None:
     headers = servable(harness)
     secret = headers["Authorization"].removeprefix("Bearer ")
-    assert harness.client.put(f"/api/minibrains/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
+    assert harness.client.put(f"/api/models/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
     response_id = chat(harness, headers)
     sent = send(harness, headers, response_id=response_id, rating="down", correction="bug", comment="double charge")
     assert sent.status_code == 201, sent.text

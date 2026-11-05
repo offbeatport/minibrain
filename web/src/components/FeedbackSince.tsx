@@ -33,7 +33,7 @@ export function FeedbackSince({ slug }: { slug: string }) {
     const train = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/minibrains/{slug}/versions", {
+                api.POST("/api/models/{slug}/versions", {
                     params: { path: { slug } },
                     body: { kind: "lora", ...lastRecipe(versions.data ?? []) },
                 }),

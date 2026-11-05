@@ -9,9 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import pydantic
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
-from pydantic import BaseModel
 from sqlalchemy import func, make_url, select
 from sqlalchemy.orm import Session
 
@@ -29,7 +29,7 @@ from minibrain.policy import load as load_policy
 from minibrain.recent_logs import RECENT
 from minibrain.redaction import redact, scrub, secret_name
 from minibrain.registry.compute import NODE_FRESH, pools
-from minibrain.registry.models import CatalogModel, Job, JobStatus, Model, Node, now
+from minibrain.registry.models import BaseModel, CatalogModel, Job, JobStatus, Node, now
 from minibrain.registry.settings_store import read
 from minibrain.settings import REPO_ROOT, Settings
 from minibrain.siem import target_of
@@ -46,7 +46,7 @@ ENVIRONMENT_PREFIXES = ("MINIBRAIN_", "HF_", "HUGGING_FACE_", "AWS_")
 RECENT_FAILURES = 20
 
 
-class InstallSoftware(BaseModel):
+class InstallSoftware(pydantic.BaseModel):
     minibrain: str
     commit: str | None
     python: str
@@ -57,7 +57,7 @@ class InstallSoftware(BaseModel):
     arch: str
 
 
-class InstallPlaces(BaseModel):
+class InstallPlaces(pydantic.BaseModel):
     host: str
     home: str
     database_kind: Literal["sqlite", "postgres"]
@@ -73,7 +73,7 @@ class InstallPlaces(BaseModel):
     web_bundle: str | None
 
 
-class InstallCatalogue(BaseModel):
+class InstallCatalogue(pydantic.BaseModel):
     snapshot: str | None
     bundled_snapshot: str
     source: str
@@ -83,7 +83,7 @@ class InstallCatalogue(BaseModel):
     models_verified_at: datetime | None
 
 
-class InstallCompute(BaseModel):
+class InstallCompute(pydantic.BaseModel):
     pools: int
     machines: int
     machines_online: int
@@ -91,14 +91,14 @@ class InstallCompute(BaseModel):
     engines_online: int
 
 
-class InstallEndpoint(BaseModel):
+class InstallEndpoint(pydantic.BaseModel):
     name: str
     url: str
     allowed: bool
     by_policy: bool
 
 
-class InstallNetwork(BaseModel):
+class InstallNetwork(pydantic.BaseModel):
     mode: Literal["open", "allowlist", "offline"]
     locked: bool
     source: str
@@ -106,7 +106,7 @@ class InstallNetwork(BaseModel):
     endpoints: list[InstallEndpoint]
 
 
-class InstallObservability(BaseModel):
+class InstallObservability(pydantic.BaseModel):
     otlp: bool
     metrics: bool
     metrics_token: bool
@@ -114,7 +114,7 @@ class InstallObservability(BaseModel):
     log_format: Literal["text", "json"]
 
 
-class InstallInfo(BaseModel):
+class InstallInfo(pydantic.BaseModel):
     software: InstallSoftware
     places: InstallPlaces
     catalogue: InstallCatalogue
@@ -213,8 +213,8 @@ def catalogue(session: Session) -> InstallCatalogue:
         source=shipped.get("source", ""),
         entries=int(session.scalar(select(func.count(CatalogModel.id))) or 0),
         synced_at=session.scalar(select(func.max(CatalogModel.synced_at))),
-        models=int(session.scalar(select(func.count(Model.id))) or 0),
-        models_verified_at=session.scalar(select(func.max(Model.verified_at))),
+        models=int(session.scalar(select(func.count(BaseModel.id))) or 0),
+        models_verified_at=session.scalar(select(func.max(BaseModel.verified_at))),
     )
 
 

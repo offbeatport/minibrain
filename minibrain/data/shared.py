@@ -48,7 +48,7 @@ from minibrain.data.templates import (
     template_sql,
 )
 from minibrain.registry.files import ArtifactKind, register
-from minibrain.registry.models import Artifact, Dataset, DatasetFolder, Minibrain, Snapshot, Source, Version, now
+from minibrain.registry.models import Artifact, Dataset, DatasetFolder, Model, Snapshot, Source, Version, now
 from minibrain.registry.service import ConflictError, NameTakenError, NotFoundError, slugify
 from minibrain.settings import Settings
 
@@ -452,10 +452,10 @@ def sources_in(session: Session, sql: str, fallback: Sequence[Source] = ()) -> l
     return sorted(found, key=lambda source: source.table_name)
 
 
-def dataset_of(minibrain: Minibrain) -> Dataset:
-    if minibrain.dataset is None:
+def dataset_of(model: Model) -> Dataset:
+    if model.dataset is None:
         raise ConflictError("upload a data file or pick a dataset first")
-    return minibrain.dataset
+    return model.dataset
 
 
 def dataset_sql(dataset: Dataset) -> str:

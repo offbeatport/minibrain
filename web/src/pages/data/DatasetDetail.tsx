@@ -14,10 +14,10 @@ import { useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
 import {
     keys,
+    useAllModels,
     useDataset,
     useDatasetPreview,
     useDatasets,
-    useModels,
     useSources,
 } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
@@ -193,7 +193,7 @@ export function CreateDataset({
 
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const refresh = useDataRefresh();
-    const models = useModels();
+    const models = useAllModels();
     const nameOf = useModelNames();
     const candidates = (models.data ?? []).filter(
         (row) => row.kind === "custom" && !dataset.models.includes(row.key),
@@ -201,7 +201,7 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const assign = useMutation({
         mutationFn: (slug: string) =>
             unwrap(
-                api.PUT("/api/minibrains/{slug}/dataset", {
+                api.PUT("/api/models/{slug}/dataset", {
                     params: { path: { slug } },
                     body: { dataset: dataset.slug },
                 }),

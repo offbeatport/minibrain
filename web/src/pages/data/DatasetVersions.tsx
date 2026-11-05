@@ -55,7 +55,7 @@ export function useVersionRefresh(slug: string) {
             client.invalidateQueries({ queryKey: dataKeys.snapshots(slug) }),
             client.invalidateQueries({ queryKey: keys.dataset(slug) }),
             client.invalidateQueries({ queryKey: keys.datasets, exact: true }),
-            client.invalidateQueries({ queryKey: ["minibrain"] }),
+            client.invalidateQueries({ queryKey: ["model"] }),
             client.invalidateQueries({ queryKey: ["infrastructure"] }),
         ]);
 }

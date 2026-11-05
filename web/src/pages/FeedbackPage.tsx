@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { Badge, Button, CheckboxSelect, DataGrid, EmptyState, Link, SearchInput } from "obp-ui";
 import { useMemo } from "react";
 import { type FeedbackInfo, useFeedbackFacets, useFeedbackList } from "~/api/feedbackQueries";
-import { useMinibrains } from "~/api/queries";
+import { useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
@@ -137,7 +137,7 @@ function itemId(value: string | undefined): number | null {
 
 export function FeedbackPage() {
     const { search, update, open } = useListSearch(FEEDBACK_PATH, KEYS);
-    const minibrains = useMinibrains();
+    const owned = useModels();
     const models = splitList(search.model);
     const statuses = splitList(search.status);
     const assignees = splitList(search.assignee);
@@ -158,10 +158,10 @@ export function FeedbackPage() {
     const clear = () => update({ model: "", status: "", assignee: "", q: "" });
     const show = (id: number | null) =>
         id === null ? update({ item: "" }) : open({ item: String(id) });
-    const modelOptions = (minibrains.data ?? []).map((item) => ({
+    const modelOptions = (owned.data ?? []).map((item) => ({
         value: item.slug,
         label: item.name,
-        count: facets.data?.minibrains[item.slug] ?? 0,
+        count: facets.data?.models[item.slug] ?? 0,
     }));
     const statusOptions = FEEDBACK_STATUSES.map((status) => ({
         value: status,

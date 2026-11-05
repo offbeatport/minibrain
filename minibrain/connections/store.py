@@ -18,7 +18,7 @@ from minibrain.connections.spec import (
 from minibrain.connections.vault import VaultError, seal, unseal
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
-from minibrain.registry.models import AuditEvent, Connection, Model, now
+from minibrain.registry.models import AuditEvent, BaseModel, Connection, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 
@@ -229,6 +229,6 @@ def delete_connection(session: Session, connection: Connection, actor: str) -> N
         names = ", ".join(source.name for source in connection.sources)
         raise ConflictError(f"{connection.name} is used by {names}; delete those sources first")
     audit(session, actor, "connection.delete", connection)
-    for model in session.scalars(select(Model).where(Model.connection_id == connection.id)):
+    for model in session.scalars(select(BaseModel).where(BaseModel.connection_id == connection.id)):
         model.connection_id = None
     session.delete(connection)

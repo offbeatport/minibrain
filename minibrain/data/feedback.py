@@ -7,7 +7,7 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.policy import load as load_policy
-from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Minibrain, RequestLog, now
+from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Model, RequestLog, now
 from minibrain.tasks.examples import Example, single
 
 UP = "up"
@@ -27,7 +27,7 @@ class FeedbackError(Exception):
 
 @dataclass(frozen=True)
 class Submission:
-    minibrain_id: int
+    model_id: int
     origin: str
     rating: str
     response_id: str | None = None
@@ -77,10 +77,10 @@ def signal(item: Feedback, verdicts: set[Verdict]) -> int:
     return UNSURE if item.rating == DOWN and not item.correction else 0
 
 
-def refresh_group(session: Session, minibrain_id: int, key: str) -> None:
+def refresh_group(session: Session, model_id: int, key: str) -> None:
     session.flush()
     query = select(Feedback).where(
-        Feedback.minibrain_id == minibrain_id,
+        Feedback.model_id == model_id,
         Feedback.input_key == key,
         Feedback.status != FeedbackStatus.REJECTED,
     )
@@ -91,24 +91,24 @@ def refresh_group(session: Session, minibrain_id: int, key: str) -> None:
         item.priority = 1 + signal(item, verdicts) if pending else REVIEWED_PRIORITY
 
 
-def logged_request(session: Session, minibrain_id: int, response_id: str | None) -> RequestLog | None:
+def logged_request(session: Session, model_id: int, response_id: str | None) -> RequestLog | None:
     if not response_id:
         return None
-    query = select(RequestLog).where(RequestLog.response_id == response_id, RequestLog.minibrain_id == minibrain_id)
+    query = select(RequestLog).where(RequestLog.response_id == response_id, RequestLog.model_id == model_id)
     return session.scalar(query.order_by(RequestLog.id.desc()).limit(1))
 
 
-def missing_input(session: Session, minibrain_id: int, response_id: str | None) -> str:
-    minibrain = session.get(Minibrain, minibrain_id)
+def missing_input(session: Session, model_id: int, response_id: str | None) -> str:
+    model = session.get(Model, model_id)
     policy = load_policy(session)
-    if minibrain is not None and not policy.keeps_bodies(minibrain.request_bodies):
+    if model is not None and not policy.keeps_bodies(model.request_bodies):
         where = (
             "locked off for every model under Settings, Security"
             if policy["request_bodies_locked"]
-            else f"turn it on under Deployments, {minibrain.name}"
+            else f"turn it on under Deployments, {model.name}"
         )
         return (
-            f"Send input with the feedback: {minibrain.name} does not keep request inputs and answers "
+            f"Send input with the feedback: {model.name} does not keep request inputs and answers "
             f"(Keep request inputs and answers: {where})."
         )
     return f"Send input with the feedback: no kept request has the response ID {response_id or '(none)'}."
@@ -118,7 +118,7 @@ def open_feedback(session: Session, submission: Submission) -> Feedback | None:
     if not submission.response_id:
         return None
     query = select(Feedback).where(
-        Feedback.minibrain_id == submission.minibrain_id,
+        Feedback.model_id == submission.model_id,
         Feedback.response_id == submission.response_id,
         Feedback.status == FeedbackStatus.PENDING,
     )
@@ -126,17 +126,17 @@ def open_feedback(session: Session, submission: Submission) -> Feedback | None:
 
 
 def record(session: Session, submission: Submission) -> Feedback:
-    log = logged_request(session, submission.minibrain_id, submission.response_id)
+    log = logged_request(session, submission.model_id, submission.response_id)
     text = cleaned(submission.input) or (cleaned(log.input) if log else None)
     if text is None:
-        raise FeedbackError(missing_input(session, submission.minibrain_id, submission.response_id))
+        raise FeedbackError(missing_input(session, submission.model_id, submission.response_id))
     correction = cleaned(submission.correction)
     if submission.rating == UP and correction:
         raise FeedbackError("A correction goes with a thumbs-down: send rating down with the right answer.")
     item = open_feedback(session, submission)
     before = item.input_key if item else None
     if item is None:
-        item = Feedback(minibrain_id=submission.minibrain_id, origin=submission.origin)
+        item = Feedback(model_id=submission.model_id, origin=submission.origin)
         session.add(item)
     item.response_id = submission.response_id
     item.version = log.version if log is not None else submission.version
@@ -149,9 +149,9 @@ def record(session: Session, submission: Submission) -> Feedback:
     item.comment = cleaned(submission.comment)
     item.status = FeedbackStatus.PENDING
     item.updated_at = now()
-    refresh_group(session, submission.minibrain_id, item.input_key)
+    refresh_group(session, submission.model_id, item.input_key)
     if before is not None and before != item.input_key:
-        refresh_group(session, submission.minibrain_id, before)
+        refresh_group(session, submission.model_id, before)
     return item
 
 
@@ -166,12 +166,12 @@ def database_feedback(sessions: sessionmaker[Session]) -> Callable[[Submission],
 
 
 def target_of(item: Feedback) -> str:
-    return f"{item.minibrain.slug}/feedback/{item.id}"
+    return f"{item.model.slug}/feedback/{item.id}"
 
 
 def audit(session: Session, item: Feedback, actor: str, action: str, detail: dict) -> None:
     session.add(
-        AuditEvent(actor=actor, action=action, target=target_of(item), detail={"name": item.minibrain.name} | detail)
+        AuditEvent(actor=actor, action=action, target=target_of(item), detail={"name": item.model.name} | detail)
     )
 
 
@@ -195,7 +195,7 @@ def review(session: Session, item: Feedback, accept: bool, label: str | None, ac
     item.reviewed_at = moment
     item.updated_at = moment
     audit(session, item, actor, action, {"from": before, "status": item.status, "label": item.label})
-    refresh_group(session, item.minibrain_id, item.input_key)
+    refresh_group(session, item.model_id, item.input_key)
     return item
 
 
@@ -210,7 +210,7 @@ def assign(session: Session, item: Feedback, mine: bool, actor: str) -> Feedback
 
 def related(session: Session, item: Feedback) -> list[Feedback]:
     query = select(Feedback).where(
-        Feedback.minibrain_id == item.minibrain_id,
+        Feedback.model_id == item.model_id,
         Feedback.input_key == item.input_key,
         Feedback.id != item.id,
     )
@@ -221,10 +221,10 @@ def count(session: Session, where: list[ColumnElement[bool]]) -> int:
     return session.scalar(select(func.count()).select_from(Feedback).where(*where)) or 0
 
 
-def summary(session: Session, minibrain: Minibrain) -> Summary:
-    newest = max(minibrain.versions, key=lambda version: version.number, default=None)
+def summary(session: Session, model: Model) -> Summary:
+    newest = max(model.versions, key=lambda version: version.number, default=None)
     since = newest.created_at if newest is not None else None
-    mine = Feedback.minibrain_id == minibrain.id
+    mine = Feedback.model_id == model.id
     accepted = Feedback.status == FeedbackStatus.ACCEPTED
     recent = [mine] if since is None else [mine, Feedback.created_at > since]
     return Summary(
@@ -233,15 +233,15 @@ def summary(session: Session, minibrain: Minibrain) -> Summary:
         total=count(session, recent),
         accepted=count(session, [*recent, accepted]),
         pending=count(session, [mine, Feedback.status == FeedbackStatus.PENDING]),
-        rows=len(training_rows(session, minibrain)),
+        rows=len(training_rows(session, model)),
     )
 
 
-def training_rows(session: Session, minibrain: Minibrain) -> list[Example]:
+def training_rows(session: Session, model: Model) -> list[Example]:
     query = (
         select(Feedback)
         .where(
-            Feedback.minibrain_id == minibrain.id,
+            Feedback.model_id == model.id,
             Feedback.status == FeedbackStatus.ACCEPTED,
             Feedback.label.is_not(None),
         )

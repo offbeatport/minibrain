@@ -30,13 +30,13 @@ export function setDeployed(row: ModelRow, deployed: boolean) {
     const body = { deployed };
     return row.kind === "base"
         ? unwrap(
-              api.POST("/api/models/base/{key}/deploy", {
+              api.POST("/api/base-models/{key}/deploy", {
                   params: { path: { key: row.key } },
                   body,
               }),
           )
         : unwrap(
-              api.POST("/api/minibrains/{slug}/deploy", {
+              api.POST("/api/models/{slug}/deploy", {
                   params: { path: { slug: row.key } },
                   body,
               }),
@@ -49,7 +49,7 @@ export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
     const undeploy = options.undeploy ?? false;
     return row.kind === "base"
         ? unwrap(
-              api.DELETE("/api/models/base/{key}", {
+              api.DELETE("/api/base-models/{key}", {
                   params: {
                       path: { key: row.key },
                       query: { cascade: options.cascade ?? false, undeploy },
@@ -57,7 +57,7 @@ export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
               }),
           )
         : unwrap(
-              api.DELETE("/api/minibrains/{slug}", {
+              api.DELETE("/api/models/{slug}", {
                   params: { path: { slug: row.key }, query: { undeploy } },
               }),
           );

@@ -72,7 +72,7 @@ const TONES: Record<string, Tone> = {
 };
 
 function subject(job: JobInfo): string {
-    const name = job.minibrain_name ?? job.model ?? "Install";
+    const name = job.model_name ?? job.base_model ?? "Install";
     return job.version === null || job.version === undefined ? name : `${name} · v${job.version}`;
 }
 

@@ -22,7 +22,7 @@ import {
 } from "obp-ui";
 import { useEffect, useMemo, useState } from "react";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, succeed, unwrap } from "~/api/client";
-import { keys, useKeys, useModels } from "~/api/queries";
+import { keys, useAllModels, useKeys } from "~/api/queries";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
@@ -37,7 +37,7 @@ function refOf(id: string): ModelRef {
 }
 
 function useChoices(): Choice[] {
-    const { data } = useModels();
+    const { data } = useAllModels();
     return useMemo(
         () =>
             (data ?? [])
@@ -52,7 +52,7 @@ function useRefreshKeys() {
     return () =>
         Promise.all([
             client.invalidateQueries({ queryKey: keys.apiKeys }),
-            client.invalidateQueries({ queryKey: keys.models }),
+            client.invalidateQueries({ queryKey: keys.allModels }),
         ]);
 }
 

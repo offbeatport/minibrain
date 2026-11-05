@@ -71,7 +71,7 @@ class InstructionsUpdate(BaseModel):
     instructions: str = Field(max_length=8000)
 
 
-class MinibrainCreate(BaseModel):
+class ModelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=280)
     tags: list[str] = Field(default_factory=list)
@@ -389,9 +389,9 @@ class SnapshotUsage(BaseModel):
 
 class JobInfo(BaseModel):
     id: int
-    minibrain: str | None
-    minibrain_name: str | None
-    model: str | None = None
+    model: str | None
+    model_name: str | None
+    base_model: str | None = None
     version: int | None
     kind: str
     status: str
@@ -416,7 +416,7 @@ class JobPage(BaseModel):
 class JobFacets(BaseModel):
     total: int
     statuses: dict[str, int]
-    minibrains: dict[str, int]
+    models: dict[str, int]
 
 
 class AttemptInfo(BaseModel):
@@ -555,7 +555,7 @@ class TeardownInfo(BaseModel):
     undeploy: bool = False
 
 
-class MinibrainSummary(BaseModel):
+class ModelSummary(BaseModel):
     slug: str
     name: str
     preset: str
@@ -578,7 +578,7 @@ class RequestBodiesUpdate(BaseModel):
     kept: bool
 
 
-class MinibrainDetail(MinibrainSummary):
+class ModelDetail(ModelSummary):
     source: SourceInfo | None
     mapping: MappingInfo
     dataset: str | None = None
@@ -595,7 +595,7 @@ class MinibrainDetail(MinibrainSummary):
     promotion: PromotionInfo
 
 
-class SampleDetail(MinibrainDetail):
+class SampleDetail(ModelDetail):
     base_name: str
     download_bytes: int | None
 

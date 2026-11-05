@@ -19,10 +19,10 @@ def two_models(harness: Harness, tmp_path: Path) -> None:
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     harness.client.post(
-        "/api/models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
+        "/api/base-models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
     )
     harness.worker(kinds=["import"]).run_once()
-    assert harness.client.post("/api/models/base/base-one/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/base-models/base-one/deploy", json={"deployed": True}).status_code == 200
     create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
@@ -68,8 +68,8 @@ def test_deleting_a_model_keeps_keys_that_cover_others(harness: Harness, tmp_pat
     two_models(harness, tmp_path)
     add_key(harness, CUSTOM, name="only-custom")
     add_key(harness, CUSTOM, BASE, name="both")
-    harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
-    assert harness.client.delete(f"/api/minibrains/{SLUG}").status_code == 202
+    harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False})
+    assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
     harness.settle()
     keys = harness.client.get("/api/keys").json()
     assert [(key["name"], [model["key"] for model in key["models"]]) for key in keys] == [("both", ["base-one"])]

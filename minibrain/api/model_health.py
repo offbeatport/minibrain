@@ -24,13 +24,13 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.compute import pools
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    BaseModel,
+    BaseModelStatus,
     CatalogVariant,
     Job,
     JobKind,
     JobStatus,
-    Minibrain,
     Model,
-    ModelStatus,
     Version,
     VersionKind,
 )
@@ -75,16 +75,16 @@ def act(kind: HealthActionKind, label: str | None = None) -> HealthAction:
     return HealthAction(kind=kind, label=label or LABELS[kind])
 
 
-def repairable(model: Model, context: HealthContext) -> bool:
+def repairable(model: BaseModel, context: HealthContext) -> bool:
     return context.hub_ok and bool(model.repo and model.revision and model.files)
 
 
-def complete_files(model: Model, context: HealthContext) -> int:
+def complete_files(model: BaseModel, context: HealthContext) -> int:
     problems = missing_files(context.settings, model)
     return len(model.files) - len(problems)
 
 
-def noun(job: Job | None, model: Model) -> str:
+def noun(job: Job | None, model: BaseModel) -> str:
     if job is None:
         return "Download" if model.source == "download" else "Import"
     if job.kind == JobKind.REPAIR:
@@ -92,31 +92,31 @@ def noun(job: Job | None, model: Model) -> str:
     return "Download" if job.kind == JobKind.DOWNLOAD else "Import"
 
 
-def stopped(model: Model, job: Job | None, context: HealthContext) -> Health:
+def stopped(model: BaseModel, job: Job | None, context: HealthContext) -> Health:
     cancelled = job is not None and job.status == JobStatus.CANCELLED
     what = noun(job, model)
     error = (job.error if job else None) or model.error
     detail = "It was cancelled before it finished." if cancelled else f"{error or 'It stopped without a message'}."
     done = complete_files(model, context) if job is None or job.kind != JobKind.IMPORT else 0
-    resumable = done > 0 and model.status != ModelStatus.AVAILABLE
+    resumable = done > 0 and model.status != BaseModelStatus.AVAILABLE
     if resumable:
         detail += f" {done} of {len(model.files)} files are complete and kept; resuming fetches only the rest."
     else:
         detail += " Try again; files already complete are kept."
     actions = [act("resume", "Resume" if resumable or cancelled else "Retry")]
-    if model.status == ModelStatus.AVAILABLE and what == "Repair":
+    if model.status == BaseModelStatus.AVAILABLE and what == "Repair":
         actions.append(act("reimport"))
-    if model.status != ModelStatus.AVAILABLE:
+    if model.status != BaseModelStatus.AVAILABLE:
         actions.append(act("remove"))
     label = f"{what} {'cancelled' if cancelled else 'failed'}"
     return Health(state="download_failed", label=label, detail=detail, actions=actions)
 
 
-def transfer_failure(model: Model, job: Job | None, context: HealthContext) -> Health | None:
+def transfer_failure(model: BaseModel, job: Job | None, context: HealthContext) -> Health | None:
     if job is None or job.kind not in TRANSFER_KINDS or job.status not in STOPPED:
         return None
     message = job.error or ""
-    installed = model.status == ModelStatus.AVAILABLE
+    installed = model.status == BaseModelStatus.AVAILABLE
     if job.error_code == NEEDS_ACCESS:
         actions = [act("get_access"), act("resume", "Retry")]
         return Health(state="needs_access", label="Needs access", detail=message, actions=actions)
@@ -134,7 +134,7 @@ def transfer_failure(model: Model, job: Job | None, context: HealthContext) -> H
     return stopped(model, job, context)
 
 
-def corrupt(model: Model, context: HealthContext) -> Health:
+def corrupt(model: BaseModel, context: HealthContext) -> Health:
     states = file_states(model)
     count = len(states)
     message = (model.health_detail or {}).get("message") or "Some files do not match the SHA-256 saved at install."
@@ -148,7 +148,7 @@ def corrupt(model: Model, context: HealthContext) -> Health:
     return Health(state="corrupt", label=label, detail=detail, actions=actions, files=sorted(states))
 
 
-def missing(model: Model, problems: dict[str, str], context: HealthContext) -> Health:
+def missing(model: BaseModel, problems: dict[str, str], context: HealthContext) -> Health:
     folder = "the bucket" if model.store == BUCKET else model_folder(context.settings, model)
     if model.store == BUCKET:
         fix = "Repair downloads them again, or re-import them from a folder or S3 path."
@@ -165,7 +165,7 @@ def missing(model: Model, problems: dict[str, str], context: HealthContext) -> H
     return Health(state="missing", label="Missing files", detail=detail, actions=actions, files=sorted(problems))
 
 
-def smaller_variants(model: Model) -> list[CatalogVariant]:
+def smaller_variants(model: BaseModel) -> list[CatalogVariant]:
     variant = model.variant
     if variant is None:
         return []
@@ -174,12 +174,12 @@ def smaller_variants(model: Model) -> list[CatalogVariant]:
     return sorted(found, key=lambda item: item.weights_bytes, reverse=True)
 
 
-def other_variants(model: Model) -> list[CatalogVariant]:
+def other_variants(model: BaseModel) -> list[CatalogVariant]:
     variant = model.variant
     return [item for item in variant.model.variants if item.id != variant.id] if variant is not None else []
 
 
-def load_failure(model: Model, context: HealthContext) -> Health:
+def load_failure(model: BaseModel, context: HealthContext) -> Health:
     detail = (model.health_detail or {}).get("message") or "The engine could not load it."
     if model.health == NO_MEMORY:
         smaller = smaller_variants(model)
@@ -194,7 +194,7 @@ def load_failure(model: Model, context: HealthContext) -> Health:
     return Health(state="cant_run", label="Can't run here", detail=detail, actions=actions)
 
 
-def capability(model: Model, context: HealthContext) -> Health | None:
+def capability(model: BaseModel, context: HealthContext) -> Health | None:
     if context.engines is None or gguf_file(model) is None or "llamacpp" in context.engines:
         return None
     alternative = any(item.format != "gguf" for item in other_variants(model))
@@ -207,7 +207,7 @@ def capability(model: Model, context: HealthContext) -> Health | None:
     return Health(state="cant_run", label="Can't run here", detail=detail, actions=actions)
 
 
-def base_health(model: Model, job: Job | None, context: HealthContext) -> Health | None:
+def base_health(model: BaseModel, job: Job | None, context: HealthContext) -> Health | None:
     if job is not None and job.status in ACTIVE_JOB_STATUSES:
         return None
     failed = transfer_failure(model, job, context)
@@ -215,7 +215,7 @@ def base_health(model: Model, job: Job | None, context: HealthContext) -> Health
         return failed
     if model.status in STOPPED:
         return stopped(model, None, context)
-    if model.status != ModelStatus.AVAILABLE:
+    if model.status != BaseModelStatus.AVAILABLE:
         return None
     if model.health == CORRUPT:
         return corrupt(model, context)
@@ -240,10 +240,10 @@ def custom_health(base: Health | None, base_name: str) -> Health | None:
     )
 
 
-def version_health(minibrain: Minibrain, version: Version, current: str | None) -> Health | None:
+def version_health(model: Model, version: Version, current: str | None) -> Health | None:
     if version.kind != VersionKind.LORA:
         return None
-    message = base_changed(f"v{version.number}", minibrain.base_model, version.base_hash, current)
+    message = base_changed(f"v{version.number}", model.base_model, version.base_hash, current)
     if message is None:
         return None
     return Health(state="base_changed", label="Base changed", detail=message, actions=[act("retrain")])

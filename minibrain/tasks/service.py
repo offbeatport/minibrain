@@ -8,7 +8,7 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.data.snapshot import SnapshotError, read_split
 from minibrain.presets import Preset, preset, render
 from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import JudgeScore, Minibrain, Snapshot, Version, VersionKind, VersionStatus
+from minibrain.registry.models import JudgeScore, Model, Snapshot, Version, VersionKind, VersionStatus
 from minibrain.registry.service import ConflictError
 from minibrain.tasks.contracts import (
     FREE_TEXT,
@@ -31,20 +31,20 @@ class BreakingChangeError(ConflictError):
     pass
 
 
-def preset_of(minibrain: Minibrain) -> Preset:
-    return preset(minibrain.preset)
+def preset_of(model: Model) -> Preset:
+    return preset(model.preset)
 
 
-def contract_of(minibrain: Minibrain) -> Contract:
-    return Contract.from_dict(minibrain.contract) if minibrain.contract else FREE_TEXT
+def contract_of(model: Model) -> Contract:
+    return Contract.from_dict(model.contract) if model.contract else FREE_TEXT
 
 
 def version_contract(version: Version) -> Contract:
     return Contract.from_dict(version.contract) if version.contract else FREE_TEXT
 
 
-def rule_of(minibrain: Minibrain) -> Rule:
-    return Rule.from_dict(minibrain.promotion)
+def rule_of(model: Model) -> Rule:
+    return Rule.from_dict(model.promotion)
 
 
 def version_metric(version: Version) -> str | None:
@@ -62,20 +62,20 @@ def held_out_score(version: Version) -> float | None:
     return None if metric is None or values is None else values.get(metric)
 
 
-def live_version(minibrain: Minibrain) -> Version | None:
-    if not minibrain.deployed or minibrain.current_version is None:
+def live_version(model: Model) -> Version | None:
+    if not model.deployed or model.current_version is None:
         return None
-    return next((item for item in minibrain.versions if item.number == minibrain.current_version), None)
+    return next((item for item in model.versions if item.number == model.current_version), None)
 
 
-def decision(minibrain: Minibrain, version: Version) -> Decision:
-    live = live_version(minibrain)
+def decision(model: Model, version: Version) -> Decision:
+    live = live_version(model)
     against = None if live is None or live.id == version.id else Live(live.number, held_out(live))
-    return decide(rule_of(minibrain), held_out(version), version_metric(version), against)
+    return decide(rule_of(model), held_out(version), version_metric(version), against)
 
 
-def latest_version_of(minibrain: Minibrain) -> Version | None:
-    return max(minibrain.versions, key=lambda item: item.number, default=None)
+def latest_version_of(model: Model) -> Version | None:
+    return max(model.versions, key=lambda item: item.number, default=None)
 
 
 def data_labels(session: Session, store: ArtifactStore, snapshot: Snapshot) -> list[str]:
@@ -90,20 +90,18 @@ def data_labels(session: Session, store: ArtifactStore, snapshot: Snapshot) -> l
     return found if len(found) <= MAX_LABELS else []
 
 
-def contract_with_data(
-    session: Session, store: ArtifactStore, minibrain: Minibrain, snapshot: Snapshot | None
-) -> Contract:
-    current = contract_of(minibrain)
-    if not preset_of(minibrain).labels_from_data:
+def contract_with_data(session: Session, store: ArtifactStore, model: Model, snapshot: Snapshot | None) -> Contract:
+    current = contract_of(model)
+    if not preset_of(model).labels_from_data:
         return current
     if snapshot is None:
         if current.labels is None:
-            raise ConflictError(f"{minibrain.name} needs at least two labels: type them, or pick a dataset")
+            raise ConflictError(f"{model.name} needs at least two labels: type them, or pick a dataset")
         return current
     labels = data_labels(session, store, snapshot)
     if len(labels) < 2:
         raise ConflictError(
-            f"{minibrain.name} classifies into labels found in its data, and this dataset version has "
+            f"{model.name} classifies into labels found in its data, and this dataset version has "
             f"{'one label' if len(labels) == 1 else 'no label set'}; it needs at least two, at most {MAX_LABELS}"
         )
     try:
@@ -112,14 +110,14 @@ def contract_with_data(
         raise ConflictError(f"{error}: add labels or pick a dataset with at least two") from error
 
 
-def checked_contract(minibrain: Minibrain, contract: Contract, breaking: bool) -> int:
-    previous = latest_version_of(minibrain)
+def checked_contract(model: Model, contract: Contract, breaking: bool) -> int:
+    previous = latest_version_of(model)
     if previous is None:
         return 1
     if version_contract(previous) == contract:
         return previous.contract_number
     found = breaking_changes(version_contract(previous), contract)
-    if found and not breaking and not minibrain.breaking_confirmed:
+    if found and not breaking and not model.breaking_confirmed:
         raise BreakingChangeError(
             f"This changes the contract apps use: {described(found)}. Confirm it as a breaking change to go on."
         )
@@ -134,13 +132,13 @@ def checked_graders(configs: Sequence[dict[str, Any]], contract: Contract) -> li
     return [dict(config) for config in configs]
 
 
-def instructions_for(minibrain: Minibrain, contract: Contract, kind: VersionKind) -> str:
-    chosen = preset_of(minibrain)
+def instructions_for(model: Model, contract: Contract, kind: VersionKind) -> str:
+    chosen = preset_of(model)
     trained = kind == VersionKind.LORA
     if trained and chosen.trained_prompts != chosen.prompts:
         return chosen.instructions(contract, trained=True)
-    if minibrain.instructions:
-        return render(minibrain.instructions, contract)
+    if model.instructions:
+        return render(model.instructions, contract)
     return chosen.instructions(contract, trained=trained)
 
 
@@ -150,38 +148,38 @@ def shots_of(session: Session, store: ArtifactStore, snapshot: Snapshot | None) 
     return [as_record(shot) for shot in read_split(snapshot_location(session, store, snapshot), "shots")]
 
 
-def next_version_number(minibrain: Minibrain) -> int:
-    highest = max((version.number for version in minibrain.versions), default=-1)
-    minibrain.last_version = max(highest, minibrain.last_version) + 1
-    return minibrain.last_version
+def next_version_number(model: Model) -> int:
+    highest = max((version.number for version in model.versions), default=-1)
+    model.last_version = max(highest, model.last_version) + 1
+    return model.last_version
 
 
 def new_version(
     session: Session,
     store: ArtifactStore,
-    minibrain: Minibrain,
+    model: Model,
     kind: VersionKind,
     snapshot: Snapshot | None,
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
 ) -> Version:
-    contract = contract_with_data(session, store, minibrain, snapshot)
-    number = checked_contract(minibrain, contract, breaking)
-    graders = checked_graders(minibrain.graders or preset_of(minibrain).default_graders(contract), contract)
-    minibrain.contract = contract.as_dict()
-    minibrain.breaking_confirmed = False
-    minibrain.graders = graders
+    contract = contract_with_data(session, store, model, snapshot)
+    number = checked_contract(model, contract, breaking)
+    graders = checked_graders(model.graders or preset_of(model).default_graders(contract), contract)
+    model.contract = contract.as_dict()
+    model.breaking_confirmed = False
+    model.graders = graders
     scored = snapshot is not None and bool(snapshot.counts)
     version = Version(
-        minibrain=minibrain,
+        model=model,
         snapshot=snapshot,
-        number=next_version_number(minibrain),
+        number=next_version_number(model),
         kind=kind,
         status=VersionStatus.TRAINING if kind == VersionKind.LORA else VersionStatus.EVALUATING,
         recipe=dict(recipe or {}),
         contract=contract.as_dict(),
         contract_number=number,
-        instructions=instructions_for(minibrain, contract, kind),
+        instructions=instructions_for(model, contract, kind),
         shots=[] if kind == VersionKind.LORA else shots_of(session, store, snapshot),
         graders=graders,
     )

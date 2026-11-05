@@ -15,7 +15,7 @@ from minibrain.models import copies
 from minibrain.models.copies import BUCKET, CopyError, Progress, ensure
 from minibrain.models.files import sha256_of
 from minibrain.models.hardware import GIB, Gpu, NodeReport
-from minibrain.registry.models import Model
+from minibrain.registry.models import BaseModel
 from minibrain.serve import engine as engine_module
 from minibrain.serve import engines as engines_module
 from minibrain.serve import select
@@ -147,7 +147,7 @@ def test_remote_engines_pull_weights_from_main_not_the_hub(harness: Harness, hub
     spec = pull_base(harness.client, token, "tiny", tmp_path / "weights")
     assert spec.path == str(tmp_path / "weights") and spec.format == "safetensors"
     assert all((tmp_path / "weights" / name).read_bytes() == data for name, data in FILES.items())
-    served = Path(harness.client.get("/api/models/base/tiny").json()["storage_path"]) / "config.json"
+    served = Path(harness.client.get("/api/base-models/tiny").json()["storage_path"]) / "config.json"
     served.write_bytes(served.read_bytes().replace(b"{", b"[", 1))
     (tmp_path / "weights" / "config.json").unlink()
     with pytest.raises(CopyError, match=r"config\.json"):
@@ -161,7 +161,7 @@ def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harne
     download_tiny(harness)
     assert harness.worker(kinds=["download"]).run_once()
     with harness.sessions() as session:
-        model = session.get(Model, "tiny")
+        model = session.get(BaseModel, "tiny")
         assert model is not None
         model.deployed = True
         session.commit()

@@ -24,31 +24,31 @@ ROUTE_ROLES = {
     ("POST", "/api/accounts"): "admin",
     ("PATCH", "/api/accounts/{account_id}"): "admin",
     ("POST", "/api/accounts/{account_id}/password-link"): "admin",
-    ("GET", "/api/minibrains"): "viewer",
-    ("POST", "/api/minibrains"): "builder",
-    ("PATCH", "/api/minibrains/{slug}"): "builder",
-    ("GET", "/api/minibrains/{slug}"): "viewer",
-    ("DELETE", "/api/minibrains/{slug}"): "builder",
-    ("POST", "/api/minibrains/{slug}/deploy"): "builder",
-    ("POST", "/api/minibrains/sample"): "builder",
-    ("GET", "/api/minibrains/name"): "viewer",
-    ("POST", "/api/minibrains/{slug}/contract/check"): "builder",
-    ("PUT", "/api/minibrains/{slug}/contract"): "builder",
-    ("PUT", "/api/minibrains/{slug}/graders"): "builder",
-    ("PUT", "/api/minibrains/{slug}/promotion"): "builder",
-    ("PUT", "/api/minibrains/{slug}/instructions"): "builder",
-    ("POST", "/api/minibrains/{slug}/versions/{number}/test"): "viewer",
+    ("GET", "/api/models"): "viewer",
+    ("POST", "/api/models"): "builder",
+    ("PATCH", "/api/models/{slug}"): "builder",
+    ("GET", "/api/models/{slug}"): "viewer",
+    ("DELETE", "/api/models/{slug}"): "builder",
+    ("POST", "/api/models/{slug}/deploy"): "builder",
+    ("POST", "/api/models/sample"): "builder",
+    ("GET", "/api/models/name"): "viewer",
+    ("POST", "/api/models/{slug}/contract/check"): "builder",
+    ("PUT", "/api/models/{slug}/contract"): "builder",
+    ("PUT", "/api/models/{slug}/graders"): "builder",
+    ("PUT", "/api/models/{slug}/promotion"): "builder",
+    ("PUT", "/api/models/{slug}/instructions"): "builder",
+    ("POST", "/api/models/{slug}/versions/{number}/test"): "viewer",
     ("GET", "/api/presets"): "viewer",
     ("GET", "/api/recipes"): "viewer",
     ("GET", "/api/recipes/{key}"): "viewer",
     ("POST", "/api/recipes/{key}/sample"): "builder",
-    ("PUT", "/api/minibrains/{slug}/dataset"): "builder",
-    ("PUT", "/api/minibrains/{slug}/mapping"): "builder",
-    ("PUT", "/api/minibrains/{slug}/request-bodies"): "builder",
-    ("POST", "/api/minibrains/{slug}/query"): "builder",
-    ("GET", "/api/minibrains/{slug}/preview"): "builder",
-    ("POST", "/api/minibrains/{slug}/snapshots"): "builder",
-    ("GET", "/api/minibrains/{slug}/golden"): "builder",
+    ("PUT", "/api/models/{slug}/dataset"): "builder",
+    ("PUT", "/api/models/{slug}/mapping"): "builder",
+    ("PUT", "/api/models/{slug}/request-bodies"): "builder",
+    ("POST", "/api/models/{slug}/query"): "builder",
+    ("GET", "/api/models/{slug}/preview"): "builder",
+    ("POST", "/api/models/{slug}/snapshots"): "builder",
+    ("GET", "/api/models/{slug}/golden"): "builder",
     ("GET", "/api/sources"): "builder",
     ("POST", "/api/sources"): "builder",
     ("GET", "/api/data/folders"): "builder",
@@ -95,20 +95,20 @@ ROUTE_ROLES = {
     ("POST", "/api/sources/database"): "builder",
     ("POST", "/api/sources/iceberg"): "builder",
     ("POST", "/api/sources/delta"): "builder",
-    ("GET", "/api/models"): "viewer",
-    ("POST", "/api/models/inspect"): "admin",
-    ("POST", "/api/models/import"): "admin",
-    ("GET", "/api/models/base/{key}"): "viewer",
-    ("PATCH", "/api/models/base/{key}"): "admin",
-    ("DELETE", "/api/models/base/{key}"): "admin",
-    ("POST", "/api/models/base/{key}/verify"): "admin",
-    ("POST", "/api/models/base/{key}/repair"): "admin",
-    ("POST", "/api/models/base/{key}/reimport"): "admin",
-    ("POST", "/api/models/base/{key}/relocate"): "admin",
-    ("POST", "/api/models/base/{key}/recheck"): "admin",
-    ("POST", "/api/models/base/{key}/retry"): "admin",
-    ("POST", "/api/models/base/{key}/deploy"): "builder",
-    ("POST", "/api/models/base/{key}/test"): "viewer",
+    ("GET", "/api/all-models"): "viewer",
+    ("POST", "/api/base-models/inspect"): "admin",
+    ("POST", "/api/base-models/import"): "admin",
+    ("GET", "/api/base-models/{key}"): "viewer",
+    ("PATCH", "/api/base-models/{key}"): "admin",
+    ("DELETE", "/api/base-models/{key}"): "admin",
+    ("POST", "/api/base-models/{key}/verify"): "admin",
+    ("POST", "/api/base-models/{key}/repair"): "admin",
+    ("POST", "/api/base-models/{key}/reimport"): "admin",
+    ("POST", "/api/base-models/{key}/relocate"): "admin",
+    ("POST", "/api/base-models/{key}/recheck"): "admin",
+    ("POST", "/api/base-models/{key}/retry"): "admin",
+    ("POST", "/api/base-models/{key}/deploy"): "builder",
+    ("POST", "/api/base-models/{key}/test"): "viewer",
     ("GET", "/api/catalog"): "viewer",
     ("POST", "/api/catalog/{catalog_id}/download"): "admin",
     ("POST", "/api/catalog/hub"): "admin",
@@ -130,24 +130,24 @@ ROUTE_ROLES = {
     ("GET", "/api/audit/export"): "admin",
     ("GET", "/api/audit/chain"): "admin",
     ("GET", "/api/audit/{event_id}"): "admin",
-    ("GET", "/api/minibrains/{slug}/versions"): "viewer",
-    ("POST", "/api/minibrains/{slug}/versions"): "builder",
-    ("DELETE", "/api/minibrains/{slug}/versions/{number}"): "builder",
-    ("POST", "/api/minibrains/{slug}/versions/{number}/promote"): "builder",
-    ("GET", "/api/minibrains/{slug}/training-plan"): "viewer",
-    ("POST", "/api/minibrains/{slug}/complete"): "viewer",
-    ("GET", "/api/minibrains/{slug}/versions/{number}/card"): "viewer",
-    ("GET", "/api/minibrains/{slug}/versions/{number}/card.json"): "viewer",
-    ("GET", "/api/minibrains/{slug}/versions/{number}/card.md"): "viewer",
-    ("GET", "/api/minibrains/{slug}/versions/{number}/aibom.json"): "viewer",
-    ("PUT", "/api/minibrains/{slug}/versions/{number}/card"): "builder",
+    ("GET", "/api/models/{slug}/versions"): "viewer",
+    ("POST", "/api/models/{slug}/versions"): "builder",
+    ("DELETE", "/api/models/{slug}/versions/{number}"): "builder",
+    ("POST", "/api/models/{slug}/versions/{number}/promote"): "builder",
+    ("GET", "/api/models/{slug}/training-plan"): "viewer",
+    ("POST", "/api/models/{slug}/complete"): "viewer",
+    ("GET", "/api/models/{slug}/versions/{number}/card"): "viewer",
+    ("GET", "/api/models/{slug}/versions/{number}/card.json"): "viewer",
+    ("GET", "/api/models/{slug}/versions/{number}/card.md"): "viewer",
+    ("GET", "/api/models/{slug}/versions/{number}/aibom.json"): "viewer",
+    ("PUT", "/api/models/{slug}/versions/{number}/card"): "builder",
     ("GET", "/api/feedback"): "builder",
     ("GET", "/api/feedback/facets"): "builder",
     ("GET", "/api/feedback/{feedback_id}"): "builder",
     ("POST", "/api/feedback/{feedback_id}/review"): "builder",
     ("POST", "/api/feedback/{feedback_id}/assign"): "builder",
-    ("POST", "/api/minibrains/{slug}/feedback"): "viewer",
-    ("GET", "/api/minibrains/{slug}/feedback/summary"): "viewer",
+    ("POST", "/api/models/{slug}/feedback"): "viewer",
+    ("GET", "/api/models/{slug}/feedback/summary"): "viewer",
     ("GET", "/api/keys"): "builder",
     ("POST", "/api/keys"): "builder",
     ("PUT", "/api/keys/{key_id}/models"): "builder",
@@ -231,38 +231,38 @@ def status(client: TestClient, method: str, path: str, body: Any = None) -> int:
 
 
 def test_viewers_see_models_but_change_nothing(team: Team) -> None:
-    assert status(team.builder, "POST", "/api/minibrains", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
+    assert status(team.builder, "POST", "/api/models", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
     viewer = team.viewer
-    assert status(viewer, "GET", "/api/minibrains") == 200
-    assert status(viewer, "GET", "/api/minibrains/triage") == 200
     assert status(viewer, "GET", "/api/models") == 200
+    assert status(viewer, "GET", "/api/models/triage") == 200
+    assert status(viewer, "GET", "/api/all-models") == 200
     assert status(viewer, "GET", "/api/jobs") == 200
     assert status(viewer, "GET", "/api/system/infrastructure") == 200
-    refused = viewer.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer))
+    refused = viewer.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer))
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Builder role"
     assert status(viewer, "GET", "/api/sources") == 403
-    assert status(viewer, "GET", "/api/minibrains/triage/preview") == 403
+    assert status(viewer, "GET", "/api/models/triage/preview") == 403
     assert status(viewer, "GET", "/api/keys") == 403
     assert status(viewer, "GET", "/api/feedback") == 403
-    assert status(viewer, "DELETE", "/api/minibrains/triage") == 403
+    assert status(viewer, "DELETE", "/api/models/triage") == 403
     assert status(viewer, "GET", "/api/policies") == 403
     assert status(viewer, "GET", "/api/accounts") == 403
 
 
 def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     builder = team.builder
-    assert status(builder, "POST", "/api/minibrains", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
+    assert status(builder, "POST", "/api/models", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
     assert status(builder, "GET", "/api/sources") == 200
     assert status(builder, "GET", "/api/keys") == 200
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}
     assert status(builder, "POST", "/api/keys", body) == 201
-    assert status(builder, "POST", "/api/minibrains/triage/deploy", {"deployed": True}) in {200, 409, 422}
+    assert status(builder, "POST", "/api/models/triage/deploy", {"deployed": True}) in {200, 409, 422}
     refused = builder.put("/api/policies/request_bodies", json={"value": True}, headers=csrf(builder))
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Admin role"
     assert status(builder, "GET", "/api/audit") == 403
     assert status(builder, "GET", "/api/accounts") == 403
     assert status(builder, "GET", "/api/system/install") == 403
-    assert status(builder, "DELETE", "/api/models/base/qwen") == 403
+    assert status(builder, "DELETE", "/api/base-models/qwen") == 403
     assert status(builder, "POST", "/api/catalog/sync") == 403
     assert status(builder, "PUT", "/api/settings/data", {"row_limit": 1000}) == 403
 
@@ -277,7 +277,7 @@ def test_admins_reach_everything(team: Team) -> None:
 
 def test_people_without_a_role_see_nothing(team: Team) -> None:
     nobody = team.nobody
-    refused = nobody.get("/api/minibrains")
+    refused = nobody.get("/api/models")
     assert refused.status_code == 403 and "Ask an admin" in refused.json()["detail"]
     person = nobody.get("/api/auth/session").json()["person"]
     assert (person["email"], person["role"]) == ("nobody@example.com", None)
@@ -293,7 +293,7 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     add_version(harness, "prompt")
     finish_with_mistakes(harness)
     people = team_of(harness)
-    path = f"/api/minibrains/{SLUG}/versions"
+    path = f"/api/models/{SLUG}/versions"
     assert [len(version["mistakes"]) for version in people.admin.get(path).json()] == [3, 0]
     assert [len(version["mistakes"]) for version in people.builder.get(path).json()] == [3, 0]
     seen = people.viewer.get(path).json()
@@ -302,7 +302,7 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     job = next(item["id"] for item in people.admin.get("/api/jobs").json()["items"] if item["kind"] == "eval")
     assert people.admin.get(f"/api/jobs/{job}").json()["result"] is not None
     assert people.viewer.get(f"/api/jobs/{job}").json()["result"] is None
-    detail = people.viewer.get(f"/api/minibrains/{SLUG}").json()
+    detail = people.viewer.get(f"/api/models/{SLUG}").json()
     assert all(check["examples"] == [] for check in detail["snapshot"]["checks"])
 
 

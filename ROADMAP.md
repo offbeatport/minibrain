@@ -1,24 +1,24 @@
 # minibrain roadmap
 
 Private platform for building models of any size on your own data, task-specific or general purpose. Point at a data
-source → build examples → train a LoRA → eval against the base → serve an OpenAI-compatible API. Many minibrains per
+source → build examples → train a LoRA → eval against the base → serve an OpenAI-compatible API. Many models per
 install. On-prem / VPC, fully offline by default. One deployable in v1, split into services later.
 
 Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factory.
 
 ## Positioning
 
-- Size follows the job: a small base where latency and cost matter, a large one where breadth matters. A minibrain can
+- Size follows the job: a small base where latency and cost matter, a large one where breadth matters. A model can
   do one task or be a general-purpose assistant for a domain.
-- A minibrain learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
+- A model learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
   things relate, rarely changing policy). Exact, changing or citable facts come from retrieval.
-- Facts that change, need citations, or sit behind per-document access rules come from the minibrain's own index
+- Facts that change, need citations, or sit behind per-document access rules come from the model's own index
   (RAG), built from the same sources as training.
-- Train only when it pays off. Every minibrain starts prompt-only on a local base model; the eval shows whether a
+- Train only when it pays off. Every model starts prompt-only on a local base model; the eval shows whether a
   trained version beats it on score, latency or cost.
 - Two products on one install: a **private frontier endpoint** (the large open model behind the gateway, offline) and
-  **minibrains** built on the customer's data, from small task models to large general-purpose ones.
-- The customer owns the result: weights, data, evals, and the decision when anything changes. Every minibrain carries
+  **models** built on the customer's data, from small task models to large general-purpose ones.
+- The customer owns the result: weights, data, evals, and the decision when anything changes. Every model carries
   forward to each new base model (rebase).
 
 ### Use cases
@@ -65,9 +65,9 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
   as the bare label.
 - The contract lives on each version and evolves additively: a new version may add enum values or optional fields
   freely; removing, renaming, retyping or making a field required is a breaking change that needs an explicit
-  confirmation (`breaking: true` on `PUT /api/minibrains/<slug>/contract` or on the new version), because apps depend
+  confirmation (`breaking: true` on `PUT /api/models/<slug>/contract` or on the new version), because apps depend
   on it. Contracts are numbered per model (contract 1, 2, …); every version records its number, and every `/v1`
-  request log records the number it was served with. `POST /api/minibrains/<slug>/contract/check` lists the changes
+  request log records the number it was served with. `POST /api/models/<slug>/contract/check` lists the changes
   against the latest version first.
 - Constrained decoding enforces the contract on one path: XGrammar on SGLang and vLLM, a grammar on llama.cpp, a token
   trie on MLX and `transformers`. The gateway checks a JSON answer against the schema and answers 422 when it breaks
@@ -170,9 +170,9 @@ recipe, which fills the form and loads the sample to try before using real data.
 | Grader | `score(answer, example) -> {metric: value}`, named and versioned |
 | Golden set | 20–50 human-verified examples; defines the task and scores every version |
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
-| Rebase | Rebuilding a minibrain on a new base model from its dataset version, golden set and config, then comparing it with `current` |
+| Rebase | Rebuilding a model on a new base model from its dataset version, golden set and config, then comparing it with `current` |
 | Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue |
-| Index | The minibrain's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
+| Index | The model's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
 
 ## Flow
 
@@ -270,7 +270,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 | API | FastAPI + uvicorn |
 | Jobs | Own jobs table with leases; workers claim through the API; Ray for multi-node training in v2 |
 | Metadata | SQLAlchemy 2 + Alembic; SQLite by default, Postgres optional |
-| Staging and transforms | DuckDB, one file per minibrain, disposable |
+| Staging and transforms | DuckDB, one file per model, disposable |
 | Connectors | DuckDB scanners in v1; dlt from the first API source |
 | PII | Presidio |
 | Embeddings | Local open embedding model, pinned (e.g. Qwen3-Embedding-0.6B, Apache-2.0) |
@@ -385,14 +385,14 @@ Data is shared across models:
 - Remote fingerprints are cached for 30 seconds per source so listing pages does not hit a bucket or database on
   every request. Everything goes through the row limit and the 30-second timeout, and dataset versions copy the
   rows to Parquet like any other source.
-- Materialize into the minibrain's DuckDB file only when previews get slow or the source must not be hit repeatedly.
+- Materialize into the model's DuckDB file only when previews get slow or the source must not be hit repeatedly.
 - dlt arrives with the first API source (Zendesk, Jira, Confluence), loading into the same DuckDB file. Its incremental
   state is what v2 "retrain on new data" runs on.
 - The DuckDB file is a cache, rebuildable from the source. The only durable data artifact is the dataset version.
 - Gateway request logs are a source like any other; the Distill task reads them directly.
-- Sources are defined once per minibrain and feed both training (a saved dataset version) and the index (continuous sync):
+- Sources are defined once per model and feed both training (a saved dataset version) and the index (continuous sync):
   one connector, one PII policy, one set of access rules, one lineage.
-- Training uses only rows every user of the minibrain may see. Rows with narrower access go to the index only, where
+- Training uses only rows every user of the model may see. Rows with narrower access go to the index only, where
   retrieval filters them per user.
 
 ### Example format
@@ -479,7 +479,7 @@ dataset and on the Training page before a run starts:
 3. User picks an action per type: keep, mask, replace with a consistent fake, drop the row.
 4. User spot-checks the preview.
 
-- Custom regex recognizers per minibrain for internal IDs (customer numbers, employee IDs).
+- Custom regex recognizers per model for internal IDs (customer numbers, employee IDs).
 - Consistent fakes, not `<PERSON>` tags, or the model learns to emit the tags.
 - Detection is risk reduction, not a guarantee; the UI says so. minibrain access control stays the real control.
 
@@ -515,7 +515,7 @@ the UI says version.
   its sources' fingerprints and the query; the dataset, the model page and the Training page say "Sources changed
   since v3" or "Query changed since v3" and offer Update. Nothing updates on its own.
 - Training and scoring pick a dataset version of the model's dataset (`snapshot_id` on `POST
-  /api/minibrains/<slug>/versions`), the latest by default; a run never reads the live query. A model's data is its
+  /api/models/<slug>/versions`), the latest by default; a run never reads the live query. A model's data is its
   dataset's latest version.
 - Feedback: a model's accepted feedback rows merge into the picked version when a model version starts, as a
   feedback copy (`base_id` names the dataset version, no number of its own); feedback that changes nothing reuses the
@@ -625,12 +625,12 @@ Built (2026-11-05). Each run picks how the base fits the memory of the machine t
   micro-batches slower. The machine is the online worker with the fastest plan, from the hardware and libraries
   workers report (`bitsandbytes` among them); with none reported the plan is unknown and the worker that takes the job
   plans on its own.
-- Nothing fits: `POST /api/minibrains/{slug}/versions` refuses up front (409) with the smallest plan, its memory and
+- Nothing fits: `POST /api/models/{slug}/versions` refuses up front (409) with the smallest plan, its memory and
   the machine's ("Qwen3 14B does not fit for training on L4: the smallest plan, LoRA bf16 with checkpointing at 1 row
   of 160 tokens, needs about 30 GB, …").
 - Overrides on the Training page and in that call: strategy, gradient checkpointing, micro-batch, sequence length,
   LoRA rank (up to 64, the SGLang pools' limit; alpha is twice the rank), learning rate, epochs and rows, each field
-  showing its default. `GET /api/minibrains/{slug}/training-plan` takes the same settings and returns the plan, every
+  showing its default. `GET /api/models/{slug}/training-plan` takes the same settings and returns the plan, every
   option's memory with its parts, and the defaults.
 - The version's recipe stores the plan (strategy, checkpointing, micro-batch, accumulation, sequence length, rank,
   alpha, learning rate, dropout, optimiser, precision, device, the overrides, and the planned peak against the
@@ -687,7 +687,7 @@ once it matches; only deleting a base removes its files.
 - A base stays until someone deletes it, and deleting it removes its files. A base with models built on it is deleted
   together with them, once the cascade checkbox in the delete dialog is ticked.
 - Where a base's main copy lives follows Settings → Storage when it is downloaded, imported or repaired
-  (`models.store`). Folder: main's `<home>/models/<id>`. S3: each file is an object in
+  (`base_models.store`). Folder: main's `<home>/models/<id>`. S3: each file is an object in
   the bucket under its SHA-256, sealed with its own data key like every artifact and registered as a `weights`
   artifact; identical files are stored once.
 - Files reach the bucket one at a time. The job checks a file's size and SHA-256 in `<home>/work/models/<id>`, the
@@ -732,7 +732,7 @@ once it matches; only deleting a base removes its files.
   unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
   Ten minutes without that is Stop failed, naming what did not confirm.
 - Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, snapshots only it
-  uses, the minibrain folder and API key scopes. A base with models built on it answers 409 with their names unless
+  uses and API key scopes. A base with models built on it answers 409 with their names unless
   the call says `cascade=true`; the cascade deletes them first, then the base.
 - Audit: `model.delete` and `model.undeploy` when a person starts one (`retry` on a retry), and `model.delete_finished`
   and `model.undeploy_finished` with the outcome, what went and the reason a failure gives.
@@ -742,7 +742,7 @@ once it matches; only deleting a base removes its files.
 - Eval first: the golden set (20–50 human-verified examples) is written or picked before any training.
 - Version 0 is created with the model: prompt-only on the base, the preset's prompt (or the model's instructions)
   plus few-shot examples when data exists. It answers at once in the Playground, through `slug@0` and through
-  `POST /api/minibrains/<slug>/versions/<n>/test` (one conversation, scored by the graders when an expected answer is
+  `POST /api/models/<slug>/versions/<n>/test` (one conversation, scored by the graders when an expected answer is
   sent), and is scored on the data when there is any (once the base is on this install). Going live is a separate
   step; training makes v1 and up, compared against the live version.
 - Evaluation calls the gateway's own prompt and constraint code (`minibrain/tasks/prompting.py`), so scores are what
@@ -774,10 +774,10 @@ once it matches; only deleting a base removes its files.
 ### Rebase
 
 1. A new base model is registered (offline bundle, pinned commit). Its chat template parity test runs first.
-2. `minibrain rebase --base <model>`, or one button, reruns every minibrain: training from the stored dataset version
+2. `minibrain rebase --base <model>`, or one button, reruns every model: training from the stored dataset version
    (relabelled first if the teacher changed), then eval on the golden set.
 3. The report compares each rebased version with `current` on score, latency and cost.
-4. Deploying stays per minibrain and explicit. Nothing that is live changes until someone deploys.
+4. Deploying stays per model and explicit. Nothing that is live changes until someone deploys.
 
 ### Feedback loop
 
@@ -787,7 +787,7 @@ once it matches; only deleting a base removes its files.
    `input` too (and optionally `output`, the answer the app got), and a call without it gets a 422 that names the
    model's switch; otherwise the response id is enough. A second call on the same
    response while it waits for review updates it. The standalone gateway forwards the call to main. Playground thumbs
-   and "Correct it" store the same record through `/api/minibrains/<slug>/feedback`.
+   and "Correct it" store the same record through `/api/models/<slug>/feedback`.
 2. Request logs always carry each response id. "Keep request inputs and answers", a per-model switch on the model's
    deployment page (off by default; see API and access), also keeps the last user message and the answer, for as long
    as the logs. Feedback is stored per model and version and links to its request log by response id.
@@ -807,7 +807,7 @@ once it matches; only deleting a base removes its files.
 
 ## Retrieval
 
-- Each minibrain has an index built from its sources: chunks, embeddings, full-text terms, source and access metadata.
+- Each model has an index built from its sources: chunks, embeddings, full-text terms, source and access metadata.
 - Sync is incremental: dlt state for API sources, change columns or file hashes otherwise. Rows deleted at the source
   leave the index.
 - At answer time the gateway's context step retrieves top chunks (hybrid search, filtered by the caller's access),
@@ -836,9 +836,9 @@ once it matches; only deleting a base removes its files.
   the same way). A custom model answers the user and assistant turns of the conversation after its instructions
   (prompt-only versions with their few-shot turns first); system messages from the app are dropped.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
-  logs the calls. Apps switch to the minibrain by changing the model name.
+  logs the calls. Apps switch to the model by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and
-  logging like any minibrain.
+  logging like any model.
 - `POST /v1/feedback` (see Feedback loop).
 - `model: "support-triage"` → current version; `"support-triage@3"` → pinned. The gateway maps it to SGLang's
   `<base>:<adapter>` name.
@@ -855,7 +855,7 @@ once it matches; only deleting a base removes its files.
   Settings → Security, or `request_bodies` in `minibrain.yaml` or the environment), and then each model's switch shows
   the locked value and cannot be changed. Gateways, standalone ones included, get each model's value in their config
   snapshot.
-- A context step between auth and the model call retrieves from the minibrain's index (see Retrieval).
+- A context step between auth and the model call retrieves from the model's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
   reaches minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
@@ -1048,7 +1048,7 @@ keys, and `/v1` stays key-only.
 
 - Missing, added to obp-ui as an opt-in entry: SQL editor (CodeMirror 6).
 - App-level: preview grid (TanStack Table over `Table`), loss and eval charts (Recharts).
-- The chat is a playground, not open chat: the minibrain's system prompt, held-out examples as starter inputs, base vs
+- The chat is a playground, not open chat: the model's system prompt, held-out examples as starter inputs, base vs
   adapter side by side.
 - The review queue is built for domain experts (doctors, analysts, lawyers), not ML engineers: plain-language labels,
   rows assigned to people, agreement between reviewers tracked, no model terms on screen.
@@ -1056,9 +1056,9 @@ keys, and `/v1` stays key-only.
 
 ## Config as code
 
-One `minibrain.yaml` per minibrain: task type, source, SQL, steps, teacher, recipe, golden set, target score.
+One `minibrain.yaml` per model: task type, source, SQL, steps, teacher, recipe, golden set, target score.
 The UI reads and writes the same file. `minibrain run <name>` rebuilds, labels, trains and evals from it, so a team
-can keep minibrains in git and rerun them in CI.
+can keep models in git and rerun them in CI.
 
 ```yaml
 name: support-triage
@@ -1119,7 +1119,7 @@ Off by default, and only ever towards systems the customer runs. Details: `docs/
 Fully offline by default. Nothing in the data, labelling, training, serving or gateway path calls out.
 
 - Teacher: a larger open model on local GPUs. An API teacher is opt-in per install and off by default; the UI marks
-  every minibrain whose data went to one.
+  every model whose data went to one.
 - Model weights: downloaded on a connected machine, pinned to a commit (`hf download <repo> --revision <sha>`), copied
   in by disk or an internal mirror, registered by local path. `HF_HUB_OFFLINE=1` everywhere.
 - Install bundle: Docker images, Python wheels, Presidio's spaCy model, the frontend build. Nothing downloads at install
@@ -1174,7 +1174,7 @@ v1, the evidence regulated buyers ask for first:
   bodies and encrypt older files in place. Format, providers and measurements: `docs/security.md`.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
-- PII and PHI handling as in Data; access to every minibrain is scoped and audited.
+- PII and PHI handling as in Data; access to every model is scoped and audited.
 - SSO: OIDC and trusted proxy headers (see API and access).
 - FIPS-ready design, so FIPS mode in v2 is a build setting, not a rewrite:
   - SHA-256 for every content hash and signature; never MD5 or SHA-1 (ruff `S324` in CI).
@@ -1274,7 +1274,7 @@ Two modes, same code, same adapter format (PEFT safetensors).
 - Teacher: ~30B class ~32GB in FP8 or ~64GB in bf16; ~70B class ~40GB in 4-bit; plus KV cache.
 - Minimum: one 80GB GPU, steps run in order by the worker. Recommended: two (teacher and training on one, serving on
   the other) so prompt-only versions stay up.
-- Reference configs: 2–3 tested servers (1× 80GB, 2× 80GB, 8× for many minibrains), each with exact driver, CUDA and
+- Reference configs: 2–3 tested servers (1× 80GB, 2× 80GB, 8× for many models), each with exact driver, CUDA and
   image versions. A preinstalled appliance comes later.
 
 ## Milestones
@@ -1295,10 +1295,10 @@ Everything in the v1 scope below, after M1.
 
 ## v1 scope
 
-- [x] minibrains: create, list, select, delete
+- [x] models: create, list, select, delete
 - [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer (the engine, Classify and Custom done;
       the rest come as presets)
-- [ ] Index per minibrain: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
+- [ ] Index per model: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations
 - [ ] Golden set authoring; eval-first flow
 - [ ] Prompt-only version 0 on the teacher pool (version 0 on the base at creation done; the teacher pool not yet)
@@ -1394,7 +1394,7 @@ Everything in the v1 scope below, after M1.
 - [ ] Signed offline update bundles (app and base models) with rollback (release files are signed with cosign
       now; bundles will reuse that signing)
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
-- [ ] Rebase: rebuild every minibrain on a new base model, compare, promote
+- [ ] Rebase: rebuild every model on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
       in the playground → review queue; accepted rows join the next version's training data; "Train with feedback"
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
@@ -1434,7 +1434,7 @@ Everything in the v1 scope below, after M1.
 - Kubernetes launcher: training as Jobs, engine replicas as autoscaled Deployments; cloud VM launcher later
 - sgl-router per pool under the gateway for many SGLang replicas of one model; llm-d on Kubernetes
 - vLLM backend, AMD ROCm production image, LoRA adapters on llama.cpp
-- Dedicated or merged-adapter instances for high-traffic minibrains
+- Dedicated or merged-adapter instances for high-traffic models
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
 - Helm chart, OpenShift
@@ -1487,9 +1487,12 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Deleted three routes no UI used: `POST /api/minibrains/{slug}/source` (uploading straight to a model, with its
   own replace-the-dataset rule; the UI uploads a source and picks a dataset), `GET /api/minibrains/bases` (the Models
   list replaced it) and `GET /api/snapshots/{snapshot_id}` (versions come from the dataset's list and the diff).
-- [ ] Rename after the task engine lands: `Minibrain` and the `minibrains` table become `Model` and `models` (a
-  model you own), today's `Model` becomes `BaseModel` and `base_models`, `/api/minibrains/{slug}/…` becomes
-  `/api/models/{slug}/…` and `/api/models/base/{key}` becomes `/api/base-models/{key}`; the UI already says model.
+- [x] Renamed to what the UI says: `Minibrain` and the `minibrains` table are `Model` and `models` (a model you own),
+  the old `Model` (base weights) is `BaseModel` and `base_models`, `minibrain_id` is `model_id` and a base's key is
+  `base_model_id`. `/api/minibrains/{slug}/…` is `/api/models/{slug}/…`, `/api/models/base/{key}/…` is
+  `/api/base-models/{key}/…`, the import routes are `/api/base-models/inspect` and `/api/base-models/import`, and the
+  Models list (models you own and bases) is `GET /api/all-models`. Jobs carry `model` and `base_model`; gateway key
+  owners are `model:<id>` and `base:<key>`, and a gateway config without `owners` is no longer read.
 - [x] S3 locations differing only by a trailing slash counted as different sources; an S3 or Iceberg path is compared
   without its trailing slashes.
 - [x] Prototype pages (`/proto/*`, such as `/proto/logos`) were reachable in production builds. Their routes are

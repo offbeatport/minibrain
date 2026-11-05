@@ -102,14 +102,14 @@ def test_proxy_headers_sign_people_in_and_map_their_groups(proxied: Proxied) -> 
 def test_proxy_headers_from_anywhere_else_are_ignored(proxied: Proxied) -> None:
     stranger = proxied.client(STRANGER)
     forged = as_person("ada", "ada@example.com", "minibrain-admins")
-    assert stranger.get("/api/minibrains", headers=forged).status_code == 401
+    assert stranger.get("/api/models", headers=forged).status_code == 401
     assert stranger.get("/api/auth/session", headers=forged).json()["person"] is None
     assert proxied.users() == []
 
 
 def test_a_proxy_without_a_user_header_falls_back_to_sign_in(proxied: Proxied) -> None:
     client = proxied.client()
-    assert client.get("/api/minibrains").status_code == 401
+    assert client.get("/api/models").status_code == 401
     info = client.get("/api/auth/session").json()
     assert (info["setup"], info["person"]) == (False, None)
 
@@ -118,7 +118,7 @@ def test_unmapped_people_get_the_default_role(settings: Settings, monkeypatch: p
     for proxied in proxied_install(settings, monkeypatch, AUTH):
         client = proxied.client()
         nobody = as_person("nia", "nia@example.com", "sales")
-        refused = client.get("/api/minibrains", headers=nobody)
+        refused = client.get("/api/models", headers=nobody)
         assert refused.status_code == 403 and "Ask an admin" in refused.json()["detail"]
         person = client.get("/api/auth/session", headers=nobody).json()["person"]
         assert (person["role"], person["role_locked"]) == (None, False)
@@ -127,7 +127,7 @@ def test_unmapped_people_get_the_default_role(settings: Settings, monkeypatch: p
         assert changed.status_code == 403
         headers = admin | csrf_for(client, admin)
         assert client.put("/api/policies/default_role", json={"value": "viewer"}, headers=headers).status_code == 200
-        assert client.get("/api/minibrains", headers=nobody).status_code == 200
+        assert client.get("/api/models", headers=nobody).status_code == 200
         assert client.get("/api/sources", headers=nobody).status_code == 403
 
 
@@ -139,22 +139,20 @@ def test_proxy_people_need_the_csrf_token_too(proxied: Proxied) -> None:
     client = proxied.client()
     builder = as_person("bea", groups="ml-team")
     assert (
-        client.post(
-            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder
-        ).status_code
+        client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder).status_code
         == 403
     )
     token = csrf_for(client, builder)
     assert (
         client.post(
-            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder | token
+            "/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder | token
         ).status_code
         == 201
     )
     other = as_person("cy", groups="ml-team")
     assert (
         client.post(
-            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Other"}, headers=other | token
+            "/api/models", json={"labels": ["billing", "bug"], "name": "Other"}, headers=other | token
         ).status_code
         == 403
     )
@@ -184,11 +182,11 @@ def test_turned_off_proxy_people_are_refused(proxied: Proxied) -> None:
     client = proxied.client()
     admin = as_person("ada", groups="minibrain-admins")
     bea = as_person("bea", groups="ml-team")
-    assert client.get("/api/minibrains", headers=bea).status_code == 200
+    assert client.get("/api/models", headers=bea).status_code == 200
     bea_id = client.get("/api/auth/session", headers=bea).json()["person"]["id"]
     headers = admin | csrf_for(client, admin)
     assert client.patch(f"/api/accounts/{bea_id}", json={"disabled": True}, headers=headers).status_code == 200
-    refused = client.get("/api/minibrains", headers=bea)
+    refused = client.get("/api/models", headers=bea)
     assert refused.status_code == 403 and "turned off" in refused.json()["detail"]
 
 
@@ -218,7 +216,7 @@ def set_up_admin(proxied: Proxied, client: TestClient) -> None:
 def test_local_accounts_still_work_behind_the_proxy(proxied: Proxied) -> None:
     client = proxied.client(STRANGER)
     set_up_admin(proxied, client)
-    assert client.get("/api/minibrains").status_code == 200
+    assert client.get("/api/models").status_code == 200
     assert client.get("/api/auth/session").json()["person"]["source"] == "local"
 
 
@@ -240,7 +238,7 @@ def test_default_role_set_in_the_config_file_is_locked(settings: Settings, monke
     for proxied in proxied_install(settings, monkeypatch, AUTH | {"default_role": "viewer"}):
         client = proxied.client()
         nobody = as_person("nia", groups="sales")
-        assert client.get("/api/minibrains", headers=nobody).status_code == 200
+        assert client.get("/api/models", headers=nobody).status_code == 200
         admin = as_person("ada", groups="minibrain-admins")
         headers = admin | csrf_for(client, admin)
         refused = client.put("/api/policies/default_role", json={"value": "none"}, headers=headers)
