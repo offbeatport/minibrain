@@ -74,6 +74,8 @@ STATE_LABELS = {
     "stopping": "Stopping",
     "stop_failed": "Stop failed",
 }
+FETCHING = "fetching"
+FETCHING_LABEL = "Fetching weights"
 USAGE_DAYS = 7
 FAILED_STATUS = 500
 LATENCY_SAMPLE = 2000
@@ -334,7 +336,7 @@ def deployment(
     if not deployed:
         return Deployment(state="not_deployed", label="Not deployed")
     state: DeploymentState = "running" if health == "running" else "unhealthy" if health == "unhealthy" else "starting"
-    label = STATE_LABELS[state]
+    label = FETCHING_LABEL if health == FETCHING else STATE_LABELS[state]
     return Deployment(state=state, label=f"{label_prefix} · {label}" if label_prefix else label, versions=versions)
 
 

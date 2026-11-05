@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from minibrain.artifacts import ArtifactStore, StreamReader
 from minibrain.base_models import BaseModelSpec
-from minibrain.models.copies import BUCKET, bucket_client, ensure, opener_for, prune
+from minibrain.models.copies import BUCKET, Progress, bucket_client, ensure, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
 from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
 from minibrain.serve.backend import (
@@ -30,6 +30,19 @@ from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.serve.structured import Constraint
 from minibrain.telemetry.logs import configure_logging
 from minibrain.worker import HttpClient
+
+FETCHING = "fetching"
+LOADING = "loading"
+FETCH_FAILED = "fetch_failed"
+GIB = 1024**3
+PROGRESS_SECONDS = 30.0
+Fetch = Callable[[Progress], Any]
+
+
+def fetching_detail(base: str, host: str, progress: Progress) -> dict[str, Any]:
+    share = f"{progress.done / GIB:.1f} of {progress.total / GIB:.1f} GB" if progress.total else "checking its files"
+    message = f"{base} is fetching its weights on {host}: {share}; try again when it finishes"
+    return {"state": FETCHING, "done": progress.done, "total": progress.total, "message": message}
 
 
 class AdapterBody(BaseModel):
@@ -157,11 +170,13 @@ class Announcer:
         token: str,
         body: Callable[[], dict[str, Any]],
         tick: Callable[[], Any] | None = None,
+        phase: Callable[[], str] = lambda: LOADING,
     ) -> None:
         self.client = client
         self.headers = {"Authorization": f"Bearer {token}"}
         self.body = body
         self.tick = tick
+        self.phase = phase
         self.count = 0
 
     def announce(self, state: str) -> None:
@@ -171,7 +186,7 @@ class Announcer:
     def forever(self, ready: threading.Event, stop: threading.Event, failed: threading.Event | None = None) -> None:
         while True:
             try:
-                self.announce("failed" if failed and failed.is_set() else "ready" if ready.is_set() else "loading")
+                self.announce("failed" if failed and failed.is_set() else "ready" if ready.is_set() else self.phase())
             except Exception:
                 log.warning("could not reach main to announce this engine")
             self.count += 1
@@ -228,25 +243,34 @@ def listing_of(client: HttpClient, token: str, key: str) -> dict[str, Any]:
     return dict(response.json())
 
 
-def copy_base(client: HttpClient, token: str, found: dict[str, Any], key: str, folder: Path) -> None:
+def copy_base(
+    client: HttpClient, token: str, found: dict[str, Any], key: str, folder: Path, progress: Progress | None = None
+) -> None:
     headers = {"Authorization": f"Bearer {token}"}
     with bucket_client() as bucket:
-        opener = opener_for(found, client, f"/internal/gateway/bases/{key}/files", headers, bucket)
-        ensure(folder, found["files"], opener, found.get("content_hash"))
+        files_url = f"/internal/gateway/bases/{key}/files"
+        opener = opener_for(found, client, files_url, headers, bucket, lambda: listing_of(client, token, key))
+        ensure(folder, found["files"], opener, found.get("content_hash"), progress)
+
+
+def remote_base(client: HttpClient, token: str, key: str, folder: Path) -> tuple[BaseModelSpec, Fetch]:
+    found = listing_of(client, token, key)
+    spec = replace(BaseModelSpec.from_dict(found["spec"]), path=str(folder))
+    return spec, lambda progress: copy_base(client, token, found, key, folder, progress)
 
 
 def pull_base(client: HttpClient, token: str, key: str, folder: Path) -> BaseModelSpec:
-    found = listing_of(client, token, key)
-    copy_base(client, token, found, key, folder)
-    return replace(BaseModelSpec.from_dict(found["spec"]), path=str(folder))
+    spec, fetch = remote_base(client, token, key, folder)
+    fetch(Progress())
+    return spec
 
 
-def local_copy(client: HttpClient, token: str, spec: BaseModelSpec) -> BaseModelSpec:
+def local_copy(client: HttpClient, token: str, spec: BaseModelSpec, progress: Progress | None = None) -> BaseModelSpec:
     if not spec.path or not spec.content_hash:
         return spec
     found = listing_of(client, token, spec.key)
     if found.get("store") == BUCKET:
-        copy_base(client, token, found, spec.key, Path(spec.path))
+        copy_base(client, token, found, spec.key, Path(spec.path), progress)
     return spec
 
 
@@ -268,6 +292,7 @@ def create_engine_app(
     node: NodeReport | None = None,
     requested: str | None = None,
     managed: bool = False,
+    fetch: Fetch | None = None,
 ) -> FastAPI:
     base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
@@ -276,16 +301,51 @@ def create_engine_app(
     ready = threading.Event()
     failed = threading.Event()
     flights = Flights()
-    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend, "failure": None}
+    progress = Progress()
+    phase = {"now": FETCHING if fetch is not None else LOADING}
+    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend, "failure": None, "host": ""}
 
     def announced() -> dict[str, Any]:
         return {"engine": current["engine"]} | (current["failure"] or {})
+
+    def fail(failure: dict[str, str]) -> None:
+        current["failure"] = failure
+        failed.set()
+
+    def log_progress(stop: threading.Event) -> None:
+        while not stop.wait(PROGRESS_SECONDS):
+            log.info("%s", fetching_detail(base, current["host"], progress)["message"])
+
+    def prepare(hardware: NodeReport) -> None:
+        if fetch is not None:
+            fetched = threading.Event()
+            threading.Thread(target=log_progress, args=(fetched,), daemon=True).start()
+            try:
+                fetch(progress)
+            except Exception as error:
+                log.exception("could not fetch the weights of %s", spec.key)
+                first = str(error).splitlines()[0][:300] if str(error) else type(error).__name__
+                fail({"code": FETCH_FAILED, "error": f"{hardware.host} could not fetch {spec.key}: {first}."})
+                return
+            finally:
+                fetched.set()
+            log.info("fetched the weights of %s (%d bytes)", spec.key, progress.done)
+        phase["now"] = LOADING
+        if current["backend"] is None:
+            try:
+                current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
+            except Exception as error:
+                log.exception("could not load %s", spec.key)
+                fail(load_failure(error, spec, hardware.host))
+                return
+        ready.set()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         configure_logging()
         stop = threading.Event()
         hardware = node or report()
+        current["host"] = hardware.host
         if current["backend"] is None:
             current["engine"] = choose_engine(hardware, spec.format, requested)
         announcer: Announcer | None = None
@@ -293,18 +353,17 @@ def create_engine_app(
             body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
             body |= {"pool": pool, "hardware": hardware.as_dict(), "managed": managed}
             announcer = Announcer(
-                client, token, lambda: body | announced(), lambda: prune_engines(client, token, home.parent)
+                client,
+                token,
+                lambda: body | announced(),
+                lambda: prune_engines(client, token, home.parent),
+                lambda: phase["now"],
             )
             threading.Thread(target=announcer.forever, args=(ready, stop, failed), daemon=True).start()
-        if current["backend"] is None:
-            try:
-                current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
-            except Exception as error:
-                log.exception("could not load %s", spec.key)
-                current["failure"] = load_failure(error, spec, hardware.host)
-                failed.set()
-        if current["failure"] is None:
+        if fetch is None and current["backend"] is not None:
             ready.set()
+        else:
+            threading.Thread(target=prepare, args=(hardware,), daemon=True).start()
         yield
         stop.set()
         if announcer is not None:
@@ -313,15 +372,17 @@ def create_engine_app(
         if closing is not None:
             closing()
 
-    app = FastAPI(title=f"minibrain engine {base}", lifespan=lifespan)
+    app = FastAPI(title=f"minibrain engine {base}", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
         if current["failure"] is not None:
             raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
+        if phase["now"] == FETCHING:
+            raise HTTPException(status_code=503, detail=fetching_detail(base, current["host"], progress))
         if not ready.is_set() or serving is None:
-            raise HTTPException(status_code=503, detail="loading")
+            raise HTTPException(status_code=503, detail=LOADING)
         loaded = next((item for item in serving.status() if item["base_model"] == base), None)
         return {
             "base_model": base,
@@ -335,8 +396,10 @@ def create_engine_app(
         if current["failure"] is not None:
             raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
-        if serving is None:
-            raise HTTPException(status_code=503, detail="loading")
+        if phase["now"] == FETCHING:
+            raise HTTPException(status_code=503, detail=fetching_detail(base, current["host"], progress))
+        if not ready.is_set() or serving is None:
+            raise HTTPException(status_code=503, detail=LOADING)
         if body.adapter is not None:
             mismatch = base_changed(body.adapter.name, base, body.adapter.base_hash, spec.content_hash)
             if mismatch is not None:

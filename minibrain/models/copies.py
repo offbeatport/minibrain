@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,15 @@ Opener = Callable[[dict[str, Any]], AbstractContextManager[Iterator[bytes]]]
 
 class CopyError(Exception):
     pass
+
+
+@dataclass
+class Progress:
+    done: int = 0
+    total: int = 0
+
+    def share(self) -> float:
+        return self.done / self.total if self.total else 0.0
 
 
 def bucket_client() -> httpx.Client:
@@ -77,7 +87,7 @@ def matches(folder: Path, files: list[dict[str, Any]], content_hash: str | None)
     )
 
 
-def fetch(target: Path, entry: dict[str, Any], opener: Opener) -> None:
+def fetch(target: Path, entry: dict[str, Any], opener: Opener, progress: Progress | None = None) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     descriptor, name = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
     digest = hashlib.sha256()
@@ -88,6 +98,8 @@ def fetch(target: Path, entry: dict[str, Any], opener: Opener) -> None:
                 out.write(chunk)
                 digest.update(chunk)
                 size += len(chunk)
+                if progress is not None:
+                    progress.done += len(chunk)
         expected = entry.get("sha256")
         if size != int(entry["size"]) or (expected and digest.hexdigest() != expected):
             raise CopyError(f"{entry['path']} arrived as {size} bytes that do not match the saved SHA-256")
@@ -96,23 +108,28 @@ def fetch(target: Path, entry: dict[str, Any], opener: Opener) -> None:
         Path(name).unlink(missing_ok=True)
 
 
-def ensure(folder: Path, files: list[dict[str, Any]], opener: Opener, content_hash: str | None) -> list[str]:
+def ensure(
+    folder: Path,
+    files: list[dict[str, Any]],
+    opener: Opener,
+    content_hash: str | None,
+    progress: Progress | None = None,
+) -> list[str]:
     manifest = read_manifest(folder)
     if manifest.get("working_copy") and content_hash and manifest.get("content_hash") != content_hash:
         shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
     known = known_hashes(folder, content_hash)
-    fetched = []
     for entry in files:
-        target = folder / str(entry["path"])
-        if not target.resolve().is_relative_to(folder.resolve()):
+        if not (folder / str(entry["path"])).resolve().is_relative_to(folder.resolve()):
             raise CopyError(f"{entry['path']} is outside the model's folder")
-        if current(target, entry, known):
-            continue
-        fetch(target, entry, opener)
-        fetched.append(str(entry["path"]))
+    needed = [entry for entry in files if not current(folder / str(entry["path"]), entry, known)]
+    if progress is not None:
+        progress.total = sum(int(entry["size"]) for entry in needed)
+    for entry in needed:
+        fetch(folder / str(entry["path"]), entry, opener, progress)
     write_manifest(folder, content_hash, files)
-    return fetched
+    return [str(entry["path"]) for entry in needed]
 
 
 def stale(folder: Path, live: dict[str, str | None], key: str) -> bool:
@@ -165,7 +182,22 @@ def main_opener(client: Any, files_url: str, headers: dict[str, str]) -> Opener:
     return opened
 
 
-def opener_for(listing: dict[str, Any], client: Any, files_url: str, headers: dict[str, str], bucket: Any) -> Opener:
+def relisted_opener(http: httpx.Client, relist: Callable[[], dict[str, Any]]) -> Opener:
+    def opened(entry: dict[str, Any]) -> AbstractContextManager[Iterator[bytes]]:
+        fresh = {str(item["path"]): item for item in relist()["files"]}
+        return bucket_chunks(http, fresh.get(str(entry["path"]), entry))
+
+    return opened
+
+
+def opener_for(
+    listing: dict[str, Any],
+    client: Any,
+    files_url: str,
+    headers: dict[str, str],
+    bucket: Any,
+    relist: Callable[[], dict[str, Any]] | None = None,
+) -> Opener:
     if listing.get("store") == BUCKET:
-        return bucket_opener(bucket)
+        return bucket_opener(bucket) if relist is None else relisted_opener(bucket, relist)
     return main_opener(client, files_url, headers)

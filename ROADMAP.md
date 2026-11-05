@@ -1339,8 +1339,9 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   fp16 where the GPU has it and fp32 on MPS, with the MPS fallback in Platforms.
 - [x] Quantized bases in the bucket were not refused for training up front: the check read `config.json` from main's
   disk, which a bucket model may not have. It reads it through the store from the saved file list.
-- [ ] A local engine's first start includes downloading its model, which can exceed the 600 s startup limit for very
-  large models. Fetch the working copy as its own step before the engine starts, with progress.
+- [x] A local engine's first start included downloading its model, which could exceed the 600 s startup limit for very
+  large models. Fetching the working copy is now its own step before loading, with progress (`docs/serving.md`), and
+  each file gets a fresh signed link.
 - [ ] Key rotation re-uploads every bucket object whole, which is slow for large weights. Re-wrap only the key header,
   or use the bucket's server-side copy.
 - [ ] Delete Copy to the bucket (moving bases from main's disk when Storage switches to S3); it only served older

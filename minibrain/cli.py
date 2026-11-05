@@ -10,6 +10,7 @@ import time
 import webbrowser
 from collections.abc import Callable
 from dataclasses import asdict
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -149,20 +150,21 @@ def engine(args: argparse.Namespace) -> None:
     import httpx
 
     from minibrain.base_models import BaseModelSpec
-    from minibrain.serve.engine import create_engine_app, local_copy, prune_engines, pull_base
+    from minibrain.serve.engine import create_engine_app, local_copy, prune_engines, remote_base
     from minibrain.settings import load_settings
 
     settings = load_settings()
     token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
     client = httpx.Client(base_url=args.main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     if args.spec:
-        spec = local_copy(client, token, BaseModelSpec.from_dict(json.loads(args.spec)))
+        spec = BaseModelSpec.from_dict(json.loads(args.spec))
+        fetch = partial(local_copy, client, token, spec)
     elif args.model:
         try:
             prune_engines(client, token, settings.home / "engines")
         except httpx.HTTPError:
             print("could not check this machine's model copies against main", flush=True)
-        spec = pull_base(client, token, args.model, settings.home / "engines" / args.model / "weights")
+        spec, fetch = remote_base(client, token, args.model, settings.home / "engines" / args.model / "weights")
     else:
         raise SystemExit("minibrain engine needs --model")
     app = create_engine_app(
@@ -175,6 +177,7 @@ def engine(args: argparse.Namespace) -> None:
         pool=args.pool,
         requested=args.engine,
         managed=args.parent is not None,
+        fetch=fetch,
     )
     threading.Thread(target=watch_parent, args=(args.parent, threading.Event(), terminate_self), daemon=True).start()
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

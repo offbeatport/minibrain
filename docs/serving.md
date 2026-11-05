@@ -95,6 +95,12 @@ hardware and the model's weight format:
   has when it starts and every 10 minutes.
 - Local engines on `main` use `main`'s working copy, `<home>/models/<id>`, fetched from the bucket the first time they
   start when the model lives there.
+- Fetching the working copy is its own step, before the engine loads the model: the engine answers `/health` with 503
+  and `{"state": "fetching", "done", "total", "message"}`, announces state `fetching` (Infrastructure and the Models
+  list say "Fetching weights") and logs its progress every 30 s. Each file gets a freshly signed link, so a fetch
+  longer than the links' 15 minutes still completes. A request to a model that is still fetching waits up to 60 s,
+  then gets a 503 that says how far the fetch is; the 600 s startup window starts only when loading starts. A fetch
+  that fails says so and loads nothing.
 - `main` starts a local engine for a deployed model only when no live replica serves it elsewhere, and starts one
   again when the remote replicas go away.
 - Scale is horizontal: more replicas of the same model, on Kubernetes autoscaled. Heavy engines are optional extras;

@@ -1,22 +1,32 @@
 import json
 import sys
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
-from minibrain.models.copies import CopyError
+from minibrain.models import copies
+from minibrain.models.copies import BUCKET, CopyError, Progress, ensure
+from minibrain.models.files import sha256_of
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import Model
 from minibrain.serve import engine as engine_module
+from minibrain.serve import engines as engines_module
 from minibrain.serve import select
-from minibrain.serve.backend import AdapterRef, CompletionRequest, TransformersBackend
-from minibrain.serve.engine import load_backend, pull_base
+from minibrain.serve.backend import AdapterRef, CompletionRequest, EngineUnavailableError, TransformersBackend
+from minibrain.serve.engine import create_engine_app, load_backend, pull_base
+from minibrain.serve.engines import FETCHING, EngineBackend, EngineManager
 from minibrain.serve.select import NoEngineError, choose_engine, installed_engines
 from minibrain.serve.sglang_backend import SglangBackend
 from minibrain.serve.structured import TokenTrie
-from tests.conftest import Harness
+from minibrain.supervise import Supervisor
+from tests.conftest import FakeBackend, Harness
 from tests.test_models import FILES, add_tiny, download_tiny, hub  # noqa: F401
 
 LINUX_GPU = NodeReport(
@@ -172,3 +182,109 @@ def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harne
         {"url": "http://gpu-09:8200", "engine": "sglang", "pool": "rack", "state": "ready"}
     ]
     assert seen[-1]["tiny"][0]["url"] == "http://gpu-09:8200"
+
+
+def test_ensure_reports_progress_over_the_files_it_fetches(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    for name, data in FILES.items():
+        (source / name).write_bytes(data)
+    files = [{"path": name, "size": len(data), "sha256": sha256_of(source / name)} for name, data in FILES.items()]
+    (tmp_path / "copy").mkdir()
+    (tmp_path / "copy" / "config.json").write_bytes(FILES["config.json"])
+
+    @contextmanager
+    def opener(entry: dict[str, Any]) -> Iterator[Iterator[bytes]]:
+        yield iter([(source / str(entry["path"])).read_bytes()])
+
+    progress = Progress()
+    fetched = ensure(tmp_path / "copy", files, opener, None, progress)
+    expected = sum(len(data) for name, data in FILES.items() if name != "config.json")
+    assert set(fetched) == set(FILES) - {"config.json"}
+    assert (progress.done, progress.total, progress.share()) == (expected, expected, 1.0)
+
+
+def wait_until(check: Callable[[], bool]) -> bool:
+    for _ in range(200):
+        if check():
+            return True
+        threading.Event().wait(0.05)
+    return False
+
+
+def test_an_engine_fetches_its_weights_before_it_loads_and_says_so(
+    harness: Harness, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release, loaded = threading.Event(), threading.Event()
+
+    def fetch(progress: Progress) -> None:
+        progress.total, progress.done = 4 * engine_module.GIB, engine_module.GIB
+        release.wait(10)
+        progress.done = progress.total
+
+    class Loading(FakeBackend):
+        def load(self, spec: BaseModelSpec) -> None:
+            loaded.set()
+
+    monkeypatch.setattr(engine_module, "make_backend", lambda _engine, _materialize: Loading())
+    node = with_engines(CPU, "transformers")
+    app = create_engine_app(QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch)
+    with TestClient(app) as engine:
+        waiting = engine.get("/health")
+        assert waiting.status_code == 503 and waiting.json()["detail"]["state"] == FETCHING
+        assert "fetching its weights on cpu-01: 1.0 of 4.0 GB" in waiting.json()["detail"]["message"]
+        assert engine.post("/generate", json={"messages": []}).json()["detail"]["state"] == FETCHING
+        manager = EngineManager(harness.settings, "http://main")
+        manager.engines[QWEN3_0_6B.key] = ("http://testserver", Supervisor("engine", [], {}))
+        assert manager.health(QWEN3_0_6B.key, engine) == FETCHING
+        backend = EngineBackend(lambda: {QWEN3_0_6B.key: [{"url": "http://testserver", "state": "loading"}]}, engine)
+        request = CompletionRequest(QWEN3_0_6B, [{"role": "user", "content": "x"}], None, 8)
+        with monkeypatch.context() as patch:
+            patch.setattr(engines_module, "FETCH_WAIT_SECONDS", 0.0)
+            with pytest.raises(EngineUnavailableError, match="fetching its weights"):
+                backend.complete(request)
+        assert not loaded.is_set()
+        release.set()
+        assert wait_until(lambda: engine.get("/health").status_code == 200)
+        assert manager.health(QWEN3_0_6B.key, engine) == "running"
+        assert backend.complete(request).text == "billing"
+
+
+def test_a_failed_fetch_is_reported_and_nothing_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fetch(_progress: Progress) -> None:
+        raise CopyError("the bucket answered 403 for model.safetensors")
+
+    monkeypatch.setattr(engine_module, "make_backend", lambda _engine, _materialize: Broken())
+    node = with_engines(CPU, "transformers")
+    app = create_engine_app(QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch)
+    with TestClient(app) as engine:
+        assert wait_until(lambda: engine.get("/health").status_code == 500)
+        detail = engine.get("/health").json()["detail"]
+        assert detail == "cpu-01 could not fetch qwen3-0.6b: the bucket answered 403 for model.safetensors."
+
+
+@pytest.mark.usefixtures("hub")
+def test_signed_links_are_fetched_fresh_for_each_file(
+    harness: Harness, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    add_tiny(harness)
+    download_tiny(harness)
+    assert harness.worker(kinds=["download"]).run_once()
+    calls: list[str] = []
+    listing = engine_module.listing_of
+
+    def counted(client: Any, token: str, key: str) -> dict[str, Any]:
+        calls.append(key)
+        return listing(client, token, key) | {"store": BUCKET}
+
+    monkeypatch.setattr(engine_module, "listing_of", counted)
+    monkeypatch.setattr(copies, "bucket_chunks", lambda _http, entry: copies_main(harness, entry))
+    pull_base(harness.client, harness.settings.secret("gateway_token"), "tiny", tmp_path / "weights")
+    assert calls == ["tiny"] * (1 + len(FILES))
+    assert all((tmp_path / "weights" / name).read_bytes() == data for name, data in FILES.items())
+
+
+@contextmanager
+def copies_main(harness: Harness, entry: dict[str, Any]) -> Iterator[Iterator[bytes]]:
+    url = f"/internal/gateway/bases/tiny/files/{entry['path']}"
+    yield iter([harness.client.get(url, headers=harness.gateway_headers).content])

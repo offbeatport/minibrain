@@ -49,6 +49,18 @@ const ENGINE_LABEL: Record<string, string> = {
     llamacpp: "llama.cpp",
 };
 
+const ENGINE_STATES: Record<string, string> = {
+    ready: "Ready",
+    loading: "Loading",
+    fetching: "Fetching weights",
+    failed: "Failed",
+};
+
+const ENGINE_BADGES: Record<string, "success" | "destructive"> = {
+    ready: "success",
+    failed: "destructive",
+};
+
 function engineNames(engines: string[]): string {
     return engines.map((engine) => ENGINE_LABEL[engine] ?? engine).join(", ");
 }
@@ -171,8 +183,8 @@ const REPLICA_COLUMNS: ColumnDef<ReplicaInfo, unknown>[] = [
         header: "State",
         id: "state",
         cell: ({ row }) => (
-            <Badge variant={row.original.state === "ready" ? "success" : "neutral"}>
-                {row.original.state === "ready" ? "Ready" : "Loading"}
+            <Badge variant={ENGINE_BADGES[row.original.state] ?? "neutral"}>
+                {ENGINE_STATES[row.original.state] ?? "Loading"}
             </Badge>
         ),
     },

@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import IO, Any, BinaryIO, Protocol
 
@@ -361,7 +362,8 @@ class Worker:
         folder = self.config.models_dir / str(spec["key"])
         files_url = f"/internal/worker/bases/{spec['key']}/files"
         with bucket_client() as bucket:
-            opener = opener_for(listing, self.client.http, files_url, self.client.headers, bucket)
+            relist = partial(self.client.bases, str(spec["key"]))
+            opener = opener_for(listing, self.client.http, files_url, self.client.headers, bucket, relist)
             ensure(folder, files, opener, content)
         return spec | {"path": str(folder)}
 
