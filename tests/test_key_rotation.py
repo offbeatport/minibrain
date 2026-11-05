@@ -155,9 +155,11 @@ def test_rotation_sends_only_the_header_of_a_large_object(harness: Harness, monk
         _, after, _ = rekey.rotate_key(session, service, "tester")
         session.commit()
     calls: list[tuple[str, int]] = []
-    if store.remote is not None:
+    bucket = store.remote
+    if bucket is not None:
+        assert isinstance(bucket, object_store.BucketBlobs)
         monkeypatch.setattr(object_store, "COPY_PART", 5 * (1 << 20))
-        filesystem = store.remote.fs
+        filesystem = bucket.fs
         call = filesystem.call_s3
 
         def counted(method: str, *args: object, **kwargs: object) -> object:
@@ -166,14 +168,14 @@ def test_rotation_sends_only_the_header_of_a_large_object(harness: Harness, monk
             return call(method, *args, **kwargs)
 
         monkeypatch.setattr(filesystem, "call_s3", counted)
-        monkeypatch.setattr(store.remote, "replace", lambda *_args: pytest.fail("the bucket object was sent whole"))
+        monkeypatch.setattr(bucket, "replace", lambda *_args: pytest.fail("the bucket object was sent whole"))
     tally = run(harness, rekey.Plan(rewrap=True))
     assert (tally.rewrapped, tally.older) == (1, 0)
     assert stored_bytes(store, artifact_id)[HEADER:] == body
     assert header_key(stored_bytes(store, artifact_id)) == after
     with store.open(artifact_id) as stream:
         assert stream.read() == payload
-    if store.remote is not None:
+    if bucket is not None:
         sent = [(method, size) for method, size in calls if method != "head_object"]
         assert sent == [
             ("create_multipart_upload", 0),
