@@ -310,7 +310,7 @@ def test_catalogue_sync_reads_our_url_and_keeps_pins(
     with harness.sessions() as session:
         entry = session.get(CatalogModel, "tiny")
         assert entry is not None and entry.popularity == 7
-    assert harness.client.get("/api/catalog/settings").json() == {"daily_sync": False}
+    assert harness.client.get("/api/catalog/settings").json() == {"daily_sync": False, "daily_sync_locked": None}
 
 
 def test_my_models_shows_training_and_serving_independently(harness: Harness) -> None:

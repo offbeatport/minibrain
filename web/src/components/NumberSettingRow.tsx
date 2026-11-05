@@ -1,6 +1,7 @@
 import { Button, NumberField, type NumberFieldProps, SettingsRow } from "obp-ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { errorMessage } from "~/components/Section";
+import { SourceBadge } from "~/components/SourceBadge";
 
 type NumberOptions = Pick<
     NumberFieldProps,
@@ -16,6 +17,7 @@ export function NumberSettingRow({
     pending,
     error,
     onSave,
+    locked,
     ...options
 }: NumberOptions & {
     id: string;
@@ -26,6 +28,7 @@ export function NumberSettingRow({
     pending: boolean;
     error: unknown;
     onSave: (value: number, saved: () => void) => void;
+    locked?: string | null;
 }) {
     const [draft, setDraft] = useState<number | null | undefined>(undefined);
     const shown = draft === undefined ? (value ?? null) : draft;
@@ -36,6 +39,31 @@ export function NumberSettingRow({
             onSave(draft, () => setDraft(undefined));
         }
     };
+    if (locked) {
+        const text =
+            value === undefined
+                ? ""
+                : new Intl.NumberFormat(undefined, options.format).format(value);
+        return (
+            <SettingsRow
+                anchor={anchor}
+                label={label}
+                description={description}
+                disabled
+                control={
+                    <>
+                        <span className="text-sm tabular-nums">
+                            {text}
+                            {options.unit && (
+                                <span className="text-muted-foreground"> {options.unit}</span>
+                            )}
+                        </span>
+                        <SourceBadge source={locked} />
+                    </>
+                }
+            />
+        );
+    }
     return (
         <form onSubmit={submit} noValidate>
             <SettingsRow

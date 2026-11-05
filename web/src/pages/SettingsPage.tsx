@@ -18,6 +18,7 @@ import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SourceBadge } from "~/components/SourceBadge";
 import { ThemeChoice } from "~/components/ThemeChoice";
 import { useCan } from "~/lib/access";
 import { CURRENCIES } from "~/lib/cost";
@@ -66,6 +67,7 @@ function ModelCatalogue() {
     });
     const data = catalog.data;
     const syncing = data?.sync_job && ["queued", "running"].includes(data.sync_job.status);
+    const dailyLocked = settings.data?.daily_sync_locked;
     const checked = data?.synced_at
         ? `Checked for updates ${relativeTime(data.synced_at)}`
         : "Using the catalogue bundled with this release";
@@ -91,7 +93,7 @@ function ModelCatalogue() {
                     id="daily-sync-switch"
                     anchor={CATALOGUE.settings.dailySync.anchor}
                     toggle
-                    disabled={data?.offline_forced}
+                    disabled={data?.offline_forced || Boolean(dailyLocked)}
                     label={CATALOGUE.settings.dailySync.label}
                     description={
                         data?.offline_forced
@@ -100,16 +102,19 @@ function ModelCatalogue() {
                     }
                     error={errorMessage(daily.error)}
                     control={
-                        <Switch
-                            id="daily-sync-switch"
-                            checked={dailyOn ?? settings.data?.daily_sync ?? false}
-                            disabled={data?.offline_forced}
-                            readOnly={daily.isPending}
-                            onCheckedChange={(next) => {
-                                setDailyOn(next);
-                                daily.mutate(next);
-                            }}
-                        />
+                        <>
+                            <Switch
+                                id="daily-sync-switch"
+                                checked={dailyOn ?? settings.data?.daily_sync ?? false}
+                                disabled={data?.offline_forced || Boolean(dailyLocked)}
+                                readOnly={daily.isPending}
+                                onCheckedChange={(next) => {
+                                    setDailyOn(next);
+                                    daily.mutate(next);
+                                }}
+                            />
+                            {dailyLocked && <SourceBadge source={dailyLocked} />}
+                        </>
                     }
                 />
             </SettingsGroup>
@@ -136,7 +141,7 @@ function useSavePrices() {
     });
 }
 
-function CurrencyRow({ value }: { value: string | undefined }) {
+function CurrencyRow({ value, locked }: { value: string | undefined; locked?: string | null }) {
     const save = useSavePrices();
     const choices = value && !CURRENCIES.includes(value) ? [value, ...CURRENCIES] : CURRENCIES;
     return (
@@ -146,26 +151,34 @@ function CurrencyRow({ value }: { value: string | undefined }) {
             label={PRICES.settings.currency.label}
             description={PRICES.settings.currency.description}
             error={errorMessage(save.error)}
+            disabled={Boolean(locked)}
             control={
-                <Select
-                    value={value ?? "USD"}
-                    onValueChange={(next) => save.mutate({ currency: String(next) })}
-                >
-                    <SelectTrigger
-                        id="price-currency"
-                        aria-describedby="price-currency-description"
-                        className="w-32"
+                locked ? (
+                    <>
+                        <span className="text-sm">{value}</span>
+                        <SourceBadge source={locked} />
+                    </>
+                ) : (
+                    <Select
+                        value={value ?? "USD"}
+                        onValueChange={(next) => save.mutate({ currency: String(next) })}
                     >
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {choices.map((code) => (
-                            <SelectItem key={code} value={code}>
-                                {code}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                        <SelectTrigger
+                            id="price-currency"
+                            aria-describedby="price-currency-description"
+                            className="w-32"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {choices.map((code) => (
+                                <SelectItem key={code} value={code}>
+                                    {code}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )
             }
         />
     );
@@ -193,6 +206,7 @@ function PoolPriceRow({ pool, currency }: { pool: PoolPrice; currency: string })
             format={{ style: "currency", currency, maximumFractionDigits: 4 }}
             unit="per hour"
             groupClassName="w-36"
+            locked={pool.locked}
             pending={save.isPending}
             error={save.error}
             onSave={(next, saved) =>
@@ -217,7 +231,7 @@ function ComputePrices() {
         >
             <ErrorLine error={prices.error} />
             <SettingsGroup>
-                <CurrencyRow value={data?.currency} />
+                <CurrencyRow value={data?.currency} locked={data?.currency_locked} />
                 {(data?.pools ?? []).map((pool) => (
                     <PoolPriceRow key={pool.pool} pool={pool} currency={data?.currency ?? "USD"} />
                 ))}

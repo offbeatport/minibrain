@@ -83,10 +83,20 @@ def announce(server: uvicorn.Server, found: "FirstRun", base: str, browser: bool
         print(f"Created the admin account {found.admin} from {ADMIN_EMAIL_ENV}.", flush=True)
 
 
+def checked_config() -> None:
+    from minibrain.provision import ConfigError, problems
+
+    try:
+        problems()
+    except ConfigError as error:
+        raise SystemExit(f"minibrain.yaml: {error}") from error
+
+
 def serve(host: str, port: int, with_worker: bool, browser: bool) -> None:
     from minibrain.settings import load_settings
     from minibrain.worker import LOCAL_KINDS
 
+    checked_config()
     settings = load_settings()
     api_url = local_url(host, port)
     os.environ["MINIBRAIN_MAIN_URL"] = api_url
@@ -399,6 +409,22 @@ def openapi(output: Path | None) -> None:
         output.write_text(schema + "\n")
 
 
+def config_command(args: argparse.Namespace) -> None:
+    from minibrain.config_export import export, render
+    from minibrain.registry.db import make_sessions, migrate
+    from minibrain.settings import load_settings
+
+    checked_config()
+    settings = load_settings()
+    migrate(settings.database_url)
+    with make_sessions(settings.database_url)() as session:
+        text = render(*export(session, settings))
+    if args.output is None:
+        print(text, end="")
+    else:
+        args.output.write_text(text)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="minibrain")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -473,6 +499,12 @@ def main() -> None:
         "setup-link", help="print a new one-time link that creates the first admin; earlier links stop working"
     )
     link_command.add_argument("--url", default=None, help=f"address people open minibrain at (default {DEFAULT_URL})")
+    config_parser = commands.add_parser("config", help="the settings file, minibrain.yaml")
+    config_actions = config_parser.add_subparsers(dest="action", required=True)
+    export_command = config_actions.add_parser(
+        "export", help="print the effective settings as minibrain.yaml, with secrets named but never included"
+    )
+    export_command.add_argument("--output", type=Path, default=None)
     openapi_command = commands.add_parser("openapi", help="print the OpenAPI schema")
     openapi_command.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -492,6 +524,8 @@ def main() -> None:
         audit(args)
     elif args.command == "admin":
         admin(args)
+    elif args.command == "config":
+        config_command(args)
     else:
         openapi(args.output)
 

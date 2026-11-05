@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 RESET_PATH = "/reset-password"
 NAME_LENGTH = 200
 ROLE_LOCKED = "This role comes from the identity provider's groups and is set in minibrain.yaml"
+ADMIN_LISTED = "This person is listed in auth.admins in minibrain.yaml, so they stay an admin"
 LAST_ADMIN = "Keep at least one admin: give someone else the Admin role first"
 RoleChoice = Literal["viewer", "builder", "admin", "none"]
 
@@ -41,6 +42,7 @@ class AccountInfo(BaseModel):
     source: str
     role: Role | None
     role_locked: bool
+    admin_listed: bool = False
     groups: list[str]
     disabled: bool
     password_set: bool
@@ -104,6 +106,7 @@ def account_info(session: Session, config: AuthConfig, user: User, sessions: int
         source=user.source,
         role=person.role,
         role_locked=person.role_locked,
+        admin_listed=config.lists_admin(user.email, user.subject),
         groups=list(user.groups or []),
         disabled=user.disabled,
         password_set=user.password_hash is not None,
@@ -166,6 +169,8 @@ def add_account(body: AccountCreate, session: SessionDep, config: AuthDep) -> Pa
 def change_role(session: Session, config: AuthConfig, user: User, choice: RoleChoice) -> tuple[Any, Any] | None:
     wanted = role_of(choice)
     value = wanted.value if wanted else None
+    if config.lists_admin(user.email, user.subject):
+        raise AccountError(ADMIN_LISTED)
     if person_for(session, user, config).role_locked:
         raise AccountError(ROLE_LOCKED)
     if value == user.role:

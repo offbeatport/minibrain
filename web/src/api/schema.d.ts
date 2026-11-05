@@ -2541,6 +2541,11 @@ export interface components {
             role: components["schemas"]["Role"] | null;
             /** Role Locked */
             role_locked: boolean;
+            /**
+             * Admin Listed
+             * @default false
+             */
+            admin_listed?: boolean;
             /** Groups */
             groups: string[];
             /** Disabled */
@@ -2736,6 +2741,8 @@ export interface components {
             path: string;
             /** Size */
             size: number;
+            /** Sha256 */
+            sha256?: string | null;
         };
         /** BaseModelDetail */
         BaseModelDetail: {
@@ -3286,6 +3293,13 @@ export interface components {
             /** Daily Sync */
             daily_sync: boolean;
         };
+        /** CatalogSettingsInfo */
+        CatalogSettingsInfo: {
+            /** Daily Sync */
+            daily_sync: boolean;
+            /** Daily Sync Locked */
+            daily_sync_locked?: string | null;
+        };
         /** CatalogVariantInfo */
         CatalogVariantInfo: {
             /** Id */
@@ -3681,6 +3695,10 @@ export interface components {
              * @default 10
              */
             min_label_rows?: number;
+            /** Locked */
+            locked?: {
+                [key: string]: string;
+            };
         };
         /** DataSettingsUpdate */
         DataSettingsUpdate: {
@@ -3859,6 +3877,8 @@ export interface components {
         DevicePricesInfo: {
             /** Currency */
             currency: string;
+            /** Currency Locked */
+            currency_locked?: string | null;
             /** Pools */
             pools: components["schemas"]["PoolPrice"][];
         };
@@ -5556,6 +5576,8 @@ export interface components {
             accelerators: string[];
             /** Hourly Price */
             hourly_price: number | null;
+            /** Locked */
+            locked?: string | null;
         };
         /** PreviewResponse */
         PreviewResponse: {
@@ -6226,6 +6248,10 @@ export interface components {
             secret_set: boolean;
             /** Secret From Environment */
             secret_from_environment: boolean;
+            /** Secret Reference */
+            secret_reference?: string | null;
+            /** Locked */
+            locked?: string | null;
             /** Location */
             location: string;
         };
@@ -9405,7 +9431,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CatalogSettings"];
+                    "application/json": components["schemas"]["CatalogSettingsInfo"];
                 };
             };
         };
@@ -9429,7 +9455,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CatalogSettings"];
+                    "application/json": components["schemas"]["CatalogSettingsInfo"];
                 };
             };
             /** @description Validation Error */

@@ -4,12 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StringConstraints
 
+from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.registry.compute import Pool, pools
 from minibrain.registry.models import AuditEvent
-from minibrain.registry.prices import KEY, DevicePrices, load_prices, save_prices
+from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
 
 router = APIRouter(prefix="/api/compute", tags=["compute"])
 
@@ -94,10 +95,12 @@ class PoolPrice(BaseModel):
     label: str
     accelerators: list[str]
     hourly_price: float | None
+    locked: str | None = None
 
 
 class DevicePricesInfo(BaseModel):
     currency: str
+    currency_locked: str | None = None
     pools: list[PoolPrice]
 
 
@@ -112,19 +115,29 @@ def accelerators(pool: Pool) -> list[str]:
 
 
 def prices_info(found: list[Pool], prices: DevicePrices) -> DevicePricesInfo:
+    provided = provision.provided("compute")
+    fixed = locked_pools(provided)
+
+    def lock(name: str) -> str | None:
+        return provided.source("prices") if name in fixed else None
+
     listed = [
         PoolPrice(
-            pool=pool.name, label=pool.label, accelerators=accelerators(pool), hourly_price=prices.hourly_for(pool.name)
+            pool=pool.name,
+            label=pool.label,
+            accelerators=accelerators(pool),
+            hourly_price=prices.hourly_for(pool.name),
+            locked=lock(pool.name),
         )
         for pool in found
     ]
     known = {pool.name for pool in found}
     gone = [
-        PoolPrice(pool=name, label=name, accelerators=[], hourly_price=price)
+        PoolPrice(pool=name, label=name, accelerators=[], hourly_price=price, locked=lock(name))
         for name, price in sorted(prices.hourly.items())
         if name not in known
     ]
-    return DevicePricesInfo(currency=prices.currency, pools=listed + gone)
+    return DevicePricesInfo(currency=prices.currency, currency_locked=provided.source("currency"), pools=listed + gone)
 
 
 @router.get("/prices", dependencies=[Depends(viewer)])

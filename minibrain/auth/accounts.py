@@ -258,6 +258,8 @@ def set_password(session: Session, user: User, password: str) -> None:
 
 
 def role_for(session: Session, user: User, config: AuthConfig) -> tuple[Role | None, bool]:
+    if config.lists_admin(user.email, user.subject):
+        return Role.ADMIN, True
     mapped = config.mapped_role(list(user.groups or []))
     if mapped is not None:
         return mapped, True

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
+from minibrain import provision
 from minibrain.api.access import admin, builder
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
@@ -589,7 +590,8 @@ def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: 
 
 
 def data_settings(limits: DataLimits) -> DataSettings:
-    return DataSettings.model_validate(asdict(limits) | {"checks_off": list(limits.checks_off)})
+    locked = provision.provided("data").sources
+    return DataSettings.model_validate(asdict(limits) | {"checks_off": list(limits.checks_off), "locked": locked})
 
 
 @router.put("/datasets/{slug}/checks/{check}/dismissal", status_code=204, dependencies=[Depends(builder)])

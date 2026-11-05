@@ -46,7 +46,7 @@ class FirstRun:
 def sso_admin(session: Session, config: AuthConfig) -> bool:
     if not config.external:
         return False
-    if Role.ADMIN in config.roles.values():
+    if config.admins or Role.ADMIN in config.roles.values():
         return True
     return str(policy.value(session, "default_role")) == Role.ADMIN.value
 

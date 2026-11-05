@@ -3878,7 +3878,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CatalogSettings"
+                  "$ref": "#/components/schemas/CatalogSettingsInfo"
                 }
               }
             }
@@ -3907,7 +3907,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CatalogSettings"
+                  "$ref": "#/components/schemas/CatalogSettingsInfo"
                 }
               }
             }
@@ -8224,6 +8224,11 @@
             "type": "boolean",
             "title": "Role Locked"
           },
+          "admin_listed": {
+            "type": "boolean",
+            "title": "Admin Listed",
+            "default": false
+          },
           "groups": {
             "items": {
               "type": "string"
@@ -8889,6 +8894,17 @@
           "size": {
             "type": "integer",
             "title": "Size"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
           }
         },
         "type": "object",
@@ -10992,6 +11008,30 @@
         ],
         "title": "CatalogSettings"
       },
+      "CatalogSettingsInfo": {
+        "properties": {
+          "daily_sync": {
+            "type": "boolean",
+            "title": "Daily Sync"
+          },
+          "daily_sync_locked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Sync Locked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "daily_sync"
+        ],
+        "title": "CatalogSettingsInfo"
+      },
       "CatalogVariantInfo": {
         "properties": {
           "id": {
@@ -11963,6 +12003,13 @@
             "minimum": 1.0,
             "title": "Min Label Rows",
             "default": 10
+          },
+          "locked": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Locked"
           }
         },
         "type": "object",
@@ -12626,6 +12673,17 @@
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "currency_locked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Locked"
           },
           "pools": {
             "items": {
@@ -17891,6 +17949,17 @@
               }
             ],
             "title": "Hourly Price"
+          },
+          "locked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked"
           }
         },
         "type": "object",
@@ -19963,6 +20032,28 @@
           "secret_from_environment": {
             "type": "boolean",
             "title": "Secret From Environment"
+          },
+          "secret_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Reference"
+          },
+          "locked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked"
           },
           "location": {
             "type": "string",

@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from minibrain import provision
 from minibrain.registry.settings_store import read, write
 
 KEY = "compute.prices"
@@ -41,23 +42,47 @@ class EvalCost:
     per_1k: float | None
 
 
-def load_prices(session: Session) -> DevicePrices:
+def stored_prices(session: Session) -> DevicePrices:
     stored = read(session, KEY, {}) or {}
     hourly = {str(pool): float(price) for pool, price in (stored.get("hourly") or {}).items() if price}
     return DevicePrices(currency=str(stored.get("currency") or DEFAULT_CURRENCY), hourly=hourly)
 
 
+def provided_hourly(found: provision.Provided) -> dict[str, float]:
+    return {str(pool): float(price) for pool, price in (found.values.get("prices") or {}).items()}
+
+
+def load_prices(session: Session) -> DevicePrices:
+    stored = stored_prices(session)
+    found = provision.provided("compute")
+    hourly = {pool: price for pool, price in (stored.hourly | provided_hourly(found)).items() if price}
+    return DevicePrices(currency=str(found.values.get("currency") or stored.currency), hourly=hourly)
+
+
+def locked_pools(found: provision.Provided) -> set[str]:
+    return set(provided_hourly(found))
+
+
 def save_prices(session: Session, currency: str | None, hourly: dict[str, float] | None) -> DevicePrices:
+    found = provision.provided("compute")
     current = load_prices(session)
-    merged = dict(current.hourly)
+    if currency and currency != current.currency:
+        found.refuse("currency", "The currency")
     for pool, price in (hourly or {}).items():
+        if pool in locked_pools(found) and float(price) != current.hourly.get(pool, 0.0):
+            found.refuse("prices", f"The price of {pool}")
+    own = stored_prices(session)
+    merged = dict(own.hourly)
+    for pool, price in (hourly or {}).items():
+        if pool in locked_pools(found):
+            continue
         if price > 0:
             merged[pool] = float(price)
         else:
             merged.pop(pool, None)
-    saved = DevicePrices(currency=currency or current.currency, hourly=merged)
-    write(session, KEY, saved.as_dict())
-    return saved
+    kept = currency if currency and not found.source("currency") else own.currency
+    write(session, KEY, DevicePrices(currency=kept, hourly=merged).as_dict())
+    return load_prices(session)
 
 
 def optional_float(value: Any) -> float | None:

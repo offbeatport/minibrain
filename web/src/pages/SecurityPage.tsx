@@ -10,7 +10,6 @@ import {
     ScrollText,
 } from "lucide-react";
 import {
-    Badge,
     Button,
     Checkbox,
     Input,
@@ -24,9 +23,6 @@ import {
     SettingsGroup,
     SettingsRow,
     Switch,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
@@ -34,6 +30,7 @@ import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SourceBadge } from "~/components/SourceBadge";
 import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
 import { EncryptionSettings } from "~/pages/settings/EncryptionSettings";
@@ -95,37 +92,8 @@ function policyNames(section: SettingsSection): string[] {
     );
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-    "config file": "Set by config file",
-    environment: "Set by environment",
-    "built in": "Always on",
-};
-
-const SOURCE_DETAIL: Record<string, string> = {
-    "config file": "Set in the server's minibrain.yaml, so it can only be changed there.",
-    environment: "Set by an environment variable on the server, so it can only be changed there.",
-};
-
 function LockedBadge({ policy }: { policy: PolicyInfo }) {
-    const badge = (
-        <Badge variant="neutral" className="w-fit">
-            {SOURCE_LABEL[policy.source] ?? policy.source}
-        </Badge>
-    );
-    const detail = SOURCE_DETAIL[policy.source];
-    if (!detail) {
-        return badge;
-    }
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="w-fit rounded-sm">
-                    {badge}
-                </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs whitespace-normal">{detail}</TooltipContent>
-        </Tooltip>
-    );
+    return <SourceBadge source={policy.source} />;
 }
 
 const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };

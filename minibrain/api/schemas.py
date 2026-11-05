@@ -284,6 +284,7 @@ class DataSettings(BaseModel):
     checks_off: list[CheckName] = Field(default_factory=list)
     majority_share: float = Field(default=0.9, ge=0.5, le=1.0)
     min_label_rows: int = Field(default=10, ge=1, le=100_000)
+    locked: dict[str, str] = Field(default_factory=dict)
 
 
 class DataSettingsUpdate(BaseModel):
@@ -606,6 +607,8 @@ class StorageSettings(BaseModel):
     access_key: str
     secret_set: bool
     secret_from_environment: bool
+    secret_reference: str | None = None
+    locked: str | None = None
     location: str
 
 

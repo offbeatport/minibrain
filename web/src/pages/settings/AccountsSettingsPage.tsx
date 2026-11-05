@@ -250,9 +250,11 @@ function EditPersonDialog({
                             id="edit-role"
                             label="Role"
                             hint={
-                                person?.role_locked
-                                    ? "Set by their identity provider groups in minibrain.yaml."
-                                    : roleHint(role)
+                                person?.admin_listed
+                                    ? "Listed in auth.admins in minibrain.yaml."
+                                    : person?.role_locked
+                                      ? "Set by their identity provider groups in minibrain.yaml."
+                                      : roleHint(role)
                             }
                         >
                             {person?.role_locked ? (
@@ -379,11 +381,15 @@ function RoleCell({ person }: { person: AccountInfo }) {
             <Tooltip>
                 <TooltipTrigger asChild>
                     <button type="button" className="rounded-sm">
-                        <Badge variant="neutral">From groups</Badge>
+                        <Badge variant="neutral">
+                            {person.admin_listed ? "From minibrain.yaml" : "From groups"}
+                        </Badge>
                     </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs whitespace-normal">
-                    {`Groups ${person.groups.join(", ")} map to this role in minibrain.yaml.`}
+                    {person.admin_listed
+                        ? "Listed in auth.admins in minibrain.yaml."
+                        : `Groups ${person.groups.join(", ")} map to this role in minibrain.yaml.`}
                 </TooltipContent>
             </Tooltip>
         </span>

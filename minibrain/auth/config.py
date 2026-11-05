@@ -1,6 +1,7 @@
 import ipaddress
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -50,10 +51,14 @@ class AuthConfig:
     roles: dict[str, Role] = field(default_factory=dict)
     proxy: ProxyConfig | None = None
     oidc: OidcConfig | None = None
+    admins: frozenset[str] = frozenset()
 
     @property
     def external(self) -> bool:
         return self.proxy is not None or self.oidc is not None
+
+    def lists_admin(self, email: str | None, subject: str) -> bool:
+        return bool(self.admins) and ((email or "").strip().lower() in self.admins or subject.lower() in self.admins)
 
     def mapped_role(self, groups: list[str]) -> Role | None:
         wanted = {group.strip().lower() for group in groups}
@@ -109,6 +114,24 @@ def roles_of(section: Any) -> dict[str, Role]:
     return found
 
 
+def admins_of(section: Any) -> frozenset[str]:
+    if not section:
+        return frozenset()
+    if not isinstance(section, list) or not all(isinstance(item, str) and item.strip() for item in section):
+        raise AuthConfigError("auth.admins is a list of emails or user names, such as [alice@corp.example]")
+    return frozenset(item.strip().lower() for item in section)
+
+
+def secret_file_of(section: dict[str, Any]) -> str | None:
+    path = text_of(section, "client_secret_file")
+    if path is None:
+        return None
+    try:
+        return Path(path).expanduser().read_text().strip() or None
+    except OSError as error:
+        raise AuthConfigError(f"auth.oidc.client_secret_file {path} cannot be read: {error.strerror}") from error
+
+
 def text_of(section: dict[str, Any], key: str) -> str | None:
     value = section.get(key)
     return str(value).strip() or None if value is not None else None
@@ -129,7 +152,9 @@ def oidc_of(section: Any) -> OidcConfig | None:
     return OidcConfig(
         issuer=issuer,
         client_id=client_id,
-        client_secret=os.environ.get(OIDC_CREDENTIAL_ENV, "").strip() or text_of(section, "client_secret"),
+        client_secret=os.environ.get(OIDC_CREDENTIAL_ENV, "").strip()
+        or secret_file_of(section)
+        or text_of(section, "client_secret"),
         label=text_of(section, "label") or "single sign-on",
         scopes=tuple(str(scope) for scope in scopes),
         groups_claim=text_of(section, "groups_claim") or "groups",
@@ -144,4 +169,5 @@ def load_auth() -> AuthConfig:
         roles=roles_of(section.get("roles")),
         proxy=proxy_of(section.get("proxy")),
         oidc=oidc_of(section.get("oidc")),
+        admins=admins_of(section.get("admins")),
     )

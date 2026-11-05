@@ -69,6 +69,7 @@ from minibrain.models.registry import model_folder
 from minibrain.object_store import apply as apply_storage
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
+from minibrain.provision import check_config
 from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
@@ -197,6 +198,7 @@ def create_app(
     settings = settings or load_settings()
     configure_extensions(settings.home)
     configure_logging()
+    check_config()
     capture()
     migrate(settings.database_url)
     sessions = make_sessions(settings.database_url)

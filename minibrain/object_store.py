@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
+from minibrain import provision
 from minibrain.artifacts import ArtifactStore, is_artifact_id
 from minibrain.encryption.envelope import HEADER
 from minibrain.registry.models import AuditEvent
@@ -36,6 +37,12 @@ class StorageConfig:
 
 
 def load_config(session: Session) -> StorageConfig:
+    found = provision.provided("storage")
+    if found:
+        return replace(
+            StorageConfig(),
+            **{name: str(found.values[name]) for name in asdict(StorageConfig()) if name in found.values},
+        )
     stored = read(session, KEY, {}) or {}
     known = {name: str(stored[name]) for name in asdict(StorageConfig()) if name in stored}
     return replace(StorageConfig(), **known)
@@ -46,6 +53,9 @@ def secret_path(settings: Settings) -> Path:
 
 
 def read_secret(settings: Settings) -> str:
+    named = provision.read_storage_secret(provision.provided("storage"))
+    if named is not None:
+        return named
     override = os.environ.get(CREDENTIAL_ENV, "").strip()
     if override:
         return override
@@ -195,6 +205,7 @@ def check(config: StorageConfig, secret: str) -> None:
 
 
 def save(session: Session, settings: Settings, update: StorageConfig, secret: str | None, actor: str) -> StorageConfig:
+    provision.provided("storage").refuse_all("Storage")
     config = clean(update)
     if config.kind not in (LOCAL, S3):
         raise StorageError("storage is either a local folder or S3-compatible")

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain import storage
+from minibrain import provision, storage
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.model_rows import base_availability, model_job
@@ -256,16 +256,27 @@ class CatalogSettings(BaseModel):
     daily_sync: bool
 
 
+class CatalogSettingsInfo(CatalogSettings):
+    daily_sync_locked: str | None = None
+
+
+def catalog_settings(session: Session) -> CatalogSettingsInfo:
+    locked = provision.provided("catalogue").source("daily_sync")
+    return CatalogSettingsInfo(daily_sync=daily_sync(session), daily_sync_locked=locked)
+
+
 @router.get("/settings", dependencies=[Depends(viewer)])
-def read_settings(session: SessionDep) -> CatalogSettings:
-    return CatalogSettings(daily_sync=daily_sync(session))
+def read_settings(session: SessionDep) -> CatalogSettingsInfo:
+    return catalog_settings(session)
 
 
 @router.put("/settings", dependencies=[Depends(admin)])
-def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettings:
+def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettingsInfo:
+    if body.daily_sync != daily_sync(session):
+        provision.provided("catalogue").refuse("daily_sync", "Check every day")
     write(session, DAILY_SYNC_KEY, body.daily_sync)
     session.commit()
-    return CatalogSettings(daily_sync=body.daily_sync)
+    return catalog_settings(session)
 
 
 def sync_due(session: Session) -> bool:

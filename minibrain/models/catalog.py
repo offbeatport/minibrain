@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from minibrain import provision
 from minibrain.registry.models import CatalogModel, CatalogVariant, Model, now
 from minibrain.registry.settings_store import read, write
 
@@ -136,4 +137,7 @@ def sync_params(_session: Session) -> dict[str, Any]:
 
 
 def daily_sync(session: Session) -> bool:
+    found = provision.provided("catalogue")
+    if found.source("daily_sync"):
+        return bool(found.values["daily_sync"])
     return bool(read(session, DAILY_SYNC_KEY, False))

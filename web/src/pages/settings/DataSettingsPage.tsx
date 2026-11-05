@@ -7,6 +7,7 @@ import { type DataSettings, dataKeys, useDataSettings } from "~/api/dataQueries"
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SourceBadge } from "~/components/SourceBadge";
 import { count } from "~/lib/format";
 import { DATA, type Setting } from "~/pages/settings/settingsIndex";
 
@@ -68,7 +69,7 @@ function NumberSetting({
     );
 }
 
-function MajorityShare({ value }: { value: number | undefined }) {
+function MajorityShare({ value, locked }: { value: number | undefined; locked?: string }) {
     const save = useSaveSettings();
     return (
         <NumberSettingRow
@@ -82,6 +83,7 @@ function MajorityShare({ value }: { value: number | undefined }) {
             step={0.01}
             largeStep={0.1}
             format={PERCENT}
+            locked={locked}
             pending={save.isPending}
             error={save.error}
             onSave={(next, saved) => save.mutate({ majority_share: next }, { onSuccess: saved })}
@@ -93,6 +95,7 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
     const save = useSaveSettings();
     const [changed, setChanged] = useState<CheckName | null>(null);
     const off = new Set(data?.checks_off ?? []);
+    const locked = data?.locked?.checks_off;
     const toggle = (name: CheckName, on: boolean) => {
         setChanged(name);
         const next = new Set(off);
@@ -117,21 +120,25 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                         id={`check-${check.name}`}
                         anchor={check.text.anchor}
                         toggle
+                        disabled={Boolean(locked)}
                         label={check.text.label}
                         description={check.text.description}
                         error={changed === check.name ? errorMessage(save.error) : undefined}
                         control={
-                            <Switch
-                                id={`check-${check.name}`}
-                                checked={!off.has(check.name)}
-                                disabled={!data}
-                                readOnly={save.isPending}
-                                onCheckedChange={(checked) => toggle(check.name, checked)}
-                            />
+                            <>
+                                <Switch
+                                    id={`check-${check.name}`}
+                                    checked={!off.has(check.name)}
+                                    disabled={!data || Boolean(locked)}
+                                    readOnly={save.isPending}
+                                    onCheckedChange={(checked) => toggle(check.name, checked)}
+                                />
+                                {locked && <SourceBadge source={locked} />}
+                            </>
                         }
                     />
                 ))}
-                <MajorityShare value={data?.majority_share} />
+                <MajorityShare value={data?.majority_share} locked={data?.locked?.majority_share} />
                 <NumberSetting
                     id="min-label-rows-field"
                     anchor={TEXT.minLabelRows.anchor}
@@ -139,6 +146,7 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                     description={TEXT.minLabelRows.description}
                     value={data?.min_label_rows}
                     field="min_label_rows"
+                    locked={data?.locked?.min_label_rows}
                     min={1}
                     max={100_000}
                 />
@@ -168,6 +176,7 @@ export function DataSettingsPage() {
                             description={`Default ${count(200_000)}.`}
                             value={data?.row_limit}
                             field="row_limit"
+                            locked={data?.locked?.row_limit}
                             min={100}
                             max={50_000_000}
                             step={1000}
@@ -190,6 +199,7 @@ export function DataSettingsPage() {
                             description={`Default 5. ${DATA.versionRetention.settings.keepSnapshots.description}`}
                             value={data?.keep_snapshots}
                             field="keep_snapshots"
+                            locked={data?.locked?.keep_snapshots}
                             min={0}
                             max={1000}
                         />

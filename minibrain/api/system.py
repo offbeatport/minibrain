@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, make_url, select
 from sqlalchemy.orm import Session
 
+from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
@@ -131,8 +132,17 @@ def artifact_store(name: str, settings: Settings, store: ArtifactStore, used: in
     return folder_store(name, settings.artifacts_dir(), used)
 
 
+def secret_reference(found: provision.Provided) -> str | None:
+    ref = provision.storage_secret_ref(found)
+    if ref is None:
+        return None
+    kind, where = ref
+    return f"the environment variable {where}" if kind == "env" else f"the file {where}"
+
+
 def storage_settings(session: Session, settings: Settings, store: ArtifactStore) -> StorageSettings:
     config = load_config(session)
+    found = provision.provided("storage")
     return StorageSettings(
         kind="s3" if config.kind == S3 else "local",
         endpoint=config.endpoint,
@@ -142,6 +152,8 @@ def storage_settings(session: Session, settings: Settings, store: ArtifactStore)
         access_key=config.access_key,
         secret_set=bool(read_secret(settings)),
         secret_from_environment=bool(os.environ.get(CREDENTIAL_ENV, "").strip()),
+        secret_reference=secret_reference(found),
+        locked=found.locked_by(),
         location=store.remote.describe() if store.writes_remote and store.remote else str(settings.artifacts_dir()),
     )
 
