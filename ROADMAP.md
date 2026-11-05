@@ -88,13 +88,38 @@ replaced, not migrated.
 
 1. The engine, usable as Custom: chat examples, a contract (free text, label set, JSON schema), built-in graders
    (exact match, label accuracy, JSON field match, text similarity, a judge model on this install) and a promotion
-   rule over them.
-2. Classify as a preset on it.
-3. Extract.
-4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback.
+   rule over them; plus the recipe format (below).
+2. Classify as a preset on it, with its recipes and Start from a recipe in Add model.
+3. Extract, with its recipes.
+4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback; with its recipes.
 5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
    reinforcement fine-tuning with the graders as rewards, exports.
 6. Text-to-SQL with the execution grader.
+
+### Recipes
+
+A recipe is a worked use case a team can start from: `recipes/<name>/` holds a `minibrain.yaml` (preset, suggested
+base, column mapping, graders, promotion rule), a small synthetic sample dataset and a `README.md` (the situation,
+the data needed, the steps, and when it is not a fit). The docs render the README; Add model offers Start from a
+recipe, which fills the form and loads the sample to try before using real data. Recipes name no customers.
+
+| Area | Recipe | Preset |
+|---|---|---|
+| Finance | Trade break triage: break description → reason (price, quantity, settlement date, counterparty) | Classify |
+| Finance | Term sheet and confirmation extraction: text → notional, maturity, coupon, counterparty | Extract |
+| Finance | Communications surveillance: chat or email → flag or not, with the reason; recall-first rule | Classify |
+| Finance | Research notes in house style: analyst draft → client-ready note | General |
+| Insurance | Claims triage: first notice of loss → line, severity, route | Classify |
+| Legal | Contract clause extraction: contract → governing law, term, termination, liability cap | Extract |
+| Healthcare | Clinical note coding: note → codes, on an air-gapped install | Extract |
+| Support | Ticket routing: subject and body → queue (the bundled sample) | Classify |
+| IT operations | Incident classification: alert or ticket → service, severity | Classify |
+| Public sector | Request routing: citizen request → department | Classify |
+| Any | Distil an assistant: a large model's logged answers → a smaller model that matches them | General |
+
+- A recipe says plainly when a language model is the wrong tool: numeric forecasting and regression on tables (for
+  example predicting fund outflows) belong to classic ML; minibrain can still supply text features for it, such as
+  flagging client emails that signal a redemption.
 
 ## Concepts
 
