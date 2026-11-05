@@ -5,7 +5,7 @@
   {
    "id": "qwen3-0.6b",
    "name": "Qwen3 0.6B",
-   "description": "Small chat model; the tested default base for training minibrains on a laptop.",
+   "description": "Small chat model; the tested default base for training models on a laptop.",
    "provider": "Qwen",
    "repo": "Qwen/Qwen3-0.6B",
    "capabilities": [
