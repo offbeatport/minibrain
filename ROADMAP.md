@@ -302,7 +302,7 @@ Data is shared across models:
 
 - Uploads: CSV, TSV, JSON, JSON Lines or Parquet, staged into a DuckDB file keyed by content hash.
 - Source names are unique across the install, case aside. A name minibrain takes from a file, folder, path or table
-  gets the next number when it is taken (`tickets (2).csv`, table `tickets_2`); a typed name (Add source, Rename,
+  gets the next number when it is taken (`tickets (2).csv`, table `tickets_2`); a typed name (Add, Rename,
   Edit) that is taken is refused with the same 409 as datasets.
 - One content is one upload source: uploading a file whose SHA-256 is already a source's, under any name, stores
   nothing and returns that source (`200`, `outcome: existing`), and the UI says "This file is already uploaded as
@@ -337,7 +337,7 @@ Data is shared across models:
   plus the time read, so every read counts as new data. Use a read-only database user: minibrain never writes, but
   the user's grants are the real control.
 - Lakehouse tables, one group in the Data tree whose items each show their table format (the source kind stays
-  `iceberg` or `delta`, so no migration); Add source → Lakehouse table picks the format, then the connection or folder:
+  `iceberg` or `delta`, so no migration); Add → Lakehouse table picks the format, then the connection or folder:
   - Iceberg: an S3 connection plus the table's folder. minibrain lists `metadata/`, takes the highest-numbered
     `*.metadata.json` and its `current-snapshot-id`, and DuckDB's iceberg extension reads that snapshot
     (`iceberg_scan(…, version, snapshot_from_id)`) with `allowed_directories` limited to the table folder.
@@ -974,10 +974,17 @@ keys, and `/v1` stays key-only.
 - Panels are the kit's `Card`; a table sits edge to edge in its panel.
 - Data is an explorer: a resizable, searchable tree (the kit's `Tree`) on the left with two sections, Datasets and
   Sources; the selected item's detail on the right. Sources holds one group per kind (Uploads, Folders, S3, Databases,
-  Lakehouse), shown only once it has a source; an empty Sources points to Add source, and a link to an empty group
+  Lakehouse), shown only once it has a source; an empty Sources points to Add, and a link to an empty group
   opens Sources. Lakehouse holds Iceberg and Delta Lake tables, each with its format's `FileTypeIcon` and a format
-  badge (`group:iceberg` links open it). One "Add source" menu: Upload a file, Connect a folder, S3 path, Database
-  table or query, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format first), and the samples. Uploads
+  badge (`group:iceberg` links open it). One primary Add button in the page header, whatever is selected (`N` opens
+  it, except in a text field, the tree or a dialog), opens one menu in three groups. Dataset: New dataset (in the
+  selected folder or the selected dataset's folder, or from the selected source), New folder (in the same folder), and
+  "From N selected sources" when rows are ticked in a source table, else "From sources…", which opens Uploads. Source:
+  Upload file, Folder on the server, S3, Database, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format
+  first); an item that cannot work stays disabled and says why in its second line and a tooltip (no folders allowed,
+  no S3 or database connection), and admins get Open connections or Open security settings. Sample data: the bundled
+  samples. Group pages and Datasets have no add buttons of their own; a folder keeps Rename, Move to… and Delete, and
+  the tree's row menus keep their items. Uploads
   also takes a file dropped on it (the kit's `DropZone`, with Choose a file for keyboard and click), through the same
   checks as the button: the same content opens the existing source, a taken name asks Replace or Keep both. A source
   shows its table name, columns, stats, first rows and the datasets that read it; a folder also shows its file count,
@@ -991,15 +998,14 @@ keys, and `/v1` stays key-only.
 - Dataset folders (`dataset_folders`, `datasets.folder_id`) only organise; nothing a model trains on depends on them.
   They nest, sort before datasets (both by name), and a folder name is unique among its sibling folders and a dataset
   name among the datasets beside it, case aside. Every dialog that names or renames a folder, dataset or source (New
-  folder, Rename, Edit, New dataset, Make a dataset, Add source) checks the name as it is typed, says which item holds
-  it and keeps the button off, and a suggested name is already free; Move to… and drag and drop refuse a folder where
-  the name is taken. New folder sits
-  on Datasets and on every folder; a folder shows its contents with counts, and Rename, Move to… and Delete. Rows move
-  by drag and drop in the tree (the kit's `Tree` with `onMove`), or from the keyboard with "Move to…", a dialog with a
-  folder picker; a folder cannot move into itself or below itself. Deleting a folder moves its datasets and
-  subfolders up one level (a clashing name gets a number, `Billing (2)`) and deletes nothing else. Search still finds
-  datasets inside folders and opens their path. Create, rename, move and delete are audited (`dataset_folder.*`), and
-  so is a dataset changing folder (`dataset.move`).
+  folder, Rename, Edit, New dataset, Make a dataset, Add's source dialogs) checks the name as it is typed, says which
+  item holds it and keeps the button off, and a suggested name is already free; Move to… and drag and drop refuse a
+  folder where the name is taken. New folder is in Add and in the row menu of Datasets and every folder; a folder shows
+  its contents with counts, and Rename, Move to… and Delete. Rows move by drag and drop in the tree (the kit's `Tree`
+  with `onMove`), or from the keyboard with "Move to…", a dialog with a folder picker; a folder cannot move into itself
+  or below itself. Deleting a folder moves its datasets and subfolders up one level (a clashing name gets a number,
+  `Billing (2)`) and deletes nothing else. Search still finds datasets inside folders and opens their path. Create,
+  rename, move and delete are audited (`dataset_folder.*`), and so is a dataset changing folder (`dataset.move`).
 - Settings → Data: most rows in one version, how many unused versions stay per dataset, and the version checks with
   their limits. Settings → Storage: where artifacts live.
 - Settings → Connections: the buckets and databases that sources and imports read (see Connections), with each

@@ -695,17 +695,15 @@ export function FolderDetail({
     folder,
     index,
     creating,
-    onCreate,
     onSelect,
 }: {
     folder: DatasetFolder;
     index: FolderIndex;
     creating: boolean;
-    onCreate: () => void;
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const [dialog, setDialog] = useState<"new" | "rename" | null>(null);
+    const [renaming, setRenaming] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const subfolders = index.folders.get(folder.id) ?? [];
     const direct = index.datasets.get(folder.id) ?? [];
@@ -735,13 +733,7 @@ export function FolderDetail({
                 }
                 actions={
                     <>
-                        <Button onClick={onCreate} disabled={creating}>
-                            New dataset
-                        </Button>
-                        <Button variant="outline" onClick={() => setDialog("new")}>
-                            New folder
-                        </Button>
-                        <Button variant="outline" onClick={() => setDialog("rename")}>
+                        <Button variant="outline" onClick={() => setRenaming(true)}>
                             Rename
                         </Button>
                         <Button
@@ -781,24 +773,17 @@ export function FolderDetail({
                     onSelect={onSelect}
                     empty={
                         <p className="text-muted-foreground">
-                            Empty. Drag datasets or folders onto it in the list, or use Move to… on
-                            one.
+                            Empty. Use Add for a new dataset or folder here, drag datasets or
+                            folders onto it in the list, or use Move to… on one.
                         </p>
                     }
                 />
             )}
-            <NewFolderDialog
-                open={dialog === "new"}
-                parentId={folder.id}
-                index={index}
-                onOpenChange={(open) => setDialog(open ? "new" : null)}
-                onCreated={(created) => onSelect({ kind: "folder", id: created.id })}
-            />
             <RenameFolderDialog
-                open={dialog === "rename"}
+                open={renaming}
                 folder={folder}
                 index={index}
-                onOpenChange={(open) => setDialog(open ? "rename" : null)}
+                onOpenChange={setRenaming}
             />
             <MoveDialog
                 targets={moving ? [moving] : null}
@@ -813,37 +798,24 @@ export function DatasetsRoot({
     datasets,
     index,
     creating,
-    onCreate,
     onSelect,
 }: {
     datasets: DatasetSummary[];
     index: FolderIndex;
     creating: boolean;
-    onCreate: () => void;
     onSelect: (item: ItemRef) => void;
 }) {
-    const [naming, setNaming] = useState(false);
     const models = new Set(datasets.flatMap((dataset) => dataset.models));
     const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="text-2xl font-semibold">Datasets</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Saved queries that turn one or more sources into input and label rows.
-                        Models train on a saved version of one.
-                    </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={onCreate} disabled={creating}>
-                        New dataset
-                    </Button>
-                    <Button variant="outline" onClick={() => setNaming(true)}>
-                        New folder
-                    </Button>
-                </div>
-            </div>
+            <header className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="text-2xl font-semibold">Datasets</h2>
+                <p className="text-sm text-muted-foreground">
+                    Saved queries that turn one or more sources into input and label rows. Models
+                    train on a saved version of one.
+                </p>
+            </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Datasets" value={count(datasets.length)} />
                 <Stat label="Folders" value={count(index.byId.size)} />
@@ -857,19 +829,12 @@ export function DatasetsRoot({
                     onSelect={onSelect}
                     empty={
                         <p className="text-muted-foreground">
-                            No datasets yet. Add a file under Sources, then pick its input and label
-                            columns, or write SQL across several sources.
+                            No datasets yet. Use Add for a new dataset from your sources, or a
+                            sample that comes with one.
                         </p>
                     }
                 />
             )}
-            <NewFolderDialog
-                open={naming}
-                parentId={null}
-                index={index}
-                onOpenChange={setNaming}
-                onCreated={(created) => onSelect({ kind: "folder", id: created.id })}
-            />
         </div>
     );
 }

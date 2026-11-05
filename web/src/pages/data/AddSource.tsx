@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -8,13 +7,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    FileTypeIcon,
     Label,
     RadioGroup,
     RadioGroupItem,
@@ -29,22 +21,21 @@ import {
     unwrap,
     uploadFile,
 } from "~/api/client";
-import { useDatasets, useSamples, useSources } from "~/api/queries";
+import { useDatasets, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
-import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { type SourceGroupId, plural } from "./catalogue";
-import { GroupIcon, SourceIcon } from "./icons";
+import { SourceIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
 export type AddKind = Exclude<SourceGroupId, "upload">;
 
 export const SOURCE_CHOICES: { group: SourceGroupId; label: string; detail: string }[] = [
-    { group: "upload", label: "Upload a file", detail: "CSV, TSV, JSON, Parquet" },
-    { group: "folder", label: "Connect a folder", detail: "Files on this server" },
-    { group: "s3", label: "S3 path", detail: "Objects in a bucket" },
-    { group: "database", label: "Database table or query", detail: "PostgreSQL or MySQL" },
+    { group: "upload", label: "Upload file", detail: "CSV, TSV, JSON, Parquet" },
+    { group: "folder", label: "Folder on the server", detail: "Files read in place" },
+    { group: "s3", label: "S3", detail: "Objects in a bucket" },
+    { group: "database", label: "Database", detail: "PostgreSQL or MySQL table or query" },
     { group: "lakehouse", label: "Lakehouse table", detail: "Iceberg, Delta Lake" },
 ];
 
@@ -316,72 +307,4 @@ export function AlreadyAddedDialog({
 
 export function addSourceKind(adder: SourceAdder, onAdd: (kind: AddKind) => void) {
     return (group: SourceGroupId) => (group === "upload" ? adder.choose() : onAdd(group));
-}
-
-export function AddSourceMenu({
-    adder,
-    onAdd,
-}: {
-    adder: SourceAdder;
-    onAdd: (kind: AddKind) => void;
-}) {
-    const samples = useSamples();
-    const pick = addSourceKind(adder, onAdd);
-    const label =
-        adder.pending === "upload"
-            ? "Uploading…"
-            : adder.pending === "sample"
-              ? "Adding…"
-              : "Add source";
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button disabled={adder.pending !== null}>
-                    {label}
-                    <ChevronDown />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-                {SOURCE_CHOICES.map((choice) => (
-                    <DropdownMenuItem
-                        key={choice.group}
-                        onSelect={() => pick(choice.group)}
-                        className="items-start"
-                    >
-                        <GroupIcon group={choice.group} className="mt-0.5" />
-                        <span className="flex min-w-0 flex-col gap-0.5">
-                            <span className="font-medium">{choice.label}</span>
-                            <span className="text-sm text-muted-foreground">{choice.detail}</span>
-                        </span>
-                    </DropdownMenuItem>
-                ))}
-                {(samples.data ?? []).length > 0 && (
-                    <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Sample data</DropdownMenuLabel>
-                        {(samples.data ?? []).map((item) => (
-                            <DropdownMenuItem
-                                key={item.file}
-                                onSelect={() => adder.addSample(item.file)}
-                                className="items-start"
-                            >
-                                <FileTypeIcon name={item.file} className="mt-0.5" />
-                                <span className="flex min-w-0 flex-col gap-0.5">
-                                    <span className="font-medium">{item.name}</span>
-                                    <span className="text-sm text-muted-foreground tabular-nums">
-                                        {`${item.format} · ${count(item.rows)} rows · ${count(item.labels)} labels`}
-                                    </span>
-                                </span>
-                            </DropdownMenuItem>
-                        ))}
-                    </>
-                )}
-                {samples.error ? (
-                    <p className="px-2.5 py-1.5 text-sm text-destructive">
-                        Sample data could not be listed.
-                    </p>
-                ) : null}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
 }

@@ -54,17 +54,19 @@ const CONNECTION_KINDS: Record<ConnectedKind, ConnectionInfo["kind"][]> = {
     database: ["postgres", "mysql"],
 };
 
-const GROUPS: Record<ConnectedKind, { title: string; body: string; add: string; noun: string }> = {
+type GroupText = { title: string; body: string; choice: string; noun: string };
+
+const GROUPS: Record<ConnectedKind, GroupText> = {
     s3: {
         title: "S3",
         body: "Objects in a bucket, read in place as one table: every Parquet, CSV or JSON file a path or pattern matches. Changes are tracked by each object's ETag and size.",
-        add: "Add S3 path",
+        choice: "S3",
         noun: "path",
     },
     database: {
         title: "Databases",
         body: "A PostgreSQL or MySQL table, or one read-only query, read in place through a connection. Nothing is ever written back.",
-        add: "Add table or query",
+        choice: "Database",
         noun: "table",
     },
 };
@@ -473,12 +475,10 @@ export function ConnectedGroup({
     kind,
     sources,
     datasets,
-    onAdd,
 }: {
     kind: ConnectedKind;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    onAdd: () => void;
 }) {
     const connections = useConnections();
     const options = usable(connections.data, kind);
@@ -495,12 +495,9 @@ export function ConnectedGroup({
             : EXTENSIONS_FOR[kind];
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="text-2xl font-semibold">{group.title}</h2>
-                    <p className="text-sm text-muted-foreground">{group.body}</p>
-                </div>
-                {options.length > 0 && <Button onClick={onAdd}>{group.add}</Button>}
+            <header className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="text-2xl font-semibold">{group.title}</h2>
+                <p className="text-sm text-muted-foreground">{group.body}</p>
             </header>
             <ErrorLine error={connections.error} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
@@ -537,7 +534,7 @@ export function ConnectedGroup({
             ) : (
                 <p className="text-sm text-muted-foreground">
                     {members.length === 0
-                        ? `No ${group.noun}s yet. Each one becomes a table in dataset SQL.`
+                        ? `No ${group.noun}s yet. Pick ${group.choice} under Add; each one becomes a table in dataset SQL.`
                         : "Pick a source to see its columns, rows and how its changes are tracked."}
                 </p>
             )}

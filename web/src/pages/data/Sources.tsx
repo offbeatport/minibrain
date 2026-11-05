@@ -4,7 +4,6 @@ import type { DatasetSummary, SourceSummary } from "~/api/client";
 import { Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
-import { type AddKind, AddSourceMenu, type SourceAdder } from "./AddSource";
 import {
     type ItemRef,
     SOURCE_GROUPS,
@@ -53,14 +52,10 @@ const KIND_COLUMNS: ColumnDef<KindRow, unknown>[] = [
 export function SourcesOverview({
     sources,
     datasets,
-    adder,
-    onAdd,
     onSelect,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    adder: SourceAdder;
-    onAdd: (kind: AddKind) => void;
     onSelect: (item: ItemRef) => void;
 }) {
     const rows = SOURCE_GROUPS.map((group) => {
@@ -89,18 +84,9 @@ export function SourcesOverview({
                 </p>
             </header>
             {sources.length === 0 ? (
-                <EmptyState
-                    variant="panel"
-                    title="No sources yet"
-                    className="mx-0 mt-0"
-                    action={
-                        <div className="mt-3 flex justify-center">
-                            <AddSourceMenu adder={adder} onAdd={onAdd} />
-                        </div>
-                    }
-                >
-                    Upload a CSV, TSV, JSON or Parquet file, connect a folder, an S3 bucket or a
-                    database, or start from sample data.
+                <EmptyState variant="panel" title="No sources yet" className="mx-0 mt-0">
+                    Use Add to upload a CSV, TSV, JSON or Parquet file, read a folder, an S3 bucket
+                    or a database, or start from sample data.
                 </EmptyState>
             ) : (
                 <>

@@ -168,7 +168,7 @@ function ColumnSelect({
     );
 }
 
-function MakeDatasetDialog({
+export function MakeDatasetDialog({
     sources,
     onOpenChange,
     onCreated,
@@ -437,18 +437,20 @@ function DeleteSourcesDialog({
 
 export function SourceTable({
     sources,
+    selected,
+    onSelectedChange,
+    onMake,
     onSelect,
-    onCreated,
 }: {
     sources: SourceSummary[];
+    selected: string[];
+    onSelectedChange: (ids: string[]) => void;
+    onMake: (sources: SourceSummary[]) => void;
     onSelect: (item: ItemRef) => void;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
 }) {
-    const [selected, setSelected] = useState<string[]>([]);
-    const [making, setMaking] = useState<SourceSummary[] | null>(null);
     const [deleting, setDeleting] = useState<SourceSummary[] | null>(null);
     const chosen = sources.filter((source) => selected.includes(String(source.id)));
-    const clear = () => setSelected([]);
+    const clear = () => onSelectedChange([]);
     return (
         <div className="flex flex-col gap-3">
             {chosen.length > 0 && (
@@ -459,7 +461,7 @@ export function SourceTable({
                         Clear selection
                     </Button>
                     <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <Button size="sm" onClick={() => setMaking(chosen)}>
+                        <Button size="sm" onClick={() => onMake(chosen)}>
                             Make a dataset
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => setDeleting(chosen)}>
@@ -476,15 +478,7 @@ export function SourceTable({
                 onOpen={(row) => onSelect({ kind: "source", id: row.id })}
                 rowLabel={(row) => row.name}
                 selectedIds={selected}
-                onSelectedIdsChange={setSelected}
-            />
-            <MakeDatasetDialog
-                sources={making}
-                onOpenChange={(open) => !open && setMaking(null)}
-                onCreated={async (dataset) => {
-                    clear();
-                    await onCreated(dataset);
-                }}
+                onSelectedIdsChange={onSelectedChange}
             />
             <DeleteSourcesDialog
                 sources={deleting}

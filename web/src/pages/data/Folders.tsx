@@ -199,14 +199,11 @@ export function AddFolderDialog({
 export function FoldersGroup({
     sources,
     datasets,
-    onAdded,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    onAdded: (source: SourceAdded) => void;
 }) {
     const roots = useFolderRoots();
-    const [adding, setAdding] = useState(false);
     const members = sources.filter((source) => source.kind === "folder");
     const used = datasets.filter((dataset) =>
         members.some((source) => usesSource(dataset, source.id)),
@@ -214,15 +211,12 @@ export function FoldersGroup({
     const allowed = roots.data?.roots ?? [];
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="text-2xl font-semibold">Folders</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Directories on this server, read in place. Every CSV, TSV, JSON, JSON Lines
-                        or Parquet file of one format in a folder and its subfolders is one table.
-                    </p>
-                </div>
-                {allowed.length > 0 && <Button onClick={() => setAdding(true)}>Add folder</Button>}
+            <header className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="text-2xl font-semibold">Folders</h2>
+                <p className="text-sm text-muted-foreground">
+                    Directories on this server, read in place. Every CSV, TSV, JSON, JSON Lines or
+                    Parquet file of one format in a folder and its subfolders is one table.
+                </p>
             </header>
             <ErrorLine error={roots.error} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
@@ -267,12 +261,6 @@ export function FoldersGroup({
                     </ul>
                 </div>
             )}
-            <AddFolderDialog
-                open={adding}
-                roots={allowed}
-                onOpenChange={setAdding}
-                onAdded={onAdded}
-            />
         </div>
     );
 }

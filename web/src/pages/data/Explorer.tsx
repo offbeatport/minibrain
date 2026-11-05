@@ -48,22 +48,21 @@ import { ErrorLine, Stat } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
+import { AddMenu, SourceChoices, useSourceBlocks } from "./AddMenu";
 import {
     type AddKind,
-    AddSourceMenu,
     AlreadyAddedDialog,
-    SOURCE_CHOICES,
     type SourceAdder,
     addSourceKind,
     useSourceAdder,
 } from "./AddSource";
 import { AddDatabaseDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { CreateDataset, DatasetDetail } from "./DatasetDetail";
-import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFolders";
+import { DatasetsRoot, FolderDetail, folderOf, folderRef, useMoveItem } from "./DatasetFolders";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
 import { AddLakehouseDialog, LakehouseGroup } from "./Lakehouse";
-import { SourceTable } from "./SourceTable";
+import { MakeDatasetDialog, SourceTable } from "./SourceTable";
 import { SourcesOverview } from "./Sources";
 import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
@@ -257,42 +256,39 @@ function GroupDetail({
     sources,
     datasets,
     adder,
-    onUploaded,
-    onAdd,
+    picked,
+    onPick,
+    onMake,
     onSelect,
-    onCreated,
 }: {
     kind: SourceGroupId;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
     adder: SourceAdder;
-    onUploaded: (source: SourceAdded) => void;
-    onAdd: (kind: AddKind) => void;
+    picked: string[];
+    onPick: (ids: string[]) => void;
+    onMake: (sources: SourceSummary[]) => void;
     onSelect: (item: ItemRef) => void;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
 }) {
     const grouped = sources.filter((source) => groupOf(source.kind).id === kind);
     const table = grouped.length > 0 && (
-        <SourceTable sources={grouped} onSelect={onSelect} onCreated={onCreated} />
+        <SourceTable
+            sources={grouped}
+            selected={picked}
+            onSelectedChange={onPick}
+            onMake={onMake}
+            onSelect={onSelect}
+        />
     );
     if (kind !== "upload") {
         return (
             <div className="flex flex-col gap-6">
                 {kind === "folder" ? (
-                    <FoldersGroup sources={sources} datasets={datasets} onAdded={onUploaded} />
+                    <FoldersGroup sources={sources} datasets={datasets} />
                 ) : kind === "lakehouse" ? (
-                    <LakehouseGroup
-                        sources={sources}
-                        datasets={datasets}
-                        onAdd={() => onAdd(kind)}
-                    />
+                    <LakehouseGroup sources={sources} datasets={datasets} />
                 ) : (
-                    <ConnectedGroup
-                        kind={kind}
-                        sources={sources}
-                        datasets={datasets}
-                        onAdd={() => onAdd(kind)}
-                    />
+                    <ConnectedGroup kind={kind} sources={sources} datasets={datasets} />
                 )}
                 {table}
             </div>
@@ -328,7 +324,7 @@ function GroupDetail({
                 activeTitle="Drop to upload"
                 description={
                     members.length === 0
-                        ? "CSV, TSV, JSON, JSON Lines or Parquet. Then make a dataset from it under Datasets, or start from a sample in Add source."
+                        ? "CSV, TSV, JSON, JSON Lines or Parquet. Then make a dataset from it, or start from sample data under Add."
                         : "CSV, TSV, JSON, JSON Lines or Parquet. A file already uploaded is not stored twice."
                 }
                 inputLabel="Data file to upload"
@@ -384,6 +380,11 @@ export function DataExplorer() {
     const [creatingFor, setCreatingFor] = useState<number | string | null>(null);
     const [adding, setAdding] = useState<AddKind | null>(null);
     const [already, setAlready] = useState<SourceSummary | null>(null);
+    const [picked, setPicked] = useState<{ scope: string; ids: string[] }>({
+        scope: "",
+        ids: [],
+    });
+    const [making, setMaking] = useState<SourceSummary[] | null>(null);
     const roots = useFolderRoots();
     const treeBox = useRef<HTMLDivElement>(null);
     const loading = sources.isLoading || datasets.isLoading || folders.isLoading;
@@ -476,6 +477,9 @@ export function DataExplorer() {
 
     const adder = useSourceAdder(onUploaded);
     const addKind = addSourceKind(adder, add);
+    const blocks = useSourceBlocks();
+    const pickedIds = picked.scope === selectedKey ? picked.ids : [];
+    const pickedSources = sourceList.filter((source) => pickedIds.includes(String(source.id)));
     const [action, setAction] = useState<TreeAction | null>(null);
     const remove = useRemoveItem(selected, select);
 
@@ -488,6 +492,34 @@ export function DataExplorer() {
     const createIn = (item: ItemRef, key: number | string) => {
         select(item);
         setCreatingFor(key);
+    };
+
+    const currentFolder = (): number | null => {
+        const id =
+            selected.kind === "folder"
+                ? selected.id
+                : selected.kind === "dataset"
+                  ? (datasetList.find((row) => row.slug === selected.id)?.folder_id ?? null)
+                  : null;
+        return id !== null && index.byId.has(id) ? id : null;
+    };
+
+    const newDataset = () => {
+        if (selected.kind === "source" && sourceList.some((row) => row.id === selected.id)) {
+            setCreatingFor(selected.id);
+            return;
+        }
+        const folder = currentFolder();
+        const into = folderRef(folder);
+        createIn(into, folder === null ? "new" : itemKey(into));
+    };
+
+    const fromSources = () => {
+        if (pickedSources.length > 0) {
+            setMaking(pickedSources);
+            return;
+        }
+        select({ kind: "group", id: "upload" });
     };
 
     const menuFor = (node: TreeNode): ReactNode => {
@@ -520,18 +552,13 @@ export function DataExplorer() {
             );
         }
         if (item.kind === "group") {
-            const choices =
-                item.id === "sources"
-                    ? SOURCE_CHOICES
-                    : SOURCE_CHOICES.filter((choice) => choice.group === item.id);
             return (
                 <TreeRowMenu label={label}>
-                    {choices.map((choice) => (
-                        <DropdownMenuItem key={choice.group} onSelect={() => addKind(choice.group)}>
-                            <GroupIcon group={choice.group} />
-                            {choice.label}
-                        </DropdownMenuItem>
-                    ))}
+                    <SourceChoices
+                        groups={item.id === "sources" ? undefined : [item.id as SourceGroupId]}
+                        blocks={blocks}
+                        onPick={addKind}
+                    />
                 </TreeRowMenu>
             );
         }
@@ -667,7 +694,6 @@ export function DataExplorer() {
                         datasets={datasetList}
                         index={index}
                         creating={creatingFor === "new"}
-                        onCreate={() => setCreatingFor("new")}
                         onSelect={select}
                     />
                     {creatingFor === "new" && (
@@ -681,13 +707,7 @@ export function DataExplorer() {
             );
         } else if (selected.kind === "group" && selected.id === "sources") {
             detail = (
-                <SourcesOverview
-                    sources={sourceList}
-                    datasets={datasetList}
-                    adder={adder}
-                    onAdd={add}
-                    onSelect={select}
-                />
+                <SourcesOverview sources={sourceList} datasets={datasetList} onSelect={select} />
             );
         } else if (selected.kind === "group") {
             detail = (
@@ -696,10 +716,10 @@ export function DataExplorer() {
                     sources={sourceList}
                     datasets={datasetList}
                     adder={adder}
-                    onUploaded={onUploaded}
-                    onAdd={add}
+                    picked={pickedIds}
+                    onPick={(ids) => setPicked({ scope: selectedKey, ids })}
+                    onMake={setMaking}
                     onSelect={select}
-                    onCreated={created}
                 />
             );
         } else if (selected.kind === "source") {
@@ -726,7 +746,6 @@ export function DataExplorer() {
                         folder={folder}
                         index={index}
                         creating={creatingFor === selectedKey}
-                        onCreate={() => setCreatingFor(selectedKey)}
                         onSelect={select}
                     />
                     {creatingFor === selectedKey && (
@@ -763,7 +782,18 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."
-                    actions={<AddSourceMenu adder={adder} onAdd={add} />}
+                    actions={
+                        <AddMenu
+                            adder={adder}
+                            picked={pickedSources.length}
+                            onAdd={add}
+                            onNewDataset={newDataset}
+                            onNewFolder={() =>
+                                setAction({ kind: "new-folder", parentId: currentFolder() })
+                            }
+                            onFromSources={fromSources}
+                        />
+                    }
                 />
                 <ErrorLine
                     error={sources.error ?? datasets.error ?? folders.error ?? adder.error}
@@ -824,8 +854,8 @@ export function DataExplorer() {
                                 />
                                 {!text && sourceList.length === 0 && (
                                     <p className="pr-3 pb-3 pl-11 text-sm text-muted-foreground">
-                                        No sources yet. Use Add source to upload a file or connect a
-                                        folder, bucket or database.
+                                        No sources yet. Use Add to upload a file, read a folder,
+                                        bucket or database, or try sample data.
                                     </p>
                                 )}
                             </>
@@ -860,6 +890,14 @@ export function DataExplorer() {
                 onOpen={(source) => {
                     setQuery("");
                     select({ kind: "source", id: source.id });
+                }}
+            />
+            <MakeDatasetDialog
+                sources={making}
+                onOpenChange={(open) => !open && setMaking(null)}
+                onCreated={async (dataset) => {
+                    setPicked({ scope: "", ids: [] });
+                    await created(dataset);
                 }}
             />
             <TreeActionDialogs

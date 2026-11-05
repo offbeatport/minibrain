@@ -1,5 +1,4 @@
 import {
-    Button,
     Field,
     FileTypeIcon,
     InfoTip,
@@ -215,11 +214,9 @@ export function AddLakehouseDialog({
 export function LakehouseGroup({
     sources,
     datasets,
-    onAdd,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    onAdd: () => void;
 }) {
     const members = sources.filter((source) => tableFormat(source.kind) !== null);
     const built = datasets.filter((dataset) =>
@@ -228,16 +225,13 @@ export function LakehouseGroup({
     const used = FORMAT_ORDER.filter((format) => members.some((source) => source.kind === format));
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="text-2xl font-semibold">Lakehouse</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Iceberg and Delta Lake tables, read in place at their current snapshot or
-                        version. Iceberg tables come from S3 through a connection, Delta tables from
-                        folders on this server.
-                    </p>
-                </div>
-                <Button onClick={onAdd}>Add table</Button>
+            <header className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="text-2xl font-semibold">Lakehouse</h2>
+                <p className="text-sm text-muted-foreground">
+                    Iceberg and Delta Lake tables, read in place at their current snapshot or
+                    version. Iceberg tables come from S3 through a connection, Delta tables from
+                    folders on this server.
+                </p>
             </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Tables" value={count(members.length)} />
@@ -253,7 +247,7 @@ export function LakehouseGroup({
             <ExtensionWarning needed={used.flatMap((format) => EXTENSIONS_FOR[format] ?? [])} />
             <p className="text-sm text-muted-foreground">
                 {members.length === 0
-                    ? "No tables yet. Each one becomes a table in dataset SQL."
+                    ? "No tables yet. Pick Lakehouse table under Add; each one becomes a table in dataset SQL."
                     : "Pick a table to see its columns, rows and the version or snapshot it is read at."}
             </p>
         </div>

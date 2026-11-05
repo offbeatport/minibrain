@@ -6,25 +6,25 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Data
 - **Upload sources** · shipped · product, ml
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
-  UI: Data › Add source › Upload a file, Data › Uploads › drop a file · API: POST /api/sources
+  UI: Data › Add › Upload file, Data › Uploads › drop a file · API: POST /api/sources
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.
-  UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
+  UI: Data › Add › Upload file, Data › Add › Sample data · API: POST /api/sources, POST /api/samples/{file}
 - **Sample data** · shipped · product
   Try the whole flow on bundled sample data in minutes.
-  UI: Home › Get started, Models › Try with sample data, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
+  UI: Home › Get started, Models › Try with sample data, Data › Add › Sample data · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
-  UI: Data › Add source › Connect a folder · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders
+  UI: Data › Add › Folder on the server · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders
 - **S3 sources** · shipped · ml
   Read Parquet, CSV or JSON objects in a bucket in place.
-  UI: Data › Add source › S3 path · API: POST /api/sources/s3
+  UI: Data › Add › S3 · API: POST /api/sources/s3
 - **Database sources** · shipped · ml
   Read a PostgreSQL or MySQL table or query, read-only.
-  UI: Data › Add source › Database table or query · API: POST /api/sources/database
+  UI: Data › Add › Database · API: POST /api/sources/database
 - **Lakehouse tables** · shipped · ml
   Read Iceberg tables on S3 and Delta Lake tables in folders.
-  UI: Data › Add source › Lakehouse table · API: POST /api/sources/iceberg, POST /api/sources/delta
+  UI: Data › Add › Lakehouse table · API: POST /api/sources/iceberg, POST /api/sources/delta
 - **Connections** · shipped · admin
   Name buckets and databases once, with write-only encrypted secrets.
   UI: Settings › Connections · API: GET /api/connections, POST /api/connections, PUT /api/connections/{connection_id}, DELETE /api/connections/{connection_id}, POST /api/connections/test, POST /api/connections/{connection_id}/test, GET /api/connections/{connection_id}/tables · Config: connections
@@ -36,13 +36,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Sources · API: GET /api/sources, GET /api/sources/{source_id}, PATCH /api/sources/{source_id}, DELETE /api/sources/{source_id}, GET /api/sources/{source_id}/rows, GET /api/sources/{source_id}/stats
 - **Datasets** · shipped · product, ml
   Turn sources into chat examples that models share.
-  UI: Data › Datasets · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
+  UI: Data › Add › New dataset, Data › Add › From sources, Data › Datasets · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
 - **Dataset SQL** · shipped · ml
   Join, filter and clean several sources in locked-down DuckDB SQL.
   UI: Data › dataset › SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
-  UI: Data › Datasets › New folder · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
+  UI: Data › Add › New folder · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
 - **Unique names** · shipped · product, ml
   No two datasets share a name in a folder, nor two sources.
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
