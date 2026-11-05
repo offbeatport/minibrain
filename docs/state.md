@@ -26,8 +26,9 @@ nothing else to operate.
 
 Files are passed by SHA-256 ID, never by path: sources, snapshots, adapters, checkpoints, eval results, logs, batch
 results. The store is a local folder or S3-compatible storage; workers and engines keep local caches. Base model
-weights are pinned by repository and revision. Artifacts and weights flow through `main`; at scale workers and engines
-read S3 directly.
+weights are pinned by repository and revision and follow the store: with a bucket, each file is an object under its
+SHA-256 and every machine that runs the model keeps a working copy, fetched straight from the bucket on links main
+signs. Other artifacts flow through `main`.
 
 ## Several mains
 

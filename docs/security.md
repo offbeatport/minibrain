@@ -135,9 +135,10 @@ password, or read it with `--password-stdin`, and record `command line` as the a
 | Corporate network | Apps, browsers | | |
 | Edge | Load balancers | The corporate network | 443 |
 | Internal network | Gateways, mains, Postgres, S3 | The edge; GPU pools reach main only | gateway 8100, main 8000, Postgres 5432, S3 443 |
-| GPU network | Workers, engines | Engines: gateways only. Workers: nothing | Outbound HTTPS to main 8000 |
+| GPU network | Workers, engines | Engines: gateways only. Workers: nothing | Outbound HTTPS to main 8000, and to the bucket endpoint when Storage is S3 |
 
-- GPU boxes need no internet access: engines and workers pull weights, adapters and snapshots from `main`.
+- GPU boxes need no internet access: engines and workers pull adapters and snapshots from `main`, and base weights
+  from `main` or, when Storage is S3, from the bucket on links `main` signs. They never hold bucket keys.
 - Workers and engines hold a shared token (`MINIBRAIN_WORKER_TOKEN`, `MINIBRAIN_GATEWAY_TOKEN`), never database
   credentials.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
@@ -270,7 +271,8 @@ locked when `minibrain.yaml` (`policy:`) or `MINIBRAIN_POLICY_<NAME>` sets it.
 | Staging databases built from uploads (`<home>/staging`) | Yes | Built in a private temporary folder, sealed, and the plaintext removed straight away |
 | Connection secrets and sealed settings (OpenTelemetry headers) | Yes, same master key | One AES-256-GCM envelope per value, the row's id as associated data |
 | The database (SQLite or Postgres) | No | Request inputs and answers kept for the models you choose live there: put SQLite on an encrypted volume, or use Postgres with storage encryption |
-| Base model weights (`<home>/models`) | No | Public weights; imported private weights are not encrypted by minibrain either |
+| Base model weights in an S3 bucket | Yes | Each file is a sealed artifact under its SHA-256, like every other one |
+| Base model weights on main's disk (`<home>/models`, Storage set to the folder) | No | Public weights; imported private weights are not encrypted by minibrain either |
 
 Main never writes decrypted copies of these files. DuckDB reads snapshots, uploads and staging databases through a
 filesystem that decrypts on the fly, a chunk at a time, so queries, previews, diffs and the gateway's prompt context
@@ -282,6 +284,26 @@ hold no master key. Main decrypts an artifact when a worker or engine pulls it o
 engine's own home (`<home>/worker`, `<home>/engines`, `<home>/gateway`) holds plain working copies of the snapshots
 and adapters it uses. Put those folders on an encrypted volume (or tmpfs) on GPU boxes; they are caches and can be
 wiped at any time. A worker's outputs are encrypted the moment main stores them.
+
+### Base weights on other machines
+
+With Storage on S3, base model files stay sealed in the bucket and machines read them from there, not through main:
+
+1. A worker or engine asks main over its authenticated channel (`GET /internal/worker/bases/<key>` with the worker
+   token, `/internal/gateway/bases/<key>` with the gateway token).
+2. Main answers, with `Cache-Control: no-store`, each file's path, size and SHA-256, a presigned GET link (SigV4,
+   valid 15 minutes, for the configured endpoint and nothing else) and the file's data key: main reads the object's
+   4 KiB header with its own bucket credentials and unwraps the data key with the master key, through the same
+   provider as every other unwrap (`cryptography`, Vault Transit, the HSM or KMS).
+3. The machine downloads the object, decrypts the STREAM format chunk by chunk with AES-256-GCM through
+   `cryptography`, checks the plaintext's size and SHA-256 against the saved list, and only then renames the file into
+   its working copy. A changed byte, chunk or header fails authentication or the hash, and the file is refused.
+
+The machine never holds the bucket's keys or the master key. A data key opens one object only (each file has its
+own), stays in memory and is never written to disk; a verify job takes its links and keys on standard input, not in
+its job file. The node channel carried these files' plaintext before, so it carries nothing it did not; run it over
+HTTPS. Working copies are plaintext, as engines need, so treat `<home>/models`, `<home>/engines` and
+`<home>/worker/models` like the other plain working copies above.
 
 ### File format
 

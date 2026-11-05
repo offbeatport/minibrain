@@ -74,7 +74,7 @@ with failure drills.
 | Decision | Why | Cost |
 |---|---|---|
 | One control plane: main and one database | One source of truth, simple operations | Changes need main; HA needs Postgres and several mains |
-| Workers and engines pull from main over HTTP | Outbound-only GPU boxes, no database credentials outside main, one SQLite writer | Artifacts flow through main until workers read S3 directly |
+| Workers and engines pull from main over HTTP | Outbound-only GPU boxes, no database credentials outside main, one SQLite writer | Artifacts flow through main; base weights in a bucket come straight from it on links main signs, so GPU boxes also reach the bucket |
 | HTTP, not gRPC | The job channel carries a few requests a second and inference is GPU-bound; HTTP streaming serves both | Larger messages than protobuf |
 | Own jobs table | Leases and fencing in one table, no broker, works on SQLite. Procrastinate is Postgres-only, Huey keeps a second record without leases, Celery / RQ / Dramatiq need a broker, Temporal / Hatchet / Prefect are separate servers | We own the bugs; DBOS Transact is the candidate for multi-step pipelines |
 | Jobs found by polling | No broker | Up to one poll interval of latency; Postgres LISTEN/NOTIFY later |

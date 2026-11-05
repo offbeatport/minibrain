@@ -181,7 +181,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   checkpoint after a lost lease.
 - Progress is events: workers post them, the UI follows over SSE. Logs are artifacts read by offset.
 - Artifacts are referenced by SHA-256 ID, never by path: sources, snapshots, adapters, checkpoints, eval results, logs,
-  batch outputs. Base model weights are pinned by repo and revision.
+  batch outputs. Base model weights are pinned by repo and revision, and each file by its SHA-256.
 - The gateway is separate from management: routing lives in memory, refreshed on version changes, with no database
   read per request. Engines are children with health checks.
 - The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
@@ -189,7 +189,8 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   Discover judges fit against the selected pool; the Compute page lists pools, machines and engines.
 - Engines pick their engine at start from the node and the weights: SGLang on Linux with NVIDIA or ROCm, MLX on Apple
   silicon, llama.cpp for GGUF, `transformers` otherwise. Remote engines (`minibrain engine --model --pool`) pull
-  weights and adapters from main and announce themselves; replicas scale horizontally.
+  adapters from main and base weights from the bucket on links main signs (from main itself when Storage is the
+  folder), and announce themselves; replicas scale horizontally.
 - Gateways route per model: fewest requests in flight, sticky by adapter or prompt prefix, overflow when busy, health
   checks and failover. HAProxy, Envoy or a cloud load balancer in front; sgl-router or llm-d under the gateway later.
 - Several mains on Postgres: an advisory lock picks the leader for lease expiry, catalogue sync and log purge. No
@@ -467,8 +468,8 @@ the UI says version.
 
 - One location per install, set in Settings → Storage: a local folder under `MINIBRAIN_HOME` (default) or an
   S3-compatible bucket (AWS, MinIO, Ceph) by endpoint, bucket, prefix, region and keys. It is an `ArtifactStore`
-  backend over s3fs, so uploads, dataset versions, adapters and logs all follow it, and workers and engines keep pulling
-  artifacts through main.
+  backend over s3fs, so uploads, dataset versions, adapters, logs and base model weights all follow it. Workers and
+  engines pull artifacts through main, and base weights in a bucket straight from the bucket (Base models on disk).
 - minibrain connects only to the endpoint set there, with explicit keys (no instance-metadata lookups), and signs every
   request with SigV4 (HMAC-SHA256; never SigV2, which is HMAC-SHA1). The secret key is kept in a 0600 file under
   `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection" writes, reads back and removes a
@@ -570,12 +571,43 @@ once it matches; only deleting a base removes its files.
 
 ### Base models on disk
 
-- A base stays on disk until someone deletes it, and deleting it removes its files. A base with models built on it is
-  deleted together with them, once the cascade checkbox in the delete dialog is ticked.
+- A base stays until someone deletes it, and deleting it removes its files. A base with models built on it is deleted
+  together with them, once the cascade checkbox in the delete dialog is ticked.
 - Rows an earlier cache budget left in status `evicted` keep "Removed to free space" with Download again or Re-import
   (the repair job, checked against the saved SHA-256 list).
-- Remote engines get each file's size and SHA-256 from the saved list, never from a folder listing, and refuse a file
-  that arrives different; a file lands under a temporary name and is renamed into place once it matches.
+- Where a base's main copy lives follows Settings → Storage when it is downloaded, imported, repaired or downloaded
+  again (`models.store`, migration 0039). Folder: main's `<home>/models/<id>`, as before. S3: each file is an object in
+  the bucket under its SHA-256, sealed with its own data key like every artifact and registered as a `weights`
+  artifact; identical files are stored once.
+- Files reach the bucket one at a time. The job checks a file's size and SHA-256 in `<home>/work/models/<id>`, the
+  worker streams it to main, main seals and uploads it (create-only) and the staged file goes, so main's disk needs
+  about twice the largest file free: the download check and the Add model gauge use that. A resumed job skips files
+  already in the bucket.
+- Every machine that runs a base keeps a working copy, because engines need local files: main (its local engines and
+  its worker share `<home>/models/<id>`), remote engines (`<home>/engines/<key>/weights`) and remote workers
+  (`<home>/worker/models/<key>`). It is made when an engine starts or a training or eval job needs it. Each file is
+  checked against the saved list as it arrives (size and SHA-256) and lands under a temporary name; the folder's
+  `minibrain-model.json` records the content hash it holds. A copy whose content hash no longer matches is replaced; a
+  missing or short file is fetched again. Remote machines get each file's size and SHA-256 from the saved list, never
+  from a folder listing.
+- Machines fetch from the bucket, not through main, and never hold bucket keys. main answers
+  `/internal/gateway/bases/<key>` (gateway token) and `/internal/worker/bases/<key>` (worker token) with a presigned
+  GET link per file, SigV4 and valid 15 minutes, for the configured endpoint only, plus the file's data key, which main
+  unwraps with the master key; the answer is `Cache-Control: no-store`. The machine decrypts with AES-256-GCM through
+  `cryptography`, checks the plaintext SHA-256 and keeps the data key in memory only. A data key opens that one object;
+  the node channel carried the plaintext itself before.
+- Working copies are not the removed cache: no budget, no pins, nothing removed to free space, and the bucket is the
+  copy that counts. The Models list and health read the database (an `artifacts` row per file), never a working copy,
+  so a model does not go missing with one. Verify files reads every object through signed links; Repair writes a
+  damaged object again.
+- Deleting a base deletes its bucket objects (unless another model has the same file), main's working copy and its
+  rows. Remote engines and workers remove copies of models main no longer has when they start and every 10 minutes.
+- Switching Storage to S3 leaves bases on main's disk usable. Settings → Storage counts them, and "Copy to the bucket"
+  starts one repair job per base that hard-links (or copies) its checked files into staging and uploads them; main
+  keeps its folder as its working copy. A base in the bucket stays there if Storage goes back to the folder, while the
+  bucket settings remain.
+- Free space: S3 reports none. The Add model gauge names its store ("S3 · <bucket>" or "Main server disk"); for S3 it
+  shows the model's size and main's free disk instead of a fill level.
 
 ### Deleting and undeploying
 
@@ -990,10 +1022,11 @@ v1, the evidence regulated buyers ask for first:
   page report the first break; SIEM export is RFC 5424 over TLS, TCP or UDP with a stored cursor. Format, canonical
   form and guarantees: `docs/security.md`.
 - Encryption at rest for snapshots, staging files and adapters. Built: every stored file (uploads, snapshots,
-  adapters, logs, staging databases; local folder or S3 bucket) is sealed with its own AES-256-GCM data key in a
-  chunked STREAM format, wrapped by a master key from a local key file (default), HashiCorp Vault Transit, a PKCS#11
-  HSM or AWS KMS (FIPS endpoints); content hashes stay over the plaintext. DuckDB reads sealed files through a
-  decrypting filesystem, so main keeps no plaintext copies; workers, engines and gateways keep plain working copies.
+  adapters, logs, staging databases, base weights in a bucket; local folder or S3 bucket) is sealed with its own
+  AES-256-GCM data key in a chunked STREAM format, wrapped by a master key from a local key file (default), HashiCorp
+  Vault Transit, a PKCS#11 HSM or AWS KMS (FIPS endpoints); content hashes stay over the plaintext. DuckDB reads sealed
+  files through a decrypting filesystem, so main keeps no plaintext copies; workers, engines and gateways keep plain
+  working copies.
   `minibrain keys status | rotate | encrypt-existing` and Settings → Security re-wrap headers without re-encrypting
   bodies and encrypt older files in place. Format, providers and measurements: `docs/security.md`.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
@@ -1035,6 +1068,8 @@ outbound calls.
 - Both stores: tests marked `both_stores` (uploads, dataset versions, adapters, logs, deletes, key passes) run twice,
   on the folder and on an S3 bucket. The bucket is moto's `ThreadedMotoServer`, started once per test run on
   127.0.0.1 with a random port, a fresh bucket per test; `uv run pytest -q` runs both, offline, locally and in CI.
+  Base weights in a bucket (downloads, imports, signed links, working copies, verify, repair, delete, copying models
+  from main's disk) have their own tests on the same server.
   moto is a dev dependency only (`moto[s3]` with flask, not its heavy `server` extra) and never ships. If moto's
   fidelity falls short of a real server, the next step is a nightly job against a real S3-compatible server (SeaweedFS
   or MinIO); there is none yet.

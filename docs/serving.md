@@ -87,8 +87,14 @@ hardware and the model's weight format:
 - `--engine` overrides the choice. An automatic choice that fails to load falls back to `transformers`.
 - Engines of different kinds serve at the same time: a Mac engine on MLX and a rack engine on SGLang can be replicas of
   one model.
-- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0` pulls weights and adapters
-  from `main`, never from Hugging Face, and announces its URL, engine and hardware every 10 s.
+- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0` pulls adapters from `main`
+  and base weights from wherever Storage keeps them, never from Hugging Face, and announces its URL, engine and
+  hardware every 10 s. With a bucket, `main` hands out a presigned link and the data key per file and the engine reads
+  the bucket directly; with the folder, it reads the files from `main`. Either way it keeps a working copy in
+  `<home>/engines/<key>/weights`, checks every file's size and SHA-256, and removes copies of models `main` no longer
+  has when it starts and every 10 minutes.
+- Local engines on `main` use `main`'s working copy, `<home>/models/<id>`, fetched from the bucket the first time they
+  start when the model lives there.
 - `main` starts a local engine for a deployed model only when no live replica serves it elsewhere, and starts one
   again when the remote replicas go away.
 - Scale is horizontal: more replicas of the same model, on Kubernetes autoscaled. Heavy engines are optional extras;
@@ -183,7 +189,8 @@ sequenceDiagram
     MA->>MA: Record in pool, add to config
     GW->>MA: Config long-poll
     MA-->>GW: Snapshot with the new engine
-    EN->>MA: Pull base weights and adapters
+    EN->>MA: Base file list (presigned links and data keys when in a bucket)
+    EN->>EN: Fetch each file from the bucket or main, check SHA-256
     loop Every 10 s
         EN->>MA: Announce: alive, loaded adapters, load
     end

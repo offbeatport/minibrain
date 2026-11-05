@@ -728,7 +728,7 @@ installs download the set for the new version. Paths are versioned, so both sets
 | `minibrain.db` | Metadata in SQLite, unless `MINIBRAIN_DATABASE_URL` points at Postgres | Yes |
 | `keys/` | The local master key (encryption at rest). Back it up apart from the data | Yes, separately |
 | `secrets/` | Worker and gateway tokens, the storage secret key. Keep it private | Yes |
-| `models/` | Downloaded and imported base models when storage is local (Settings → Storage) | Yes |
+| `models/` | Downloaded and imported base models when storage is local (Settings → Storage); with a bucket, main's working copies | Yes when local |
 | `artifacts/` | Uploads, dataset versions, adapters and logs, encrypted, when storage is local | Yes |
 | `cache/`, `staging/`, `work/` | Unpacked artifacts, DuckDB databases built from uploads, job scratch | No: rebuilt on use |
 | `gateway/`, `engines/`, `worker/` | Copies kept by the gateway, engines and the worker | No: fetched again |
