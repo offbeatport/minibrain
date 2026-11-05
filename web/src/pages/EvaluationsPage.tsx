@@ -36,6 +36,7 @@ import {
 import { useCan } from "~/lib/access";
 import { costSortValue, costText, deviceTime, headline, measuredOn, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
+import { checkSentence } from "~/lib/judging";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { metricName, metricOf } from "~/lib/metrics";
 import { modelCardHref } from "~/lib/modelLinks";
@@ -242,10 +243,7 @@ function blockedReason(version: ModelVersionRow): string | null {
         return null;
     }
     const failed = (version.promotion?.checks ?? []).filter((check) => !check.passed);
-    return (
-        failed.map((check) => `${check.name}: ${check.detail}`).join("; ") ||
-        "It does not pass the promotion rule."
-    );
+    return failed.map(checkSentence).join(" ") || "It does not pass the promotion rule.";
 }
 
 function DeployButton({
@@ -281,7 +279,7 @@ function DeployButton({
                     </Button>
                 </span>
             </TooltipTrigger>
-            <TooltipContent>{`Blocked by the promotion rule: ${reason}`}</TooltipContent>
+            <TooltipContent>{`It can't go live yet. ${reason}`}</TooltipContent>
         </Tooltip>
     );
 }
@@ -381,8 +379,8 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
             {info?.held_out && <GraderScores split={info.held_out} main={info.main_metric} />}
             {info && <ScoredBy version={info} />}
             {info?.promotion && <PromotionDecision decision={info.promotion} />}
-            {info && <PresetResults version={info} />}
-            {info && info.mistakes.length > 0 && (
+            {info && <PresetResults slug={model.key} version={info} />}
+            {info && info.view !== "free_text" && info.mistakes.length > 0 && (
                 <div className="flex min-w-0 flex-col gap-2">
                     <div>
                         <h3 className="text-base font-semibold">Mistakes</h3>
@@ -433,7 +431,7 @@ function VersionDialog({
 }) {
     return (
         <Dialog open={target !== null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-3xl">
+            <DialogContent className="sm:max-w-3xl sm:has-[[data-wide]]:max-w-5xl">
                 {line ? (
                     <VersionDetail line={line} onDone={onClose} />
                 ) : (

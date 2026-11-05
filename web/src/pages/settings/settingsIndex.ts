@@ -178,6 +178,25 @@ export const GENERAL = {
         },
         { role: "admin" },
     ),
+    judge: section(
+        "Judge model",
+        {
+            judgeModel: setting(
+                "Judge model",
+                "The base that scores free-text answers against a rubric, for every model that does not pick its own.",
+                [
+                    "judge",
+                    "rubric",
+                    "grader",
+                    "evaluation",
+                    "llm as a judge",
+                    "scoring",
+                    "chat assistant",
+                ],
+            ),
+        },
+        { role: "admin" },
+    ),
     recipe: section(
         "Default training recipe",
         {},

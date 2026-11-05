@@ -71,9 +71,22 @@ class Check:
     passed: bool
     detail: str
     actual: float | None = None
+    metric: str | None = None
+    op: str | None = None
+    target: float | None = None
+    live: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "passed": self.passed, "detail": self.detail, "actual": self.actual}
+        return {
+            "name": self.name,
+            "passed": self.passed,
+            "detail": self.detail,
+            "actual": self.actual,
+            "metric": self.metric,
+            "op": self.op,
+            "target": self.target,
+            "live": self.live,
+        }
 
 
 @dataclass(frozen=True)
@@ -96,12 +109,13 @@ class Decision:
 
 def threshold_check(threshold: Threshold, metrics: Mapping[str, float] | None) -> Check:
     name = threshold.text()
+    facts = {"metric": threshold.metric, "op": threshold.op, "target": threshold.value}
     if metrics is None:
-        return Check(name, False, "not scored yet")
+        return Check(name, False, "not scored yet", **facts)
     actual = metrics.get(threshold.metric)
     if actual is None:
-        return Check(name, False, f"this version has no {threshold.metric} score")
-    return Check(name, threshold.holds(actual), f"{threshold.metric} is {actual:.4g}", actual)
+        return Check(name, False, f"this version has no {threshold.metric} score", **facts)
+    return Check(name, threshold.holds(actual), f"{threshold.metric} is {actual:.4g}", actual, **facts)
 
 
 def live_check(main: str | None, metrics: Mapping[str, float] | None, live: Live | None) -> Check:
@@ -112,11 +126,12 @@ def live_check(main: str | None, metrics: Mapping[str, float] | None, live: Live
         return Check(name, True, "no main metric to compare")
     theirs = (live.metrics or {}).get(main)
     if theirs is None:
-        return Check(name, True, f"v{live.number} has no {main} score")
+        return Check(name, True, f"v{live.number} has no {main} score", metric=main, live=live.number)
     mine = (metrics or {}).get(main)
+    facts = {"metric": main, "op": ">=", "target": theirs, "live": live.number}
     if mine is None:
-        return Check(name, False, f"this version has no {main} score")
-    return Check(name, mine >= theirs, f"{main} {mine:.4g} against {theirs:.4g} for v{live.number}", mine)
+        return Check(name, False, f"this version has no {main} score", **facts)
+    return Check(name, mine >= theirs, f"{main} {mine:.4g} against {theirs:.4g} for v{live.number}", mine, **facts)
 
 
 def decide(rule: Rule, metrics: Mapping[str, float] | None, main: str | None, live: Live | None) -> Decision:

@@ -24,6 +24,8 @@ export const keys = {
     sourceRows: (id: number) => ["sources", id, "rows"] as const,
     sourceStats: (id: number) => ["sources", id, "stats"] as const,
     presets: ["presets"] as const,
+    judge: ["settings", "judge"] as const,
+    answers: (slug: string, number: number) => ["model", slug, "answers", number] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -248,5 +250,25 @@ export function usePresets() {
         queryKey: keys.presets,
         queryFn: () => unwrap(api.GET("/api/presets")),
         staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
+export function useJudgeSetting() {
+    return useQuery({
+        queryKey: keys.judge,
+        queryFn: () => unwrap(api.GET("/api/settings/judge")),
+    });
+}
+
+export function useVersionAnswers(slug: string, number: number, enabled: boolean) {
+    return useQuery({
+        queryKey: keys.answers(slug, number),
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/models/{slug}/versions/{number}/answers", {
+                    params: { path: { slug, number } },
+                }),
+            ),
+        enabled,
     });
 }

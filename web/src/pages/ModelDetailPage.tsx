@@ -67,8 +67,9 @@ import {
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
 import { DeleteModelsDialog } from "./models/DeleteModelsDialog";
+import { InstructionsSection } from "./models/InstructionsSection";
+import { JudgedSection } from "./models/JudgedSection";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
-import { TaskSection } from "./models/TaskSection";
 import {
     ConfirmAction,
     type Confirmation,
@@ -635,7 +636,8 @@ function CustomModelView({ row }: { row: ModelRow }) {
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}
-            {detail.data && <TaskSection detail={detail.data} />}
+            {detail.data && <InstructionsSection detail={detail.data} />}
+            {detail.data && <JudgedSection detail={detail.data} />}
             <PanelSection
                 icon={History}
                 title="Revisions"

@@ -9,7 +9,7 @@ const NAMES: Record<string, string> = {
     json_valid: "JSON valid",
     json_field_match: "JSON field match",
     text_similarity: "Text similarity",
-    judge: "Judge",
+    judge: "Judge score",
 };
 
 export function metricName(metric: string | null | undefined): string {

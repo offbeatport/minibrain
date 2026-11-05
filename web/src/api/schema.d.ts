@@ -6714,6 +6714,14 @@ export interface components {
             detail: string;
             /** Actual */
             actual?: number | null;
+            /** Metric */
+            metric?: string | null;
+            /** Op */
+            op?: (">=" | "<=" | ">" | "<" | "==") | null;
+            /** Target */
+            target?: number | null;
+            /** Live */
+            live?: number | null;
         };
         /** S3SourceCreate */
         S3SourceCreate: {

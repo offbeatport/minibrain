@@ -40,6 +40,10 @@ class RuleCheckInfo(BaseModel):
     passed: bool
     detail: str
     actual: float | None = None
+    metric: str | None = None
+    op: Literal[">=", "<=", ">", "<", "=="] | None = None
+    target: float | None = None
+    live: int | None = None
 
 
 class DecisionInfo(BaseModel):

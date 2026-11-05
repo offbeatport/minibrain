@@ -30,6 +30,18 @@ const NONE = "none";
 const STORAGE_KEY = "minibrain.playground.model";
 
 type Exchange = { id: number; text: string; replies: CompleteResponse[] };
+type Turn = { role: "user" | "assistant"; content: string };
+
+function conversationOf(history: Exchange[], text: string): Turn[] {
+    const earlier = [...history].reverse().flatMap((exchange): Turn[] => [
+        { role: "user", content: exchange.text },
+        {
+            role: "assistant",
+            content: exchange.replies[0]?.answer ?? exchange.replies[0]?.output ?? "",
+        },
+    ]);
+    return [...earlier, { role: "user", content: text }];
+}
 
 function VersionPicker({
     id,
@@ -70,20 +82,55 @@ function Reply({
     input,
     reply,
     labels,
+    prose,
 }: {
     slug: string;
     input: string;
     reply: CompleteResponse;
     labels: string[];
+    prose: boolean;
 }) {
     return (
         <div className="flex flex-col gap-1">
-            <ChatBubble role="assistant" text={asCode(reply.output) || "(empty)"} />
+            <ChatBubble
+                role="assistant"
+                text={(prose ? reply.output : asCode(reply.output)) || "(empty)"}
+            />
             <p className="text-sm text-muted-foreground">
-                <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}{" "}
-                · {reply.valid ? "meets the contract" : "breaks the contract"}
+                <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}
+                {prose ? "" : ` · ${reply.valid ? "meets the contract" : "breaks the contract"}`}
             </p>
             <AnswerFeedback slug={slug} input={input} reply={reply} labels={labels} />
+        </div>
+    );
+}
+
+function Exchanged({
+    slug,
+    exchange,
+    labels,
+    prose,
+}: {
+    slug: string;
+    exchange: Exchange;
+    labels: string[];
+    prose: boolean;
+}) {
+    return (
+        <div className="flex flex-col gap-2">
+            <ChatBubble role="user" text={exchange.text} />
+            <div className="grid gap-3 md:grid-cols-2">
+                {exchange.replies.map((reply) => (
+                    <Reply
+                        key={reply.model}
+                        slug={slug}
+                        input={exchange.text}
+                        reply={reply}
+                        labels={labels}
+                        prose={prose}
+                    />
+                ))}
+            </div>
         </div>
     );
 }
@@ -102,15 +149,19 @@ function Playground({ slug }: { slug: string }) {
     const [history, setHistory] = useState<Exchange[]>([]);
     const chosen = primary || String(detail?.current_version ?? ready[0] ?? "");
     const labels = detail?.contract.labels ?? [];
+    const conversational = detail?.contract.kind === "text";
     const run = useMutation({
         mutationFn: async (input: string) => {
             const targets = [chosen, compare].filter((value) => value && value !== NONE);
+            const messages = conversational ? conversationOf(history, input) : null;
             const replies = await Promise.all(
                 targets.map((version) =>
                     unwrap(
                         api.POST("/api/models/{slug}/complete", {
                             params: { path: { slug } },
-                            body: { text: input, version: Number(version) },
+                            body: messages
+                                ? { messages, version: Number(version) }
+                                : { text: input, version: Number(version) },
                         }),
                     ),
                 ),
@@ -142,11 +193,21 @@ function Playground({ slug }: { slug: string }) {
         );
     }
     const samples = (golden.data ?? []).slice(0, 4);
+    const shown = conversational ? [...history].reverse() : history;
+    const restart = (next: string) => (value: string) => {
+        if (conversational && value !== next) {
+            setHistory([]);
+        }
+    };
     return (
         <>
             <Section
                 title="Try it"
-                caption="Each message is answered on its own, held to the version's contract. Pick a second version to compare answers side by side."
+                caption={
+                    conversational
+                        ? "A conversation: each answer sees the turns before it, held to the version's contract. A second version answers the same conversation, side by side."
+                        : "Each message is answered on its own, held to the version's contract. Pick a second version to compare answers side by side."
+                }
             >
                 <form onSubmit={submit} className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-3">
@@ -155,7 +216,10 @@ function Playground({ slug }: { slug: string }) {
                             label="Version"
                             value={chosen}
                             options={ready}
-                            onChange={setPrimary}
+                            onChange={(next) => {
+                                restart(chosen)(next);
+                                setPrimary(next);
+                            }}
                         />
                         <VersionPicker
                             id="compare"
@@ -177,8 +241,13 @@ function Playground({ slug }: { slug: string }) {
                     />
                     <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={!text.trim() || run.isPending}>
-                            {run.isPending ? "Running…" : "Run"}
+                            {run.isPending ? "Running…" : conversational ? "Send" : "Run"}
                         </Button>
+                        {conversational && history.length > 0 && (
+                            <Button type="button" variant="outline" onClick={() => setHistory([])}>
+                                New conversation
+                            </Button>
+                        )}
                         {samples.map((sample) => (
                             <Button
                                 key={sample.input}
@@ -197,24 +266,34 @@ function Playground({ slug }: { slug: string }) {
                     <ErrorLine error={run.error} />
                 </form>
             </Section>
-            {history.map((exchange) => (
-                <Card key={exchange.id}>
-                    <CardContent className="flex flex-col gap-2">
-                        <ChatBubble role="user" text={exchange.text} />
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {exchange.replies.map((reply) => (
-                                <Reply
-                                    key={reply.model}
-                                    slug={slug}
-                                    input={exchange.text}
-                                    reply={reply}
-                                    labels={labels}
-                                />
-                            ))}
-                        </div>
+            {conversational && shown.length > 0 ? (
+                <Card>
+                    <CardContent className="flex flex-col gap-4">
+                        {shown.map((exchange) => (
+                            <Exchanged
+                                key={exchange.id}
+                                slug={slug}
+                                exchange={exchange}
+                                labels={labels}
+                                prose
+                            />
+                        ))}
                     </CardContent>
                 </Card>
-            ))}
+            ) : (
+                shown.map((exchange) => (
+                    <Card key={exchange.id}>
+                        <CardContent>
+                            <Exchanged
+                                slug={slug}
+                                exchange={exchange}
+                                labels={labels}
+                                prose={false}
+                            />
+                        </CardContent>
+                    </Card>
+                ))
+            )}
         </>
     );
 }

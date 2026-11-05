@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, Coins, GraduationCap, Palette, Split } from "lucide-react";
+import { BookMarked, Coins, GraduationCap, Palette, Scale, Split } from "lucide-react";
 import {
     Button,
     Select,
@@ -13,7 +13,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
-import { useCatalog, useInstallSettings } from "~/api/queries";
+import { keys, useAllModels, useCatalog, useInstallSettings, useJudgeSetting } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
@@ -48,6 +48,8 @@ function Appearance() {
 
 const CATALOGUE = GENERAL.catalogue;
 const PRICES = GENERAL.prices;
+const JUDGE = GENERAL.judge;
+const OWN_BASE = "own-base";
 
 function ModelCatalogue() {
     const refresh = useModelsRefresh();
@@ -240,6 +242,69 @@ function ComputePrices() {
     );
 }
 
+function JudgeModel() {
+    const client = useQueryClient();
+    const setting = useJudgeSetting();
+    const models = useAllModels();
+    const save = useMutation({
+        mutationFn: (model: string | null) =>
+            unwrap(api.PUT("/api/settings/judge", { body: { model } })),
+        onSuccess: async (saved) => {
+            client.setQueryData(keys.judge, saved);
+            await client.invalidateQueries({ predicate: (query) => query.queryKey[0] === "model" });
+        },
+    });
+    const chosen = setting.data?.model;
+    const bases = (models.data ?? []).filter(
+        (row) =>
+            row.kind === "base" && (row.availability.state === "available" || row.key === chosen),
+    );
+    const value = save.isPending ? (save.variables ?? OWN_BASE) : (setting.data?.model ?? OWN_BASE);
+    return (
+        <PanelSection
+            icon={Scale}
+            anchor={JUDGE.anchor}
+            title={JUDGE.title}
+            description="A judge scores free-text answers from 1 to 5 against a rubric, as its own job on this install, and says why. Chat assistants add a judge score once one is chosen; a model can pick its own on its page."
+        >
+            <SettingsGroup>
+                <SettingsRow
+                    id="judge-model-select"
+                    anchor={JUDGE.settings.judgeModel.anchor}
+                    label={JUDGE.settings.judgeModel.label}
+                    description={JUDGE.settings.judgeModel.description}
+                    error={errorMessage(save.error ?? setting.error)}
+                    control={
+                        <Select
+                            value={value}
+                            onValueChange={(next) =>
+                                save.mutate(!next || next === OWN_BASE ? null : String(next))
+                            }
+                        >
+                            <SelectTrigger id="judge-model-select" className="w-64">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    value={OWN_BASE}
+                                    description="No judge score unless a model turns it on"
+                                >
+                                    None chosen
+                                </SelectItem>
+                                {bases.map((row) => (
+                                    <SelectItem key={row.key} value={row.key}>
+                                        {row.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    }
+                />
+            </SettingsGroup>
+        </PanelSection>
+    );
+}
+
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     const can = useCan();
@@ -250,6 +315,7 @@ export function SettingsPage() {
                 <Appearance />
                 {can.admin && <ModelCatalogue />}
                 {can.admin && <ComputePrices />}
+                {can.admin && <JudgeModel />}
                 <PanelSection
                     icon={GraduationCap}
                     anchor={GENERAL.recipe.anchor}

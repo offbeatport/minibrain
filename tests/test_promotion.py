@@ -37,6 +37,10 @@ def test_beating_the_live_version_compares_the_main_metric() -> None:
     worse = decide(rule, {"label_accuracy": 0.7}, "label_accuracy", live)
     assert not worse.passed
     assert "against 0.8 for v2" in worse.reason()
+    [check] = worse.checks
+    assert (check.metric, check.op, check.target, check.live, check.actual) == ("label_accuracy", ">=", 0.8, 2, 0.7)
+    [threshold] = decide(Rule((Threshold("judge", ">=", 0.6),), beats_live=False), {"judge": 0.5}, "judge", None).checks
+    assert (threshold.metric, threshold.op, threshold.target, threshold.live) == ("judge", ">=", 0.6, None)
     assert decide(rule, None, "label_accuracy", None).passed
     assert not decide(rule, None, "label_accuracy", live).passed
     assert decide(rule, {"label_accuracy": 0.1}, "label_accuracy", Live(number=0, metrics=None)).passed
