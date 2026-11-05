@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from tests.conftest import Harness, fake_adapter, tickets_csv
+from tests.conftest import Harness, fake_adapter, give_data
 
 pytestmark = pytest.mark.both_stores
 
@@ -17,8 +17,7 @@ def build_dataset(harness: Harness) -> dict[str, Any]:
 
 def create_with_dataset(harness: Harness) -> dict[str, Any]:
     harness.client.post("/api/minibrains", json={"name": "Support Triage"})
-    files = {"file": ("tickets.csv", tickets_csv(), "text/csv")}
-    harness.client.post(f"/api/minibrains/{SLUG}/source", files=files)
+    give_data(harness, SLUG)
     return build_dataset(harness)
 
 
@@ -60,8 +59,7 @@ def bearer(harness: Harness, *models: tuple[str, str]) -> dict[str, str]:
 
 def test_upload_guesses_mapping_and_previews(harness: Harness) -> None:
     harness.client.post("/api/minibrains", json={"name": "Support Triage"})
-    files = {"file": ("tickets.csv", tickets_csv(), "text/csv")}
-    detail = harness.client.post(f"/api/minibrains/{SLUG}/source", files=files).json()
+    detail = give_data(harness, SLUG)
     assert detail["mapping"]["input_column"] == "text"
     assert detail["mapping"]["label_column"] == "category"
     assert detail["source"]["rows"] == 200

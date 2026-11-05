@@ -152,19 +152,6 @@ def test_samples_are_added_once(harness: Harness) -> None:
     assert len(harness.client.get("/api/sources").json()) == 1
 
 
-def test_uploading_known_content_to_a_model_reuses_the_source(harness: Harness) -> None:
-    source = send(harness, "tickets.csv", tickets_csv()).json()
-    harness.client.post("/api/datasets", json={"name": "Triage", "source_id": source["id"]})
-    assert harness.client.post("/api/minibrains", json={"name": "Triage"}).status_code == 201
-    upload = harness.client.post(
-        "/api/minibrains/triage/source", files={"file": ("copy.csv", tickets_csv(), "text/csv")}
-    )
-    assert upload.status_code == 200, upload.text
-    assert sources(harness) == {"tickets.csv": "tickets"}
-    names = {dataset["name"]: dataset["sources"][0]["id"] for dataset in harness.client.get("/api/datasets").json()}
-    assert names == {"Triage": source["id"], "Triage (2)": source["id"]}
-
-
 def test_source_names_are_unique_when_typed_and_numbered_when_derived(harness: Harness, tmp_path: Path) -> None:
     first = send(harness, "tickets.csv", tickets_csv()).json()
     other = send(harness, "other.csv", tickets_csv(40)).json()

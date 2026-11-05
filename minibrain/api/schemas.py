@@ -679,13 +679,6 @@ class StorageSettings(BaseModel):
     secret_reference: str | None = None
     locked: str | None = None
     location: str
-    models_on_main: int = 0
-    models_on_main_bytes: int = 0
-
-
-class ModelCopies(BaseModel):
-    started: list[str]
-    skipped: list[str]
 
 
 class StorageUpdate(BaseModel):

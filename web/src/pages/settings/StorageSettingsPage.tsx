@@ -17,7 +17,6 @@ import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SourceBadge } from "~/components/SourceBadge";
 import { StatusText } from "~/components/models/StatusText";
-import { bytes } from "~/lib/time";
 import { STORAGE, type Setting } from "~/pages/settings/settingsIndex";
 
 type StorageSettings = components["schemas"]["StorageSettings"];
@@ -240,53 +239,12 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
 }
 
 function ModelFiles({ settings }: { settings: StorageSettings }) {
-    const queries = useQueryClient();
-    const copy = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/settings/storage/copy-models")),
-        onSuccess: () => queries.invalidateQueries({ queryKey: STORAGE_KEY }),
-    });
-    if (settings.kind !== "s3") {
-        return (
-            <p className="text-sm text-muted-foreground">
-                Base model files stay on main's disk. Remote engines and workers fetch them from
-                main.
-            </p>
-        );
-    }
-    const count = settings.models_on_main ?? 0;
     return (
-        <div className="flex flex-col gap-label">
-            {count === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    Every base model's files are in the bucket. Each machine that runs one fetches
-                    it from there and keeps a working copy.
-                </p>
-            ) : (
-                <>
-                    <p className="text-sm">
-                        {`${count} ${count === 1 ? "base model" : "base models"} (${bytes(settings.models_on_main_bytes ?? 0)}) still ${count === 1 ? "has its" : "have their"} files on main's disk. They keep working; copying them puts their main copy in the bucket, checked against each file's SHA-256, and main keeps its folder as a working copy.`}
-                    </p>
-                    <div>
-                        <Button
-                            variant="outline"
-                            onClick={() => copy.mutate()}
-                            disabled={copy.isPending || settings.locked !== null}
-                        >
-                            Copy to the bucket
-                        </Button>
-                    </div>
-                </>
-            )}
-            {copy.data && (
-                <p className="text-sm text-muted-foreground">
-                    {copy.data.started.length > 0
-                        ? `Copying ${copy.data.started.join(", ")}. Follow it on the Models page.`
-                        : "Nothing to copy."}
-                    {copy.data.skipped.length > 0 && ` Skipped: ${copy.data.skipped.join("; ")}.`}
-                </p>
-            )}
-            <ErrorLine error={copy.error} />
-        </div>
+        <p className="text-sm text-muted-foreground">
+            {settings.kind === "s3"
+                ? "Base models downloaded, imported or repaired from now on keep their files in the bucket; each machine that runs one fetches it from there and keeps a working copy. Bases already on main's disk stay there and keep working."
+                : "Base model files stay on main's disk. Remote engines and workers fetch them from main."}
+        </p>
     );
 }
 

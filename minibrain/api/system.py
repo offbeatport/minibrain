@@ -14,7 +14,6 @@ from minibrain.api.schemas import (
     InfrastructureInfo,
     InstallSettings,
     LoadedModel,
-    ModelCopies,
     SnapshotUsage,
     StorageCheck,
     StorageSettings,
@@ -29,7 +28,7 @@ from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.models.bucket import WEIGHTS, writes_bucket
 from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
-from minibrain.models.registry import copy_to_bucket, models_dir, models_on_main
+from minibrain.models.registry import models_dir
 from minibrain.object_store import CREDENTIAL_ENV, S3, StorageConfig, StorageError, load_config, read_secret
 from minibrain.object_store import apply as apply_storage
 from minibrain.object_store import check as check_storage
@@ -38,7 +37,7 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, AuditEvent, Job, Model, ModelStatus, Snapshot, Version
+from minibrain.registry.models import Artifact, Job, Model, ModelStatus, Snapshot, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -167,7 +166,6 @@ def on_main() -> tuple[ColumnElement[bool], ...]:
 
 def storage_settings(session: Session, settings: Settings, store: ArtifactStore) -> StorageSettings:
     config = load_config(session)
-    local = models_on_main(session) if writes_bucket(store) else []
     found = provision.provided("storage")
     return StorageSettings(
         kind="s3" if config.kind == S3 else "local",
@@ -181,8 +179,6 @@ def storage_settings(session: Session, settings: Settings, store: ArtifactStore)
         secret_reference=secret_reference(found),
         locked=found.locked_by(),
         location=store.remote.describe() if store.writes_remote and store.remote else str(settings.artifacts_dir()),
-        models_on_main=len(local),
-        models_on_main_bytes=sum(model.size_bytes for model in local),
     )
 
 
@@ -222,18 +218,6 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     except StorageError as error:
         return StorageCheck(ok=False, message=str(error))
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
-
-
-@router.post("/settings/storage/copy-models", dependencies=[Depends(admin)])
-def copy_models(session: SessionDep, settings: SettingsDep) -> ModelCopies:
-    started, skipped = copy_to_bucket(session, settings)
-    if started:
-        names = [model.id for model in started]
-        session.add(
-            AuditEvent(actor=current_actor(), action="storage.copy_models", target="storage", detail={"models": names})
-        )
-    session.commit()
-    return ModelCopies(started=[model.name for model in started], skipped=skipped)
 
 
 @router.get("/system/infrastructure", dependencies=[Depends(viewer)])

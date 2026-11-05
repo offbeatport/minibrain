@@ -277,8 +277,7 @@ Data is shared across models:
   dataset whose name is taken one level up.
 - A **dataset version** is a full copy of a dataset's rows, never a reference (see Dataset versions). Each model
   version records the dataset version it trained and scored on.
-- Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
-  model gets a new dataset. A dataset or source still in use cannot be deleted.
+- A dataset or source still in use cannot be deleted.
 - Catalogue: sources and datasets carry a name, an optional description and tags. Search covers names, table names,
   column names, descriptions and tags. Column stats (type, empty share, approximate distinct count, range for non-text
   types) come from a bounded sample (`SUMMARIZE` over the first 10,000 rows); the preview runs the query live, shows
@@ -671,10 +670,9 @@ once it matches; only deleting a base removes its files.
   damaged object again.
 - Deleting a base deletes its bucket objects (unless another model has the same file), main's working copy and its
   rows. Remote engines and workers remove copies of models main no longer has when they start and every 10 minutes.
-- Switching Storage to S3 leaves bases on main's disk usable. Settings → Storage counts them, and "Copy to the bucket"
-  starts one repair job per base that hard-links (or copies) its checked files into staging and uploads them; main
-  keeps its folder as its working copy. A base in the bucket stays there if Storage goes back to the folder, while the
-  bucket settings remain.
+- Switching Storage to S3 leaves bases on main's disk usable, served from main as before; a base moves to the bucket
+  only when it is downloaded, imported or repaired again. A base in the bucket stays there if Storage goes back to the
+  folder, while the bucket settings remain.
 - Free space: S3 reports none. The Add model gauge names its store ("S3 · <bucket>" or "Main server disk"); for S3 it
   shows the model's size and main's free disk instead of a fill level.
 
@@ -1155,8 +1153,8 @@ outbound calls.
 - Both stores: tests marked `both_stores` (uploads, dataset versions, adapters, logs, deletes, key passes) run twice,
   on the folder and on an S3 bucket. The bucket is moto's `ThreadedMotoServer`, started once per test run on
   127.0.0.1 with a random port, a fresh bucket per test; `uv run pytest -q` runs both, offline, locally and in CI.
-  Base weights in a bucket (downloads, imports, signed links, working copies, verify, repair, delete, copying models
-  from main's disk) have their own tests on the same server.
+  Base weights in a bucket (downloads, imports, signed links, working copies, verify, repair, delete) have their own
+  tests on the same server.
   moto is a dev dependency only (`moto[s3]` with flask, not its heavy `server` extra) and never ships. If moto's
   fidelity falls short of a real server, the next step is a nightly job against a real S3-compatible server (SeaweedFS
   or MinIO); there is none yet.
@@ -1408,11 +1406,15 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   each file gets a fresh signed link.
 - [x] Key rotation re-uploaded every bucket object whole, which is slow for large weights. It sends the new header and
   the first 5 MiB and the bucket copies the rest server-side (Artifact storage).
-- [ ] Delete Copy to the bucket (moving bases from main's disk when Storage switches to S3); it only served older
-  installs.
-- [ ] Delete the job format version check that turns away older workers; there are no older workers.
-- [ ] Delete inline secrets in `policy.otel_headers` and `auth.oidc.client_secret`; they become env or file references
-  like every other secret.
+- [x] Deleted Copy to the bucket (moving bases from main's disk when Storage switches to S3) and the repair seed behind
+  it; it only served older installs.
+- [x] Deleted the job format version check that turned away older workers; there are no older workers.
+- [x] Deleted inline secrets in `policy.otel_headers` and `auth.oidc.client_secret`: the headers are named with
+  `secret_env` or `secret_file` (or `OTEL_EXPORTER_OTLP_HEADERS`), the client secret with `MINIBRAIN_OIDC_CLIENT_SECRET`
+  or `client_secret_file`, and a value written in `minibrain.yaml` stops the start.
+- [x] Deleted three routes no UI used: `POST /api/minibrains/{slug}/source` (uploading straight to a model, with its
+  own replace-the-dataset rule; the UI uploads a source and picks a dataset), `GET /api/minibrains/bases` (the Models
+  list replaced it) and `GET /api/snapshots/{snapshot_id}` (versions come from the dataset's list and the diff).
 - [ ] Rename after the task engine lands: `Minibrain` and the `minibrains` table become `Model` and `models` (a
   model you own), today's `Model` becomes `BaseModel` and `base_models`, `/api/minibrains/{slug}/…` becomes
   `/api/models/{slug}/…` and `/api/models/base/{key}` becomes `/api/base-models/{key}`; the UI already says model.

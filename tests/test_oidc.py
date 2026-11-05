@@ -11,7 +11,7 @@ from joserfc.jwk import RSAKey
 from sqlalchemy import select
 
 from minibrain.app import create_app
-from minibrain.auth.config import AuthConfigError, load_auth
+from minibrain.auth.config import OIDC_CREDENTIAL_ENV, AuthConfigError, load_auth
 from minibrain.auth.first_run import FirstRun, prepare
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
@@ -23,7 +23,6 @@ from tests.test_proxy import write_config
 OIDC = {
     "issuer": ISSUER,
     "client_id": CLIENT_ID,
-    "client_secret": CLIENT_CREDENTIAL,
     "label": "Keycloak",
 }
 AUTH = {"oidc": OIDC, "roles": {"minibrain-admins": "admin", "ml-team": "builder"}}
@@ -50,6 +49,7 @@ class Sso:
 def sso_install(settings: Settings, monkeypatch: pytest.MonkeyPatch, auth: dict) -> Iterator[Sso]:
     settings.home.mkdir(parents=True, exist_ok=True)
     write_config(settings.home, monkeypatch, auth)
+    monkeypatch.setenv(OIDC_CREDENTIAL_ENV, CLIENT_CREDENTIAL)
     app = create_app(settings=settings, backend=FakeBackend(), background=False)
     provider = FakeProvider(claims=dict(ADA))
     app.state.oidc.transport = httpx2.MockTransport(provider.handle)
@@ -188,8 +188,11 @@ def test_oidc_config_is_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         write_config(tmp_path, monkeypatch, {"oidc": oidc})
         with pytest.raises(AuthConfigError, match=message):
             load_auth()
-    write_config(tmp_path, monkeypatch, {"oidc": {"issuer": ISSUER, "client_id": "x", "client_secret": "file"}})
-    monkeypatch.setenv("MINIBRAIN_OIDC_CLIENT_SECRET", "from-env")
+    write_config(tmp_path, monkeypatch, {"oidc": {"issuer": ISSUER, "client_id": "x", "client_secret": "inline"}})
+    with pytest.raises(AuthConfigError, match="MINIBRAIN_OIDC_CLIENT_SECRET"):
+        load_auth()
+    write_config(tmp_path, monkeypatch, {"oidc": {"issuer": ISSUER, "client_id": "x"}})
+    monkeypatch.setenv(OIDC_CREDENTIAL_ENV, "from-env")
     loaded = load_auth().oidc
     assert loaded is not None and loaded.client_secret == "from-env" and loaded.label == "single sign-on"
 

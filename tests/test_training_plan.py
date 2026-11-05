@@ -19,7 +19,6 @@ from minibrain.ml.planner import (
     plan,
 )
 from minibrain.models.hardware import Gpu, NodeReport
-from minibrain.versions import JOB_PROTOCOL
 from tests.conftest import Harness
 from tests.test_flow import SLUG, create_with_dataset
 
@@ -185,7 +184,6 @@ def register(harness: Harness, hardware: dict[str, Any], host: str = "gpu-box") 
         "gpus": 1,
         "pool": "local",
         "hardware": hardware,
-        "protocol": JOB_PROTOCOL,
     }
     assert harness.internal("/register", body).status_code == 204
 

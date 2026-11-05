@@ -146,15 +146,18 @@ def oidc_of(section: Any) -> OidcConfig | None:
     client_id = text_of(section, "client_id")
     if not issuer or urlparse(issuer).scheme not in ("https", "http") or not client_id:
         raise AuthConfigError("auth.oidc needs an issuer URL and a client_id")
+    if section.get("client_secret") is not None:
+        raise AuthConfigError(
+            "auth.oidc.client_secret writes the secret into minibrain.yaml; set MINIBRAIN_OIDC_CLIENT_SECRET or "
+            "name a file with auth.oidc.client_secret_file instead"
+        )
     scopes = section.get("scopes") or ["openid", "email", "profile"]
     if not isinstance(scopes, list) or "openid" not in scopes:
         raise AuthConfigError("auth.oidc.scopes is a list that includes openid")
     return OidcConfig(
         issuer=issuer,
         client_id=client_id,
-        client_secret=os.environ.get(OIDC_CREDENTIAL_ENV, "").strip()
-        or secret_file_of(section)
-        or text_of(section, "client_secret"),
+        client_secret=os.environ.get(OIDC_CREDENTIAL_ENV, "").strip() or secret_file_of(section),
         label=text_of(section, "label") or "single sign-on",
         scopes=tuple(str(scope) for scope in scopes),
         groups_claim=text_of(section, "groups_claim") or "groups",

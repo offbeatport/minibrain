@@ -23,7 +23,7 @@ environment):
 |---|---|---|---|
 | OpenTelemetry export | `otel_protocol: http/protobuf` | `OTEL_EXPORTER_OTLP_PROTOCOL` | `off` |
 | Collector endpoint | `otel_endpoint: https://otel-collector.internal:4318` | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty |
-| Collector headers | `otel_headers: Authorization=Bearer …` | `OTEL_EXPORTER_OTLP_HEADERS` | empty |
+| Collector headers | `otel_headers: {secret_env: COLLECTOR_HEADERS}` or `{secret_file: /run/secrets/otel-headers}` | `OTEL_EXPORTER_OTLP_HEADERS` | empty |
 | Service name | `otel_service_name: minibrain-eu` | `OTEL_SERVICE_NAME` | `minibrain` |
 | Collector CA bundle | `otel_ca_bundle: /etc/minibrain/collector-ca.pem` | `OTEL_EXPORTER_OTLP_CERTIFICATE` | system CAs |
 
@@ -34,6 +34,8 @@ environment):
   `OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE` and `OTEL_EXPORTER_OTLP_CLIENT_KEY` (mTLS), `OTEL_METRIC_EXPORT_INTERVAL`
   (milliseconds, 60000 by default), `OTEL_BSP_*` for span batching and `OTEL_RESOURCE_ATTRIBUTES`.
 - Only `http/protobuf` is supported; no gRPC. Any other `OTEL_EXPORTER_OTLP_PROTOCOL` leaves export off and logs why.
+- `minibrain.yaml` never holds header values: `otel_headers` names the variable or file that does, and a value written
+  in the file, or a variable or file that is missing, stops the start with the reason.
 - Header values are encrypted at rest with the install's master key (like connection secrets), never returned by the
   API and never written to the audit log; the UI and the audit log show header names only. Values come URL-decoded,
   as the OTLP specification asks (`X-Tenant=acme%20corp`).

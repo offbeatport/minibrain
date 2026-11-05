@@ -26,7 +26,6 @@ from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import size_problems
 from minibrain.registry.models import JobKind
 from minibrain.telemetry.logs import configure_logging
-from minibrain.versions import JOB_PROTOCOL
 
 MODULES: dict[str, str] = {
     JobKind.TRAIN: "minibrain.ml.train",
@@ -59,10 +58,6 @@ log = logging.getLogger("minibrain.worker")
 
 
 class LeaseLostError(Exception):
-    pass
-
-
-class IncompatibleWorkerError(Exception):
     pass
 
 
@@ -126,8 +121,6 @@ class MainClient:
             else:
                 if response.status_code == 409:
                     raise LeaseLostError(response.text)
-                if response.status_code == 426:
-                    raise IncompatibleWorkerError(response.json().get("detail", response.text))
                 if response.status_code < 500 or attempt == RETRIES - 1:
                     response.raise_for_status()
                     return response
@@ -148,7 +141,6 @@ class MainClient:
             "gpus": config.gpus,
             "pool": config.pool,
             "hardware": config.hardware,
-            "protocol": JOB_PROTOCOL,
         }
 
     def register(self) -> None:
@@ -327,9 +319,6 @@ class Worker:
                     pruned = time.monotonic()
         except WorkerStoppedError:
             return
-        except IncompatibleWorkerError as error:
-            log.error("%s", error)
-            stop.set()
 
     def run_once(self, wait: float = 0.0) -> bool:
         claim = self.client.claim(wait)

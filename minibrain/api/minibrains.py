@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -37,8 +37,7 @@ from minibrain.data.shared import (
     tables_of,
 )
 from minibrain.data.snapshots import cleanup, take_version, version_if_mapped
-from minibrain.data.sources import safe_filename
-from minibrain.models.registry import ACTIVE_STATUSES, available_bases, base_readiness, start_download
+from minibrain.models.registry import ACTIVE_STATUSES, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.registry.files import snapshot_location
 from minibrain.registry.models import AuditEvent, CatalogModel, Minibrain, Model, ModelStatus, now
@@ -79,11 +78,6 @@ def create(body: MinibrainCreate, session: SessionDep, settings: SettingsDep, st
             )
     session.commit()
     return detail(settings, minibrain)
-
-
-@router.get("/bases", dependencies=[Depends(viewer)])
-def bases(session: SessionDep) -> list[str]:
-    return available_bases(session)
 
 
 @router.patch("/{slug}", dependencies=[Depends(builder)])
@@ -167,18 +161,6 @@ def keep_request_bodies(
         )
     minibrain.request_bodies = body.kept
     minibrain.updated_at = now()
-    session.commit()
-    return detail(settings, minibrain)
-
-
-@router.post("/{slug}/source", dependencies=[Depends(builder)])
-def upload_source(
-    slug: str, file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep
-) -> MinibrainDetail:
-    minibrain = get_minibrain(session, slug)
-    dataset = attach_upload(session, settings, store, minibrain, safe_filename(file.filename or ""), file.file)
-    version_if_mapped(session, settings, dataset)
-    cleanup(session, settings)
     session.commit()
     return detail(settings, minibrain)
 

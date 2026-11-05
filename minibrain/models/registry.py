@@ -19,7 +19,6 @@ from minibrain.models.bucket import missing_objects, writes_bucket
 from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import MISSING, content_hash, listed, problem_of, size_problems
 from minibrain.models.inspect import source_type_of
-from minibrain.models.sources import FOLDER as FOLDER_SOURCE
 from minibrain.models.sources import HUB, S3, s3_endpoint
 from minibrain.object_store import load_config
 from minibrain.policy import load as load_policy
@@ -41,7 +40,6 @@ from minibrain.storage import missing_room, staging_room
 
 ACTIVE_STATUSES = (ModelStatus.DOWNLOADING, ModelStatus.IMPORTING)
 MAIN_DISK = "Main server disk"
-COPY_REASON = "copy"
 CONFIG_FILE = "config.json"
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
 
@@ -78,10 +76,7 @@ def files_present(settings: Settings, model: Model) -> bool:
 def transfer_target(settings: Settings, model: Model) -> dict[str, Any]:
     if not writes_bucket(store_for(settings)):
         return {"store": FOLDER, "out": str(model_folder(settings, model))}
-    target = {"store": BUCKET, "out": str(staging_dir(settings, model.id))}
-    if model.store == FOLDER and model.files:
-        target["seed"] = str(model_folder(settings, model))
-    return target
+    return {"store": BUCKET, "out": str(staging_dir(settings, model.id))}
 
 
 def gguf_file(model: Model) -> str | None:
@@ -365,11 +360,6 @@ def retry(session: Session, settings: Settings, model: Model) -> Model:
     return model
 
 
-def available_bases(session: Session) -> list[str]:
-    downloaded = session.scalars(select(Model.id).where(Model.status == ModelStatus.AVAILABLE))
-    return sorted(set(BASE_MODELS) | set(downloaded))
-
-
 PENDING = (ModelStatus.IMPORTING, ModelStatus.DOWNLOADING)
 
 
@@ -530,37 +520,3 @@ def relocate(session: Session, settings: Settings, model: Model, location: str) 
     model.path = None if managed.exists() and folder.resolve() == managed.resolve() else str(folder)
     model.updated_at = now()
     return start_verify(session, settings, model)
-
-
-def models_on_main(session: Session) -> list[Model]:
-    query = select(Model).where(Model.status == ModelStatus.AVAILABLE, Model.store == FOLDER).order_by(Model.id)
-    return list(session.scalars(query))
-
-
-def copy_refusal(session: Session, settings: Settings, model: Model) -> str | None:
-    if model.teardown is not None:
-        return "being deleted"
-    if active_job(session, model) is not None:
-        return "a job is running"
-    if content_hash(model.files) is None:
-        return "verify its files first"
-    if missing_files(settings, model):
-        return "files are missing on main; repair it first"
-    return None
-
-
-def copy_to_bucket(session: Session, settings: Settings) -> tuple[list[Model], list[str]]:
-    if not writes_bucket(store_for(settings)):
-        raise ConflictError("Storage is the local folder; choose an S3 bucket first")
-    started: list[Model] = []
-    skipped: list[str] = []
-    for model in models_on_main(session):
-        refusal = copy_refusal(session, settings, model)
-        if refusal is not None:
-            skipped.append(f"{model.name}: {refusal}")
-            continue
-        location = str(model_folder(settings, model))
-        params = repair_params(session, settings, model, FOLDER_SOURCE, location) | {"reason": COPY_REASON}
-        enqueue(session, JobKind.REPAIR, params, idempotency_key=f"repair:{model.id}", model_id=model.id)
-        started.append(model)
-    return started, skipped

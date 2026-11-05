@@ -54,15 +54,12 @@ def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_snapshots
     assert harness.client.delete(f"/api/sources/{source['id']}").status_code == 204
 
 
-def test_uploading_to_a_model_never_changes_a_dataset_other_models_use(harness: Harness) -> None:
+def test_models_sharing_a_dataset_see_its_mapping_change(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     for name in ("Triage A", "Triage B"):
         harness.client.post("/api/minibrains", json={"name": name})
         harness.client.put(f"/api/minibrains/{name.lower().replace(' ', '-')}/dataset", json={"dataset": "tickets"})
-    files = {"file": ("other.csv", tickets_csv(50), "text/csv")}
-    replaced = harness.client.post("/api/minibrains/triage-a/source", files=files).json()
-    assert replaced["dataset"] != "tickets" and replaced["source"]["rows"] == 50
     assert harness.client.get("/api/minibrains/triage-b").json()["source"]["rows"] == 200
     mapped = harness.client.put(
         "/api/datasets/tickets/mapping", json={"sql": "SELECT text AS input, category AS label FROM source"}

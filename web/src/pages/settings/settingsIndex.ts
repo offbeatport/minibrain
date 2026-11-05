@@ -607,11 +607,11 @@ export const STORAGE = {
         ]),
     }),
     models: section("Base model files", {
-        copy: onSection(
+        place: onSection(
             setting(
-                "Copy model files to the bucket",
-                "Base models still on main's disk get their main copy in the bucket; main keeps its folder as a working copy.",
-                [...S3_WORDS, "weights", "migrate", "move", "working copy"],
+                "Where base model files live",
+                "Bases downloaded, imported or repaired follow Storage; bases already on main's disk stay there.",
+                [...S3_WORDS, "weights", "working copy"],
             ),
         ),
     }),

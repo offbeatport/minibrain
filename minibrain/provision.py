@@ -9,7 +9,7 @@ import yaml
 from pydantic import BaseModel, Field, StringConstraints, ValidationError
 
 from minibrain.api.schemas import DataSettingsUpdate
-from minibrain.policy import BY_NAME, RETIRED, LockedError, PolicyError, coerce, config_path
+from minibrain.policy import BY_NAME, RETIRED, LockedError, PolicyError, coerce, config_path, from_config
 
 log = logging.getLogger("minibrain")
 
@@ -211,13 +211,9 @@ def policy_problems(config: dict[str, Any]) -> list[str]:
             warnings.append(f"minibrain.yaml: unknown policy {name}, ignored")
             continue
         try:
-            coerce(field_, value)
+            from_config(field_, value)
         except (PolicyError, TypeError, ValueError) as error:
             raise ConfigError(f"policy.{name}: {error}") from error
-        if field_.kind == "headers" and value:
-            warnings.append(
-                f"minibrain.yaml: policy.{name} holds secrets in the file; move them to OTEL_EXPORTER_OTLP_HEADERS"
-            )
     return warnings
 
 
@@ -239,12 +235,6 @@ def auth_problems(config: dict[str, Any]) -> list[str]:
         warnings.append(
             "minibrain.yaml: auth.admins applies to people who sign in with single sign-on or a proxy; "
             "add auth.oidc or auth.proxy, or create the first admin with the setup link"
-        )
-    oidc = section.get("oidc")
-    if isinstance(oidc, dict) and oidc.get("client_secret"):
-        warnings.append(
-            "minibrain.yaml: auth.oidc.client_secret holds a secret in the file; move it to "
-            "MINIBRAIN_OIDC_CLIENT_SECRET or a file named by auth.oidc.client_secret_file"
         )
     return warnings
 

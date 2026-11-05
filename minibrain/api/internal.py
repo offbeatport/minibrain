@@ -25,7 +25,6 @@ from minibrain.registry.files import register
 from minibrain.registry.models import Artifact, Job, JobKind, Model
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
-from minibrain.versions import JOB_PROTOCOL, library_version
 
 CLAIM_POLL_SECONDS = 0.5
 MAX_CLAIM_WAIT_SECONDS = 30.0
@@ -48,7 +47,6 @@ class WorkerBody(BaseModel):
     gpus: int = 1
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = Field(default_factory=dict)
-    protocol: int = 1
 
     def info(self) -> WorkerInfo:
         return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus)
@@ -137,20 +135,8 @@ def report_worker(session: SessionDep, body: WorkerBody) -> None:
     session.commit()
 
 
-def check_protocol(body: WorkerBody) -> None:
-    if body.protocol == JOB_PROTOCOL:
-        return
-    main = library_version("minibrain") or "the same version as main"
-    raise HTTPException(
-        status_code=426,
-        detail=f"minibrain on {body.host} uses job format {body.protocol}; main uses {JOB_PROTOCOL}. "
-        f"Install minibrain {main} on {body.host}.",
-    )
-
-
 @router.post("/register", status_code=204)
 def register_worker(body: WorkerBody, queue: QueueDep, session: SessionDep) -> None:
-    check_protocol(body)
     queue.register(body.info())
     report_worker(session, body)
 
@@ -158,7 +144,6 @@ def register_worker(body: WorkerBody, queue: QueueDep, session: SessionDep) -> N
 @router.post("/claim", response_model=None)
 def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: SettingsDep) -> ClaimResponse | Response:
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
-    check_protocol(body.worker)
     worker = body.worker.info()
     queue.register(worker)
     report_worker(session, body.worker)

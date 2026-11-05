@@ -12,6 +12,7 @@ from minibrain.auth.first_run import setup_open
 from minibrain.config_export import export, render
 from minibrain.data.limits import load_limits
 from minibrain.object_store import load_config, read_secret
+from minibrain.policy import locked_sources
 from minibrain.provision import ConfigError, problems
 from minibrain.registry.prices import load_prices
 from minibrain.settings import Settings
@@ -104,6 +105,31 @@ def test_secrets_in_the_file_are_refused_with_the_key(config_file: Path) -> None
     write(config_file, {"storage": STORAGE | {"password": "inline"}})
     with pytest.raises(ConfigError, match=r"storage\.password"):
         problems()
+    write(config_file, {"policy": {"otel_headers": "Authorization=Bearer inline"}})
+    with pytest.raises(ConfigError, match=r"policy\.otel_headers: minibrain.yaml never holds secrets"):
+        problems()
+    oidc = {"issuer": "https://idp.example.test/realms/corp", "client_id": "minibrain", "client_secret": "inline"}
+    write(config_file, {"auth": {"oidc": oidc}})
+    with pytest.raises(ConfigError, match=r"auth\.oidc\.client_secret writes the secret into minibrain.yaml"):
+        problems()
+
+
+def test_collector_headers_come_from_a_named_variable_or_file(
+    config_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(config_file, {"policy": {"otel_headers": {"secret_env": "COLLECTOR_HEADERS"}}})
+    with pytest.raises(ConfigError, match="Collector headers not found in the environment variable COLLECTOR_HEADERS"):
+        problems()
+    monkeypatch.setenv("COLLECTOR_HEADERS", "Authorization=Bearer t0ken")
+    assert problems() == []
+    assert locked_sources()["otel_headers"] == (
+        "config file",
+        {"names": ["Authorization"], "plain": "Authorization=Bearer t0ken"},
+    )
+    headers = tmp_path / "otel-headers"
+    headers.write_text("X-Tenant=acme\n")
+    write(config_file, {"policy": {"otel_headers": {"secret_file": str(headers)}}})
+    assert locked_sources()["otel_headers"][1]["names"] == ["X-Tenant"]
 
 
 @pytest.mark.parametrize(

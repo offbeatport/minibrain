@@ -602,7 +602,9 @@ and connections. It lives at `$MINIBRAIN_HOME/minibrain.yaml` (`/data/minibrain.
   `MINIBRAIN_DATA_ROW_LIMIT=500000` or `MINIBRAIN_STORAGE_BUCKET=ml-artifacts` (`storage`, `data`, `catalogue` and
   `compute.currency`). Policies keep `MINIBRAIN_POLICY_<NAME>`. The UI shows "Set by environment".
 - Secrets never go in the file. Name them instead: `secret_env` (an environment variable) or `secret_file` (a file
-  such as a Docker or Kubernetes secret). A `secret`, `password` or `token` key stops the start with the reason.
+  such as a Docker or Kubernetes secret). A `secret`, `password` or `token` key stops the start with the reason, and
+  so do `auth.oidc.client_secret` (use `client_secret_file` or `MINIBRAIN_OIDC_CLIENT_SECRET`) and header values in
+  `policy.otel_headers` (use `otel_headers: {secret_env: NAME}` or `{secret_file: /path}`).
 - main checks the file when it starts. A bad value stops it with the key named (`data.row_limit: Input should be
   greater than or equal to 100`); an unknown section or key is logged as a warning and ignored.
 - `minibrain config export` prints the install's current settings in this format, with every secret named but

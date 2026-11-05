@@ -6,7 +6,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Data
 - **Upload sources** · shipped · product, ml
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
-  UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/minibrains/{slug}/source
+  UI: Data › Add source › Upload a file · API: POST /api/sources
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.
   UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
@@ -48,7 +48,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
-  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, GET /api/snapshots/{snapshot_id}, POST /api/minibrains/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots
+  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, POST /api/minibrains/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
   UI: Data › dataset › Versions › Compare · API: GET /api/snapshots/{snapshot_id}/diff/{other_id}
@@ -122,7 +122,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models · API: GET /api/models
 - **Base model page** · shipped · ml, admin
   See a base's files, revisions, usage and API, and rename it.
-  UI: Models › base model · API: GET /api/models/base/{key}, PATCH /api/models/base/{key}, GET /api/minibrains/bases
+  UI: Models › base model · API: GET /api/models/base/{key}, PATCH /api/models/base/{key}
 - **Try a base model** · shipped · product, ml
   Send a prompt to a base model before building on it.
   UI: Models › base model › Test · API: POST /api/models/base/{key}/test
@@ -344,7 +344,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Storage · API: GET /api/settings/storage, PUT /api/settings/storage, POST /api/settings/storage/test · Config: storage, MINIBRAIN_STORAGE_S3_SECRET
 - **Base weights in the bucket** · shipped · admin
   Keep base weights in the bucket; machines fetch them by signed links.
-  UI: Settings › Storage › Base model files · API: POST /api/settings/storage/copy-models
+  UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
   See disk use by stores, models and dataset versions.
   UI: Infrastructure › Storage

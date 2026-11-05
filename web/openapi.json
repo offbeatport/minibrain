@@ -483,31 +483,6 @@
         }
       }
     },
-    "/api/minibrains/bases": {
-      "get": {
-        "tags": [
-          "minibrains"
-        ],
-        "summary": "Bases",
-        "operationId": "bases_api_minibrains_bases_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array",
-                  "title": "Response Bases Api Minibrains Bases Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/minibrains/{slug}": {
       "patch": {
         "tags": [
@@ -726,58 +701,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RequestBodiesUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MinibrainDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/minibrains/{slug}/source": {
-      "post": {
-        "tags": [
-          "minibrains"
-        ],
-        "summary": "Upload Source",
-        "operationId": "upload_source_api_minibrains__slug__source_post",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_source_api_minibrains__slug__source_post"
               }
             }
           }
@@ -2178,48 +2101,6 @@
         ],
         "responses": {
           "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SnapshotInfo"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/snapshots/{snapshot_id}": {
-      "get": {
-        "tags": [
-          "data"
-        ],
-        "summary": "Read Snapshot",
-        "operationId": "read_snapshot_api_snapshots__snapshot_id__get",
-        "parameters": [
-          {
-            "name": "snapshot_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Snapshot Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -7517,27 +7398,6 @@
         }
       }
     },
-    "/api/settings/storage/copy-models": {
-      "post": {
-        "tags": [
-          "system"
-        ],
-        "summary": "Copy Models",
-        "operationId": "copy_models_api_settings_storage_copy_models_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelCopies"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/system/infrastructure": {
       "get": {
         "tags": [
@@ -10256,20 +10116,6 @@
           "files"
         ],
         "title": "BaseWeights"
-      },
-      "Body_upload_source_api_minibrains__slug__source_post": {
-        "properties": {
-          "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "File"
-          }
-        },
-        "type": "object",
-        "required": [
-          "file"
-        ],
-        "title": "Body_upload_source_api_minibrains__slug__source_post"
       },
       "Body_upload_source_api_sources_post": {
         "properties": {
@@ -18063,30 +17909,6 @@
         ],
         "title": "ModelCardExport"
       },
-      "ModelCopies": {
-        "properties": {
-          "started": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Started"
-          },
-          "skipped": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Skipped"
-          }
-        },
-        "type": "object",
-        "required": [
-          "started",
-          "skipped"
-        ],
-        "title": "ModelCopies"
-      },
       "ModelFile": {
         "properties": {
           "path": {
@@ -21539,16 +21361,6 @@
           "location": {
             "type": "string",
             "title": "Location"
-          },
-          "models_on_main": {
-            "type": "integer",
-            "title": "Models On Main",
-            "default": 0
-          },
-          "models_on_main_bytes": {
-            "type": "integer",
-            "title": "Models On Main Bytes",
-            "default": 0
           }
         },
         "type": "object",
@@ -22844,11 +22656,6 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Hardware"
-          },
-          "protocol": {
-            "type": "integer",
-            "title": "Protocol",
-            "default": 1
           }
         },
         "type": "object",

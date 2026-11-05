@@ -158,27 +158,18 @@ def test_verify_reads_the_bucket_and_repair_replaces_a_damaged_object(harness: H
 
 @pytest.mark.parametrize("store_kind", [FOLDER])
 @pytest.mark.usefixtures("hub")
-def test_models_on_main_are_copied_to_the_bucket_and_stay_usable(harness: Harness, moto: FakeS3) -> None:
+def test_models_on_main_stay_usable_after_storage_switches_to_the_bucket(harness: Harness, moto: FakeS3) -> None:
     detail = installed(harness)
     folder = Path(detail["storage_path"])
     assert detail["store"] == "folder" and (folder / WEIGHTS_FILE).is_file()
     use_bucket(harness, moto)
-    storage = harness.client.get("/api/settings/storage").json()
-    assert (storage["models_on_main"], storage["models_on_main_bytes"]) == (1, detail["size_bytes"])
     assert listing(harness).json()["store"] == "folder"
-    copied = harness.client.post("/api/settings/storage/copy-models")
-    assert copied.status_code == 200 and copied.json() == {"started": ["Tiny"], "skipped": []}
-    assert harness.worker(kinds=["repair"]).run_once()
     after = harness.client.get("/api/models/base/tiny").json()
-    assert after["store"] == "s3" and {entry["state"] for entry in after["files"]} == {"ok"}
-    assert all(in_bucket(moto, harness, sha) for sha in SHA.values())
-    assert (folder / WEIGHTS_FILE).read_bytes() == FILES[WEIGHTS_FILE]
-    assert listing(harness).json()["store"] == "s3"
-    assert harness.client.get("/api/settings/storage").json()["models_on_main"] == 0
+    assert after["store"] == "folder" and after["availability"]["state"] == "available"
+    assert not any(in_bucket(moto, harness, sha) for sha in SHA.values())
     with harness.sessions() as session:
         model = session.get(Model, "tiny")
-        assert model is not None and model.store == BUCKET
-        assert session.query(AuditEvent).filter(AuditEvent.action == "storage.copy_models").count() == 1
+        assert model is not None and model.store == FOLDER
 
 
 @pytest.mark.parametrize("store_kind", [BUCKET])

@@ -319,5 +319,5 @@ def test_two_snapshots_diff_by_input_with_label_shift(harness: Harness) -> None:
     assert found["relabelled_rows"] == [{"input": "ticket 0 about billing", "before": "billing", "after": "bug"}]
     shifts = {item["label"]: (item["before"], item["after"]) for item in found["labels"]}
     assert shifts == {"billing": (50, 50), "bug": (50, 51), "account": (50, 50), "feature": (50, 0)}
-    assert harness.client.get(f"/api/snapshots/{after['id']}").json()["rows"] == 151
+    assert found["after"]["rows"] == 151
     assert harness.client.get("/api/snapshots/999/diff/1").status_code == 404

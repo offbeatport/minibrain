@@ -16,7 +16,7 @@ from minibrain.models.transfer import fetch
 from minibrain.registry.models import AuditEvent, Model
 from minibrain.serve.engine import create_engine_app, load_failure
 from minibrain.serve.select import NoEngineError
-from tests.conftest import FakeBackend, Harness, tickets_csv
+from tests.conftest import FakeBackend, Harness, give_data, tickets_csv
 from tests.test_flow import SLUG, add_version, bearer, build_dataset, deploy, finish
 from tests.test_models import FILES, REPO, REVISION, Quiet, add_tiny, download_tiny, hub, manifest
 
@@ -202,8 +202,7 @@ def test_reimport_restores_files_only_from_an_identical_copy(harness: Harness, h
 def train_on(harness: Harness, base: str) -> None:
     created = harness.client.post("/api/minibrains", json={"name": "Support Triage", "base_model": base})
     assert created.status_code == 201
-    files = {"file": ("tickets.csv", tickets_csv(), "text/csv")}
-    harness.client.post(f"/api/minibrains/{SLUG}/source", files=files)
+    give_data(harness, SLUG)
     build_dataset(harness)
     add_version(harness, "lora")
     finish(harness, "train")

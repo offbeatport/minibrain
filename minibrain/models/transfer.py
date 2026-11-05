@@ -43,13 +43,11 @@ class Target:
     out: Path
     bucket: bool = False
     stored: dict[str, str] = field(default_factory=dict)
-    seed: Path | None = None
 
     @staticmethod
     def of(spec: JobSpec) -> "Target":
-        seed = spec.optional_path("seed")
         stored = {str(entry["path"]): str(entry["sha256"]) for entry in spec.raw.get("stored") or []}
-        return Target(out=spec.path("out"), bucket=spec.raw.get("store") == BUCKET, stored=stored, seed=seed)
+        return Target(out=spec.path("out"), bucket=spec.raw.get("store") == BUCKET, stored=stored)
 
     def in_bucket(self, entry: dict[str, Any]) -> bool:
         return self.bucket and bool(entry.get("sha256")) and self.stored.get(str(entry["path"])) == entry["sha256"]
@@ -61,21 +59,6 @@ class Target:
         print(json.dumps({"staged": entry["path"], "sha256": entry["sha256"], "size": entry["size"]}), flush=True)
         while target.exists():
             time.sleep(PUBLISH_POLL_SECONDS)
-
-    def seeded(self, entry: dict[str, Any]) -> bool:
-        if self.seed is None:
-            return False
-        source = self.seed / str(entry["path"])
-        if not valid(source, entry):
-            return False
-        target = self.out / str(entry["path"])
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.unlink(missing_ok=True)
-        try:
-            os.link(source, target)
-        except OSError:
-            shutil.copyfile(source, target)
-        return True
 
     def finish(self, record: dict[str, Any]) -> None:
         if self.bucket:
@@ -158,7 +141,7 @@ def install(
         if target.in_bucket(entry):
             progress.add(int(entry["size"]), entry["path"])
             recorded.append(entry)
-        elif valid(local, entry) or target.seeded(entry):
+        elif valid(local, entry):
             progress.add(int(entry["size"]), entry["path"])
             found = entry | {"sha256": entry.get("sha256") or sha256_of(local)}
             target.publish(found)

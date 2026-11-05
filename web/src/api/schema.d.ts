@@ -193,23 +193,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/minibrains/bases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bases */
-        get: operations["bases_api_minibrains_bases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/minibrains/{slug}": {
         parameters: {
             query?: never;
@@ -257,23 +240,6 @@ export interface paths {
         /** Keep Request Bodies */
         put: operations["keep_request_bodies_api_minibrains__slug__request_bodies_put"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/minibrains/{slug}/source": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Upload Source */
-        post: operations["upload_source_api_minibrains__slug__source_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -689,23 +655,6 @@ export interface paths {
         put?: never;
         /** Save Snapshot */
         post: operations["save_snapshot_api_datasets__slug__snapshots_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/snapshots/{snapshot_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Snapshot */
-        get: operations["read_snapshot_api_snapshots__snapshot_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2172,23 +2121,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/settings/storage/copy-models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Copy Models */
-        post: operations["copy_models_api_settings_storage_copy_models_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/system/infrastructure": {
         parameters: {
             query?: never;
@@ -3051,11 +2983,6 @@ export interface components {
             content_hash?: string | null;
             /** Files */
             files: components["schemas"]["BaseFile"][];
-        };
-        /** Body_upload_source_api_minibrains__slug__source_post */
-        Body_upload_source_api_minibrains__slug__source_post: {
-            /** File */
-            file: string;
         };
         /** Body_upload_source_api_sources_post */
         Body_upload_source_api_sources_post: {
@@ -5554,13 +5481,6 @@ export interface components {
              */
             canonical_form?: string;
         };
-        /** ModelCopies */
-        ModelCopies: {
-            /** Started */
-            started: string[];
-            /** Skipped */
-            skipped: string[];
-        };
         /** ModelFile */
         ModelFile: {
             /** Path */
@@ -6664,16 +6584,6 @@ export interface components {
             locked?: string | null;
             /** Location */
             location: string;
-            /**
-             * Models On Main
-             * @default 0
-             */
-            models_on_main?: number;
-            /**
-             * Models On Main Bytes
-             * @default 0
-             */
-            models_on_main_bytes?: number;
         };
         /** StorageUpdate */
         StorageUpdate: {
@@ -7091,11 +7001,6 @@ export interface components {
             hardware?: {
                 [key: string]: unknown;
             };
-            /**
-             * Protocol
-             * @default 1
-             */
-            protocol?: number;
         };
     };
     responses: never;
@@ -7476,26 +7381,6 @@ export interface operations {
             };
         };
     };
-    bases_api_minibrains_bases_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": string[];
-                };
-            };
-        };
-    };
     read_api_minibrains__slug__get: {
         parameters: {
             query?: never;
@@ -7642,41 +7527,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RequestBodiesUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MinibrainDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upload_source_api_minibrains__slug__source_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_source_api_minibrains__slug__source_post"];
             };
         };
         responses: {
@@ -8729,37 +8579,6 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SnapshotInfo"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_snapshot_api_snapshots__snapshot_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                snapshot_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11875,26 +11694,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    copy_models_api_settings_storage_copy_models_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelCopies"];
                 };
             };
         };

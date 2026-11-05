@@ -601,11 +601,6 @@ def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) ->
     return location
 
 
-@router.get("/snapshots/{snapshot_id}", dependencies=[Depends(builder)])
-def read_snapshot(snapshot_id: int, session: SessionDep) -> SnapshotInfo:
-    return snapshot_info(get_snapshot(session, snapshot_id))
-
-
 @router.get("/snapshots/{snapshot_id}/diff/{other_id}", dependencies=[Depends(builder)])
 def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: StoreDep) -> SnapshotDiff:
     before, after = get_snapshot(session, snapshot_id), get_snapshot(session, other_id)

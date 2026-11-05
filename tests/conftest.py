@@ -23,7 +23,6 @@ from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest
 from minibrain.settings import Settings
-from minibrain.versions import JOB_PROTOCOL
 from minibrain.worker import MainClient, Worker, WorkerConfig
 from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
 
@@ -117,7 +116,7 @@ class Harness:
         return self.client.post(f"/internal/worker{path}", json=body, headers=headers)
 
     def claim(self, kinds: list[str], worker_id: str = "test-worker") -> dict[str, Any] | None:
-        worker = {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1, "protocol": JOB_PROTOCOL}
+        worker = {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1}
         body = {"worker": worker, "wait": 0}
         response = self.internal("/claim", body)
         return None if response.status_code == 204 else response.json()
@@ -138,6 +137,15 @@ def tickets_csv(rows: int = 200) -> bytes:
     lines = ["text,category"]
     lines += [f"ticket {index} about {LABELS[index % 4]},{LABELS[index % 4]}" for index in range(rows)]
     return ("\n".join(lines) + "\n").encode()
+
+
+def give_data(harness: "Harness", slug: str, data: bytes | None = None, name: str = "tickets.csv") -> dict[str, Any]:
+    files = {"file": (name, data if data is not None else tickets_csv(), "text/csv")}
+    source = harness.client.post("/api/sources", files=files).json()
+    dataset = harness.client.post("/api/datasets", json={"name": slug, "source_id": source["id"]}).json()
+    chosen = harness.client.put(f"/api/minibrains/{slug}/dataset", json={"dataset": dataset["slug"]})
+    chosen.raise_for_status()
+    return chosen.json()
 
 
 def fake_adapter() -> bytes:

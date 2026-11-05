@@ -475,11 +475,37 @@ def implied_locks(found: dict[str, tuple[str, Any]]) -> dict[str, tuple[str, Any
     return {}
 
 
+def referenced_secret(field: Field, value: Any) -> str:
+    keys = set(value) if isinstance(value, dict) else set()
+    if len(keys) != 1 or not keys <= {"secret_env", "secret_file"}:
+        raise PolicyError(
+            f"minibrain.yaml never holds secrets; name {field.label.lower()} with secret_env: NAME or "
+            "secret_file: /path, or set OTEL_EXPORTER_OTLP_HEADERS"
+        )
+    if "secret_env" in value:
+        found = os.environ.get(str(value["secret_env"]), "").strip()
+        where = f"the environment variable {value['secret_env']}"
+    else:
+        path = Path(str(value["secret_file"])).expanduser()
+        try:
+            found = path.read_text().strip() if path.is_file() else ""
+        except OSError:
+            found = ""
+        where = f"the file {path}"
+    if not found:
+        raise PolicyError(f"{field.label} not found in {where}")
+    return found
+
+
+def from_config(field: Field, value: Any) -> Any:
+    return coerce(field, referenced_secret(field, value) if field.kind == "headers" else value)
+
+
 def locked_sources() -> dict[str, tuple[str, Any]]:
     found: dict[str, tuple[str, Any]] = {}
     for name, value in from_file().items():
         if name in BY_NAME:
-            found[name] = ("config file", coerce(BY_NAME[name], value))
+            found[name] = ("config file", from_config(BY_NAME[name], value))
         elif name in RETIRED:
             retired(name, "minibrain.yaml")
     auth = config_section("auth")

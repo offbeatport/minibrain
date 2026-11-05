@@ -25,7 +25,7 @@ from minibrain.api.views import cost_info, teardown_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
-from minibrain.models.registry import COPY_REASON, files_present
+from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
 from minibrain.models.sources import HUB
 from minibrain.registry.models import (
@@ -454,8 +454,6 @@ def base_row(
     activity = base_activity(job)
     if model.status == ModelStatus.EVICTED:
         activity = restored_label(activity, job)
-    if job is not None and job.params.get("reason") == COPY_REASON:
-        activity = activity.model_copy(update={"label": activity.label.replace("Repairing", "Copying to the bucket")})
     problem = base_health(model, job, context or HealthContext(settings=settings, hub_ok=False))
     variant = model.variant
     latest = variant.latest_revision if variant is not None else None

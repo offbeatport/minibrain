@@ -27,7 +27,7 @@ from minibrain.registry.models import (
 )
 from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
-from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, tickets_csv
+from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, give_data
 from tests.test_flow import SLUG, add_key, add_version, bearer, create_with_dataset, deploy, finish
 
 pytestmark = pytest.mark.both_stores
@@ -101,8 +101,7 @@ def add_base(harness: Harness, key: str = BASE, name: str = "Tiny") -> Path:
 def add_custom(harness: Harness, name: str, trained: bool = False) -> str:
     slug = harness.client.post("/api/minibrains", json={"name": name, "base_model": BASE}).json()["slug"]
     if trained:
-        files = {"file": ("tickets.csv", tickets_csv(), "text/csv")}
-        harness.client.post(f"/api/minibrains/{slug}/source", files=files)
+        give_data(harness, slug)
         assert harness.client.post(f"/api/minibrains/{slug}/snapshots").status_code == 201
         created = harness.client.post(f"/api/minibrains/{slug}/versions", json={"kind": "lora", "max_rows": 100})
         assert created.status_code == 201, created.text

@@ -46,7 +46,7 @@ def exported_auth(notes: list[str]) -> dict[str, Any]:
     oidc = section.get("oidc")
     if isinstance(oidc, dict):
         oidc = dict(oidc)
-        if oidc.pop("client_secret", None) or os.environ.get(OIDC_CREDENTIAL_ENV, "").strip():
+        if os.environ.get(OIDC_CREDENTIAL_ENV, "").strip():
             notes.append(f"auth.oidc: set {OIDC_CREDENTIAL_ENV}, or name a file in auth.oidc.client_secret_file")
         section["oidc"] = oidc
     return section

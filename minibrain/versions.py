@@ -1,6 +1,5 @@
 from importlib.metadata import PackageNotFoundError, version
 
-JOB_PROTOCOL = 2
 REPORTED = (
     "minibrain",
     "torch",
