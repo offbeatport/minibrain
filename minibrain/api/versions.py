@@ -66,9 +66,11 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     if readiness == "missing":
         raise ConflictError(f"{minibrain.base_model} is no longer on this install")
     require_usable(session, settings, minibrain.base_model)
-    if kind == VersionKind.LORA and resolve_spec(session, settings, minibrain.base_model).format == "gguf":
+    quantization = resolve_spec(session, settings, minibrain.base_model).quantization()
+    if kind == VersionKind.LORA and quantization:
         raise ConflictError(
-            f"{minibrain.base_model} has GGUF weights, which can be served but not fine-tuned; use safetensors"
+            f"{minibrain.base_model} has {quantization.upper()} weights, which can be served but not fine-tuned; "
+            "train on its full-precision format"
         )
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
     snapshot = training_snapshot(session, settings, minibrain, body.snapshot_id)

@@ -512,6 +512,30 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     assert missing.status_code == 409
 
 
+def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: Path) -> None:
+    folder = tmp_path / "corp-fp8"
+    folder.mkdir()
+    for name, data in FILES.items():
+        (folder / name).write_bytes(data)
+    config = {"architectures": ["Qwen3ForCausalLM"], "quantization_config": {"quant_method": "fp8"}}
+    (folder / "config.json").write_text(json.dumps(config))
+    base = harness.client.post("/api/models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
+    harness.worker(kinds=["import"]).run_once()
+    assert harness.client.post("/api/minibrains", json={"name": "On FP8", "base_model": base["key"]}).status_code == 201
+    trained = harness.client.post("/api/minibrains/on-fp8/versions", json={"kind": "lora"})
+    assert trained.status_code == 409
+    assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]
+
+
+def test_hub_entries_name_their_quantization() -> None:
+    from minibrain.models.hubadd import describe
+
+    info = {"sha": "c" * 40, "siblings": [{"rfilename": "model.safetensors", "size": 10}]}
+    plain = describe(REPO, info, {"torch_dtype": "bfloat16"})["variants"][0]
+    fp8 = describe(REPO, info, {"torch_dtype": "bfloat16", "quantization_config": {"quant_method": "fp8"}})
+    assert (plain["precision"], fp8["variants"][0]["precision"]) == ("bfloat16", "fp8")
+
+
 def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> None:
     add_tiny(harness)
     download_tiny(harness)

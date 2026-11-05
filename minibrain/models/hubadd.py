@@ -61,6 +61,12 @@ def licence_of(repo: str, info: dict[str, Any]) -> tuple[str, str, str, str]:
     )
 
 
+def precision_of(config: dict[str, Any]) -> str:
+    quantization = config.get("quantization_config")
+    method = quantization.get("quant_method") if isinstance(quantization, dict) else None
+    return str(method or config.get("torch_dtype") or "bf16")
+
+
 def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     files = []
     for sibling in info.get("siblings", []):
@@ -116,7 +122,7 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
                 "id": f"{identifier}:bf16:safetensors",
                 "label": "Safetensors",
                 "format": "safetensors",
-                "precision": str(config.get("torch_dtype") or "bf16"),
+                "precision": precision_of(config),
                 "repo": repo,
                 "revision": info["sha"],
                 "files": files,

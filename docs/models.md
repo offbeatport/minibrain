@@ -42,3 +42,6 @@ Weights are pinned by repository and revision and fetched by a `download` or `im
 - An import whose revision and files match a catalogue variant is verified and takes the catalogue's details; anything
   else is listed as unverified.
 - GGUF files run on llama.cpp, base models only ([engines](serving.md#engines)).
+- Quantized weights (GGUF, or safetensors whose `config.json` has a `quantization_config`, such as FP8) serve but
+  are not fine-tuned: transformers refuses to train FP8 layers on the GPUs that run them natively. Training a
+  quantized base is refused up front; train on its full-precision format.
