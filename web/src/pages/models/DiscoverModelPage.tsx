@@ -1,7 +1,7 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronLeft, ExternalLink, Info, Layers, Scale } from "lucide-react";
-import { Button, DataGrid, Link, Skeleton } from "obp-ui";
+import { Button, CubePlus, DataGrid, Link, Skeleton } from "obp-ui";
 import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
@@ -126,6 +126,7 @@ function variantColumns(
                         disabled={!allowed}
                         onClick={() => onDownload(row.original)}
                     >
+                        <CubePlus />
                         Add model
                     </Button>
                 </div>

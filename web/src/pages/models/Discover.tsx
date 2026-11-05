@@ -1,10 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, KeyRound, Plus, X } from "lucide-react";
+import { ArrowUpDown, ExternalLink, KeyRound, X } from "lucide-react";
 import {
     Badge,
     Button,
+    CubePlus,
     DataGrid,
     DataGridDetail,
     Dialog,
@@ -149,7 +150,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
         return (
             <div className="flex justify-end">
                 <Button onClick={() => on.download(entry)}>
-                    <Plus />
+                    <CubePlus />
                     Add model
                 </Button>
             </div>
@@ -188,7 +189,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     }
     const label = (
         <>
-            <Plus />
+            <CubePlus />
             Add model
         </>
     );

@@ -1,6 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
-import { Button } from "obp-ui";
+import { Button, CubePlus } from "obp-ui";
 import { PageHeader } from "~/components/PageHeader";
 import { Page } from "~/components/Section";
 import { useCan } from "~/lib/access";
@@ -21,7 +20,7 @@ export function ModelsPage() {
                 actions={
                     can.build && (
                         <Button onClick={add}>
-                            <Plus />
+                            <CubePlus />
                             Add model
                         </Button>
                     )

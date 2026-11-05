@@ -8,13 +8,13 @@ import {
     FlaskConical,
     type LucideIcon,
     PenLine,
-    Plus,
     Tags,
     X,
 } from "lucide-react";
 import {
     Button,
     Card,
+    CubePlus,
     Field,
     InfoTip,
     Input,
@@ -530,7 +530,7 @@ export function AddModelPage() {
                         Cancel
                     </Button>
                     <Button type="submit" disabled={add.isPending}>
-                        <Plus />
+                        <CubePlus />
                         {add.isPending ? "Adding…" : "Add model"}
                     </Button>
                 </div>
