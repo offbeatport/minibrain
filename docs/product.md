@@ -189,7 +189,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Set rows and epochs per run over the default recipe.
   UI: Training › model, Settings › General › Default training recipe · API: GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
-  Train on CUDA or CPU, with a per-install device override.
+  Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE
 - **Training methods** · planned · ml
   Full fine-tuning, QLoRA, DPO from feedback and GRPO with graders.

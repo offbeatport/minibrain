@@ -57,6 +57,9 @@ def device_info() -> DeviceInfo:
     if torch.cuda.is_available():
         free, capacity = torch.cuda.mem_get_info()
         accelerator, total, used = torch.cuda.get_device_name(0), capacity / MEGABYTE, (capacity - free) / MEGABYTE
+    elif hasattr(torch, "xpu") and torch.xpu.is_available():
+        free, capacity = torch.xpu.mem_get_info()
+        accelerator, total, used = torch.xpu.get_device_name(0), capacity / MEGABYTE, (capacity - free) / MEGABYTE
     elif torch.backends.mps.is_available():
         accelerator = "Apple GPU (Metal)"
         total = torch.mps.recommended_max_memory() / MEGABYTE

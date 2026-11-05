@@ -27,5 +27,8 @@ Classify, 77 banking intents ([PolyAI/banking77](https://huggingface.co/datasets
 - **50 golden examples are noisy:** one row moves the score 2 points, and golden and eval differ by 8–11 points.
   Promotion uses the larger held-out split, not the golden set alone.
 - **The Metal GPU hangs during LoRA backward** (M1 Pro, macOS 27.0.1, torch 2.15): `kIOGPUCommandBufferCallbackError`
-  within 3–8 steps, with SDPA and eager attention. Inference on MPS is fine, and CPU training was only ~1.8× slower,
-  so minibrain trains on the CPU on Apple silicon (`MINIBRAIN_TRAIN_DEVICE` overrides).
+  within 3–8 steps, with SDPA and eager attention. Inference on MPS is fine, and CPU training was only ~1.8× slower.
+- **One example per micro-batch keeps the Metal GPU alive** (same M1 Pro, 2026-11-05): batch 4 hung in the first
+  steps (`kIOGPUCommandBufferCallbackErrorHang`), while batch 1 with 4 accumulation steps trained 40 steps of
+  Qwen3-0.6B LoRA (160 rows, rank 8) in 83 s, to the same loss as the CPU. minibrain trains on MPS that way, and a
+  job that still fails or stalls there starts again on the CPU.

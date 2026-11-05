@@ -1134,7 +1134,9 @@ Two modes, same code, same adapter format (PEFT safetensors).
 - MPS gaps fall back to CPU with `PYTORCH_ENABLE_MPS_FALLBACK=1`.
 - Local training falls back to CPU when the Metal GPU hangs. Seen in the spike: LoRA backward on an M1 Pro (macOS
   27.0.1, torch 2.15) hangs the GPU within 3–8 steps, while inference runs fine. CPU training there was only ~1.8×
-  slower.
+  slower. MPS trains one example per micro-batch with gradient accumulation, which does not hang there; a GPU error
+  or a step that takes ten times the slowest one so far (at least 3 minutes; 15 for the first) starts the job again
+  on the CPU, and it stays there.
 - Tests run on the `transformers` backend with a ~0.5B model; integration tests run on a GPU box.
 - `llamacpp` serves GGUF base models (Metal, CUDA, CPU). Adapters on llama.cpp need PEFT → GGUF conversion: later.
 
@@ -1333,6 +1335,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 
 - [x] Switching the OS from dark to light with the page open left some Cobalt colours dark (`--input-background`):
   the preset is applied with obp-ui's `applyPresetStyle`, which clears every preset property before setting a mode.
+- [x] Training on a Mac used the CPU: training now picks CUDA (or ROCm), Intel XPU, the Apple GPU, then CPU, in bf16 or
+  fp16 where the GPU has it and fp32 on MPS, with the MPS fallback in Platforms.
 - [ ] Quantized bases in the bucket are not refused for training up front: the check reads `config.json` from main's
   disk, which a bucket model may not have. Read it from the saved file list or the bucket instead.
 - [ ] A local engine's first start includes downloading its model, which can exceed the 600 s startup limit for very

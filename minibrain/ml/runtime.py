@@ -17,7 +17,7 @@ from transformers import (
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.ml.devices import pick_device
+from minibrain.ml.devices import pick_device, weights_dtype
 from minibrain.serve.structured import TokenTrie
 
 Message = dict[str, str]
@@ -40,10 +40,6 @@ def stop_ids(tokenizer: PreTrainedTokenizerBase, tokens: tuple[str, ...]) -> lis
     return found
 
 
-def pick_dtype(device: str) -> torch.dtype:
-    return torch.bfloat16 if device == "cuda" else torch.float32
-
-
 def load_tokenizer(spec: BaseModelSpec, padding_side: str = "left") -> PreTrainedTokenizerBase:
     source, revision = spec.source()
     tokenizer = AutoTokenizer.from_pretrained(source, revision=revision)
@@ -53,7 +49,8 @@ def load_tokenizer(spec: BaseModelSpec, padding_side: str = "left") -> PreTraine
 
 def load_base_model(spec: BaseModelSpec, device: str) -> PreTrainedModel:
     source, revision = spec.source()
-    return AutoModelForCausalLM.from_pretrained(source, revision=revision, dtype=pick_dtype(device), device_map=device)
+    dtype = weights_dtype(device)
+    return AutoModelForCausalLM.from_pretrained(source, revision=revision, dtype=dtype, device_map=device)
 
 
 def as_text(rendered: object) -> str:

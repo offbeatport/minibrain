@@ -118,5 +118,5 @@ mise run api-types   # regenerate the TypeScript client after API changes
 On a fresh `.minibrain/`, the `mise run dev` log prints a setup link on `http://localhost:5173/setup?token=…` that
 creates the first admin; the same path on :8000 redirects there. `mise run setup-link` prints a new one.
 
-Training runs on CUDA when available, otherwise on CPU: the Metal GPU hangs during LoRA training on Apple Silicon (see
-`docs/findings.md`). Set `MINIBRAIN_TRAIN_DEVICE` to override.
+Training picks CUDA, ROCm, Intel XPU, the Apple GPU or the CPU, in that order; on the Apple GPU a job that fails or
+stalls starts again on the CPU (see `docs/findings.md`). Set `MINIBRAIN_TRAIN_DEVICE` to force one.

@@ -307,8 +307,12 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install minibrain
 ```
 
-Training runs on CUDA when there is a GPU, otherwise on CPU, including on Apple silicon, where the Metal GPU hangs
-during LoRA training (see [`findings.md`](findings.md)). `MINIBRAIN_TRAIN_DEVICE` overrides the choice.
+Training and serving pick the best device PyTorch has: CUDA (NVIDIA, or AMD through ROCm), Intel XPU, the Apple GPU
+(MPS), then CPU. CUDA and XPU train in bf16 where the GPU supports it and fp16 otherwise; the Apple GPU and the CPU use
+fp32. On the Apple GPU, training runs one example at a time with gradient accumulation, which keeps the Metal GPU
+from hanging in LoRA backward (see [`findings.md`](findings.md)); if it still fails or stops making steps, the job
+starts again on the CPU and stays there. `PYTORCH_ENABLE_MPS_FALLBACK=1` is set, so an operation MPS lacks runs on the
+CPU. `MINIBRAIN_TRAIN_DEVICE` forces a device, with no fallback.
 
 SGLang is not part of any install above. On Linux with NVIDIA or AMD GPUs, put it in its own environment, because it
 pins its own torch, and point minibrain at that environment's Python with `MINIBRAIN_SGLANG_PYTHON`. Without it,
@@ -412,7 +416,7 @@ Often added with `-e`:
 | `MINIBRAIN_DATABASE_URL` | Metadata in Postgres (the image includes the `postgres` extra) |
 | `MINIBRAIN_MODELS_S3_URL`, `AWS_*` | Models from an S3-compatible bucket |
 | `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror. Also set `MINIBRAIN_OFFLINE=0` and `HF_HUB_OFFLINE=0`, and allow the host in Settings → Security |
-| `MINIBRAIN_TRAIN_DEVICE` | Force `cuda` or `cpu` for training |
+| `MINIBRAIN_TRAIN_DEVICE` | Force `cuda`, `xpu`, `mps` or `cpu` for training |
 | `MINIBRAIN_ADMIN_EMAIL`, `MINIBRAIN_ADMIN_PASSWORD_FILE` | Create the first admin on the first start, with the password in a mounted secret file ([First admin](#first-admin)) |
 | `MINIBRAIN_LOG_FORMAT` | `json` for one JSON object per log line on standard output ([observability](observability.md#json-logs)) |
 | `MINIBRAIN_METRICS_TOKEN`, `MINIBRAIN_METRICS_ADDRESSES` | Turn on `/metrics` for Prometheus ([observability](observability.md#prometheus)) |

@@ -11,7 +11,7 @@ FITS_SHARE = 0.8
 LOCAL_POOL = "local"
 LOCAL_LABEL = "This machine"
 FIT_RANK = {"fits": 0, "limited": 1, "unknown": 2, "insufficient": 3}
-MEMORY_LABELS = {"cuda": "GPU memory", "rocm": "GPU memory", "mps": "GPU-usable unified memory"}
+MEMORY_LABELS = {"cuda": "GPU memory", "rocm": "GPU memory", "xpu": "GPU memory", "mps": "GPU-usable unified memory"}
 
 
 @dataclass(frozen=True)
@@ -96,6 +96,11 @@ def gpu_report() -> tuple[str, str, list[Gpu], int | None]:
         first = devices[0]
         name = f"{first.name} (compute {first.major}.{first.minor})"
         return kind, name if len(gpus) == 1 else f"{len(gpus)} x {name}", gpus, sum(gpu.memory_bytes for gpu in gpus)
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        devices = [torch.xpu.get_device_properties(index) for index in range(torch.xpu.device_count())]
+        gpus = [Gpu(device.name, int(device.total_memory)) for device in devices]
+        name = devices[0].name
+        return "xpu", name if len(gpus) == 1 else f"{len(gpus)} x {name}", gpus, sum(gpu.memory_bytes for gpu in gpus)
     if torch.backends.mps.is_available():
         usable = int(torch.mps.recommended_max_memory()) if hasattr(torch.mps, "recommended_max_memory") else None
         name = f"Apple GPU ({arch})"

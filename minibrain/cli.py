@@ -19,6 +19,7 @@ from minibrain.supervise import Supervisor
 
 COMMAND_LINE = "command line"
 DEFAULT_URL = "http://127.0.0.1:8000"
+MPS_FALLBACK_ENV = "PYTORCH_ENABLE_MPS_FALLBACK"
 STARTUP_FAILURE = 3
 RULE = "-" * 78
 
@@ -432,6 +433,7 @@ def config_command(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    os.environ.setdefault(MPS_FALLBACK_ENV, "1")
     parser = argparse.ArgumentParser(prog="minibrain")
     commands = parser.add_subparsers(dest="command", required=True)
     serve_command = commands.add_parser("serve", help="run main (UI, API, gateway) and a local worker")
