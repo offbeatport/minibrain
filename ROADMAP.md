@@ -1319,6 +1319,11 @@ Everything in the v1 scope below, after M1.
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
 - [ ] Custom model logos: PNG, JPEG or WebP up to 256 KB, stored with the model; never SVG, which can carry scripts
 - Preinstalled appliance
+- Later, kept simple until the engine settles:
+  - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base
+  - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency
+  - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
+  - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
 
 ## Fixes
 
