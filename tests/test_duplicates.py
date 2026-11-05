@@ -6,12 +6,13 @@ import duckdb
 import pytest
 from sqlalchemy import func, select
 
-from minibrain.data import remote
+from minibrain.data import remote, shared
 from minibrain.data.names import free_name
 from minibrain.registry.models import Artifact, Source
 from tests.conftest import Harness, tickets_csv
+from tests.fake_s3 import FakeS3
 from tests.test_folders import allow
-from tests.test_remote_sources import FileDatabase, database_connection
+from tests.test_remote_sources import FileDatabase, database_connection, s3_connection
 
 
 def send(harness: Harness, name: str, data: bytes, name_taken: str | None = None) -> Any:
@@ -235,6 +236,23 @@ def test_a_database_table_or_query_added_twice_is_one_source(harness: Harness, s
     assert harness.client.post("/api/sources/database", json=query).json()["outcome"] == "existing"
     other = harness.client.post("/api/sources/database", json=query | {"query": "SELECT * FROM tickets"})
     assert other.status_code == 201 and other.json()["name"] == "Shop (2)"
+
+
+def test_an_s3_path_with_or_without_a_trailing_slash_is_one_source(
+    harness: Harness, moto: FakeS3, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    listed = remote.RemoteState(fingerprint="f", detail="2 objects", files=2, size=10, format="parquet")
+    monkeypatch.setattr(shared, "remote_state", lambda _settings, _source: listed)
+    monkeypatch.setattr(shared, "describe", lambda _table: None)
+    connection = s3_connection(harness, moto)
+    body = {"connection_id": connection["id"], "path": "s3://data/exports/"}
+    first = harness.client.post("/api/sources/s3", json=body)
+    assert first.status_code == 201, first.text
+    for path in ("s3://data/exports", "s3://data/exports//", " s3://data/exports/ "):
+        again = harness.client.post("/api/sources/s3", json=body | {"path": path})
+        assert (again.status_code, again.json()["outcome"], again.json()["id"]) == (200, "existing", first.json()["id"])
+    other = harness.client.post("/api/sources/s3", json=body | {"path": "s3://data/exports/2026"})
+    assert other.json()["outcome"] == "created"
 
 
 def test_dataset_names_are_unique_within_their_folder(harness: Harness) -> None:

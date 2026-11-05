@@ -308,7 +308,8 @@ Data is shared across models:
   content never prompts; Training's upload keeps both.
 - A folder, S3 path, database table or query, or Lakehouse table added again at the same location (connection,
   path or table or query, and format when one is given) returns the existing source the same way (`200`,
-  `outcome: existing`) without reading it again.
+  `outcome: existing`) without reading it again. An S3 or Iceberg path is the same location with or without trailing
+  slashes.
 - An upload's stored file and staged table are deleted when it is replaced or deleted and no other source, dataset
   version or model version uses that content.
 - Folders: a directory on the server, read in place as one table: every file of one format (CSV, TSV, JSON, JSON
@@ -1418,6 +1419,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [ ] Rename after the task engine lands: `Minibrain` and the `minibrains` table become `Model` and `models` (a
   model you own), today's `Model` becomes `BaseModel` and `base_models`, `/api/minibrains/{slug}/…` becomes
   `/api/models/{slug}/…` and `/api/models/base/{key}` becomes `/api/base-models/{key}`; the UI already says model.
+- [x] S3 locations differing only by a trailing slash counted as different sources; an S3 or Iceberg path is compared
+  without its trailing slashes.
 
 ## Risks to verify early
 

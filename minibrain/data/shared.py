@@ -6,7 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session, object_session
 
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing
@@ -378,7 +378,10 @@ def add_remote(
 def same_remote(
     session: Session, kind: str, connection_id: int, path: str | None, format: str | None, query: str | None
 ) -> Source | None:
-    conditions = [Source.kind == kind, Source.connection_id == connection_id, Source.path.is_not_distinct_from(path)]
+    location = Source.path.is_not_distinct_from(path)
+    if kind in (S3_SOURCE, ICEBERG) and path is not None:
+        location = func.rtrim(Source.path, "/") == path.rstrip("/")
+    conditions = [Source.kind == kind, Source.connection_id == connection_id, location]
     if kind == DATABASE:
         conditions.append(Source.query.is_not_distinct_from(query))
     if format is not None:
