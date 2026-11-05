@@ -8,6 +8,7 @@ import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { DatasetMapping } from "./DatasetDetail";
+import { datasetsIn, freeDatasetName } from "./catalogue";
 
 type DataSource = "upload" | "dataset" | "sample";
 
@@ -42,21 +43,51 @@ function useCatalogueRefresh() {
         ]);
 }
 
+function readerOf(source: SourceSummary, datasets: DatasetSummary[]): DatasetSummary | undefined {
+    return datasets.find(
+        (dataset) =>
+            dataset.sources.length === 1 &&
+            dataset.sources[0]?.id === source.id &&
+            Boolean(dataset.mapping.sql),
+    );
+}
+
+function uploadNote(source: SourceSummary, outcome: string, dataset: DatasetSummary): string {
+    if (outcome === "existing") {
+        return `Already uploaded as ${source.name}; using its dataset ${dataset.name}.`;
+    }
+    return source.name === source.filename
+        ? `Added ${source.name} as the dataset ${dataset.name}.`
+        : `Added as ${source.name}, since a different ${source.filename} is already uploaded.`;
+}
+
 function UploadChoice({ onDataset }: { onDataset: (slug: string) => void }) {
     const refresh = useCatalogueRefresh();
+    const datasets = useDatasets();
     const [file, setFile] = useState<File | null>(null);
     const upload = useMutation({
         mutationFn: async (chosen: File) => {
             const uploaded = await uploadFile(chosen);
-            return unwrap(
-                api.POST("/api/datasets", {
-                    body: { name: stem(chosen.name), source_id: uploaded.id },
-                }),
-            );
+            if (uploaded.outcome === "name_taken") {
+                throw new Error(uploaded.taken.detail);
+            }
+            const known = datasets.data ?? [];
+            const reading = uploaded.outcome === "existing" ? readerOf(uploaded, known) : undefined;
+            const dataset =
+                reading ??
+                (await unwrap(
+                    api.POST("/api/datasets", {
+                        body: {
+                            name: freeDatasetName(datasetsIn(known, null), stem(uploaded.name)),
+                            source_id: uploaded.id,
+                        },
+                    }),
+                ));
+            return { dataset, note: uploadNote(uploaded, uploaded.outcome, dataset) };
         },
-        onSuccess: async (created) => {
+        onSuccess: async ({ dataset }) => {
             await refresh();
-            onDataset(created.slug);
+            onDataset(dataset.slug);
         },
     });
     return (
@@ -85,7 +116,7 @@ function UploadChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                     <span className="min-w-0 truncate text-sm text-muted-foreground">
                         {upload.isPending
                             ? `Reading ${file.name}…`
-                            : `${file.name} · ${bytes(file.size)}`}
+                            : (upload.data?.note ?? `${file.name} · ${bytes(file.size)}`)}
                     </span>
                 )}
             </div>
@@ -140,7 +171,13 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                 ).id;
             return unwrap(
                 api.POST("/api/datasets", {
-                    body: { name: sample?.name ?? stem(chosen), source_id: sourceId },
+                    body: {
+                        name: freeDatasetName(
+                            datasetsIn(datasets.data ?? [], null),
+                            sample?.name ?? stem(chosen),
+                        ),
+                        source_id: sourceId,
+                    },
                 }),
             );
         },

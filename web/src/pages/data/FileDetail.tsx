@@ -19,7 +19,15 @@ import { ConnectedFacts } from "./Connected";
 import { CreateDataset } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
 import { LakehouseFacts } from "./Lakehouse";
-import { type ItemRef, TABLE_FORMATS, groupOf, itemHref, plural, tableFormat } from "./catalogue";
+import {
+    type ItemRef,
+    TABLE_FORMATS,
+    groupOf,
+    itemHref,
+    plural,
+    sourceNameProblem,
+    tableFormat,
+} from "./catalogue";
 import { SourceIcon } from "./icons";
 import {
     About,
@@ -355,7 +363,8 @@ export function FileDetail({
             <Datasets datasets={datasets} />
             <EditDialog
                 item={source}
-                noun="file"
+                noun={source.kind === "upload" ? "file" : "source"}
+                problem={(name) => sourceNameProblem(sources, name, source.id)}
                 open={editing}
                 onOpenChange={setEditing}
                 onSave={(body) =>

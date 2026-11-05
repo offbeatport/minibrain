@@ -12,7 +12,14 @@ import {
     folderRef,
     removalText,
 } from "./DatasetFolders";
-import { type FolderIndex, type ItemRef, folderPath, groupOf } from "./catalogue";
+import {
+    type FolderIndex,
+    type ItemRef,
+    datasetNameProblem,
+    folderPath,
+    groupOf,
+    sourceNameProblem,
+} from "./catalogue";
 import { useDataRefresh } from "./parts";
 
 export type TreeAction =
@@ -121,12 +128,14 @@ function removalCopy(action: TreeAction, index: FolderIndex) {
 export function TreeActionDialogs({
     action,
     index,
+    sources,
     onClose,
     onSelect,
     onRemove,
 }: {
     action: TreeAction | null;
     index: FolderIndex;
+    sources: SourceSummary[];
     onClose: () => void;
     onSelect: (item: ItemRef) => void;
     onRemove: (removal: Removal) => Promise<unknown>;
@@ -167,7 +176,15 @@ export function TreeActionDialogs({
                 }
                 initial={renaming?.name ?? ""}
                 submitLabel="Rename"
-                problem={() => null}
+                problem={(name) =>
+                    renaming
+                        ? datasetNameProblem(
+                              index.datasets.get(renaming.folder_id ?? null) ?? [],
+                              name,
+                              renaming.slug,
+                          )
+                        : null
+                }
                 onOpenChange={close}
                 onSubmit={async (name) => {
                     if (renaming) {
@@ -191,7 +208,7 @@ export function TreeActionDialogs({
                 }
                 initial={renamingSource?.name ?? ""}
                 submitLabel="Rename"
-                problem={() => null}
+                problem={(name) => sourceNameProblem(sources, name, renamingSource?.id)}
                 onOpenChange={close}
                 onSubmit={async (name) => {
                     if (renamingSource) {

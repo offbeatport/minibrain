@@ -181,14 +181,79 @@ export function datasetsInside(index: FolderIndex, id: number | null): DatasetSu
     return ids.flatMap((at) => index.datasets.get(at) ?? []);
 }
 
+export function sameName(first: string, second: string): boolean {
+    return first.trim().toLocaleLowerCase() === second.trim().toLocaleLowerCase();
+}
+
+const DATA_SUFFIX = /\.(csv|tsv|json|jsonl|ndjson|parquet)$/i;
+
+export function freeName(name: string, taken: string[]): string {
+    if (!taken.some((item) => sameName(item, name))) {
+        return name;
+    }
+    const suffix = name.match(DATA_SUFFIX)?.[0] ?? "";
+    const ending = suffix.length < name.length ? suffix : "";
+    const base = name.slice(0, name.length - ending.length).replace(/ \(\d+\)$/, "");
+    for (let number = 2; ; number++) {
+        const candidate = `${base} (${number})${ending}`;
+        if (!taken.some((item) => sameName(item, candidate))) {
+            return candidate;
+        }
+    }
+}
+
 export function siblingNamed(
     index: FolderIndex,
     parentId: number | null,
     name: string,
     except?: number,
 ): DatasetFolder | undefined {
-    const wanted = name.trim().toLocaleLowerCase();
     return (index.folders.get(parentId) ?? []).find(
-        (folder) => folder.id !== except && folder.name.toLocaleLowerCase() === wanted,
+        (folder) => folder.id !== except && sameName(folder.name, name),
     );
+}
+
+export function datasetsIn(datasets: DatasetSummary[], folderId: number | null): DatasetSummary[] {
+    return datasets.filter((dataset) => (dataset.folder_id ?? null) === folderId);
+}
+
+export function datasetNamed(
+    siblings: DatasetSummary[],
+    name: string,
+    except?: string,
+): DatasetSummary | undefined {
+    return siblings.find((dataset) => dataset.slug !== except && sameName(dataset.name, name));
+}
+
+export function freeDatasetName(siblings: DatasetSummary[], name: string): string {
+    return freeName(
+        name,
+        siblings.map((dataset) => dataset.name),
+    );
+}
+
+export function datasetNameProblem(
+    siblings: DatasetSummary[],
+    name: string,
+    except?: string,
+): string | null {
+    const taken = name.trim() ? datasetNamed(siblings, name, except) : undefined;
+    return taken ? `There is already a dataset called ${taken.name} here` : null;
+}
+
+export function sourceNamed(
+    sources: SourceSummary[],
+    name: string,
+    except?: number,
+): SourceSummary | undefined {
+    return sources.find((source) => source.id !== except && sameName(source.name, name));
+}
+
+export function sourceNameProblem(
+    sources: SourceSummary[],
+    name: string,
+    except?: number,
+): string | null {
+    const taken = name.trim() ? sourceNamed(sources, name, except) : undefined;
+    return taken ? `There is already a source called ${taken.name}` : null;
 }

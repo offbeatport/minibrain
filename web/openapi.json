@@ -1126,10 +1126,10 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SourceSummary"
                   },
-                  "type": "array",
                   "title": "Response List Sources Api Sources Get"
                 }
               }
@@ -1143,15 +1143,26 @@
         ],
         "summary": "Upload Source",
         "operationId": "upload_source_api_sources_post",
+        "parameters": [
+          {
+            "name": "name_taken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/NameTaken",
+              "default": "keep_both"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_source_api_sources_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -1159,7 +1170,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -1221,7 +1252,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -1262,7 +1313,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -1321,6 +1392,15 @@
               "type": "string",
               "title": "File"
             }
+          },
+          {
+            "name": "name_taken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/NameTaken",
+              "default": "keep_both"
+            }
           }
         ],
         "responses": {
@@ -1329,7 +1409,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -1425,6 +1525,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -1700,6 +1810,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1791,6 +1911,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -2906,7 +3036,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -2947,7 +3097,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -2988,7 +3158,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SourceSummary"
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Already added, so nothing new was stored; or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceAdded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameTakenInfo"
                 }
               }
             }
@@ -17697,6 +17887,50 @@
         "type": "object",
         "title": "ModelUpdate"
       },
+      "NameTaken": {
+        "type": "string",
+        "enum": [
+          "keep_both",
+          "replace",
+          "fail"
+        ],
+        "title": "NameTaken"
+      },
+      "NameTakenInfo": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "suggestion": {
+            "type": "string",
+            "title": "Suggestion"
+          },
+          "taken": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Taken"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "name",
+          "suggestion",
+          "taken"
+        ],
+        "title": "NameTakenInfo"
+      },
       "NodeInfo": {
         "properties": {
           "id": {
@@ -20003,6 +20237,231 @@
           "keep"
         ],
         "title": "SnapshotUsage"
+      },
+      "SourceAdded": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "folder",
+              "s3",
+              "database",
+              "iceberg",
+              "delta"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "table": {
+            "type": "string",
+            "title": "Table"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnInfo"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "datasets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Datasets"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "files": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files"
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "connection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Id"
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "change_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Column"
+          },
+          "fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint"
+          },
+          "fingerprint_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprint Detail"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "created",
+              "replaced",
+              "existing"
+            ],
+            "title": "Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "filename",
+          "table",
+          "description",
+          "tags",
+          "size",
+          "rows",
+          "columns",
+          "datasets",
+          "created_at",
+          "outcome"
+        ],
+        "title": "SourceAdded"
       },
       "SourceInfo": {
         "properties": {

@@ -1,14 +1,20 @@
+import hashlib
+import shutil
 from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session, object_session
 
-from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.connections.store import get_connection, resolve
+from minibrain.data.dataset_folders import free_dataset_name
 from minibrain.data.delta import DELTA, LOG, delta_state, local_path, refuse_remote
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
+from minibrain.data.names import free_name, same_name
 from minibrain.data.remote import (
     DATABASE,
     ICEBERG,
@@ -36,13 +42,32 @@ from minibrain.data.sources import (
     table_name_base,
 )
 from minibrain.registry.files import ArtifactKind, register
-from minibrain.registry.models import Dataset, Minibrain, Source, now
-from minibrain.registry.service import ConflictError, NotFoundError, slugify
+from minibrain.registry.models import Artifact, Dataset, DatasetFolder, Minibrain, Snapshot, Source, Version, now
+from minibrain.registry.service import ConflictError, NameTakenError, NotFoundError, slugify
 from minibrain.settings import Settings
 
 INPUT_NAMES = ("input", "text", "message", "question", "query", "prompt", "utterance", "body", "content")
 LABEL_NAMES = ("label", "category", "intent", "class", "target", "topic", "tag")
 FOLDER = "folder"
+UPLOAD = "upload"
+
+
+class Outcome(StrEnum):
+    CREATED = "created"
+    REPLACED = "replaced"
+    EXISTING = "existing"
+
+
+class NameTaken(StrEnum):
+    KEEP_BOTH = "keep_both"
+    REPLACE = "replace"
+    FAIL = "fail"
+
+
+@dataclass(frozen=True)
+class Added:
+    source: Source
+    outcome: Outcome
 
 
 def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
@@ -50,9 +75,13 @@ def guess(columns: list[str], names: tuple[str, ...]) -> str | None:
     return next((lowered[name] for name in names if name in lowered), None)
 
 
+def staging_key(artifact_id: str, filename: str) -> str:
+    return f"{artifact_id}{Path(filename).suffix.lower()}"
+
+
 def staging_of(store: ArtifactStore, source: Source) -> str:
     artifact_id = str(source.artifact_id)
-    key = f"{artifact_id}{Path(source.filename).suffix.lower()}"
+    key = staging_key(artifact_id, source.filename)
     return store.staged(key, lambda target: stage(store.url(artifact_id, source.filename), target))
 
 
@@ -137,22 +166,116 @@ def free_table_name(session: Session, name: str, keep: Source | None = None) -> 
     return next(candidate for candidate in candidates if candidate not in taken)
 
 
-def add_source(session: Session, store: ArtifactStore, filename: str, stream: BinaryIO) -> Source:
-    stored = store.put_stream(stream)
-    artifact = register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
+def source_named(session: Session, name: str, keep: Source | None = None) -> Source | None:
+    found = session.scalars(select(Source).order_by(Source.id))
+    return next((source for source in found if source is not keep and same_name(source.name, name)), None)
+
+
+def free_source_name(session: Session, name: str, keep: Source | None = None) -> str:
+    return free_name(name, [source.name for source in session.scalars(select(Source)) if source is not keep])
+
+
+def taken_error(session: Session, taken: Source, name: str, keep: Source | None = None) -> NameTakenError:
+    return NameTakenError(
+        f"There is already a source called {taken.name}", taken.name, free_source_name(session, name, keep), taken.id
+    )
+
+
+def require_free_source_name(session: Session, name: str, keep: Source | None = None) -> None:
+    taken = source_named(session, name, keep)
+    if taken is not None:
+        raise taken_error(session, taken, name, keep)
+
+
+def source_name(session: Session, typed: str | None, derived: str) -> str:
+    wanted = (typed or "").strip()
+    if not wanted:
+        return free_source_name(session, derived)
+    require_free_source_name(session, wanted)
+    return wanted
+
+
+def first_source(session: Session, *conditions: ColumnElement[bool]) -> Source | None:
+    return session.scalar(select(Source).where(*conditions).order_by(Source.id).limit(1))
+
+
+def content_hash(stream: BinaryIO) -> str:
+    digest = hashlib.sha256()
+    while block := stream.read(CHUNK):
+        digest.update(block)
+    stream.seek(0)
+    return digest.hexdigest()
+
+
+def store_upload(session: Session, store: ArtifactStore, filename: str, stream: BinaryIO, digest: str) -> Artifact:
+    stored = store.put_stream(stream, digest)
+    return register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
+
+
+def artifact_in_use(session: Session, artifact_id: str) -> bool:
+    references = (Source.artifact_id, Snapshot.artifact_id, Version.adapter_artifact_id)
+    return any(
+        session.scalar(select(column).where(column == artifact_id).limit(1)) is not None for column in references
+    )
+
+
+def release_upload(session: Session, store: ArtifactStore, artifact_id: str | None, filename: str) -> None:
+    session.flush()
+    if artifact_id is None or artifact_in_use(session, artifact_id):
+        return
+    found = session.get(Artifact, artifact_id)
+    if found is None or found.kind != ArtifactKind.SOURCE:
+        return
+    session.delete(found)
+    store.delete(artifact_id)
+    shutil.rmtree(store.staged_path(staging_key(artifact_id, filename)), ignore_errors=True)
+
+
+def replace_upload(
+    session: Session, store: ArtifactStore, source: Source, filename: str, stream: BinaryIO, digest: str
+) -> None:
+    if source.kind != UPLOAD:
+        raise ConflictError(f"{source.name} is not an uploaded file, so a file cannot replace it; keep both instead")
+    previous, previous_name = source.artifact_id, source.filename
+    artifact = store_upload(session, store, filename, stream, digest)
+    source.filename = filename
+    source.artifact_id = artifact.id
+    source.size = artifact.size
+    release_upload(session, store, previous, previous_name)
+
+
+def add_source(
+    session: Session,
+    store: ArtifactStore,
+    filename: str,
+    stream: BinaryIO,
+    name_taken: NameTaken = NameTaken.KEEP_BOTH,
+) -> Added:
+    digest = content_hash(stream)
+    same = first_source(session, Source.artifact_id == digest)
+    if same is not None:
+        return Added(same, Outcome.EXISTING)
+    clash = source_named(session, filename)
+    if clash is not None and name_taken == NameTaken.FAIL:
+        raise taken_error(session, clash, filename)
+    if clash is not None and name_taken == NameTaken.REPLACE:
+        replace_upload(session, store, clash, filename, stream, digest)
+        return Added(clash, Outcome.REPLACED)
+    name = free_source_name(session, filename)
+    artifact = store_upload(session, store, filename, stream, digest)
     source = Source(
-        name=filename,
+        name=name,
         filename=filename,
-        table_name=free_table_name(session, filename),
+        table_name=free_table_name(session, name),
         artifact_id=artifact.id,
-        size=stored.size,
+        size=artifact.size,
     )
     session.add(source)
     session.flush()
-    return source
+    return Added(source, Outcome.CREATED)
 
 
-def add_folder(session: Session, path: str, name: str | None, format: str | None) -> Source:
+def add_folder(session: Session, path: str, name: str | None, format: str | None) -> Added:
     root = check_folder(session, path)
     if (root / LOG).is_dir():
         raise SourceError(
@@ -162,8 +285,11 @@ def add_folder(session: Session, path: str, name: str | None, format: str | None
     chosen = format or detect_format(root)
     if chosen not in READERS:
         raise SourceError("pick CSV, TSV, JSON, JSON Lines or Parquet")
+    same = first_source(session, Source.kind == FOLDER, Source.path == str(root), Source.format == chosen)
+    if same is not None:
+        return Added(same, Outcome.EXISTING)
     found = scan(root, chosen)
-    label = (name or "").strip() or root.name or str(root)
+    label = source_name(session, name, root.name or str(root))
     source = Source(
         name=label,
         filename=root.name or str(root),
@@ -175,14 +301,17 @@ def add_folder(session: Session, path: str, name: str | None, format: str | None
     )
     session.add(source)
     session.flush()
-    return source
+    return Added(source, Outcome.CREATED)
 
 
-def add_delta(session: Session, path: str, name: str | None) -> Source:
+def add_delta(session: Session, path: str, name: str | None) -> Added:
     refuse_remote(path)
     root = check_folder(session, local_path(path))
+    same = first_source(session, Source.kind == DELTA, Source.path == str(root))
+    if same is not None:
+        return Added(same, Outcome.EXISTING)
     state = delta_state(root)
-    label = (name or "").strip() or root.name or str(root)
+    label = source_name(session, name, root.name or str(root))
     source = Source(
         name=label,
         filename=root.name or str(root),
@@ -193,7 +322,7 @@ def add_delta(session: Session, path: str, name: str | None) -> Source:
     session.add(source)
     session.flush()
     describe(Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader))
-    return source
+    return Added(source, Outcome.CREATED)
 
 
 def add_remote(
@@ -206,7 +335,7 @@ def add_remote(
     format: str | None = None,
     query: str | None = None,
     change_column: str | None = None,
-) -> Source:
+) -> Added:
     connection = get_connection(session, connection_id)
     require_kind(kind, resolve(session, settings, connection))
     if format is not None and format not in READERS:
@@ -221,7 +350,10 @@ def add_remote(
     else:
         path = (path or "").strip()
         label = path.rstrip("/").rsplit("/", 1)[-1] or path
-    title = (name or "").strip() or (connection.name if label == "query" else label)
+    same = same_remote(session, kind, connection_id, path, format, query)
+    if same is not None:
+        return Added(same, Outcome.EXISTING)
+    title = source_name(session, name, connection.name if label == "query" else label)
     source = Source(
         name=title,
         filename=label,
@@ -240,7 +372,18 @@ def add_remote(
     if kind == S3_SOURCE and source.format is None:
         source.format = state.format
     describe(Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader))
-    return source
+    return Added(source, Outcome.CREATED)
+
+
+def same_remote(
+    session: Session, kind: str, connection_id: int, path: str | None, format: str | None, query: str | None
+) -> Source | None:
+    conditions = [Source.kind == kind, Source.connection_id == connection_id, Source.path.is_not_distinct_from(path)]
+    if kind == DATABASE:
+        conditions.append(Source.query.is_not_distinct_from(query))
+    if format is not None:
+        conditions.append(Source.format == format)
+    return first_source(session, *conditions)
 
 
 def free_slug(session: Session, name: str) -> str:
@@ -262,10 +405,14 @@ def map_columns(settings: Settings, store: ArtifactStore, dataset: Dataset, sour
 
 
 def add_dataset(
-    session: Session, settings: Settings, store: ArtifactStore, name: str, source: Source | None
+    session: Session,
+    settings: Settings,
+    store: ArtifactStore,
+    name: str,
+    source: Source | None,
+    folder: DatasetFolder | None = None,
 ) -> Dataset:
-    fallback = source.name if source is not None else "New dataset"
-    dataset = Dataset(slug=free_slug(session, name.strip() or fallback), name=name.strip() or fallback)
+    dataset = Dataset(slug=free_slug(session, name), name=name, folder_id=folder.id if folder is not None else None)
     session.add(dataset)
     session.flush()
     if source is not None:
@@ -291,12 +438,12 @@ def attach_upload(
     filename: str,
     stream: BinaryIO,
 ) -> Dataset:
-    source = add_source(session, store, filename, stream)
+    source = add_source(session, store, filename, stream).source
     dataset = minibrain.dataset
     if dataset is not None and len(dataset.minibrains) == 1:
         map_columns(settings, store, dataset, source)
         return dataset
-    created = add_dataset(session, settings, store, minibrain.name, source)
+    created = add_dataset(session, settings, store, free_dataset_name(session, minibrain.name, None), source)
     minibrain.dataset = created
     return created
 

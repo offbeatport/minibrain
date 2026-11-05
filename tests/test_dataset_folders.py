@@ -17,7 +17,7 @@ def folder(harness: Harness, name: str, parent: int | None = None) -> dict[str, 
 
 
 def dataset(harness: Harness, name: str, folder_id: int | None = None) -> dict[str, Any]:
-    source = upload(harness, f"{name}.csv", tickets_csv(20))
+    source = upload(harness, f"{name}.csv", tickets_csv(20) + f"{name} ticket,billing\n".encode())
     body = {"name": name, "source_id": source["id"], "folder_id": folder_id}
     response = harness.client.post("/api/datasets", json=body)
     assert response.status_code == 201, response.text
@@ -105,12 +105,12 @@ def test_deleting_a_folder_moves_its_contents_up_one_level(harness: Harness) -> 
     assert folders(harness) == {
         "Support": None,
         "Billing": support["id"],
-        "Billing 2": support["id"],
+        "Billing (2)": support["id"],
         "Refunds": nested["id"],
     }
     assert placement(harness) == {"routing": support["id"], "triage": support["id"]}
     assert harness.client.delete(f"/api/dataset-folders/{support['id']}").status_code == 204
-    assert folders(harness) == {"Billing": None, "Billing 2": None, "Refunds": nested["id"]}
+    assert folders(harness) == {"Billing": None, "Billing (2)": None, "Refunds": nested["id"]}
     assert placement(harness) == {"routing": None, "triage": None}
     assert harness.client.delete(f"/api/dataset-folders/{tickets['id']}").status_code == 404
     deletes = [detail for action, detail in audited(harness, "dataset_folder.delete")]
@@ -120,7 +120,7 @@ def test_deleting_a_folder_moves_its_contents_up_one_level(harness: Harness) -> 
             "path": "/Support/Tickets",
             "folders": 1,
             "datasets": 1,
-            "renamed": ["Billing → Billing 2"],
+            "renamed": ["Billing → Billing (2)"],
         },
         {"name": "Support", "path": "/Support", "folders": 2, "datasets": 2},
     ]
@@ -138,7 +138,7 @@ def test_datasets_move_between_folders_and_the_top_level(harness: Harness) -> No
     top = harness.client.put("/api/datasets/routing/folder", json={"folder_id": None})
     assert top.status_code == 200 and top.json()["folder_id"] is None
     assert harness.client.put("/api/datasets/routing/folder", json={"folder_id": None}).status_code == 200
-    missing = upload(harness, "other.csv", tickets_csv(20))
+    missing = upload(harness, "other.csv", tickets_csv(21))
     body = {"name": "Lost", "source_id": missing["id"], "folder_id": 999}
     assert harness.client.post("/api/datasets", json=body).status_code == 404
     assert placement(harness) == {"routing": None}

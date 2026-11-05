@@ -5513,6 +5513,22 @@ export interface components {
             /** Tags */
             tags?: string[] | null;
         };
+        /**
+         * NameTaken
+         * @enum {string}
+         */
+        NameTaken: "keep_both" | "replace" | "fail";
+        /** NameTakenInfo */
+        NameTakenInfo: {
+            /** Detail */
+            detail: string;
+            /** Name */
+            name: string;
+            /** Suggestion */
+            suggestion: string;
+            /** Taken */
+            taken: number | string;
+        };
         /** NodeInfo */
         NodeInfo: {
             /** Id */
@@ -6255,6 +6271,66 @@ export interface components {
             saved: number;
             /** Keep */
             keep: number;
+        };
+        /** SourceAdded */
+        SourceAdded: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "folder" | "s3" | "database" | "iceberg" | "delta";
+            /** Name */
+            name: string;
+            /** Filename */
+            filename: string;
+            /** Table */
+            table: string;
+            /** Description */
+            description: string;
+            /** Tags */
+            tags: string[];
+            /** Size */
+            size: number;
+            /** Rows */
+            rows: number | null;
+            /** Columns */
+            columns: components["schemas"]["ColumnInfo"][];
+            /** Datasets */
+            datasets: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Path */
+            path?: string | null;
+            /** Format */
+            format?: string | null;
+            /** Files */
+            files?: number | null;
+            /** Modified At */
+            modified_at?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Connection Id */
+            connection_id?: number | null;
+            /** Connection */
+            connection?: string | null;
+            /** Query */
+            query?: string | null;
+            /** Change Column */
+            change_column?: string | null;
+            /** Fingerprint */
+            fingerprint?: string | null;
+            /** Fingerprint Detail */
+            fingerprint_detail?: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "created" | "replaced" | "existing";
         };
         /** SourceInfo */
         SourceInfo: {
@@ -7562,7 +7638,9 @@ export interface operations {
     };
     upload_source_api_sources_post: {
         parameters: {
-            query?: never;
+            query?: {
+                name_taken?: components["schemas"]["NameTaken"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7573,13 +7651,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -7626,13 +7722,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -7659,13 +7773,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -7701,7 +7833,9 @@ export interface operations {
     };
     add_sample_source_api_samples__file__post: {
         parameters: {
-            query?: never;
+            query?: {
+                name_taken?: components["schemas"]["NameTaken"];
+            };
             header?: never;
             path: {
                 file: string;
@@ -7710,13 +7844,31 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -7812,6 +7964,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceSummary"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -7997,6 +8158,15 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetSummary"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -8090,6 +8260,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DatasetSummary"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -8878,13 +9057,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -8911,13 +9108,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */
@@ -8944,13 +9159,31 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Already added, so nothing new was stored; or replaced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceSummary"];
+                    "application/json": components["schemas"]["SourceAdded"];
+                };
+            };
+            /** @description The name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameTakenInfo"];
                 };
             };
             /** @description Validation Error */

@@ -29,6 +29,7 @@ import {
     DATASETS_GROUP,
     type FolderIndex,
     type ItemRef,
+    datasetNamed,
     datasetsInside,
     folderPath,
     folderTrail,
@@ -120,8 +121,11 @@ export function useMoveItem() {
 }
 
 export function moveProblem(index: FolderIndex, target: MoveTarget, into: number | null) {
-    if (target.item.kind !== "folder") {
-        return null;
+    if (target.item.kind === "dataset") {
+        const taken = datasetNamed(index.datasets.get(into) ?? [], target.name, target.item.id);
+        return taken
+            ? `${folderPath(index, into)} already has a dataset called ${taken.name}`
+            : null;
     }
     const taken = siblingNamed(index, into, target.name, target.item.id);
     return taken ? `${folderPath(index, into)} already has a folder called ${taken.name}` : null;
@@ -679,11 +683,12 @@ export function removalText(index: FolderIndex, folder: DatasetFolder): string {
         folders.length ? plural(folders.length, "folder") : "",
         datasets.length ? plural(datasets.length, "dataset") : "",
     ].filter(Boolean);
-    const clash = folders.some((child) =>
-        siblingNamed(index, folder.parent_id, child.name, folder.id),
-    );
+    const above = index.datasets.get(folder.parent_id) ?? [];
+    const clash =
+        folders.some((child) => siblingNamed(index, folder.parent_id, child.name, folder.id)) ||
+        datasets.some((dataset) => datasetNamed(above, dataset.name, dataset.slug));
     const parent = folder.parent_id === null ? "Datasets" : folderPath(index, folder.parent_id);
-    return `Its ${parts.join(" and ")} move up to ${parent}; nothing inside is deleted.${clash ? " A folder whose name is taken there gets a number added." : ""}`;
+    return `Its ${parts.join(" and ")} move up to ${parent}; nothing inside is deleted.${clash ? " One whose name is taken there gets a number added." : ""}`;
 }
 
 export function FolderDetail({

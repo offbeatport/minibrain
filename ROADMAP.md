@@ -270,6 +270,11 @@ Data is shared across models:
   over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
   SQL mode joins, unions, filters and cleans across sources. A dataset over one source can still say `FROM source`.
   Each custom model points at one dataset, and several models can use the same dataset to compare fairly.
+  Dataset names are unique within their folder, like files in a folder, case aside; slugs stay unique across the
+  install. A typed name that is taken is refused with a 409 naming the dataset that holds it and a free name
+  (`detail`, `name`, `suggestion`, `taken`); a name minibrain suggests that is taken gets the next number
+  (`Tickets (2)`). Moving a dataset into a folder where its name is taken is refused; deleting a folder numbers a
+  dataset whose name is taken one level up.
 - A **dataset version** is a full copy of a dataset's rows, never a reference (see Dataset versions). Each model
   version records the dataset version it trained and scored on.
 - Uploading a file to a model replaces its dataset's source only when no other model uses that dataset; otherwise the
@@ -289,6 +294,24 @@ Data is shared across models:
 ### Sources
 
 - Uploads: CSV, TSV, JSON, JSON Lines or Parquet, staged into a DuckDB file keyed by content hash.
+- Source names are unique across the install, case aside. A name minibrain takes from a file, folder, path or table
+  gets the next number when it is taken (`tickets (2).csv`, table `tickets_2`); a typed name (Add source, Rename,
+  Edit) that is taken is refused with the same 409 as datasets.
+- One content is one upload source: uploading a file whose SHA-256 is already a source's, under any name, stores
+  nothing and returns that source (`200`, `outcome: existing`), and the UI says "This file is already uploaded as
+  <name>" with Open. A second source over the same content is not offered: it would be a second table name for the
+  same rows, and datasets already share sources and SQL can read one table twice. Samples follow the same rule.
+- A new file whose name an upload with other content holds: `POST /api/sources?name_taken=keep_both` (the default)
+  adds it as `tickets (2).csv` with its own table; `replace` points the existing source at the new file, keeping its
+  id, name and table, so datasets reading it say "Sources changed since vN" and Update saves the next version (a
+  source that is not an upload cannot be replaced); `fail` stores nothing and answers 409 with the taken name and a
+  free one. The upload button sends `fail` and, only then, asks Replace or Keep both (Keep both selected), so the same
+  content never prompts; Training's upload keeps both.
+- A folder, S3 path, database table or query, or Lakehouse table added again at the same location (connection,
+  path or table or query, and format when one is given) returns the existing source the same way (`200`,
+  `outcome: existing`) without reading it again.
+- An upload's stored file and staged table are deleted when it is replaced or deleted and no other source, dataset
+  version or model version uses that content.
 - Folders: a directory on the server, read in place as one table: every file of one format (CSV, TSV, JSON, JSON
   Lines or Parquet) under it, hidden files and symlinks skipped, joined by column name (`union_by_name`), at most
   10,000 files. Only folders inside the Folder sources policy (Settings → Security, lockable from config or
@@ -883,11 +906,15 @@ keys, and `/v1` stays key-only.
   (`group:datasets`, `group:sources`, `group:upload`, `folder:3`, `source:12`, `dataset:<slug>`, plus
   `&compare=<id>~<id>` for a version diff) is the permalink; `/data/datasets/<slug>` redirects to it.
 - Dataset folders (`dataset_folders`, `datasets.folder_id`) only organise; nothing a model trains on depends on them.
-  They nest, sort before datasets (both by name), and a name is unique among its siblings, case aside. New folder sits
+  They nest, sort before datasets (both by name), and a folder name is unique among its sibling folders and a dataset
+  name among the datasets beside it, case aside. Every dialog that names or renames a folder, dataset or source (New
+  folder, Rename, Edit, New dataset, Make a dataset, Add source) checks the name as it is typed, says which item holds
+  it and keeps the button off, and a suggested name is already free; Move to… and drag and drop refuse a folder where
+  the name is taken. New folder sits
   on Datasets and on every folder; a folder shows its contents with counts, and Rename, Move to… and Delete. Rows move
   by drag and drop in the tree (the kit's `Tree` with `onMove`), or from the keyboard with "Move to…", a dialog with a
   folder picker; a folder cannot move into itself or below itself. Deleting a folder moves its datasets and
-  subfolders up one level (a clashing subfolder name gets a number) and deletes nothing else. Search still finds
+  subfolders up one level (a clashing name gets a number, `Billing (2)`) and deletes nothing else. Search still finds
   datasets inside folders and opens their path. Create, rename, move and delete are audited (`dataset_folder.*`), and
   so is a dataset changing folder (`dataset.move`).
 - Settings → Data: most rows in one version, how many unused versions stay per dataset, and the version checks with

@@ -3,7 +3,7 @@ from dataclasses import asdict
 from functools import lru_cache
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
@@ -29,6 +29,7 @@ from minibrain.api.schemas import (
     LabelCount,
     LabelShiftInfo,
     MappingUpdate,
+    NameTakenInfo,
     PreviewResponse,
     PreviewRow,
     QualityInfo,
@@ -38,6 +39,7 @@ from minibrain.api.schemas import (
     SampleInfo,
     SnapshotDiff,
     SnapshotInfo,
+    SourceAdded,
     SourceKind,
     SourceRef,
     SourceStats,
@@ -47,7 +49,7 @@ from minibrain.api.views import change_info, mapping_info, snapshot_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
-from minibrain.data.dataset_folders import folder_or_root
+from minibrain.data.dataset_folders import folder_or_root, require_free_dataset_name
 from minibrain.data.delta import DELTA
 from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
@@ -56,6 +58,9 @@ from minibrain.data.remote import REMOTE_KINDS
 from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     FOLDER,
+    Added,
+    NameTaken,
+    Outcome,
     add_dataset,
     add_delta,
     add_folder,
@@ -67,7 +72,9 @@ from minibrain.data.shared import (
     folder_scan,
     get_dataset,
     get_source,
+    release_upload,
     remote_state,
+    require_free_source_name,
     sources_in,
     table_of,
     tables_of,
@@ -349,12 +356,33 @@ def list_sources(session: SessionDep, settings: SettingsDep, store: StoreDep) ->
     return [source_summary(settings, store, source) for source in found]
 
 
-@router.post("/sources", status_code=201, dependencies=[Depends(builder)])
-def upload_source(file: UploadFile, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
-    source = add_source(session, store, safe_filename(file.filename or ""), file.file)
-    summary = source_summary(settings, store, source)
+ADDED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {"model": SourceAdded, "description": "Already added, so nothing new was stored; or replaced"},
+    409: {"model": NameTakenInfo, "description": "The name is taken"},
+}
+
+
+def added_source(
+    session: Session, settings: Settings, store: ArtifactStore, added: Added, response: Response
+) -> SourceAdded:
     session.commit()
-    return summary
+    if added.outcome != Outcome.CREATED:
+        response.status_code = 200
+    summary = source_summary(settings, store, added.source)
+    return SourceAdded(**summary.model_dump(), outcome=added.outcome.value)
+
+
+@router.post("/sources", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+def upload_source(
+    file: UploadFile,
+    response: Response,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    name_taken: NameTaken = NameTaken.KEEP_BOTH,
+) -> SourceAdded:
+    added = add_source(session, store, safe_filename(file.filename or ""), file.file, name_taken)
+    return added_source(session, settings, store, added, response)
 
 
 @router.get("/data/folders", dependencies=[Depends(builder)])
@@ -362,22 +390,20 @@ def folder_roots(session: SessionDep) -> FolderRoots:
     return FolderRoots(roots=[str(root) for root in allowed_roots(session)], locked="data_folders" in locked_sources())
 
 
-@router.post("/sources/folders", status_code=201, dependencies=[Depends(builder)])
-def add_folder_source(body: FolderCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
-    source = add_folder(session, body.path, body.name, body.format)
-    summary = source_summary(settings, store, source)
-    session.commit()
-    return summary
+@router.post("/sources/folders", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+def add_folder_source(
+    body: FolderCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceAdded:
+    added = add_folder(session, body.path, body.name, body.format)
+    return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/delta", status_code=201, dependencies=[Depends(builder)])
+@router.post("/sources/delta", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
 def add_delta_source(
-    body: DeltaSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
-) -> SourceSummary:
-    source = add_delta(session, body.path, body.name)
-    summary = source_summary(settings, store, source)
-    session.commit()
-    return summary
+    body: DeltaSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceAdded:
+    added = add_delta(session, body.path, body.name)
+    return added_source(session, settings, store, added, response)
 
 
 @router.get("/samples", dependencies=[Depends(builder)])
@@ -385,12 +411,17 @@ def list_samples() -> list[SampleInfo]:
     return [SampleInfo(**vars(sample)) for sample in SAMPLES]
 
 
-@router.post("/samples/{file}", status_code=201, dependencies=[Depends(builder)])
-def add_sample_source(file: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
-    source = add_sample(session, store, file)
-    summary = source_summary(settings, store, source)
-    session.commit()
-    return summary
+@router.post("/samples/{file}", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+def add_sample_source(
+    file: str,
+    response: Response,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    name_taken: NameTaken = NameTaken.KEEP_BOTH,
+) -> SourceAdded:
+    added = add_sample(session, store, file, name_taken)
+    return added_source(session, settings, store, added, response)
 
 
 @router.get("/sources/{source_id}", dependencies=[Depends(builder)])
@@ -398,11 +429,13 @@ def read_source(source_id: int, session: SessionDep, settings: SettingsDep, stor
     return source_summary(settings, store, get_source(session, source_id))
 
 
-@router.patch("/sources/{source_id}", dependencies=[Depends(builder)])
+@router.patch("/sources/{source_id}", responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
 def update_source(
     source_id: int, body: CatalogueUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceSummary:
     source = get_source(session, source_id)
+    if body.name is not None:
+        require_free_source_name(session, body.name, keep=source)
     describe_item(source, body)
     session.commit()
     return source_summary(settings, store, source)
@@ -441,12 +474,14 @@ def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, st
 
 
 @router.delete("/sources/{source_id}", status_code=204, dependencies=[Depends(builder)])
-def delete_source(source_id: int, session: SessionDep) -> None:
+def delete_source(source_id: int, session: SessionDep, store: StoreDep) -> None:
     source = get_source(session, source_id)
     if source.datasets:
         names = ", ".join(dataset.name for dataset in source.datasets)
         raise ConflictError(f"{source.name} is used by {names}; delete those datasets first")
+    artifact_id, filename = source.artifact_id, source.filename
     session.delete(source)
+    release_upload(session, store, artifact_id, filename)
     session.commit()
 
 
@@ -456,14 +491,14 @@ def list_datasets(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     return [dataset_summary(settings, store, dataset) for dataset in found]
 
 
-@router.post("/datasets", status_code=201, dependencies=[Depends(builder)])
+@router.post("/datasets", status_code=201, responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
 def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
     source = get_source(session, body.source_id) if body.source_id is not None else None
     if source is None and body.sql is None:
         raise ConflictError("pick a source, or write SQL over the sources")
     folder = folder_or_root(session, body.folder_id)
-    dataset = add_dataset(session, settings, store, body.name, source)
-    dataset.folder_id = folder.id if folder is not None else None
+    require_free_dataset_name(session, body.name, folder)
+    dataset = add_dataset(session, settings, store, body.name, source, folder)
     mapping = MappingUpdate(
         source_id=body.source_id, input_column=body.input_column, label_column=body.label_column, sql=body.sql
     )
@@ -479,11 +514,13 @@ def read_dataset(slug: str, session: SessionDep, settings: SettingsDep, store: S
     return dataset_summary(settings, store, get_dataset(session, slug))
 
 
-@router.patch("/datasets/{slug}", dependencies=[Depends(builder)])
+@router.patch("/datasets/{slug}", responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
 def update_dataset(
     slug: str, body: CatalogueUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> DatasetSummary:
     dataset = get_dataset(session, slug)
+    if body.name is not None:
+        require_free_dataset_name(session, body.name, folder_or_root(session, dataset.folder_id), keep=dataset)
     describe_item(dataset, body)
     session.commit()
     return dataset_summary(settings, store, dataset)

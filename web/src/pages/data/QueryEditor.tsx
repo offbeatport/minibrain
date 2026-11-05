@@ -179,6 +179,7 @@ export function QueryEditor({
     title = "Query",
     caption = "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.",
     saveLabel,
+    saveBlocked = false,
     before,
     extraActions,
 }: {
@@ -191,6 +192,7 @@ export function QueryEditor({
     title?: string;
     caption?: string;
     saveLabel?: string;
+    saveBlocked?: boolean;
     before?: ReactNode;
     extraActions?: ReactNode;
 }) {
@@ -286,7 +288,7 @@ export function QueryEditor({
                         </Button>
                         <Button
                             onClick={() => save.mutate({ sql })}
-                            disabled={!sql.trim() || save.isPending}
+                            disabled={!sql.trim() || saveBlocked || save.isPending}
                         >
                             {saveLabel ?? "Save query"}
                         </Button>
@@ -332,7 +334,7 @@ export function QueryEditor({
                             disabled={!chosen}
                         />
                         <Button
-                            disabled={!chosen || !input || !label || save.isPending}
+                            disabled={!chosen || !input || !label || saveBlocked || save.isPending}
                             onClick={() =>
                                 save.mutate({
                                     source_id: chosen?.id,

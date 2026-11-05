@@ -79,6 +79,17 @@ class SourceSummary(BaseModel):
     fingerprint_detail: str | None = None
 
 
+class SourceAdded(SourceSummary):
+    outcome: Literal["created", "replaced", "existing"]
+
+
+class NameTakenInfo(BaseModel):
+    detail: str
+    name: str
+    suggestion: str
+    taken: int | str
+
+
 class S3SourceCreate(BaseModel):
     connection_id: int
     path: str = Field(min_length=6, max_length=4096)
@@ -208,7 +219,7 @@ class DatasetSummary(BaseModel):
 
 
 class DatasetCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     source_id: int | None = None
     input_column: str | None = None
     label_column: str | None = None
@@ -244,7 +255,7 @@ class DatasetFolderChoice(BaseModel):
 
 
 class CatalogueUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=120)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] | None = None
     description: str | None = Field(default=None, max_length=1000)
     tags: list[str] | None = Field(default=None, max_length=20)
 

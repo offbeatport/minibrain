@@ -19,6 +19,10 @@ export type ModelUsage = Schemas["Usage"];
 export type ModelVersionRow = Schemas["VersionRow"];
 export type DatasetSummary = Schemas["DatasetSummary"];
 export type SourceSummary = Schemas["SourceSummary"];
+export type SourceAdded = Schemas["SourceAdded"];
+export type NameTaken = Schemas["NameTaken"];
+export type NameTakenInfo = Schemas["NameTakenInfo"];
+export type Uploaded = SourceAdded | { outcome: "name_taken"; taken: NameTakenInfo };
 export type MappingInfo = Schemas["MappingInfo"];
 export type LabelCount = Schemas["LabelCount"];
 export type ColumnStats = Schemas["ColumnStats"];
@@ -161,15 +165,28 @@ export async function uploadSource(slug: string, file: File): Promise<MinibrainD
     return body as MinibrainDetail;
 }
 
-export async function uploadFile(file: File): Promise<SourceSummary> {
+function isNameTaken(body: unknown): body is NameTakenInfo {
+    return typeof (body as Partial<NameTakenInfo> | null)?.suggestion === "string";
+}
+
+export async function uploadFile(
+    file: File,
+    nameTaken: NameTaken = "keep_both",
+): Promise<Uploaded> {
     const form = new FormData();
     form.append("file", file);
-    const response = await apiFetch("/api/sources", { method: "POST", body: form });
+    const response = await apiFetch(`/api/sources?name_taken=${nameTaken}`, {
+        method: "POST",
+        body: form,
+    });
     const body: unknown = await response.json();
+    if (response.status === 409 && isNameTaken(body)) {
+        return { outcome: "name_taken", taken: body };
+    }
     if (!response.ok) {
         throw new Error(describeError(body, response.status));
     }
-    return body as SourceSummary;
+    return body as SourceAdded;
 }
 
 export function jobEventsUrl(jobId: number): string {

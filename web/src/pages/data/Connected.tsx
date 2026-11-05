@@ -23,7 +23,13 @@ import {
     Textarea,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import {
+    type DatasetSummary,
+    type SourceAdded,
+    type SourceSummary,
+    api,
+    unwrap,
+} from "~/api/client";
 import {
     type ConnectionInfo,
     EXTENSIONS_FOR,
@@ -39,7 +45,7 @@ import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { FORMAT_LABELS } from "./Folders";
 import { usesSource } from "./catalogue";
-import { useDataRefresh } from "./parts";
+import { useDataRefresh, useSourceNameProblem } from "./parts";
 
 export type ConnectedKind = "s3" | "database";
 
@@ -172,7 +178,9 @@ export function AddDialog({
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        onSubmit();
+                        if (ready && !pending) {
+                            onSubmit();
+                        }
                     }}
                 >
                     <DialogHeader>
@@ -196,14 +204,14 @@ export function AddDialog({
 }
 
 export function useAddSource(
-    request: () => Promise<SourceSummary>,
-    onAdded: (source: SourceSummary) => void,
+    request: () => Promise<SourceAdded>,
+    onAdded: (source: SourceAdded) => void,
     onOpenChange: (open: boolean) => void,
 ) {
     const refresh = useDataRefresh();
     return useMutation({
         mutationFn: request,
-        onSuccess: async (source: SourceSummary) => {
+        onSuccess: async (source: SourceAdded) => {
             await refresh();
             onOpenChange(false);
             onAdded(source);
@@ -213,14 +221,21 @@ export function useAddSource(
 
 export function NameField({
     value,
+    problem,
     onChange,
-}: { value: string; onChange: (value: string) => void }) {
+}: { value: string; problem: string | null; onChange: (value: string) => void }) {
     return (
-        <Field id="connected-name" label="Name" hint="Taken from the path or table if empty.">
+        <Field
+            id="connected-name"
+            label="Name"
+            hint="Taken from the path or table if empty; a taken one gets a number."
+            error={problem}
+        >
             <Input
                 id="connected-name"
                 value={value}
                 maxLength={120}
+                aria-invalid={problem ? true : undefined}
                 onChange={(event) => onChange(event.target.value)}
             />
         </Field>
@@ -238,7 +253,7 @@ export function AddS3Dialog({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onAdded: (source: SourceSummary) => void;
+    onAdded: (source: SourceAdded) => void;
 }) {
     const connections = useConnections();
     const options = usable(connections.data, "s3");
@@ -248,6 +263,7 @@ export function AddS3Dialog({
     const [name, setName] = useState("");
     const chosen = connection ?? firstId(options);
     const bucket = options.find((item) => item.id === chosen)?.bucket;
+    const nameProblem = useSourceNameProblem(name);
     const add = useAddSource(
         () =>
             unwrap(
@@ -269,7 +285,7 @@ export function AddS3Dialog({
             title="Add an S3 path"
             description="minibrain lists the matching objects and reads them in place as one table each time a query runs. Nothing is copied until a dataset saves a version."
             pending={add.isPending}
-            ready={chosen !== null && path.trim().startsWith("s3://")}
+            ready={chosen !== null && path.trim().startsWith("s3://") && !nameProblem}
             submitLabel="Add S3 path"
             error={add.error}
             onOpenChange={onOpenChange}
@@ -311,7 +327,7 @@ export function AddS3Dialog({
                     </SelectContent>
                 </Select>
             </Field>
-            <NameField value={name} onChange={setName} />
+            <NameField value={name} problem={nameProblem} onChange={setName} />
             <ExtensionWarning needed={EXTENSIONS_FOR.s3} />
         </AddDialog>
     );
@@ -324,7 +340,7 @@ export function AddDatabaseDialog({
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onAdded: (source: SourceSummary) => void;
+    onAdded: (source: SourceAdded) => void;
 }) {
     const connections = useConnections();
     const options = usable(connections.data, "database");
@@ -355,8 +371,11 @@ export function AddDatabaseDialog({
         onAdded,
         onOpenChange,
     );
+    const nameProblem = useSourceNameProblem(name);
     const ready =
-        chosen !== null && (mode === "table" ? Boolean(table.trim()) : Boolean(query.trim()));
+        chosen !== null &&
+        !nameProblem &&
+        (mode === "table" ? Boolean(table.trim()) : Boolean(query.trim()));
     return (
         <AddDialog
             open={open}
@@ -442,7 +461,7 @@ export function AddDatabaseDialog({
                     onChange={(event) => setChangeColumn(event.target.value)}
                 />
             </Field>
-            <NameField value={name} onChange={setName} />
+            <NameField value={name} problem={nameProblem} onChange={setName} />
             <ExtensionWarning
                 needed={picked?.kind === "mysql" ? EXTENSIONS_FOR.mysql : EXTENSIONS_FOR.postgres}
             />

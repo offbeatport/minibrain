@@ -1,10 +1,10 @@
 from typing import cast
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import admin, builder
-from minibrain.api.data import source_summary
+from minibrain.api.data import ADDED_RESPONSES, added_source
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
     ConnectionBody,
@@ -19,9 +19,8 @@ from minibrain.api.schemas import (
     ExtensionsInfo,
     IcebergSourceCreate,
     S3SourceCreate,
-    SourceSummary,
+    SourceAdded,
 )
-from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionConfig, ConnectionProblem, clean, clean_name, config_from
 from minibrain.connections.store import (
@@ -42,7 +41,7 @@ from minibrain.connections.store import (
 )
 from minibrain.data import extensions
 from minibrain.data.remote import DATABASE, ICEBERG, S3_SOURCE, database_tables, probe
-from minibrain.data.shared import add_remote, get_source
+from minibrain.data.shared import add_remote
 from minibrain.data.sources import SourceError
 from minibrain.policy import PolicyError
 from minibrain.registry.models import Connection
@@ -166,22 +165,19 @@ def read_extensions() -> ExtensionsInfo:
     )
 
 
-def added(session: Session, settings: Settings, store: ArtifactStore, source_id: int) -> SourceSummary:
-    session.commit()
-    return source_summary(settings, store, get_source(session, source_id))
+@router.post("/sources/s3", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+def add_s3_source(
+    body: S3SourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceAdded:
+    added = add_remote(session, settings, S3_SOURCE, body.connection_id, body.name, path=body.path, format=body.format)
+    return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/s3", status_code=201, dependencies=[Depends(builder)])
-def add_s3_source(body: S3SourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
-    source = add_remote(session, settings, S3_SOURCE, body.connection_id, body.name, path=body.path, format=body.format)
-    return added(session, settings, store, source.id)
-
-
-@router.post("/sources/database", status_code=201, dependencies=[Depends(builder)])
+@router.post("/sources/database", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
 def add_database_source(
-    body: DatabaseSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
-) -> SourceSummary:
-    source = add_remote(
+    body: DatabaseSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceAdded:
+    added = add_remote(
         session,
         settings,
         DATABASE,
@@ -191,12 +187,12 @@ def add_database_source(
         query=body.query,
         change_column=body.change_column,
     )
-    return added(session, settings, store, source.id)
+    return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/iceberg", status_code=201, dependencies=[Depends(builder)])
+@router.post("/sources/iceberg", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
 def add_iceberg_source(
-    body: IcebergSourceCreate, session: SessionDep, settings: SettingsDep, store: StoreDep
-) -> SourceSummary:
-    source = add_remote(session, settings, ICEBERG, body.connection_id, body.name, path=body.path)
-    return added(session, settings, store, source.id)
+    body: IcebergSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> SourceAdded:
+    added = add_remote(session, settings, ICEBERG, body.connection_id, body.name, path=body.path)
+    return added_source(session, settings, store, added, response)

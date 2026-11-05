@@ -39,7 +39,7 @@ import {
     useRef,
     useState,
 } from "react";
-import type { DatasetSummary, SourceSummary } from "~/api/client";
+import type { DatasetSummary, SourceAdded, SourceSummary } from "~/api/client";
 import { type DatasetFolder, useDatasetFolders, useFolderRoots } from "~/api/dataQueries";
 import { useDatasets, useSources } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
@@ -49,6 +49,7 @@ import { bytes } from "~/lib/time";
 import {
     type AddKind,
     AddSourceMenu,
+    AlreadyAddedDialog,
     SOURCE_CHOICES,
     type SourceAdder,
     addSourceKind,
@@ -71,6 +72,7 @@ import {
     SOURCE_GROUPS,
     type SourceGroupId,
     TABLE_FORMATS,
+    datasetNamed,
     datasetText,
     datasetsInside,
     folderIndex,
@@ -262,7 +264,7 @@ function GroupDetail({
     sources: SourceSummary[];
     datasets: DatasetSummary[];
     adder: SourceAdder;
-    onUploaded: (source: SourceSummary) => void;
+    onUploaded: (source: SourceAdded) => void;
     onAdd: (kind: AddKind) => void;
     onSelect: (item: ItemRef) => void;
     onCreated: (dataset: DatasetSummary) => Promise<void>;
@@ -382,6 +384,7 @@ export function DataExplorer() {
     const [collapsed, setCollapsed] = useState<string[]>([]);
     const [creatingFor, setCreatingFor] = useState<number | string | null>(null);
     const [adding, setAdding] = useState<AddKind | null>(null);
+    const [already, setAlready] = useState<SourceSummary | null>(null);
     const roots = useFolderRoots();
     const treeBox = useRef<HTMLDivElement>(null);
     const loading = sources.isLoading || datasets.isLoading || folders.isLoading;
@@ -454,14 +457,22 @@ export function DataExplorer() {
         if (into === undefined || (item?.kind !== "dataset" && item?.kind !== "folder")) {
             return false;
         }
-        const folder = item.kind === "folder" ? index.byId.get(item.id) : undefined;
+        if (item.kind === "dataset") {
+            const dataset = datasetList.find((row) => row.slug === item.id);
+            return !dataset || !datasetNamed(index.datasets.get(into) ?? [], dataset.name, item.id);
+        }
+        const folder = index.byId.get(item.id);
         return !folder || !siblingNamed(index, into, folder.name, folder.id);
     };
 
-    const onUploaded = (source: SourceSummary) => {
+    const onUploaded = (source: SourceAdded) => {
+        if (source.outcome === "existing") {
+            setAlready(source);
+            return;
+        }
         setQuery("");
         router.history.replace(itemHref({ kind: "source", id: source.id }));
-        setCreatingFor(source.id);
+        setCreatingFor(source.outcome === "created" ? source.id : null);
     };
 
     const adder = useSourceAdder(onUploaded);
@@ -844,9 +855,18 @@ export function DataExplorer() {
                     {detail}
                 </section>
             </div>
+            <AlreadyAddedDialog
+                source={already}
+                onOpenChange={(open) => !open && setAlready(null)}
+                onOpen={(source) => {
+                    setQuery("");
+                    select({ kind: "source", id: source.id });
+                }}
+            />
             <TreeActionDialogs
                 action={action}
                 index={index}
+                sources={sourceList}
                 onClose={() => {
                     setAction(null);
                     focusTreeRow();

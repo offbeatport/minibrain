@@ -31,6 +31,14 @@ class ConflictError(Exception):
     pass
 
 
+class NameTakenError(ConflictError):
+    def __init__(self, message: str, name: str, suggestion: str, taken: int | str) -> None:
+        super().__init__(message)
+        self.name = name
+        self.suggestion = suggestion
+        self.taken = taken
+
+
 class ModelNameError(ValueError):
     pass
 

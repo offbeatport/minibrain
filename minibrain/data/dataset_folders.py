@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.data.names import free_name, same_name
 from minibrain.registry.models import Dataset, DatasetFolder
-from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.registry.service import ConflictError, NameTakenError, NotFoundError
 
 ROOT = "Datasets"
 
@@ -55,15 +56,41 @@ def place_name(folder: DatasetFolder | None) -> str:
 def require_free_name(
     session: Session, name: str, parent: DatasetFolder | None, keep: DatasetFolder | None = None
 ) -> None:
-    wanted = name.casefold()
-    for sibling in children_of(session, parent.id if parent is not None else None):
-        if sibling is not keep and sibling.name.casefold() == wanted:
-            raise ConflictError(f"{place_name(parent)} already has a folder called {sibling.name}")
+    siblings = children_of(session, parent.id if parent is not None else None)
+    for sibling in siblings:
+        if sibling is not keep and same_name(sibling.name, name):
+            raise NameTakenError(
+                f"{place_name(parent)} already has a folder called {sibling.name}",
+                sibling.name,
+                free_name(name, [found.name for found in siblings if found is not keep]),
+                sibling.id,
+            )
 
 
-def free_name(name: str, taken: set[str]) -> str:
-    candidates = (name if number == 1 else f"{name} {number}" for number in range(1, 10_000))
-    return next(candidate for candidate in candidates if candidate.casefold() not in taken)
+def datasets_in(session: Session, folder_id: int | None) -> list[Dataset]:
+    return list(session.scalars(select(Dataset).where(Dataset.folder_id == folder_id)))
+
+
+def dataset_names(session: Session, folder_id: int | None, keep: Dataset | None = None) -> list[str]:
+    return [dataset.name for dataset in datasets_in(session, folder_id) if dataset is not keep]
+
+
+def free_dataset_name(session: Session, name: str, folder_id: int | None) -> str:
+    return free_name(name, dataset_names(session, folder_id))
+
+
+def require_free_dataset_name(
+    session: Session, name: str, folder: DatasetFolder | None, keep: Dataset | None = None
+) -> None:
+    folder_id = folder.id if folder is not None else None
+    for dataset in datasets_in(session, folder_id):
+        if dataset is not keep and same_name(dataset.name, name):
+            raise NameTakenError(
+                f"{place_name(folder)} already has a dataset called {dataset.name}",
+                dataset.name,
+                free_name(name, dataset_names(session, folder_id, keep)),
+                dataset.slug,
+            )
 
 
 def create_folder(session: Session, name: str, parent_id: int | None) -> DatasetFolder:
@@ -88,20 +115,27 @@ def move_folder(session: Session, folder: DatasetFolder, parent_id: int | None) 
     folder.parent_id = parent_id
 
 
+def rename_into(item: Dataset | DatasetFolder, taken: list[str]) -> list[str]:
+    name = free_name(item.name, taken)
+    taken.append(name)
+    if name == item.name:
+        return []
+    before, item.name = item.name, name
+    return [f"{before} → {name}"]
+
+
 def delete_folder(session: Session, folder: DatasetFolder) -> Removal:
     parent_id = folder.parent_id
-    taken = {sibling.name.casefold() for sibling in children_of(session, parent_id) if sibling is not folder}
     renamed: list[str] = []
     subfolders = children_of(session, folder.id)
+    folder_names = [sibling.name for sibling in children_of(session, parent_id) if sibling is not folder]
     for child in subfolders:
-        name = free_name(child.name, taken)
-        taken.add(name.casefold())
-        if name != child.name:
-            renamed.append(f"{child.name} → {name}")
-        child.name = name
+        renamed += rename_into(child, folder_names)
         child.parent_id = parent_id
-    datasets = list(session.scalars(select(Dataset).where(Dataset.folder_id == folder.id)))
+    datasets = datasets_in(session, folder.id)
+    names = dataset_names(session, parent_id)
     for dataset in datasets:
+        renamed += rename_into(dataset, names)
         dataset.folder_id = parent_id
     session.flush()
     session.delete(folder)
@@ -110,4 +144,6 @@ def delete_folder(session: Session, folder: DatasetFolder) -> Removal:
 
 
 def move_dataset(session: Session, dataset: Dataset, folder_id: int | None) -> None:
-    dataset.folder_id = None if folder_id is None else get_folder(session, folder_id).id
+    folder = folder_or_root(session, folder_id)
+    require_free_dataset_name(session, dataset.name, folder, keep=dataset)
+    dataset.folder_id = folder.id if folder is not None else None

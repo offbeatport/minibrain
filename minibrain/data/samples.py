@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
-from minibrain.data.shared import add_source
-from minibrain.registry.models import Source
+from minibrain.data.shared import Added, NameTaken, Outcome, add_source
 from minibrain.registry.service import NotFoundError
 from minibrain.settings import sample_file
 
@@ -60,10 +59,11 @@ def find_sample(file: str) -> Sample:
     raise NotFoundError(f"no sample called {file}")
 
 
-def add_sample(session: Session, store: ArtifactStore, file: str) -> Source:
+def add_sample(session: Session, store: ArtifactStore, file: str, name_taken: NameTaken = NameTaken.KEEP_BOTH) -> Added:
     sample = find_sample(file)
     with sample_file(sample.file).open("rb") as stream:
-        source = add_source(session, store, sample.file, stream)
-    source.description = f"Sample: {sample.description} {sample.credit}"
-    source.tags = [SAMPLE_TAG]
-    return source
+        added = add_source(session, store, sample.file, stream, name_taken)
+    if added.outcome == Outcome.CREATED:
+        added.source.description = f"Sample: {sample.description} {sample.credit}"
+        added.source.tags = [SAMPLE_TAG]
+    return added

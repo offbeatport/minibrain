@@ -7,6 +7,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Upload sources** · shipped · product, ml
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
   UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/minibrains/{slug}/source
+- **Duplicate uploads** · shipped · product, ml
+  Store each file once; a taken name offers Replace or Keep both.
+  UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
 - **Sample data** · shipped · product
   Try the whole flow on bundled sample data in minutes.
   UI: Home › Get started, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/minibrains/sample
@@ -40,6 +43,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Datasets › New folder · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
+- **Unique names** · shipped · product, ml
+  No two datasets share a name in a folder, nor two sources.
+  UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
   UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, GET /api/snapshots/{snapshot_id}, POST /api/minibrains/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots

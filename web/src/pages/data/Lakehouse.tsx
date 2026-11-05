@@ -10,7 +10,13 @@ import {
     RadioGroupItem,
 } from "obp-ui";
 import { useState } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import {
+    type DatasetSummary,
+    type SourceAdded,
+    type SourceSummary,
+    api,
+    unwrap,
+} from "~/api/client";
 import { EXTENSIONS_FOR, useConnections } from "~/api/connectionQueries";
 import { Stat } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -24,6 +30,7 @@ import {
     useAddSource,
 } from "./Connected";
 import { TABLE_FORMATS, type TableFormat, tableFormat, usesSource } from "./catalogue";
+import { useSourceNameProblem } from "./parts";
 
 const FORMAT_ORDER: TableFormat[] = ["iceberg", "delta"];
 
@@ -86,7 +93,7 @@ export function AddLakehouseDialog({
     open: boolean;
     roots: string[];
     onOpenChange: (open: boolean) => void;
-    onAdded: (source: SourceSummary) => void;
+    onAdded: (source: SourceAdded) => void;
 }) {
     const connections = useConnections();
     const options = usable(connections.data, "s3");
@@ -117,10 +124,12 @@ export function AddLakehouseDialog({
         onAdded,
         onOpenChange,
     );
+    const nameProblem = useSourceNameProblem(name);
     const ready =
-        format === "iceberg"
+        !nameProblem &&
+        (format === "iceberg"
             ? chosen !== null && s3Path.trim().startsWith("s3://")
-            : roots.length > 0 && folder.trim().length > 0;
+            : roots.length > 0 && folder.trim().length > 0);
     const pick = (next: TableFormat) => {
         setFormat(next);
         add.reset();
@@ -197,7 +206,7 @@ export function AddLakehouseDialog({
                     />
                 </Field>
             )}
-            <NameField value={name} onChange={setName} />
+            <NameField value={name} problem={nameProblem} onChange={setName} />
             <ExtensionWarning needed={EXTENSIONS_FOR[format] ?? []} />
         </AddDialog>
     );

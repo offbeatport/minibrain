@@ -4,6 +4,7 @@ import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
@@ -74,7 +75,7 @@ from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, backfill, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
-from minibrain.registry.service import ConflictError, ModelNameError, NotFoundError
+from minibrain.registry.service import ConflictError, ModelNameError, NameTakenError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.settings import Settings, load_settings
@@ -92,6 +93,7 @@ API_PREFIXES = ("api/", "v1/", "internal/", "healthz", "readyz", "metrics")
 ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
     ConflictError: 409,
+    NameTakenError: 409,
     LeaseError: 409,
     JobStateError: 409,
     MissingArtifactError: 409,
@@ -117,8 +119,14 @@ ERROR_STATUS: dict[type[Exception], int] = {
 log = logging.getLogger("minibrain")
 
 
+def error_body(error: Exception) -> dict[str, Any]:
+    if isinstance(error, NameTakenError):
+        return {"detail": str(error), "name": error.name, "suggestion": error.suggestion, "taken": error.taken}
+    return {"detail": str(error)}
+
+
 async def domain_error(_request: Request, error: Exception) -> JSONResponse:
-    return JSONResponse(status_code=ERROR_STATUS.get(type(error), 400), content={"detail": str(error)})
+    return JSONResponse(status_code=ERROR_STATUS.get(type(error), 400), content=error_body(error))
 
 
 def mount_web(app: FastAPI, dist: Path, ui_url: str | None = None) -> None:

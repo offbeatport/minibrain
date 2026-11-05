@@ -12,7 +12,14 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
-import { keys, useDataset, useDatasetPreview, useModels, useSources } from "~/api/queries";
+import {
+    keys,
+    useDataset,
+    useDatasetPreview,
+    useDatasets,
+    useModels,
+    useSources,
+} from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { count } from "~/lib/format";
@@ -27,7 +34,15 @@ import {
     useVersionRefresh,
 } from "./DatasetVersions";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
-import { type FolderIndex, type ItemRef, itemHref, stem } from "./catalogue";
+import {
+    type FolderIndex,
+    type ItemRef,
+    datasetNameProblem,
+    datasetsIn,
+    freeDatasetName,
+    itemHref,
+    stem,
+} from "./catalogue";
 import {
     About,
     DeleteAction,
@@ -124,12 +139,17 @@ export function CreateDataset({
     onCreated: (dataset: DatasetSummary) => Promise<void>;
     onCancel: () => void;
 }) {
-    const [name, setName] = useState(source ? stem(source.name) : "");
+    const datasets = useDatasets();
+    const siblings = datasetsIn(datasets.data ?? [], folderId);
+    const [typed, setTyped] = useState<string | null>(null);
+    const name = typed ?? (source ? freeDatasetName(siblings, stem(source.name)) : "");
+    const problem = datasetNameProblem(siblings, name);
     return (
         <QueryEditor
             title="New dataset"
             caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources. Creating the dataset saves version 1 of its rows."
             saveLabel="Create dataset"
+            saveBlocked={problem !== null}
             mapping={EMPTY_MAPPING}
             mode="columns"
             sourceId={source?.id}
@@ -140,13 +160,14 @@ export function CreateDataset({
                 </Button>
             }
             before={
-                <Field id="new-dataset-name" label="Name" className="mb-4 max-w-sm">
+                <Field id="new-dataset-name" label="Name" className="mb-4 max-w-sm" error={problem}>
                     <Input
                         id="new-dataset-name"
                         value={name}
                         maxLength={80}
                         placeholder="Support tickets by team"
-                        onChange={(event) => setName(event.target.value)}
+                        aria-invalid={problem ? true : undefined}
+                        onChange={(event) => setTyped(event.target.value)}
                     />
                 </Field>
             }
@@ -155,7 +176,9 @@ export function CreateDataset({
                 const created = await unwrap(
                     api.POST("/api/datasets", {
                         body: {
-                            name: name.trim() || stem(fallback ?? "") || "New dataset",
+                            name:
+                                name.trim() ||
+                                freeDatasetName(siblings, stem(fallback ?? "") || "New dataset"),
                             folder_id: folderId,
                             ...body,
                         },
@@ -383,6 +406,9 @@ export function DatasetDetail({
             <EditDialog
                 item={dataset}
                 noun="dataset"
+                problem={(name) =>
+                    datasetNameProblem(index.datasets.get(folderId) ?? [], name, dataset.slug)
+                }
                 open={editing}
                 onOpenChange={setEditing}
                 onSave={(body) =>

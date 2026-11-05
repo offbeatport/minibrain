@@ -21,10 +21,11 @@ import {
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { LabelCount } from "~/api/client";
 import { dataKeys } from "~/api/dataQueries";
-import { keys, useModels } from "~/api/queries";
+import { keys, useModels, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { splitTags } from "../models/dialogs";
+import { sourceNameProblem } from "./catalogue";
 
 export type Described = { name: string; description: string; tags: string[] };
 
@@ -40,6 +41,11 @@ export function useDataRefresh() {
             client.invalidateQueries({ queryKey: keys.models }),
             client.invalidateQueries({ queryKey: ["minibrain"] }),
         ]);
+}
+
+export function useSourceNameProblem(name: string, except?: number): string | null {
+    const sources = useSources();
+    return sourceNameProblem(sources.data ?? [], name, except);
 }
 
 export function useModelNames() {
@@ -201,12 +207,14 @@ export function EditDialog({
     item,
     open,
     noun,
+    problem,
     onOpenChange,
     onSave,
 }: {
     item: Described;
     open: boolean;
     noun: string;
+    problem: (name: string) => string | null;
     onOpenChange: (open: boolean) => void;
     onSave: (body: Described) => Promise<unknown>;
 }) {
@@ -225,13 +233,16 @@ export function EditDialog({
             onSave({ name: name.trim(), description: description.trim(), tags: splitTags(tags) }),
         onSuccess: () => onOpenChange(false),
     });
+    const clash = name.trim() ? problem(name) : null;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
-                        save.mutate();
+                        if (!clash) {
+                            save.mutate();
+                        }
                     }}
                     className="contents"
                 >
@@ -242,11 +253,12 @@ export function EditDialog({
                         </DialogDescription>
                     </DialogHeader>
                     <FieldGroup>
-                        <Field id="data-edit-name" label="Name">
+                        <Field id="data-edit-name" label="Name" error={clash}>
                             <Input
                                 id="data-edit-name"
                                 value={name}
                                 maxLength={120}
+                                aria-invalid={clash ? true : undefined}
                                 onChange={(event) => setName(event.target.value)}
                             />
                         </Field>
@@ -272,7 +284,7 @@ export function EditDialog({
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={!name.trim() || save.isPending}>
+                        <Button type="submit" disabled={!name.trim() || !!clash || save.isPending}>
                             Save
                         </Button>
                     </DialogFooter>

@@ -19,13 +19,19 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useState } from "react";
-import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import {
+    type DatasetSummary,
+    type SourceAdded,
+    type SourceSummary,
+    api,
+    unwrap,
+} from "~/api/client";
 import { useFolderRoots } from "~/api/dataQueries";
 import { ErrorLine, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { usesSource } from "./catalogue";
-import { useDataRefresh } from "./parts";
+import { useDataRefresh, useSourceNameProblem } from "./parts";
 
 type FolderFormat = ".csv" | ".tsv" | ".json" | ".jsonl" | ".parquet";
 
@@ -55,12 +61,13 @@ export function AddFolderDialog({
     open: boolean;
     roots: string[];
     onOpenChange: (open: boolean) => void;
-    onAdded: (source: SourceSummary) => void;
+    onAdded: (source: SourceAdded) => void;
 }) {
     const refresh = useDataRefresh();
     const [path, setPath] = useState("");
     const [name, setName] = useState("");
     const [format, setFormat] = useState<FolderFormat | "auto">("auto");
+    const nameProblem = useSourceNameProblem(name);
     const add = useMutation({
         mutationFn: () =>
             unwrap(
@@ -111,7 +118,9 @@ export function AddFolderDialog({
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        add.mutate();
+                        if (!nameProblem) {
+                            add.mutate();
+                        }
                     }}
                 >
                     <DialogHeader>
@@ -135,11 +144,17 @@ export function AddFolderDialog({
                                 onChange={(event) => setPath(event.target.value)}
                             />
                         </Field>
-                        <Field id="folder-name" label="Name" hint="The folder's name if empty.">
+                        <Field
+                            id="folder-name"
+                            label="Name"
+                            hint="The folder's name if empty; a taken one gets a number."
+                            error={nameProblem}
+                        >
                             <Input
                                 id="folder-name"
                                 value={name}
                                 maxLength={120}
+                                aria-invalid={nameProblem ? true : undefined}
                                 onChange={(event) => setName(event.target.value)}
                             />
                         </Field>
@@ -168,7 +183,10 @@ export function AddFolderDialog({
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={!path.trim() || add.isPending}>
+                        <Button
+                            type="submit"
+                            disabled={!path.trim() || !!nameProblem || add.isPending}
+                        >
                             {add.isPending ? "Reading…" : "Add folder"}
                         </Button>
                     </DialogFooter>
@@ -185,7 +203,7 @@ export function FoldersGroup({
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    onAdded: (source: SourceSummary) => void;
+    onAdded: (source: SourceAdded) => void;
 }) {
     const roots = useFolderRoots();
     const [adding, setAdding] = useState(false);

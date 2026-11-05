@@ -28,7 +28,15 @@ import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
-import { type ItemRef, itemHref, plural, stem } from "./catalogue";
+import {
+    type ItemRef,
+    datasetNameProblem,
+    datasetsIn,
+    freeDatasetName,
+    itemHref,
+    plural,
+    stem,
+} from "./catalogue";
 import { SourceIcon } from "./icons";
 import { useDataRefresh } from "./parts";
 
@@ -172,7 +180,11 @@ function MakeDatasetDialog({
     const chosen = sources ?? [];
     const columns = sharedColumns(chosen);
     const opened = sources ? sources.map((source) => source.id).join(",") : null;
-    const [name, setName] = useState("");
+    const datasets = useDatasets();
+    const siblings = datasetsIn(datasets.data ?? [], null);
+    const [typed, setTyped] = useState<string | null>(null);
+    const name = typed ?? freeDatasetName(siblings, defaultName(chosen) || "New dataset");
+    const problem = datasetNameProblem(siblings, name);
     const [input, setInput] = useState("");
     const [label, setLabel] = useState("");
     const create = useMutation({
@@ -180,7 +192,9 @@ function MakeDatasetDialog({
             unwrap(
                 api.POST("/api/datasets", {
                     body: {
-                        name: name.trim() || defaultName(chosen) || "New dataset",
+                        name:
+                            name.trim() ||
+                            freeDatasetName(siblings, defaultName(chosen) || "New dataset"),
                         sql: stackedSql(chosen, input, label),
                     },
                 }),
@@ -198,7 +212,7 @@ function MakeDatasetDialog({
         const picked = sources ?? [];
         const shared = sharedColumns(picked);
         const guessedInput = guess(shared, INPUT_NAMES);
-        setName(defaultName(picked));
+        setTyped(null);
         setInput(guessedInput);
         setLabel(guess(shared, LABEL_NAMES, guessedInput));
         reset();
@@ -235,12 +249,13 @@ function MakeDatasetDialog({
                     </StatusText>
                 ) : (
                     <div className="flex flex-col gap-field">
-                        <Field id="stack-name" label="Name">
+                        <Field id="stack-name" label="Name" error={problem}>
                             <Input
                                 id="stack-name"
                                 value={name}
                                 maxLength={80}
-                                onChange={(event) => setName(event.target.value)}
+                                aria-invalid={problem ? true : undefined}
+                                onChange={(event) => setTyped(event.target.value)}
                             />
                         </Field>
                         <div className="grid gap-field sm:grid-cols-2">
@@ -273,7 +288,9 @@ function MakeDatasetDialog({
                         Cancel
                     </Button>
                     <Button
-                        disabled={!ready || columns.length < 2 || create.isPending}
+                        disabled={
+                            !ready || columns.length < 2 || problem !== null || create.isPending
+                        }
                         onClick={() => create.mutate()}
                     >
                         {create.isPending ? "Making…" : "Make dataset"}
