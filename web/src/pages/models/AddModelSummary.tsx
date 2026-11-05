@@ -293,6 +293,11 @@ export function AddModelSummary({
                     free={free}
                     total={catalog?.store_total_bytes}
                     onDisk={onDisk}
+                    store={{
+                        kind: catalog?.store_kind ?? "folder",
+                        label: catalog?.store_label ?? "Main server disk",
+                        stagingFree: catalog?.staging_free_bytes,
+                    }}
                 />
                 <MemoryGauge variant={variant} memoryLabel={catalog?.hardware.memory_label} />
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />

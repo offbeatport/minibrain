@@ -107,20 +107,70 @@ function Gauge({
     );
 }
 
+export type WeightsStore = {
+    kind: "folder" | "s3";
+    label: string;
+    stagingFree: number | null | undefined;
+};
+
+function BucketGauge({
+    need,
+    store,
+    onDisk,
+}: {
+    need: DiskNeed;
+    store: WeightsStore;
+    onDisk: number | null;
+}) {
+    const size = need?.size ?? onDisk ?? 0;
+    const verb = need?.verb === "import" ? "to import" : need ? "to download" : "in the bucket";
+    const rows: Row[] = [
+        {
+            id: "model",
+            label: `This model, ${verb}`,
+            value: size ? bytes(size) : "–",
+            swatch: null,
+        },
+        {
+            id: "staging",
+            label: "Free on main's disk",
+            value:
+                store.stagingFree === null || store.stagingFree === undefined
+                    ? "–"
+                    : bytes(store.stagingFree),
+            swatch: null,
+        },
+    ];
+    return (
+        <Gauge title={store.label} headline="–" tone="normal">
+            <Legend rows={rows} />
+            <p className="text-sm text-muted-foreground">
+                S3 reports no free space, so the bucket's own quota is the limit. Files pass through
+                main's disk one at a time on the way in.
+            </p>
+        </Gauge>
+    );
+}
+
 export function DiskGauge({
     need,
     free,
     total,
     onDisk,
+    store,
 }: {
     need: DiskNeed;
     free: number | null | undefined;
     total: number | null | undefined;
     onDisk: number | null;
+    store: WeightsStore;
 }) {
+    if (store.kind === "s3") {
+        return <BucketGauge need={need} store={store} onDisk={onDisk} />;
+    }
     if (free === null || free === undefined || !total) {
         return (
-            <Gauge title="Disk" headline="–" tone="normal">
+            <Gauge title={store.label} headline="–" tone="normal">
                 <p className="text-sm text-muted-foreground">Free space unknown</p>
             </Gauge>
         );
@@ -154,12 +204,12 @@ export function DiskGauge({
     ];
     return (
         <Gauge
-            title="Disk"
+            title={store.label}
             headline={after < 0 ? "Does not fit" : `${Math.min(full, 100)}% full`}
             tone={tone}
         >
             <Bar
-                label="Disk"
+                label={store.label}
                 total={total}
                 segments={[
                     { id: "used", label: "Used", value: others, fill: "bg-faint" },

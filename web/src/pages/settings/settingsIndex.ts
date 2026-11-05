@@ -580,8 +580,8 @@ export const STORAGE = {
         kind: onSection(
             setting(
                 "Storage location",
-                "A local folder on this server, or an S3-compatible bucket, for uploads, dataset versions, adapters and logs.",
-                [...S3_WORDS, "bucket", "disk", "artifacts", "files"],
+                "A local folder on this server, or an S3-compatible bucket, for uploads, dataset versions, adapters, logs and base model files.",
+                [...S3_WORDS, "bucket", "disk", "artifacts", "files", "weights"],
             ),
         ),
         endpoint: setting("Endpoint", "minibrain connects to this address only.", [
@@ -605,6 +605,15 @@ export const STORAGE = {
             "password",
             "credentials",
         ]),
+    }),
+    models: section("Base model files", {
+        copy: onSection(
+            setting(
+                "Copy model files to the bucket",
+                "Base models still on main's disk get their main copy in the bucket; main keeps its folder as a working copy.",
+                [...S3_WORDS, "weights", "migrate", "move", "working copy"],
+            ),
+        ),
     }),
 };
 

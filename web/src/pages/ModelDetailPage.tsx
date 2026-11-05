@@ -23,7 +23,7 @@ import {
     TooltipTrigger,
     cn,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
@@ -405,10 +405,24 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                             ],
                             [
                                 "Storage",
-                                <span key="storage" className="font-mono">
-                                    {model.storage_path}
-                                </span>,
+                                model.store === "s3" ? (
+                                    model.store_label
+                                ) : (
+                                    <span key="storage" className="font-mono">
+                                        {model.storage_path}
+                                    </span>
+                                ),
                             ],
+                            ...(model.store === "s3"
+                                ? [
+                                      [
+                                          "Main's working copy",
+                                          <span key="copy" className="font-mono">
+                                              {model.storage_path}
+                                          </span>,
+                                      ] as [string, ReactNode],
+                                  ]
+                                : []),
                         ]}
                     />
                     {model.error && !model.health && (
