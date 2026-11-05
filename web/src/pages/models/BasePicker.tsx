@@ -153,32 +153,28 @@ function factsOf(option: BaseOption): string[] {
 
 function Details({ entry }: { entry: CatalogEntry }) {
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    asChild
-                    variant="ghost"
-                    size="icon-sm"
-                    className="invisible shrink-0 self-center in-data-highlighted:visible focus-visible:visible"
-                >
-                    <a
-                        href={discoverHref(entry)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="Details"
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                event.stopPropagation();
-                            }
-                        }}
-                    >
-                        <ExternalLink />
-                    </a>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open in Discover</TooltipContent>
-        </Tooltip>
+        <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="invisible shrink-0 self-center in-data-highlighted:visible focus-visible:visible"
+        >
+            <a
+                href={discoverHref(entry)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                        event.stopPropagation();
+                    }
+                }}
+            >
+                Details
+                <ExternalLink aria-hidden="true" className="size-3.5" />
+                <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+        </Button>
     );
 }
 
