@@ -1,6 +1,6 @@
 from importlib.metadata import PackageNotFoundError, version
 
-JOB_PROTOCOL = 1
+JOB_PROTOCOL = 2
 REPORTED = ("minibrain", "torch", "transformers", "peft", "trl", "sglang", "mlx-lm", "llama-cpp-python")
 
 

@@ -23,6 +23,7 @@ from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest
 from minibrain.settings import Settings
+from minibrain.versions import JOB_PROTOCOL
 from minibrain.worker import MainClient, Worker, WorkerConfig
 from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
 
@@ -116,7 +117,8 @@ class Harness:
         return self.client.post(f"/internal/worker{path}", json=body, headers=headers)
 
     def claim(self, kinds: list[str], worker_id: str = "test-worker") -> dict[str, Any] | None:
-        body = {"worker": {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1}, "wait": 0}
+        worker = {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1, "protocol": JOB_PROTOCOL}
+        body = {"worker": worker, "wait": 0}
         response = self.internal("/claim", body)
         return None if response.status_code == 204 else response.json()
 

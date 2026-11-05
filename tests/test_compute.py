@@ -23,6 +23,7 @@ RACK = NodeReport(
 
 def join_rack(harness: Harness) -> None:
     worker = {"id": "w-rack", "host": RACK.host, "kinds": ["train"], "pool": "rack", "hardware": RACK.as_dict()}
+    worker |= {"protocol": JOB_PROTOCOL}
     assert harness.internal("/register", worker).status_code == 204
 
 
