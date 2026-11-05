@@ -73,11 +73,16 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     first = harness.client.post("/api/models/sample")
     assert first.status_code == 201, first.text
     body = first.json()
-    assert (body["name"], body["source"]["file"]) == ("Ticket routing", "tickets.csv")
-    assert body["mapping"]["template"] == {"user": "Subject: {subject}\n\n{body}", "assistant": "{queue}"}
-    assert body["dataset_version"]["rows"] == 240
+    assert (body["name"], body["preset"], body["source"]["file"]) == (
+        "Travel intents",
+        "classify",
+        "travel_intents.jsonl",
+    )
+    assert body["mapping"]["template"] == {"user": "{message}", "assistant": "{intent}"}
+    assert body["dataset_version"]["rows"] == 750
+    assert len(body["contract"]["labels"]) == 5
     again = harness.client.post("/api/models/sample").json()
-    assert (again["name"], again["dataset"]) == ("Ticket routing 2", body["dataset"])
+    assert (again["name"], again["dataset"]) == ("Travel intents 2", body["dataset"])
 
 
 def test_each_version_is_reported_with_its_own_status_and_requests(harness: Harness) -> None:

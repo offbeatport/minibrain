@@ -101,11 +101,10 @@ replaced, not migrated.
 
 1. Done (2026-11-05). The engine, usable as Custom: chat examples, a contract (free text, label set, JSON schema),
    built-in graders (exact match, label accuracy, JSON field match, text similarity, a judge model on this install)
-   and a promotion rule over them; plus the recipe format (below).
-2. Done (2026-11-05). Classify as a preset on it, with its first recipe (Ticket routing) and Start from a recipe in Add
-   model.
-3. Extract, with its recipes.
-4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback; with its recipes.
+   and a promotion rule over them.
+2. Done (2026-11-05). Classify as a preset on it.
+3. Extract.
+4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback.
 5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
    reinforcement fine-tuning with the graders as rewards, exports.
 6. Text-to-SQL with the execution grader.
@@ -120,41 +119,11 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 - Classify: a label set built from the labels typed in Add model and those found in the data (new ones join it on the
   next version); mapping `input` → user, `label` → assistant; a version 0 prompt listing the labels and a trained
   prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least two labels and label balance; the
-  results view shows per-label counts and the confusion matrix, and feedback picks the right label.
+  results view shows per-label counts and the confusion matrix, and feedback picks the right label. Try with sample
+  data on the empty Models page creates a Classify model on the travel intents sample.
 - Custom: free text or a JSON schema pasted in Add model, any graders that fit it (free text: exact match and text
   similarity; JSON: JSON valid and field match by default), optional instructions as the system prompt, chat JSONL
   (`messages`) as data.
-
-### Recipes
-
-A recipe is a worked use case a team can start from: `recipes/<name>/` holds a `minibrain.yaml` (preset, suggested
-base, column mapping, graders, promotion rule), a small synthetic sample dataset and a `README.md` (the situation,
-the data needed, the steps, and when it is not a fit). The docs render the README; Add model offers Start from a
-recipe, which fills the form and loads the sample to try before using real data. Recipes name no customers.
-
-- Built: Ticket routing (`recipes/ticket-routing/`, 240 synthetic tickets across five queues, the mapping
-  `Subject: {subject}\n\n{body}` → `{queue}`, `label_accuracy >= 0.85`). The wheel carries `recipes/` as
-  `minibrain/bundled/recipes`. `GET /api/recipes` and `GET /api/recipes/<key>` list them with the README;
-  `POST /api/recipes/<key>/sample` loads the sample once (the same content is one source) as a mapped dataset with a
-  version. Try with sample data on the empty Models page creates a model from this recipe.
-
-| Area | Recipe | Preset |
-|---|---|---|
-| Finance | Trade break triage: break description → reason (price, quantity, settlement date, counterparty) | Classify |
-| Finance | Term sheet and confirmation extraction: text → notional, maturity, coupon, counterparty | Extract |
-| Finance | Communications surveillance: chat or email → flag or not, with the reason; recall-first rule | Classify |
-| Finance | Research notes in house style: analyst draft → client-ready note | General |
-| Insurance | Claims triage: first notice of loss → line, severity, route | Classify |
-| Legal | Contract clause extraction: contract → governing law, term, termination, liability cap | Extract |
-| Healthcare | Clinical note coding: note → codes, on an air-gapped install | Extract |
-| Support | Ticket routing: subject and body → queue (the bundled sample) | Classify |
-| IT operations | Incident classification: alert or ticket → service, severity | Classify |
-| Public sector | Request routing: citizen request → department | Classify |
-| Any | Distil an assistant: a large model's logged answers → a smaller model that matches them | General |
-
-- A recipe says plainly when a language model is the wrong tool: numeric forecasting and regression on tables (for
-  example predicting fund outflows) belong to classic ML; minibrain can still supply text features for it, such as
-  flagging client emails that signal a redemption.
 
 ## Concepts
 
@@ -962,12 +931,11 @@ keys, and `/v1` stays key-only.
   model's API link to it, and the copy-paste harness configs stay where they are.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
-- Add model (`/models/new`) offers Start from a recipe first (it loads the sample and fills the task, base, name,
-  graders and promotion rule; Read the recipe shows its README), then the task (Classify and Custom; Extract, General,
-  Rewrite and Text-to-SQL as Coming), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
+- Add model (`/models/new`) offers the task (Classify and Custom; Extract, General, Rewrite and Text-to-SQL as
+  Coming), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
   one search over four tabs. The name is prefilled and required: the task noun and the next free number
   ("Classifier 1", "Custom 1"), never a name a base or custom model already has, with an inline error when a typed
-  one is taken. Classify takes labels (at least two, unless a dataset or recipe brings them); Custom takes free text
+  one is taken. Classify takes labels (at least two, unless a dataset brings them); Custom takes free text
   or a JSON schema, graders that fit it (a judge with its rubric and model) and optional instructions. Both take a
   promotion rule (thresholds and "at least as good as the live version"). The model page's Task section shows the
   contract with its number and edits it (a breaking change asks to confirm), the graders and the rule.
@@ -1447,6 +1415,7 @@ Everything in the v1 scope below, after M1.
   - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base
   - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency
   - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
+  - [ ] Recipes: worked use cases, designed properly later.
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
   - [ ] MLX training on Macs behind a flag, only if MPS training is too slow for local use: a second trainer plus an
     MLX-to-PEFT adapter converter, so Mac-trained adapters still serve on SGLang and vLLM

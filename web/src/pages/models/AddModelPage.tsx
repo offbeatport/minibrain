@@ -3,8 +3,8 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { type CatalogEntry, type ModelRow, type RecipeSample, api, unwrap } from "~/api/client";
-import { keys, useAllModels, useCatalog, usePresets, useRecipes } from "~/api/queries";
+import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
+import { keys, useAllModels, useCatalog, usePresets } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
@@ -14,7 +14,6 @@ import { AddModelSummary, Licence } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
-import { RecipePicker } from "./RecipePicker";
 import {
     ClassifyFields,
     CustomFields,
@@ -164,14 +163,8 @@ export function AddModelPage() {
     const models = useAllModels();
     const catalog = useCatalog();
     const presets = usePresets();
-    const recipes = useRecipes();
     const [task, setTaskKey] = useState<TaskKey>("classify");
     const [draft, setDraft] = useState<TaskDraft>(EMPTY_TASK);
-    const [recipe, setRecipe] = useState<{
-        key: string;
-        name: string;
-        sample: RecipeSample;
-    } | null>(null);
     const [nameEdited, setNameEdited] = useState(false);
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
@@ -205,53 +198,6 @@ export function AddModelPage() {
         setTaskKey(next);
         const graders = defaultGraders(presets.data, next, draft);
         setDraft({ ...draft, graders: next === "custom" ? graders : [] });
-    };
-    const loadRecipe = useMutation({
-        mutationFn: async (key: string) => {
-            const sample = await unwrap(
-                api.POST("/api/recipes/{key}/sample", { params: { path: { key } } }),
-            );
-            return { key, sample };
-        },
-        onSuccess: async ({ key, sample }) => {
-            const found = recipes.data?.find((item) => item.key === key);
-            if (!found) {
-                return;
-            }
-            await client.invalidateQueries({ queryKey: keys.datasets });
-            setRecipe({ key, name: found.name, sample });
-            setTaskKey(taskOf(found.preset));
-            setDataset(sample.dataset);
-            setDescription(found.summary);
-            setDraft({
-                ...EMPTY_TASK,
-                instructions: found.instructions ?? "",
-                graders: found.graders.map((item) => item.name),
-                promotion: found.promotion,
-            });
-            setName(nextFree(found.name, takenNames(rows), false));
-            setNameEdited(true);
-            if (found.base) {
-                const entry = entries.find((item) => item.id === found.base);
-                choose(
-                    entry
-                        ? { kind: "catalogue", id: entry.id, variant: "" }
-                        : { kind: "base", key: found.base },
-                );
-            }
-        },
-        onError: (error) =>
-            toast({
-                title: "The recipe was not loaded",
-                description: errorMessage(error),
-                tone: "destructive",
-            }),
-    });
-    const clearRecipe = () => {
-        setRecipe(null);
-        setDataset(params.dataset === undefined ? "" : String(params.dataset));
-        setDraft(EMPTY_TASK);
-        setNameEdited(false);
     };
     const startFrom = useMutation({
         mutationFn: async (row: ModelRow) => {
@@ -330,7 +276,6 @@ export function AddModelPage() {
     const baseKey =
         option?.kind === "local" && option.baseKey ? option.baseKey : (option?.entry?.id ?? "");
     const labels = splitLabels(draft.labels);
-    const found = recipe?.sample.labels ?? [];
     const graders = graderConfigs(task, draft, baseKey);
     const metrics =
         task === "classify"
@@ -413,7 +358,7 @@ export function AddModelPage() {
                 : undefined,
         labels:
             task === "classify" && !dataset && labels.length < 2
-                ? "Add at least two labels, or start from a recipe or a dataset."
+                ? "Add at least two labels, or pick a dataset."
                 : undefined,
         schema:
             task === "custom" && draft.answer === "json" ? schemaProblem(draft.schema) : undefined,
@@ -467,13 +412,6 @@ export function AddModelPage() {
                 className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch"
             >
                 <Card className="gap-field p-panel">
-                    <RecipePicker
-                        recipes={recipes.data ?? []}
-                        chosen={recipe}
-                        loading={loadRecipe.isPending}
-                        onPick={(key) => loadRecipe.mutate(key)}
-                        onClear={clearRecipe}
-                    />
                     <PresetSelect
                         presets={presets.data}
                         value={task}
@@ -530,7 +468,7 @@ export function AddModelPage() {
                         <ClassifyFields
                             draft={draft}
                             onChange={setDraft}
-                            found={found}
+                            found={[]}
                             error={shown.labels}
                         />
                     ) : (

@@ -1,8 +1,6 @@
 import pytest
 
 from minibrain.presets import PLANNED, preset, presets
-from minibrain.presets.recipes import RecipeError, loaded, recipe, recipes
-from minibrain.registry.service import NotFoundError
 from minibrain.tasks.contracts import FREE_TEXT, json_contract, label_set
 from minibrain.tasks.promotion import Live, Rule, RuleError, Threshold, decide
 
@@ -65,30 +63,3 @@ def test_presets_are_definition_files() -> None:
     assert [item["name"] for item in custom.default_graders(FREE_TEXT)] == ["exact_match", "text_similarity"]
     assert custom.view is None
     assert {item.key for item in PLANNED} == {"extract", "general", "rewrite", "sql"}
-
-
-def test_the_ticket_routing_recipe_loads() -> None:
-    found = recipe("ticket-routing")
-    assert found.key in recipes()
-    assert (found.preset, found.base) == ("classify", "qwen3-0.6b")
-    assert found.mapping == {"user": "Subject: {subject}\n\n{body}", "assistant": "{queue}"}
-    assert found.promotion.thresholds == (Threshold("label_accuracy", ">=", 0.85),)
-    assert found.data_path().is_file()
-    assert "When it is not a fit" in found.readme
-    with pytest.raises(NotFoundError):
-        recipe("nope")
-
-
-def test_a_recipe_needs_a_known_preset_and_its_data(tmp_path) -> None:
-    folder = tmp_path / "broken"
-    folder.mkdir()
-    (folder / "minibrain.yaml").write_text("name: Broken\npreset: extract\ndata: rows.csv\nmapping: {messages: m}\n")
-    with pytest.raises(RecipeError, match="no preset"):
-        loaded(folder)
-    (folder / "minibrain.yaml").write_text("name: Broken\npreset: custom\ndata: rows.csv\nmapping: {messages: m}\n")
-    with pytest.raises(RecipeError, match="data"):
-        loaded(folder)
-    (folder / "rows.csv").write_text("m\n")
-    (folder / "minibrain.yaml").write_text("name: Broken\npreset: custom\ndata: rows.csv\nmapping: {user: '{a}'}\n")
-    with pytest.raises(RecipeError, match="assistant"):
-        loaded(folder)

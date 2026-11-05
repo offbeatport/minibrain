@@ -1,3 +1,4 @@
+import importlib.util
 import json
 from typing import Any
 
@@ -239,53 +240,49 @@ def test_default_names_count_up_and_names_are_unique_across_base_and_custom_mode
     assert taken.status_code == 409
 
 
-def test_presets_and_recipes_are_listed(harness: Harness) -> None:
+def test_presets_are_listed_and_recipes_are_gone(harness: Harness) -> None:
     found = harness.client.get("/api/presets").json()
     assert [item["key"] for item in found["presets"]] == ["classify", "custom"]
     assert {item["key"] for item in found["planned"]} == {"extract", "general", "rewrite", "sql"}
     assert "judge" in {item["name"] for item in found["graders"]}
-    [routing] = harness.client.get("/api/recipes").json()
-    assert (routing["key"], routing["preset"], routing["base"]) == ("ticket-routing", "classify", "qwen3-0.6b")
-    assert routing["promotion"]["thresholds"] == [{"metric": "label_accuracy", "op": ">=", "value": 0.85}]
-    assert harness.client.get("/api/recipes/ticket-routing").json()["readme"].startswith("# Ticket routing")
-    assert harness.client.get("/api/recipes/nope").status_code == 404
+    assert harness.client.get("/api/recipes").status_code == 404
+    assert harness.client.post("/api/recipes/ticket-routing/sample").status_code in (404, 405)
+    paths = harness.client.get("/api/openapi/api.json").json()["paths"]
+    assert not [path for path in paths if "recipe" in path]
+    assert importlib.util.find_spec("minibrain.presets.recipes") is None
 
 
-def test_start_from_a_recipe_loads_its_sample_and_fills_the_model(harness: Harness) -> None:
-    loaded = harness.client.post("/api/recipes/ticket-routing/sample")
-    assert loaded.status_code == 201, loaded.text
-    sample = loaded.json()
-    assert sample["rows"] == 240
-    assert sample["labels"] == ["account", "billing", "returns", "shipping", "technical"]
-    again = harness.client.post("/api/recipes/ticket-routing/sample").json()
-    assert again["dataset"] == sample["dataset"]
-    dataset = harness.client.get(f"/api/datasets/{sample['dataset']}").json()
-    assert dataset["mapping"]["template"] == {"user": "Subject: {subject}\n\n{body}", "assistant": "{queue}"}
+def test_a_rule_with_a_threshold_blocks_a_version_below_it(harness: Harness) -> None:
+    create_model(harness, "Seed")
+    upload(harness, "seed", "tickets.csv", tickets_csv())
+    dataset = harness.client.get("/api/models/seed").json()["dataset"]
     body = {
-        "name": "Ticket routing",
-        "dataset": sample["dataset"],
+        "name": "Gated",
+        "dataset": dataset,
         "promotion": {"thresholds": [{"metric": "label_accuracy", "op": ">=", "value": 0.85}]},
     }
     created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
-    [v0] = versions(harness, "ticket-routing")
+    [v0] = versions(harness, "gated")
     assert v0["status"] == "evaluating"
     assert v0["promotion"] is None
     finish(harness, "eval", accuracy=0.8)
-    [v0] = versions(harness, "ticket-routing")
+    [v0] = versions(harness, "gated")
     assert v0["promotion"]["passed"] is False
-    assert harness.client.post("/api/models/ticket-routing/versions/0/promote").status_code == 409
+    assert harness.client.post("/api/models/gated/versions/0/promote").status_code == 409
 
 
-def test_try_with_sample_data_is_the_ticket_routing_recipe(harness: Harness) -> None:
+def test_try_with_sample_data_is_a_classifier_on_travel_intents(harness: Harness) -> None:
     created = harness.client.post("/api/models/sample")
     assert created.status_code == 201, created.text
     found = created.json()
-    assert (found["name"], found["preset"], found["dataset_name"]) == (
-        "Ticket routing",
-        "classify",
-        "Ticket routing sample",
-    )
-    assert found["promotion"]["thresholds"][0]["value"] == 0.85
-    assert sorted(found["contract"]["labels"]) == ["account", "billing", "returns", "shipping", "technical"]
-    assert harness.client.post("/api/models/sample").json()["name"] == "Ticket routing 2"
+    assert (found["name"], found["preset"], found["dataset_name"]) == ("Travel intents", "classify", "Travel intents")
+    assert found["promotion"] == {"thresholds": [], "beats_live": True}
+    assert sorted(found["contract"]["labels"]) == [
+        "book_flight",
+        "book_hotel",
+        "car_rental",
+        "flight_status",
+        "lost_luggage",
+    ]
+    assert harness.client.post("/api/models/sample").json()["name"] == "Travel intents 2"

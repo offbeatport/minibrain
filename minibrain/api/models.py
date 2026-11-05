@@ -41,7 +41,7 @@ from minibrain.auth.roles import Role, allows
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import splits
 from minibrain.data.dataset_versions import cleanup, take_version, version_if_mapped
-from minibrain.data.samples import load_recipe_sample
+from minibrain.data.samples import find_sample, sample_dataset
 from minibrain.data.shared import (
     aliases_for,
     dataset_of,
@@ -52,14 +52,12 @@ from minibrain.data.shared import (
 from minibrain.models.registry import ACTIVE_STATUSES, base_hash, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.presets import Preset, preset
-from minibrain.presets.recipes import Recipe, recipe
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import (
     AuditEvent,
     BaseModel,
     BaseModelStatus,
     CatalogModel,
-    Dataset,
     Model,
     VersionKind,
     now,
@@ -207,7 +205,8 @@ def delete(
     return model_row(request, session, settings, store, "custom", slug)
 
 
-SAMPLE_RECIPE = "ticket-routing"
+SAMPLE_FILE = "travel_intents.jsonl"
+SAMPLE_PRESET = "classify"
 
 
 @router.post("/{slug}/deploy", dependencies=[Depends(builder)])
@@ -273,30 +272,23 @@ def fetch_sample_base(session: Session, settings: Settings, key: str) -> tuple[s
     return entry.name, variant.size_bytes
 
 
-def recipe_body(session: Session, settings: Settings, store: ArtifactStore, found: Recipe) -> ModelCreate:
-    dataset: Dataset = load_recipe_sample(session, settings, store, found)
-    return ModelCreate.model_validate(
-        {
-            "name": free_model_name(session, found.name, numbered=False),
-            "description": found.summary,
-            "base_model": found.base,
-            "preset": found.preset,
-            "labels": list(found.labels),
-            "contract": found.contract,
-            "instructions": found.instructions,
-            "graders": list(found.graders) or None,
-            "promotion": found.promotion.as_dict(),
-            "dataset": dataset.slug,
-        }
+def sample_body(session: Session, settings: Settings, store: ArtifactStore) -> ModelCreate:
+    sample = find_sample(SAMPLE_FILE)
+    dataset = sample_dataset(session, settings, store, SAMPLE_FILE)
+    return ModelCreate(
+        name=free_model_name(session, sample.name, numbered=False),
+        description=sample.description,
+        base_model=DEFAULT_BASE_MODEL,
+        preset=SAMPLE_PRESET,
+        dataset=dataset.slug,
     )
 
 
 @router.post("/sample", status_code=201, dependencies=[Depends(builder)])
 def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> SampleDetail:
-    found = recipe(SAMPLE_RECIPE)
-    base_name, download_bytes = fetch_sample_base(session, settings, found.base or DEFAULT_BASE_MODEL)
-    body = recipe_body(session, settings, store, found)
-    model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
+    base_name, download_bytes = fetch_sample_base(session, settings, DEFAULT_BASE_MODEL)
+    body = sample_body(session, settings, store)
+    model = configured(session, settings, store, body, DEFAULT_BASE_MODEL)
     session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     session.commit()
     return SampleDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)

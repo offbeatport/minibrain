@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 from minibrain.artifacts import ArtifactStore
 from minibrain.data.dataset_folders import free_dataset_name
 from minibrain.data.dataset_versions import take_version
-from minibrain.data.shared import Added, NameTaken, Outcome, add_dataset, add_source
-from minibrain.presets.recipes import Recipe
-from minibrain.registry.models import Dataset, Source
+from minibrain.data.shared import Added, NameTaken, Outcome, add_dataset, add_source, guessed_template, source_columns
+from minibrain.registry.models import Dataset
 from minibrain.registry.service import NotFoundError, latest_version
 from minibrain.settings import Settings, sample_file
 
@@ -74,23 +73,15 @@ def add_sample(session: Session, store: ArtifactStore, file: str, name_taken: Na
     return added
 
 
-def recipe_dataset(session: Session, source: Source, recipe: Recipe) -> Dataset | None:
+def sample_dataset(session: Session, settings: Settings, store: ArtifactStore, file: str) -> Dataset:
+    sample = find_sample(file)
+    source = add_sample(session, store, file).source
+    template = guessed_template(source_columns(settings, store, source))
     found = session.scalars(select(Dataset).where(Dataset.source_id == source.id))
-    return next((dataset for dataset in found if dataset.template == recipe.mapping), None)
-
-
-def load_recipe_sample(session: Session, settings: Settings, store: ArtifactStore, recipe: Recipe) -> Dataset:
-    with recipe.data_path().open("rb") as stream:
-        added = add_source(session, store, recipe.data, stream)
-    source = added.source
-    if added.outcome == Outcome.CREATED:
-        source.description = f"Sample for the {recipe.name} recipe: synthetic data, no real customers."
-        source.tags = [SAMPLE_TAG]
-    dataset = recipe_dataset(session, source, recipe)
+    dataset = next((item for item in found if template is not None and item.template == template), None)
     if dataset is None:
-        name = free_dataset_name(session, f"{recipe.name} sample", None)
-        dataset = add_dataset(session, settings, store, name, source, template=dict(recipe.mapping))
-        dataset.description = recipe.summary or None
+        dataset = add_dataset(session, settings, store, free_dataset_name(session, sample.name, None), source)
+        dataset.description = sample.description
     if latest_version(dataset) is None:
         take_version(session, settings, dataset)
     return dataset

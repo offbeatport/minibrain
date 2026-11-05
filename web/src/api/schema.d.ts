@@ -1659,57 +1659,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/recipes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Recipes */
-        get: operations["list_recipes_api_recipes_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/recipes/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Recipe */
-        get: operations["read_recipe_api_recipes__key__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/recipes/{key}/sample": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Load Sample */
-        post: operations["load_sample_api_recipes__key__sample_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/models/{slug}/training-plan": {
         parameters: {
             query?: never;
@@ -6353,47 +6302,6 @@ export interface components {
             columns: string[];
             /** Rows */
             rows: (string | null)[][];
-        };
-        /** RecipeInfo */
-        RecipeInfo: {
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
-            /**
-             * Preset
-             * @enum {string}
-             */
-            preset: "classify" | "custom";
-            /** Summary */
-            summary: string;
-            /** Base */
-            base: string | null;
-            /** Data */
-            data: string;
-            /** Mapping */
-            mapping: {
-                [key: string]: string;
-            };
-            /** Graders */
-            graders: components["schemas"]["GraderConfig"][];
-            promotion: components["schemas"]["PromotionInfo"];
-            contract?: components["schemas"]["ContractInfo"] | null;
-            /** Instructions */
-            instructions?: string | null;
-            /** Readme */
-            readme: string;
-        };
-        /** RecipeSample */
-        RecipeSample: {
-            /** Dataset */
-            dataset: string;
-            /** Dataset Name */
-            dataset_name: string;
-            /** Rows */
-            rows: number;
-            /** Labels */
-            labels: string[];
         };
         /** RelabelInfo */
         RelabelInfo: {
@@ -11305,88 +11213,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PresetsResponse"];
-                };
-            };
-        };
-    };
-    list_recipes_api_recipes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecipeInfo"][];
-                };
-            };
-        };
-    };
-    read_recipe_api_recipes__key__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecipeInfo"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    load_sample_api_recipes__key__sample_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RecipeSample"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

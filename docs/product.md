@@ -165,9 +165,6 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema per version, extended without breaking apps.
   UI: Models › model › Task · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
-- **Recipes** · partial · product, ml
-  Start a model from a worked use case with sample data.
-  UI: Models › Add model › Start from a recipe · API: GET /api/recipes, GET /api/recipes/{key}, POST /api/recipes/{key}/sample · Roadmap: Recipes
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -510,14 +507,14 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Config file
 
 ## Use cases
-- **Trade break triage** · partial · uses: Classify preset, Dataset versions, Scores, Recipes
-- **Term sheet extraction** · planned · uses: Extract preset, Structured output, Recipes
-- **Communications surveillance** · partial · uses: Classify preset, Promotion rule, Review queue, Recipes
-- **Research notes in house style** · planned · uses: General preset, Graders, Recipes
-- **Claims triage** · partial · uses: Classify preset, Dataset versions, Recipes
-- **Contract clause extraction** · planned · uses: Extract preset, Structured output, Recipes
-- **Clinical note coding** · planned · uses: Extract preset, Air-gapped bundle, Recipes
-- **Ticket routing** · shipped · uses: Classify preset, Sample data, Deploy and roll back, Recipes
-- **Incident classification** · partial · uses: Classify preset, Feedback API, Recipes
-- **Request routing** · partial · uses: Classify preset, Train with feedback, Recipes
-- **Distil an assistant** · planned · uses: Distillation data, Upstream routes, General preset, Recipes
+- **Trade break triage** · partial · uses: Classify preset, Dataset versions, Scores
+- **Term sheet extraction** · planned · uses: Extract preset, Structured output
+- **Communications surveillance** · partial · uses: Classify preset, Promotion rule, Review queue
+- **Research notes in house style** · planned · uses: General preset, Graders
+- **Claims triage** · partial · uses: Classify preset, Dataset versions
+- **Contract clause extraction** · planned · uses: Extract preset, Structured output
+- **Clinical note coding** · planned · uses: Extract preset, Air-gapped bundle
+- **Ticket routing** · partial · uses: Classify preset, Dataset versions, Deploy and roll back
+- **Incident classification** · partial · uses: Classify preset, Feedback API
+- **Request routing** · partial · uses: Classify preset, Train with feedback
+- **Distil an assistant** · planned · uses: Distillation data, Upstream routes, General preset

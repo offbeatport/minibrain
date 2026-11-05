@@ -13,9 +13,9 @@ export function ModelsEmpty() {
         mutationFn: () => unwrap(api.POST("/api/models/sample")),
         onSuccess: async (created) => {
             await refresh();
-            const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} sample tickets`;
+            const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} sample messages`;
             toast({
-                title: "Ticket routing recipe added",
+                title: "Sample model added",
                 description:
                     created.download_bytes === null
                         ? `${rows}. Version 0 on ${created.base_name} is being scored.`
@@ -36,8 +36,8 @@ export function ModelsEmpty() {
             <div className="flex flex-col items-center gap-1">
                 <h2 className="text-lg font-semibold">No models yet</h2>
                 <p className="text-base text-muted-foreground">
-                    Add a base model to get started, or try the Ticket routing recipe with its
-                    sample tickets.
+                    Add a base model to get started, or try a classifier on sample travel support
+                    messages.
                 </p>
             </div>
             <Button

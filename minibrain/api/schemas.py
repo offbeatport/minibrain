@@ -785,28 +785,6 @@ class PresetsResponse(BaseModel):
     graders: list[GraderKindInfo]
 
 
-class RecipeInfo(BaseModel):
-    key: str
-    name: str
-    preset: PresetKey
-    summary: str
-    base: str | None
-    data: str
-    mapping: dict[str, str]
-    graders: list[GraderConfig]
-    promotion: PromotionInfo
-    contract: ContractInfo | None = None
-    instructions: str | None = None
-    readme: str
-
-
-class RecipeSample(BaseModel):
-    dataset: str
-    dataset_name: str
-    rows: int
-    labels: list[str]
-
-
 class ModelRef(BaseModel):
     kind: Literal["custom", "base"]
     key: str
