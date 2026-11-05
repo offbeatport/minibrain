@@ -1,4 +1,4 @@
-import { Boxes, ChevronDown } from "lucide-react";
+import { Boxes, ChevronDown, HardDrive, type LucideIcon, MemoryStick } from "lucide-react";
 import {
     Badge,
     Checkbox,
@@ -17,7 +17,6 @@ import {
 import { useState } from "react";
 import type { CatalogResponse, ModelRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { bytes } from "~/lib/time";
 import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
 import { TIERS } from "./DiscoverFilters";
 import {
@@ -34,13 +33,6 @@ import {
 import { RUNS_HERE_INFO, useRunsHere } from "./runsHere";
 
 export type PickerTab = "catalogue" | "mine" | "import";
-
-const LICENCE_TEXT: Record<string, string> = {
-    commercial: "Commercial use",
-    restricted: "Commercial use with conditions",
-    "non-commercial": "No commercial use",
-    unknown: "Licence not reviewed",
-};
 
 const USE_FILTERS = [
     { value: "commercial", label: "Commercial use" },
@@ -68,26 +60,49 @@ function installState(option: BaseOption): InstallState | null {
 
 function Availability({ option }: { option: BaseOption }) {
     const state = installState(option);
-    if (state) {
-        return <Badge variant={state.variant}>{state.text}</Badge>;
-    }
-    return option.size ? (
-        <span className="tabular-nums">{`${gigabytes(option.size)} GB`}</span>
-    ) : null;
+    return state ? <Badge variant={state.variant}>{state.text}</Badge> : null;
 }
 
-function memoryText(option: BaseOption): string | null {
-    const needed = option.variant?.fit.needed_bytes;
-    return needed ? `Needs ${gigabytes(needed)} GB memory` : null;
+function Amount({ icon: Icon, label, bytes }: { icon: LucideIcon; label: string; bytes: number }) {
+    return (
+        <span className="flex items-center gap-1">
+            <Icon aria-hidden="true" className="size-4 shrink-0" />
+            <span className="sr-only">{`${label}: `}</span>
+            {`${gigabytes(bytes)} GB`}
+        </span>
+    );
+}
+
+function Resources({ option }: { option: BaseOption }) {
+    const memory = option.kind === "local" ? null : option.variant?.fit.needed_bytes;
+    const disk = option.size;
+    if (!memory && !disk) {
+        return null;
+    }
+    return (
+        <span className="flex items-center gap-3 text-muted-foreground tabular-nums">
+            {memory ? <Amount icon={MemoryStick} label="Memory needed" bytes={memory} /> : null}
+            {disk ? (
+                <Amount
+                    icon={HardDrive}
+                    label={installState(option) ? "On disk" : "Download"}
+                    bytes={disk}
+                />
+            ) : null}
+        </span>
+    );
+}
+
+function factsOf(option: BaseOption): string[] {
+    return [
+        option.kind === "custom" ? null : option.publisher,
+        option.params ? `${option.params} parameters` : null,
+        option.entry?.license_name ?? null,
+    ].filter((fact): fact is string => Boolean(fact));
 }
 
 function OptionRow({ option, recommended }: { option: BaseOption; recommended?: boolean }) {
-    const memory = option.kind === "local" ? null : memoryText(option);
-    const facts = [
-        option.kind === "custom" ? null : option.publisher,
-        option.params ? `${option.params} parameters` : null,
-        option.licence ? LICENCE_TEXT[option.licence] : null,
-    ].filter(Boolean);
+    const facts = factsOf(option);
     const description = descriptionOf(option);
     return (
         <span className="flex w-full min-w-0 items-start gap-3 py-1.5">
@@ -106,7 +121,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                 <Availability option={option} />
-                {memory && <span className="text-muted-foreground tabular-nums">{memory}</span>}
+                <Resources option={option} />
             </span>
         </span>
     );
@@ -135,15 +150,7 @@ type PickerValue = { option: BaseOption | null; importText: string | null };
 function Trigger({ value }: { value: PickerValue }) {
     const { option, importText } = value;
     const state = option ? (installState(option) ?? DOWNLOAD) : null;
-    const facts = option
-        ? [
-              option.kind === "custom" ? null : option.publisher,
-              option.params ? `${option.params} parameters` : null,
-              option.size ? bytes(option.size) : null,
-              option.kind === "local" ? null : memoryText(option),
-              option.licence ? LICENCE_TEXT[option.licence] : null,
-          ].filter(Boolean)
-        : [];
+    const facts = option ? factsOf(option) : [];
     const description = option ? descriptionOf(option) : null;
     return (
         <DialogTrigger asChild>
@@ -172,8 +179,11 @@ function Trigger({ value }: { value: PickerValue }) {
                                     </Badge>
                                 )}
                             </span>
-                            <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-muted-foreground tabular-nums">
-                                <span className="truncate">{facts.join(" · ")}</span>
+                            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                                {facts.length > 0 && (
+                                    <span className="truncate">{facts.join(" · ")}</span>
+                                )}
+                                <Resources option={option} />
                             </span>
                             {description && (
                                 <span className="line-clamp-2 text-foreground">{description}</span>

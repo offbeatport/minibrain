@@ -41,5 +41,8 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - `PanelSection` (`web/src/components/Section.tsx`) puts an icon before each section title, with the title and
   description above the panel: the user's choice on 2026-11-02 for Settings, Security, Compute and model details,
   an exception to the no-icon-per-heading rule.
+- The base model picker shows memory needed and disk size as an icon and a number (`MemoryStick`, `HardDrive`, with
+  screen-reader labels) instead of repeating "Needs X GB memory": the user's choice on 2026-11-05, an exception to the
+  functional-icons-only rule.
 - Sidebar section titles are 12px uppercase (`SectionLabel` in `web/src/components/Shell.tsx`): the user's
   choice on 2026-10-30, an exception to the portfolio's sentence-case label rule and 13px floor.
