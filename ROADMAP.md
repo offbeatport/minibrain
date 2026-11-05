@@ -47,21 +47,46 @@ policy, HR helpdesk, customer success onboarding.
 
 ## Task types
 
-A minibrain starts from a task type. It fixes the example shape, output schema, eval metric and default recipe, so
-mapping comes down to a few fields.
+Every model has an output contract, fixed for its life, and graders. Training data is always chat examples
+(`messages`); a column mapping is a template that turns table rows into them. A task type is a preset that picks the
+contract, the default graders, the mapping form and the serving constraint, so a team without ML specialists gets a
+scored, promotable model. Fireworks and Together expose only the parts; minibrain exposes both, on one engine.
 
-| Type | Input → output | Metric | Output |
+| Preset | Contract (served as) | Default graders | Example |
 |---|---|---|---|
-| Classify | Text → one label from a set | Accuracy, per-label F1 | JSON schema enum |
-| Extract | Text → fields | JSON validity, field F1 | JSON schema |
-| Rewrite | Text → text in house style | LLM judge vs reference | Free text |
-| Text-to-SQL | Question + schema → SQL | Execution match on a read-only DB | SQL |
-| Distill | Any prompt → the teacher's answer | LLM judge or exact match vs teacher | As the teacher |
-| Answer | Question + retrieved chunks → answer | LLM judge vs reference, citation precision | Free text + citations |
+| Classify | One value from a label set (an enum in `response_format`) | Exact match: accuracy, per-label F1 | Ticket → `billing` |
+| Extract | A JSON schema (`response_format: json_schema`) | JSON validity, per-field match | Invoice → `{"total": 120, "due": "2026-12-01"}` |
+| Rewrite | Free text | Judge model with a rubric, similarity to the reference | Draft reply → reply in house style |
+| General / Assistant | Free text, multi-turn; structured output on request | Judge model with a rubric, plus any added graders | Support conversation → answer in company tone |
+| Text-to-SQL | SQL | Execution match on a read-only database | Question + schema → query |
+| Custom | Any contract above, chosen | Chosen | Bring chat JSONL |
 
-- Classify is served held to its labels (a grammar on SGLang and llama.cpp, a token trie on MLX and `transformers`)
-  and still answers with the bare label; Extract will be served with its schema as `response_format: json_schema`.
+- Changing a contract makes a new model: versions, scores and API answers only compare under one contract. The base
+  can change (Rebase); the contract cannot.
+- Constrained decoding enforces the contract: XGrammar on SGLang and vLLM, a grammar on llama.cpp, a token trie on MLX
+  and `transformers`. Classify is an Extract contract with one enum field and still answers with the bare label.
+- Graders: exact match, JSON field match, text similarity, a judge model with a rubric (a model on this install, so it
+  runs air-gapped), SQL execution, and Python graders `score(answer, example) -> float` run sandboxed. Graders combine
+  into the promotion rule, for example `judge >= 0.8 and no_card_numbers == 1`.
+- Distill is a data source, not a preset: answers logged from a teacher model become the examples for any preset.
 - Rewrite also accepts raw documents as a style source, not only input/output pairs.
+- Training methods: SFT with LoRA by default; full fine-tuning; DPO from feedback pairs; reinforcement fine-tuning
+  (GRPO) with the same graders as rewards.
+
+### For ML engineers
+
+- The Custom preset: chat JSONL, the contract and graders chosen, Python graders.
+- Training settings: LoRA rank, learning rate, epochs, sequence length, full fine-tuning, DPO; saved recipes.
+- Everything the UI does through the API and CLI; `minibrain.yaml` per model in git (Config as code); `minibrain train`
+  in CI with the promotion rule as the gate.
+- Export adapters or merged weights (safetensors, GGUF), with training logs and metrics.
+
+### Order
+
+1. Contract and graders refactor; Classify moves onto the JSON-schema path.
+2. Extract.
+3. General / Assistant: the judge grader, distillation, DPO from feedback.
+4. Custom with Python graders and training settings; Text-to-SQL.
 
 ## Concepts
 
