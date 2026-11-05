@@ -411,12 +411,24 @@ the UI says version.
   S3-compatible bucket (AWS, MinIO, Ceph) by endpoint, bucket, prefix, region and keys. It is an `ArtifactStore`
   backend over s3fs, so uploads, dataset versions, adapters and logs all follow it, and workers and engines keep pulling
   artifacts through main.
-- minibrain connects only to the endpoint set there, with explicit keys (no instance-metadata lookups). The secret key
-  is kept in a 0600 file under `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection"
-  writes, reads back and removes a probe object; saving S3 runs the same check. Artifacts already stored stay readable
-  after switching either way.
+- minibrain connects only to the endpoint set there, with explicit keys (no instance-metadata lookups), and signs every
+  request with SigV4 (HMAC-SHA256; never SigV2, which is HMAC-SHA1). The secret key is kept in a 0600 file under
+  `secrets/` (or `MINIBRAIN_STORAGE_S3_SECRET`) and never returned. "Test connection" writes, reads back and removes a
+  probe object; saving S3 runs the same check. Artifacts already stored stay readable after switching either way.
 - Both locations hold only ciphertext: main encrypts each artifact with its own data key before it reaches the folder
   or the bucket (client-side), so the bucket's own SSE-KMS is an optional second layer.
+- One contract for both, so the folder behaves like a bucket and switching is configuration: an object is addressed by
+  the SHA-256 of its plaintext, written once and never changed, and read by id. A bucket write is create-only
+  (`If-None-Match: *`); the folder stages in `artifacts/.incoming` and renames into place only when the id is new.
+  Nothing depends on a listing, an append or a lock: the `artifacts` table says what exists, and deletes, retention and
+  key passes start from it (a key pass also lists the store, only to find strays; a registered object it cannot find
+  blocks retiring the key). The one change in place is re-wrapping a key header, which never touches the content or
+  its id: the folder rewrites a header slot, the bucket takes the object again whole. Uploads from workers stream into
+  the store, never into memory.
+- What under `MINIBRAIN_HOME` is data and what is a cache. Data: `minibrain.db`, `keys/`, `secrets/`, `artifacts/` (the
+  folder store) and `models/` (base weights when Storage is the folder). Caches and scratch, safe to wipe while
+  minibrain is stopped: `cache/` (unpacked artifacts), `staging/` (DuckDB databases built from uploads, rebuilt from
+  the upload), `work/` (job scratch), `gateway/`, `engines/` and `worker/` (copies on serving and batch machines).
 
 ### Connections
 
@@ -504,6 +516,8 @@ once it matches; only deleting a base removes its files.
   deleted together with them, once the cascade checkbox in the delete dialog is ticked.
 - Rows an earlier cache budget left in status `evicted` keep "Removed to free space" with Download again or Re-import
   (the repair job, checked against the saved SHA-256 list).
+- Remote engines get each file's size and SHA-256 from the saved list, never from a folder listing, and refuse a file
+  that arrives different; a file lands under a temporary name and is renamed into place once it matches.
 
 ### Deleting and undeploying
 

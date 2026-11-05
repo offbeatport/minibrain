@@ -9,15 +9,15 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import IO, Any, Protocol
+from typing import IO, Any, BinaryIO, Protocol
 
 import httpx
 
-from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.models import JobKind
@@ -166,7 +166,10 @@ class MainClient:
     def upload(self, store: ArtifactStore, artifact_id: str, kind: str, packing: str, name: str) -> str:
         headers = {"X-Artifact-Kind": kind, "X-Artifact-Packing": packing, "X-Artifact-Name": name}
         self.call(
-            "PUT", f"/internal/worker/artifacts/{artifact_id}", opener=lambda: store.open(artifact_id), extra=headers
+            "PUT",
+            f"/internal/worker/artifacts/{artifact_id}",
+            opener=lambda: file_chunks(store.open(artifact_id)),
+            extra=headers,
         )
         return artifact_id
 
@@ -176,6 +179,12 @@ class MainClient:
         with self.http.stream("GET", f"/internal/worker/artifacts/{artifact_id}", headers=self.headers) as response:
             response.raise_for_status()
             store.put_stream(StreamReader(response.iter_bytes()), expected=artifact_id)
+
+
+def file_chunks(stream: BinaryIO) -> Iterator[bytes]:
+    with stream:
+        while chunk := stream.read(CHUNK):
+            yield chunk
 
 
 class StreamReader:

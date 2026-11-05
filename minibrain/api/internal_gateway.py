@@ -17,6 +17,7 @@ from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.registry import resolve_spec
 from minibrain.models.usage import touch
 from minibrain.registry.compute import EngineReport, GatewayReport, record_engine, record_gateway
+from minibrain.registry.models import Model
 from minibrain.serve.weights import local_dir
 
 MAX_WAIT_SECONDS = 30.0
@@ -111,6 +112,7 @@ def report_gateway(body: GatewayBody, session: SessionDep) -> None:
 class BaseFile(BaseModel):
     path: str
     size: int
+    sha256: str | None = None
 
 
 class BaseWeights(BaseModel):
@@ -126,7 +128,7 @@ def weights_folder(session: SessionDep, settings: SettingsDep, key: str) -> tupl
         raise HTTPException(status_code=404, detail=f"weights for {key} are not on main") from error
 
 
-def shareable(folder: Path) -> list[BaseFile]:
+def listed_files(folder: Path) -> list[BaseFile]:
     return [
         BaseFile(path=path.relative_to(folder).as_posix(), size=path.stat().st_size)
         for path in sorted(folder.rglob("*"))
@@ -134,17 +136,27 @@ def shareable(folder: Path) -> list[BaseFile]:
     ]
 
 
+def shareable(session: SessionDep, key: str, folder: Path) -> list[BaseFile]:
+    model = session.get(Model, key)
+    if model is None or not model.files:
+        return listed_files(folder)
+    return [
+        BaseFile(path=str(entry["path"]), size=int(entry["size"]), sha256=entry.get("sha256")) for entry in model.files
+    ]
+
+
 @router.get("/bases/{key}")
 def base_weights(key: str, session: SessionDep, settings: SettingsDep) -> BaseWeights:
     spec, folder = weights_folder(session, settings, key)
-    return BaseWeights(spec=spec | {"path": None}, files=shareable(folder))
+    return BaseWeights(spec=spec | {"path": None}, files=shareable(session, key, folder))
 
 
 @router.get("/bases/{key}/files/{path:path}")
 def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -> FileResponse:
     _, folder = weights_folder(session, settings, key)
     candidate = (folder / path).resolve()
-    if not candidate.is_file() or path not in {entry.path for entry in shareable(folder)}:
+    known = {entry.path for entry in shareable(session, key, folder)}
+    if path not in known or not candidate.is_file() or not candidate.is_relative_to(folder):
         raise HTTPException(status_code=404, detail=f"{path} is not part of {key}")
     return FileResponse(candidate)
 

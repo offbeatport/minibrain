@@ -105,6 +105,7 @@ def s3_filesystem(config: StorageConfig, secret: str) -> Any:
         client_kwargs={"region_name": config.region or "us-east-1"},
         config_kwargs={
             "s3": {"addressing_style": addressing(config.endpoint)},
+            "signature_version": "s3v4",
             "retries": {"max_attempts": 2, "mode": "standard"},
             "connect_timeout": 5,
             "read_timeout": 60,
@@ -133,6 +134,12 @@ class BucketBlobs:
         return bool(self.fs.exists(self.key(artifact_id)))
 
     def upload(self, source: Path, artifact_id: str) -> None:
+        try:
+            self.fs.put_file(str(source), self.key(artifact_id), mode="create")
+        except FileExistsError:
+            return
+
+    def replace(self, source: Path, artifact_id: str) -> None:
         self.fs.put_file(str(source), self.key(artifact_id))
 
     def download(self, artifact_id: str, target: Path) -> None:

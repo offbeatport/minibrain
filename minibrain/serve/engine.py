@@ -1,4 +1,7 @@
+import hashlib
 import logging
+import os
+import tempfile
 import threading
 import uuid
 from collections import Counter
@@ -206,6 +209,30 @@ def load_backend(
     return engine, backend
 
 
+class PulledFileError(Exception):
+    pass
+
+
+def pull_file(client: HttpClient, url: str, headers: dict[str, str], target: Path, entry: dict[str, Any]) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, name = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
+    digest = hashlib.sha256()
+    size = 0
+    try:
+        with os.fdopen(descriptor, "wb") as out, client.stream("GET", url, headers=headers) as stream:
+            stream.raise_for_status()
+            for chunk in stream.iter_bytes():
+                out.write(chunk)
+                digest.update(chunk)
+                size += len(chunk)
+        expected = entry.get("sha256")
+        if size != entry["size"] or (expected and digest.hexdigest() != expected):
+            raise PulledFileError(f"{entry['path']} arrived as {size} bytes that do not match the saved SHA-256")
+        os.replace(name, target)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
 def pull_base(client: HttpClient, token: str, key: str, folder: Path) -> BaseModelSpec:
     headers = {"Authorization": f"Bearer {token}"}
     response = client.request("GET", f"/internal/gateway/bases/{key}", headers=headers)
@@ -215,14 +242,7 @@ def pull_base(client: HttpClient, token: str, key: str, folder: Path) -> BaseMod
         target = folder / entry["path"]
         if target.is_file() and target.stat().st_size == entry["size"]:
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        partial = target.with_name(target.name + ".partial")
-        with client.stream("GET", f"/internal/gateway/bases/{key}/files/{entry['path']}", headers=headers) as stream:
-            stream.raise_for_status()
-            with partial.open("wb") as out:
-                for chunk in stream.iter_bytes():
-                    out.write(chunk)
-        partial.replace(target)
+        pull_file(client, f"/internal/gateway/bases/{key}/files/{entry['path']}", headers, target, entry)
     return replace(BaseModelSpec.from_dict(found["spec"]), path=str(folder))
 
 

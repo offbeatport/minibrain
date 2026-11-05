@@ -26,7 +26,7 @@ from minibrain.encryption.sealed import (
 )
 from minibrain.encryption.secrets import needs_reseal, open_text, seal_text, wrapped_of
 from minibrain.leader import Leader
-from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Connection, Setting, now
+from minibrain.registry.models import SYSTEM_ACTOR, Artifact, AuditEvent, Connection, Setting, now
 from minibrain.registry.settings_store import read, write
 
 TASK = "encryption.task"
@@ -102,6 +102,14 @@ def local_ids(root: Path) -> Iterator[str]:
                 yield path.name
 
 
+def stored_ids(session: Session, store: ArtifactStore) -> list[str]:
+    found = set(session.scalars(select(Artifact.id)))
+    found.update(local_ids(store.root))
+    if store.remote is not None:
+        found.update(store.remote.ids())
+    return sorted(found)
+
+
 def head_of(path: Path) -> bytes:
     with path.open("rb") as stream:
         return read_exact(stream, HEADER)
@@ -152,7 +160,7 @@ def visit_remote(store: ArtifactStore, artifact_id: str, keys: Keys, plan: Plan,
                 else:
                     encrypt_in_place(local, keys, context, artifact_id)
                     tally.encrypted += 1
-                remote.upload(local, artifact_id)
+                remote.replace(local, artifact_id)
             state = state_of(remote.head(artifact_id), keys)
         tally.seen(state)
     except (EnvelopeError, EncryptionError, OSError) as error:
@@ -253,14 +261,15 @@ def run_pass(session: Session, store: ArtifactStore, keys: Keys, plan: Plan, pro
             progress(tally)
             last = time.monotonic()
 
-    for artifact_id in local_ids(store.root):
-        visit_local(store.path(artifact_id), artifact_context(artifact_id), artifact_id, keys, plan, tally)
+    for artifact_id in stored_ids(session, store):
+        if store.local(artifact_id):
+            visit_local(store.path(artifact_id), artifact_context(artifact_id), artifact_id, keys, plan, tally)
+        elif store.remote is not None and store.remote.has(artifact_id):
+            visit_remote(store, artifact_id, keys, plan, tally)
+        else:
+            tally.files += 1
+            tally.problem(f"{artifact_id}: registered, but in neither the folder nor the bucket")
         report()
-    if store.remote is not None:
-        for artifact_id in store.remote.ids():
-            if not store.local(artifact_id):
-                visit_remote(store, artifact_id, keys, plan, tally)
-                report()
     visit_staging(store, keys, plan, tally)
     if plan.encrypt and keys.sealing():
         clear_cache(store, tally)

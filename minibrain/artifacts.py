@@ -17,6 +17,7 @@ from minibrain.encryption.sealed import KeySource, artifact_context, open_reader
 
 CHUNK = 1 << 20
 STAGED_NAME = "staging.duckdb"
+INCOMING = ".incoming"
 
 
 class Packing(StrEnum):
@@ -64,6 +65,8 @@ class RemoteBlobs(Protocol):
     def has(self, artifact_id: str) -> bool: ...
 
     def upload(self, source: Path, artifact_id: str) -> None: ...
+
+    def replace(self, source: Path, artifact_id: str) -> None: ...
 
     def download(self, artifact_id: str, target: Path) -> None: ...
 
@@ -123,9 +126,13 @@ class ArtifactStore:
     def has(self, artifact_id: str) -> bool:
         return self.local(artifact_id) or (self.remote is not None and self.remote.has(artifact_id))
 
+    def incoming(self) -> Path:
+        folder = self.root / INCOMING
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
+
     def put_stream(self, stream: Readable, expected: str | None = None) -> Stored:
-        self.root.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=self.root, delete=False) as temporary:
+        with tempfile.NamedTemporaryFile(dir=self.incoming(), delete=False) as temporary:
             try:
                 if self.sealing() and self.keys is not None:
                     artifact_id, size = seal_stream(stream, temporary, self.keys, artifact_context)

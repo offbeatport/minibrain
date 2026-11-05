@@ -1,5 +1,4 @@
 import hmac
-import io
 import time
 from typing import Annotated, Any
 
@@ -8,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
@@ -211,9 +211,8 @@ async def upload_artifact(
 ) -> StoredArtifact:
     if x_artifact_packing not in (Packing.FILE, Packing.TAR) or not is_artifact_id(artifact_id):
         raise HTTPException(status_code=422, detail="bad artifact id or packing")
-    data = b"".join([chunk async for chunk in request.stream()])
     try:
-        stored = store.put_stream(io.BytesIO(data), expected=artifact_id)
+        stored = await store_body(store, request, artifact_id)
     except ArtifactError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     register(session, stored.id, x_artifact_kind, x_artifact_packing, x_artifact_name, stored.size)

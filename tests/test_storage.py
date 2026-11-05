@@ -1,13 +1,20 @@
+import hashlib
+import io
 import stat
 from collections.abc import Iterator
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
 from fsspec.implementations.memory import MemoryFileSystem
 
 from minibrain import object_store
-from minibrain.registry.files import store_for
-from tests.conftest import Harness, tickets_csv
+from minibrain.artifacts import INCOMING
+from minibrain.encryption import keys, rekey
+from minibrain.registry.files import register, store_for
+from tests.conftest import Harness, stored_bytes, tickets_csv
+from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3
 
 BUCKET_KEY = "wJalrXUtnFEMI-not-a-real-key"
 S3_BODY = {
@@ -119,3 +126,53 @@ def other_artifact(harness: Harness, source: dict) -> str:
         found = session.get(Source, source["id"])
         assert found is not None and found.artifact_id is not None
         return found.artifact_id
+
+
+@pytest.mark.both_stores
+def test_writes_stage_outside_the_store_and_never_replace_an_object(harness: Harness) -> None:
+    store = store_for(harness.settings)
+    first = store.put_stream(io.BytesIO(b"same rows"))
+    sealed = stored_bytes(store, first.id)
+    again = store.put_stream(io.BytesIO(b"same rows"))
+    assert again.id == first.id and stored_bytes(store, first.id) == sealed
+    assert not any((store.root / INCOMING).iterdir())
+    root_files = [path for path in store.root.iterdir() if path.is_file()]
+    assert root_files == []
+
+
+@pytest.mark.both_stores
+def test_key_retirement_waits_for_a_registered_artifact_the_store_has_lost(harness: Harness) -> None:
+    store = store_for(harness.settings)
+    kept = store.put_stream(io.BytesIO(b"kept rows")).id
+    lost = hashlib.sha256(b"lost rows").hexdigest()
+    with harness.sessions() as session:
+        register(session, kept, "source", "file", "kept.csv", 9)
+        register(session, lost, "source", "file", "lost.csv", 9)
+        session.commit()
+        service = keys.keys_for(harness.settings)
+        rekey.rotate_key(session, service, "tester")
+        session.commit()
+        tally = rekey.run_pass(session, store, service, rekey.Plan(rewrap=True))
+        assert (tally.rewrapped, tally.damaged) == (1, 1) and lost in tally.problems[0]
+        assert rekey.retire_unused(session, service, tally, timedelta(0), "tester") == []
+
+
+def test_the_bucket_keeps_the_first_object_written_under_an_id(moto: FakeS3, tmp_path: Path) -> None:
+    moto.bucket("first-write-wins")
+    config = object_store.StorageConfig(
+        kind="s3", endpoint=moto.endpoint, bucket="first-write-wins", access_key=ACCESS_KEY
+    )
+    blobs = object_store.bucket_for(config, SECRET_KEY)
+    assert blobs is not None
+    artifact_id = hashlib.sha256(b"rows").hexdigest()
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.write_bytes(b"first sealed copy")
+    second.write_bytes(b"second sealed copy")
+    blobs.upload(first, artifact_id)
+    blobs.upload(second, artifact_id)
+    with blobs.open(artifact_id) as stream:
+        assert stream.read() == b"first sealed copy"
+    blobs.replace(second, artifact_id)
+    with blobs.open(artifact_id) as stream:
+        assert stream.read() == b"second sealed copy"
+    assert "X-Amz-Algorithm=AWS4-HMAC-SHA256" in blobs.fs.sign(blobs.key(artifact_id), expiration=60)

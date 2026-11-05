@@ -1,5 +1,6 @@
 import io
 import os
+import secrets
 import tarfile
 import tempfile
 from collections.abc import Iterator
@@ -15,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.app import create_app
+from minibrain.artifacts import ArtifactStore
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
 from minibrain.auth.roles import Role
 from minibrain.jobs.queue import SqlJobQueue
@@ -22,9 +24,22 @@ from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest
 from minibrain.settings import Settings
 from minibrain.worker import MainClient, Worker, WorkerConfig
+from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
 
 LABELS = ("billing", "bug", "account", "feature")
 ADMIN_EMAIL = "admin@example.com"
+FOLDER = "folder"
+BUCKET = "s3"
+BOTH_STORES = "both_stores"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line("markers", f"{BOTH_STORES}: run the test against the folder store and an S3 bucket")
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if metafunc.definition.get_closest_marker(BOTH_STORES) and "store_kind" in metafunc.fixturenames:
+        metafunc.parametrize("store_kind", [FOLDER, BUCKET])
 
 
 @dataclass
@@ -60,6 +75,7 @@ class Harness:
     settings: Settings
     backend: FakeBackend
     sessions: sessionmaker[Session]
+    store_kind: str = FOLDER
 
     @property
     def queue(self) -> SqlJobQueue:
@@ -111,6 +127,11 @@ class Harness:
         return client.upload(worker.store, stored.id, kind, packing, name)
 
 
+def stored_bytes(store: ArtifactStore, artifact_id: str) -> bytes:
+    with store.raw(artifact_id) as stream:
+        return stream.read()
+
+
 def tickets_csv(rows: int = 200) -> bytes:
     lines = ["text,category"]
     lines += [f"ticket {index} about {LABELS[index % 4]},{LABELS[index % 4]}" for index in range(rows)]
@@ -133,10 +154,52 @@ def settings(tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-def harness(settings: Settings) -> Iterator[Harness]:
+def store_kind() -> str:
+    return FOLDER
+
+
+@pytest.fixture(scope="session")
+def moto() -> Iterator[FakeS3]:
+    with fake_s3() as server:
+        yield server
+
+
+def storage_body(server: FakeS3, bucket: str) -> dict[str, Any]:
+    return {
+        "kind": BUCKET,
+        "endpoint": server.endpoint,
+        "bucket": bucket,
+        "prefix": "minibrain",
+        "region": "",
+        "access_key": ACCESS_KEY,
+        "secret": SECRET_KEY,
+    }
+
+
+def use_bucket(harness: Harness, server: FakeS3) -> str:
+    bucket = f"minibrain-{secrets.token_hex(6)}"
+    server.bucket(bucket)
+    harness.client.put("/api/settings/storage", json=storage_body(server, bucket)).raise_for_status()
+    if not harness.app.state.store.writes_remote:
+        raise RuntimeError(f"storage did not switch to {bucket}")
+    return bucket
+
+
+@pytest.fixture
+def harness(settings: Settings, store_kind: str, request: pytest.FixtureRequest) -> Iterator[Harness]:
     settings.home.mkdir(parents=True)
     backend = FakeBackend()
     app = create_app(settings=settings, backend=backend, background=False, config_max_age=0)
     with TestClient(app) as client:
         sign_in(app, client)
-        yield Harness(app=app, client=client, settings=settings, backend=backend, sessions=app.state.sessions)
+        found = Harness(
+            app=app,
+            client=client,
+            settings=settings,
+            backend=backend,
+            sessions=app.state.sessions,
+            store_kind=store_kind,
+        )
+        if store_kind == BUCKET:
+            use_bucket(found, request.getfixturevalue("moto"))
+        yield found

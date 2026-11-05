@@ -11,7 +11,7 @@ from minibrain.registry.models import Model
 from minibrain.serve import engine as engine_module
 from minibrain.serve import select
 from minibrain.serve.backend import AdapterRef, CompletionRequest, TransformersBackend
-from minibrain.serve.engine import load_backend, pull_base
+from minibrain.serve.engine import PulledFileError, load_backend, pull_base
 from minibrain.serve.select import NoEngineError, choose_engine, installed_engines
 from minibrain.serve.sglang_backend import SglangBackend
 from minibrain.serve.structured import TokenTrie
@@ -136,6 +136,13 @@ def test_remote_engines_pull_weights_from_main_not_the_hub(harness: Harness, hub
     spec = pull_base(harness.client, token, "tiny", tmp_path / "weights")
     assert spec.path == str(tmp_path / "weights") and spec.format == "safetensors"
     assert all((tmp_path / "weights" / name).read_bytes() == data for name, data in FILES.items())
+    served = Path(harness.client.get("/api/models/base/tiny").json()["storage_path"]) / "config.json"
+    served.write_bytes(served.read_bytes().replace(b"{", b"[", 1))
+    (tmp_path / "weights" / "config.json").unlink()
+    with pytest.raises(PulledFileError, match=r"config\.json"):
+        pull_base(harness.client, token, "tiny", tmp_path / "weights")
+    assert not (tmp_path / "weights" / "config.json").exists()
+    assert not [path for path in (tmp_path / "weights").iterdir() if path.name.startswith(".")]
 
 
 def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harness, hub: Path) -> None:  # noqa: F811

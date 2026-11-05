@@ -619,13 +619,15 @@ installs download the set for the new version. Paths are versioned, so both sets
 | Native | `~/.minibrain`, or `MINIBRAIN_HOME` |
 | Docker | `/data` in the container: the `minibrain-data` volume |
 
-| Path | Holds |
-|---|---|
-| `minibrain.db` | Metadata in SQLite, unless `MINIBRAIN_DATABASE_URL` points at Postgres |
-| `models/` | Downloaded and imported base models |
-| `artifacts/` | Snapshots, adapters and eval results, when storage is local (Settings → Storage) |
-| `minibrains/`, `staging/`, `sources/` | Per-minibrain and per-source working files |
-| `secrets/` | Worker and gateway tokens. Keep it private |
-| `duckdb/extensions/` | Installed DuckDB extensions |
-| `huggingface/` | The Hugging Face cache, in Docker. Native installs use `~/.cache/huggingface` |
-| `minibrain.yaml` | Optional settings for locked-down installs |
+| Path | Holds | Back up |
+|---|---|---|
+| `minibrain.db` | Metadata in SQLite, unless `MINIBRAIN_DATABASE_URL` points at Postgres | Yes |
+| `keys/` | The local master key (encryption at rest). Back it up apart from the data | Yes, separately |
+| `secrets/` | Worker and gateway tokens, the storage secret key. Keep it private | Yes |
+| `models/` | Downloaded and imported base models when storage is local (Settings → Storage) | Yes |
+| `artifacts/` | Uploads, dataset versions, adapters and logs, encrypted, when storage is local | Yes |
+| `cache/`, `staging/`, `work/` | Unpacked artifacts, DuckDB databases built from uploads, job scratch | No: rebuilt on use |
+| `gateway/`, `engines/`, `worker/` | Copies kept by the gateway, engines and the worker | No: fetched again |
+| `duckdb/extensions/` | Installed DuckDB extensions | No: install again |
+| `huggingface/` | The Hugging Face cache, in Docker. Native installs use `~/.cache/huggingface` | No |
+| `minibrain.yaml` | Optional settings for locked-down installs | Yes |
