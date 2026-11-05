@@ -1293,6 +1293,22 @@ Everything in the v1 scope below, after M1.
 - [ ] Custom model logos: PNG, JPEG or WebP up to 256 KB, stored with the model; never SVG, which can carry scripts
 - Preinstalled appliance
 
+## Fixes
+
+Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
+
+- [ ] Quantized bases in the bucket are not refused for training up front: the check reads `config.json` from main's
+  disk, which a bucket model may not have. Read it from the saved file list or the bucket instead.
+- [ ] A local engine's first start includes downloading its model, which can exceed the 600 s startup limit for very
+  large models. Fetch the working copy as its own step before the engine starts, with progress.
+- [ ] Key rotation re-uploads every bucket object whole, which is slow for large weights. Re-wrap only the key header,
+  or use the bucket's server-side copy.
+- [ ] Delete Copy to the bucket (moving bases from main's disk when Storage switches to S3); it only served older
+  installs.
+- [ ] Delete the job format version check that turns away older workers; there are no older workers.
+- [ ] Delete inline secrets in `policy.otel_headers` and `auth.oidc.client_secret`; they become env or file references
+  like every other secret.
+
 ## Risks to verify early
 
 - SGLang LoRA on ROCm, MI300X specifically.
