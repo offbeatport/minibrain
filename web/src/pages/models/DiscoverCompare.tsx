@@ -42,6 +42,7 @@ import {
 import { TIERS, licenceOf, licenceUseLabel } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
 import { FormatHelp, formatName, formatUse, schemes } from "./formats";
+import { TRAIN_MEMORY_INFO, leastTrainMemory } from "./runsHere";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
@@ -142,6 +143,20 @@ function sizedVariants(entry: CatalogEntry, value: (variant: Variant) => number)
 }
 
 const needed = (variant: Variant) => variant.fit.needed_bytes;
+
+function TrainFigure({ entry }: { entry: CatalogEntry }) {
+    const least = leastTrainMemory(entry);
+    if (least === null) {
+        return <span className="text-muted-foreground">Serve only</span>;
+    }
+    const here = entry.variants.some((variant) => variant.train_fit.level === "fits");
+    return (
+        <div className="flex flex-col">
+            <span className="tabular-nums">{bytes(least)}</span>
+            {here && <span className="text-muted-foreground">Trains here</span>}
+        </div>
+    );
+}
 const download = (variant: Variant) => variant.size_bytes;
 const smallest = (value: (variant: Variant) => number) => (entry: CatalogEntry) =>
     Math.min(...entry.variants.map(value));
@@ -175,7 +190,7 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                 },
                 {
                     id: "memory",
-                    label: "Memory needed",
+                    label: "Memory to run",
                     key: (entry) => sizedVariants(entry, needed),
                     amount: smallest(needed),
                     formatDelta: bytes,
@@ -188,6 +203,16 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                             bestLabel="Least"
                         />
                     ),
+                },
+                {
+                    id: "train",
+                    label: "Memory to train (QLoRA)",
+                    info: TRAIN_MEMORY_INFO,
+                    key: (entry) => bytes(leastTrainMemory(entry)),
+                    amount: (entry) => leastTrainMemory(entry) ?? Number.POSITIVE_INFINITY,
+                    formatDelta: bytes,
+                    better: "lower",
+                    render: (entry) => <TrainFigure entry={entry} />,
                 },
                 {
                     id: "download",

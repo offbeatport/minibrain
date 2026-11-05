@@ -46,8 +46,9 @@ def trained_card(harness: Harness) -> dict[str, Any]:
     complete(harness, "eval", {"metrics": metrics(wrong=6)})
     assert harness.client.post(f"{CARD}/0/promote").status_code == 200
     assert harness.client.post(CARD, json={"kind": "lora", "max_rows": 120, "epochs": 2}).status_code == 201
-    summary = {"max_rows": 120, "epochs": 2.0, "rank": 16, "alpha": 32, "learning_rate": 2e-4, "batch_size": 8}
-    summary |= {"grad_accum": 2, "device": "cpu", "examples": 120, "train_seconds": 9.5, "train_loss": 0.43219}
+    summary = {"max_rows": 120, "epochs": 2.0, "rank": 16, "alpha": 32, "learning_rate": 2e-4, "micro_batch": 8}
+    summary |= {"grad_accum": 2, "seq_len": 64, "strategy": "lora", "plan": {"label": "LoRA fp32"}}
+    summary |= {"device": "cpu", "examples": 120, "train_seconds": 9.5, "train_loss": 0.43219}
     adapter = harness.upload(fake_adapter(), "adapter", "tar", "adapter")
     complete(harness, "train", {"summary": summary}, {"adapter": adapter})
     complete(harness, "eval", {"metrics": metrics(wrong=5)})
@@ -86,10 +87,12 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
     assert data["personal_data"]["status"] == "ok"
     training = card["training"]
     assert training["recipe"] == {
+        "strategy": "LoRA fp32",
         "max_rows": 120,
         "epochs": 2.0,
-        "batch_size": 8,
+        "micro_batch": 8,
         "grad_accum": 2,
+        "seq_len": 64,
         "rank": 16,
         "alpha": 32,
         "learning_rate": 0.0002,

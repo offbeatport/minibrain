@@ -102,10 +102,12 @@ class CardRun(BaseModel):
 
 
 class CardRecipe(BaseModel):
+    strategy: str | None = None
     max_rows: int | None
     epochs: float | None
-    batch_size: int | None
+    micro_batch: int | None
     grad_accum: int | None
+    seq_len: int | None = None
     rank: int | None
     alpha: int | None
     learning_rate: float | None

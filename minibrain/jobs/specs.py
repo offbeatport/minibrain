@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from minibrain.models.registry import resolve_spec
+from minibrain.models.train_facts import base_facts
 from minibrain.models.usage import touch
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.files import MissingArtifactError, ref
@@ -30,6 +31,7 @@ def train_params(session: Session, settings: Settings, version: Version) -> dict
         "base_spec": base_spec(session, settings, version),
         "snapshot": snapshot_ref(session, version),
         "recipe": DEFAULT_RECIPE | dict(version.recipe),
+        "plan_base": base_facts(session, settings, version.minibrain.base_model).as_dict(),
     }
 
 

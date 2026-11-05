@@ -2,6 +2,7 @@ import {
     Boxes,
     ChevronDown,
     ExternalLink,
+    GraduationCap,
     HardDrive,
     type LucideIcon,
     MemoryStick,
@@ -43,7 +44,13 @@ import {
     servingCopies,
 } from "./baseOptions";
 import { formatName, quantized } from "./formats";
-import { RUNS_HERE_INFO, useRunsHere } from "./runsHere";
+import {
+    RUNS_HERE_INFO,
+    TRAINS_HERE_INFO,
+    trainMemory,
+    useRunsHere,
+    useTrainsHere,
+} from "./runsHere";
 
 export type PickerTab = "catalogue" | "mine" | "import";
 
@@ -109,8 +116,21 @@ function Amount({
     );
 }
 
+function trainHelp(option: BaseOption): string {
+    const level = option.variant?.train_fit.level;
+    const where =
+        level === "fits"
+            ? " Trains here."
+            : level === "insufficient"
+              ? " Too big to train on the machines here."
+              : "";
+    return `Memory to train (QLoRA): GPU memory it takes to train with QLoRA 4-bit.${where}`;
+}
+
 function Resources({ option }: { option: BaseOption }) {
-    const memory = option.kind === "local" ? null : option.variant?.fit.needed_bytes;
+    const local = option.kind === "local";
+    const memory = local ? null : option.variant?.fit.needed_bytes;
+    const training = local ? null : trainMemory(option.variant);
     const disk = option.size;
     if (!memory && !disk) {
         return null;
@@ -120,9 +140,17 @@ function Resources({ option }: { option: BaseOption }) {
             {memory ? (
                 <Amount
                     icon={MemoryStick}
-                    label="Memory needed"
-                    help="Memory needed: GPU or unified memory it takes to run"
+                    label="Memory to run"
+                    help="Memory to run: GPU or unified memory it takes to serve"
                     bytes={memory}
+                />
+            ) : null}
+            {training ? (
+                <Amount
+                    icon={GraduationCap}
+                    label="Memory to train (QLoRA)"
+                    help={trainHelp(option)}
+                    bytes={training}
                 />
             ) : null}
             {disk ? (
@@ -331,12 +359,15 @@ export function BasePicker({
     const [tiers, setTiers] = useState<string[]>([]);
     const [uses, setUses] = useState<string[]>([]);
     const [runsHere, setRunsHere] = useState(false);
+    const [trainsHere, setTrainsHere] = useState(false);
     const entries = catalog?.entries ?? [];
     const runsSomewhere = useRunsHere(catalog);
+    const trainsSomewhere = useTrainsHere(catalog);
     const everything = entries.map((entry) => catalogueOption(entry));
     const shown = (option: BaseOption) =>
         (tiers.length === 0 || tiers.includes(option.entry?.tier ?? "")) &&
         (!runsHere || runsSomewhere(option.entry)) &&
+        (!trainsHere || trainsSomewhere(option.entry)) &&
         (uses.length === 0 || uses.includes(option.licence ?? "unknown"));
     const catalogue = everything.filter(shown);
     const copies = entries.flatMap(servingCopies).filter(shown);
@@ -395,12 +426,23 @@ export function BasePicker({
                             checked: runsHere,
                             onCheckedChange: setRunsHere,
                         },
+                        {
+                            kind: "toggle",
+                            key: "trains-here",
+                            title: "Training",
+                            label: "Trains here",
+                            info: TRAINS_HERE_INFO,
+                            count: count((option) => trainsSomewhere(option.entry)),
+                            checked: trainsHere,
+                            onCheckedChange: setTrainsHere,
+                        },
                     ]}
                     summary={`${catalogue.length} of ${everything.length} models`}
                     onClear={() => {
                         setTiers([]);
                         setUses([]);
                         setRunsHere(false);
+                        setTrainsHere(false);
                     }}
                 />
             ),

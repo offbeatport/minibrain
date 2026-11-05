@@ -25,6 +25,7 @@ import {
 } from "./Discover";
 import { useModelsRefresh } from "./dialogs";
 import { FormatHelp, formatName, formatUse } from "./formats";
+import { TRAIN_MEMORY_INFO, trainMemory } from "./runsHere";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
@@ -113,9 +114,28 @@ function variantColumns(
         },
         {
             id: "memory",
-            header: "Memory needed",
+            header: "Memory to run",
             accessorFn: (variant) => variant.fit.needed_bytes,
             cell: ({ row }) => bytes(row.original.fit.needed_bytes),
+        },
+        {
+            id: "train",
+            header: "Memory to train (QLoRA)",
+            meta: { info: TRAIN_MEMORY_INFO },
+            accessorFn: (variant) => trainMemory(variant) ?? Number.POSITIVE_INFINITY,
+            cell: ({ row }) => {
+                const value = trainMemory(row.original);
+                return value === null ? (
+                    <span className="text-muted-foreground">Serve only</span>
+                ) : (
+                    <span className="inline-flex items-center gap-2">
+                        {bytes(value)}
+                        {row.original.train_fit.level === "fits" && (
+                            <StatusText tone="success">Trains here</StatusText>
+                        )}
+                    </span>
+                );
+            },
         },
         {
             id: "runtimes",

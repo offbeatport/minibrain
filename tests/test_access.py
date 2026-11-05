@@ -129,6 +129,7 @@ ROUTE_ROLES = {
     ("POST", "/api/minibrains/{slug}/versions"): "builder",
     ("DELETE", "/api/minibrains/{slug}/versions/{number}"): "builder",
     ("POST", "/api/minibrains/{slug}/versions/{number}/promote"): "builder",
+    ("GET", "/api/minibrains/{slug}/training-plan"): "viewer",
     ("POST", "/api/minibrains/{slug}/complete"): "viewer",
     ("GET", "/api/minibrains/{slug}/versions/{number}/card"): "viewer",
     ("GET", "/api/minibrains/{slug}/versions/{number}/card.json"): "viewer",

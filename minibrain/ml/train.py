@@ -15,10 +15,18 @@ from transformers import TrainerCallback, TrainerControl, TrainerState, Training
 from trl.trainer.sft_config import SFTConfig
 from trl.trainer.sft_trainer import SFTTrainer
 
-from minibrain.data.snapshot import read_split
+from minibrain.data.snapshot import Example, read_split
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
-from minibrain.ml.runtime import load_base_model, load_tokenizer
+from minibrain.ml.examples import encode_all
+from minibrain.ml.runtime import load_tokenizer
+from minibrain.ml.strategies import (
+    fitted_recipe,
+    load_training_model,
+    lora_settings,
+    peak_memory,
+    trainer_settings,
+)
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.tasks.classify import trained_messages
 
@@ -99,24 +107,32 @@ def training_row(spec: JobSpec, text: str, label: str) -> dict[str, Any]:
     return row
 
 
-def training_rows(spec: JobSpec, max_rows: int | None) -> Dataset:
-    examples = read_split(spec.path("snapshot"), "train")[:max_rows]
+def training_examples(spec: JobSpec, max_rows: int | None) -> list[Example]:
+    return read_split(spec.path("snapshot"), "train")[:max_rows]
+
+
+def training_rows(spec: JobSpec, examples: list[Example]) -> Dataset:
     return Dataset.from_list([training_row(spec, example.input, example.label) for example in examples])
 
 
 def micro_batches(recipe: dict[str, Any], device: str) -> tuple[int, int]:
-    batch, accumulate = int(recipe["batch_size"]), int(recipe["grad_accum"])
+    batch, accumulate = int(recipe["micro_batch"]), int(recipe["grad_accum"])
     return (1, batch * accumulate) if kind_of(device) == "mps" else (batch, accumulate)
 
 
 def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str) -> SFTConfig:
     batch, accumulate = micro_batches(recipe, device)
+    settings = trainer_settings(recipe)
     return SFTConfig(
         output_dir=str(checkpoints),
-        num_train_epochs=float(recipe["epochs"]),
+        num_train_epochs=settings.epochs,
         per_device_train_batch_size=batch,
         gradient_accumulation_steps=accumulate,
-        learning_rate=float(recipe["learning_rate"]),
+        learning_rate=settings.learning_rate,
+        max_length=settings.max_length,
+        gradient_checkpointing=settings.checkpointing,
+        gradient_checkpointing_kwargs={"use_reentrant": False} if settings.checkpointing else None,
+        optim=settings.optimizer,
         lr_scheduler_type="cosine",
         warmup_steps=10,
         logging_steps=5,
@@ -125,7 +141,6 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str) -> SFTCon
         save_total_limit=1,
         report_to="none",
         disable_tqdm=True,
-        max_length=256,
         completion_only_loss=True,
         dataloader_pin_memory=False,
         use_cpu=device == "cpu",
@@ -136,10 +151,11 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str) -> SFTCon
 
 
 def lora_config(recipe: dict[str, Any]) -> LoraConfig:
+    settings = lora_settings(recipe)
     return LoraConfig(
-        r=int(recipe["rank"]),
-        lora_alpha=int(recipe["alpha"]),
-        lora_dropout=0.05,
+        r=settings.rank,
+        lora_alpha=settings.alpha,
+        lora_dropout=settings.dropout,
         target_modules="all-linear",
         task_type="CAUSAL_LM",
     )
@@ -159,18 +175,21 @@ def train(trainer: Trainer, resume: bool, stall: StallWatch | None) -> Any:
 
 
 def main(spec: JobSpec) -> None:
-    recipe = DEFAULT_RECIPE | spec.raw["recipe"]
+    stored = DEFAULT_RECIPE | spec.raw["recipe"]
     checkpoints = spec.path("checkpoints")
     device = chosen_device(checkpoints.with_name(DEVICE_MARK), checkpoints)
-    rows = training_rows(spec, recipe["max_rows"])
+    examples = training_examples(spec, stored["max_rows"])
+    tokenizer = load_tokenizer(spec.base, padding_side="right")
+    recipe = fitted_recipe(spec, stored, encode_all(tokenizer, examples, spec.base.template_kwargs), device)
+    rows = training_rows(spec, examples)
     resume = checkpoints.is_dir() and any(checkpoints.glob("checkpoint-*"))
     print(json.dumps({"device": device, "examples": len(rows), "recipe": recipe, "resume": resume}), flush=True)
     stall = StallWatch() if kind_of(device) == "mps" and not forced_training_device() else None
     trainer = SFTTrainer(
-        model=load_base_model(spec.base, device),
+        model=load_training_model(spec.base, device, recipe),
         args=sft_config(checkpoints, recipe, device),
         train_dataset=rows,
-        processing_class=load_tokenizer(spec.base, padding_side="right"),
+        processing_class=tokenizer,
         peft_config=lora_config(recipe),
         callbacks=[ProgressCallback(), *([stall] if stall else [])],
     )
@@ -181,6 +200,7 @@ def main(spec: JobSpec) -> None:
         "examples": len(rows),
         "train_seconds": output.metrics.get("train_runtime"),
         "train_loss": output.metrics.get("train_loss"),
+        "peak_bytes": peak_memory(device),
     }
     write_result(spec, {"summary": summary})
     report(1.0, **summary)

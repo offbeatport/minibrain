@@ -39,7 +39,7 @@ def test_duplicates_conflicts_and_lengths_are_counted() -> None:
         ("message number 1", "label 1"),
         ("message number 2", "label 0"),
         ("", "label 3"),
-        ("x" * 1200, "label 2"),
+        ("x" * 9000, "label 2"),
     ]
     found = by_check(run_checks(labelled(120) + extra, None, CheckLimits()))
     assert (found["duplicates"].status, found["duplicates"].count) == ("warning", 2)

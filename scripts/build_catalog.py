@@ -15,6 +15,7 @@ from minibrain.models.rules import (
     context_of,
     needed,
     released_of,
+    shape_of,
     tier,
 )
 
@@ -344,6 +345,7 @@ class Builder:
             "tier": size_tier,
             "params_b": round(params, 2),
             "moe": moe,
+            "shape": shape_of(config),
             "variants": variants,
         }
 

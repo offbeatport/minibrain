@@ -550,10 +550,54 @@ from. They have different endpoints and keys, so they are configured apart.
   → load the adapter into the serving pool.
 - Progress: a TRL `TrainerCallback` writes to the jobs table and a log file streamed to the UI.
 - Cancel kills the process group. On start, the worker marks orphaned `running` jobs `failed`.
-- One default recipe (rank, alpha, learning rate, epochs, `max_seq_len`), assistant-only loss, a small general
-  instruction mix to limit forgetting. QLoRA optional on CUDA.
+- One default recipe (rank, alpha, learning rate, epochs), assistant-only loss, a small general instruction mix to
+  limit forgetting. How it fits in memory is planned per run (Training memory).
 - The teacher can be a base model too: LoRA on the large model when prompting gets close but stays inconsistent
   (QLoRA keeps it on one GPU).
+
+### Training memory
+
+Built (2026-11-05). Each run picks how the base fits the memory of the machine that trains it.
+
+- Strategies: LoRA on the base in bf16 (CUDA, ROCm, Intel XPU) or fp32 (Apple MPS, CPU), and QLoRA: the base in
+  4-bit NF4 with double quantisation through bitsandbytes, bf16 compute, adapters on every linear layer. Each with or
+  without gradient checkpointing (non-reentrant). Micro-batches of 8, 4, 2 or 1 rows with gradient accumulation to an
+  effective batch of 16; MPS takes one row at a time. 8-bit optimiser states from bitsandbytes where a worker has it:
+  paged AdamW on CUDA, plain 8-bit AdamW on ROCm and XPU; fp32 AdamW otherwise.
+- QLoRA runs where the pinned bitsandbytes (0.50.2, the `qlora` extra, installed in the Docker image) ships kernels:
+  its Linux x86_64 wheel carries CUDA 11.8–13.2, ROCm 6.4–7.2 and Intel XPU builds, the aarch64 and Windows wheels
+  CUDA. Never on Apple silicon or the CPU: there the plan says "QLoRA needs an NVIDIA GPU" whenever QLoRA would have
+  fitted. MLX training stays parked (v2).
+- Sequence length: the longest training example, rounded up to 16 tokens and capped by the base's context from the
+  catalogue. The plan estimates it from characters (four a token plus 48 for the prompt); the worker tokenises the
+  rows the way TRL does and fits it exactly.
+- Peak memory per option: base weights (parameters from the catalogue's `shape`: hidden size, layers, vocabulary,
+  heads, MLP width, tied embeddings; NF4 with bf16 embeddings for QLoRA), adapter with gradients and optimiser states,
+  activations per token and layer (every layer, or each layer's input plus one layer with checkpointing), logits
+  (vocabulary × tokens × 12 bytes for the fp32 loss), a fixed runtime overhead and 10% fragmentation. Imported bases
+  take their shape from `config.json`; a base with neither gets one guessed from its size.
+- Choice: the fastest option whose peak stays under 85% of the machine's memory (the largest single GPU, GPU-usable
+  unified memory on Apple silicon, RAM on the CPU). Speed is relative: QLoRA ×0.7, checkpointing ×0.75, smaller
+  micro-batches slower. The machine is the online worker with the fastest plan, from the hardware and libraries
+  workers report (`bitsandbytes` among them); with none reported the plan is unknown and the worker that takes the job
+  plans on its own.
+- Nothing fits: `POST /api/minibrains/{slug}/versions` refuses up front (409) with the smallest plan, its memory and
+  the machine's ("Qwen3 14B does not fit for training on L4: the smallest plan, LoRA bf16 with checkpointing at 1 row
+  of 160 tokens, needs about 30 GB, …").
+- Overrides on the Training page and in that call: strategy, gradient checkpointing, micro-batch, sequence length,
+  LoRA rank (up to 64, the SGLang pools' limit; alpha is twice the rank), learning rate, epochs and rows, each field
+  showing its default. `GET /api/minibrains/{slug}/training-plan` takes the same settings and returns the plan, every
+  option's memory with its parts, and the defaults.
+- The version's recipe stores the plan (strategy, checkpointing, micro-batch, accumulation, sequence length, rank,
+  alpha, learning rate, dropout, optimiser, precision, device, the overrides, and the planned peak against the
+  machine's memory), so a run is reproducible. The worker keeps it when it fits its machine, plans again what was not
+  overridden when it does not, and fails with the refusal when overrides no longer fit. The summary records what ran,
+  the measured peak memory and how many examples were longer than the sequence length.
+- Evaluation scores the adapter on the full-precision base, the way serving runs it, whatever trained it.
+- Discover, Add model and the base picker show Memory to run and Memory to train (QLoRA): QLoRA 4-bit with
+  checkpointing on an NVIDIA GPU, one 512-token row at a time, with "Trains here" when a worker in the pool can train
+  it. Runs here stays about serving.
+- Measured on an M1 Pro (`docs/findings.md`); QLoRA and the CUDA estimates have not run on an NVIDIA GPU yet.
 
 ### Base model registry
 
@@ -1136,7 +1180,7 @@ Two modes, same code, same adapter format (PEFT safetensors).
 | OS | Linux, macOS, Windows | Linux |
 | Install | Native via uv (Docker on macOS has no GPU access) | Docker image + compose; Helm / OpenShift in v2 |
 | Compute | PyTorch picks CUDA, ROCm, MPS, Intel XPU or CPU | NVIDIA CUDA; AMD ROCm in v2 |
-| Training | Same TRL/PEFT code; models up to ~3B (CPU: ~0.5B) | Full recipe, QLoRA optional |
+| Training | Same TRL/PEFT code; LoRA in fp32 on MPS or CPU, sized by the planner (~2B on a 16 GB Mac) | LoRA or QLoRA, picked by the training planner |
 | Serving | `transformers` backend, PEFT multi-adapter | SGLang pool |
 | Teacher | The base model itself, a larger compressed model if memory allows, or an opt-in API | Larger local model on its own pool |
 | For | Evaluating, developing, small teams | Real workloads |
@@ -1169,7 +1213,8 @@ Two modes, same code, same adapter format (PEFT safetensors).
 
 ### Production hardware
 
-- 8B student: LoRA in bf16 ~40–48GB, QLoRA ~16–24GB, serving ~16GB weights plus KV cache.
+- 8B student, planner estimates at 160-token rows and an effective batch of 16: LoRA in bf16 ~32GB at micro-batch 8
+  (~20GB with checkpointing), QLoRA with checkpointing ~10GB; serving ~16GB weights plus KV cache.
 - Teacher: ~30B class ~32GB in FP8 or ~64GB in bf16; ~70B class ~40GB in 4-bit; plus KV cache.
 - Minimum: one 80GB GPU, steps run in order by the worker. Recommended: two (teacher and training on one, serving on
   the other) so prompt-only versions stay up.
@@ -1226,6 +1271,9 @@ Everything in the v1 scope below, after M1.
 - [x] Job contract: jobs table with leases, workers over HTTP, retries with backoff, cancel, events over SSE
 - [x] Artifacts by SHA-256 ID; Alembic migrations; `MINIBRAIN_DATABASE_URL`
 - [ ] Base model registry, default recipe, chat template parity tests
+- [ ] Training memory: LoRA or QLoRA (bitsandbytes), gradient checkpointing, 8-bit optimisers and a fitted sequence
+      length, chosen per run by the planner, with overrides stored on the version (built and measured with LoRA on
+      MPS and CPU; QLoRA and the CUDA estimates: verify on a GPU box)
 - [x] Base model health: saved SHA-256 file list, verify, repair, re-import, relocate, failure states with one action
       each, adapters pinned to their base's content hash
 - [x] Base models stay on disk until deleted; deleting removes their files, and a base with models built on it goes

@@ -24,10 +24,12 @@ from minibrain.api.schemas import (
     ModelRow,
     PoolChoice,
 )
+from minibrain.api.training_plan import train_fit
 from minibrain.api.views import job_info
 from minibrain.auth.identity import current_actor
 from minibrain.jobs.queue import enqueue
 from minibrain.leader import Leader
+from minibrain.ml.planner import Machine
 from minibrain.models import hub
 from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
 from minibrain.models.copies import BUCKET
@@ -35,6 +37,7 @@ from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
 from minibrain.models.registry import start_download, weights_space
 from minibrain.models.rules import licence_use
+from minibrain.models.train_facts import trainer_machines
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import Pool, find_pool, pools
 from minibrain.registry.models import CatalogModel, CatalogVariant, Job, JobKind, JobStatus, Model, now
@@ -56,8 +59,13 @@ def pool_hardware(pool: Pool) -> Hardware:
     return max(machines, key=lambda machine: machine.memory_bytes or 0)
 
 
-def local_machines(session: Session, node: NodeReport) -> list[Hardware]:
-    return find_pool(pools(session, node), LOCAL_POOL).machines()
+def local_pool(session: Session, node: NodeReport) -> Pool:
+    return find_pool(pools(session, node), LOCAL_POOL)
+
+
+def local_info(session: Session, settings: Settings, node: NodeReport, entry: CatalogModel) -> CatalogEntry:
+    pool = local_pool(session, node)
+    return entry_info(session, settings, entry, pool.machines(), trainer_machines([pool]))
 
 
 def cached_fully(variant: CatalogVariant) -> bool:
@@ -91,7 +99,9 @@ def added_for(session: Session, settings: Settings, entry: CatalogModel) -> list
     return added
 
 
-def variant_info(variant: CatalogVariant, machines: list[Hardware]) -> CatalogVariantInfo:
+def variant_info(
+    entry: CatalogModel, variant: CatalogVariant, machines: list[Hardware], trainers: list[Machine]
+) -> CatalogVariantInfo:
     return CatalogVariantInfo(
         id=variant.id,
         label=variant.label,
@@ -106,10 +116,13 @@ def variant_info(variant: CatalogVariant, machines: list[Hardware]) -> CatalogVa
         runtimes=list(variant.runtimes),
         requires=dict(variant.requires),
         fit=FitInfo(**pool_fit(variant.weights_bytes, variant.requires, machines)),
+        train_fit=train_fit(entry, variant, trainers),
     )
 
 
-def entry_info(session: Session, settings: Settings, entry: CatalogModel, machines: list[Hardware]) -> CatalogEntry:
+def entry_info(
+    session: Session, settings: Settings, entry: CatalogModel, machines: list[Hardware], trainers: list[Machine]
+) -> CatalogEntry:
     return CatalogEntry(
         id=entry.id,
         name=entry.name,
@@ -136,7 +149,7 @@ def entry_info(session: Session, settings: Settings, entry: CatalogModel, machin
         moe=entry.moe,
         superseded_by=entry.superseded_by,
         origin=entry.origin,
-        variants=[variant_info(variant, machines) for variant in entry.variants],
+        variants=[variant_info(entry, variant, machines, trainers) for variant in entry.variants],
         added=added_for(session, settings, entry),
     )
 
@@ -153,13 +166,14 @@ def catalogue(
     found = pools(session, node)
     chosen = find_pool(found, pool)
     machines = chosen.machines()
+    trainers = trainer_machines([chosen])
     policy = load_policy(session)
     entries = session.scalars(select(CatalogModel).order_by(CatalogModel.position))
     synced = [entry.synced_at for entry in session.scalars(select(CatalogModel)) if entry.synced_at is not None]
     sync = latest_sync(session)
     space = weights_space(session, settings)
     return CatalogResponse(
-        entries=[entry_info(session, settings, entry, machines) for entry in entries],
+        entries=[entry_info(session, settings, entry, machines, trainers) for entry in entries],
         hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
         pools=[PoolChoice(name=item.name, label=item.label) for item in found if item.machines() or item is chosen],
         pool=chosen.name,
@@ -213,7 +227,7 @@ def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep
         raise ConflictError(str(error)) from error
     existing = session.scalar(select(CatalogModel).where(CatalogModel.repo == repo))
     if existing is not None:
-        return entry_info(session, settings, existing, local_machines(session, node))
+        return local_info(session, settings, node, existing)
     try:
         entry = lookup(repo)
     except HubAddError as error:
@@ -227,7 +241,7 @@ def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep
         raise NotFoundError(f"{repo} could not be added")
     added.origin = "hub"
     session.commit()
-    return entry_info(session, settings, added, local_machines(session, node))
+    return local_info(session, settings, node, added)
 
 
 @router.delete("/{catalog_id}", status_code=204, dependencies=[Depends(admin)])

@@ -11,6 +11,7 @@ import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
 import { type BaseOption, logoPublisher, trainableVariant } from "./baseOptions";
 import { FormatHelp, fileType, formatName, formatUse, scheme, trainable } from "./formats";
+import { trainMemory } from "./runsHere";
 
 function Block({
     title,
@@ -45,13 +46,48 @@ function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control
                 <span className="text-sm tabular-nums">{bytes(variant.size_bytes)}</span>
             </span>
             <span className="text-sm text-muted-foreground">
-                {`${fileType(variant)} · ${formatUse(variant)} · ${bytes(variant.fit.needed_bytes)} memory`}
+                {[
+                    fileType(variant),
+                    formatUse(variant),
+                    `${bytes(variant.fit.needed_bytes)} to run`,
+                    trainMemory(variant) === null
+                        ? null
+                        : `${bytes(trainMemory(variant))} to train`,
+                ]
+                    .filter(Boolean)
+                    .join(" · ")}
             </span>
         </span>
     );
 }
 
 const CARD = "flex rounded-lg border px-3 py-2.5 text-sm leading-snug";
+
+const TRAIN_TONES = { fits: "success", insufficient: "destructive" } as const;
+
+function TrainLine({ variant }: { variant: CatalogVariantInfo | null }) {
+    const fit = variant?.train_fit;
+    if (!fit || fit.qlora_bytes === null) {
+        return null;
+    }
+    const level = fit.level === "fits" || fit.level === "insufficient" ? fit.level : null;
+    return (
+        <div className="flex flex-col gap-1 text-sm">
+            <div className="flex items-baseline justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                    Memory to train (QLoRA)
+                    <InfoTip label="Memory to train">{fit.basis}</InfoTip>
+                </span>
+                <span className="tabular-nums">{bytes(fit.qlora_bytes)}</span>
+            </div>
+            {level && (
+                <StatusText tone={TRAIN_TONES[level]}>
+                    {level === "fits" ? "Trains here" : "Too big to train here"}
+                </StatusText>
+            )}
+        </div>
+    );
+}
 
 function Formats({
     plan,
@@ -300,6 +336,7 @@ export function AddModelSummary({
                     }}
                 />
                 <MemoryGauge variant={variant} memoryLabel={catalog?.hardware.memory_label} />
+                <TrainLine variant={variant} />
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp

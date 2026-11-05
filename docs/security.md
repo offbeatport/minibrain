@@ -495,8 +495,9 @@ writes the same two into `sbom/`.
 Each release carries one SBOM per image, `minibrain-image-{cpu,cuda}-{amd64,arm64}.cdx.json`: the release workflow
 loads the image it pushes into Docker and runs syft on it, with the settings below, and attests the SBOM on that
 image in GHCR. CI does not build the image (the CUDA one is about 7 GB). Its Python packages are the
-`--no-dev --extra postgres` subset of `minibrain-python.cdx.json`, except torch, which comes from the PyTorch index as
-the CUDA or CPU build. For a local build, operating system packages included, run syft against the built image:
+`--no-dev --extra postgres --extra qlora` subset of `minibrain-python.cdx.json`, except torch, which comes from the
+PyTorch index as the CUDA or CPU build. For a local build, operating system packages included, run syft against the
+built image:
 
 ```sh
 SYFT_CHECK_FOR_APP_UPDATE=false SYFT_FILE_METADATA_DIGESTS=sha256 \

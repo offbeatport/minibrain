@@ -62,7 +62,7 @@ FEW_TRAINING_ROWS = 10
 LOW_RECALL = 0.5
 SMALL_HELD_OUT = 200
 DIGITS = 4
-RECIPE_INTS = ("max_rows", "batch_size", "grad_accum", "rank", "alpha")
+RECIPE_INTS = ("max_rows", "micro_batch", "grad_accum", "seq_len", "rank", "alpha")
 
 
 def stamp(moment: datetime | None) -> str | None:
@@ -270,11 +270,15 @@ def run_card(session: Session, job: Job | None, device: Any) -> CardRun | None:
 
 def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
     ints = {key: whole(recipe.get(key)) for key in RECIPE_INTS}
+    plan = recipe.get("plan")
+    label = plan.get("label") if isinstance(plan, dict) else None
     return CardRecipe(
+        strategy=str(label) if label else None,
         max_rows=ints["max_rows"],
         epochs=rounded(recipe.get("epochs")),
-        batch_size=ints["batch_size"],
+        micro_batch=ints["micro_batch"],
         grad_accum=ints["grad_accum"],
+        seq_len=ints["seq_len"],
         rank=ints["rank"],
         alpha=ints["alpha"],
         learning_rate=None if recipe.get("learning_rate") is None else float(recipe["learning_rate"]),

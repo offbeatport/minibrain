@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
-import { type JobInfo, type MinibrainDetail, api, unwrap } from "~/api/client";
+import { type JobInfo, type MinibrainDetail, type VersionCreate, api, unwrap } from "~/api/client";
 import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
@@ -25,6 +25,13 @@ import { relativeTime } from "~/lib/time";
 import { ModelChecks } from "./data/Checks";
 import { TrainingData } from "./data/TrainingData";
 import { ModelDataNotice } from "./data/versionData";
+import {
+    NO_CHOICES,
+    type TrainingChoices,
+    TrainingPlanPanel,
+    chosenSettings,
+    useTrainingPlan,
+} from "./training/TrainingPlan";
 
 const FINISHED_SHOWN = 5;
 
@@ -103,13 +110,16 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     });
     const [maxRows, setMaxRows] = useState<number | null>(Number(preset.rows) || 3000);
     const [epochs, setEpochs] = useState<number | null>(Number(preset.epochs) || 1);
+    const [choices, setChoices] = useState<TrainingChoices>(NO_CHOICES);
     const versions = useSnapshots(detail.dataset ?? "", Boolean(detail.dataset));
     const options = versions.data ?? [];
     const [picked, setPicked] = useState<string | null>(null);
     const chosen = options.find((item) => String(item.id) === picked);
     const shown = chosen ?? detail.snapshot;
+    const settings = { ...choices, max_rows: maxRows, epochs };
+    const plan = useTrainingPlan(slug, chosen?.id ?? null, settings);
     const create = useMutation({
-        mutationFn: (body: { kind: "prompt" | "lora"; max_rows?: number; epochs?: number }) =>
+        mutationFn: (body: VersionCreate) =>
             unwrap(
                 api.POST("/api/minibrains/{slug}/versions", {
                     params: { path: { slug } },
@@ -120,9 +130,10 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     });
     const train = () => {
         if (maxRows !== null && epochs !== null) {
-            create.mutate({ kind: "lora", max_rows: maxRows, epochs });
+            create.mutate({ kind: "lora", ...chosenSettings(settings) });
         }
     };
+    const refused = plan.data?.level === "insufficient";
     return (
         <Section
             title="New version"
@@ -140,7 +151,14 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                 <ModelDataNotice slug={slug} />
             </div>
             <ModelChecks snapshot={shown} />
-            <div className="flex flex-wrap items-end gap-6">
+            <TrainingPlanPanel
+                plan={plan.data}
+                error={plan.error}
+                choices={choices}
+                onChange={setChoices}
+            />
+            <ErrorLine error={plan.error} />
+            <div className="flex flex-wrap items-end gap-6 pt-4">
                 <Button variant="outline" onClick={() => create.mutate({ kind: "prompt" })}>
                     Score prompt-only version
                 </Button>
@@ -171,7 +189,9 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                     <Button
                         ref={trainButton}
                         onClick={train}
-                        disabled={create.isPending || maxRows === null || epochs === null}
+                        disabled={
+                            create.isPending || maxRows === null || epochs === null || refused
+                        }
                     >
                         Train new version
                     </Button>

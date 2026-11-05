@@ -24,7 +24,7 @@ FROM python AS lock
 WORKDIR /src
 COPY pyproject.toml uv.lock ./
 RUN mkdir /lock \
-    && export_lock() { uv export --frozen --no-dev --no-emit-project --extra postgres --no-header --no-annotate "$@"; } \
+    && export_lock() { uv export --frozen --no-dev --no-emit-project --extra postgres --extra qlora --no-header --no-annotate "$@"; } \
     && export_lock --no-hashes -o /lock/all.txt \
     && export_lock --no-hashes --prune torch -o /lock/without-torch.txt \
     && grep -vxFf /lock/without-torch.txt /lock/all.txt > /lock/torch.txt \

@@ -9,8 +9,7 @@ from minibrain.data.snapshot import Example
 
 CHECKS = ("duplicates", "conflicts", "balance", "leakage", "length", "personal_data")
 HARD_STOPS = ("empty", "single_label")
-TRAINING_TOKENS = 256
-PROMPT_TOKENS = 48
+LONG_TOKENS = 2048
 CHARS_PER_TOKEN = 4
 EXAMPLES = 5
 
@@ -175,10 +174,9 @@ def leakage(_rows: list[tuple[str, str]], _limits: CheckLimits, splits: dict[str
 
 def length(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object, raw: Rows = ()) -> Finding:
     empty = sum(1 for text, label in raw if label and label.strip() and not (text and text.strip()))
-    room = TRAINING_TOKENS - PROMPT_TOKENS
-    long = [text for text, _ in rows if len(text) / CHARS_PER_TOKEN > room]
+    long = [text for text, _ in rows if len(text) / CHARS_PER_TOKEN > LONG_TOKENS]
     if not empty and not long:
-        return Finding("length", "ok", "Input lengths", f"Every input fits in about {room} tokens.")
+        return Finding("length", "ok", "Input lengths", f"Every input fits in about {LONG_TOKENS:,} tokens.")
     parts = []
     if empty:
         parts.append(
@@ -187,9 +185,9 @@ def length(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object, r
         )
     if long:
         parts.append(
-            f"{plural(len(long), 'input')} {agree(len(long), 'runs', 'run')} past about {room} tokens (estimated at "
-            f"{CHARS_PER_TOKEN} characters a token) and {agree(len(long), 'is', 'are')} cut to fit a "
-            f"{TRAINING_TOKENS}-token training example"
+            f"{plural(len(long), 'input')} {agree(len(long), 'runs', 'run')} past about {LONG_TOKENS:,} tokens "
+            f"(estimated at {CHARS_PER_TOKEN} characters a token); training fits its sequence length to the longest "
+            "example, so long ones raise the memory every step needs, and anything past the base model's context is cut"
         )
     return Finding(
         "length",

@@ -4,7 +4,7 @@ from typing import Any
 import httpx
 
 from minibrain.models import hub
-from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, context_of, needed, released_of, tier
+from minibrain.models.rules import LICENCE_OVERRIDES, LICENCES, context_of, needed, released_of, shape_of, tier
 
 REPO = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")
 TIMEOUT = httpx.Timeout(20.0)
@@ -116,6 +116,7 @@ def describe(repo: str, info: dict[str, Any], config: dict[str, Any]) -> dict[st
         "tier": size_tier,
         "params_b": round(params, 2),
         "moe": moe,
+        "shape": shape_of(config),
         "superseded_by": None,
         "variants": [
             {

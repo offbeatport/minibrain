@@ -267,6 +267,7 @@ minibrain serve
 | `postgres` | psycopg, for `MINIBRAIN_DATABASE_URL=postgresql+psycopg://user:password@host/db` |
 | `mlx` | The MLX engine (`mlx-lm`), Apple silicon only |
 | `llamacpp` | The llama.cpp engine, for GGUF models |
+| `qlora` | bitsandbytes, for QLoRA and 8-bit optimisers on CUDA, ROCm and Intel GPUs (Linux and Windows; the image includes it) |
 
 ## PyTorch backends
 
@@ -413,7 +414,7 @@ Often added with `-e`:
 
 | Variable | For |
 |---|---|
-| `MINIBRAIN_DATABASE_URL` | Metadata in Postgres (the image includes the `postgres` extra) |
+| `MINIBRAIN_DATABASE_URL` | Metadata in Postgres (the image includes the `postgres` and `qlora` extras) |
 | `MINIBRAIN_MODELS_S3_URL`, `AWS_*` | Models from an S3-compatible bucket |
 | `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror. Also set `MINIBRAIN_OFFLINE=0` and `HF_HUB_OFFLINE=0`, and allow the host in Settings → Security |
 | `MINIBRAIN_TRAIN_DEVICE` | Force `cuda`, `xpu`, `mps` or `cpu` for training |
@@ -543,7 +544,7 @@ in a checkout of the release tag, with the release wheel downloaded next to it. 
 and a trusted root along to check it on the target ([Offline](#offline)).
 
 ```sh
-uv export --frozen --no-dev --no-emit-project --extra postgres -o requirements.txt
+uv export --frozen --no-dev --no-emit-project --extra postgres --extra qlora -o requirements.txt
 python3.12 -m pip download --only-binary=:all: -d wheels -r requirements.txt
 cp minibrain-0.1.0-py3-none-any.whl wheels/
 ```

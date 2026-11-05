@@ -5032,6 +5032,207 @@
         }
       }
     },
+    "/api/minibrains/{slug}/training-plan": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Training Plan",
+        "operationId": "get_training_plan_api_minibrains__slug__training_plan_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "lora",
+                    "qlora"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Strategy"
+            }
+          },
+          {
+            "name": "checkpointing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Checkpointing"
+            }
+          },
+          {
+            "name": "micro_batch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 64,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Micro Batch"
+            }
+          },
+          {
+            "name": "seq_len",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1048576,
+                  "minimum": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Seq Len"
+            }
+          },
+          {
+            "name": "rank",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 64,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rank"
+            }
+          },
+          {
+            "name": "learning_rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 0.01,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Learning Rate"
+            }
+          },
+          {
+            "name": "epochs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 10,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Epochs"
+            }
+          },
+          {
+            "name": "max_rows",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Rows"
+            }
+          },
+          {
+            "name": "snapshot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingPlanInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}/versions/{number}/card": {
       "get": {
         "tags": [
@@ -10984,6 +11185,17 @@
       },
       "CardRecipe": {
         "properties": {
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy"
+          },
           "max_rows": {
             "anyOf": [
               {
@@ -11006,7 +11218,7 @@
             ],
             "title": "Epochs"
           },
-          "batch_size": {
+          "micro_batch": {
             "anyOf": [
               {
                 "type": "integer"
@@ -11015,7 +11227,7 @@
                 "type": "null"
               }
             ],
-            "title": "Batch Size"
+            "title": "Micro Batch"
           },
           "grad_accum": {
             "anyOf": [
@@ -11027,6 +11239,17 @@
               }
             ],
             "title": "Grad Accum"
+          },
+          "seq_len": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq Len"
           },
           "rank": {
             "anyOf": [
@@ -11066,7 +11289,7 @@
         "required": [
           "max_rows",
           "epochs",
-          "batch_size",
+          "micro_batch",
           "grad_accum",
           "rank",
           "alpha",
@@ -11830,6 +12053,9 @@
           },
           "fit": {
             "$ref": "#/components/schemas/FitInfo"
+          },
+          "train_fit": {
+            "$ref": "#/components/schemas/TrainFitInfo"
           }
         },
         "type": "object",
@@ -11846,7 +12072,8 @@
           "files",
           "runtimes",
           "requires",
-          "fit"
+          "fit",
+          "train_fit"
         ],
         "title": "CatalogVariantInfo"
       },
@@ -21718,6 +21945,347 @@
         ],
         "title": "TokenUsage"
       },
+      "TrainFitInfo": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "fits",
+              "insufficient",
+              "unknown",
+              "unsupported"
+            ],
+            "title": "Level"
+          },
+          "qlora_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qlora Bytes"
+          },
+          "available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Bytes"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "qlora_bytes",
+          "available_bytes",
+          "label",
+          "basis"
+        ],
+        "title": "TrainFitInfo"
+      },
+      "TrainingDefaults": {
+        "properties": {
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy"
+          },
+          "checkpointing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpointing"
+          },
+          "micro_batch": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Micro Batch"
+          },
+          "seq_len": {
+            "type": "integer",
+            "title": "Seq Len"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "learning_rate": {
+            "type": "number",
+            "title": "Learning Rate"
+          },
+          "epochs": {
+            "type": "number",
+            "title": "Epochs"
+          },
+          "max_rows": {
+            "type": "integer",
+            "title": "Max Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy",
+          "checkpointing",
+          "micro_batch",
+          "seq_len",
+          "rank",
+          "learning_rate",
+          "epochs",
+          "max_rows"
+        ],
+        "title": "TrainingDefaults"
+      },
+      "TrainingOptionInfo": {
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "title": "Strategy"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "checkpointing": {
+            "type": "boolean",
+            "title": "Checkpointing"
+          },
+          "micro_batch": {
+            "type": "integer",
+            "title": "Micro Batch"
+          },
+          "grad_accum": {
+            "type": "integer",
+            "title": "Grad Accum"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "precision": {
+            "type": "string",
+            "title": "Precision"
+          },
+          "optimizer": {
+            "type": "string",
+            "title": "Optimizer"
+          },
+          "peak_bytes": {
+            "type": "integer",
+            "title": "Peak Bytes"
+          },
+          "available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Bytes"
+          },
+          "fits": {
+            "type": "boolean",
+            "title": "Fits"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "parts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy",
+          "label",
+          "checkpointing",
+          "micro_batch",
+          "grad_accum",
+          "device",
+          "precision",
+          "optimizer",
+          "peak_bytes",
+          "available_bytes",
+          "fits",
+          "supported",
+          "reason",
+          "parts"
+        ],
+        "title": "TrainingOptionInfo"
+      },
+      "TrainingPlanInfo": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "fits",
+              "insufficient",
+              "unknown"
+            ],
+            "title": "Level"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine"
+          },
+          "memory_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Label"
+          },
+          "chosen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingOptionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/TrainingOptionInfo"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "seq_len": {
+            "type": "integer",
+            "title": "Seq Len"
+          },
+          "longest_tokens": {
+            "type": "integer",
+            "title": "Longest Tokens"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "overrides": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Overrides"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/TrainingDefaults"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "basis",
+          "note",
+          "machine",
+          "memory_label",
+          "chosen",
+          "options",
+          "rows",
+          "seq_len",
+          "longest_tokens",
+          "context",
+          "overrides",
+          "defaults"
+        ],
+        "title": "TrainingPlanInfo"
+      },
       "Usage": {
         "properties": {
           "days": {
@@ -21817,25 +22385,83 @@
       },
       "VersionCreate": {
         "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "prompt",
-              "lora"
-            ],
-            "title": "Kind"
-          },
-          "max_rows": {
+          "strategy": {
             "anyOf": [
               {
-                "type": "integer",
-                "minimum": 10.0
+                "type": "string",
+                "enum": [
+                  "lora",
+                  "qlora"
+                ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Max Rows"
+            "title": "Strategy"
+          },
+          "checkpointing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpointing"
+          },
+          "micro_batch": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Micro Batch"
+          },
+          "seq_len": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1048576.0,
+                "minimum": 32.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq Len"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 64.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "learning_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.01,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Rate"
           },
           "epochs": {
             "anyOf": [
@@ -21849,6 +22475,26 @@
               }
             ],
             "title": "Epochs"
+          },
+          "max_rows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Rows"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prompt",
+              "lora"
+            ],
+            "title": "Kind"
           },
           "snapshot_id": {
             "anyOf": [

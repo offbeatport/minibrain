@@ -39,6 +39,9 @@ mlx = [
 llamacpp = [
     "llama-cpp-python>=0.3.36",
 ]
+qlora = [
+    "bitsandbytes>=0.50.2 ; sys_platform == 'linux' or sys_platform == 'win32'",
+]
 hsm = [
     "pykcs11>=1.5.20",
 ]

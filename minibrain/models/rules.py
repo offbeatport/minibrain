@@ -148,6 +148,40 @@ def context_of(config: dict[str, Any]) -> int | None:
     return None
 
 
+def whole(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
+def active_intermediate(text: dict[str, Any], dense: int) -> int:
+    per_expert = whole(text.get("moe_intermediate_size"))
+    chosen = whole(text.get("num_experts_per_tok"))
+    if per_expert is None or chosen is None:
+        return dense
+    shared = whole(text.get("shared_expert_intermediate_size")) or 0
+    return per_expert * (chosen + (whole(text.get("n_shared_experts")) or 0)) + shared
+
+
+def shape_of(config: dict[str, Any]) -> dict[str, Any] | None:
+    text = config.get("text_config") or config
+    hidden, layers, vocab = (whole(text.get(key)) for key in ("hidden_size", "num_hidden_layers", "vocab_size"))
+    if hidden is None or layers is None or vocab is None:
+        return None
+    heads = whole(text.get("num_attention_heads")) or max(1, hidden // 128)
+    head_dim = whole(text.get("head_dim")) or hidden // heads
+    dense = whole(text.get("intermediate_size")) or 4 * hidden
+    tied = text.get("tie_word_embeddings", config.get("tie_word_embeddings", False))
+    return {
+        "hidden": hidden,
+        "layers": layers,
+        "vocab": vocab,
+        "heads": heads,
+        "kv_heads": whole(text.get("num_key_value_heads")) or heads,
+        "head_dim": head_dim,
+        "intermediate": active_intermediate(text, dense),
+        "tied": bool(tied),
+    }
+
+
 def released_of(info: dict[str, Any]) -> str | None:
     created = info.get("createdAt")
     return created[:10] if isinstance(created, str) and len(created) >= 10 else None

@@ -499,6 +499,7 @@ class CatalogModel(Base):
     tier: Mapped[str] = mapped_column(default="S", server_default="S")
     params_b: Mapped[float] = mapped_column(default=0.0, server_default="0")
     moe: Mapped[bool] = mapped_column(default=False, server_default=false())
+    shape: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     superseded_by: Mapped[str | None] = mapped_column(default=None)
     origin: Mapped[str] = mapped_column(default="catalogue", server_default="catalogue")
 

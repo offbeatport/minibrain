@@ -399,6 +399,7 @@ class Worker:
         if claim["kind"] == JobKind.TRAIN:
             spec |= {
                 "recipe": params["recipe"],
+                "plan_base": params.get("plan_base"),
                 "adapter_out": str(attempt_dir / "out"),
                 "checkpoints": str(workdir / "checkpoints"),
             }

@@ -1,7 +1,17 @@
 from importlib.metadata import PackageNotFoundError, version
 
 JOB_PROTOCOL = 2
-REPORTED = ("minibrain", "torch", "transformers", "peft", "trl", "sglang", "mlx-lm", "llama-cpp-python")
+REPORTED = (
+    "minibrain",
+    "torch",
+    "transformers",
+    "peft",
+    "trl",
+    "bitsandbytes",
+    "sglang",
+    "mlx-lm",
+    "llama-cpp-python",
+)
 
 
 def library_version(name: str) -> str | None:

@@ -1591,6 +1591,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/{slug}/training-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Training Plan */
+        get: operations["get_training_plan_api_minibrains__slug__training_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}/versions/{number}/card": {
         parameters: {
             query?: never;
@@ -3272,14 +3289,18 @@ export interface components {
         };
         /** CardRecipe */
         CardRecipe: {
+            /** Strategy */
+            strategy?: string | null;
             /** Max Rows */
             max_rows: number | null;
             /** Epochs */
             epochs: number | null;
-            /** Batch Size */
-            batch_size: number | null;
+            /** Micro Batch */
+            micro_batch: number | null;
             /** Grad Accum */
             grad_accum: number | null;
+            /** Seq Len */
+            seq_len?: number | null;
             /** Rank */
             rank: number | null;
             /** Alpha */
@@ -3519,6 +3540,7 @@ export interface components {
                 [key: string]: unknown;
             };
             fit: components["schemas"]["FitInfo"];
+            train_fit: components["schemas"]["TrainFitInfo"];
         };
         /** CatalogueUpdate */
         CatalogueUpdate: {
@@ -6814,6 +6836,104 @@ export interface components {
             /** Total Tokens */
             total_tokens: number;
         };
+        /** TrainFitInfo */
+        TrainFitInfo: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "fits" | "insufficient" | "unknown" | "unsupported";
+            /** Qlora Bytes */
+            qlora_bytes: number | null;
+            /** Available Bytes */
+            available_bytes: number | null;
+            /** Label */
+            label: string | null;
+            /** Basis */
+            basis: string;
+        };
+        /** TrainingDefaults */
+        TrainingDefaults: {
+            /** Strategy */
+            strategy: string | null;
+            /** Checkpointing */
+            checkpointing: boolean | null;
+            /** Micro Batch */
+            micro_batch: number | null;
+            /** Seq Len */
+            seq_len: number;
+            /** Rank */
+            rank: number;
+            /** Learning Rate */
+            learning_rate: number;
+            /** Epochs */
+            epochs: number;
+            /** Max Rows */
+            max_rows: number;
+        };
+        /** TrainingOptionInfo */
+        TrainingOptionInfo: {
+            /** Strategy */
+            strategy: string;
+            /** Label */
+            label: string;
+            /** Checkpointing */
+            checkpointing: boolean;
+            /** Micro Batch */
+            micro_batch: number;
+            /** Grad Accum */
+            grad_accum: number;
+            /** Device */
+            device: string;
+            /** Precision */
+            precision: string;
+            /** Optimizer */
+            optimizer: string;
+            /** Peak Bytes */
+            peak_bytes: number;
+            /** Available Bytes */
+            available_bytes: number | null;
+            /** Fits */
+            fits: boolean;
+            /** Supported */
+            supported: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Parts */
+            parts: {
+                [key: string]: number;
+            };
+        };
+        /** TrainingPlanInfo */
+        TrainingPlanInfo: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "fits" | "insufficient" | "unknown";
+            /** Basis */
+            basis: string;
+            /** Note */
+            note: string | null;
+            /** Machine */
+            machine: string | null;
+            /** Memory Label */
+            memory_label: string | null;
+            chosen: components["schemas"]["TrainingOptionInfo"] | null;
+            /** Options */
+            options: components["schemas"]["TrainingOptionInfo"][];
+            /** Rows */
+            rows: number;
+            /** Seq Len */
+            seq_len: number;
+            /** Longest Tokens */
+            longest_tokens: number;
+            /** Context */
+            context: number | null;
+            /** Overrides */
+            overrides: string[];
+            defaults: components["schemas"]["TrainingDefaults"];
+        };
         /** Usage */
         Usage: {
             /** Days */
@@ -6849,15 +6969,27 @@ export interface components {
         };
         /** VersionCreate */
         VersionCreate: {
+            /** Strategy */
+            strategy?: ("lora" | "qlora") | null;
+            /** Checkpointing */
+            checkpointing?: boolean | null;
+            /** Micro Batch */
+            micro_batch?: number | null;
+            /** Seq Len */
+            seq_len?: number | null;
+            /** Rank */
+            rank?: number | null;
+            /** Learning Rate */
+            learning_rate?: number | null;
+            /** Epochs */
+            epochs?: number | null;
+            /** Max Rows */
+            max_rows?: number | null;
             /**
              * Kind
              * @enum {string}
              */
             kind: "prompt" | "lora";
-            /** Max Rows */
-            max_rows?: number | null;
-            /** Epochs */
-            epochs?: number | null;
             /** Snapshot Id */
             snapshot_id?: number | null;
         };
@@ -10582,6 +10714,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_training_plan_api_minibrains__slug__training_plan_get: {
+        parameters: {
+            query?: {
+                strategy?: ("lora" | "qlora") | null;
+                checkpointing?: boolean | null;
+                micro_batch?: number | null;
+                seq_len?: number | null;
+                rank?: number | null;
+                learning_rate?: number | null;
+                epochs?: number | null;
+                max_rows?: number | null;
+                snapshot_id?: number | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingPlanInfo"];
                 };
             };
             /** @description Validation Error */

@@ -35,6 +35,10 @@ export type CatalogEntry = Schemas["CatalogEntry"];
 export type CatalogVariantInfo = Schemas["CatalogVariantInfo"];
 export type HardwareInfo = Schemas["HardwareInfo"];
 export type FitInfo = Schemas["FitInfo"];
+export type TrainFitInfo = Schemas["TrainFitInfo"];
+export type TrainingPlanInfo = Schemas["TrainingPlanInfo"];
+export type TrainingOptionInfo = Schemas["TrainingOptionInfo"];
+export type VersionCreate = Schemas["VersionCreate"];
 
 export const CSRF_HEADER = "X-CSRF-Token";
 

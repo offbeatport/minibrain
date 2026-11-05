@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep
+from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
     CompleteRequest,
     CompleteResponse,
@@ -12,6 +12,7 @@ from minibrain.api.schemas import (
     VersionCreate,
     VersionInfo,
 )
+from minibrain.api.training_plan import refuse, require_trainable, training_plan
 from minibrain.api.views import detail, version_info
 from minibrain.auth.identity import current_actor
 from minibrain.data.snapshots import cleanup, require_splits, training_snapshot
@@ -19,7 +20,7 @@ from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.models.health import base_changed
-from minibrain.models.registry import base_hash, base_readiness, quantization, require_usable
+from minibrain.models.registry import base_hash, base_readiness, require_usable
 from minibrain.models.usage import touch
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, Model, VersionKind
 from minibrain.registry.prices import load_prices
@@ -53,7 +54,9 @@ def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
 
 
 @router.post("/minibrains/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
-def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: SettingsDep) -> VersionInfo:
+def add_version(
+    slug: str, body: VersionCreate, session: SessionDep, settings: SettingsDep, node: LocalNodeDep
+) -> VersionInfo:
     minibrain = get_minibrain(session, slug)
     require_idle(minibrain.teardown, minibrain.name)
     base = session.get(Model, minibrain.base_model)
@@ -66,16 +69,16 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     if readiness == "missing":
         raise ConflictError(f"{minibrain.base_model} is no longer on this install")
     require_usable(session, settings, minibrain.base_model)
-    quantized = quantization(session, settings, minibrain.base_model)
-    if kind == VersionKind.LORA and quantized:
-        raise ConflictError(
-            f"{minibrain.base_model} has {quantized.upper()} weights, which can be served but not fine-tuned; "
-            "train on its full-precision format"
-        )
-    recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}
+    if kind == VersionKind.LORA:
+        require_trainable(session, settings, minibrain)
     snapshot = training_snapshot(session, settings, minibrain, body.snapshot_id)
     require_splits(snapshot)
-    version = create_version(session, minibrain, kind, recipe if kind == VersionKind.LORA else {}, snapshot)
+    recipe: dict[str, Any] = {}
+    if kind == VersionKind.LORA:
+        found, _ = training_plan(session, settings, node, minibrain, snapshot, body)
+        refuse(found)
+        recipe = found.recipe()
+    version = create_version(session, minibrain, kind, recipe, snapshot)
     audit_version(
         session,
         minibrain,

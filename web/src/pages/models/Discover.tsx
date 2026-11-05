@@ -50,7 +50,13 @@ import {
 } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
 import { FormatHelp, schemes } from "./formats";
-import { RUNS_HERE_INFO, type RunsHere, useRunsHere } from "./runsHere";
+import {
+    RUNS_HERE_INFO,
+    type RunsHere,
+    TRAIN_MEMORY_INFO,
+    leastTrainMemory,
+    useRunsHere,
+} from "./runsHere";
 
 export function leastMemory(entry: CatalogEntry): number {
     return Math.min(...entry.variants.map((variant) => variant.fit.needed_bytes));
@@ -361,7 +367,34 @@ export function compareHref(ids: string[], pool?: string, onlyDifferences = fals
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-const COLUMNS_KEY = "minibrain.discover.columns.v4";
+function trainHint(entry: CatalogEntry): ReactNode {
+    const levels = new Set(entry.variants.map((variant) => variant.train_fit.level));
+    if (levels.has("fits")) {
+        return <StatusText tone="success">Trains here</StatusText>;
+    }
+    if (levels.has("insufficient")) {
+        return <StatusText tone="neutral">Too big to train here</StatusText>;
+    }
+    return null;
+}
+
+function TrainMemory({ entry }: { entry: CatalogEntry }) {
+    const least = leastTrainMemory(entry);
+    if (least === null) {
+        return muted("Serve only");
+    }
+    const hint = trainHint(entry);
+    return (
+        <span className="flex flex-col">
+            <span>{bytes(least)}</span>
+            {hint && (
+                <DataGridDetail className="text-sm text-muted-foreground">{hint}</DataGridDetail>
+            )}
+        </span>
+    );
+}
+
+const COLUMNS_KEY = "minibrain.discover.columns.v5";
 
 const HIDDEN_COLUMNS = [
     "newer",
@@ -435,10 +468,17 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
         },
         {
             id: "memory",
-            header: "Memory",
+            header: "To run",
             meta: { info: "Memory the model needs to run, in its smallest format." },
             accessorFn: leastMemory,
             cell: ({ row }) => memoryNeeded(row.original),
+        },
+        {
+            id: "train",
+            header: "To train",
+            meta: { info: TRAIN_MEMORY_INFO },
+            accessorFn: (entry) => leastTrainMemory(entry) ?? Number.POSITIVE_INFINITY,
+            cell: ({ row }) => <TrainMemory entry={row.original} />,
         },
         {
             id: "size",

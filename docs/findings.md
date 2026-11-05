@@ -32,3 +32,24 @@ Classify, 77 banking intents ([PolyAI/banking77](https://huggingface.co/datasets
   steps (`kIOGPUCommandBufferCallbackErrorHang`), while batch 1 with 4 accumulation steps trained 40 steps of
   Qwen3-0.6B LoRA (160 rows, rank 8) in 83 s, to the same loss as the CPU. minibrain trains on MPS that way, and a
   job that still fails or stalls there starts again on the CPU.
+
+## Training memory planner on Apple silicon (2026-11-05, Apple M1 Pro 16 GB)
+
+`Qwen/Qwen3-0.6B` LoRA (r 16, all linear layers, dropout 0.05), 160 Banking77 rows, longest example 109 tokens, so a
+112-token sequence length; effective batch 16, one epoch, torch 2.15, transformers 5.21, TRL 1.16. Measured peak is
+the Metal driver's allocation on MPS and the process's peak resident memory on the CPU. GB are GiB, as on screen.
+
+| Device | Precision | Checkpointing | Micro-batch | Planned peak | Measured peak | Time |
+|---|---|---|---|---|---|---|
+| MPS | fp32 | off | 1 | 3.7 GB | 3.4 GB | 92 s |
+| MPS | fp32 | on | 1 | 3.1 GB | 2.8 GB | 228 s |
+| CPU | fp32 | off | 8 | 9.6 GB | 4.8 GB | 156 s |
+
+- **On MPS the plan is 8–11% above the measurement,** so the 85% headroom is not eaten by the estimate. The
+  machine reports 11.8 GB of GPU-usable unified memory (`torch.mps.recommended_max_memory`).
+- **Checkpointing saved 0.6 GB (16%) here but took 2.5× as long** at one row per micro-batch, so the planner turns it
+  on only when the faster option does not fit.
+- **On the CPU the plan is twice the measurement:** the activation and logit terms are conservative there. They are
+  the same per-token terms as on CUDA, which no NVIDIA GPU has checked yet; QLoRA has not run either.
+- Counting parameters from the shape matters for tied embeddings: Qwen3-0.6B's safetensors hold 0.75B values (the
+  tied output layer is stored twice), but training holds 0.6B; weights from the file size were 0.6 GB too high.

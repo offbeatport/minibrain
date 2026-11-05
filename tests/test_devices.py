@@ -66,7 +66,7 @@ def test_half_precision_only_where_the_device_supports_it(
 
 
 def test_mps_and_cpu_train_without_mixed_precision(tmp_path: Path):
-    recipe = train.DEFAULT_RECIPE | {"batch_size": 4, "grad_accum": 2}
+    recipe = train.DEFAULT_RECIPE | {"micro_batch": 4, "grad_accum": 2, "seq_len": 128}
     found = {device: train.sft_config(tmp_path, recipe, device) for device in ("mps", "cpu")}
     assert {device: (config.bf16, config.fp16, config.use_cpu) for device, config in found.items()} == {
         "mps": (False, False, False),

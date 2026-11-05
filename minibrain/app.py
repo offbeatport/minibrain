@@ -35,6 +35,7 @@ from minibrain.api import (
     reference,
     request_logs,
     system,
+    training_plan,
     versions,
 )
 from minibrain.api.access import Identify, TrustedProxy
@@ -281,6 +282,7 @@ def create_app(
         encryption,
         audit,
         versions,
+        training_plan,
         cards,
         feedback,
         keys,

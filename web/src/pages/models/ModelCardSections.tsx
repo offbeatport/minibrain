@@ -440,6 +440,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
             <Facts
                 items={[
                     ["Method", "LoRA adapter"],
+                    ["Strategy", recipe.strategy ?? NONE],
                     ["Rows trained on", value(training.examples)],
                     ["Epochs", value(recipe.epochs)],
                     [
@@ -450,11 +451,12 @@ export function TrainingSection({ card }: { card: ModelCard }) {
                         />,
                     ],
                     ["Learning rate", value(recipe.learning_rate)],
+                    ["Sequence length", value(recipe.seq_len)],
                     [
                         "Batch size",
                         <Numeric
                             key="batch"
-                            value={`${recipe.batch_size ?? NONE} × ${recipe.grad_accum ?? NONE} accumulation`}
+                            value={`${recipe.micro_batch ?? NONE} × ${recipe.grad_accum ?? NONE} accumulation`}
                         />,
                     ],
                     ["Final training loss", value(training.train_loss)],

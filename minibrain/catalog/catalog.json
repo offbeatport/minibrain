@@ -1,5 +1,5 @@
 {
- "snapshot": "2026-11-04T16:14",
+ "snapshot": "2026-11-05T12:00",
  "source": "https://huggingface.co",
  "entries": [
   {
@@ -36,6 +36,16 @@
    "tier": "S",
    "params_b": 0.75,
    "moe": false,
+   "shape": {
+    "hidden": 1024,
+    "layers": 28,
+    "vocab": 151936,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 3072,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen3-0.6b:bf16:safetensors",
@@ -160,6 +170,16 @@
    "tier": "S",
    "params_b": 2.03,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 28,
+    "vocab": 151936,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 6144,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen3-1.7b:bf16:safetensors",
@@ -294,6 +314,16 @@
    "tier": "S",
    "params_b": 4.02,
    "moe": false,
+   "shape": {
+    "hidden": 2560,
+    "layers": 36,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 9728,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen3-4b:bf16:safetensors",
@@ -433,6 +463,16 @@
    "tier": "M",
    "params_b": 8.19,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 36,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 12288,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-8b:bf16:safetensors",
@@ -653,6 +693,16 @@
    "tier": "M",
    "params_b": 14.77,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 40,
+    "vocab": 151936,
+    "heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 17408,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-14b:bf16:safetensors",
@@ -791,6 +841,16 @@
    "tier": "L",
    "params_b": 32.76,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 64,
+    "vocab": 151936,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 25600,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-32b:bf16:safetensors",
@@ -974,6 +1034,16 @@
    "tier": "L",
    "params_b": 30.53,
    "moe": true,
+   "shape": {
+    "hidden": 2048,
+    "layers": 48,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 6144,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-30b-a3b:bf16:safetensors",
@@ -1152,6 +1222,16 @@
    "tier": "XL",
    "params_b": 235.09,
    "moe": true,
+   "shape": {
+    "hidden": 4096,
+    "layers": 94,
+    "vocab": 151936,
+    "heads": 64,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 12288,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-235b-a22b:bf16:safetensors",
@@ -1839,6 +1919,16 @@
    "tier": "S",
    "params_b": 4.02,
    "moe": false,
+   "shape": {
+    "hidden": 2560,
+    "layers": 36,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 9728,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen3-4b-instruct-2507:bf16:safetensors",
@@ -1950,6 +2040,16 @@
    "tier": "L",
    "params_b": 30.53,
    "moe": true,
+   "shape": {
+    "hidden": 2048,
+    "layers": 48,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 6144,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-30b-a3b-instruct-2507:bf16:safetensors",
@@ -2127,6 +2227,16 @@
    "tier": "L",
    "params_b": 30.53,
    "moe": true,
+   "shape": {
+    "hidden": 2048,
+    "layers": 48,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 6144,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen3-coder-30b-a3b-instruct:bf16:safetensors",
@@ -2308,6 +2418,16 @@
    "tier": "S",
    "params_b": 0.49,
    "moe": false,
+   "shape": {
+    "hidden": 896,
+    "layers": 24,
+    "vocab": 151936,
+    "heads": 14,
+    "kv_heads": 2,
+    "head_dim": 64,
+    "intermediate": 4864,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen2.5-0.5b-instruct:bf16:safetensors",
@@ -2404,6 +2524,16 @@
    "tier": "S",
    "params_b": 1.54,
    "moe": false,
+   "shape": {
+    "hidden": 1536,
+    "layers": 28,
+    "vocab": 151936,
+    "heads": 12,
+    "kv_heads": 2,
+    "head_dim": 128,
+    "intermediate": 8960,
+    "tied": true
+   },
    "variants": [
     {
      "id": "qwen2.5-1.5b-instruct:bf16:safetensors",
@@ -2500,6 +2630,16 @@
    "tier": "M",
    "params_b": 7.62,
    "moe": false,
+   "shape": {
+    "hidden": 3584,
+    "layers": 28,
+    "vocab": 152064,
+    "heads": 28,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 18944,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen2.5-7b-instruct:bf16:safetensors",
@@ -2616,6 +2756,16 @@
    "tier": "M",
    "params_b": 14.77,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 48,
+    "vocab": 152064,
+    "heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 13824,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen2.5-14b-instruct:bf16:safetensors",
@@ -2752,6 +2902,16 @@
    "tier": "L",
    "params_b": 32.76,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 64,
+    "vocab": 152064,
+    "heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 27648,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen2.5-32b-instruct:bf16:safetensors",
@@ -2933,6 +3093,16 @@
    "tier": "XL",
    "params_b": 72.71,
    "moe": false,
+   "shape": {
+    "hidden": 8192,
+    "layers": 80,
+    "vocab": 152064,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 29568,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen2.5-72b-instruct:bf16:safetensors",
@@ -3216,6 +3386,16 @@
    "tier": "M",
    "params_b": 7.62,
    "moe": false,
+   "shape": {
+    "hidden": 3584,
+    "layers": 28,
+    "vocab": 152064,
+    "heads": 28,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 18944,
+    "tied": false
+   },
    "variants": [
     {
      "id": "qwen2.5-coder-7b-instruct:bf16:safetensors",
@@ -3329,6 +3509,16 @@
    "tier": "S",
    "params_b": 1.0,
    "moe": false,
+   "shape": {
+    "hidden": 1152,
+    "layers": 26,
+    "vocab": 262144,
+    "heads": 4,
+    "kv_heads": 1,
+    "head_dim": 256,
+    "intermediate": 6912,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gemma-3-1b-it:bf16:safetensors",
@@ -3417,6 +3607,16 @@
    "tier": "S",
    "params_b": 2.61,
    "moe": false,
+   "shape": {
+    "hidden": 2304,
+    "layers": 26,
+    "vocab": 256000,
+    "heads": 8,
+    "kv_heads": 4,
+    "head_dim": 256,
+    "intermediate": 9216,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gemma-2-2b-it:bf16:safetensors",
@@ -3510,6 +3710,16 @@
    "tier": "M",
    "params_b": 9.24,
    "moe": false,
+   "shape": {
+    "hidden": 3584,
+    "layers": 42,
+    "vocab": 256000,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 256,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gemma-2-9b-it:bf16:safetensors",
@@ -3613,6 +3823,16 @@
    "tier": "L",
    "params_b": 27.23,
    "moe": false,
+   "shape": {
+    "hidden": 4608,
+    "layers": 46,
+    "vocab": 256000,
+    "heads": 32,
+    "kv_heads": 16,
+    "head_dim": 128,
+    "intermediate": 36864,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gemma-2-27b-it:bf16:safetensors",
@@ -3759,6 +3979,16 @@
    "tier": "S",
    "params_b": 1.24,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 16,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 8192,
+    "tied": true
+   },
    "variants": [
     {
      "id": "llama-3.2-1b-instruct:bf16:safetensors",
@@ -3847,6 +4077,16 @@
    "tier": "S",
    "params_b": 3.21,
    "moe": false,
+   "shape": {
+    "hidden": 3072,
+    "layers": 28,
+    "vocab": 128256,
+    "heads": 24,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 8192,
+    "tied": true
+   },
    "variants": [
     {
      "id": "llama-3.2-3b-instruct:bf16:safetensors",
@@ -3948,6 +4188,16 @@
    "tier": "M",
    "params_b": 8.03,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "llama-3.1-8b-instruct:bf16:safetensors",
@@ -4061,6 +4311,16 @@
    "tier": "XL",
    "params_b": 70.55,
    "moe": false,
+   "shape": {
+    "hidden": 8192,
+    "layers": 80,
+    "vocab": 128256,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 28672,
+    "tied": false
+   },
    "variants": [
     {
      "id": "llama-3.3-70b-instruct:bf16:safetensors",
@@ -4305,6 +4565,16 @@
    "tier": "M",
    "params_b": 7.25,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 32768,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "mistral-7b-instruct-v0.3:bf16:safetensors",
@@ -4403,6 +4673,16 @@
    "tier": "M",
    "params_b": 12.25,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 40,
+    "vocab": 131072,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "mistral-nemo-instruct-2407:bf16:safetensors",
@@ -4521,6 +4801,16 @@
    "tier": "L",
    "params_b": 23.57,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 40,
+    "vocab": 131072,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 32768,
+    "tied": false
+   },
    "variants": [
     {
      "id": "mistral-small-24b-instruct-2501:bf16:safetensors",
@@ -4654,6 +4944,16 @@
    "tier": "XL",
    "params_b": 46.7,
    "moe": true,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 32000,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "mixtral-8x7b-instruct-v0.1:bf16:safetensors",
@@ -4833,6 +5133,16 @@
    "tier": "S",
    "params_b": 3.82,
    "moe": false,
+   "shape": {
+    "hidden": 3072,
+    "layers": 32,
+    "vocab": 32064,
+    "heads": 32,
+    "kv_heads": 32,
+    "head_dim": 96,
+    "intermediate": 8192,
+    "tied": false
+   },
    "variants": [
     {
      "id": "phi-3.5-mini-instruct:bf16:safetensors",
@@ -4939,6 +5249,16 @@
    "tier": "S",
    "params_b": 3.84,
    "moe": false,
+   "shape": {
+    "hidden": 3072,
+    "layers": 32,
+    "vocab": 200064,
+    "heads": 24,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 8192,
+    "tied": true
+   },
    "variants": [
     {
      "id": "phi-4-mini-instruct:bf16:safetensors",
@@ -5052,6 +5372,16 @@
    "tier": "M",
    "params_b": 14.66,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 40,
+    "vocab": 100352,
+    "heads": 40,
+    "kv_heads": 10,
+    "head_dim": 128,
+    "intermediate": 17920,
+    "tied": false
+   },
    "variants": [
     {
      "id": "phi-4:bf16:safetensors",
@@ -5185,6 +5515,16 @@
    "tier": "M",
    "params_b": 8.17,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 40,
+    "vocab": 49155,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 12800,
+    "tied": true
+   },
    "variants": [
     {
      "id": "granite-3.1-8b-instruct:bf16:safetensors",
@@ -5305,6 +5645,16 @@
    "tier": "S",
    "params_b": 2.53,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 40,
+    "vocab": 49159,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 8192,
+    "tied": true
+   },
    "variants": [
     {
      "id": "granite-3.3-2b-instruct:bf16:safetensors",
@@ -5413,6 +5763,16 @@
    "tier": "M",
    "params_b": 8.17,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 40,
+    "vocab": 49159,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 12800,
+    "tied": true
+   },
    "variants": [
     {
      "id": "granite-3.3-8b-instruct:bf16:safetensors",
@@ -5531,6 +5891,16 @@
    "tier": "M",
    "params_b": 8.03,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "llama-3.1-nemotron-nano-8b-v1:bf16:safetensors",
@@ -5635,6 +6005,16 @@
    "tier": "S",
    "params_b": 1.78,
    "moe": false,
+   "shape": {
+    "hidden": 1536,
+    "layers": 28,
+    "vocab": 151936,
+    "heads": 12,
+    "kv_heads": 2,
+    "head_dim": 128,
+    "intermediate": 8960,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-qwen-1.5b:bf16:safetensors",
@@ -5719,6 +6099,16 @@
    "tier": "M",
    "params_b": 7.62,
    "moe": false,
+   "shape": {
+    "hidden": 3584,
+    "layers": 28,
+    "vocab": 152064,
+    "heads": 28,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 18944,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-qwen-7b:bf16:safetensors",
@@ -5813,6 +6203,16 @@
    "tier": "M",
    "params_b": 8.03,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-llama-8b:bf16:safetensors",
@@ -5907,6 +6307,16 @@
    "tier": "M",
    "params_b": 14.77,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 48,
+    "vocab": 152064,
+    "heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 13824,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-qwen-14b:bf16:safetensors",
@@ -6011,6 +6421,16 @@
    "tier": "L",
    "params_b": 32.76,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 64,
+    "vocab": 152064,
+    "heads": 40,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 27648,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-qwen-32b:bf16:safetensors",
@@ -6135,6 +6555,16 @@
    "tier": "XL",
    "params_b": 70.55,
    "moe": false,
+   "shape": {
+    "hidden": 8192,
+    "layers": 80,
+    "vocab": 128256,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 28672,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-r1-distill-llama-70b:bf16:safetensors",
@@ -6304,6 +6734,16 @@
    "tier": "XL",
    "params_b": 684.49,
    "moe": false,
+   "shape": {
+    "hidden": 7168,
+    "layers": 61,
+    "vocab": 129280,
+    "heads": 128,
+    "kv_heads": 128,
+    "head_dim": 56,
+    "intermediate": 18432,
+    "tied": false
+   },
    "variants": [
     {
      "id": "deepseek-v3:bf16:safetensors",
@@ -7194,6 +7634,16 @@
    "tier": "L",
    "params_b": 20.91,
    "moe": true,
+   "shape": {
+    "hidden": 2880,
+    "layers": 24,
+    "vocab": 201088,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 2880,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gpt-oss-20b:bf16:safetensors",
@@ -7303,6 +7753,16 @@
    "tier": "XL",
    "params_b": 116.83,
    "moe": true,
+   "shape": {
+    "hidden": 2880,
+    "layers": 36,
+    "vocab": 201088,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 2880,
+    "tied": false
+   },
    "variants": [
     {
      "id": "gpt-oss-120b:bf16:safetensors",
@@ -7474,6 +7934,16 @@
    "tier": "S",
    "params_b": 1.48,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 16,
+    "vocab": 100352,
+    "heads": 16,
+    "kv_heads": 16,
+    "head_dim": 128,
+    "intermediate": 8192,
+    "tied": false
+   },
    "variants": [
     {
      "id": "olmo-2-1b-instruct:bf16:safetensors",
@@ -7567,6 +8037,16 @@
    "tier": "M",
    "params_b": 7.3,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 100352,
+    "heads": 32,
+    "kv_heads": 32,
+    "head_dim": 128,
+    "intermediate": 11008,
+    "tied": false
+   },
    "variants": [
     {
      "id": "olmo-2-1124-7b-instruct:bf16:safetensors",
@@ -7675,6 +8155,16 @@
    "tier": "M",
    "params_b": 13.72,
    "moe": false,
+   "shape": {
+    "hidden": 5120,
+    "layers": 40,
+    "vocab": 100352,
+    "heads": 40,
+    "kv_heads": 40,
+    "head_dim": 128,
+    "intermediate": 13824,
+    "tied": false
+   },
    "variants": [
     {
      "id": "olmo-2-1124-13b-instruct:bf16:safetensors",
@@ -7798,6 +8288,16 @@
    "tier": "S",
    "params_b": 0.36,
    "moe": false,
+   "shape": {
+    "hidden": 960,
+    "layers": 32,
+    "vocab": 49152,
+    "heads": 15,
+    "kv_heads": 5,
+    "head_dim": 64,
+    "intermediate": 2560,
+    "tied": true
+   },
    "variants": [
     {
      "id": "smollm2-360m-instruct:bf16:safetensors",
@@ -7893,6 +8393,16 @@
    "tier": "S",
    "params_b": 1.71,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 24,
+    "vocab": 49152,
+    "heads": 32,
+    "kv_heads": 32,
+    "head_dim": 64,
+    "intermediate": 8192,
+    "tied": true
+   },
    "variants": [
     {
      "id": "smollm2-1.7b-instruct:bf16:safetensors",
@@ -7986,6 +8496,16 @@
    "tier": "S",
    "params_b": 3.08,
    "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 36,
+    "vocab": 128256,
+    "heads": 16,
+    "kv_heads": 4,
+    "head_dim": 128,
+    "intermediate": 11008,
+    "tied": true
+   },
    "variants": [
     {
      "id": "smollm3-3b:bf16:safetensors",
@@ -8088,6 +8608,16 @@
    "tier": "M",
    "params_b": 9.4,
    "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 40,
+    "vocab": 151552,
+    "heads": 32,
+    "kv_heads": 2,
+    "head_dim": 128,
+    "intermediate": 13696,
+    "tied": false
+   },
    "variants": [
     {
      "id": "glm-4-9b-0414:bf16:safetensors",
@@ -8205,6 +8735,16 @@
    "tier": "L",
    "params_b": 32.57,
    "moe": false,
+   "shape": {
+    "hidden": 6144,
+    "layers": 61,
+    "vocab": 151552,
+    "heads": 48,
+    "kv_heads": 2,
+    "head_dim": 128,
+    "intermediate": 23040,
+    "tied": false
+   },
    "variants": [
     {
      "id": "glm-4-32b-0414:bf16:safetensors",
@@ -8375,6 +8915,16 @@
    "tier": "XL",
    "params_b": 110.47,
    "moe": true,
+   "shape": {
+    "hidden": 4096,
+    "layers": 46,
+    "vocab": 151552,
+    "heads": 96,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 12672,
+    "tied": false
+   },
    "variants": [
     {
      "id": "glm-4.5-air:bf16:safetensors",
@@ -8701,6 +9251,16 @@
    "tier": "XL",
    "params_b": 356.79,
    "moe": true,
+   "shape": {
+    "hidden": 5120,
+    "layers": 92,
+    "vocab": 151552,
+    "heads": 96,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 13824,
+    "tied": false
+   },
    "variants": [
     {
      "id": "glm-4.6:bf16:safetensors",

@@ -255,7 +255,7 @@ export function MemoryGauge({
     const short = needed - available;
     const title = MEMORY_TITLES[memoryLabel ?? ""] ?? "Memory";
     const rows: Row[] = [
-        { id: "needs", label: "This model needs", value: bytes(needed), swatch: TONE_FILL[tone] },
+        { id: "needs", label: "Memory to run", value: bytes(needed), swatch: TONE_FILL[tone] },
         short > 0
             ? { id: "left", label: "Short by", value: bytes(short), swatch: null, tone }
             : { id: "left", label: "Left over", value: bytes(available - needed), swatch: null },

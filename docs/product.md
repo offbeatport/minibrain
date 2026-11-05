@@ -102,6 +102,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Fit per pool** · shipped · ml, admin
   See which models run on which compute pool before downloading.
   UI: Discover, Models › Add model
+- **Memory to train** · shipped · ml, admin
+  See the QLoRA training memory and whether a pool's workers train it.
+  UI: Discover, Discover › model, Discover › Compare, Models › Add model · API: GET /api/catalog
 - **Catalogue updates** · shipped · admin
   Refresh the catalogue from a configured URL, on demand or daily.
   UI: Settings › General › Model catalogue · API: POST /api/catalog/sync, GET /api/catalog/settings, PUT /api/catalog/settings · Config: catalogue, MINIBRAIN_CATALOG_URL
@@ -185,14 +188,20 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Versions** · shipped · product, ml
   Keep immutable prompt-only and trained versions per model.
   UI: Evaluations · API: GET /api/minibrains/{slug}/versions, DELETE /api/minibrains/{slug}/versions/{number}
+- **Training memory planner** · shipped · ml, admin
+  Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
+  UI: Training › model › Training plan · API: GET /api/minibrains/{slug}/training-plan
+- **QLoRA training** · partial · ml, admin
+  Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
+  UI: Training › model › Training plan · Roadmap: Training memory
 - **Training settings** · partial · ml
-  Set rows and epochs per run over the default recipe.
-  UI: Training › model, Settings › General › Default training recipe · API: GET /api/settings · Roadmap: For ML engineers
+  Override strategy, batch, sequence length, rank, rate, epochs and rows per run.
+  UI: Training › model › Training plan › Settings, Settings › General › Default training recipe · API: POST /api/minibrains/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE
 - **Training methods** · planned · ml
-  Full fine-tuning, QLoRA, DPO from feedback and GRPO with graders.
+  Full fine-tuning, DPO from feedback and GRPO with graders.
   Roadmap: Task types
 - **Rebase** · planned · product, ml
   Rebuild every model on a new base and compare with live.

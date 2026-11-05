@@ -273,12 +273,14 @@ def training_section(card: ModelCard) -> list[str]:
         return section("## Training", [text])
     rows: Facts = [
         ("Method", "LoRA adapter"),
+        ("Strategy", recipe.strategy),
         ("Rows trained on", training.examples),
         ("Row limit", recipe.max_rows),
         ("Epochs", recipe.epochs),
         ("LoRA rank and alpha", f"{recipe.rank} and {recipe.alpha}" if recipe.rank is not None else None),
         ("Learning rate", recipe.learning_rate),
-        ("Batch size", recipe.batch_size),
+        ("Sequence length", recipe.seq_len),
+        ("Micro-batch", recipe.micro_batch),
         ("Gradient accumulation", recipe.grad_accum),
         ("Final training loss", training.train_loss),
     ]

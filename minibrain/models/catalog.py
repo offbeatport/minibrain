@@ -36,6 +36,7 @@ ENTRY_FIELDS = (
     "tier",
     "params_b",
     "moe",
+    "shape",
     "superseded_by",
 )
 VARIANT_FIELDS = (

@@ -3,6 +3,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from minibrain.ml.planner import MAX_RANK
 from minibrain.models.rules import LicenceUse
 
 
@@ -527,11 +528,68 @@ class ExampleInfo(BaseModel):
     label: str
 
 
-class VersionCreate(BaseModel):
-    kind: Literal["prompt", "lora"]
-    max_rows: int | None = Field(default=None, ge=10)
+class TrainingSettings(BaseModel):
+    strategy: Literal["lora", "qlora"] | None = None
+    checkpointing: bool | None = None
+    micro_batch: int | None = Field(default=None, ge=1, le=64)
+    seq_len: int | None = Field(default=None, ge=32, le=1_048_576)
+    rank: int | None = Field(default=None, ge=1, le=MAX_RANK)
+    learning_rate: float | None = Field(default=None, gt=0, le=0.01)
     epochs: float | None = Field(default=None, gt=0, le=10)
+    max_rows: int | None = Field(default=None, ge=10)
+
+
+class VersionCreate(TrainingSettings):
+    kind: Literal["prompt", "lora"]
     snapshot_id: int | None = None
+
+
+class TrainingPlanQuery(TrainingSettings):
+    snapshot_id: int | None = None
+
+
+class TrainingOptionInfo(BaseModel):
+    strategy: str
+    label: str
+    checkpointing: bool
+    micro_batch: int
+    grad_accum: int
+    device: str
+    precision: str
+    optimizer: str
+    peak_bytes: int
+    available_bytes: int | None
+    fits: bool
+    supported: bool
+    reason: str | None
+    parts: dict[str, int]
+
+
+class TrainingDefaults(BaseModel):
+    strategy: str | None
+    checkpointing: bool | None
+    micro_batch: int | None
+    seq_len: int
+    rank: int
+    learning_rate: float
+    epochs: float
+    max_rows: int
+
+
+class TrainingPlanInfo(BaseModel):
+    level: Literal["fits", "insufficient", "unknown"]
+    basis: str
+    note: str | None
+    machine: str | None
+    memory_label: str | None
+    chosen: TrainingOptionInfo | None
+    options: list[TrainingOptionInfo]
+    rows: int
+    seq_len: int
+    longest_tokens: int
+    context: int | None
+    overrides: list[str]
+    defaults: TrainingDefaults
 
 
 class CompleteRequest(BaseModel):
@@ -901,6 +959,14 @@ class FitInfo(BaseModel):
     basis: str
 
 
+class TrainFitInfo(BaseModel):
+    level: Literal["fits", "insufficient", "unknown", "unsupported"]
+    qlora_bytes: int | None
+    available_bytes: int | None
+    label: str | None
+    basis: str
+
+
 class CatalogVariantInfo(BaseModel):
     id: str
     label: str
@@ -915,6 +981,7 @@ class CatalogVariantInfo(BaseModel):
     runtimes: list[str]
     requires: dict[str, Any]
     fit: FitInfo
+    train_fit: TrainFitInfo
 
 
 class AddedInfo(BaseModel):
