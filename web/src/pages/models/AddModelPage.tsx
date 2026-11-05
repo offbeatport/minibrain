@@ -21,7 +21,10 @@ import {
     Link,
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
     Textarea,
@@ -162,6 +165,16 @@ function taskOf(value: string): TaskKey {
     return TASKS.find((task) => task.key === value)?.key ?? "classify";
 }
 
+function taskItem(task: (typeof TASKS)[number]) {
+    const Icon = task.icon;
+    return (
+        <SelectItem key={task.key} value={task.key} disabled={!task.ready} description={task.hint}>
+            <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+            {task.label}
+        </SelectItem>
+    );
+}
+
 function TaskSelect({ value, onChange }: { value: TaskKey; onChange: (task: TaskKey) => void }) {
     return (
         <Field id="create-task" label="Task">
@@ -170,20 +183,12 @@ function TaskSelect({ value, onChange }: { value: TaskKey; onChange: (task: Task
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    {TASKS.map((task) => {
-                        const Icon = task.icon;
-                        return (
-                            <SelectItem
-                                key={task.key}
-                                value={task.key}
-                                disabled={!task.ready}
-                                description={task.ready ? task.hint : `${task.hint} · Later`}
-                            >
-                                <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
-                                {task.label}
-                            </SelectItem>
-                        );
-                    })}
+                    {TASKS.filter((task) => task.ready).map(taskItem)}
+                    <SelectSeparator />
+                    <SelectGroup>
+                        <SelectLabel>Coming</SelectLabel>
+                        {TASKS.filter((task) => !task.ready).map(taskItem)}
+                    </SelectGroup>
                 </SelectContent>
             </Select>
         </Field>

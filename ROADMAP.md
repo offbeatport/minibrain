@@ -914,7 +914,8 @@ keys, and `/v1` stays key-only.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
 - Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
-  `TabbedSearchList` in a dialog): one search over four tabs.
+  `TabbedSearchList` in a dialog): one search over four tabs. Only Classify can be picked today; the other tasks are
+  listed under Coming and cannot be chosen.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for the task (capability, size tier, the catalogue's tested default; superseded models left out), then
     popularity. Being downloaded is not a ranking factor.
@@ -1261,7 +1262,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor (column picker and SQL over several sources
       done; CodeMirror editor and auto-mapping not yet)
 - [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
-- [x] Preview of 5–10 examples
+- [ ] Preview of 5–10 examples as chat transcripts (the preview shows the query's first 20 rows as a table, with
+      label counts; chat transcripts not yet)
 - [ ] Quality score and PII report (version checks with pattern-based PII done; Presidio and near duplicates
       not yet)
 - [x] Dataset versions: content-hashed Parquet copies saved when a dataset is created or updated, picked at training
@@ -1277,7 +1279,8 @@ Everything in the v1 scope below, after M1.
       each, adapters pinned to their base's content hash
 - [x] Base models stay on disk until deleted; deleting removes their files, and a base with models built on it goes
       with them after the cascade checkbox
-- [x] Eval vs base, side-by-side review, deploy any version at any step, rollback
+- [x] Eval against the base (a prompt-only version on it, scored on the same held-out rows), side-by-side review,
+      deploy any version at any step, rollback; against a teacher waits for the teacher pool
 - [ ] SGLang pool with runtime adapter load/unload (built; tested against a fake SGLang process, verify on a GPU box)
 - [x] Catalogue by rules: approved publishers, all generations, size tiers, built at release, no runtime Hugging Face
       calls, optional sync from our catalogue URL; Add from Hugging Face with support badges
@@ -1423,6 +1426,9 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   without its trailing slashes.
 - [x] Prototype pages (`/proto/*`, such as `/proto/logos`) were reachable in production builds. Their routes are
   registered only in development (`import.meta.env.DEV`), and the build leaves them and their code out.
+- [x] Add model offered six tasks but only Classify works: the others are listed under Coming and cannot be picked.
+  "Preview of 5–10 examples" is unticked (the preview is a table of rows, not chat transcripts) and "Eval vs base" says
+  what it is (a prompt-only version on the base; no teacher yet).
 
 ## Risks to verify early
 
