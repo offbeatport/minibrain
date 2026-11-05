@@ -7,6 +7,9 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - `ROADMAP.md` is the technical plan. Read it before implementing; treat it as settled unless the user changes it.
 - This repo is public. Business content (customers, pricing, design partners, investors, license strategy) lives in
   the private repo at `~/Development/private/minibrain_plan.md` and never lands here.
+- `docs/product.md` is the inventory of features: read it before planning. A change that adds, removes or changes a
+  user-facing feature updates it in the same commit (`scripts/check_product.py` checks it in CI); ROADMAP.md keeps
+  design and order. Internal: never link it from README.md or any other doc.
 
 ## Layout
 
