@@ -1324,6 +1324,8 @@ Everything in the v1 scope below, after M1.
   - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency
   - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
+  - [ ] MLX training on Macs behind a flag, only if MPS training is too slow for local use: a second trainer plus an
+    MLX-to-PEFT adapter converter, so Mac-trained adapters still serve on SGLang and vLLM
 
 ## Fixes
 
