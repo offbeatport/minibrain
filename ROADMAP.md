@@ -959,6 +959,12 @@ outbound calls.
 - Python, on 3.12 and 3.13: `uv sync --locked`, ruff, ruff format, `scripts/check_crypto.py`, pyright, pytest. The
   mlx and llama.cpp extras are not installed on Linux, so pyright reports their imports as warnings, only in the three
   files that use them (`executionEnvironments` in `pyproject.toml`).
+- Both stores: tests marked `both_stores` (uploads, dataset versions, adapters, logs, deletes, key passes) run twice,
+  on the folder and on an S3 bucket. The bucket is moto's `ThreadedMotoServer`, started once per test run on
+  127.0.0.1 with a random port, a fresh bucket per test; `uv run pytest -q` runs both, offline, locally and in CI.
+  moto is a dev dependency only (`moto[s3]` with flask, not its heavy `server` extra) and never ships. If moto's
+  fidelity falls short of a real server, the next step is a nightly job against a real S3-compatible server (SeaweedFS
+  or MinIO); there is none yet.
 - Web: `pnpm install --frozen-lockfile`, Biome, `tsc`, `vite build`.
 - Wheel and sdist, once both pass: `uv build` with the built UI inside both, uploaded as the `minibrain-wheel` and
   `minibrain-sdist` artifacts.

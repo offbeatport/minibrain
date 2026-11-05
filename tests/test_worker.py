@@ -8,6 +8,8 @@ from minibrain import worker as worker_module
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
+pytestmark = pytest.mark.both_stores
+
 FAKE = {"train": "tests.fake_job", "eval": "tests.fake_job"}
 
 

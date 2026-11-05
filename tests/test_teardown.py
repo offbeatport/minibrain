@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 
@@ -28,6 +29,8 @@ from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
 from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, tickets_csv
 from tests.test_flow import SLUG, add_key, add_version, bearer, create_with_dataset, deploy, finish
+
+pytestmark = pytest.mark.both_stores
 
 BASE = "tiny"
 WEIGHTS = {"config.json": b'{"architectures": ["Qwen3ForCausalLM"]}', "model.safetensors": b"weights" * 300}

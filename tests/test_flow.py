@@ -1,6 +1,10 @@
 from typing import Any
 
+import pytest
+
 from tests.conftest import Harness, fake_adapter, tickets_csv
+
+pytestmark = pytest.mark.both_stores
 
 SLUG = "support-triage"
 

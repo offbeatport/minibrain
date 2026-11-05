@@ -13,13 +13,13 @@ from sqlalchemy import select
 from minibrain import object_store
 from minibrain.artifacts import ArtifactStore
 from minibrain.connections import vault
-from minibrain.encryption import envelope, keys, sealed
+from minibrain.encryption import envelope, keys, rekey, sealed
 from minibrain.encryption.envelope import CHUNK, HEADER, TAG, EnvelopeError, Wrapped
 from minibrain.encryption.providers import KeyFile, LocalKeys
 from minibrain.registry.files import store_for
 from minibrain.registry.models import Connection
 from minibrain.settings import Settings
-from tests.conftest import Harness, tickets_csv
+from tests.conftest import FOLDER, Harness, stored_bytes, tickets_csv
 
 SMALL = 64
 
@@ -135,6 +135,7 @@ def sealed_name(path: Path) -> bool:
     return len(path.name) == 64 and path.parent.name == path.name[:2]
 
 
+@pytest.mark.both_stores
 def test_uploads_snapshots_and_staging_are_encrypted_at_rest(harness: Harness) -> None:
     data = tickets_csv()
     source = harness.client.post("/api/sources", files={"file": ("tickets.csv", data, "text/csv")})
@@ -143,16 +144,18 @@ def test_uploads_snapshots_and_staging_are_encrypted_at_rest(harness: Harness) -
     snapshot = harness.client.post("/api/datasets/tickets/snapshots")
     assert snapshot.status_code == 201, snapshot.text
     home = harness.settings.home
-    files = artifact_files(home / "artifacts")
-    assert len(files) == 2
-    for path in files:
-        assert envelope.is_sealed(path.read_bytes()[:HEADER])
-        assert b"ticket 1 about" not in path.read_bytes()
+    store = store_for(harness.settings)
+    with harness.sessions() as session:
+        stored = rekey.stored_ids(session, store)
+    assert len(stored) == 2
+    assert len(artifact_files(home / "artifacts")) == (2 if harness.store_kind == FOLDER else 0)
+    for artifact_id in stored:
+        blob = stored_bytes(store, artifact_id)
+        assert envelope.is_sealed(blob[:HEADER]) and b"ticket 1 about" not in blob
     staged = list((home / "staging").rglob("staging.duckdb"))
     assert len(staged) == 1 and envelope.is_sealed(staged[0].read_bytes()[:HEADER])
     assert not [path for path in (home / "staging").rglob("*") if path.name.startswith(".building")]
     assert not (home / "cache").exists() or not any((home / "cache").rglob("*.parquet"))
-    store = store_for(harness.settings)
     with store.open(hashlib.sha256(data).hexdigest()) as stream:
         assert stream.read() == data
     rows = harness.client.get(f"/api/sources/{source.json()['id']}/rows")
@@ -162,10 +165,11 @@ def test_uploads_snapshots_and_staging_are_encrypted_at_rest(harness: Harness) -
     assert stat.S_IMODE(key.stat().st_mode) == 0o600 and stat.S_IMODE(key.parent.stat().st_mode) == 0o700
 
 
+@pytest.mark.both_stores
 def test_workers_get_plaintext_and_store_their_outputs_encrypted(harness: Harness) -> None:
     payload = b"adapter weights " * 1000
     artifact_id = harness.upload(payload, "adapter", "file", "adapter.bin")
-    stored = store_for(harness.settings).path(artifact_id).read_bytes()
+    stored = stored_bytes(store_for(harness.settings), artifact_id)
     assert envelope.is_sealed(stored) and payload[:64] not in stored
     downloaded = harness.client.get(
         f"/internal/worker/artifacts/{artifact_id}", headers={"Authorization": f"Bearer {harness.token}"}
@@ -184,6 +188,7 @@ def test_files_written_before_encryption_stay_readable(harness: Harness) -> None
     assert store.materialize(legacy.id, "file", "log.txt").read_bytes() == payload
 
 
+@pytest.mark.both_stores
 def test_turning_encryption_off_writes_plaintext_and_keeps_reading_sealed_files(harness: Harness) -> None:
     store = store_for(harness.settings)
     before = store.put_stream(io.BytesIO(b"sealed before"))
@@ -191,7 +196,7 @@ def test_turning_encryption_off_writes_plaintext_and_keeps_reading_sealed_files(
     assert changed.status_code == 200, changed.text
     keys.keys_for(harness.settings).invalidate()
     after = store.put_stream(io.BytesIO(b"plain after"))
-    assert store.path(after.id).read_bytes() == b"plain after"
+    assert stored_bytes(store, after.id) == b"plain after"
     with store.open(before.id) as stream:
         assert stream.read() == b"sealed before"
 

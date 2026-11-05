@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -11,6 +12,8 @@ from minibrain.registry.models import AuditEvent, Feedback, RequestLog, Snapshot
 from tests.conftest import FakeBackend, Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 from tests.test_gateway import CHAT, Down, servable
+
+pytestmark = pytest.mark.both_stores
 
 
 def chat(harness: Harness, headers: dict[str, str]) -> str:

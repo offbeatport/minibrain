@@ -18,7 +18,7 @@ from minibrain.encryption.envelope import HEADER
 from minibrain.registry.files import store_for
 from minibrain.registry.models import AuditEvent, Connection
 from minibrain.registry.settings_store import read
-from tests.conftest import Harness, tickets_csv
+from tests.conftest import Harness, stored_bytes, tickets_csv
 
 
 def legacy_store(harness: Harness) -> ArtifactStore:
@@ -27,7 +27,11 @@ def legacy_store(harness: Harness) -> ArtifactStore:
 
 
 def newest_key(path: Path) -> str:
-    return envelope.parse_header(path.read_bytes()[:HEADER]).newest.wrapped.key
+    return header_key(path.read_bytes())
+
+
+def header_key(blob: bytes) -> str:
+    return envelope.parse_header(blob[:HEADER]).newest.wrapped.key
 
 
 def run(harness: Harness, plan: rekey.Plan) -> rekey.Tally:
@@ -106,12 +110,13 @@ def test_old_connection_secrets_move_to_the_envelope_format(harness: Harness) ->
         assert vault.unseal(harness.settings, row.secret or "", f"minibrain.connection.{row.id}") == "old-password"
 
 
+@pytest.mark.both_stores
 def test_rotation_rewraps_every_header_and_leaves_the_bodies_alone(harness: Harness) -> None:
     store = store_for(harness.settings)
     payload = os.urandom(3 * (1 << 20) + 5)
     first = store.put_stream(io.BytesIO(payload)).id
     second = store.put_stream(io.BytesIO(b"small")).id
-    body = store.path(first).read_bytes()[HEADER:]
+    body = stored_bytes(store, first)[HEADER:]
     service = keys.keys_for(harness.settings)
     old = service.target().current()
     with harness.sessions() as session:
@@ -122,8 +127,8 @@ def test_rotation_rewraps_every_header_and_leaves_the_bodies_alone(harness: Harn
         assert stream.read() == payload
     tally = run(harness, rekey.Plan(rewrap=True))
     assert (tally.rewrapped, tally.older, tally.current) == (2, 0, 2)
-    assert store.path(first).read_bytes()[HEADER:] == body
-    assert newest_key(store.path(first)) == after == newest_key(store.path(second))
+    assert stored_bytes(store, first)[HEADER:] == body
+    assert header_key(stored_bytes(store, first)) == after == header_key(stored_bytes(store, second))
     ring = service.local_ring()
     assert ring is not None and ring.known() == [old, after]
     with harness.sessions() as session:

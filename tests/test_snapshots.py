@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from alembic import command
 from sqlalchemy import select, text
 
@@ -10,6 +11,8 @@ from minibrain.registry.models import Artifact, Snapshot
 from tests.conftest import Harness, tickets_csv
 from tests.test_data_catalogue import migration_config
 from tests.test_flow import SLUG, finish
+
+pytestmark = pytest.mark.both_stores
 
 
 def upload(harness: Harness, rows: int = 200, name: str = "tickets.csv") -> dict:

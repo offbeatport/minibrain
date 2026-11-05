@@ -16,6 +16,8 @@ from minibrain.data.sources import (
 from minibrain.tasks.classify import build_messages, parse_label, score
 from tests.conftest import tickets_csv
 
+pytestmark = pytest.mark.both_stores
+
 
 @pytest.fixture
 def staging(tmp_path: Path) -> list[Table]:
