@@ -1,6 +1,14 @@
-import { Boxes, ChevronDown, HardDrive, type LucideIcon, MemoryStick } from "lucide-react";
+import {
+    Boxes,
+    ChevronDown,
+    ExternalLink,
+    HardDrive,
+    type LucideIcon,
+    MemoryStick,
+} from "lucide-react";
 import {
     Badge,
+    Button,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -15,9 +23,10 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { useState } from "react";
-import type { CatalogResponse, ModelRow } from "~/api/client";
+import type { CatalogEntry, CatalogResponse, ModelRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
+import { discoverHref } from "./Discover";
 import { TIERS } from "./DiscoverFilters";
 import {
     type BaseOption,
@@ -141,6 +150,37 @@ function factsOf(option: BaseOption): string[] {
     ].filter((fact): fact is string => Boolean(fact));
 }
 
+function Details({ entry }: { entry: CatalogEntry }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    asChild
+                    variant="ghost"
+                    size="icon-sm"
+                    className="invisible shrink-0 self-center in-data-highlighted:visible focus-visible:visible"
+                >
+                    <a
+                        href={discoverHref(entry)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Details"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.stopPropagation();
+                            }
+                        }}
+                    >
+                        <ExternalLink />
+                    </a>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open in Discover</TooltipContent>
+        </Tooltip>
+    );
+}
+
 function OptionRow({ option, recommended }: { option: BaseOption; recommended?: boolean }) {
     const facts = factsOf(option);
     const description = descriptionOf(option);
@@ -164,6 +204,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
                 <Availability option={option} />
                 <Resources option={option} />
             </span>
+            {option.kind === "catalogue" && option.entry && <Details entry={option.entry} />}
         </span>
     );
 }
