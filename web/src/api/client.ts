@@ -58,6 +58,10 @@ function guarded(method: string, headers: Headers): Headers {
     return headers;
 }
 
+export function withCsrf(request: Request): Request {
+    return new Request(request, { headers: guarded(request.method, new Headers(request.headers)) });
+}
+
 let signedOutReason: string | null = null;
 
 function reasonText(header: string): string | null {

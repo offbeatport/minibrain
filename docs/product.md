@@ -455,6 +455,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Diagnostics** · shipped · admin
   Download a support zip with every secret scrubbed.
   UI: Settings › This install › Download diagnostics · API: GET /api/system/diagnostics
+- **API reference** · shipped · engineer, ml
+  Browse /v1 and /api with this install's examples and try calls.
+  UI: User menu › API reference, Deployments › model › Connect, Models › base model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
 - **OpenAPI schema** · shipped · engineer
   Print the /api and /v1 schema for generated clients.
   CLI: minibrain openapi

@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, LogOut, Settings, SunMoon } from "lucide-react";
+import { ArrowLeft, BookOpen, LogOut, Settings, SunMoon } from "lucide-react";
 import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
@@ -17,6 +17,7 @@ import { TeardownToasts } from "~/components/models/TeardownToasts";
 import { SECTIONS, SETTINGS_PAGES, isSettingsPath, visibleTo } from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
+import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 import { NoAccessPage, SetPasswordPage, SetupPage, SignInPage } from "~/pages/auth/AuthPages";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
@@ -111,6 +112,7 @@ function Account() {
     const sub = person?.email ?? (person?.role ? ROLE_LABELS[person.role] : "No role");
     const items: AccountMenuItem[] = [
         { icon: <Settings />, label: "Settings", href: "/settings" },
+        { icon: <BookOpen />, label: "API reference", href: API_REFERENCE_PATH },
         { kind: "theme", icon: <SunMoon />, label: "Theme" },
         ...(signsOut
             ? [

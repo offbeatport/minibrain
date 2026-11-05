@@ -768,6 +768,16 @@ once it matches; only deleting a base removes its files.
   reaches minibrain through the customer's identity provider or a broker (Keycloak); CAC / PIV through the proxy's
   client-certificate check. Proxy headers are trusted only from configured proxy addresses.
 - Harness config export: base URL, key and model name for common harnesses.
+- API reference (`/developers`): Scalar, bundled into the web build and loaded as its own chunk, with its telemetry,
+  fonts, request proxy, agent, MCP, developer tools, SDK generation and client.scalar.com links off, so the page makes
+  no call outside the install. Two documents cut from main's schema, for any role: `GET /api/openapi/v1.json` (the
+  gateway, with `/v1` as its server and the bearer key scheme) and `GET /api/openapi/api.json` (every `/api` route
+  with the role it needs, and the CSRF header on changes). The page fills in this install's base URL and deployed
+  model names, and curl, Python and JavaScript samples (the `openai` SDK for `/v1`). Try it: `/v1` with a key pasted
+  into the page, kept in memory and never sent to main; `/api` with the signed-in session, the page adding the CSRF
+  token to same-origin `/api` calls only, so a call runs with the person's role and is audited like the same change in
+  the UI. FastAPI's `/docs`, `/redoc` and `/openapi.json` are off on main, gateways and engines (404), and the schema
+  carries the package version; `minibrain openapi` still prints the whole schema for generated clients.
 
 ### Accounts and roles
 
@@ -822,8 +832,8 @@ keys, and `/v1` stays key-only.
 
 - obp-ui, operator-console style.
 - Sidebar: Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations, Feedback) · Run
-  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, Theme, Sign out). Sidebar
-  links are plain paths; no page carries a model into another.
+  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, API reference, Theme,
+  Sign out). Sidebar links are plain paths; no page carries a model into another.
 - Training, Evaluations and Feedback cover every model, like Deployments and Monitor. Training and Evaluations are the
   kit's `DataGrid` with model and status filters kept in the URL: `?model=<slug>,<slug>&status=<status>,<status>`.
   - Training lists training and scoring jobs: model, version, job, status, progress, started, duration. A row opens
@@ -854,6 +864,10 @@ keys, and `/v1` stays key-only.
   the kept input and answer for Builders and Admins (Viewers see that it needs the Builder role; when the model does
   not keep them, "Not kept for this model", with a link to its switch for Builders) and the feedback on its response
   id.
+- API reference: two `TabNav` pages, OpenAI-compatible API (`/developers`) and Management API
+  (`/developers/management`), each a Scalar reference themed from the obp-ui tokens (Cobalt, light and dark, the
+  kit's sans and mono). Create a key (Builders) links to Deployments; the user menu, Connect on Deployments and a base
+  model's API link to it, and the copy-paste harness configs stay where they are.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
 - Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's

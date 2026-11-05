@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "minibrain",
-    "version": "0.0.0"
+    "version": "0.1.0"
   },
   "paths": {
     "/api/auth/session": {
@@ -7110,6 +7110,52 @@
         }
       }
     },
+    "/api/openapi/v1.json": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "OpenAPI document for /v1",
+        "operationId": "gateway_reference_api_openapi_v1_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Gateway Reference Api Openapi V1 Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi/api.json": {
+      "get": {
+        "tags": [
+          "reference"
+        ],
+        "summary": "OpenAPI document for /api",
+        "operationId": "management_reference_api_openapi_api_json_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Management Reference Api Openapi Api Json Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/install": {
       "get": {
         "tags": [
@@ -7336,9 +7382,10 @@
     "/v1/models": {
       "get": {
         "tags": [
-          "openai"
+          "models"
         ],
-        "summary": "List Models",
+        "summary": "List models",
+        "description": "The models this API key can call, each version under its own name.",
         "operationId": "list_models_v1_models_get",
         "responses": {
           "200": {
@@ -7346,22 +7393,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response List Models V1 Models Get"
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
       }
     },
     "/v1/chat/completions": {
       "post": {
         "tags": [
-          "openai"
+          "chat"
         ],
-        "summary": "Chat Completions",
+        "summary": "Create a chat completion",
+        "description": "Answer a conversation with a model. Every call is logged without its content, unless the model keeps request inputs and answers.",
         "operationId": "chat_completions_v1_chat_completions_post",
         "requestBody": {
           "content": {
@@ -7375,32 +7436,105 @@
         },
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "The answer, or with stream set, server-sent chat.completion.chunk events.",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletion"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "response_format is not valid or cannot be applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not cover this model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No model has this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The version was trained on base weights that have changed since.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The answer does not match response_format, or the body is not valid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No engine is serving this model right now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
       }
     },
     "/v1/feedback": {
       "post": {
         "tags": [
-          "openai"
+          "feedback"
         ],
         "summary": "Rate or correct a chat completion",
+        "description": "The feedback waits in the review queue; accepted answers join the model's next training data.",
         "operationId": "feedback_v1_feedback_post",
         "requestBody": {
           "content": {
@@ -7423,17 +7557,52 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "401": {
+            "description": "The API key is missing, unknown or expired.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not cover this model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No model has this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The model is a base model, or the body is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
       }
     },
     "/internal/worker/register": {
@@ -8973,6 +9142,25 @@
           "error"
         ],
         "title": "AddedInfo"
+      },
+      "AnswerMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "const": "assistant",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "AnswerMessage"
       },
       "AssignRequest": {
         "properties": {
@@ -11761,18 +11949,62 @@
         ],
         "title": "ChangeInfo"
       },
+      "ChatCompletion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The response id; send it as response_id to POST /feedback."
+          },
+          "object": {
+            "type": "string",
+            "const": "chat.completion",
+            "title": "Object"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionChoice"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/TokenUsage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "title": "ChatCompletion"
+      },
       "ChatCompletionRequest": {
         "properties": {
           "model": {
             "type": "string",
-            "title": "Model"
+            "title": "Model",
+            "description": "A name from GET /models: a custom model follows its live version, name@3 pins version 3, and a served base model goes by its key."
           },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/Message"
             },
             "type": "array",
-            "title": "Messages"
+            "title": "Messages",
+            "description": "The conversation. A custom model answers the last user message; a base model reads them all."
           },
           "max_tokens": {
             "anyOf": [
@@ -11783,7 +12015,8 @@
                 "type": "null"
               }
             ],
-            "title": "Max Tokens"
+            "title": "Max Tokens",
+            "description": "The most tokens to answer with; 64 by default."
           },
           "max_completion_tokens": {
             "anyOf": [
@@ -11794,11 +12027,13 @@
                 "type": "null"
               }
             ],
-            "title": "Max Completion Tokens"
+            "title": "Max Completion Tokens",
+            "description": "The same as max_tokens, under its newer name."
           },
           "stream": {
             "type": "boolean",
             "title": "Stream",
+            "description": "Send the answer as server-sent events, ending with data: [DONE].",
             "default": false
           },
           "response_format": {
@@ -11812,7 +12047,16 @@
           "model",
           "messages"
         ],
-        "title": "ChatCompletionRequest"
+        "title": "ChatCompletionRequest",
+        "example": {
+          "messages": [
+            {
+              "content": "I was charged twice",
+              "role": "user"
+            }
+          ],
+          "model": "support-triage"
+        }
       },
       "ChatMessage": {
         "properties": {
@@ -12094,6 +12338,33 @@
           "completion_tokens"
         ],
         "title": "CompleteResponse"
+      },
+      "CompletionChoice": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "message": {
+            "$ref": "#/components/schemas/AnswerMessage"
+          },
+          "finish_reason": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "length"
+            ],
+            "title": "Finish Reason",
+            "description": "stop when the answer ended, length when max_tokens cut it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "message",
+          "finish_reason"
+        ],
+        "title": "CompletionChoice"
       },
       "ConnectionBody": {
         "properties": {
@@ -13879,6 +14150,61 @@
           "state"
         ],
         "title": "EngineBody"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorDetail"
+      },
+      "ErrorInfo": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "param": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "type",
+          "param",
+          "code"
+        ],
+        "title": "ErrorInfo"
       },
       "EvalCost": {
         "properties": {
@@ -17076,7 +17402,8 @@
         "properties": {
           "role": {
             "type": "string",
-            "title": "Role"
+            "title": "Role",
+            "description": "system, user or assistant."
           },
           "content": {
             "anyOf": [
@@ -17575,6 +17902,58 @@
         ],
         "title": "ModelFile"
       },
+      "ModelInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The name to send as model."
+          },
+          "object": {
+            "type": "string",
+            "const": "model",
+            "title": "Object",
+            "default": "model"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "owned_by": {
+            "type": "string",
+            "title": "Owned By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created",
+          "owned_by"
+        ],
+        "title": "ModelInfo"
+      },
+      "ModelList": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object",
+            "default": "list"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelInfo"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ModelList"
+      },
       "ModelRef": {
         "properties": {
           "kind": {
@@ -18047,6 +18426,18 @@
           "engines"
         ],
         "title": "NodeInfo"
+      },
+      "OpenAIErrorBody": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "OpenAIErrorBody"
       },
       "OverviewBucket": {
         "properties": {
@@ -21304,6 +21695,29 @@
         ],
         "title": "TokenBody"
       },
+      "TokenUsage": {
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt_tokens",
+          "completion_tokens",
+          "total_tokens"
+        ],
+        "title": "TokenUsage"
+      },
       "Usage": {
         "properties": {
           "days": {
@@ -21798,6 +22212,14 @@
           "kinds"
         ],
         "title": "WorkerBody"
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "type": "http",
+        "description": "A minibrain API key, created on Deployments. It covers one or more models.",
+        "scheme": "bearer",
+        "bearerFormat": "mb_..."
       }
     }
   }

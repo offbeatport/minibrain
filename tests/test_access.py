@@ -167,6 +167,8 @@ ROUTE_ROLES = {
     ("POST", "/api/settings/storage/copy-models"): "admin",
     ("GET", "/api/system/infrastructure"): "viewer",
     ("GET", "/api/settings"): "viewer",
+    ("GET", "/api/openapi/v1.json"): "viewer",
+    ("GET", "/api/openapi/api.json"): "viewer",
 }
 
 
@@ -301,3 +303,21 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     assert people.viewer.get(f"/api/jobs/{job}").json()["result"] is None
     detail = people.viewer.get(f"/api/minibrains/{SLUG}").json()
     assert all(check["examples"] == [] for check in detail["snapshot"]["checks"])
+
+
+def test_the_old_fastapi_docs_are_gone(harness: Harness) -> None:
+    harness.settings.web_dist.mkdir(parents=True, exist_ok=True)
+    (harness.settings.web_dist / "index.html").write_text("<!doctype html>")
+    anonymous = TestClient(harness.app)
+    for path in ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"):
+        assert anonymous.get(path).status_code == 404
+        assert harness.client.get(path).status_code == 404
+    assert anonymous.get("/developers").status_code == 200
+
+
+def test_the_api_reference_needs_a_role(harness: Harness) -> None:
+    people = team_of(harness)
+    for path in ("/api/openapi/v1.json", "/api/openapi/api.json"):
+        assert TestClient(harness.app).get(path).status_code == 401
+        assert people.nobody.get(path).status_code == 403
+        assert people.viewer.get(path).status_code == 200

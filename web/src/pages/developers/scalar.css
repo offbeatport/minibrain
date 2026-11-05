@@ -1,0 +1,82 @@
+.light-mode,
+.dark-mode {
+    --scalar-font: var(--font-sans);
+    --scalar-font-code: var(--font-mono);
+    --scalar-radius: calc(var(--radius) / 2);
+    --scalar-radius-lg: var(--radius);
+    --scalar-radius-xl: var(--radius-card);
+    --scalar-border-width: 1px;
+
+    --scalar-background-1: var(--background);
+    --scalar-background-2: var(--card);
+    --scalar-background-3: var(--secondary);
+    --scalar-background-accent: var(--accent);
+    --scalar-color-1: var(--foreground);
+    --scalar-color-2: var(--muted-foreground);
+    --scalar-color-3: var(--faint);
+    --scalar-color-accent: var(--primary);
+    --scalar-color-green: var(--success);
+    --scalar-color-red: var(--destructive);
+    --scalar-color-yellow: var(--warning);
+    --scalar-color-blue: var(--info);
+    --scalar-color-orange: var(--warning);
+    --scalar-color-purple: var(--approval);
+    --scalar-color-query: var(--info);
+    --scalar-color-alert: var(--warning);
+    --scalar-color-danger: var(--destructive);
+    --scalar-background-alert: var(--warning-soft);
+    --scalar-background-danger: var(--destructive-soft);
+    --scalar-border-color: var(--border);
+    --scalar-focus-color: var(--ring);
+    --scalar-link-color: var(--primary);
+    --scalar-link-color-hover: var(--primary);
+    --scalar-button-1: var(--primary);
+    --scalar-button-1-hover: var(--primary);
+    --scalar-button-1-color: var(--primary-foreground);
+    --scalar-tooltip-background: var(--popover);
+    --scalar-tooltip-color: var(--popover-foreground);
+    --scalar-shadow-1: var(--shadow-e1);
+    --scalar-shadow-2: var(--shadow-e2);
+    --scalar-lifted-brightness: 1;
+    --scalar-backdrop-brightness: 1;
+
+    --scalar-sidebar-background-1: var(--background);
+    --scalar-sidebar-color-1: var(--foreground);
+    --scalar-sidebar-color-2: var(--muted-foreground);
+    --scalar-sidebar-border-color: var(--border);
+    --scalar-sidebar-item-hover-background: var(--secondary);
+    --scalar-sidebar-item-hover-color: var(--foreground);
+    --scalar-sidebar-item-active-background: var(--accent);
+    --scalar-sidebar-color-active: var(--accent-foreground);
+    --scalar-sidebar-search-background: var(--input-background);
+    --scalar-sidebar-search-color: var(--muted-foreground);
+    --scalar-sidebar-search-border-color: var(--input);
+
+    --scalar-heading-1: var(--type-2xl);
+    --scalar-page-description: var(--type-lg);
+    --scalar-heading-2: var(--type-xl);
+    --scalar-heading-3: var(--type-lg);
+    --scalar-heading-4: var(--type-lg);
+    --scalar-heading-5: var(--type-base);
+    --scalar-heading-6: var(--type-base);
+    --scalar-paragraph: var(--type-base);
+    --scalar-small: var(--type-sm);
+    --scalar-mini: var(--type-sm);
+    --scalar-micro: var(--type-sm);
+    --scalar-font-size-1: var(--type-2xl);
+    --scalar-font-size-2: var(--type-base);
+    --scalar-font-size-3: var(--type-sm);
+    --scalar-font-size-4: var(--type-sm);
+    --scalar-font-size-5: var(--type-sm);
+    --scalar-font-size-6: var(--type-sm);
+    --scalar-font-size-7: var(--type-sm);
+}
+
+.api-reference .scalar-app {
+    background: var(--background);
+}
+
+.scalar-app .ascii-art,
+.scalar-app a[href^="https://scalar.com/?utm_source=powered-by"] {
+    display: none;
+}

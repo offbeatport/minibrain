@@ -4,6 +4,7 @@ import {
     createRootRoute,
     createRoute,
     createRouter,
+    lazyRouteComponent,
     redirect,
 } from "@tanstack/react-router";
 import type { Role } from "./api/authQueries";
@@ -11,6 +12,8 @@ import { NeedsRole } from "./components/NeedsRole";
 import { Shell } from "./components/Shell";
 import { hrefWith } from "./lib/listSearch";
 import {
+    API_REFERENCE_PATH,
+    MANAGEMENT_REFERENCE_PATH,
     deploymentPageHref,
     evaluationsHref,
     modelDataHref,
@@ -50,6 +53,11 @@ const LEGACY_TABS: Record<string, (slug: string) => string> = {
 };
 
 const rootRoute = createRootRoute({ component: Shell });
+
+const ApiReferencePage = lazyRouteComponent(
+    () => import("./pages/developers/ApiReferencePage"),
+    "ApiReferencePage",
+);
 
 function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
@@ -175,6 +183,8 @@ const routeTree = rootRoute.addChildren([
     globalPage("/monitor", MonitorPage),
     globalPage("/monitor/jobs", MonitorPage),
     globalPage("/monitor/requests", MonitorPage),
+    globalPage(API_REFERENCE_PATH, ApiReferencePage),
+    globalPage(MANAGEMENT_REFERENCE_PATH, ApiReferencePage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", guarded("admin", SecurityPage)),
     globalPage("/settings/accounts", guarded("admin", AccountsSettingsPage)),

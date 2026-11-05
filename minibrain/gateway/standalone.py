@@ -90,7 +90,7 @@ def create_gateway_app(
         stop.set()
         app.state.telemetry.shutdown()
 
-    app = FastAPI(title="minibrain gateway", lifespan=lifespan)
+    app = FastAPI(title="minibrain gateway", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.gateway_config = source
     app.state.request_logs = logs
     app.state.feedback = send_feedback

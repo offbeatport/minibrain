@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "obp-ui";
+import { Button, Link, Tabs, TabsContent, TabsList, TabsTrigger } from "obp-ui";
 import { useState } from "react";
+import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 
 type Harness = { id: string; label: string; file?: string; code: string };
 
@@ -169,12 +170,15 @@ export function HarnessConfigs({
                     </pre>
                 </TabsContent>
             ))}
-            {!keyValue && (
-                <p className="text-sm text-muted-foreground">
-                    Replace YOUR_KEY with a key from the list below; a new key is filled in here
-                    once.
-                </p>
-            )}
+            <p className="text-sm text-muted-foreground">
+                {!keyValue &&
+                    "Replace YOUR_KEY with a key from the list below; a new key is filled in here once. "}
+                Every endpoint, its fields and a client to try calls are in the{" "}
+                <Link href={API_REFERENCE_PATH} className="text-primary hover:underline">
+                    API reference
+                </Link>
+                .
+            </p>
         </Tabs>
     );
 }

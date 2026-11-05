@@ -2035,6 +2035,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/openapi/v1.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OpenAPI document for /v1 */
+        get: operations["gateway_reference_api_openapi_v1_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/openapi/api.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OpenAPI document for /api */
+        get: operations["management_reference_api_openapi_api_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/install": {
         parameters: {
             query?: never;
@@ -2179,7 +2213,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Models */
+        /**
+         * List models
+         * @description The models this API key can call, each version under its own name.
+         */
         get: operations["list_models_v1_models_get"];
         put?: never;
         post?: never;
@@ -2198,7 +2235,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Chat Completions */
+        /**
+         * Create a chat completion
+         * @description Answer a conversation with a model. Every call is logged without its content, unless the model keeps request inputs and answers.
+         */
         post: operations["chat_completions_v1_chat_completions_post"];
         delete?: never;
         options?: never;
@@ -2215,7 +2255,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rate or correct a chat completion */
+        /**
+         * Rate or correct a chat completion
+         * @description The feedback waits in the review queue; accepted answers join the model's next training data.
+         */
         post: operations["feedback_v1_feedback_post"];
         delete?: never;
         options?: never;
@@ -2720,6 +2763,16 @@ export interface components {
             availability: components["schemas"]["Availability"];
             /** Error */
             error: string | null;
+        };
+        /** AnswerMessage */
+        AnswerMessage: {
+            /**
+             * Role
+             * @constant
+             */
+            role: "assistant";
+            /** Content */
+            content: string;
         };
         /** AssignRequest */
         AssignRequest: {
@@ -3494,18 +3547,62 @@ export interface components {
             /** Dataset */
             dataset: boolean;
         };
-        /** ChatCompletionRequest */
-        ChatCompletionRequest: {
+        /** ChatCompletion */
+        ChatCompletion: {
+            /**
+             * Id
+             * @description The response id; send it as response_id to POST /feedback.
+             */
+            id: string;
+            /**
+             * Object
+             * @constant
+             */
+            object: "chat.completion";
+            /** Created */
+            created: number;
             /** Model */
             model: string;
-            /** Messages */
+            /** Choices */
+            choices: components["schemas"]["CompletionChoice"][];
+            usage: components["schemas"]["TokenUsage"];
+        };
+        /**
+         * ChatCompletionRequest
+         * @example {
+         *       "messages": [
+         *         {
+         *           "content": "I was charged twice",
+         *           "role": "user"
+         *         }
+         *       ],
+         *       "model": "support-triage"
+         *     }
+         */
+        ChatCompletionRequest: {
+            /**
+             * Model
+             * @description A name from GET /models: a custom model follows its live version, name@3 pins version 3, and a served base model goes by its key.
+             */
+            model: string;
+            /**
+             * Messages
+             * @description The conversation. A custom model answers the last user message; a base model reads them all.
+             */
             messages: components["schemas"]["Message"][];
-            /** Max Tokens */
+            /**
+             * Max Tokens
+             * @description The most tokens to answer with; 64 by default.
+             */
             max_tokens?: number | null;
-            /** Max Completion Tokens */
+            /**
+             * Max Completion Tokens
+             * @description The same as max_tokens, under its newer name.
+             */
             max_completion_tokens?: number | null;
             /**
              * Stream
+             * @description Send the answer as server-sent events, ending with data: [DONE].
              * @default false
              */
             stream?: boolean;
@@ -3620,6 +3717,18 @@ export interface components {
             prompt_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
+        };
+        /** CompletionChoice */
+        CompletionChoice: {
+            /** Index */
+            index: number;
+            message: components["schemas"]["AnswerMessage"];
+            /**
+             * Finish Reason
+             * @description stop when the answer ended, length when max_tokens cut it.
+             * @enum {string}
+             */
+            finish_reason: "stop" | "length";
         };
         /** ConnectionBody */
         ConnectionBody: {
@@ -4259,6 +4368,22 @@ export interface components {
             error?: string | null;
             /** Code */
             code?: string | null;
+        };
+        /** ErrorDetail */
+        ErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /** ErrorInfo */
+        ErrorInfo: {
+            /** Message */
+            message: string;
+            /** Type */
+            type: string;
+            /** Param */
+            param: string | null;
+            /** Code */
+            code: string | null;
         };
         /** EvalCost */
         EvalCost: {
@@ -5260,7 +5385,10 @@ export interface components {
         };
         /** Message */
         Message: {
-            /** Role */
+            /**
+             * Role
+             * @description system, user or assistant.
+             */
             role: string;
             /** Content */
             content?: string | null;
@@ -5426,6 +5554,35 @@ export interface components {
              */
             state?: "ok" | "corrupt" | "missing" | "wrong_size" | "unchecked";
         };
+        /** ModelInfo */
+        ModelInfo: {
+            /**
+             * Id
+             * @description The name to send as model.
+             */
+            id: string;
+            /**
+             * Object
+             * @default model
+             * @constant
+             */
+            object?: "model";
+            /** Created */
+            created: number;
+            /** Owned By */
+            owned_by: string;
+        };
+        /** ModelList */
+        ModelList: {
+            /**
+             * Object
+             * @default list
+             * @constant
+             */
+            object?: "list";
+            /** Data */
+            data: components["schemas"]["ModelInfo"][];
+        };
         /** ModelRef */
         ModelRef: {
             /**
@@ -5566,6 +5723,10 @@ export interface components {
             versions?: {
                 [key: string]: string;
             };
+        };
+        /** OpenAIErrorBody */
+        OpenAIErrorBody: {
+            error: components["schemas"]["ErrorInfo"];
         };
         /** OverviewBucket */
         OverviewBucket: {
@@ -6643,6 +6804,15 @@ export interface components {
         TokenBody: {
             /** Token */
             token: string;
+        };
+        /** TokenUsage */
+        TokenUsage: {
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Total Tokens */
+            total_tokens: number;
         };
         /** Usage */
         Usage: {
@@ -11346,6 +11516,50 @@ export interface operations {
             };
         };
     };
+    gateway_reference_api_openapi_v1_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    management_reference_api_openapi_api_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     install_api_system_install_get: {
         parameters: {
             query?: never;
@@ -11567,9 +11781,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ModelList"];
+                };
+            };
+            /** @description The API key is missing, unknown or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };
@@ -11587,22 +11808,77 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description The answer, or with stream set, server-sent chat.completion.chunk events. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ChatCompletion"];
+                    "text/event-stream": string;
                 };
             };
-            /** @description Validation Error */
+            /** @description response_format is not valid or cannot be applied. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description The API key is missing, unknown or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The API key does not cover this model. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No model has this name. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The version was trained on base weights that have changed since. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The answer does not match response_format, or the body is not valid. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description No engine is serving this model right now. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };
@@ -11629,13 +11905,40 @@ export interface operations {
                     "application/json": components["schemas"]["FeedbackReceipt"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The API key is missing, unknown or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The API key does not cover this model. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No model has this name. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The model is a base model, or the body is not valid. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
         };

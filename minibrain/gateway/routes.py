@@ -10,6 +10,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
 from minibrain.base_models import BaseModelSpec, base_model
@@ -32,7 +33,7 @@ from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, 
 from minibrain.tasks.classify import build_messages
 from minibrain.telemetry.call import current_call
 
-router = APIRouter(prefix="/v1", tags=["openai"])
+router = APIRouter(prefix="/v1")
 log = logging.getLogger("minibrain.gateway")
 
 DEFAULT_MAX_TOKENS = 64
@@ -45,6 +46,22 @@ UNCONSTRAINED = "only SGLang and llama.cpp engines constrain decoding, the other
 FORMAT_HELP = (
     'An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or '
     '{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}.'
+)
+
+MODEL_HELP = (
+    "A name from GET /models: a custom model follows its live version, name@3 pins version 3, "
+    "and a served base model goes by its key."
+)
+CHAT_HELP = (
+    "Answer a conversation with a model. Every call is logged without its content, "
+    "unless the model keeps request inputs and answers."
+)
+MESSAGES_HELP = "The conversation. A custom model answers the last user message; a base model reads them all."
+API_KEY = HTTPBearer(
+    auto_error=False,
+    scheme_name="apiKey",
+    bearerFormat="mb_...",
+    description="A minibrain API key, created on Deployments. It covers one or more models.",
 )
 
 FeedbackSink = Callable[[Submission], int]
@@ -77,19 +94,110 @@ def invalid(param: str, message: str, code: str = "invalid_value") -> OpenAIErro
 class Message(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    role: str
+    role: str = Field(description="system, user or assistant.")
     content: str | None = None
 
 
 class ChatCompletionRequest(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(
+        extra="allow",
+        json_schema_extra={
+            "example": {"model": "support-triage", "messages": [{"role": "user", "content": "I was charged twice"}]}
+        },
+    )
 
-    model: str
-    messages: list[Message]
-    max_tokens: int | None = None
-    max_completion_tokens: int | None = None
-    stream: bool = False
+    model: str = Field(description=MODEL_HELP)
+    messages: list[Message] = Field(description=MESSAGES_HELP)
+    max_tokens: int | None = Field(
+        default=None, description=f"The most tokens to answer with; {DEFAULT_MAX_TOKENS} by default."
+    )
+    max_completion_tokens: int | None = Field(default=None, description="The same as max_tokens, under its newer name.")
+    stream: bool = Field(default=False, description="Send the answer as server-sent events, ending with data: [DONE].")
     response_format: Any = Field(default=None, description=FORMAT_HELP)
+
+
+class ModelInfo(BaseModel):
+    id: str = Field(description="The name to send as model.")
+    object: Literal["model"] = "model"
+    created: int
+    owned_by: str
+
+
+class ModelList(BaseModel):
+    object: Literal["list"] = "list"
+    data: list[ModelInfo]
+
+
+class AnswerMessage(BaseModel):
+    role: Literal["assistant"]
+    content: str
+
+
+class CompletionChoice(BaseModel):
+    index: int
+    message: AnswerMessage
+    finish_reason: Literal["stop", "length"] = Field(
+        description="stop when the answer ended, length when max_tokens cut it."
+    )
+
+
+class TokenUsage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class ChatCompletion(BaseModel):
+    id: str = Field(description="The response id; send it as response_id to POST /feedback.")
+    object: Literal["chat.completion"]
+    created: int
+    model: str
+    choices: list[CompletionChoice]
+    usage: TokenUsage
+
+
+class ErrorInfo(BaseModel):
+    message: str
+    type: str
+    param: str | None
+    code: str | None
+
+
+class OpenAIErrorBody(BaseModel):
+    error: ErrorInfo
+
+
+class ErrorDetail(BaseModel):
+    detail: str
+
+
+KEY_ERRORS: dict[int | str, dict[str, Any]] = {
+    401: {"model": ErrorDetail, "description": "The API key is missing, unknown or expired."},
+}
+MODEL_ERRORS: dict[int | str, dict[str, Any]] = {
+    **KEY_ERRORS,
+    403: {"model": ErrorDetail, "description": "The API key does not cover this model."},
+    404: {"model": ErrorDetail, "description": "No model has this name."},
+}
+CHAT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {
+        "model": ChatCompletion,
+        "description": "The answer, or with stream set, server-sent chat.completion.chunk events.",
+        "content": {"text/event-stream": {"schema": {"type": "string"}}},
+    },
+    400: {"model": OpenAIErrorBody, "description": "response_format is not valid or cannot be applied."},
+    **MODEL_ERRORS,
+    409: {"model": ErrorDetail, "description": "The version was trained on base weights that have changed since."},
+    422: {
+        "model": OpenAIErrorBody,
+        "description": "The answer does not match response_format, or the body is not valid.",
+    },
+    503: {"model": ErrorDetail, "description": "No engine is serving this model right now."},
+}
+FEEDBACK_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **MODEL_ERRORS,
+    422: {"model": ErrorDetail, "description": "The model is a base model, or the body is not valid."},
+}
 
 
 def gateway_config(request: Request) -> GatewayConfig:
@@ -100,10 +208,11 @@ def gateway_config(request: Request) -> GatewayConfig:
 ConfigDep = Annotated[GatewayConfig, Depends(gateway_config)]
 
 
-def authorize(request: Request, config: ConfigDep) -> Grant:
-    scheme, _, token = request.headers.get("authorization", "").partition(" ")
-    token = token.strip()
-    grant = config.keys.get(key_digest(token)) if scheme.lower() == "bearer" and token.startswith(KEY_PREFIX) else None
+def authorize(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(API_KEY)], config: ConfigDep
+) -> Grant:
+    token = credentials.credentials.strip() if credentials else ""
+    grant = config.keys.get(key_digest(token)) if token.startswith(KEY_PREFIX) else None
     if grant is None:
         raise HTTPException(status_code=401, detail="invalid API key")
     if grant.expired(now()):
@@ -328,14 +437,26 @@ def stream_events(identifier: str, model: str, completion: Completion) -> Iterat
     yield "data: [DONE]\n\n"
 
 
-@router.get("/models")
-def list_models(grant: GrantDep, config: ConfigDep) -> dict:
+@router.get(
+    "/models",
+    tags=["models"],
+    summary="List models",
+    description="The models this API key can call, each version under its own name.",
+    responses=KEY_ERRORS,
+)
+def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
     names = [name for owner in grant.owners for name in config.models.get(owner, [])]
-    data = [{"id": name, "object": "model", "created": 0, "owned_by": "minibrain"} for name in names]
-    return {"object": "list", "data": data}
+    return ModelList(data=[ModelInfo(id=name, created=0, owned_by="minibrain") for name in names])
 
 
-@router.post("/chat/completions", response_model=None)
+@router.post(
+    "/chat/completions",
+    response_model=None,
+    tags=["chat"],
+    summary="Create a chat completion",
+    description=CHAT_HELP,
+    responses=CHAT_RESPONSES,
+)
 def chat_completions(
     body: ChatCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
 ) -> dict | StreamingResponse:
@@ -413,7 +534,14 @@ class FeedbackReceipt(BaseModel):
     status: Literal["pending"] = "pending"
 
 
-@router.post("/feedback", status_code=201, summary="Rate or correct a chat completion")
+@router.post(
+    "/feedback",
+    status_code=201,
+    tags=["feedback"],
+    summary="Rate or correct a chat completion",
+    description="The feedback waits in the review queue; accepted answers join the model's next training data.",
+    responses=FEEDBACK_RESPONSES,
+)
 def feedback(body: FeedbackRequest, grant: GrantDep, config: ConfigDep, request: Request) -> FeedbackReceipt:
     route = config.routes.get(body.model)
     if route is None:

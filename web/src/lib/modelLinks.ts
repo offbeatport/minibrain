@@ -18,6 +18,10 @@ export function modelDataHref(slug: string): string {
 
 export const REQUEST_BODIES_ID = "request-bodies";
 
+export const API_REFERENCE_PATH = "/developers";
+
+export const MANAGEMENT_REFERENCE_PATH = "/developers/management";
+
 export function deploymentPageHref(slug: string): string {
     return `/deployments/${encodeURIComponent(slug)}`;
 }

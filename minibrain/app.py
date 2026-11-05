@@ -32,6 +32,7 @@ from minibrain.api import (
     ops,
     overview,
     policies,
+    reference,
     request_logs,
     system,
     versions,
@@ -86,9 +87,11 @@ from minibrain.telemetry.context import RequestContext
 from minibrain.telemetry.logs import configure_logging
 from minibrain.telemetry.prometheus import load_metrics_access
 from minibrain.telemetry.setup import main_telemetry
+from minibrain.versions import library_version
 
 EXPIRY_SECONDS = 5.0
 API_PREFIXES = ("api/", "v1/", "internal/", "healthz", "readyz", "metrics")
+RETIRED_PATHS = frozenset({"docs", "docs/oauth2-redirect", "redoc", "openapi.json"})
 
 ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
@@ -134,7 +137,7 @@ def mount_web(app: FastAPI, dist: Path, ui_url: str | None = None) -> None:
 
     @app.get("/{path:path}", include_in_schema=False)
     def web(path: str, request: Request) -> Response:
-        if path.startswith(API_PREFIXES):
+        if path.startswith(API_PREFIXES) or path in RETIRED_PATHS:
             raise HTTPException(status_code=404)
         if ui_url:
             query = f"?{request.url.query}" if request.url.query else ""
@@ -220,7 +223,14 @@ def create_app(
         csrf_key = ensure_csrf_key(session)
         session.commit()
         report_problems(session, lambda model: missing_files(settings, model))
-    app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
+    app = FastAPI(
+        title="minibrain",
+        version=library_version("minibrain") or "unknown",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
     app.state.settings = settings
     app.state.sessions = sessions
     app.state.csrf_key = csrf_key
@@ -277,6 +287,7 @@ def create_app(
         jobs,
         overview,
         request_logs,
+        reference,
         install,
         system,
         gateway,
