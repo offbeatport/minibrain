@@ -83,10 +83,18 @@ scored, promotable model. Fireworks and Together expose only the parts; minibrai
 
 ### Order
 
-1. Contract and graders refactor; Classify moves onto the JSON-schema path.
-2. Extract.
-3. General / Assistant: the judge grader, distillation, DPO from feedback.
-4. Custom with Python graders and training settings; Text-to-SQL.
+There are no users yet, so the engine is built from scratch with no compatibility layer; today's Classify code is
+replaced, not migrated.
+
+1. The engine, usable as Custom: chat examples, a contract (free text, label set, JSON schema), built-in graders
+   (exact match, label accuracy, JSON field match, text similarity, a judge model on this install) and a promotion
+   rule over them.
+2. Classify as a preset on it.
+3. Extract.
+4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback.
+5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
+   reinforcement fine-tuning with the graders as rewards, exports.
+6. Text-to-SQL with the execution grader.
 
 ## Concepts
 
