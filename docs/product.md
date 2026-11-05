@@ -61,6 +61,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Data settings** · shipped · admin
   Set the row limit, version retention and check thresholds.
   UI: Settings › Data · API: GET /api/settings/data, PUT /api/settings/data · Config: data
+- **Chat uploads** · shipped · product, ml
+  Upload chat JSONL as conversations; question and answer tables map too.
+  UI: Data › Add › Upload file · API: POST /api/sources, PUT /api/models/{slug}/dataset
 - **Mapping templates** · shipped · product, ml
   Turn columns or chat JSONL into chat examples, compiled to SQL.
   UI: Data › dataset › Columns · API: PUT /api/datasets/{slug}/mapping
@@ -150,21 +153,24 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Rewrite preset** · planned · product
   Rewrite drafts in house style, from pairs or documents.
   Roadmap: Task types
-- **General preset** · planned · product, ml
-  Adapt an assistant to the organisation's language, formats and policies.
-  Roadmap: Task types
+- **General preset** · partial · product, ml
+  A chat assistant in the organisation's language, formats and policies.
+  UI: Models › model › How it's judged, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
 - **Text-to-SQL preset** · planned · ml
   Answer questions with SQL on your own schema.
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › Add model › Custom · API: PUT /api/models/{slug}/graders, PUT /api/models/{slug}/instructions
+  UI: Models › Add model › Custom · API: PUT /api/models/{slug}/graders
+- **Instructions** · shipped · product, ml
+  Write the system prompt; a prompt-only version tries it at once.
+  UI: Models › model › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  UI: Models › model › Task
+  UI: Models › model › How it's judged
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema per version, extended without breaking apps.
-  UI: Models › model › Task · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
+  UI: Models › model › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -232,6 +238,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Mistakes and side by side** · shipped · product, ml
   Read held-out mistakes and compare answers with the base.
   UI: Evaluations › version, Playground › Compare with
+- **Answer review** · shipped · product, ml
+  Read free-text answers beside the expected and live ones, worse first.
+  UI: Evaluations › version › Answers · API: GET /api/models/{slug}/versions/{number}/answers
 - **Cost and latency** · partial · product, admin
   See p50, p95 and cost per 1,000 requests per version.
   UI: Evaluations · Roadmap: Eval and promote
@@ -249,10 +258,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Eval and promote
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
-  UI: Evaluations › version · Roadmap: Task types
+  UI: Models › model › How it's judged, Evaluations › version · Roadmap: Task types
+- **Judge model** · shipped · ml, admin
+  Pick the base that judges free-text answers, per install or model.
+  UI: Settings › General › Judge model, Models › model › How it's judged · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{slug}/judge
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › Task, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · planned · product, ml
   Compare two versions' scores, not only their data.
   Roadmap: v2
@@ -277,7 +289,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
   UI: Deployments › model › Connect
 - **Playground** · shipped · product
-  Chat with one model or version and compare with another.
+  Chat with one model or version over turns, and compare with another.
   UI: Playground · API: POST /api/models/{slug}/complete
 - **Engines per machine** · shipped · admin
   Serve on SGLang, MLX, transformers or llama.cpp, on any machine.

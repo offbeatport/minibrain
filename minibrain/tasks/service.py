@@ -23,6 +23,7 @@ from minibrain.tasks.contracts import (
 from minibrain.tasks.examples import Example, as_record
 from minibrain.tasks.graders import Grader, GraderError, build, check_configs, grade, main_metric, metric_values
 from minibrain.tasks.judge import judge_of
+from minibrain.tasks.judges import JUDGE, judge_choice, pinned_judge
 from minibrain.tasks.promotion import Decision, Live, Rule, decide
 from minibrain.tasks.prompting import Prompting
 
@@ -134,6 +135,27 @@ def checked_graders(configs: Sequence[dict[str, Any]], contract: Contract) -> li
     return [dict(config) for config in configs]
 
 
+def configured_graders(session: Session, model: Model, contract: Contract) -> list[dict[str, Any]]:
+    choice = judge_choice(session, model)
+    configs = model.graders or preset_of(model).default_graders(contract, judged=choice.configured)
+    return [pinned_judge(session, config, choice) for config in configs]
+
+
+def told(config: dict[str, Any], instructions: str) -> dict[str, Any]:
+    return config | {"instructions": instructions} if config.get("name") == JUDGE and instructions else config
+
+
+def model_graders(session: Session, model: Model, contract: Contract) -> list[dict[str, Any]]:
+    return checked_graders(configured_graders(session, model, contract), contract)
+
+
+def shown_graders(session: Session, model: Model) -> list[dict[str, Any]]:
+    try:
+        return configured_graders(session, model, contract_of(model))
+    except ConflictError:
+        return [dict(config) for config in model.graders]
+
+
 def instructions_for(model: Model, contract: Contract, kind: VersionKind) -> str:
     chosen = preset_of(model)
     trained = kind == VersionKind.LORA
@@ -167,10 +189,10 @@ def new_version(
 ) -> Version:
     contract = contract_with_data(session, store, model, dataset_version)
     number = checked_contract(model, contract, breaking)
-    graders = checked_graders(model.graders or preset_of(model).default_graders(contract), contract)
+    instructions = instructions_for(model, contract, kind)
+    graders = [told(config, instructions) for config in model_graders(session, model, contract)]
     model.contract = contract.as_dict()
     model.breaking_confirmed = False
-    model.graders = graders
     scored = dataset_version is not None and bool(dataset_version.counts)
     version = Version(
         model=model,
@@ -181,7 +203,7 @@ def new_version(
         recipe=dict(recipe or {}),
         contract=contract.as_dict(),
         contract_number=number,
-        instructions=instructions_for(model, contract, kind),
+        instructions=instructions,
         shots=[] if kind == VersionKind.LORA else shots_of(session, store, dataset_version),
         graders=graders,
     )

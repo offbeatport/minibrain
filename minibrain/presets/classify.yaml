@@ -1,6 +1,7 @@
 key: classify
 label: Classify
 noun: Classifier
+order: 2
 hint: Text → one label
 contract: labels
 mapping:

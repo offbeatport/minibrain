@@ -6,10 +6,14 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
+    AnswerSide,
     CompleteRequest,
     CompleteResponse,
+    ExampleAnswer,
     ModelDetail,
     ScoreInfo,
+    TurnInfo,
+    VersionAnswers,
     VersionCreate,
     VersionInfo,
     VersionTest,
@@ -42,9 +46,10 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.prices import load_prices
-from minibrain.registry.service import ConflictError, get_model, get_version
+from minibrain.registry.service import ConflictError, get_model, get_version, latest_dataset_version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
+from minibrain.tasks.answers import Side, compared
 from minibrain.tasks.contracts import answer_of
 from minibrain.tasks.examples import Example, turns_of
 from minibrain.tasks.graders import GraderError
@@ -96,6 +101,10 @@ def start_version(
     return version
 
 
+def needs_no_data(model: Model, body: VersionCreate) -> bool:
+    return body.dataset_version_id is None and latest_dataset_version(model) is None
+
+
 @router.get("/models/{slug}/versions", dependencies=[Depends(viewer)])
 def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
     model = get_model(session, slug)
@@ -103,6 +112,31 @@ def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
     prices = load_prices(session)
     found = [version_info(model, version, prices) for version in versions]
     return found if sees_rows() else [info.model_copy(update={"mistakes": []}) for info in found]
+
+
+def answer_side(side: Side | None) -> AnswerSide | None:
+    return None if side is None else AnswerSide(answer=side.answer, scores=side.scores, reason=side.reason)
+
+
+@router.get("/models/{slug}/versions/{number}/answers", dependencies=[Depends(builder)])
+def version_answers(slug: str, number: int, session: SessionDep, store: StoreDep) -> VersionAnswers:
+    model = get_model(session, slug)
+    found = compared(session, store, model, get_version(model, number))
+    return VersionAnswers(
+        number=found.number,
+        live=found.live,
+        metric=found.metric,
+        examples=[
+            ExampleAnswer(
+                messages=[TurnInfo(role=turn.role, content=turn.content) for turn in row.example.turns],
+                expected=row.example.expected,
+                version=AnswerSide(answer=row.mine.answer, scores=row.mine.scores, reason=row.mine.reason),
+                live=answer_side(row.live),
+                worse=row.worse,
+            )
+            for row in found.rows
+        ],
+    )
 
 
 @router.post("/models/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
@@ -128,6 +162,10 @@ def add_version(
     require_usable(session, settings, model.base_model)
     if kind == VersionKind.LORA:
         require_trainable(session, settings, model)
+    if kind == VersionKind.PROMPT and needs_no_data(model, body):
+        version = start_version(session, settings, store, model, kind, None, {}, body.breaking)
+        session.commit()
+        return version_info(model, version)
     dataset_version = training_dataset_version(session, settings, model, body.dataset_version_id)
     require_splits(dataset_version)
     recipe: dict[str, Any] = {}
@@ -221,6 +259,14 @@ def answered(
         return completion
 
 
+def conversation_of(body: CompleteRequest) -> list[dict[str, str]]:
+    if body.messages:
+        return [message.model_dump() for message in body.messages]
+    if body.text:
+        return [{"role": "user", "content": body.text}]
+    raise ConflictError("send text, or the conversation as messages")
+
+
 @router.post("/models/{slug}/complete", dependencies=[Depends(viewer)])
 def complete(
     slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, request: Request
@@ -228,7 +274,7 @@ def complete(
     model = get_model(session, slug)
     config = request.app.state.gateway_config.current()
     route = routed(config, model, body.version)
-    completion = answered(backend, config, route, [{"role": "user", "content": body.text}], body.max_tokens)
+    completion = answered(backend, config, route, conversation_of(body), body.max_tokens)
     touch(session, model.base_model)
     session.commit()
     answer, valid = answer_text(route, completion.text)

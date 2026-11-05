@@ -44,7 +44,7 @@ def test_beating_the_live_version_compares_the_main_metric() -> None:
 
 
 def test_presets_are_definition_files() -> None:
-    assert list(presets()) == ["classify", "custom"]
+    assert list(presets()) == ["general", "classify", "custom"]
     classify = preset("classify")
     labels = label_set(["billing", "bug"])
     assert classify.labels_from_data
@@ -62,4 +62,18 @@ def test_presets_are_definition_files() -> None:
     assert [item["name"] for item in custom.default_graders(schema)] == ["json_valid", "json_field_match"]
     assert [item["name"] for item in custom.default_graders(FREE_TEXT)] == ["exact_match", "text_similarity"]
     assert custom.view is None
-    assert {item.key for item in PLANNED} == {"extract", "general", "rewrite", "sql"}
+    assert {item.key for item in PLANNED} == {"extract", "rewrite", "sql"}
+    general = preset("general")
+    assert (general.label, general.noun, general.free_text, general.expected) == (
+        "Chat assistant",
+        "Assistant",
+        True,
+        "data",
+    )
+    assert general.instructions(FREE_TEXT) == general.instructions(FREE_TEXT, trained=True)
+    assert general.default_graders(FREE_TEXT) == [{"name": "text_similarity"}]
+    judged = general.default_graders(FREE_TEXT, judged=True)
+    assert [item["name"] for item in judged] == ["judge", "text_similarity"]
+    assert all(word in str(judged[0]["rubric"]) for word in ("Correct", "Follows the instructions", "Concise"))
+    assert general.view == "free_text"
+    assert custom.default_graders(FREE_TEXT, judged=True) == custom.default_graders(FREE_TEXT)

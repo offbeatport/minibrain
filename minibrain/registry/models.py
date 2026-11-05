@@ -217,6 +217,7 @@ class Model(Base):
     request_bodies: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    judge_model: Mapped[str | None] = mapped_column(default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
@@ -478,6 +479,7 @@ class JudgeScore(Base):
     judge: Mapped[str]
     judge_version: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    reason: Mapped[str | None] = mapped_column(default=None)
 
 
 class CatalogModel(Base):

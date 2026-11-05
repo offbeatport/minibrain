@@ -3,7 +3,7 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
+import { type CatalogEntry, type ModelRow, type PresetsResponse, api, unwrap } from "~/api/client";
 import { keys, useAllModels, useCatalog, usePresets } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
@@ -69,6 +69,10 @@ const PROBLEM_TARGETS: Record<keyof Problems, string> = {
 };
 
 const NOUNS: Record<string, string> = { classify: "Classifier", custom: "Custom" };
+
+function offered(found: PresetsResponse | undefined): PresetsResponse | undefined {
+    return found && { ...found, presets: found.presets.filter((item) => item.key in NOUNS) };
+}
 
 function takenNames(rows: ModelRow[]): Set<string> {
     return new Set(
@@ -162,7 +166,7 @@ export function AddModelPage() {
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useAllModels();
     const catalog = useCatalog();
-    const presets = usePresets();
+    const presets = offered(usePresets().data);
     const [task, setTaskKey] = useState<TaskKey>("classify");
     const [draft, setDraft] = useState<TaskDraft>(EMPTY_TASK);
     const [nameEdited, setNameEdited] = useState(false);
@@ -196,7 +200,7 @@ export function AddModelPage() {
     const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
     const setTask = (next: TaskKey) => {
         setTaskKey(next);
-        const graders = defaultGraders(presets.data, next, draft);
+        const graders = defaultGraders(presets, next, draft);
         setDraft({ ...draft, graders: next === "custom" ? graders : [] });
     };
     const startFrom = useMutation({
@@ -279,8 +283,8 @@ export function AddModelPage() {
     const graders = graderConfigs(task, draft, baseKey);
     const metrics =
         task === "classify"
-            ? metricsFor(presets.data, ["label_accuracy"])
-            : metricsFor(presets.data, draft.graders);
+            ? metricsFor(presets, ["label_accuracy"])
+            : metricsFor(presets, draft.graders);
     const bases = rows
         .filter((row) => row.kind === "base")
         .map((row) => ({ key: row.key, name: row.name }));
@@ -413,7 +417,7 @@ export function AddModelPage() {
             >
                 <Card className="gap-field p-panel">
                     <PresetSelect
-                        presets={presets.data}
+                        presets={presets}
                         value={task}
                         onChange={(next) => setTask(taskOf(next))}
                     />
@@ -475,7 +479,7 @@ export function AddModelPage() {
                         <CustomFields
                             draft={draft}
                             onChange={setDraft}
-                            presets={presets.data}
+                            presets={presets}
                             bases={bases}
                             base={baseKey}
                             problems={shown}

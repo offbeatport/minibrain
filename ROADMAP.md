@@ -57,7 +57,7 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 | Classify | One value from a label set (an enum in `response_format`) | Exact match: accuracy, per-label F1 | Ticket → `billing` |
 | Extract | A JSON schema (`response_format: json_schema`) | JSON validity, per-field match | Invoice → `{"total": 120, "due": "2026-12-01"}` |
 | Rewrite | Free text | Judge model with a rubric, similarity to the reference | Draft reply → reply in house style |
-| General / Assistant | Free text, multi-turn; structured output on request | Judge model with a rubric, plus any added graders | Support conversation → answer in company tone |
+| General / Chat assistant | Free text, multi-turn; structured output on request | Text similarity; a judge model with a rubric once a judge model is set | Support conversation → answer in company tone |
 | Text-to-SQL | SQL | Execution match on a read-only database | Question + schema → query |
 | Custom | Any contract above, chosen | Chosen | Bring chat JSONL |
 
@@ -75,8 +75,8 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 - Graders share one interface, `score(answer, example) -> {metric: value}`, and summarise a split. Built in: exact
   match, label accuracy (with macro F1, per-label scores and the confusion matrix as its report), JSON valid, JSON
   field match (per field), text similarity (token F1), and a judge model with a rubric (a model on this install, so it
-  runs air-gapped, scoring 1 to 5 as its own job). Later: SQL execution and Python graders run sandboxed. Every score
-  records its grader's name and version, so scores stay comparable.
+  runs air-gapped, scoring 1 to 5 with a one-sentence reason as its own job). Later: SQL execution and Python graders
+  run sandboxed. Every score records its grader's name and version, so scores stay comparable.
 - The promotion rule is a plain list of thresholds over metric names (`label_accuracy >= 0.85`, `json_valid == 1`) on
   the held-out split, plus "at least as good as the live version on the main metric" (the first metric of the first
   grader; ties pass). No rule language. A version goes live only when the rule passes; a version that was live before
@@ -103,8 +103,10 @@ replaced, not migrated.
    built-in graders (exact match, label accuracy, JSON field match, text similarity, a judge model on this install)
    and a promotion rule over them.
 2. Done (2026-11-05). Classify as a preset on it.
-3. Extract.
-4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback.
+3. Done (2026-11-05). General, shown as Chat assistant: free text over turns, chat JSONL and question and answer
+   tables as data, a system prompt, text similarity plus a judge with a default rubric, the judge model setting, the
+   answer review and the default rule. Later: distillation from a teacher, DPO from feedback.
+4. Extract.
 5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
    reinforcement fine-tuning with the graders as rewards, exports.
 6. Text-to-SQL with the execution grader.
@@ -113,7 +115,7 @@ replaced, not migrated.
 
 A preset is a definition file in `minibrain/presets/<key>.yaml`: the contract (`labels` from the data, or `choose`),
 the mapping template, the version 0 prompt and the trained prompt per contract kind, the default graders, the data
-checks, the default promotion rule and at most a results view. Adding Extract or General is one such file plus its
+checks, the default promotion rule and at most a results view. Adding Extract is one such file plus its
 view in the UI; `GET /api/presets` lists the presets, the ones coming and the graders.
 
 - Classify: a label set built from the labels typed in Add model and those found in the data (new ones join it on the
@@ -121,6 +123,13 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
   prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least two labels and label balance; the
   results view shows per-label counts and the confusion matrix, and feedback picks the right label. Try with sample
   data on the empty Models page creates a Classify model on the travel intents sample.
+- General, shown as Chat assistant: a free-text contract over turns; chat JSONL (`messages`, system messages
+  dropped) or a question and answer table (`question`/`answer`, `prompt`/`completion`, `input`/`output` and the
+  like) as data; every assistant turn trains and the last one is scored; version 0 is the base with the model's
+  system prompt (written on the model page) plus a few examples once there is data; graders text similarity, plus the
+  judge with a default rubric (correct, follows the instructions, concise) once a judge model is set; no checks; the
+  default rule. `expected: data` takes expected answers from the data; the hook for distillation is `expected:
+  teacher`, which will fill them from a teacher model.
 - Custom: free text or a JSON schema pasted in Add model, any graders that fit it (free text: exact match and text
   similarity; JSON: JSON valid and field match by default), optional instructions as the system prompt, chat JSONL
   (`messages`) as data.
@@ -134,7 +143,7 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 | Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
-| Preset | Classify or Custom today (Extract, General, Rewrite, Text-to-SQL coming); sets the contract, mapping, prompts, graders, checks and promotion rule defaults |
+| Preset | General (Chat assistant), Classify or Custom today (Extract, Rewrite, Text-to-SQL coming); sets the contract, mapping, prompts, graders, checks and promotion rule defaults |
 | Contract | Free text or a JSON schema (a label set is one enum field); numbered, additive, on each version |
 | Grader | `score(answer, example) -> {metric: value}`, named and versioned |
 | Golden set | 20–50 human-verified examples; defines the task and scores every version |
@@ -716,7 +725,17 @@ once it matches; only deleting a base removes its files.
 - Evaluation calls the gateway's own prompt and constraint code (`minibrain/tasks/prompting.py`), so scores are what
   apps get. The eval job only generates answers and times them; main grades them with the version's graders, and a
   judge grader queues a `judge` job for the answers the cache lacks (`judge_scores`, keyed by the SHA-256 of the
-  conversation, expected answer and answer, the rubric, and the judge model and its content hash).
+  conversation, expected answer and answer, the rubric, the version's system prompt, and the judge model and its
+  content hash). The judge also returns a one-sentence reason, kept with the score.
+- The judge model is a setting: Settings → General → Judge model for the install (`GET`/`PUT /api/settings/judge`,
+  audited as `settings.judge`) and a per-model override (`PUT /api/models/<slug>/judge`), any base on this install.
+  A preset with a default rubric (General) adds the judge to its graders once either is set, ahead of its other
+  graders, so the judge score becomes the main metric. A judge turned on without a judge model uses the model's own
+  base, and the model page says so.
+- Free-text versions (General, and Custom with free text) open on the answer review
+  (`GET /api/models/<slug>/versions/<n>/answers`): per held-out example the conversation, the expected answer, the
+  version's answer and the live version's answer side by side, with each one's scores and the judge's reason, filtered
+  to the examples where the version scores below the live one on the main metric.
 - Few-shot examples never come from the golden set, which must stay unseen: they come from other labelled rows, or,
   when the golden set is all there is, a few of its rows move out of it and stop being scored.
 - If version 0 meets `target.min_score` and its latency and cost are acceptable, the UI says no training is needed.
@@ -931,14 +950,16 @@ keys, and `/v1` stays key-only.
   model's API link to it, and the copy-paste harness configs stay where they are.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
-- Add model (`/models/new`) offers the task (Classify and Custom; Extract, General, Rewrite and Text-to-SQL as
-  Coming), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
+- Add model (`/models/new`) offers the task (Classify and Custom; Extract, Rewrite and Text-to-SQL as Coming;
+  General is created through the API until Add model's question is settled), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
   one search over four tabs. The name is prefilled and required: the task noun and the next free number
   ("Classifier 1", "Custom 1"), never a name a base or custom model already has, with an inline error when a typed
   one is taken. Classify takes labels (at least two, unless a dataset brings them); Custom takes free text
   or a JSON schema, graders that fit it (a judge with its rubric and model) and optional instructions. Both take a
-  promotion rule (thresholds and "at least as good as the live version"). The model page's Task section shows the
-  contract with its number and edits it (a breaking change asks to confirm), the graders and the rule.
+  promotion rule (thresholds and "at least as good as the live version"). The model page's How it's judged section
+  shows each part as a plain default with an Edit action, collapsed until opened: the labels or contract with its
+  number (a breaking change asks to confirm), the graders with the judge's rubric and model, and the rule. Its
+  Instructions section edits the system prompt; saving makes a prompt-only version that tries it at once.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for the task (capability, size tier, the catalogue's tested default; superseded models left out), then
     popularity. Being downloaded is not a ranking factor.
@@ -1269,7 +1290,7 @@ Everything in the v1 scope below, after M1.
 ## v1 scope
 
 - [x] models: create, list, select, delete
-- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer (the engine, Classify and Custom done;
+- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer (the engine, General, Classify and Custom done;
       the rest come as presets)
 - [ ] Index per model: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations

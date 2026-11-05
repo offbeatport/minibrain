@@ -467,6 +467,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{slug}/judge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Judge */
+        put: operations["update_judge_api_models__slug__judge_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources": {
         parameters: {
             query?: never;
@@ -1574,6 +1591,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{slug}/versions/{number}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Answers */
+        get: operations["version_answers_api_models__slug__versions__number__answers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{slug}/versions/{number}": {
         parameters: {
             query?: never;
@@ -1652,6 +1686,24 @@ export interface paths {
         /** List Presets */
         get: operations["list_presets_api_presets_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/judge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Judge */
+        get: operations["read_judge_api_settings_judge_get"];
+        /** Update Judge */
+        put: operations["update_judge_api_settings_judge_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2842,6 +2894,17 @@ export interface components {
             /** Content */
             content: string;
         };
+        /** AnswerSide */
+        AnswerSide: {
+            /** Answer */
+            answer: string;
+            /** Scores */
+            scores: {
+                [key: string]: number;
+            };
+            /** Reason */
+            reason: string | null;
+        };
         /** AssignRequest */
         AssignRequest: {
             /** Mine */
@@ -3757,7 +3820,9 @@ export interface components {
         /** CompleteRequest */
         CompleteRequest: {
             /** Text */
-            text: string;
+            text?: string | null;
+            /** Messages */
+            messages?: components["schemas"]["ChatMessage"][] | null;
             /** Version */
             version?: number | null;
             /** Max Tokens */
@@ -4638,6 +4703,17 @@ export interface components {
             /** Events */
             events?: components["schemas"]["EventBody"][];
         };
+        /** ExampleAnswer */
+        ExampleAnswer: {
+            /** Messages */
+            messages: components["schemas"]["TurnInfo"][];
+            /** Expected */
+            expected: string;
+            version: components["schemas"]["AnswerSide"];
+            live: components["schemas"]["AnswerSide"] | null;
+            /** Worse */
+            worse: boolean | null;
+        };
         /** ExampleInfo */
         ExampleInfo: {
             /** Input */
@@ -5441,6 +5517,38 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** JudgeInfo */
+        JudgeInfo: {
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "model" | "install" | "base";
+            /** Override */
+            override: string | null;
+            /** Used */
+            used: boolean;
+            /** Rubric */
+            rubric: string | null;
+            /** Default Rubric */
+            default_rubric: string | null;
+        };
+        /** JudgeSetting */
+        JudgeSetting: {
+            /** Model */
+            model: string | null;
+            /** Name */
+            name: string | null;
+        };
+        /** JudgeUpdate */
+        JudgeUpdate: {
+            /** Model */
+            model?: string | null;
+        };
         /** KeyCreate */
         KeyCreate: {
             /**
@@ -5735,7 +5843,7 @@ export interface components {
              * @default classify
              * @enum {string}
              */
-            preset?: "classify" | "custom";
+            preset?: "general" | "classify" | "custom";
             /** Labels */
             labels?: string[];
             contract?: components["schemas"]["ContractInfo"] | null;
@@ -5789,8 +5897,13 @@ export interface components {
             contract_number: number;
             /** Instructions */
             instructions: string;
+            /** Default Instructions */
+            default_instructions: string;
             /** Graders */
             graders: components["schemas"]["GraderConfig"][];
+            /** Graders Default */
+            graders_default: boolean;
+            judge: components["schemas"]["JudgeInfo"];
             promotion: components["schemas"]["PromotionInfo"];
         };
         /** ModelFile */
@@ -6204,7 +6317,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "classify" | "custom";
+            key: "general" | "classify" | "custom";
             /** Label */
             label: string;
             /** Noun */
@@ -6215,7 +6328,7 @@ export interface components {
              * Contract
              * @enum {string}
              */
-            contract: "labels" | "choose";
+            contract: "labels" | "choose" | "text";
             /** Mapping */
             mapping: {
                 [key: string]: string;
@@ -6228,6 +6341,13 @@ export interface components {
             graders: {
                 [key: string]: components["schemas"]["GraderConfig"][];
             };
+            /** Rubric */
+            rubric: string | null;
+            /**
+             * Expected
+             * @constant
+             */
+            expected: "data";
             /** Checks */
             checks: string[];
             promotion: components["schemas"]["PromotionInfo"];
@@ -6648,8 +6768,13 @@ export interface components {
             contract_number: number;
             /** Instructions */
             instructions: string;
+            /** Default Instructions */
+            default_instructions: string;
             /** Graders */
             graders: components["schemas"]["GraderConfig"][];
+            /** Graders Default */
+            graders_default: boolean;
+            judge: components["schemas"]["JudgeInfo"];
             promotion: components["schemas"]["PromotionInfo"];
             /** Base Name */
             base_name: string;
@@ -7215,6 +7340,13 @@ export interface components {
             overrides: string[];
             defaults: components["schemas"]["TrainingDefaults"];
         };
+        /** TurnInfo */
+        TurnInfo: {
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
+        };
         /** Usage */
         Usage: {
             /** Days */
@@ -7247,6 +7379,17 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VersionAnswers */
+        VersionAnswers: {
+            /** Number */
+            number: number;
+            /** Live */
+            live: number | null;
+            /** Metric */
+            metric: string | null;
+            /** Examples */
+            examples: components["schemas"]["ExampleAnswer"][];
         };
         /** VersionCreate */
         VersionCreate: {
@@ -8382,6 +8525,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["InstructionsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_judge_api_models__slug__judge_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeUpdate"];
             };
         };
         responses: {
@@ -11064,6 +11242,38 @@ export interface operations {
             };
         };
     };
+    version_answers_api_models__slug__versions__number__answers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionAnswers"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_version_api_models__slug__versions__number__delete: {
         parameters: {
             query?: never;
@@ -11213,6 +11423,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PresetsResponse"];
+                };
+            };
+        };
+    };
+    read_judge_api_settings_judge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSetting"];
+                };
+            };
+        };
+    };
+    update_judge_api_settings_judge_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JudgeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JudgeSetting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

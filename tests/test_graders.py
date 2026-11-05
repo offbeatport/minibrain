@@ -17,7 +17,7 @@ from minibrain.tasks.graders import (
     main_metric,
     metric_values,
 )
-from minibrain.tasks.judge import Item, grade_value, judge_of, messages_for, pending_items
+from minibrain.tasks.judge import Item, grade_value, judge_of, messages_for, pending_items, reason_of
 
 LABELS = ("x", "y")
 SCHEMA = {"type": "object", "properties": {"total": {"type": "number"}, "due": {"type": "string"}}}
@@ -127,3 +127,17 @@ def test_the_judge_reads_cached_scores_and_lists_what_is_missing() -> None:
     assert grade_value("none") is None
     pair = from_pair("q", "a")
     assert pair is not None and pair.expected == "a"
+
+
+def test_the_judge_reads_the_system_prompt_and_gives_a_short_reason() -> None:
+    example = single("Where is my order?", "It ships on Friday.")
+    plain = Judge("Is it right?", "qwen3-0.6b", "rev1")
+    told = Judge("Is it right?", "qwen3-0.6b", "rev1", instructions="Answer as Acme support.")
+    assert plain.key("Friday.", example) != told.key("Friday.", example)
+    [item] = pending_items(told, [example], ["Friday."])
+    prompt = messages_for(told.rubric, item, told.instructions)
+    assert "Answer as Acme support." in prompt[1]["content"]
+    assert "Answer as Acme support." not in messages_for(told.rubric, item)[1]["content"]
+    assert (grade_value("4 - Right, a bit long."), reason_of("4 - Right, a bit long.")) == (0.75, "Right, a bit long.")
+    assert reason_of("3/5: misses the date.\nMore.") == "misses the date. More."
+    assert reason_of("5") is None

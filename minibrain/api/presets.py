@@ -1,9 +1,21 @@
 from fastapi import APIRouter, Depends
 
-from minibrain.api.access import viewer
-from minibrain.api.schemas import GraderKindInfo, PlannedPresetInfo, PresetInfo, PresetsResponse
+from minibrain.api.access import admin, viewer
+from minibrain.api.deps import SessionDep
+from minibrain.api.schemas import (
+    GraderKindInfo,
+    JudgeSetting,
+    JudgeUpdate,
+    PlannedPresetInfo,
+    PresetInfo,
+    PresetsResponse,
+)
+from minibrain.api.views import base_name
+from minibrain.auth.identity import current_actor
 from minibrain.presets import PLANNED, Preset, presets
+from minibrain.registry.models import AuditEvent
 from minibrain.tasks.graders import CATALOGUE
+from minibrain.tasks.judges import install_judge, set_install_judge
 
 router = APIRouter(prefix="/api", tags=["presets"])
 
@@ -19,6 +31,8 @@ def preset_info(item: Preset) -> PresetInfo:
             "mapping": item.mapping,
             "prompts": item.prompts,
             "graders": {kind: list(configs) for kind, configs in item.graders.items()},
+            "rubric": item.rubric,
+            "expected": item.expected,
             "checks": list(item.checks),
             "promotion": item.promotion.as_dict(),
             "view": item.view,
@@ -43,3 +57,23 @@ def list_presets() -> PresetsResponse:
             for info in CATALOGUE
         ],
     )
+
+
+def judge_setting(session: SessionDep) -> JudgeSetting:
+    found = install_judge(session)
+    return JudgeSetting(model=found, name=base_name(session, found) if found else None)
+
+
+@router.get("/settings/judge", dependencies=[Depends(viewer)])
+def read_judge(session: SessionDep) -> JudgeSetting:
+    return judge_setting(session)
+
+
+@router.put("/settings/judge", dependencies=[Depends(admin)])
+def update_judge(body: JudgeUpdate, session: SessionDep) -> JudgeSetting:
+    before = install_judge(session)
+    set_install_judge(session, body.model)
+    facts = {"from": before, "to": body.model or None}
+    session.add(AuditEvent(actor=current_actor(), action="settings.judge", target="judge", detail=facts))
+    session.commit()
+    return judge_setting(session)

@@ -17,6 +17,7 @@ from minibrain.api.schemas import (
     GraderConfig,
     JobDetail,
     JobInfo,
+    JudgeInfo,
     KeyInfo,
     KeyModel,
     LabelScoreInfo,
@@ -60,7 +61,8 @@ from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.registry.service import find_version, latest_dataset_version
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
-from minibrain.tasks.contracts import Contract
+from minibrain.tasks.contracts import FREE_TEXT, Contract
+from minibrain.tasks.judges import JUDGE, judge_choice
 from minibrain.tasks.service import (
     contract_of,
     decision,
@@ -68,10 +70,12 @@ from minibrain.tasks.service import (
     latest_version_of,
     preset_of,
     rule_of,
+    shown_graders,
     version_contract,
     version_metric,
 )
 
+FREE_TEXT_VIEW = "free_text"
 TEARDOWN_LABELS: dict[tuple[str, str], str] = {
     (TeardownKind.DELETE, TeardownStatus.RUNNING): "Deleting",
     (TeardownKind.DELETE, TeardownStatus.FAILED): "Delete failed",
@@ -276,6 +280,11 @@ def cost_info(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost 
     return None if found is None else EvalCost.model_validate(asdict(found))
 
 
+def view_of(model: Model, version: Version) -> str | None:
+    chosen = preset_of(model).view
+    return chosen or (FREE_TEXT_VIEW if version_contract(version) == FREE_TEXT else None)
+
+
 def version_info(model: Model, version: Version, prices: DevicePrices | None = None) -> VersionInfo:
     metrics = version.metrics or {}
     latency = metrics.get("latency") or {}
@@ -315,7 +324,7 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         score=held_out_score(version),
         promotion=DecisionInfo.model_validate(decision(model, version).as_dict()) if ready else None,
         live_at=version.live_at,
-        view=preset_of(model).view,
+        view=view_of(model, version),
     )
 
 
@@ -357,8 +366,33 @@ def bodies_info(model: Model) -> RequestBodiesInfo:
     return RequestBodiesInfo(kept=kept, locked=lock is not None, source=lock or "model")
 
 
+def base_name(session: Session, key: str) -> str:
+    found = session.get(BaseModel, key)
+    return found.name if found is not None else key
+
+
+def judge_info(session: Session, model: Model, graders: list[dict[str, Any]]) -> JudgeInfo:
+    choice = judge_choice(session, model)
+    used = next((config for config in graders if config.get("name") == JUDGE), None)
+    key = str(used.get("model") or choice.model) if used else choice.model
+    rubric = preset_of(model).rubric
+    return JudgeInfo(
+        model=key,
+        name=base_name(session, key),
+        source=choice.source if key == choice.model else "model",
+        override=model.judge_model,
+        used=used is not None,
+        rubric=str(used.get("rubric")) if used and used.get("rubric") else rubric,
+        default_rubric=rubric,
+    )
+
+
 def detail(settings: Settings, model: Model) -> ModelDetail:
     current = latest_dataset_version(model)
+    session = object_session(model)
+    if session is None:
+        raise RuntimeError(f"{model.slug} is not attached to a session")
+    graders = shown_graders(session, model)
     return ModelDetail(
         slug=model.slug,
         name=model.name,
@@ -382,7 +416,10 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         contract=contract_info(contract_of(model)),
         contract_number=current_contract(model),
         instructions=model.instructions or "",
-        graders=grader_infos(model.graders),
+        default_instructions=preset_of(model).instructions(contract_of(model)),
+        graders=grader_infos(graders),
+        graders_default=not model.graders,
+        judge=judge_info(session, model, graders),
         promotion=PromotionInfo.model_validate(rule_of(model).as_dict()),
     )
 

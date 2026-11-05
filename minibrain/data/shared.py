@@ -54,6 +54,7 @@ from minibrain.settings import Settings
 
 INPUT_NAMES = ("input", "text", "message", "question", "query", "prompt", "utterance", "body", "content")
 LABEL_NAMES = ("label", "category", "intent", "class", "target", "topic", "tag")
+ANSWER_NAMES = ("answer", "response", "output", "completion", "reply", "expected")
 FOLDER = "folder"
 UPLOAD = "upload"
 
@@ -405,8 +406,9 @@ def free_slug(session: Session, name: str) -> str:
 def guessed_template(columns: list[str]) -> Template | None:
     if MESSAGES in columns:
         return chat_template()
-    input_column, label_column = guess(columns, INPUT_NAMES), guess(columns, LABEL_NAMES)
-    return pair_template(input_column, label_column) if input_column and label_column else None
+    input_column = guess(columns, INPUT_NAMES)
+    answer_column = guess(columns, LABEL_NAMES) or guess(columns, ANSWER_NAMES)
+    return pair_template(input_column, answer_column) if input_column and answer_column else None
 
 
 def apply_template(dataset: Dataset, source: Source, template: Template | None) -> None:

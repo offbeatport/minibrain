@@ -24,7 +24,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.settings import Settings
-from minibrain.tasks.judge import judge_of, pending_items
+from minibrain.tasks.judge import REASON_CHARACTERS, judge_of, pending_items
 from minibrain.tasks.service import graded, graders_of, judge_keys, judge_scores, split_examples
 
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
@@ -178,10 +178,12 @@ class DomainEffects:
     def judged(self, session: Session, job: Job) -> None:
         version = job.version
         scores = dict((job.result or {}).get("scores") or {})
+        reasons = dict((job.result or {}).get("reasons") or {})
+        judge, revision = str(job.params.get("judge")), str(job.params.get("judge_version") or "")
         for key, value in scores.items():
             if session.get(JudgeScore, key) is None:
-                judge, revision = str(job.params.get("judge")), str(job.params.get("judge_version") or "")
-                session.add(JudgeScore(key=key, score=float(value), judge=judge, judge_version=revision))
+                reason = str(reasons[key])[:REASON_CHARACTERS] if reasons.get(key) else None
+                session.add(JudgeScore(key=key, score=float(value), judge=judge, judge_version=revision, reason=reason))
         session.flush()
         source = session.get(Job, job.params.get("eval_job"))
         if version is None or source is None:

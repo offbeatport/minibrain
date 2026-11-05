@@ -1,0 +1,23 @@
+key: general
+label: Chat assistant
+noun: Assistant
+order: 1
+hint: Answers in your words, over a conversation
+contract: text
+mapping:
+  messages: messages
+prompt: You are a helpful assistant. Answer the user's message correctly and concisely.
+answer_tokens: 512
+graders:
+  - name: text_similarity
+rubric: |-
+  Grade the answer on three things, equally:
+  - Correct: it agrees with the reference answer on every fact that matters.
+  - Follows the instructions: it does what the conversation and the system prompt ask.
+  - Concise: no padding, repetition or detail nobody asked for.
+checks: []
+promotion:
+  thresholds: []
+  beats_live: true
+view: free_text
+expected: data

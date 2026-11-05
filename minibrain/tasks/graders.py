@@ -213,8 +213,8 @@ def answer_hash(example: Example, answer: str) -> str:
     return digest({"messages": example.messages(), "expected": example.expected, "answer": answer})
 
 
-def judge_key(answer_digest: str, rubric: str, model: str, model_version: str) -> str:
-    return digest([answer_digest, rubric, model, model_version])
+def judge_key(answer_digest: str, rubric: str, model: str, model_version: str, instructions: str = "") -> str:
+    return digest([answer_digest, rubric, model, model_version, instructions])
 
 
 @dataclass(frozen=True)
@@ -223,12 +223,14 @@ class Judge:
     model: str
     model_version: str = ""
     found: Mapping[str, float] = field(default_factory=dict)
+    instructions: str = ""
     name: str = "judge"
-    version: int = 1
+    version: int = 2
     metrics: tuple[str, ...] = ("judge",)
 
     def key(self, answer: str, example: Example) -> str:
-        return judge_key(answer_hash(example, answer), self.rubric, self.model, self.model_version)
+        digest_of = answer_hash(example, answer)
+        return judge_key(digest_of, self.rubric, self.model, self.model_version, self.instructions)
 
     def score(self, answer: str, example: Example) -> dict[str, float]:
         value = self.found.get(self.key(answer, example))
@@ -308,8 +310,8 @@ def labelled(config: dict[str, Any], contract: Contract, _found: Mapping[str, fl
 
 
 def judged(config: dict[str, Any], _contract: Contract, found: Mapping[str, float]) -> Grader:
-    version = config.get("model_version")
-    return Judge(option(config, "rubric"), option(config, "model"), str(version or ""), found)
+    version, instructions = config.get("model_version"), config.get("instructions")
+    return Judge(option(config, "rubric"), option(config, "model"), str(version or ""), found, str(instructions or ""))
 
 
 BUILDERS: dict[str, Builder] = {

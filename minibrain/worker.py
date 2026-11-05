@@ -404,6 +404,7 @@ class Worker:
             }
         if claim["kind"] == JobKind.JUDGE:
             spec |= {key: params[key] for key in ("rubric", "items", "judge", "judge_version")}
+            spec["instructions"] = params.get("instructions") or ""
         return spec
 
     def outputs(self, kind: str, attempt_dir: Path) -> dict[str, str]:

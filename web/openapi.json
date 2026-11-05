@@ -1339,6 +1339,58 @@
         }
       }
     },
+    "/api/models/{slug}/judge": {
+      "put": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Update Judge",
+        "operationId": "update_judge_api_models__slug__judge_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sources": {
       "get": {
         "tags": [
@@ -5043,6 +5095,57 @@
         }
       }
     },
+    "/api/models/{slug}/versions/{number}/answers": {
+      "get": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Version Answers",
+        "operationId": "version_answers_api_models__slug__versions__number__answers_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionAnswers"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{slug}/versions/{number}": {
       "delete": {
         "tags": [
@@ -5265,6 +5368,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PresetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/judge": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Read Judge",
+        "operationId": "read_judge_api_settings_judge_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeSetting"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Update Judge",
+        "operationId": "update_judge_api_settings_judge_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeSetting"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -9582,6 +9745,39 @@
         ],
         "title": "AnswerMessage"
       },
+      "AnswerSide": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Scores"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "scores",
+          "reason"
+        ],
+        "title": "AnswerSide"
+      },
       "AssignRequest": {
         "properties": {
           "mine": {
@@ -12694,9 +12890,31 @@
       "CompleteRequest": {
         "properties": {
           "text": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Text"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
           },
           "version": {
             "anyOf": [
@@ -12724,9 +12942,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "text"
-        ],
         "title": "CompleteRequest"
       },
       "CompleteResponse": {
@@ -15248,6 +15463,54 @@
         ],
         "title": "EventsBody"
       },
+      "ExampleAnswer": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TurnInfo"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "expected": {
+            "type": "string",
+            "title": "Expected"
+          },
+          "version": {
+            "$ref": "#/components/schemas/AnswerSide"
+          },
+          "live": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "worse": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages",
+          "expected",
+          "version",
+          "live",
+          "worse"
+        ],
+        "title": "ExampleAnswer"
+      },
       "ExampleInfo": {
         "properties": {
           "input": {
@@ -16405,7 +16668,6 @@
               "$ref": "#/components/schemas/GraderConfig"
             },
             "type": "array",
-            "minItems": 1,
             "title": "Graders"
           }
         },
@@ -17818,6 +18080,125 @@
         ],
         "title": "JobPage"
       },
+      "JudgeInfo": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "model",
+              "install",
+              "base"
+            ],
+            "title": "Source"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "used": {
+            "type": "boolean",
+            "title": "Used"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric"
+          },
+          "default_rubric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Rubric"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "name",
+          "source",
+          "override",
+          "used",
+          "rubric",
+          "default_rubric"
+        ],
+        "title": "JudgeInfo"
+      },
+      "JudgeSetting": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "name"
+        ],
+        "title": "JudgeSetting"
+      },
+      "JudgeUpdate": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "title": "JudgeUpdate"
+      },
       "KeyCreate": {
         "properties": {
           "name": {
@@ -18702,6 +19083,7 @@
           "preset": {
             "type": "string",
             "enum": [
+              "general",
               "classify",
               "custom"
             ],
@@ -18929,12 +19311,23 @@
             "type": "string",
             "title": "Instructions"
           },
+          "default_instructions": {
+            "type": "string",
+            "title": "Default Instructions"
+          },
           "graders": {
             "items": {
               "$ref": "#/components/schemas/GraderConfig"
             },
             "type": "array",
             "title": "Graders"
+          },
+          "graders_default": {
+            "type": "boolean",
+            "title": "Graders Default"
+          },
+          "judge": {
+            "$ref": "#/components/schemas/JudgeInfo"
           },
           "promotion": {
             "$ref": "#/components/schemas/PromotionInfo"
@@ -18958,7 +19351,10 @@
           "contract",
           "contract_number",
           "instructions",
+          "default_instructions",
           "graders",
+          "graders_default",
+          "judge",
           "promotion"
         ],
         "title": "ModelDetail"
@@ -20225,6 +20621,7 @@
           "key": {
             "type": "string",
             "enum": [
+              "general",
               "classify",
               "custom"
             ],
@@ -20246,7 +20643,8 @@
             "type": "string",
             "enum": [
               "labels",
-              "choose"
+              "choose",
+              "text"
             ],
             "title": "Contract"
           },
@@ -20273,6 +20671,22 @@
             },
             "type": "object",
             "title": "Graders"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric"
+          },
+          "expected": {
+            "type": "string",
+            "const": "data",
+            "title": "Expected"
           },
           "checks": {
             "items": {
@@ -20310,6 +20724,8 @@
           "mapping",
           "prompts",
           "graders",
+          "rubric",
+          "expected",
           "checks",
           "promotion",
           "view",
@@ -21601,12 +22017,23 @@
             "type": "string",
             "title": "Instructions"
           },
+          "default_instructions": {
+            "type": "string",
+            "title": "Default Instructions"
+          },
           "graders": {
             "items": {
               "$ref": "#/components/schemas/GraderConfig"
             },
             "type": "array",
             "title": "Graders"
+          },
+          "graders_default": {
+            "type": "boolean",
+            "title": "Graders Default"
+          },
+          "judge": {
+            "$ref": "#/components/schemas/JudgeInfo"
           },
           "promotion": {
             "$ref": "#/components/schemas/PromotionInfo"
@@ -21645,7 +22072,10 @@
           "contract",
           "contract_number",
           "instructions",
+          "default_instructions",
           "graders",
+          "graders_default",
+          "judge",
           "promotion",
           "base_name",
           "download_bytes"
@@ -23324,6 +23754,24 @@
         ],
         "title": "TrainingPlanInfo"
       },
+      "TurnInfo": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "TurnInfo"
+      },
       "Usage": {
         "properties": {
           "days": {
@@ -23420,6 +23868,51 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VersionAnswers": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "live": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/ExampleAnswer"
+            },
+            "type": "array",
+            "title": "Examples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "live",
+          "metric",
+          "examples"
+        ],
+        "title": "VersionAnswers"
       },
       "VersionCreate": {
         "properties": {

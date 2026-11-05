@@ -68,5 +68,6 @@ def judge_params(
         "rubric": judge.rubric,
         "judge": judge.model,
         "judge_version": judge.model_version,
+        "instructions": judge.instructions,
         "items": [item.as_dict() for item in items],
     }

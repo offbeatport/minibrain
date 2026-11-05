@@ -1,6 +1,7 @@
 key: custom
 label: Custom
 noun: Custom
+order: 4
 hint: Your contract and graders
 contract: choose
 mapping:

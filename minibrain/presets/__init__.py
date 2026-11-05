@@ -13,7 +13,11 @@ from minibrain.tasks.promotion import Rule
 DIRECTORY = Path(__file__).resolve().parent
 KINDS = ("text", "json", "labels")
 LABEL_SET = "labels"
+FREE_TEXT_KIND = "text"
 CHOOSE = "choose"
+FROM_DATA = "data"
+EXPECTED = (FROM_DATA,)
+JUDGE = "judge"
 
 
 class PresetError(NotFoundError):
@@ -29,7 +33,6 @@ class Planned:
 
 PLANNED = (
     Planned("extract", "Extract", "Text → fields"),
-    Planned("general", "General", "An assistant in your tone"),
     Planned("rewrite", "Rewrite", "Text → text in your style"),
     Planned("sql", "Text-to-SQL", "Question → SQL"),
 )
@@ -66,22 +69,35 @@ class Preset:
     checks: tuple[str, ...]
     promotion: Rule
     view: str | None
+    order: int = 0
+    rubric: str | None = None
+    expected: str = FROM_DATA
 
     @property
     def labels_from_data(self) -> bool:
         return self.contract == LABEL_SET
+
+    @property
+    def free_text(self) -> bool:
+        return self.contract == FREE_TEXT_KIND
 
     def instructions(self, contract: Contract, trained: bool = False) -> str:
         prompts = self.trained_prompts if trained else self.prompts
         template = prompts.get(kind_of(contract)) or self.prompts.get(kind_of(contract)) or ""
         return render(template, contract)
 
-    def default_graders(self, contract: Contract) -> list[dict[str, Any]]:
-        return [dict(config) for config in self.graders.get(kind_of(contract), ())]
+    def default_graders(self, contract: Contract, judged: bool = False) -> list[dict[str, Any]]:
+        found = [dict(config) for config in self.graders.get(kind_of(contract), ())]
+        if judged and self.rubric:
+            return [{"name": JUDGE, "rubric": self.rubric}, *found]
+        return found
 
 
 def loaded(path: Path) -> Preset:
     data = yaml.safe_load(path.read_text())
+    expected = str(data.get("expected") or FROM_DATA)
+    if expected not in EXPECTED:
+        raise ValueError(f"{path.name}: expected answers come from one of {', '.join(EXPECTED)}")
     prompts = per_kind(data["prompt"])
     graders = per_kind(data.get("graders") or [])
     return Preset(
@@ -98,12 +114,15 @@ def loaded(path: Path) -> Preset:
         checks=tuple(str(check) for check in data.get("checks") or ()),
         promotion=Rule.from_dict(data.get("promotion")),
         view=data.get("view"),
+        order=int(data.get("order", 0)),
+        rubric=str(data["rubric"]).strip() if data.get("rubric") else None,
+        expected=expected,
     )
 
 
 @cache
 def presets() -> dict[str, Preset]:
-    found = [loaded(path) for path in sorted(DIRECTORY.glob("*.yaml"))]
+    found = sorted((loaded(path) for path in DIRECTORY.glob("*.yaml")), key=lambda item: (item.order, item.key))
     return {item.key: item for item in found}
 
 

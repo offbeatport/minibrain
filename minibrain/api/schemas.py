@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field, StringConstraints
 from minibrain.ml.planner import MAX_RANK
 from minibrain.models.rules import LicenceUse
 
-PresetKey = Literal["classify", "custom"]
+PresetKey = Literal["general", "classify", "custom"]
+JudgeSource = Literal["model", "install", "base"]
 MetricName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][\w.]*$", max_length=80)]
 
 
@@ -64,7 +65,26 @@ class ContractUpdate(BaseModel):
 
 
 class GradersUpdate(BaseModel):
-    graders: list[GraderConfig] = Field(min_length=1)
+    graders: list[GraderConfig]
+
+
+class JudgeUpdate(BaseModel):
+    model: str | None = Field(default=None, max_length=200)
+
+
+class JudgeInfo(BaseModel):
+    model: str
+    name: str
+    source: JudgeSource
+    override: str | None
+    used: bool
+    rubric: str | None
+    default_rubric: str | None
+
+
+class JudgeSetting(BaseModel):
+    model: str | None
+    name: str | None
 
 
 class InstructionsUpdate(BaseModel):
@@ -591,7 +611,10 @@ class ModelDetail(ModelSummary):
     contract: ContractInfo
     contract_number: int
     instructions: str
+    default_instructions: str
     graders: list[GraderConfig]
+    graders_default: bool
+    judge: JudgeInfo
     promotion: PromotionInfo
 
 
@@ -713,7 +736,8 @@ class TrainingPlanInfo(BaseModel):
 
 
 class CompleteRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str | None = Field(default=None, min_length=1)
+    messages: list[ChatMessage] | None = Field(default=None, min_length=1)
     version: int | None = None
     max_tokens: int | None = Field(default=None, ge=1, le=4096)
 
@@ -763,10 +787,12 @@ class PresetInfo(BaseModel):
     label: str
     noun: str
     hint: str
-    contract: Literal["labels", "choose"]
+    contract: Literal["labels", "choose", "text"]
     mapping: dict[str, str]
     prompts: dict[str, str]
     graders: dict[str, list[GraderConfig]]
+    rubric: str | None
+    expected: Literal["data"]
     checks: list[str]
     promotion: PromotionInfo
     view: str | None
@@ -783,6 +809,32 @@ class PresetsResponse(BaseModel):
     presets: list[PresetInfo]
     planned: list[PlannedPresetInfo]
     graders: list[GraderKindInfo]
+
+
+class TurnInfo(BaseModel):
+    role: str
+    content: str
+
+
+class AnswerSide(BaseModel):
+    answer: str
+    scores: dict[str, float]
+    reason: str | None
+
+
+class ExampleAnswer(BaseModel):
+    messages: list[TurnInfo]
+    expected: str
+    version: AnswerSide
+    live: AnswerSide | None
+    worse: bool | None
+
+
+class VersionAnswers(BaseModel):
+    number: int
+    live: int | None
+    metric: str | None
+    examples: list[ExampleAnswer]
 
 
 class ModelRef(BaseModel):

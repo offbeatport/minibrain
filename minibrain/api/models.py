@@ -19,6 +19,7 @@ from minibrain.api.schemas import (
     GraderConfig,
     GradersUpdate,
     InstructionsUpdate,
+    JudgeUpdate,
     MappingUpdate,
     ModelCreate,
     ModelDetail,
@@ -49,7 +50,7 @@ from minibrain.data.shared import (
     sources_in,
     tables_of,
 )
-from minibrain.models.registry import ACTIVE_STATUSES, base_hash, base_readiness, start_download
+from minibrain.models.registry import ACTIVE_STATUSES, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.presets import Preset, preset
 from minibrain.registry.files import dataset_version_location
@@ -73,8 +74,9 @@ from minibrain.registry.service import (
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
 from minibrain.tasks.contracts import FREE_TEXT, Contract, ContractError, changes, json_contract, label_set
+from minibrain.tasks.judges import installed
 from minibrain.tasks.promotion import Rule, RuleError
-from minibrain.tasks.service import checked_graders, contract_of, latest_version_of, version_contract
+from minibrain.tasks.service import contract_of, latest_version_of, model_graders, version_contract
 from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
 
 router = APIRouter(prefix="/api/models", tags=["models"])
@@ -97,6 +99,8 @@ def contract_from(info: ContractInfo | None) -> Contract:
 
 
 def starting_contract(chosen: Preset, body: ModelCreate) -> Contract:
+    if chosen.free_text:
+        return FREE_TEXT
     if not chosen.labels_from_data:
         return contract_from(body.contract)
     labels = body.labels or (body.contract.labels if body.contract and body.contract.labels else [])
@@ -108,16 +112,8 @@ def starting_contract(chosen: Preset, body: ModelCreate) -> Contract:
         raise ConflictError(str(error)) from error
 
 
-def pinned(session: Session, configs: list[GraderConfig]) -> list[dict[str, Any]]:
-    found: list[dict[str, Any]] = []
-    for config in configs:
-        item = config.model_dump(exclude_none=True)
-        if item["name"] == "judge" and item.get("model"):
-            if base_readiness(session, str(item["model"])) == "missing":
-                raise ConflictError(f"the judge model {item['model']} is not on this install")
-            item["model_version"] = base_hash(session, str(item["model"])) or str(item["model"])
-        found.append(item)
-    return found
+def chosen_graders(configs: list[GraderConfig] | None) -> list[dict[str, Any]]:
+    return [config.model_dump(exclude_none=True) for config in configs or []]
 
 
 def rule_from(info: PromotionInfo | None, fallback: Rule) -> dict[str, Any]:
@@ -147,7 +143,7 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     contract = starting_contract(chosen, body)
     model.contract = contract.as_dict() if contract != FREE_TEXT or not chosen.labels_from_data else {}
     model.instructions = (body.instructions or "").strip() or None
-    model.graders = pinned(session, body.graders) if body.graders else []
+    model.graders = chosen_graders(body.graders)
     model.promotion = rule_from(body.promotion, chosen.promotion)
     if body.dataset:
         model.dataset = get_dataset(session, body.dataset)
@@ -363,12 +359,14 @@ def check_contract(slug: str, body: ContractInfo, session: SessionDep) -> Contra
 def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
     contract = contract_from(body.contract)
+    if preset(model.preset).labels_from_data and contract.labels is None:
+        raise ConflictError(f"{model.name} answers with one label from a set; send labels")
+    if preset(model.preset).free_text and contract != FREE_TEXT:
+        raise ConflictError(f"{model.name} answers in free text; a Custom model takes a JSON schema")
     found = contract_check(model, contract)
     if found.breaking and not body.breaking:
         raise ConflictError("This contract removes or renames what apps rely on; confirm it as a breaking change")
-    if preset(model.preset).labels_from_data and contract.labels is None:
-        raise ConflictError(f"{model.name} answers with one label from a set; send labels")
-    checked_graders(model.graders or preset(model.preset).default_graders(contract), contract)
+    model_graders(session, model, contract)
     before = contract_of(model).as_dict()
     model.contract = contract.as_dict()
     model.breaking_confirmed = found.breaking
@@ -388,9 +386,15 @@ def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settin
 @router.put("/{slug}/graders", dependencies=[Depends(builder)])
 def update_graders(slug: str, body: GradersUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
-    configs = checked_graders(pinned(session, body.graders), contract_of(model))
+    configs = chosen_graders(body.graders)
     facts = {"name": model.name, "from": [item.get("name") for item in model.graders]}
+    before = model.graders
     model.graders = configs
+    try:
+        model_graders(session, model, contract_of(model))
+    except ConflictError:
+        model.graders = before
+        raise
     model.updated_at = now()
     facts["to"] = [item["name"] for item in configs]
     session.add(AuditEvent(actor=current_actor(), action="model.graders", target=slug, detail=facts))
@@ -419,5 +423,18 @@ def update_instructions(slug: str, body: InstructionsUpdate, session: SessionDep
     session.add(
         AuditEvent(actor=current_actor(), action="model.instructions", target=slug, detail={"name": model.name})
     )
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/judge", dependencies=[Depends(builder)])
+def update_judge(slug: str, body: JudgeUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    if body.model and not installed(session, body.model):
+        raise ConflictError(f"{body.model} is not a base model on this install")
+    facts = {"name": model.name, "from": model.judge_model, "to": body.model or None}
+    model.judge_model = body.model or None
+    model.updated_at = now()
+    session.add(AuditEvent(actor=current_actor(), action="model.judge", target=slug, detail=facts))
     session.commit()
     return detail(settings, model)

@@ -242,8 +242,8 @@ def test_default_names_count_up_and_names_are_unique_across_base_and_custom_mode
 
 def test_presets_are_listed_and_recipes_are_gone(harness: Harness) -> None:
     found = harness.client.get("/api/presets").json()
-    assert [item["key"] for item in found["presets"]] == ["classify", "custom"]
-    assert {item["key"] for item in found["planned"]} == {"extract", "general", "rewrite", "sql"}
+    assert [item["key"] for item in found["presets"]] == ["general", "classify", "custom"]
+    assert {item["key"] for item in found["planned"]} == {"extract", "rewrite", "sql"}
     assert "judge" in {item["name"] for item in found["graders"]}
     assert harness.client.get("/api/recipes").status_code == 404
     assert harness.client.post("/api/recipes/ticket-routing/sample").status_code in (404, 405)
