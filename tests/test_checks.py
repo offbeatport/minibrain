@@ -1,5 +1,6 @@
 from minibrain.data.checks import CheckLimits, Finding, run_checks
-from minibrain.data.snapshot import clean, split
+from minibrain.data.snapshot import Row, clean, split
+from minibrain.tasks.examples import Example, Turn, encode_turns, single
 from tests.conftest import Harness, tickets_csv
 
 
@@ -11,9 +12,13 @@ def labelled(count: int, labels: int = 4) -> list[tuple[str | None, str | None]]
     return [(f"message number {index}", f"label {index % labels}") for index in range(count)]
 
 
+def examples_of(rows: list[tuple[str | None, str | None]]) -> list[Row]:
+    return [(encode_turns(single(text, label).turns), text, label) for text, label in rows if text and label]
+
+
 def test_clean_rows_pass_every_check() -> None:
     rows = labelled(200)
-    found = by_check(run_checks(rows, split(clean(rows)), CheckLimits()))
+    found = by_check(run_checks(rows, split(clean(examples_of(rows))), CheckLimits()))
     assert {name: finding.status for name, finding in found.items()} == {
         "empty": "ok",
         "single_label": "ok",
@@ -60,9 +65,9 @@ def test_balance_uses_the_configured_limits() -> None:
 
 def test_leakage_finds_test_rows_that_differ_only_in_case_and_punctuation() -> None:
     rows = labelled(300)
-    splits = split(clean(rows))
+    splits = split(clean(examples_of(rows)))
     held_out = splits["golden"][0]
-    splits["train"].append(type(held_out)(input=held_out.input.upper() + "!", label=held_out.label))
+    splits["train"].append(Example(turns=(Turn("user", held_out.input.upper() + "!"),), expected=held_out.expected))
     found = by_check(run_checks(rows, splits, CheckLimits()))["leakage"]
     assert (found.status, found.count) == ("warning", 1)
 
@@ -139,3 +144,10 @@ def test_dismissed_warnings_return_when_their_result_changes(harness: Harness) -
     settings = harness.client.put("/api/settings/data", json={"majority_share": 0.6, "min_label_rows": 3}).json()
     assert (settings["majority_share"], settings["min_label_rows"]) == (0.6, 3)
     assert harness.client.put("/api/settings/data", json={"checks_off": ["nonsense"]}).status_code == 422
+
+
+def test_free_text_answers_skip_the_label_checks() -> None:
+    rows: list[tuple[str | None, str | None]] = [(f"question {index}", f"answer {index}") for index in range(120)]
+    found = by_check(run_checks(rows, None, CheckLimits(), labelled=False))
+    assert "single_label" not in found
+    assert found["balance"].status == "skipped"

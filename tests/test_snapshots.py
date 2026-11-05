@@ -24,7 +24,7 @@ def upload(harness: Harness, rows: int = 200, name: str = "tickets.csv") -> dict
 def dataset_with_model(harness: Harness, rows: int = 200) -> dict:
     source = upload(harness, rows)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
-    harness.client.post("/api/minibrains", json={"name": "Support Triage"})
+    harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Support Triage"})
     harness.client.put(f"/api/minibrains/{SLUG}/dataset", json={"dataset": "tickets"})
     return source
 
@@ -143,9 +143,9 @@ def test_splits_are_derived_from_the_parquet_file(harness: Harness) -> None:
     taken = save(harness)
     path = store_for(harness.settings).materialize(taken["hash"], "file", "snapshot.parquet")
     assert [len(splits.read_split(path, name)) for name in splits.SPLITS] == [20, 30, 4, 146]
-    assert splits.read_labels(path) == ["account", "billing", "bug", "feature"]
-    labels, shots = splits.prompt_context(str(path))
-    assert len(labels) == 4 and len(shots) == 4
+    found = splits.parquet_splits(str(path))
+    assert splits.labels_of(found) == ["account", "billing", "bug", "feature"]
+    assert {shot.expected for shot in found["shots"]} == {"account", "billing", "bug", "feature"}
 
 
 def test_the_row_limit_refuses_large_versions_with_a_way_out(harness: Harness) -> None:
@@ -204,7 +204,7 @@ def test_retention_keeps_used_versions_the_latest_and_the_last_unused_ones(harne
     assert numbers(harness) == [3, 5, 6]
     assert harness.client.put("/api/settings/data", json={"keep_snapshots": 0}).status_code == 200
     assert numbers(harness) == [3, 6]
-    assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/1").status_code == 204
     assert numbers(harness) == [6]
 
 
@@ -220,9 +220,9 @@ def test_feedback_copies_are_removed_with_their_versions(harness: Harness) -> No
     copy = next(item for item in stored_snapshots(harness) if item.id == version["snapshot_id"])
     assert (copy.number, copy.base_id, copy.feedback_rows, copy.saved) == (None, first["id"], 1, False)
     assert version["snapshot_number"] == 1
-    assert versions(harness)[0]["versions"] == [f"{SLUG}@0"]
+    assert versions(harness)[0]["versions"] == [f"{SLUG}@1"]
     finish(harness, "eval")
-    assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/0").status_code == 204
+    assert harness.client.delete(f"/api/minibrains/{SLUG}/versions/1").status_code == 204
     assert [item.id for item in stored_snapshots(harness)] == [first["id"]]
     assert not store_for(harness.settings).has(copy.hash)
     with harness.sessions() as session:

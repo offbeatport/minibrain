@@ -26,7 +26,7 @@ def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:
         "category",
     )
     for name in ("Triage A", "Triage B"):
-        harness.client.post("/api/minibrains", json={"name": name})
+        harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": name})
     for slug in ("triage-a", "triage-b"):
         chosen = harness.client.put(f"/api/minibrains/{slug}/dataset", json={"dataset": "tickets"}).json()
         assert (chosen["dataset"], chosen["source"]["rows"]) == ("tickets", 200)
@@ -37,7 +37,7 @@ def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:
 def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_snapshots(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
-    harness.client.post("/api/minibrains", json={"name": "Triage"})
+    harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"})
     harness.client.put("/api/minibrains/triage/dataset", json={"dataset": "tickets"})
     taken = snapshot_hash(harness, "triage")
     assert harness.client.post("/api/minibrains/triage/versions", json={"kind": "prompt"}).status_code == 201
@@ -58,7 +58,7 @@ def test_models_sharing_a_dataset_see_its_mapping_change(harness: Harness) -> No
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     for name in ("Triage A", "Triage B"):
-        harness.client.post("/api/minibrains", json={"name": name})
+        harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": name})
         harness.client.put(f"/api/minibrains/{name.lower().replace(' ', '-')}/dataset", json={"dataset": "tickets"})
     assert harness.client.get("/api/minibrains/triage-b").json()["source"]["rows"] == 200
     mapped = harness.client.put(

@@ -319,10 +319,57 @@ def output_columns(tables: Sequence[Table], sql: str, aliases: dict[str, str] | 
     return [Column(name=row[0], type=row[1]) for row in found]
 
 
-def require_mapping(columns: Sequence[Column]) -> None:
+MESSAGES_COLUMN = "messages"
+PAIR = "pair"
+CHAT = "chat"
+CHAT_SHAPE = '[{"role":"VARCHAR","content":"VARCHAR"}]'
+TEXT_TYPES = ("VARCHAR", "JSON")
+EXAMPLE_COLUMNS = ("messages", "input", "expected")
+NOT_EXAMPLES = "the query must return an input column and a label column, or a messages column of chat turns"
+
+
+def shape_of(columns: Sequence[Column]) -> str:
     names = {column.name for column in columns}
-    if "input" not in names or "label" not in names:
-        raise SourceError("the query must return an input column and a label column")
+    if MESSAGES_COLUMN in names:
+        return CHAT
+    if "input" in names and "label" in names:
+        return PAIR
+    raise SourceError(NOT_EXAMPLES)
+
+
+def require_mapping(columns: Sequence[Column]) -> None:
+    shape_of(columns)
+
+
+def pair_examples(sql: str, limit: int | None = None) -> str:
+    text, answer = "trim(CAST(input AS VARCHAR))", "trim(CAST(label AS VARCHAR))"
+    return (
+        f"SELECT to_json([{{'role': 'user', 'content': {text}}}])::VARCHAR AS messages, {text} AS input, "
+        f"{answer} AS expected FROM ({wrapped(sql, limit)})"
+    )
+
+
+def chat_examples(sql: str, column: Column, limit: int | None = None) -> str:
+    raw = "CAST(messages AS VARCHAR)" if column.type in TEXT_TYPES else "to_json(messages)::VARCHAR"
+    prompt = "list_slice(t, 1, len(t) - 1)"
+    lines = f"array_to_string(list_transform({prompt}, lambda x: x.role || ': ' || x.content), chr(10))"
+    return (
+        f"WITH parsed AS (SELECT list_filter(from_json(try_cast({raw} AS JSON), {quote_literal(CHAT_SHAPE)}), "
+        f"lambda x: x.role <> 'system') AS t FROM ({wrapped(sql, limit)})) "
+        f"SELECT to_json({prompt})::VARCHAR AS messages, "
+        f"CASE WHEN len(t) = 2 THEN t[1].content ELSE {lines} END AS input, "
+        "CASE WHEN t[len(t)].role = 'assistant' THEN t[len(t)].content END AS expected FROM parsed"
+    )
+
+
+def examples_query(sql: str, columns: Sequence[Column], limit: int | None = None) -> str:
+    if shape_of(columns) == CHAT:
+        return chat_examples(sql, next(column for column in columns if column.name == MESSAGES_COLUMN), limit)
+    return pair_examples(sql, limit)
+
+
+def usable_examples(examples: str) -> str:
+    return f"SELECT * FROM ({examples}) WHERE coalesce(trim(input), '') <> '' AND coalesce(trim(expected), '') <> ''"
 
 
 def count_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> int:
@@ -332,23 +379,12 @@ def count_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None
     return int(found[0]) if found else 0
 
 
-def labelled_query(sql: str) -> str:
-    return f"SELECT CAST(input AS VARCHAR) AS input, CAST(label AS VARCHAR) AS label FROM ({wrapped(sql)})"
-
-
-def usable_query(sql: str) -> str:
-    return (
-        f"SELECT trim(input) AS input, trim(label) AS label FROM ({labelled_query(sql)}) "
-        "WHERE coalesce(trim(input), '') <> '' AND coalesce(trim(label), '') <> ''"
-    )
-
-
 def assess(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> Quality:
-    require_mapping(output_columns(tables, sql, aliases))
+    examples = examples_query(sql, output_columns(tables, sql, aliases))
     with sandbox(tables, aliases) as connection:
         found = connection.execute(
-            f"WITH everything AS ({labelled_query(sql)}), usable AS ({usable_query(sql)}), "
-            "per_label AS (SELECT label, count(*) AS rows FROM usable GROUP BY label) "
+            f"WITH everything AS ({examples}), usable AS ({usable_examples(examples)}), "
+            "per_label AS (SELECT expected, count(*) AS rows FROM usable GROUP BY expected) "
             "SELECT (SELECT count(*) FROM everything), (SELECT count(*) FROM usable), "
             "(SELECT count(DISTINCT input) FROM usable), (SELECT count(*) FROM per_label), "
             "(SELECT coalesce(min(rows), 0) FROM per_label), (SELECT coalesce(max(rows), 0) FROM per_label), "
@@ -369,10 +405,11 @@ def assess(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = N
 def label_counts(
     tables: Sequence[Table], sql: str, limit: int, aliases: dict[str, str] | None = None
 ) -> list[tuple[str, int]]:
+    examples = examples_query(sql, output_columns(tables, sql, aliases))
     with sandbox(tables, aliases) as connection:
         found = connection.execute(
-            f"SELECT label, count(*) AS rows FROM ({usable_query(sql)}) GROUP BY label "
-            f"ORDER BY rows DESC, label LIMIT {int(limit)}"
+            f"SELECT expected, count(*) AS rows FROM ({usable_examples(examples)}) GROUP BY expected "
+            f"ORDER BY rows DESC, expected LIMIT {int(limit)}"
         ).fetchall()
     return [(str(label), int(rows)) for label, rows in found]
 
@@ -382,35 +419,32 @@ def table_identifier(name: str) -> str:
     return name if plain else quote_identifier(name)
 
 
-def mapping_sql(input_column: str, label_column: str, table: str = SOURCE_TABLE) -> str:
-    return (
-        f"SELECT CAST({quote_identifier(input_column)} AS VARCHAR) AS input, "
-        f"CAST({quote_identifier(label_column)} AS VARCHAR) AS label FROM {table_identifier(table)}"
-    )
+def select_from(expressions: Sequence[tuple[str, str]], table: str) -> str:
+    listed = ", ".join(f"{expression} AS {alias}" for expression, alias in expressions)
+    return f"SELECT {listed} FROM {table_identifier(table)}"
 
 
 def to_text(value: Any) -> str | None:
     return None if value is None else str(value)
 
 
-def labelled_rows(
+ExampleRow = tuple[str | None, str | None, str | None]
+
+
+def example_rows(
     tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None, limit: int | None = None
-) -> list[tuple[str | None, str | None]]:
-    result = run_query(tables, sql, limit, aliases)
-    if "input" not in result.columns or "label" not in result.columns:
-        raise SourceError("the query must return an input column and a label column")
-    input_index, label_index = result.columns.index("input"), result.columns.index("label")
-    return [(to_text(row[input_index]), to_text(row[label_index])) for row in result.rows]
+) -> list[ExampleRow]:
+    examples = examples_query(sql, output_columns(tables, sql, aliases), limit)
+    with sandbox(tables, aliases) as connection:
+        found = connection.execute(f"SELECT messages, input, expected FROM ({examples})").fetchall()
+    return [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found]
 
 
 def copy_rows(
     tables: Sequence[Table], sql: str, target: Path, limit: int, aliases: dict[str, str] | None = None
 ) -> int:
-    require_mapping(output_columns(tables, sql, aliases))
-    rows = (
-        "SELECT * REPLACE (CAST(input AS VARCHAR) AS input, CAST(label AS VARCHAR) AS label) "
-        f"FROM ({wrapped(sql, limit + 1)}) ORDER BY ALL"
-    )
+    examples = examples_query(sql, output_columns(tables, sql, aliases), limit + 1)
+    rows = f"SELECT messages, input, expected FROM ({examples}) ORDER BY ALL"
     with sandbox(tables, aliases, target.parent) as connection:
         connection.execute(
             f"COPY ({rows}) TO {quote_literal(str(target))} (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 100000)"
@@ -422,8 +456,8 @@ def copy_rows(
 
 FEEDBACK_CHANGES = (
     "CREATE TABLE changes AS SELECT f.* FROM feedback_rows f WHERE NOT ("
-    "EXISTS (SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.label = f.label) AND NOT EXISTS "
-    "(SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.label IS DISTINCT FROM f.label))"
+    "EXISTS (SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.expected = f.expected) AND NOT EXISTS "
+    "(SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.expected IS DISTINCT FROM f.expected))"
 )
 FEEDBACK_MERGED = (
     "SELECT * FROM (SELECT * FROM dataset WHERE input IS NULL OR trim(input) NOT IN (SELECT input FROM changes) "
@@ -431,12 +465,12 @@ FEEDBACK_MERGED = (
 )
 
 
-def merge_rows(target: Path, rows: Sequence[tuple[str, str]]) -> tuple[int, int]:
+def merge_rows(target: Path, rows: Sequence[tuple[str, str, str]]) -> tuple[int, int]:
     merged = target.with_name(f"merged-{target.name}")
     with duckdb.connect() as connection:
         connection.execute(f"CREATE VIEW dataset AS SELECT * FROM read_parquet({quote_literal(str(target))})")
-        connection.execute("CREATE TABLE feedback_rows (input VARCHAR, label VARCHAR)")
-        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?)", list(rows))
+        connection.execute("CREATE TABLE feedback_rows (messages VARCHAR, input VARCHAR, expected VARCHAR)")
+        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?, ?)", list(rows))
         connection.execute(FEEDBACK_CHANGES)
         found = connection.execute("SELECT count(*) FROM changes").fetchone()
         changed = int(found[0]) if found else 0

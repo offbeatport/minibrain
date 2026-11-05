@@ -38,8 +38,8 @@ class Diff:
 
 KEYED = (
     "SELECT trim(CAST(input AS VARCHAR)) AS key, trim(CAST(input AS VARCHAR)) AS input, "
-    "min(trim(CAST(label AS VARCHAR))) AS label FROM read_parquet($path) "
-    "WHERE coalesce(trim(CAST(input AS VARCHAR)), '') <> '' AND coalesce(trim(CAST(label AS VARCHAR)), '') <> '' "
+    "min(trim(CAST(expected AS VARCHAR))) AS label FROM read_parquet($path) "
+    "WHERE coalesce(trim(CAST(input AS VARCHAR)), '') <> '' AND coalesce(trim(CAST(expected AS VARCHAR)), '') <> '' "
     "GROUP BY ALL"
 )
 

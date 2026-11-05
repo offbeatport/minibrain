@@ -14,6 +14,7 @@ from minibrain.data import feedback as store
 from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, Submission, suggestion
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Minibrain
 from minibrain.registry.service import NotFoundError, get_minibrain, latest_snapshot
+from minibrain.tasks.service import contract_of
 
 router = APIRouter(prefix="/api", tags=["feedback"])
 
@@ -230,8 +231,11 @@ def get_feedback(session: Session, feedback_id: int) -> Feedback:
 
 
 def labels_for(session: Session, minibrain: Minibrain) -> list[str]:
+    contract = contract_of(minibrain).labels
+    if contract is None:
+        return []
     snapshot = latest_snapshot(minibrain)
-    known = set(snapshot.labels if snapshot is not None else [])
+    known = set(contract) | set(snapshot.labels if snapshot is not None else [])
     accepted = select(Feedback.label).where(
         Feedback.minibrain_id == minibrain.id, Feedback.status == FeedbackStatus.ACCEPTED
     )

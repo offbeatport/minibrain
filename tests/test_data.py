@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -6,14 +7,16 @@ from minibrain.data import snapshot
 from minibrain.data.sources import (
     SourceError,
     Table,
-    labelled_rows,
-    mapping_sql,
+    assess,
+    example_rows,
+    label_counts,
     run_query,
     stage,
     statement_tables,
     table_name_base,
 )
-from minibrain.tasks.classify import build_messages, parse_label, score
+from minibrain.data.templates import pair_template, plain_columns, template_sql
+from minibrain.tasks.examples import encode_turns, single
 from tests.conftest import tickets_csv
 
 pytestmark = pytest.mark.both_stores
@@ -46,10 +49,57 @@ def test_user_sql_is_sandboxed(staging: list[Table], sql: str) -> None:
 
 
 def test_mapping_quotes_identifiers(staging: list[Table]) -> None:
-    rows = labelled_rows(staging, mapping_sql("text", "category"))
+    rows = example_rows(staging, template_sql(pair_template("text", "category"), "source"))
     assert len(rows) == 200
     with pytest.raises(SourceError):
-        run_query(staging, mapping_sql('text" FROM source; --', "category"), 1)
+        run_query(staging, template_sql(pair_template('text" FROM source; --', "category"), "source"), 1)
+
+
+def test_templates_compile_to_chat_messages(staging: list[Table]) -> None:
+    template = {"user": "Ticket: {text}\nWhy: {category}", "assistant": "{category}"}
+    sql = template_sql(template, "source")
+    messages, text, expected = example_rows(staging, sql, limit=1)[0]
+    assert text == f"Ticket: ticket 0 about billing\nWhy: {expected}"
+    assert json.loads(messages or "") == [{"role": "user", "content": text}]
+    assert plain_columns(template) == (None, "category")
+    assert plain_columns(pair_template("text", "category")) == ("text", "category")
+    with pytest.raises(SourceError, match="names at least one column"):
+        template_sql({"user": "no columns", "assistant": "{category}"}, "source")
+
+
+def test_chat_rows_split_off_the_last_answer(tmp_path: Path) -> None:
+    rows = [
+        {"messages": [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "billing"}]},
+        {
+            "messages": [
+                {"role": "system", "content": "short"},
+                {"role": "user", "content": "a"},
+                {"role": "assistant", "content": "b"},
+                {"role": "user", "content": "c"},
+                {"role": "assistant", "content": "bug"},
+            ]
+        },
+        {"messages": [{"role": "user", "content": "no answer"}]},
+    ]
+    source = tmp_path / "chat.jsonl"
+    source.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    path = tmp_path / "chat.duckdb"
+    stage(source, path)
+    tables = [Table(name="source", staging=str(path))]
+    found = example_rows(tables, "SELECT messages FROM source")
+    assert [(text, expected) for _, text, expected in found] == [
+        ("hi", "billing"),
+        ("user: a\nassistant: b\nuser: c", "bug"),
+        ("", None),
+    ]
+    examples = snapshot.clean(found)
+    assert [example.expected for example in examples] == ["billing", "bug"]
+    assert len(examples[1].turns) == 3
+    quality = assess(tables, "SELECT messages FROM source")
+    assert (quality.rows, quality.empty, quality.labels) == (3, 1, 2)
+    assert label_counts(tables, "SELECT messages FROM source", 10) == [("billing", 1), ("bug", 1)]
+    with pytest.raises(SourceError, match="messages column"):
+        example_rows(tables, "SELECT 1 AS other")
 
 
 def test_table_names_are_readable_identifiers() -> None:
@@ -78,44 +128,27 @@ def test_parse_errors_point_at_the_line_and_column() -> None:
     assert str(raised.value) == ('syntax error at or near "tickets"\n\nLINE 2:   label FORM tickets\n' + " " * 21 + "^")
 
 
+def row(text: str, expected: str) -> snapshot.Row:
+    return (encode_turns(single(text, expected).turns) if text else None, text, expected)
+
+
 def test_split_is_disjoint_and_deterministic() -> None:
-    rows = [(f"text {index}", f"label {index % 7}") for index in range(400)] + [("", "x"), ("text 1", "dup")]
+    rows = [row(f"text {index}", f"label {index % 7}") for index in range(400)] + [row("", "x"), row("text 1", "dup")]
     examples = snapshot.clean(rows)
     assert len(examples) == 400
     first, second = snapshot.split(examples), snapshot.split(examples)
-    assert snapshot.content_hash(first) == snapshot.content_hash(second)
+    assert first == second
     inputs = [{example.input for example in first[name]} for name in snapshot.SPLITS]
     assert sum(len(group) for group in inputs) == len(set().union(*inputs))
-    assert len({shot.label for shot in first["shots"]}) == len(first["shots"]) == 7
+    assert len({shot.expected for shot in first["shots"]}) == len(first["shots"]) == 7
+
+
+def test_free_text_answers_are_not_a_label_set() -> None:
+    examples = snapshot.clean([row(f"question {index}", f"answer number {index}") for index in range(120)])
+    assert snapshot.answer_labels(examples) == []
+    assert len(snapshot.split(examples)["shots"]) == snapshot.TEXT_SHOTS
 
 
 def test_split_needs_enough_rows() -> None:
     with pytest.raises(snapshot.SnapshotError):
-        snapshot.split(snapshot.clean([("a", "b")] * 50))
-
-
-def test_parse_label_returns_canonical_case() -> None:
-    labels = ["Billing", "card_arrival"]
-    assert parse_label(" billing\n", labels) == "Billing"
-    assert parse_label("`card_arrival`.", labels) == "card_arrival"
-    assert parse_label("something else", labels) is None
-
-
-def test_score_counts_invalid_as_wrong() -> None:
-    examples = [snapshot.Example("a", "x"), snapshot.Example("b", "y"), snapshot.Example("c", "x")]
-    result = score(examples, ["x", "nonsense", "y"], ["x", "y"])
-    assert result["accuracy"] == pytest.approx(1 / 3)
-    assert result["invalid_rate"] == pytest.approx(1 / 3)
-    assert len(result["mistakes"]) == 2
-
-
-def test_prompt_only_lists_labels_and_shots() -> None:
-    shots = [snapshot.Example("where is my card", "card_arrival")]
-    messages = build_messages("prompt", "hello", ["card_arrival", "billing"], shots)
-    assert "billing" in messages[0]["content"]
-    assert messages[1:] == [
-        {"role": "user", "content": "where is my card"},
-        {"role": "assistant", "content": "card_arrival"},
-        {"role": "user", "content": "hello"},
-    ]
-    assert len(build_messages("lora", "hello", ["billing"], shots)) == 2
+        snapshot.split(snapshot.clean([row("a", "b")] * 50))

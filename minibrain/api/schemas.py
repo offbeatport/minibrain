@@ -6,14 +6,83 @@ from pydantic import BaseModel, Field, StringConstraints
 from minibrain.ml.planner import MAX_RANK
 from minibrain.models.rules import LicenceUse
 
+PresetKey = Literal["classify", "custom"]
+MetricName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][\w.]*$", max_length=80)]
+
+
+class ContractInfo(BaseModel):
+    kind: Literal["text", "json"]
+    json_schema: dict[str, Any] | None = None
+    labels: list[str] | None = None
+
+
+class GraderConfig(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    rubric: str | None = Field(default=None, max_length=4000)
+    model: str | None = Field(default=None, max_length=200)
+    fields: list[str] | None = None
+
+
+class ThresholdInfo(BaseModel):
+    metric: MetricName
+    op: Literal[">=", "<=", ">", "<", "=="]
+    value: float
+
+
+class PromotionInfo(BaseModel):
+    thresholds: list[ThresholdInfo] = Field(default_factory=list)
+    beats_live: bool = True
+
+
+class RuleCheckInfo(BaseModel):
+    name: str
+    passed: bool
+    detail: str
+    actual: float | None = None
+
+
+class DecisionInfo(BaseModel):
+    passed: bool
+    checks: list[RuleCheckInfo]
+
+
+class ContractChange(BaseModel):
+    path: str
+    detail: str
+    breaking: bool
+
+
+class ContractCheck(BaseModel):
+    changes: list[ContractChange]
+    breaking: bool
+    against: int | None
+
+
+class ContractUpdate(BaseModel):
+    contract: ContractInfo
+    breaking: bool = False
+
+
+class GradersUpdate(BaseModel):
+    graders: list[GraderConfig] = Field(min_length=1)
+
+
+class InstructionsUpdate(BaseModel):
+    instructions: str = Field(max_length=8000)
+
 
 class MinibrainCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=280)
     tags: list[str] = Field(default_factory=list)
     base_model: str | None = None
-    task: Literal["classify", "extract", "rewrite", "sql", "distill", "answer"] = "classify"
-    sample: bool = False
+    preset: PresetKey = "classify"
+    labels: list[str] = Field(default_factory=list)
+    contract: ContractInfo | None = None
+    instructions: str | None = Field(default=None, max_length=8000)
+    graders: list[GraderConfig] | None = None
+    promotion: PromotionInfo | None = None
+    dataset: str | None = None
 
 
 class ColumnInfo(BaseModel):
@@ -30,6 +99,7 @@ class SourceInfo(BaseModel):
 class MappingInfo(BaseModel):
     input_column: str | None
     label_column: str | None
+    template: dict[str, str] | None = None
     sql: str | None
 
 
@@ -224,6 +294,7 @@ class DatasetCreate(BaseModel):
     source_id: int | None = None
     input_column: str | None = None
     label_column: str | None = None
+    template: dict[str, str] | None = None
     sql: str | None = None
     folder_id: int | None = None
 
@@ -284,6 +355,7 @@ class MappingUpdate(BaseModel):
     source_id: int | None = None
     input_column: str | None = None
     label_column: str | None = None
+    template: dict[str, str] | None = None
     sql: str | None = None
 
 
@@ -373,11 +445,42 @@ class JobEventInfo(BaseModel):
     at: datetime
 
 
+class ScoreInfo(BaseModel):
+    grader: str
+    version: int
+    metric: str
+    value: float
+
+
+class LabelScoreInfo(BaseModel):
+    label: str
+    support: int
+    predicted: int
+    correct: int
+    precision: float | None
+    recall: float | None
+    f1: float | None
+
+
+class ConfusionInfo(BaseModel):
+    gold: str
+    predicted: str | None
+    count: int
+
+
+class FieldScoreInfo(BaseModel):
+    field: str
+    accuracy: float
+
+
 class SplitScore(BaseModel):
     examples: int
-    accuracy: float
-    macro_f1: float
     invalid_rate: float
+    scores: list[ScoreInfo]
+    labels: list[LabelScoreInfo] = Field(default_factory=list)
+    confusion: list[ConfusionInfo] = Field(default_factory=list)
+    fields: list[FieldScoreInfo] = Field(default_factory=list)
+    judge_pending: int = 0
 
 
 class EvalCost(BaseModel):
@@ -406,8 +509,8 @@ class VersionInfo(BaseModel):
     kind: str
     status: str
     current: bool
-    snapshot_hash: str
-    snapshot_id: int
+    snapshot_hash: str | None
+    snapshot_id: int | None
     snapshot_dataset: str | None = None
     snapshot_number: int | None = None
     snapshot_rows: int = 0
@@ -421,6 +524,16 @@ class VersionInfo(BaseModel):
     mistakes: list[Mistake]
     job: JobInfo | None
     created_at: datetime
+    contract: ContractInfo
+    contract_number: int
+    instructions: str
+    shots: int = 0
+    graders: list[GraderConfig]
+    main_metric: str | None
+    score: float | None
+    promotion: DecisionInfo | None = None
+    live_at: datetime | None = None
+    view: str | None = None
 
 
 TeardownKindName = Literal["delete", "undeploy"]
@@ -445,11 +558,12 @@ class TeardownInfo(BaseModel):
 class MinibrainSummary(BaseModel):
     slug: str
     name: str
-    task: str
+    preset: str
     base_model: str
     current_version: int | None
     deployed: bool = False
-    current_accuracy: float | None
+    main_metric: str | None = None
+    current_score: float | None
     versions: int
     active_jobs: int
 
@@ -474,6 +588,11 @@ class MinibrainDetail(MinibrainSummary):
     models: list[str]
     request_bodies: RequestBodiesInfo
     teardown: TeardownInfo | None = None
+    contract: ContractInfo
+    contract_number: int
+    instructions: str
+    graders: list[GraderConfig]
+    promotion: PromotionInfo
 
 
 class SampleDetail(MinibrainDetail):
@@ -525,7 +644,7 @@ class PreviewResponse(BaseModel):
 
 class ExampleInfo(BaseModel):
     input: str
-    label: str
+    expected: str
 
 
 class TrainingSettings(BaseModel):
@@ -542,6 +661,7 @@ class TrainingSettings(BaseModel):
 class VersionCreate(TrainingSettings):
     kind: Literal["prompt", "lora"]
     snapshot_id: int | None = None
+    breaking: bool = False
 
 
 class TrainingPlanQuery(TrainingSettings):
@@ -595,17 +715,96 @@ class TrainingPlanInfo(BaseModel):
 class CompleteRequest(BaseModel):
     text: str = Field(min_length=1)
     version: int | None = None
-    max_tokens: int = Field(default=24, ge=1, le=512)
+    max_tokens: int | None = Field(default=None, ge=1, le=4096)
 
 
 class CompleteResponse(BaseModel):
     id: str
     model: str
     output: str
-    label: str | None
+    answer: str | None
+    valid: bool
+    contract: int | None = None
     latency_ms: float
     prompt_tokens: int
     completion_tokens: int
+
+
+class VersionTest(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1)
+    expected: str | None = None
+    max_tokens: int | None = Field(default=None, ge=1, le=4096)
+
+
+class VersionTestResult(BaseModel):
+    output: str
+    answer: str | None
+    valid: bool
+    scores: list[ScoreInfo]
+    latency_ms: float
+    prompt_tokens: int
+    completion_tokens: int
+
+
+class NameSuggestion(BaseModel):
+    name: str
+
+
+class GraderKindInfo(BaseModel):
+    name: str
+    label: str
+    description: str
+    contracts: list[str]
+    metrics: list[str]
+
+
+class PresetInfo(BaseModel):
+    key: PresetKey
+    label: str
+    noun: str
+    hint: str
+    contract: Literal["labels", "choose"]
+    mapping: dict[str, str]
+    prompts: dict[str, str]
+    graders: dict[str, list[GraderConfig]]
+    checks: list[str]
+    promotion: PromotionInfo
+    view: str | None
+    answer_tokens: int
+
+
+class PlannedPresetInfo(BaseModel):
+    key: str
+    label: str
+    hint: str
+
+
+class PresetsResponse(BaseModel):
+    presets: list[PresetInfo]
+    planned: list[PlannedPresetInfo]
+    graders: list[GraderKindInfo]
+
+
+class RecipeInfo(BaseModel):
+    key: str
+    name: str
+    preset: PresetKey
+    summary: str
+    base: str | None
+    data: str
+    mapping: dict[str, str]
+    graders: list[GraderConfig]
+    promotion: PromotionInfo
+    contract: ContractInfo | None = None
+    instructions: str | None = None
+    readme: str
+
+
+class RecipeSample(BaseModel):
+    dataset: str
+    dataset_name: str
+    rows: int
+    labels: list[str]
 
 
 class ModelRef(BaseModel):
@@ -805,7 +1004,10 @@ class VersionRow(BaseModel):
     kind: str
     status: str
     live: bool
-    accuracy: float | None
+    score: float | None
+    metric: str | None = None
+    promotion: DecisionInfo | None = None
+    was_live: bool = False
     progress: float | None
     job_id: int | None
     error: str | None
@@ -836,7 +1038,8 @@ class ModelRow(BaseModel):
     publisher: str | None = None
     size_bytes: int | None = None
     stages: list[Stage] = []
-    accuracy: float | None = None
+    score: float | None = None
+    metric: str | None = None
     usage: Usage | None = None
     revision: str | None = None
     error: str | None = None

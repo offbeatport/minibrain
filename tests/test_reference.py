@@ -3,7 +3,7 @@ from typing import Any
 from minibrain.api.reference import refs_in
 from minibrain.versions import library_version
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
+from tests.test_flow import SLUG, add_key, create_on_data, deploy, finish
 
 UNSAFE = ("post", "put", "patch", "delete")
 
@@ -50,8 +50,7 @@ def test_the_management_reference_names_roles_and_csrf(harness: Harness) -> None
 
 
 def test_v1_models_keeps_its_openai_shape(harness: Harness) -> None:
-    create_with_dataset(harness)
-    add_version(harness, "prompt")
+    create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
     secret = add_key(harness)["secret"]

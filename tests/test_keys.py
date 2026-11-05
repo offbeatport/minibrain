@@ -2,7 +2,7 @@ from pathlib import Path
 
 from minibrain.registry.models import ApiKey, AuditEvent
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
+from tests.test_flow import SLUG, add_key, create_on_data, create_with_dataset, deploy, finish
 from tests.test_models import FILES
 
 CUSTOM = ("custom", SLUG)
@@ -23,8 +23,7 @@ def two_models(harness: Harness, tmp_path: Path) -> None:
     )
     harness.worker(kinds=["import"]).run_once()
     assert harness.client.post("/api/models/base/base-one/deploy", json={"deployed": True}).status_code == 200
-    create_with_dataset(harness)
-    add_version(harness, "prompt")
+    create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
 

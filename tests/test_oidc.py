@@ -91,7 +91,12 @@ def test_single_sign_on_signs_people_in_with_pkce(sso: Sso) -> None:
     assert (person["email"], person["name"], person["source"]) == ("ada@example.com", "Ada Lovelace", "oidc")
     assert (person["role"], person["role_locked"]) == ("builder", True)
     assert browser.get("/api/sources").status_code == 200
-    assert browser.post("/api/minibrains", json={"name": "Triage"}, headers=csrf(browser)).status_code == 201
+    assert (
+        browser.post(
+            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(browser)
+        ).status_code
+        == 201
+    )
     [user] = sso.users()
     assert (user.source, user.subject, user.groups) == ("oidc", "ada-1", ["ml-team"])
     [signed] = sso.events("auth.sign_in")

@@ -15,7 +15,7 @@ from transformers import TrainerCallback, TrainerControl, TrainerState, Training
 from trl.trainer.sft_config import SFTConfig
 from trl.trainer.sft_trainer import SFTTrainer
 
-from minibrain.data.snapshot import Example, read_split
+from minibrain.data.snapshot import read_split
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
@@ -28,7 +28,8 @@ from minibrain.ml.strategies import (
     trainer_settings,
 )
 from minibrain.recipes import DEFAULT_RECIPE
-from minibrain.tasks.classify import trained_messages
+from minibrain.tasks.examples import Example, assistant_turns
+from minibrain.tasks.prompting import Prompting
 
 CHECKPOINT_STEPS = 50
 DEVICE_MARK = "training-device"
@@ -97,22 +98,22 @@ def chosen_device(mark: Path, checkpoints: Path) -> str:
     return "cpu"
 
 
-def training_row(spec: JobSpec, text: str, label: str) -> dict[str, Any]:
-    row: dict[str, Any] = {
-        "prompt": trained_messages(text),
-        "completion": [{"role": "assistant", "content": label}],
-    }
-    if spec.base.template_kwargs:
-        row["chat_template_kwargs"] = dict(spec.base.template_kwargs)
-    return row
+def example_rows(spec: JobSpec, prompting: Prompting, example: Example) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for prompt, completion in assistant_turns(example):
+        row: dict[str, Any] = {"prompt": prompting.messages(prompt), "completion": [completion]}
+        if spec.base.template_kwargs:
+            row["chat_template_kwargs"] = dict(spec.base.template_kwargs)
+        rows.append(row)
+    return rows
 
 
 def training_examples(spec: JobSpec, max_rows: int | None) -> list[Example]:
     return read_split(spec.path("snapshot"), "train")[:max_rows]
 
 
-def training_rows(spec: JobSpec, examples: list[Example]) -> Dataset:
-    return Dataset.from_list([training_row(spec, example.input, example.label) for example in examples])
+def training_rows(spec: JobSpec, prompting: Prompting, examples: list[Example]) -> Dataset:
+    return Dataset.from_list([row for example in examples for row in example_rows(spec, prompting, example)])
 
 
 def micro_batches(recipe: dict[str, Any], device: str) -> tuple[int, int]:
@@ -179,9 +180,11 @@ def main(spec: JobSpec) -> None:
     checkpoints = spec.path("checkpoints")
     device = chosen_device(checkpoints.with_name(DEVICE_MARK), checkpoints)
     examples = training_examples(spec, stored["max_rows"])
+    prompting = Prompting.from_dict(spec.raw["prompting"])
     tokenizer = load_tokenizer(spec.base, padding_side="right")
-    recipe = fitted_recipe(spec, stored, encode_all(tokenizer, examples, spec.base.template_kwargs), device)
-    rows = training_rows(spec, examples)
+    encoded = encode_all(tokenizer, prompting, examples, spec.base.template_kwargs)
+    recipe = fitted_recipe(spec, stored, encoded, device)
+    rows = training_rows(spec, prompting, examples)
     resume = checkpoints.is_dir() and any(checkpoints.glob("checkpoint-*"))
     print(json.dumps({"device": device, "examples": len(rows), "recipe": recipe, "resume": resume}), flush=True)
     stall = StallWatch() if kind_of(device) == "mps" and not forced_training_device() else None

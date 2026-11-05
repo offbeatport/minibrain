@@ -30,6 +30,7 @@ from minibrain.telemetry.logs import configure_logging
 MODULES: dict[str, str] = {
     JobKind.TRAIN: "minibrain.ml.train",
     JobKind.EVAL: "minibrain.ml.evaluate",
+    JobKind.JUDGE: "minibrain.ml.judge",
     JobKind.DOWNLOAD: "minibrain.models.download",
     JobKind.IMPORT: "minibrain.models.importer",
     JobKind.CATALOG_SYNC: "minibrain.models.sync",
@@ -40,7 +41,7 @@ PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, Job
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
 WEIGHTS = "weights"
 PRUNE_SECONDS = 600.0
-REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL]
+REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
@@ -384,11 +385,12 @@ class Worker:
         spec |= {key: params[key] for key in ("slug", "number", "base_model") if key in params}
         if "base_spec" in params:
             spec["base_spec"] = self.base_copy(params["base_spec"])
-        spec["snapshot"] = self.material(params["snapshot"])
+        spec["snapshot"] = self.material(params.get("snapshot"))
         if claim["kind"] == JobKind.TRAIN:
             spec |= {
                 "recipe": params["recipe"],
                 "plan_base": params.get("plan_base"),
+                "prompting": params["prompting"],
                 "adapter_out": str(attempt_dir / "out"),
                 "checkpoints": str(workdir / "checkpoints"),
             }
@@ -396,8 +398,12 @@ class Worker:
             spec |= {
                 "version_kind": params["version_kind"],
                 "adapter": self.material(params.get("adapter")),
+                "prompting": params["prompting"],
+                "answer_tokens": params.get("answer_tokens"),
                 "pool": self.config.pool,
             }
+        if claim["kind"] == JobKind.JUDGE:
+            spec |= {key: params[key] for key in ("rubric", "items", "judge", "judge_version")}
         return spec
 
     def outputs(self, kind: str, attempt_dir: Path) -> dict[str, str]:

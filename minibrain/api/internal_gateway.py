@@ -40,6 +40,7 @@ class LogBody(BaseModel):
     version: int | None
     status: int
     latency_ms: float
+    contract: int | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     response_id: str | None = None

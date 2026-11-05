@@ -12,6 +12,7 @@ from minibrain.api.schemas import (
     Activity,
     Availability,
     AvailabilityState,
+    DecisionInfo,
     Deployment,
     DeploymentState,
     Health,
@@ -49,8 +50,9 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.prices import DevicePrices, load_prices
-from minibrain.registry.service import held_out_accuracy, latest_snapshot
+from minibrain.registry.service import latest_snapshot
 from minibrain.settings import Settings
+from minibrain.tasks.service import decision, held_out_score, version_metric
 
 FAILED_LABELS: dict[str, str] = {
     JobKind.TRAIN: "Training failed",
@@ -169,8 +171,9 @@ def evaluate_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | N
     if failed is not None and failed.kind == JobKind.EVAL:
         return Stage(key="evaluate", state="failed", label=FAILED_LABELS[JobKind.EVAL])
     latest = max(scored(minibrain), key=lambda v: v.number, default=None)
-    if latest is not None:
-        return Stage(key="evaluate", state="done", label=f"{held_out_accuracy(latest):.0%} on v{latest.number}")
+    score = held_out_score(latest) if latest is not None else None
+    if latest is not None and score is not None:
+        return Stage(key="evaluate", state="done", label=f"{score:.0%} on v{latest.number}")
     return Stage(key="evaluate", state="todo", label="Score")
 
 
@@ -195,11 +198,16 @@ def custom_stages(minibrain: Minibrain, jobs: list[Job]) -> list[Stage]:
     ]
 
 
-def shown_accuracy(minibrain: Minibrain) -> float | None:
+def promotion_of(minibrain: Minibrain, version: Version) -> DecisionInfo | None:
+    if version.status != VersionStatus.READY:
+        return None
+    return DecisionInfo.model_validate(decision(minibrain, version).as_dict())
+
+
+def shown_version(minibrain: Minibrain) -> Version | None:
     versions = scored(minibrain)
     current = next((v for v in versions if v.number == minibrain.current_version), None)
-    shown = current or max(versions, key=lambda v: v.number, default=None)
-    return held_out_accuracy(shown) if shown is not None else None
+    return current or max(versions, key=lambda v: v.number, default=None)
 
 
 def usage_window() -> tuple[datetime, list[str]]:
@@ -292,7 +300,10 @@ def version_rows(
                 kind=version.kind,
                 status=version.status,
                 live=minibrain.deployed and minibrain.current_version == version.number,
-                accuracy=held_out_accuracy(version) if version.metrics else None,
+                score=held_out_score(version),
+                metric=version_metric(version),
+                promotion=promotion_of(minibrain, version),
+                was_live=version.live_at is not None,
                 progress=running_progress(job) if job is not None and active else None,
                 job_id=job.id if job is not None else None,
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
@@ -371,6 +382,7 @@ def custom_row(
         latest_version.created_at if latest_version else None,
         latest_job.finished_at or latest_job.started_at or latest_job.created_at if latest_job else None,
     )
+    shown = shown_version(minibrain)
     return ModelRow(
         kind="custom",
         key=minibrain.slug,
@@ -396,7 +408,8 @@ def custom_row(
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         stages=custom_stages(minibrain, jobs),
-        accuracy=shown_accuracy(minibrain),
+        score=held_out_score(shown) if shown is not None else None,
+        metric=version_metric(shown) if shown is not None else None,
         usage=usage,
         health=custom_health(broken, base_name),
         teardown=info,

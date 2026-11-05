@@ -103,7 +103,9 @@ def test_a_removed_import_is_reimported_from_a_folder(harness: Harness, tmp_path
 
 def test_files_a_person_removed_name_them_and_block_the_models_built_on_it(harness: Harness) -> None:
     folder = add_base(harness, "old", 10)
-    slug = harness.client.post("/api/minibrains", json={"name": "Foo", "base_model": "old"}).json()["slug"]
+    slug = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Foo", "base_model": "old"}
+    ).json()["slug"]
     harness.client.post(f"/api/minibrains/{slug}/deploy", json={"deployed": True})
     headers = bearer(harness, ("custom", slug))
     evict(harness, "old", folder, by=ADMIN_EMAIL)

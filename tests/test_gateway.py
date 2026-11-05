@@ -12,14 +12,13 @@ from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from tests.conftest import FakeBackend, Harness
-from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, deploy, finish
+from tests.test_flow import SLUG, add_version, bearer, create_on_data, deploy, finish
 
 CHAT = {"model": SLUG, "messages": [{"role": "user", "content": "I was charged twice"}]}
 
 
 def servable(harness: Harness) -> dict[str, str]:
-    create_with_dataset(harness)
-    add_version(harness, "prompt")
+    create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
     return bearer(harness)
@@ -42,7 +41,13 @@ def test_config_snapshot_lists_routes_and_key_hashes(harness: Harness) -> None:
     response = config(harness)
     body = response.json()
     assert set(body["routes"]) == {SLUG, f"{SLUG}@0"}
-    assert body["routes"][SLUG]["labels"] == ["account", "billing", "bug", "feature"]
+    assert body["routes"][SLUG]["prompting"]["contract"]["schema"]["properties"]["label"]["enum"] == [
+        "account",
+        "billing",
+        "bug",
+        "feature",
+    ]
+    assert body["routes"][SLUG]["contract"] == 1
     assert len(body["keys"]) == 1
     version = response.headers["etag"]
     assert config(harness, f"?version={version}&wait=0").status_code == 304

@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.data.feedback import ORIGIN_API, Submission
-from minibrain.data.snapshot import Example
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.ml.completion import Completion
@@ -30,7 +29,8 @@ from minibrain.serve.backend import (
     ServingBackend,
 )
 from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
-from minibrain.tasks.classify import build_messages
+from minibrain.tasks.contracts import JSON, Contract
+from minibrain.tasks.prompting import PromptError, Prompting
 from minibrain.telemetry.call import current_call
 
 router = APIRouter(prefix="/v1")
@@ -231,14 +231,18 @@ def spec_for(config: GatewayConfig, key: str) -> BaseModelSpec:
     return BaseModelSpec.from_dict(found) if found else base_model(key)
 
 
+def prompting(route: Route) -> Prompting | None:
+    return Prompting.from_dict(route.prompting) if route.kind != "base" and route.prompting else None
+
+
 def route_messages(route: Route, messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    if route.kind == "base":
+    found = prompting(route)
+    if found is None:
         return messages
-    texts = [message["content"] for message in messages if message.get("role") == "user" and message.get("content")]
-    if not texts:
-        raise HTTPException(status_code=400, detail="a user message with text content is required")
-    shots = [Example(input=shot_input, label=label) for shot_input, label in route.shots]
-    return build_messages(route.kind, texts[-1], route.labels, shots)
+    try:
+        return found.messages(messages)
+    except PromptError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 def schema_format(spec: Any) -> dict[str, Any]:
@@ -278,14 +282,25 @@ def requested_format(raw: Any) -> Constraint | None:
     return Constraint(json_schema=schema_format(raw.get("json_schema")))
 
 
+def route_contract(route: Route) -> Contract | None:
+    found = prompting(route)
+    return found.contract if found is not None else None
+
+
 def task_constraint(route: Route) -> Constraint | None:
-    if route.kind != "base" and route.task == "classify" and route.labels:
-        return Constraint(choices=tuple(route.labels))
-    return None
+    found = prompting(route)
+    return found.constraint() if found is not None else None
 
 
-def conformed(requested: Constraint | None, completion: Completion) -> Completion:
-    schema = requested.json_schema if requested else None
+def contract_schema(route: Route) -> dict[str, Any] | None:
+    contract = route_contract(route)
+    if contract is None or contract.kind != JSON or contract.labels is not None:
+        return None
+    return contract.schema
+
+
+def conformed(requested: Constraint | None, completion: Completion, route: Route | None = None) -> Completion:
+    schema = requested.json_schema if requested else contract_schema(route) if route else None
     if schema is None or not completion.stopped:
         return completion
     text = unfenced(completion.text)
@@ -296,7 +311,8 @@ def conformed(requested: Constraint | None, completion: Completion) -> Completio
         raise OpenAIError(422, message, FORMAT, "invalid_json", "invalid_output_error") from error
     problem = violation(schema, value)
     if problem is not None:
-        message = f"The model's answer does not match response_format: {problem}; {UNCONSTRAINED}"
+        against = "response_format" if requested else "the model's contract"
+        message = f"The model's answer does not match {against}: {problem}; {UNCONSTRAINED}"
         raise OpenAIError(422, message, FORMAT, "schema_mismatch", "invalid_output_error")
     return replace(completion, text=text)
 
@@ -475,7 +491,7 @@ def chat_completions(
         requested = requested_format(body.response_format)
         max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
         completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens, requested)
-        completion = conformed(requested, completion)
+        completion = conformed(requested, completion, route)
     except (HTTPException, OpenAIError) as error:
         status = error.status_code
         code = error.code if isinstance(error, OpenAIError) else None
@@ -491,6 +507,7 @@ def chat_completions(
                 minibrain_id=route.minibrain_id if route else None,
                 model=body.model,
                 version=route.version if route else None,
+                contract=route.contract if route else None,
                 status=status,
                 latency_ms=(time.monotonic() - started) * 1000,
                 prompt_tokens=completion.prompt_tokens if completion else 0,

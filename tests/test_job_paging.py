@@ -9,7 +9,7 @@ from tests.conftest import Harness
 
 
 def minibrain_id(harness: Harness, name: str) -> int:
-    slug = harness.client.post("/api/minibrains", json={"name": name}).json()["slug"]
+    slug = harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": name}).json()["slug"]
     with harness.sessions() as session:
         return session.scalars(select(Minibrain.id).where(Minibrain.slug == slug)).one()
 

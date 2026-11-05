@@ -6,9 +6,9 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.data.snapshot import Example
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Minibrain, RequestLog, now
+from minibrain.tasks.examples import Example, single
 
 UP = "up"
 DOWN = "down"
@@ -251,5 +251,5 @@ def training_rows(session: Session, minibrain: Minibrain) -> list[Example]:
     for item in session.scalars(query):
         text, label = item.input.strip(), (item.label or "").strip()
         if text and label:
-            latest[text] = Example(input=text, label=label)
+            latest[text] = single(text, label)
     return list(latest.values())

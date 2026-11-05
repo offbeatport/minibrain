@@ -2,24 +2,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from minibrain.data.snapshot import Example
-from minibrain.tasks.classify import trained_messages
-
-Message = dict[str, str]
+from minibrain.tasks.examples import Example, Message, assistant_turns
+from minibrain.tasks.prompting import Prompting
 
 
 @dataclass(frozen=True)
 class Encoded:
     tokens: list[int]
     offset: int
-
-
-def prompt_of(text: str) -> list[Message]:
-    return trained_messages(text)
-
-
-def completion_of(label: str) -> list[Message]:
-    return [{"role": "assistant", "content": label}]
 
 
 def token_ids(rendered: Any) -> list[int]:
@@ -37,16 +27,24 @@ def common_prefix(left: Sequence[int], right: Sequence[int]) -> int:
     return length
 
 
-def encode(tokenizer: Any, example: Example, template_kwargs: dict[str, Any]) -> Encoded:
-    prompt = prompt_of(example.input)
-    options = {"tokenize": True, "return_dict": False, **template_kwargs}
+def encode_turn(tokenizer: Any, prompt: list[Message], completion: Message, options: dict[str, Any]) -> Encoded:
     prompt_ids = token_ids(tokenizer.apply_chat_template(prompt, add_generation_prompt=True, **options))
-    full = token_ids(tokenizer.apply_chat_template(prompt + completion_of(example.label), **options))
+    full = token_ids(tokenizer.apply_chat_template([*prompt, completion], **options))
     return Encoded(full, common_prefix(prompt_ids, full))
 
 
-def encode_all(tokenizer: Any, examples: Sequence[Example], template_kwargs: dict[str, Any]) -> list[Encoded]:
-    return [encode(tokenizer, example, template_kwargs) for example in examples]
+def encode(tokenizer: Any, prompting: Prompting, example: Example, template_kwargs: dict[str, Any]) -> list[Encoded]:
+    options = {"tokenize": True, "return_dict": False, **template_kwargs}
+    return [
+        encode_turn(tokenizer, prompting.messages(prompt), completion, options)
+        for prompt, completion in assistant_turns(example)
+    ]
+
+
+def encode_all(
+    tokenizer: Any, prompting: Prompting, examples: Sequence[Example], template_kwargs: dict[str, Any]
+) -> list[Encoded]:
+    return [item for example in examples for item in encode(tokenizer, prompting, example, template_kwargs)]
 
 
 def longest(encoded: Sequence[Encoded]) -> int:

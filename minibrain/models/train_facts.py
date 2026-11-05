@@ -75,5 +75,7 @@ def pool_trainers(pool: Pool) -> list[Machine]:
 @lru_cache(maxsize=32)
 def longest_example(location: str, max_rows: int) -> tuple[int, int]:
     examples = read_split(location, "train")[:max_rows]
-    longest = max((len(example.input) + len(example.label) for example in examples), default=0)
+    longest = max(
+        (sum(len(turn.content) for turn in example.turns) + len(example.expected) for example in examples), default=0
+    )
     return len(examples), estimated_tokens(longest)

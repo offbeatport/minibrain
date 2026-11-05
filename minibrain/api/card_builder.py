@@ -33,7 +33,7 @@ from minibrain.api.card_schemas import (
 )
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS
-from minibrain.data.snapshot import SPLITS, Example, SnapshotError, read_split
+from minibrain.data.snapshot import SPLITS, SnapshotError, read_split
 from minibrain.data.snapshots import version_number
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
@@ -55,7 +55,11 @@ from minibrain.registry.models import (
     Worker,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost, load_prices
+from minibrain.registry.service import ConflictError
 from minibrain.settings import Settings
+from minibrain.tasks.examples import Example
+from minibrain.tasks.graders import metric_values
+from minibrain.tasks.service import version_metric
 
 CARD_ACTIONS = ("version.create", "version.promote", "model.deploy", "model.undeploy")
 FEW_TRAINING_ROWS = 10
@@ -173,7 +177,7 @@ def snapshot_splits(session: Session, settings: Settings, snapshot: Snapshot) ->
 
 
 def label_balance(splits: dict[str, list[Example]]) -> list[CardLabelRows]:
-    per_split = {name: Counter(example.label for example in examples) for name, examples in splits.items()}
+    per_split = {name: Counter(example.expected for example in examples) for name, examples in splits.items()}
     total = Counter[str]()
     for counts in per_split.values():
         total.update(counts)
@@ -287,7 +291,7 @@ def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
 
 def training_card(session: Session, minibrain: Minibrain, version: Version) -> CardTraining:
     if version.kind != VersionKind.LORA:
-        shots = int((version.snapshot.counts or {}).get("shots", 0))
+        shots = len(version.shots or [])
         return CardTraining(
             method="prompt", recipe=None, examples=None, few_shot_examples=shots, train_loss=None, run=None
         )
@@ -303,15 +307,25 @@ def training_card(session: Session, minibrain: Minibrain, version: Version) -> C
     )
 
 
-def score_card(split: dict[str, Any] | None) -> CardScore | None:
-    if not split:
+def main_of(split: dict[str, Any] | None, metric: str | None) -> float | None:
+    values = metric_values(split)
+    return None if metric is None or metric not in values else values[metric]
+
+
+def score_card(split: dict[str, Any] | None, metric: str | None) -> CardScore | None:
+    if not split or "scores" not in split:
         return None
+    values = metric_values(split)
     return CardScore(
         examples=int(split.get("examples", 0)),
-        accuracy=rounded(split.get("accuracy", 0.0)) or 0.0,
-        macro_f1=rounded(split.get("macro_f1", 0.0)) or 0.0,
+        accuracy=rounded(main_of(split, metric)) or 0.0,
+        macro_f1=rounded(values.get("macro_f1", 0.0)) or 0.0,
         invalid_rate=rounded(split.get("invalid_rate", 0.0)) or 0.0,
     )
+
+
+def label_report(split: dict[str, Any] | None) -> dict[str, Any]:
+    return ((split or {}).get("reports") or {}).get("label_accuracy") or {}
 
 
 def label_score(item: dict[str, Any]) -> CardLabelScore:
@@ -340,12 +354,11 @@ def held_out(version: Version) -> dict[str, Any] | None:
 
 
 def is_scored(version: Version) -> bool:
-    return version.status == VersionStatus.READY and held_out(version) is not None
+    return version.status == VersionStatus.READY and bool((held_out(version) or {}).get("scores"))
 
 
 def accuracy_of(version: Version) -> float | None:
-    split = held_out(version)
-    return None if split is None else float(split.get("accuracy", 0.0))
+    return main_of(held_out(version), version_metric(version))
 
 
 def cost_card(metrics: dict[str, Any] | None, prices: DevicePrices) -> CardCost | None:
@@ -377,8 +390,8 @@ def comparison(version: Version, other: Version, prices: DevicePrices) -> CardCo
         kind=other.kind,
         same_data=other.snapshot_id == version.snapshot_id,
         held_out_accuracy=rounded(theirs),
-        held_out_macro_f1=rounded((held_out(other) or {}).get("macro_f1")),
-        test_accuracy=rounded((metrics.get("golden") or {}).get("accuracy")),
+        held_out_macro_f1=rounded(metric_values(held_out(other)).get("macro_f1")),
+        test_accuracy=rounded(main_of(metrics.get("golden"), version_metric(other))),
         latency_p50_ms=rounded((metrics.get("latency") or {}).get("p50_ms"), 1),
         accuracy_change=change,
         latency_p95_ms=rounded((metrics.get("latency") or {}).get("p95_ms"), 1),
@@ -408,13 +421,14 @@ def evaluation_card(session: Session, minibrain: Minibrain, version: Version) ->
     latency = metrics.get("latency") or {}
     baseline = prompt_baseline(minibrain, version)
     previous = previous_version(minibrain, version)
-    labels = (split or {}).get("labels")
-    confusions = (split or {}).get("confusion")
+    labels = label_report(split).get("labels")
+    confusions = label_report(split).get("confusion")
     prices = load_prices(session)
+    metric = version_metric(version)
     return CardEvaluation(
         scored=is_scored(version),
-        held_out=score_card(split),
-        test_set=score_card(metrics.get("golden")),
+        held_out=score_card(split, metric),
+        test_set=score_card(metrics.get("golden"), metric),
         latency_p50_ms=rounded(latency.get("p50_ms"), 1),
         latency_p95_ms=rounded(latency.get("p95_ms"), 1),
         per_label=None if labels is None else [label_score(item) for item in labels],
@@ -525,6 +539,8 @@ def build_card(session: Session, settings: Settings, minibrain: Minibrain, versi
     events = card_events(session, minibrain)
     history = history_of(events, minibrain, version.number)
     creator = creator_of(events, minibrain, version.number)
+    if version.snapshot is None:
+        raise ConflictError(f"{minibrain.slug}@{version.number} has no data yet, so there is nothing to put on a card")
     data = data_card(session, version.snapshot, snapshot_splits(session, settings, version.snapshot))
     evaluation = evaluation_card(session, minibrain, version)
     return ModelCard(
@@ -539,7 +555,7 @@ def build_card(session: Session, settings: Settings, minibrain: Minibrain, versi
             created_by=creator,
         ),
         purpose=CardPurpose(
-            description=minibrain.description, task=minibrain.task, labels=sorted(version.snapshot.labels)
+            description=minibrain.description, task=minibrain.preset, labels=sorted(version.snapshot.labels)
         ),
         base_model=base_card(session, minibrain, version),
         training_data=data,

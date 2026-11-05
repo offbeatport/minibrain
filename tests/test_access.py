@@ -10,9 +10,7 @@ from minibrain.api.access import Guard
 from minibrain.auth.roles import Role
 from tests.conftest import Harness
 from tests.test_accounts import csrf
-from tests.test_flow import SLUG, add_version, create_with_dataset
-
-MISTAKE = {"input": "I was charged twice", "gold": "billing", "output": "bug"}
+from tests.test_flow import SLUG, add_version, create_with_dataset, finish
 
 ROUTE_ROLES = {
     ("GET", "/api/auth/session"): "public",
@@ -33,6 +31,17 @@ ROUTE_ROLES = {
     ("DELETE", "/api/minibrains/{slug}"): "builder",
     ("POST", "/api/minibrains/{slug}/deploy"): "builder",
     ("POST", "/api/minibrains/sample"): "builder",
+    ("GET", "/api/minibrains/name"): "viewer",
+    ("POST", "/api/minibrains/{slug}/contract/check"): "builder",
+    ("PUT", "/api/minibrains/{slug}/contract"): "builder",
+    ("PUT", "/api/minibrains/{slug}/graders"): "builder",
+    ("PUT", "/api/minibrains/{slug}/promotion"): "builder",
+    ("PUT", "/api/minibrains/{slug}/instructions"): "builder",
+    ("POST", "/api/minibrains/{slug}/versions/{number}/test"): "viewer",
+    ("GET", "/api/presets"): "viewer",
+    ("GET", "/api/recipes"): "viewer",
+    ("GET", "/api/recipes/{key}"): "viewer",
+    ("POST", "/api/recipes/{key}/sample"): "builder",
     ("PUT", "/api/minibrains/{slug}/dataset"): "builder",
     ("PUT", "/api/minibrains/{slug}/mapping"): "builder",
     ("PUT", "/api/minibrains/{slug}/request-bodies"): "builder",
@@ -223,14 +232,14 @@ def status(client: TestClient, method: str, path: str, body: Any = None) -> int:
 
 
 def test_viewers_see_models_but_change_nothing(team: Team) -> None:
-    assert status(team.builder, "POST", "/api/minibrains", {"name": "Triage"}) == 201
+    assert status(team.builder, "POST", "/api/minibrains", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
     viewer = team.viewer
     assert status(viewer, "GET", "/api/minibrains") == 200
     assert status(viewer, "GET", "/api/minibrains/triage") == 200
     assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/jobs") == 200
     assert status(viewer, "GET", "/api/system/infrastructure") == 200
-    refused = viewer.post("/api/minibrains", json={"name": "Other"}, headers=csrf(viewer))
+    refused = viewer.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer))
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Builder role"
     assert status(viewer, "GET", "/api/sources") == 403
     assert status(viewer, "GET", "/api/minibrains/triage/preview") == 403
@@ -243,7 +252,7 @@ def test_viewers_see_models_but_change_nothing(team: Team) -> None:
 
 def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     builder = team.builder
-    assert status(builder, "POST", "/api/minibrains", {"name": "Triage"}) == 201
+    assert status(builder, "POST", "/api/minibrains", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
     assert status(builder, "GET", "/api/sources") == 200
     assert status(builder, "GET", "/api/keys") == 200
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}
@@ -277,11 +286,7 @@ def test_people_without_a_role_see_nothing(team: Team) -> None:
 
 
 def finish_with_mistakes(harness: Harness) -> None:
-    claim = harness.claim(["eval"])
-    assert claim is not None
-    scores = {"examples": 30, "accuracy": 0.9, "macro_f1": 0.9, "invalid_rate": 0, "mistakes": [MISTAKE]}
-    body = {"token": claim["token"], "result": {"metrics": {"eval": scores}}, "outputs": {}}
-    assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
+    finish(harness, "eval", accuracy=0.9)
 
 
 def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
@@ -290,11 +295,11 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     finish_with_mistakes(harness)
     people = team_of(harness)
     path = f"/api/minibrains/{SLUG}/versions"
-    assert [version["mistakes"] for version in people.admin.get(path).json()] == [[MISTAKE]]
-    assert [version["mistakes"] for version in people.builder.get(path).json()] == [[MISTAKE]]
+    assert [len(version["mistakes"]) for version in people.admin.get(path).json()] == [3, 0]
+    assert [len(version["mistakes"]) for version in people.builder.get(path).json()] == [3, 0]
     seen = people.viewer.get(path).json()
-    assert [version["mistakes"] for version in seen] == [[]]
-    assert seen[0]["held_out"]["accuracy"] == 0.9
+    assert [version["mistakes"] for version in seen] == [[], []]
+    assert seen[0]["score"] == 0.9
     job = next(item["id"] for item in people.admin.get("/api/jobs").json()["items"] if item["kind"] == "eval")
     assert people.admin.get(f"/api/jobs/{job}").json()["result"] is not None
     assert people.viewer.get(f"/api/jobs/{job}").json()["result"] is None

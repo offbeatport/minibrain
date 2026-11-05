@@ -200,7 +200,9 @@ def test_reimport_restores_files_only_from_an_identical_copy(harness: Harness, h
 
 
 def train_on(harness: Harness, base: str) -> None:
-    created = harness.client.post("/api/minibrains", json={"name": "Support Triage", "base_model": base})
+    created = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Support Triage", "base_model": base}
+    )
     assert created.status_code == 201
     give_data(harness, SLUG)
     build_dataset(harness)
@@ -212,7 +214,7 @@ def train_on(harness: Harness, base: str) -> None:
 def test_adapter_refuses_a_base_whose_files_changed(harness: Harness, hub: Path, tmp_path: Path) -> None:
     detail = installed(harness)
     train_on(harness, "tiny")
-    deploy(harness, 0)
+    deploy(harness, 1)
     headers = bearer(harness)
     assert chat(harness, SLUG, headers).status_code == 200
     with harness.sessions() as session:
@@ -225,7 +227,7 @@ def test_adapter_refuses_a_base_whose_files_changed(harness: Harness, hub: Path,
     assert f"trained on tiny with files {detail['content_hash'][:12]}" in refused.json()["detail"]
     version = row(harness, SLUG)["versions"][0]
     assert (version["health"]["state"], version["health"]["label"]) == ("base_changed", "Base changed")
-    assert harness.client.post(f"/api/minibrains/{SLUG}/versions/0/promote").status_code == 409
+    assert harness.client.post(f"/api/minibrains/{SLUG}/versions/1/promote").status_code == 409
     spec = BaseModelSpec(key="tiny", repo=REPO, revision=REVISION, license="apache-2.0", content_hash="b" * 64)
     engine = create_engine_app(spec, "http://main", "t", tmp_path / "engine", backend=FakeBackend())
     with TestClient(engine) as client:

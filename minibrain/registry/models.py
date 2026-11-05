@@ -48,6 +48,7 @@ class JobKind(StrEnum):
     CATALOG_SYNC = "catalog_sync"
     VERIFY = "verify"
     REPAIR = "repair"
+    JUDGE = "judge"
 
 
 class ModelStatus(StrEnum):
@@ -178,8 +179,7 @@ class Dataset(Base):
     folder_id: Mapped[int | None] = mapped_column(
         ForeignKey("dataset_folders.id", ondelete="SET NULL", name="fk_datasets_folder"), default=None
     )
-    input_column: Mapped[str | None] = mapped_column(default=None)
-    label_column: Mapped[str | None] = mapped_column(default=None)
+    template: Mapped[dict[str, str] | None] = mapped_column(JSON, default=None)
     sql: Mapped[str | None] = mapped_column(default=None)
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
@@ -202,8 +202,13 @@ class Minibrain(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
-    task: Mapped[str]
+    preset: Mapped[str]
     base_model: Mapped[str]
+    contract: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    breaking_confirmed: Mapped[bool] = mapped_column(default=False, server_default=false())
+    instructions: Mapped[str | None] = mapped_column(default=None)
+    graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    promotion: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     snapshot_id: Mapped[int | None] = mapped_column(
         ForeignKey("snapshots.id", ondelete="SET NULL", use_alter=True), default=None
@@ -271,10 +276,16 @@ class Version(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     minibrain_id: Mapped[int] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"))
-    snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
+    snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("snapshots.id"), default=None)
     number: Mapped[int]
     kind: Mapped[str]
     status: Mapped[str]
+    contract: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    contract_number: Mapped[int] = mapped_column(default=1, server_default="1")
+    instructions: Mapped[str] = mapped_column(default="", server_default="")
+    shots: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     adapter_dir: Mapped[str | None] = mapped_column(default=None)
     adapter_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
     base_hash: Mapped[str | None] = mapped_column(default=None)
@@ -285,7 +296,7 @@ class Version(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     minibrain: Mapped[Minibrain] = relationship(back_populates="versions")
-    snapshot: Mapped[Snapshot] = relationship(back_populates="versions")
+    snapshot: Mapped[Snapshot | None] = relationship(back_populates="versions")
 
 
 class Worker(Base):
@@ -427,6 +438,7 @@ class RequestLog(Base):
     minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
     model: Mapped[str]
     version: Mapped[int | None] = mapped_column(default=None)
+    contract: Mapped[int | None] = mapped_column(default=None)
     status: Mapped[int]
     latency_ms: Mapped[float]
     prompt_tokens: Mapped[int] = mapped_column(default=0)
@@ -468,6 +480,16 @@ class Feedback(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     minibrain: Mapped[Minibrain] = relationship()
+
+
+class JudgeScore(Base):
+    __tablename__ = "judge_scores"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    score: Mapped[float]
+    judge: Mapped[str]
+    judge_version: Mapped[str] = mapped_column(default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
 
 class CatalogModel(Base):

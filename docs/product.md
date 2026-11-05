@@ -12,7 +12,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
 - **Sample data** · shipped · product
   Try the whole flow on bundled sample data in minutes.
-  UI: Home › Get started, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/minibrains/sample
+  UI: Home › Get started, Models › Try with sample data, Data › Add source › Samples · API: GET /api/samples, POST /api/samples/{file}, POST /api/minibrains/sample
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
   UI: Data › Add source › Connect a folder · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders
@@ -35,7 +35,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Find sources by name, column or tag, with stats and rows.
   UI: Data › Sources · API: GET /api/sources, GET /api/sources/{source_id}, PATCH /api/sources/{source_id}, DELETE /api/sources/{source_id}, GET /api/sources/{source_id}/rows, GET /api/sources/{source_id}/stats
 - **Datasets** · shipped · product, ml
-  Turn sources into input and label rows that models share.
+  Turn sources into chat examples that models share.
   UI: Data › Datasets · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
 - **Dataset SQL** · shipped · ml
   Join, filter and clean several sources in locked-down DuckDB SQL.
@@ -61,8 +61,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Data settings** · shipped · admin
   Set the row limit, version retention and check thresholds.
   UI: Settings › Data · API: GET /api/settings/data, PUT /api/settings/data · Config: data
+- **Mapping templates** · shipped · product, ml
+  Turn columns or chat JSONL into chat examples, compiled to SQL.
+  UI: Data › dataset › Columns · API: PUT /api/datasets/{slug}/mapping
 - **Mapping editor** · planned · product, ml
-  Map fields to chat messages, proposed by a model, compiled to SQL.
+  Edit message templates in the UI, proposed by a model.
   Roadmap: Transforms
 - **Built-in steps** · planned · product, ml
   Clean rows with strip_html, chunk, pii_scrub and dedupe_near.
@@ -134,13 +137,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › Delete · API: DELETE /api/models/base/{key}
 - **Custom models** · shipped · product, ml
   Create a named model for a task on a chosen base.
-  UI: Models › Add model · API: GET /api/minibrains, POST /api/minibrains, GET /api/minibrains/{slug}, PATCH /api/minibrains/{slug}, DELETE /api/minibrains/{slug}
+  UI: Models › Add model · API: GET /api/minibrains, POST /api/minibrains, GET /api/minibrains/name, GET /api/minibrains/{slug}, PATCH /api/minibrains/{slug}, DELETE /api/minibrains/{slug}
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments
-- **Classify preset** · partial · product, ml
-  Sort text into one label from a fixed set.
-  UI: Models › Add model › Classify · Roadmap: Order
+- **Classify preset** · shipped · product, ml
+  Sort text into one label from a set that grows.
+  UI: Models › Add model › Classify, Evaluations › version · API: GET /api/presets
 - **Extract preset** · planned · product, ml
   Pull JSON fields out of text against a schema.
   Roadmap: Task types
@@ -153,15 +156,18 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Text-to-SQL preset** · planned · ml
   Answer questions with SQL on your own schema.
   Roadmap: Task types
-- **Custom preset** · planned · ml
+- **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  Roadmap: For ML engineers
-- **Task engine** · planned · ml
+  UI: Models › Add model › Custom · API: PUT /api/minibrains/{slug}/graders, PUT /api/minibrains/{slug}/instructions
+- **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  Roadmap: Order
-- **Recipes** · planned · product, ml
+  UI: Models › model › Task
+- **Contracts** · shipped · engineer, ml
+  Free text or a JSON schema per version, extended without breaking apps.
+  UI: Models › model › Task · API: POST /api/minibrains/{slug}/contract/check, PUT /api/minibrains/{slug}/contract
+- **Recipes** · partial · product, ml
   Start a model from a worked use case with sample data.
-  Roadmap: Recipes
+  UI: Models › Add model › Start from a recipe · API: GET /api/recipes, GET /api/recipes/{key}, POST /api/recipes/{key}/sample · Roadmap: Recipes
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -220,9 +226,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: v2
 
 ## Evaluation
-- **Prompt-only versions** · partial · product, ml
-  Score a prompt with few-shot examples before training anything.
-  UI: Training › model › Score a prompt · API: POST /api/minibrains/{slug}/versions · Roadmap: Eval and promote
+- **Prompt-only versions** · shipped · product, ml
+  Get a scored version 0 the moment a model exists.
+  UI: Training › model › Score a prompt, Playground · API: POST /api/minibrains/{slug}/versions, POST /api/minibrains/{slug}/versions/{number}/test
 - **Scores** · shipped · product, ml
   Score every version on the test set and held-out split.
   UI: Evaluations · API: GET /api/minibrains/{slug}/golden
@@ -244,19 +250,19 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Target score** · planned · product
   Say when the prompt-only version is good enough to skip training.
   Roadmap: Eval and promote
-- **Graders** · planned · ml
-  Score with exact match, JSON fields, a judge, SQL or Python.
-  Roadmap: Task types
-- **Promotion rule** · planned · ml, engineer
-  Gate a version on a rule over its grader scores, in CI.
-  Roadmap: Task types
+- **Graders** · partial · ml
+  Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
+  UI: Evaluations › version · Roadmap: Task types
+- **Promotion rule** · partial · ml, engineer
+  Gate a version on thresholds over its grader scores, in CI.
+  UI: Models › model › Task, Evaluations › Deploy · API: PUT /api/minibrains/{slug}/promotion, POST /api/minibrains/{slug}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · planned · product, ml
   Compare two versions' scores, not only their data.
   Roadmap: v2
 
 ## Serving
 - **Deploy and roll back** · shipped · product, engineer
-  Deploy any version at any step; roll back by deploying another.
+  Deploy a version that passes its rule; roll back any time.
   UI: Deployments, Evaluations › Deploy · API: POST /api/minibrains/{slug}/deploy, POST /api/minibrains/{slug}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
@@ -265,7 +271,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Call any model by name or pinned version, with streaming.
   UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
 - **Structured output** · partial · engineer
-  Hold answers to the label set or a JSON schema.
+  Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access
 - **API keys** · shipped · engineer, admin
   Issue keys scoped to models, with expiry and an audit trail.
@@ -511,7 +517,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Claims triage** · partial · uses: Classify preset, Dataset versions, Recipes
 - **Contract clause extraction** · planned · uses: Extract preset, Structured output, Recipes
 - **Clinical note coding** · planned · uses: Extract preset, Air-gapped bundle, Recipes
-- **Ticket routing** · partial · uses: Classify preset, Sample data, Deploy and roll back, Recipes
+- **Ticket routing** · shipped · uses: Classify preset, Sample data, Deploy and roll back, Recipes
 - **Incident classification** · partial · uses: Classify preset, Feedback API, Recipes
 - **Request routing** · partial · uses: Classify preset, Train with feedback, Recipes
 - **Distil an assistant** · planned · uses: Distillation data, Upstream routes, General preset, Recipes

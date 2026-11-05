@@ -16,13 +16,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
-from minibrain.data.snapshot import prompt_context
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
 from minibrain.models.registry import missing_files, resolve_spec
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import GatewayReport, live_engines, record_gateway
-from minibrain.registry.files import ref, snapshot_location
+from minibrain.registry.files import ref
 from minibrain.registry.models import (
     ApiKey,
     Minibrain,
@@ -35,6 +34,7 @@ from minibrain.registry.models import (
 )
 from minibrain.registry.service import NotFoundError, adapter_name
 from minibrain.settings import Settings
+from minibrain.tasks.service import prompting_of
 
 log = logging.getLogger("minibrain.gateway")
 
@@ -49,10 +49,10 @@ class Route:
     version: int | None
     kind: str
     base_model: str
-    labels: list[str]
-    shots: list[list[str]]
     adapter: dict[str, Any] | None
-    task: str = ""
+    prompting: dict[str, Any] | None = None
+    contract: int | None = None
+    preset: str = ""
     request_bodies: bool = False
 
 
@@ -115,11 +115,10 @@ def replicas_of(found: Any) -> list[dict[str, str]]:
 EMPTY = GatewayConfig(version="empty")
 
 
-def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain, bodies: bool) -> list[Route]:
+def routes_for(session: Session, minibrain: Minibrain, bodies: bool) -> list[Route]:
     ready = sorted((v for v in minibrain.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
     for version in ready:
-        labels, shots = prompt_context(snapshot_location(session, store, version.snapshot))
         adapter = None
         if version.kind == VersionKind.LORA and version.adapter_artifact_id is not None:
             adapter = {
@@ -136,10 +135,10 @@ def routes_for(session: Session, store: ArtifactStore, minibrain: Minibrain, bod
             version=version.number,
             kind=version.kind,
             base_model=minibrain.base_model,
-            labels=list(labels),
-            shots=[[shot.input, shot.label] for shot in shots],
             adapter=adapter,
-            task=minibrain.task,
+            prompting=prompting_of(version).as_dict(),
+            contract=version.contract_number,
+            preset=minibrain.preset,
             request_bodies=bodies,
         )
         routes.append(route)
@@ -170,8 +169,6 @@ def base_route_for(model_id: str) -> Route:
         version=None,
         kind="base",
         base_model=model_id,
-        labels=[],
-        shots=[],
         adapter=None,
     )
 
@@ -194,7 +191,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         if minibrain.id in deleting:
             continue
         bodies = policy.keeps_bodies(minibrain.request_bodies)
-        routes |= {route.name: route for route in routes_for(session, store, minibrain, bodies)}
+        routes |= {route.name: route for route in routes_for(session, minibrain, bodies)}
     deployed = select(Model).where(Model.deployed.is_(True), Model.status == ModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
     routes |= {

@@ -34,7 +34,7 @@ AIBOM_CANONICAL_FORM = (
     "separators=(',', ':'), ensure_ascii=False) writes it; serialNumber is a UUIDv8 made from its first 16 bytes"
 )
 SPDX_IDS = {"apache-2.0": "Apache-2.0", "mit": "MIT"}
-TASKS = {"classify": "text-classification"}
+TASKS = {"classify": "text-classification", "custom": "text-generation"}
 MIME_TYPES = {"tar": "application/x-tar", "file": "application/octet-stream"}
 UPLOAD = "upload"
 SHA256_HEX = re.compile(r"[0-9a-f]{64}")

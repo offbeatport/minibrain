@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 
-from minibrain.data.snapshot import Example
 from minibrain.ml.examples import Encoded
 from minibrain.ml.planner import (
     GIB,
@@ -19,6 +18,9 @@ from minibrain.ml.planner import (
     plan,
 )
 from minibrain.models.hardware import Gpu, NodeReport
+from minibrain.tasks.contracts import label_set
+from minibrain.tasks.examples import single
+from minibrain.tasks.prompting import Prompting
 from tests.conftest import Harness
 from tests.test_flow import SLUG, create_with_dataset
 
@@ -323,7 +325,10 @@ def test_examples_are_measured_the_way_trl_tokenizes_them() -> None:
             prompt = "<assistant>" if options.get("add_generation_prompt") else ""
             return [ord(character) for character in text + prompt]
 
-    found = encode(Tokenizer(), Example("hi", "billing"), {})
+    prompting = Prompting(
+        "Classify the input. Answer with the label only.", label_set(["billing", "bug"]), trained=True
+    )
+    [found] = encode(Tokenizer(), prompting, single("hi", "billing"), {})
     prompt = len("<system>Classify the input. Answer with the label only.<user>hi<assistant>")
     assert found.offset == prompt
     assert len(found.tokens) == prompt + len("billing")

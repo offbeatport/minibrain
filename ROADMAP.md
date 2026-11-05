@@ -47,10 +47,10 @@ policy, HR helpdesk, customer success onboarding.
 
 ## Task types
 
-Every model has an output contract, fixed for its life, and graders. Training data is always chat examples
-(`messages`); a column mapping is a template that turns table rows into them. A task type is a preset that picks the
-contract, the default graders, the mapping form and the serving constraint, so a team without ML specialists gets a
-scored, promotable model. Fireworks and Together expose only the parts; minibrain exposes both, on one engine.
+Every model has an output contract and graders. Training data is always chat examples (`messages`); a column mapping
+is a template that turns table rows into them. A task type is a preset that picks the contract, the default graders,
+the mapping form and the serving constraint, so a team without ML specialists gets a scored, promotable model.
+Fireworks and Together expose only the parts; minibrain exposes both, on one engine.
 
 | Preset | Contract (served as) | Default graders | Example |
 |---|---|---|---|
@@ -61,13 +61,26 @@ scored, promotable model. Fireworks and Together expose only the parts; minibrai
 | Text-to-SQL | SQL | Execution match on a read-only database | Question + schema → query |
 | Custom | Any contract above, chosen | Chosen | Bring chat JSONL |
 
-- Changing a contract makes a new model: versions, scores and API answers only compare under one contract. The base
-  can change (Rebase); the contract cannot.
-- Constrained decoding enforces the contract: XGrammar on SGLang and vLLM, a grammar on llama.cpp, a token trie on MLX
-  and `transformers`. Classify is an Extract contract with one enum field and still answers with the bare label.
-- Graders: exact match, JSON field match, text similarity, a judge model with a rubric (a model on this install, so it
-  runs air-gapped), SQL execution, and Python graders `score(answer, example) -> float` run sandboxed. Graders combine
-  into the promotion rule, for example `judge >= 0.8 and no_card_numbers == 1`.
+- Two contracts: free text and a JSON schema. A label set is a JSON schema with one enum field (`label`) and is served
+  as the bare label.
+- The contract lives on each version and evolves additively: a new version may add enum values or optional fields
+  freely; removing, renaming, retyping or making a field required is a breaking change that needs an explicit
+  confirmation (`breaking: true` on `PUT /api/minibrains/<slug>/contract` or on the new version), because apps depend
+  on it. Contracts are numbered per model (contract 1, 2, …); every version records its number, and every `/v1`
+  request log records the number it was served with. `POST /api/minibrains/<slug>/contract/check` lists the changes
+  against the latest version first.
+- Constrained decoding enforces the contract on one path: XGrammar on SGLang and vLLM, a grammar on llama.cpp, a token
+  trie on MLX and `transformers`. The gateway checks a JSON answer against the schema and answers 422 when it breaks
+  it.
+- Graders share one interface, `score(answer, example) -> {metric: value}`, and summarise a split. Built in: exact
+  match, label accuracy (with macro F1, per-label scores and the confusion matrix as its report), JSON valid, JSON
+  field match (per field), text similarity (token F1), and a judge model with a rubric (a model on this install, so it
+  runs air-gapped, scoring 1 to 5 as its own job). Later: SQL execution and Python graders run sandboxed. Every score
+  records its grader's name and version, so scores stay comparable.
+- The promotion rule is a plain list of thresholds over metric names (`label_accuracy >= 0.85`, `json_valid == 1`) on
+  the held-out split, plus "at least as good as the live version on the main metric" (the first metric of the first
+  grader; ties pass). No rule language. A version goes live only when the rule passes; a version that was live before
+  can always be rolled back to.
 - Distill is a data source, not a preset: answers logged from a teacher model become the examples for any preset.
 - Rewrite also accepts raw documents as a style source, not only input/output pairs.
 - Training methods: SFT with LoRA by default; full fine-tuning; DPO from feedback pairs; reinforcement fine-tuning
@@ -86,15 +99,31 @@ scored, promotable model. Fireworks and Together expose only the parts; minibrai
 There are no users yet, so the engine is built from scratch with no compatibility layer; today's Classify code is
 replaced, not migrated.
 
-1. The engine, usable as Custom: chat examples, a contract (free text, label set, JSON schema), built-in graders
-   (exact match, label accuracy, JSON field match, text similarity, a judge model on this install) and a promotion
-   rule over them; plus the recipe format (below).
-2. Classify as a preset on it, with its recipes and Start from a recipe in Add model.
+1. Done (2026-11-05). The engine, usable as Custom: chat examples, a contract (free text, label set, JSON schema),
+   built-in graders (exact match, label accuracy, JSON field match, text similarity, a judge model on this install)
+   and a promotion rule over them; plus the recipe format (below).
+2. Done (2026-11-05). Classify as a preset on it, with its first recipe (Ticket routing) and Start from a recipe in Add
+   model.
 3. Extract, with its recipes.
 4. General / Assistant: judge rubrics, distillation from a teacher, DPO from feedback; with its recipes.
 5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
    reinforcement fine-tuning with the graders as rewards, exports.
 6. Text-to-SQL with the execution grader.
+
+### Presets
+
+A preset is a definition file in `minibrain/presets/<key>.yaml`: the contract (`labels` from the data, or `choose`),
+the mapping template, the version 0 prompt and the trained prompt per contract kind, the default graders, the data
+checks, the default promotion rule and at most a results view. Adding Extract or General is one such file plus its
+view in the UI; `GET /api/presets` lists the presets, the ones coming and the graders.
+
+- Classify: a label set built from the labels typed in Add model and those found in the data (new ones join it on the
+  next version); mapping `input` → user, `label` → assistant; a version 0 prompt listing the labels and a trained
+  prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least two labels and label balance; the
+  results view shows per-label counts and the confusion matrix, and feedback picks the right label.
+- Custom: free text or a JSON schema pasted in Add model, any graders that fit it (free text: exact match and text
+  similarity; JSON: JSON valid and field match by default), optional instructions as the system prompt, chat JSONL
+  (`messages`) as data.
 
 ### Recipes
 
@@ -102,6 +131,12 @@ A recipe is a worked use case a team can start from: `recipes/<name>/` holds a `
 base, column mapping, graders, promotion rule), a small synthetic sample dataset and a `README.md` (the situation,
 the data needed, the steps, and when it is not a fit). The docs render the README; Add model offers Start from a
 recipe, which fills the form and loads the sample to try before using real data. Recipes name no customers.
+
+- Built: Ticket routing (`recipes/ticket-routing/`, 240 synthetic tickets across five queues, the mapping
+  `Subject: {subject}\n\n{body}` → `{queue}`, `label_accuracy >= 0.85`). The wheel carries `recipes/` as
+  `minibrain/bundled/recipes`. `GET /api/recipes` and `GET /api/recipes/<key>` list them with the README;
+  `POST /api/recipes/<key>/sample` loads the sample once (the same content is one source) as a mapped dataset with a
+  version. Try with sample data on the empty Models page creates a model from this recipe.
 
 | Area | Recipe | Preset |
 |---|---|---|
@@ -126,11 +161,13 @@ recipe, which fills the form and loads the sample to try before using real data.
 | Term | Meaning |
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
-| Version | Prompt-only (model + system prompt + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its eval result. Immutable. Version 0 is always prompt-only |
+| Version | Prompt-only (model + instructions + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its contract and number, graders and eval result. Immutable. Version 0 is always prompt-only and is created with the model |
 | Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it. Internally a snapshot |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
-| Task type | Classify, Extract, Rewrite, Text-to-SQL or Distill; sets shape, schema, metric, recipe |
+| Preset | Classify or Custom today (Extract, General, Rewrite, Text-to-SQL coming); sets the contract, mapping, prompts, graders, checks and promotion rule defaults |
+| Contract | Free text or a JSON schema (a label set is one enum field); numbered, additive, on each version |
+| Grader | `score(answer, example) -> {metric: value}`, named and versioned |
 | Golden set | 20–50 human-verified examples; defines the task and scores every version |
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
 | Rebase | Rebuilding a minibrain on a new base model from its dataset version, golden set and config, then comparing it with `current` |
@@ -139,8 +176,8 @@ recipe, which fills the form and loads the sample to try before using real data.
 
 ## Flow
 
-task type → golden set → version 0: prompt-only on the teacher, evaluated → stop here if it passes and the cost is
-acceptable.
+preset → name + contract → version 0: prompt-only on the base at once, scored by the graders when there is data → stop
+here if it passes the promotion rule and the cost is acceptable.
 
 Otherwise: source → DuckDB (query in place or stage) → mapping / SQL → built-in steps → teacher labels + human review
 → dataset version (train/eval split) → quality + PII + preview → LoRA training (worker subprocess) → eval vs base,
@@ -266,9 +303,11 @@ Data is shared across models:
   server folder (all but uploads read in place; S3, database and Iceberg through a connection). Each source is a
   table in dataset SQL under a stable, readable name taken from its name when it is added (`support_tickets`,
   `support_tickets_2`); renaming the source keeps the table name, so saved SQL keeps working.
-- A **dataset** stands on its own: one saved DuckDB query that returns `input` and `label`, plus any extra columns,
-  over one or more sources. Columns mode picks one source and its input and label columns and generates the SELECT;
-  SQL mode joins, unions, filters and cleans across sources. A dataset over one source can still say `FROM source`.
+- A **dataset** stands on its own: one saved DuckDB query over one or more sources that returns `input` and `label`,
+  or a `messages` column of chat turns. Columns mode picks one source and a mapping template (an input and a label
+  column, templates such as `Subject: {subject}\n\n{body}` for the user turn, or the messages column, picked for chat
+  JSONL uploads) and compiles the SELECT; SQL mode joins, unions, filters and cleans across sources. A dataset over
+  one source can still say `FROM source`.
   Each custom model points at one dataset, and several models can use the same dataset to compare fairly.
   Dataset names are unique within their folder, like files in a folder, case aside; slugs stay unique across the
   install. A typed name that is taken is refused with a 409 naming the dataset that holds it and a free name
@@ -420,8 +459,10 @@ PII counts.
 Version checks, run on every dataset version (and every feedback copy) and stored with it; the report shows on the
 dataset and on the Training page before a run starts:
 
-- Hard stops, always on: no row with both an input and a label, or a single label. These refuse the version, so a
-  dataset is not created and a query is not saved while they hold.
+- Hard stops, always on: no row with both an input and an answer, or, when the answers are a label set (at most 256
+  short single-line values, each repeated on average), a single label. These refuse the version, so a dataset is not
+  created and a query is not saved while they hold. Label balance is checked for label sets only; a Classify model
+  refuses a dataset version without at least two labels.
 - Warnings, each with an on/off switch under Settings → Data, never block: repeated inputs; the same input with
   different labels; label balance (one label above a share, 90% by default, or labels under a row count, 10 by
   default, both editable); train/test leakage (a test or held-out input also in training once case, spacing and
@@ -450,9 +491,12 @@ the UI says version.
 
 - Saved when a dataset is created with its columns or SQL (version 1), when its query or columns are saved, and with
   Update on the dataset (or on Training, when its sources changed). A dataset created with no columns picked has no
-  version until its first successful mapping. Saving runs the dataset's query once in the main process, sorts the
-  rows (`ORDER BY ALL`) and writes them to Parquet; the file's SHA-256 is the version's hash and its artifact id, so
-  identical rows are stored once. Rows identical to the latest version make no new version (Update then only records
+  version until its first successful mapping. Saving runs the dataset's query once in the main process, turns each
+  row into a chat example in DuckDB (`messages`: the turns before the answer, system turns dropped; `input`: the user
+  turn, or every turn as `role: text` lines; `expected`: the last assistant turn), sorts them (`ORDER BY ALL`) and
+  writes them to Parquet; the file's SHA-256 is the version's hash and its artifact id, so identical rows are stored
+  once. Training, evaluation and serving read only these examples, never columns: a multi-turn example trains on every
+  assistant turn and is scored on the last one. Rows identical to the latest version make no new version (Update then only records
   the sources' new fingerprints); rows identical to an older one make the next version, sharing its file.
 - Versions are numbered per dataset (`snapshots.number`, unique per dataset) and listed newest first: number, saved,
   rows, labels, checks, the model versions that use it, size and hash. Migration 0038 numbered the snapshots that
@@ -699,8 +743,15 @@ once it matches; only deleting a base removes its files.
 ## Eval and promote
 
 - Eval first: the golden set (20–50 human-verified examples) is written or picked before any training.
-- Version 0 is prompt-only on the teacher: the task type's prompt plus few-shot examples. It is usable minutes after
-  the minibrain is created.
+- Version 0 is created with the model: prompt-only on the base, the preset's prompt (or the model's instructions)
+  plus few-shot examples when data exists. It answers at once in the Playground, through `slug@0` and through
+  `POST /api/minibrains/<slug>/versions/<n>/test` (one conversation, scored by the graders when an expected answer is
+  sent), and is scored on the data when there is any (once the base is on this install). Going live is a separate
+  step; training makes v1 and up, compared against the live version.
+- Evaluation calls the gateway's own prompt and constraint code (`minibrain/tasks/prompting.py`), so scores are what
+  apps get. The eval job only generates answers and times them; main grades them with the version's graders, and a
+  judge grader queues a `judge` job for the answers the cache lacks (`judge_scores`, keyed by the SHA-256 of the
+  conversation, expected answer and answer, the rubric, and the judge model and its content hash).
 - Few-shot examples never come from the golden set, which must stay unseen: they come from other labelled rows, or,
   when the golden set is all there is, a few of its rows move out of it and stop being scored.
 - If version 0 meets `target.min_score` and its latency and cost are acceptable, the UI says no training is needed.
@@ -716,9 +767,9 @@ once it matches; only deleting a base removes its files.
   time × the pool's price per hour from Settings → General → Compute prices (one currency per install, audited as
   `settings.prices`). With no price it shows the GPU time instead; prices are never looked up online. An API teacher
   will record source `list_price` with its token counts.
-- Deploy at any step. A custom model can be deployed the moment it exists: with no version yet it serves its base model.
-  Any ready version can then be deployed, scored or not, whatever its score; scores inform the choice and never block
-  it. Training or scoring never changes what is live.
+- Deploy at any step. A custom model can be deployed the moment it exists: with no version live it serves its base
+  model. A ready version goes live only when it passes the model's promotion rule (Task types); one that was live before
+  can always be rolled back to. Training or scoring never changes what is live.
 - Side-by-side review screen. The golden set alone is too small to decide: in the spike, one of 50 rows moved the
   score 2 points and golden and held-out scores differed by 8–11 points.
 - Deploying a version moves `current` and loads its adapter into the pool. Rollback deploys an earlier version.
@@ -783,8 +834,10 @@ once it matches; only deleting a base removes its files.
 ## API and access
 
 - `/v1/chat/completions` with streaming, `/v1/models`.
-- `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema;
-  Classify minibrains hold decoding to their labels by default, Extract minibrains will set their schema.
+- `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema; without
+  one, a custom model's contract holds decoding: its labels for a label set, its schema for a JSON contract (checked
+  the same way). A custom model answers the user and assistant turns of the conversation after its instructions
+  (prompt-only versions with their few-shot turns first); system messages from the app are dropped.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the minibrain by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and
@@ -913,9 +966,15 @@ keys, and `/v1` stays key-only.
   model's API link to it, and the copy-paste harness configs stay where they are.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
-- Add model (`/models/new`) asks for the task first, then the base model from one picker (the kit's
-  `TabbedSearchList` in a dialog): one search over four tabs. Only Classify can be picked today; the other tasks are
-  listed under Coming and cannot be chosen.
+- Add model (`/models/new`) offers Start from a recipe first (it loads the sample and fills the task, base, name,
+  graders and promotion rule; Read the recipe shows its README), then the task (Classify and Custom; Extract, General,
+  Rewrite and Text-to-SQL as Coming), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
+  one search over four tabs. The name is prefilled and required: the task noun and the next free number
+  ("Classifier 1", "Custom 1"), never a name a base or custom model already has, with an inline error when a typed
+  one is taken. Classify takes labels (at least two, unless a dataset or recipe brings them); Custom takes free text
+  or a JSON schema, graders that fit it (a judge with its rubric and model) and optional instructions. Both take a
+  promotion rule (thresholds and "at least as good as the live version"). The model page's Task section shows the
+  contract with its number and edits it (a breaking change asks to confirm), the graders and the rule.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for the task (capability, size tier, the catalogue's tested default; superseded models left out), then
     popularity. Being downloaded is not a ranking factor.
@@ -1242,11 +1301,12 @@ Everything in the v1 scope below, after M1.
 ## v1 scope
 
 - [x] minibrains: create, list, select, delete
-- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer
+- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer (the engine, Classify and Custom done;
+      the rest come as presets)
 - [ ] Index per minibrain: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations
 - [ ] Golden set authoring; eval-first flow
-- [ ] Prompt-only version 0 on the teacher pool
+- [ ] Prompt-only version 0 on the teacher pool (version 0 on the base at creation done; the teacher pool not yet)
 - [ ] Teacher pool, permanent or temporary; API teacher opt-in, off by default
 - [ ] `generate_qa` with check pass
 - [ ] Teacher labelling with review queue

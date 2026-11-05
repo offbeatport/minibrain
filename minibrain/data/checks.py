@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 
-from minibrain.data.snapshot import Example
+from minibrain.tasks.examples import Example
 
 CHECKS = ("duplicates", "conflicts", "balance", "leakage", "length", "personal_data")
 HARD_STOPS = ("empty", "single_label")
@@ -62,16 +62,18 @@ def agree(count: int, one: str, many: str) -> str:
     return one if count == 1 else many
 
 
-def hard_stops(rows: list[tuple[str, str]]) -> list[Finding]:
+def hard_stops(rows: list[tuple[str, str]], labelled: bool) -> list[Finding]:
     labels = Counter(label for _, label in rows)
-    empty = Finding("empty", "ok", "Rows to train on", f"{plural(len(rows), 'row')} with an input and a label.")
+    empty = Finding("empty", "ok", "Rows to train on", f"{plural(len(rows), 'row')} with an input and an answer.")
     if not rows:
         empty = Finding(
             "empty",
             "blocked",
             "No rows to train on",
-            "No row has both an input and a label. Check the query's input and label columns.",
+            "No row has both an input and an answer. Check the query's input and label columns, or its messages.",
         )
+    if not labelled:
+        return [empty]
     single = Finding("single_label", "ok", "More than one label", f"{plural(len(labels), 'label')}.")
     if len(labels) == 1:
         only = next(iter(labels))
@@ -121,7 +123,9 @@ def conflicts(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object
     )
 
 
-def balance(rows: list[tuple[str, str]], limits: CheckLimits, _splits: object) -> Finding:
+def balance(rows: list[tuple[str, str]], limits: CheckLimits, _splits: object, labelled: bool = True) -> Finding:
+    if not labelled:
+        return Finding("balance", "skipped", "Label balance", "Not checked: the answers are not a set of labels.")
     counts = Counter(label for _, label in rows)
     if not counts:
         return Finding("balance", "ok", "Label balance", "No labels yet.")
@@ -304,14 +308,18 @@ TITLES = {
 }
 
 
-def run_checks(raw: Rows, splits: dict[str, list[Example]] | None, limits: CheckLimits) -> list[Finding]:
+def run_checks(
+    raw: Rows, splits: dict[str, list[Example]] | None, limits: CheckLimits, labelled: bool = True
+) -> list[Finding]:
     rows = usable(raw)
-    findings = hard_stops(rows)
+    findings = hard_stops(rows, labelled)
     for name in CHECKS:
         if name in limits.off:
             findings.append(Finding(name, "off", TITLES[name], "Turned off under Settings, Data."))
         elif name == "length":
             findings.append(length(rows, limits, splits, raw))
+        elif name == "balance":
+            findings.append(balance(rows, limits, splits, labelled))
         else:
             findings.append(RUNNERS[name](rows, limits, splits))
     return findings

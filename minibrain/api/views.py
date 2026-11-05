@@ -8,16 +8,24 @@ from minibrain.api.schemas import (
     ChangeInfo,
     CheckInfo,
     ColumnInfo,
+    ConfusionInfo,
+    ContractInfo,
+    DecisionInfo,
     EvalCost,
+    FieldScoreInfo,
+    GraderConfig,
     JobDetail,
     JobInfo,
     KeyInfo,
     KeyModel,
+    LabelScoreInfo,
     MappingInfo,
     MinibrainDetail,
     MinibrainSummary,
     Mistake,
+    PromotionInfo,
     RequestBodiesInfo,
+    ScoreInfo,
     SnapshotInfo,
     SourceInfo,
     SplitScore,
@@ -29,6 +37,7 @@ from minibrain.api.schemas import (
 from minibrain.data.shared import table_of
 from minibrain.data.snapshots import Changes, changes_since, version_number
 from minibrain.data.sources import SourceError, describe
+from minibrain.data.templates import plain_columns
 from minibrain.policy import bodies_choice
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
@@ -45,11 +54,23 @@ from minibrain.registry.models import (
     TeardownStatus,
     TeardownStep,
     Version,
+    VersionStatus,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost
-from minibrain.registry.service import find_version, held_out_accuracy, latest_snapshot
+from minibrain.registry.service import find_version, latest_snapshot
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
+from minibrain.tasks.contracts import Contract
+from minibrain.tasks.service import (
+    contract_of,
+    decision,
+    held_out_score,
+    latest_version_of,
+    preset_of,
+    rule_of,
+    version_contract,
+    version_metric,
+)
 
 TEARDOWN_LABELS: dict[tuple[str, str], str] = {
     (TeardownKind.DELETE, TeardownStatus.RUNNING): "Deleting",
@@ -119,7 +140,8 @@ def source_info(settings: Settings, minibrain: Minibrain) -> SourceInfo | None:
 def mapping_info(dataset: Dataset | None) -> MappingInfo:
     if dataset is None:
         return MappingInfo(input_column=None, label_column=None, sql=None)
-    return MappingInfo(input_column=dataset.input_column, label_column=dataset.label_column, sql=dataset.sql)
+    input_column, label_column = plain_columns(dataset.template)
+    return MappingInfo(input_column=input_column, label_column=label_column, template=dataset.template, sql=dataset.sql)
 
 
 def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
@@ -212,9 +234,33 @@ def job_detail(job: Job) -> JobDetail:
     )
 
 
+def contract_info(contract: Contract) -> ContractInfo:
+    labels = contract.labels
+    schema = None if labels is not None else contract.schema
+    return ContractInfo(kind=contract.kind, json_schema=schema, labels=list(labels) if labels is not None else None)
+
+
+def grader_infos(configs: list[dict[str, Any]]) -> list[GraderConfig]:
+    return [GraderConfig.model_validate(config) for config in configs]
+
+
 def split_score(metrics: dict | None, key: str) -> SplitScore | None:
     split = (metrics or {}).get(key)
-    return SplitScore.model_validate(split) if split else None
+    if not split or "scores" not in split:
+        return None
+    reports = split.get("reports") or {}
+    labelled = reports.get("label_accuracy") or {}
+    return SplitScore(
+        examples=int(split.get("examples", 0)),
+        invalid_rate=float(split.get("invalid_rate", 0.0)),
+        scores=[ScoreInfo.model_validate(item) for item in split["scores"]],
+        labels=[LabelScoreInfo.model_validate(item) for item in labelled.get("labels", [])],
+        confusion=[ConfusionInfo.model_validate(item) for item in labelled.get("confusion", [])],
+        fields=[
+            FieldScoreInfo.model_validate(item) for item in (reports.get("json_field_match") or {}).get("fields", [])
+        ],
+        judge_pending=int((reports.get("judge") or {}).get("pending", 0)),
+    )
 
 
 def latest_job(minibrain: Minibrain, version: Version) -> Job | None:
@@ -231,16 +277,18 @@ def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | 
     metrics = version.metrics or {}
     latency = metrics.get("latency") or {}
     job = latest_job(minibrain, version)
+    snapshot = version.snapshot
+    ready = version.status == VersionStatus.READY
     return VersionInfo(
         number=version.number,
         kind=version.kind,
         status=version.status,
         current=minibrain.current_version == version.number,
-        snapshot_hash=version.snapshot.hash,
-        snapshot_id=version.snapshot.id,
-        snapshot_dataset=version.snapshot.dataset.slug if version.snapshot.dataset is not None else None,
-        snapshot_number=version_number(version.snapshot),
-        snapshot_rows=version.snapshot.rows or sum(version.snapshot.counts.values()),
+        snapshot_hash=snapshot.hash if snapshot is not None else None,
+        snapshot_id=snapshot.id if snapshot is not None else None,
+        snapshot_dataset=snapshot.dataset.slug if snapshot is not None and snapshot.dataset is not None else None,
+        snapshot_number=version_number(snapshot) if snapshot is not None else None,
+        snapshot_rows=(snapshot.rows or sum(snapshot.counts.values())) if snapshot is not None else 0,
         recipe=version.recipe,
         golden=split_score(metrics, "golden"),
         held_out=split_score(metrics, "eval"),
@@ -251,25 +299,46 @@ def version_info(minibrain: Minibrain, version: Version, prices: DevicePrices | 
         mistakes=[Mistake.model_validate(item) for item in (metrics.get("eval") or {}).get("mistakes", [])],
         job=job_info(job) if job is not None else None,
         created_at=version.created_at,
+        contract=contract_info(version_contract(version)),
+        contract_number=version.contract_number,
+        instructions=version.instructions,
+        shots=len(version.shots or []),
+        graders=grader_infos(version.graders),
+        main_metric=version_metric(version),
+        score=held_out_score(version),
+        promotion=DecisionInfo.model_validate(decision(minibrain, version).as_dict()) if ready else None,
+        live_at=version.live_at,
+        view=preset_of(minibrain).view,
     )
 
 
-def current_accuracy(minibrain: Minibrain) -> float | None:
+def current_score(minibrain: Minibrain) -> float | None:
     if minibrain.current_version is None:
         return None
     version = find_version(minibrain, minibrain.current_version)
-    return held_out_accuracy(version) if version is not None and version.metrics else None
+    return held_out_score(version) if version is not None else None
+
+
+def model_metric(minibrain: Minibrain) -> str | None:
+    newest = latest_version_of(minibrain)
+    return version_metric(newest) if newest is not None else None
+
+
+def current_contract(minibrain: Minibrain) -> int:
+    newest = latest_version_of(minibrain)
+    return newest.contract_number if newest is not None else 1
 
 
 def summary(minibrain: Minibrain) -> MinibrainSummary:
     return MinibrainSummary(
         slug=minibrain.slug,
         name=minibrain.name,
-        task=minibrain.task,
+        preset=minibrain.preset,
         base_model=minibrain.base_model,
         current_version=minibrain.current_version,
         deployed=minibrain.deployed,
-        current_accuracy=current_accuracy(minibrain),
+        main_metric=model_metric(minibrain),
+        current_score=current_score(minibrain),
         versions=len(minibrain.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
     )
@@ -286,11 +355,12 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
     return MinibrainDetail(
         slug=minibrain.slug,
         name=minibrain.name,
-        task=minibrain.task,
+        preset=minibrain.preset,
         base_model=minibrain.base_model,
         current_version=minibrain.current_version,
         deployed=minibrain.deployed,
-        current_accuracy=current_accuracy(minibrain),
+        main_metric=model_metric(minibrain),
+        current_score=current_score(minibrain),
         versions=len(minibrain.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in minibrain.jobs),
         source=source_info(settings, minibrain),
@@ -302,6 +372,11 @@ def detail(settings: Settings, minibrain: Minibrain) -> MinibrainDetail:
         models=model_names(minibrain),
         request_bodies=bodies_info(minibrain),
         teardown=teardown_info(minibrain.teardown),
+        contract=contract_info(contract_of(minibrain)),
+        contract_number=current_contract(minibrain),
+        instructions=minibrain.instructions or "",
+        graders=grader_infos(minibrain.graders),
+        promotion=PromotionInfo.model_validate(rule_of(minibrain).as_dict()),
     )
 
 

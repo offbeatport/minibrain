@@ -19,10 +19,14 @@ from minibrain.app import create_app
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
 from minibrain.auth.roles import Role
+from minibrain.data.snapshot import read_split
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
+from minibrain.registry.files import snapshot_location
+from minibrain.registry.models import Job
 from minibrain.serve.backend import CompletionRequest
 from minibrain.settings import Settings
+from minibrain.tasks.service import version_contract
 from minibrain.worker import MainClient, Worker, WorkerConfig
 from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
 
@@ -126,6 +130,28 @@ class Harness:
         worker = Worker(self.worker_config(), client=client)
         stored = worker.store.put_stream(io.BytesIO(data))
         return client.upload(worker.store, stored.id, kind, packing, name)
+
+
+def wrong_label(expected: str, labels: tuple[str, ...]) -> str:
+    return next(label for label in labels if label != expected)
+
+
+def scored_answers(harness: Harness, job_id: int, accuracy: float) -> dict[str, list[str]]:
+    with harness.sessions() as session:
+        job = session.get(Job, job_id)
+        version = job.version if job is not None else None
+        if version is None or version.snapshot is None:
+            raise RuntimeError(f"job {job_id} scores no version with data")
+        location = snapshot_location(session, harness.app.state.store, version.snapshot)
+        labels = version_contract(version).labels or LABELS
+        splits = {name: read_split(location, name) for name in ("golden", "eval")}
+    answers: dict[str, list[str]] = {}
+    for name, rows in splits.items():
+        right = round(len(rows) * accuracy)
+        answers[name] = [
+            row.expected if index < right else wrong_label(row.expected, labels) for index, row in enumerate(rows)
+        ]
+    return answers
 
 
 def stored_bytes(store: ArtifactStore, artifact_id: str) -> bytes:

@@ -15,11 +15,12 @@ from minibrain.data.shared import dataset_sql, dataset_tables, fingerprint
 from minibrain.data.snapshot import (
     MIN_ROWS,
     SPLITS,
-    Example,
+    Row,
     SnapshotError,
+    answer_labels,
     clean,
     is_parquet,
-    labels_of,
+    pairs,
     read_rows,
     split,
 )
@@ -28,6 +29,7 @@ from minibrain.registry.files import ArtifactKind, snapshot_location, store_file
 from minibrain.registry.models import Artifact, Dataset, Minibrain, Snapshot, Version, now
 from minibrain.registry.service import ConflictError, latest_snapshot, latest_version
 from minibrain.settings import Settings
+from minibrain.tasks.examples import Example, encode_turns
 
 SNAPSHOT_FILE = "snapshot.parquet"
 
@@ -47,15 +49,14 @@ def over_limit(limit: int) -> str:
     )
 
 
-def split_summary(
-    rows: list[tuple[str | None, str | None]],
-) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
+def split_summary(rows: list[Row]) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
     examples = clean(rows)
+    labels = answer_labels(examples)
     try:
         splits = split(examples)
     except SnapshotError:
-        return {}, sorted({example.label for example in examples}), None
-    return {name: len(splits[name]) for name in SPLITS}, labels_of(splits), splits
+        return {}, labels, None
+    return {name: len(splits[name]) for name in SPLITS}, labels, splits
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ class Taken:
 def checked(session: Session, settings: Settings, target: Path) -> Taken:
     rows_read = read_rows(target)
     counts, labels, splits = split_summary(rows_read)
-    findings = run_checks(rows_read, splits, load_limits(session).checks())
+    findings = run_checks(pairs(rows_read), splits, load_limits(session).checks(), labelled=bool(labels))
     stop = blocking(findings)
     if stop is not None:
         raise ConflictError(f"{stop.title}: {stop.detail}")
@@ -147,7 +148,7 @@ def with_feedback(session: Session, settings: Settings, minibrain: Minibrain, ve
         target = Path(scratch) / SNAPSHOT_FILE
         if not plain_copy(session, settings, version, target):
             return version
-        _, added = merge_rows(target, [(example.input, example.label) for example in extra])
+        _, added = merge_rows(target, [(encode_turns(row.turns), row.input, row.expected) for row in extra])
         if added == 0:
             return version
         result = checked(session, settings, target)

@@ -3,7 +3,6 @@ import re
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -13,10 +12,9 @@ from minibrain.registry.models import (
     Dataset,
     KeyScope,
     Minibrain,
+    Model,
     Snapshot,
     Version,
-    VersionKind,
-    VersionStatus,
     now,
 )
 
@@ -59,18 +57,37 @@ def get_minibrain(session: Session, slug: str) -> Minibrain:
     return minibrain
 
 
-def create_minibrain(session: Session, name: str, task: str, base_model: str) -> Minibrain:
+def taken_names(session: Session) -> tuple[set[str], set[str]]:
+    custom = session.execute(select(Minibrain.name, Minibrain.slug)).all()
+    bases = session.execute(select(Model.name, Model.id)).all()
+    names = {name.strip().lower() for name, _ in [*custom, *bases]}
+    slugs = {slug for _, slug in custom} | {slugify(key) for _, key in bases} | {key for _, key in bases}
+    return names, slugs
+
+
+def name_taken(session: Session, name: str) -> bool:
+    names, slugs = taken_names(session)
+    return name.strip().lower() in names or slugify(name) in slugs
+
+
+def free_model_name(session: Session, noun: str, numbered: bool = True) -> str:
+    names, slugs = taken_names(session)
+    candidates = (noun if number == 1 and not numbered else f"{noun} {number}" for number in range(1, 10_000))
+    return next(item for item in candidates if item.lower() not in names and slugify(item) not in slugs)
+
+
+def create_minibrain(session: Session, name: str, preset: str, base_model: str) -> Minibrain:
     from minibrain.policy import load
 
     if not re.search(r"[A-Za-z0-9]", name):
         raise ModelNameError("a model name needs at least one letter or number")
     slug = slugify(name)
-    if session.scalar(select(Minibrain).where(Minibrain.slug == slug)) is not None:
+    if name_taken(session, name):
         raise ConflictError(f"a model called {name.strip()} already exists, or one with the same address ({slug})")
     bodies = bool(load(session)["request_bodies"])
-    minibrain = Minibrain(slug=slug, name=name.strip(), task=task, base_model=base_model, request_bodies=bodies)
+    minibrain = Minibrain(slug=slug, name=name.strip(), preset=preset, base_model=base_model, request_bodies=bodies)
     session.add(minibrain)
-    session.commit()
+    session.flush()
     return minibrain
 
 
@@ -98,41 +115,8 @@ def get_version(minibrain: Minibrain, number: int) -> Version:
     return version
 
 
-def next_version_number(minibrain: Minibrain) -> int:
-    highest = max((version.number for version in minibrain.versions), default=-1)
-    minibrain.last_version = max(highest, minibrain.last_version) + 1
-    return minibrain.last_version
-
-
-def create_version(
-    session: Session, minibrain: Minibrain, kind: VersionKind, recipe: dict[str, Any], snapshot: Snapshot
-) -> Version:
-    version = Version(
-        minibrain=minibrain,
-        snapshot=snapshot,
-        number=next_version_number(minibrain),
-        kind=kind,
-        status=VersionStatus.TRAINING if kind == VersionKind.LORA else VersionStatus.EVALUATING,
-        recipe=recipe,
-    )
-    session.add(version)
-    session.flush()
-    return version
-
-
 def adapter_name(slug: str, number: int) -> str:
     return f"{slug}-v{number}"
-
-
-def held_out_accuracy(version: Version) -> float:
-    return float((version.metrics or {}).get("eval", {}).get("accuracy", 0.0))
-
-
-def promote(minibrain: Minibrain, version: Version) -> None:
-    if version.status != VersionStatus.READY:
-        raise ConflictError(f"{minibrain.slug}@{version.number} is not ready")
-    minibrain.current_version = version.number
-    minibrain.deployed = True
 
 
 def key_digest(raw: str) -> str:

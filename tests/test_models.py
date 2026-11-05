@@ -19,7 +19,7 @@ from minibrain.registry.models import AuditEvent, CatalogModel, CatalogVariant
 from minibrain.registry.settings_store import write
 from minibrain.storage import Space
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, deploy, finish
+from tests.test_flow import SLUG, add_version, bearer, create_on_data, create_with_dataset, deploy, finish
 
 REPO = "test/tiny"
 REVISION = "a" * 40
@@ -184,7 +184,9 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
     harness.client.post("/api/models/base/tiny/deploy", json={"deployed": True})
     assert "undeploy it first" in harness.client.delete("/api/models/base/tiny").json()["detail"]
     harness.client.post("/api/models/base/tiny/deploy", json={"deployed": False})
-    custom = harness.client.post("/api/minibrains", json={"name": "Tickets", "base_model": "tiny"}).json()
+    custom = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"}
+    ).json()
     assert "Tickets is trained on Tiny" in harness.client.delete("/api/models/base/tiny").json()["detail"]
     assert harness.client.delete(f"/api/minibrains/{custom['slug']}").status_code == 202
     harness.settle()
@@ -314,8 +316,7 @@ def test_catalogue_sync_reads_our_url_and_keeps_pins(
 
 
 def test_my_models_shows_training_and_serving_independently(harness: Harness) -> None:
-    create_with_dataset(harness)
-    add_version(harness, "prompt")
+    create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
     add_version(harness, "lora")
@@ -336,8 +337,8 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
         "progress": None,
         "job_id": claim["job_id"],
     }
-    harness.client.post("/api/minibrains", json={"name": "Draft"})
-    assert rows(harness)["draft"]["activity"]["label"] == "Needs examples"
+    harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Draft"})
+    assert rows(harness)["draft"]["activity"]["label"] == "v0 ready"
     assert rows(harness)["draft"]["stages"][0] == {
         "key": "data",
         "state": "todo",
@@ -349,8 +350,7 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
 
 
 def test_ready_candidate_is_reported(harness: Harness) -> None:
-    create_with_dataset(harness)
-    add_version(harness, "prompt")
+    create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     add_version(harness, "lora")
     finish(harness, "train")
@@ -501,14 +501,18 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     base = harness.client.post("/api/models/import", json={"name": "Corp base", "location": str(folder)}).json()
-    created = harness.client.post("/api/minibrains", json={"name": "On corp", "base_model": base["key"]})
+    created = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "On corp", "base_model": base["key"]}
+    )
     assert created.status_code == 201
     pending = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "prompt"})
     assert pending.status_code == 409 and "still being imported" in pending.json()["detail"]
     harness.worker(kinds=["import"]).run_once()
     trained = harness.client.post("/api/minibrains/on-corp/versions", json={"kind": "lora"})
     assert "pick a dataset" in trained.json()["detail"]
-    missing = harness.client.post("/api/minibrains", json={"name": "Nowhere", "base_model": "nope"})
+    missing = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Nowhere", "base_model": "nope"}
+    )
     assert missing.status_code == 409
 
 
@@ -521,7 +525,12 @@ def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: 
     (folder / "config.json").write_text(json.dumps(config))
     base = harness.client.post("/api/models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
     harness.worker(kinds=["import"]).run_once()
-    assert harness.client.post("/api/minibrains", json={"name": "On FP8", "base_model": base["key"]}).status_code == 201
+    assert (
+        harness.client.post(
+            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "On FP8", "base_model": base["key"]}
+        ).status_code
+        == 201
+    )
     trained = harness.client.post("/api/minibrains/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
     assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]
@@ -539,7 +548,9 @@ def test_hub_entries_name_their_quantization() -> None:
 def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> None:
     add_tiny(harness)
     download_tiny(harness)
-    created = harness.client.post("/api/minibrains", json={"name": "Tickets", "base_model": "tiny"})
+    created = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"}
+    )
     assert created.status_code == 201, created.text
     assert rows(harness)["tickets"]["availability"]["state"] == "downloading"
     assert harness.worker(kinds=["download"]).run_once()
@@ -553,7 +564,7 @@ def test_sample_starts_its_base_download_once(harness: Harness, hub: Path, monke
     assert (first.json()["base_name"], first.json()["download_bytes"] > GIB) == ("Qwen3 0.6B", True)
     assert rows(harness)["qwen3-0.6b"]["availability"]["state"] == "downloading"
     second = harness.client.post("/api/minibrains/sample").json()
-    assert (second["name"], second["download_bytes"]) == ("Travel intents (sample) 2", None)
+    assert (second["name"], second["download_bytes"]) == ("Ticket routing 2", None)
 
 
 def test_sample_needing_a_download_offline_creates_nothing(

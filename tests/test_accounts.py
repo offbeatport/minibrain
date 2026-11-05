@@ -105,7 +105,7 @@ def test_everyone_signs_in_even_on_loopback(install: Install) -> None:
         assert (info["setup"], info["person"], info["csrf_token"]) == (True, None, None)
         refused = browser.get("/api/minibrains")
         assert refused.status_code == 401 and refused.json()["detail"] == "Sign in to use minibrain"
-        assert browser.post("/api/minibrains", json={"name": "Triage"}).status_code == 401
+        assert browser.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 401
 
 
 def test_setup_needs_the_one_time_token(install: Install) -> None:
@@ -196,12 +196,14 @@ def test_setup_checks_the_password_and_email(install: Install) -> None:
 
 def test_state_changing_calls_need_the_csrf_token(install: Install) -> None:
     admin = set_up(install)
-    refused = admin.post("/api/minibrains", json={"name": "Triage"})
+    refused = admin.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"})
     assert refused.status_code == 403 and "CSRF" in refused.json()["detail"]
-    wrong = admin.post("/api/minibrains", json={"name": "Triage"}, headers={"X-CSRF-Token": "0" * 64})
+    wrong = admin.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers={"X-CSRF-Token": "0" * 64}
+    )
     assert wrong.status_code == 403
     assert admin.get("/api/minibrains").status_code == 200
-    created = admin.post("/api/minibrains", json={"name": "Triage"}, headers=csrf(admin))
+    created = admin.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(admin))
     assert created.status_code == 201
     assert admin.delete("/api/minibrains/triage", headers=csrf(admin)).status_code == 202
     [event] = install.events("model.delete")
@@ -214,7 +216,10 @@ def test_the_csrf_token_belongs_to_one_session(install: Install) -> None:
     other = install.browser()
     assert other.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
     assert csrf(other) != first
-    assert other.post("/api/minibrains", json={"name": "Triage"}, headers=first).status_code == 403
+    assert (
+        other.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=first).status_code
+        == 403
+    )
 
 
 def test_sign_in_and_out(install: Install) -> None:
@@ -378,7 +383,12 @@ def test_the_last_admin_stays(install: Install) -> None:
 def test_signed_in_people_are_recorded_on_reviews_and_keys(install: Install) -> None:
     admin = set_up(install)
     headers = csrf(admin)
-    assert admin.post("/api/minibrains", json={"name": "Triage"}, headers=headers).status_code == 201
+    assert (
+        admin.post(
+            "/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=headers
+        ).status_code
+        == 201
+    )
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}
     key = admin.post("/api/keys", json=body, headers=headers)
     assert key.status_code == 201
@@ -558,7 +568,9 @@ def test_harness_signs_in_as_an_admin(harness: Harness) -> None:
     assert (info["setup"], info["person"]["email"], info["person"]["role"]) == (False, ADMIN_EMAIL, "admin")
     viewer = harness.person(None)
     assert viewer.get("/api/minibrains").status_code == 403
-    assert harness.client.post("/api/minibrains", json={"name": "Triage"}).status_code == 201
+    assert (
+        harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Triage"}).status_code == 201
+    )
 
 
 def test_accounts_migration_round_trip(tmp_path: Path) -> None:

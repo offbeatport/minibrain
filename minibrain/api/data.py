@@ -87,9 +87,8 @@ from minibrain.data.sources import (
     assess,
     count_rows,
     describe,
+    example_rows,
     label_counts,
-    labelled_rows,
-    mapping_sql,
     output_columns,
     require_mapping,
     run_query,
@@ -97,13 +96,14 @@ from minibrain.data.sources import (
     summarize,
     to_text,
 )
+from minibrain.data.templates import Template, pair_template, template_sql
 from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import snapshot_location
 from minibrain.registry.models import AuditEvent, Dataset, Snapshot, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags
-from minibrain.tasks.classify import trained_messages
+from minibrain.tasks.examples import turns_of
 
 router = APIRouter(prefix="/api", tags=["data"])
 
@@ -251,7 +251,7 @@ def dataset_shape(
 
 def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) -> DatasetSummary:
     columns, rows, problem = dataset_shape(settings, store, dataset)
-    columns_mode = bool(dataset.input_column and dataset.label_column) or not dataset.sql
+    columns_mode = bool(dataset.template) or not dataset.sql
     latest = latest_of(dataset)
     changed = dataset_changes(settings, dataset, latest)
     session = object_session(dataset)
@@ -301,28 +301,35 @@ def check_mapping(tables: Sequence[Table], aliases: dict[str, str], sql: str) ->
     run_query(tables, sql, 1, aliases)
 
 
+def requested_template(body: MappingUpdate) -> Template | None:
+    if body.template is not None:
+        return dict(body.template)
+    if body.input_column and body.label_column:
+        return pair_template(body.input_column, body.label_column)
+    return None
+
+
 def apply_mapping(
     session: Session, settings: Settings, store: ArtifactStore, dataset: Dataset, body: MappingUpdate
 ) -> None:
+    template = requested_template(body)
     if body.sql is not None:
         sources = sources_in(session, body.sql, dataset.sources)
         check_mapping(tables_of(settings, store, sources), aliases_for(sources), body.sql)
         dataset.sql = body.sql
         dataset.sources = sources
         dataset.source = sources[0] if len(sources) == 1 else None
-        dataset.input_column = None
-        dataset.label_column = None
-    elif body.input_column and body.label_column:
+        dataset.template = None
+    elif template is not None:
         source = column_source(session, dataset, body)
-        sql = mapping_sql(body.input_column, body.label_column, source.table_name)
+        sql = template_sql(template, source.table_name)
         check_mapping([table_of(settings, store, source)], {}, sql)
         dataset.source = source
         dataset.sources = [source]
-        dataset.input_column = body.input_column
-        dataset.label_column = body.label_column
+        dataset.template = template
         dataset.sql = sql
     else:
-        raise ConflictError("send an input column and a label column, or SQL")
+        raise ConflictError("send an input column and a label column, a template, or SQL")
     dataset.updated_at = now()
 
 
@@ -331,17 +338,23 @@ def query_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None
     return QueryResponse(columns=result.columns, rows=[[to_text(value) for value in row] for row in result.rows])
 
 
+def chat_example(messages: str | None, expected: str | None) -> list[ChatMessage]:
+    turns = turns_of(messages) or ()
+    found = [ChatMessage(role=turn.role, content=turn.content) for turn in turns]
+    return [*found, ChatMessage(role="assistant", content=expected)] if found and expected else found
+
+
 def preview_of(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> PreviewResponse:
     quality = assess(tables, sql, aliases)
-    rows = labelled_rows(tables, sql, aliases, PREVIEW_ROWS)
+    rows = example_rows(tables, sql, aliases, PREVIEW_ROWS)
     counts = label_counts(tables, sql, LABEL_COUNTS, aliases)
-    first = next((text for text, label in rows if text and label), "")
+    first = next(((messages, expected) for messages, text, expected in rows if text and expected), (None, None))
     return PreviewResponse(
-        rows=[PreviewRow(input=text, label=label) for text, label in rows],
+        rows=[PreviewRow(input=text, label=expected) for _, text, expected in rows],
         quality=QualityInfo.model_validate(quality, from_attributes=True),
         labels=sorted(label for label, _ in counts),
         label_counts=[LabelCount(label=label, rows=size) for label, size in counts],
-        example=[ChatMessage.model_validate(message) for message in trained_messages(first)],
+        example=chat_example(*first),
     )
 
 
@@ -500,9 +513,13 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     require_free_dataset_name(session, body.name, folder)
     dataset = add_dataset(session, settings, store, body.name, source, folder)
     mapping = MappingUpdate(
-        source_id=body.source_id, input_column=body.input_column, label_column=body.label_column, sql=body.sql
+        source_id=body.source_id,
+        input_column=body.input_column,
+        label_column=body.label_column,
+        template=body.template,
+        sql=body.sql,
     )
-    if mapping.sql is not None or (mapping.input_column and mapping.label_column):
+    if mapping.sql is not None or requested_template(mapping) is not None:
         apply_mapping(session, settings, store, dataset, mapping)
     version_if_mapped(session, settings, dataset)
     session.commit()

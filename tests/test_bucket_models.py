@@ -207,7 +207,8 @@ def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness
     assert harness.worker(kinds=["import"]).run_once()
     imported = harness.client.get(f"/api/models/base/{base['key']}").json()
     assert imported["store"] == "s3" and not Path(imported["storage_path"]).exists()
-    assert harness.client.post("/api/minibrains", json={"name": "On FP8", "base_model": base["key"]}).status_code == 201
+    body = {"name": "On FP8", "labels": ["billing", "bug"], "base_model": base["key"]}
+    assert harness.client.post("/api/minibrains", json=body).status_code == 201
     trained = harness.client.post("/api/minibrains/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
     assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]

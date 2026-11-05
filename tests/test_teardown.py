@@ -99,7 +99,9 @@ def add_base(harness: Harness, key: str = BASE, name: str = "Tiny") -> Path:
 
 
 def add_custom(harness: Harness, name: str, trained: bool = False) -> str:
-    slug = harness.client.post("/api/minibrains", json={"name": name, "base_model": BASE}).json()["slug"]
+    slug = harness.client.post(
+        "/api/minibrains", json={"labels": ["billing", "bug"], "name": name, "base_model": BASE}
+    ).json()["slug"]
     if trained:
         give_data(harness, slug)
         assert harness.client.post(f"/api/minibrains/{slug}/snapshots").status_code == 201
@@ -115,7 +117,7 @@ def trained_and_live(harness: Harness) -> None:
     add_version(harness, "lora")
     finish(harness, "train")
     finish(harness, "eval", accuracy=0.9)
-    deploy(harness, 0)
+    deploy(harness, 1)
 
 
 def row(harness: Harness, key: str, kind: str = "custom") -> dict[str, Any] | None:
@@ -183,7 +185,7 @@ def test_deleting_a_model_shows_deleting_until_its_files_and_records_are_gone(ha
     [begun] = events(harness, "model.delete")
     [done] = events(harness, "model.delete_finished")
     assert (begun.actor, done.actor, done.target, done.detail["outcome"]) == (ADMIN_EMAIL, ADMIN_EMAIL, SLUG, "done")
-    assert done.detail["removed"]["versions"] == 1 and done.detail["removed"]["artifacts"] == len(adapters)
+    assert done.detail["removed"]["versions"] == 2 and done.detail["removed"]["artifacts"] == len(adapters)
 
 
 def test_a_live_model_is_deleted_only_with_undeploy_and_stops_first(harness: Harness) -> None:
@@ -200,9 +202,9 @@ def test_a_live_model_is_deleted_only_with_undeploy_and_stops_first(harness: Har
 def test_undeploy_shows_stopping_until_every_gateway_and_engine_confirms(harness: Harness) -> None:
     trained_and_live(harness)
     register_engine(harness, "qwen3-0.6b")
-    report_gateway(harness, [SLUG, f"{SLUG}@0"])
+    report_gateway(harness, [SLUG, f"{SLUG}@1"])
     engines = FakeEngines(
-        drained(in_flight=2, total=2, loaded=[f"{SLUG}-v0"]), drained(loaded=[f"{SLUG}-v0"]), drained()
+        drained(in_flight=2, total=2, loaded=[f"{SLUG}-v1"]), drained(loaded=[f"{SLUG}-v1"]), drained()
     )
     harness.app.state.teardowns.http = engines
     stopped = harness.client.post(f"/api/minibrains/{SLUG}/deploy", json={"deployed": False})
@@ -214,15 +216,15 @@ def test_undeploy_shows_stopping_until_every_gateway_and_engine_confirms(harness
         f"the gateway on edge-1 to stop routing {SLUG}",
         "the engine on gpu-1 to finish 2 requests in flight",
     ]
-    report_gateway(harness, [f"{SLUG}@0"])
+    report_gateway(harness, [f"{SLUG}@1"])
     harness.app.state.teardowns.run_once()
-    assert shown(harness, SLUG)["teardown"]["waiting"] == [f"the engine on gpu-1 to unload {SLUG}-v0"]
+    assert shown(harness, SLUG)["teardown"]["waiting"] == [f"the engine on gpu-1 to unload {SLUG}-v1"]
     harness.app.state.teardowns.run_once()
     found = shown(harness, SLUG)
     assert found["teardown"] is None and found["deployment"]["state"] == "not_deployed"
-    assert engines.calls[0] == ("http://gpu-1:8300/drain", {"routes": [SLUG], "adapters": [f"{SLUG}-v0"]})
+    assert engines.calls[0] == ("http://gpu-1:8300/drain", {"routes": [SLUG], "adapters": [f"{SLUG}-v1"]})
     [done] = events(harness, "model.undeploy_finished")
-    assert done.detail["outcome"] == "done" and done.detail["stopped"]["adapters"] == [f"{SLUG}-v0"]
+    assert done.detail["outcome"] == "done" and done.detail["stopped"]["adapters"] == [f"{SLUG}-v1"]
 
 
 def test_a_stop_that_is_never_confirmed_fails_with_the_reason_and_retries(harness: Harness) -> None:

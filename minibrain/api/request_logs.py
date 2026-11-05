@@ -41,6 +41,7 @@ class RequestRow(BaseModel):
     model_name: str
     custom: bool
     version: int | None
+    contract: int | None = None
     key_id: int | None
     key_name: str | None
     status: int
@@ -270,6 +271,7 @@ def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
                 model_name=model_name,
                 custom=custom,
                 version=log.version,
+                contract=log.contract,
                 key_id=log.key_id,
                 key_name=key_name,
                 status=log.status,

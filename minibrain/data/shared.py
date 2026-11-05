@@ -36,10 +36,17 @@ from minibrain.data.sources import (
     SourceError,
     Table,
     describe,
-    mapping_sql,
     stage,
     statement_tables,
     table_name_base,
+)
+from minibrain.data.templates import (
+    MESSAGES,
+    Template,
+    chat_template,
+    missing_columns,
+    pair_template,
+    template_sql,
 )
 from minibrain.registry.files import ArtifactKind, register
 from minibrain.registry.models import Artifact, Dataset, DatasetFolder, Minibrain, Snapshot, Source, Version, now
@@ -396,15 +403,27 @@ def free_slug(session: Session, name: str) -> str:
     return next(candidate for candidate in candidates if candidate not in taken)
 
 
-def map_columns(settings: Settings, store: ArtifactStore, dataset: Dataset, source: Source) -> None:
-    columns = source_columns(settings, store, source)
+def guessed_template(columns: list[str]) -> Template | None:
+    if MESSAGES in columns:
+        return chat_template()
     input_column, label_column = guess(columns, INPUT_NAMES), guess(columns, LABEL_NAMES)
+    return pair_template(input_column, label_column) if input_column and label_column else None
+
+
+def apply_template(dataset: Dataset, source: Source, template: Template | None) -> None:
     dataset.source = source
     dataset.sources = [source]
-    dataset.input_column = input_column
-    dataset.label_column = label_column
-    dataset.sql = mapping_sql(input_column, label_column, source.table_name) if input_column and label_column else None
+    dataset.template = template
+    dataset.sql = template_sql(template, source.table_name) if template else None
     dataset.updated_at = now()
+
+
+def map_columns(
+    settings: Settings, store: ArtifactStore, dataset: Dataset, source: Source, template: Template | None = None
+) -> None:
+    columns = source_columns(settings, store, source)
+    chosen = template if template and not missing_columns(template, columns) else guessed_template(columns)
+    apply_template(dataset, source, chosen)
 
 
 def add_dataset(
@@ -414,12 +433,13 @@ def add_dataset(
     name: str,
     source: Source | None,
     folder: DatasetFolder | None = None,
+    template: Template | None = None,
 ) -> Dataset:
     dataset = Dataset(slug=free_slug(session, name), name=name, folder_id=folder.id if folder is not None else None)
     session.add(dataset)
     session.flush()
     if source is not None:
-        map_columns(settings, store, dataset, source)
+        map_columns(settings, store, dataset, source, template)
     return dataset
 
 
@@ -459,7 +479,7 @@ def dataset_of(minibrain: Minibrain) -> Dataset:
 
 def dataset_sql(dataset: Dataset) -> str:
     if not dataset.sql:
-        raise ConflictError("map an input column and a label column first")
+        raise ConflictError("map an input column and a label column, or a messages column, first")
     return dataset.sql
 
 

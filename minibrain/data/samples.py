@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
-from minibrain.data.shared import Added, NameTaken, Outcome, add_source
-from minibrain.registry.service import NotFoundError
-from minibrain.settings import sample_file
+from minibrain.data.dataset_folders import free_dataset_name
+from minibrain.data.shared import Added, NameTaken, Outcome, add_dataset, add_source
+from minibrain.data.snapshots import take_version
+from minibrain.presets.recipes import Recipe
+from minibrain.registry.models import Dataset, Source
+from minibrain.registry.service import NotFoundError, latest_version
+from minibrain.settings import Settings, sample_file
 
 SAMPLE_TAG = "minibrain:sample"
 
@@ -67,3 +72,25 @@ def add_sample(session: Session, store: ArtifactStore, file: str, name_taken: Na
         added.source.description = f"Sample: {sample.description} {sample.credit}"
         added.source.tags = [SAMPLE_TAG]
     return added
+
+
+def recipe_dataset(session: Session, source: Source, recipe: Recipe) -> Dataset | None:
+    found = session.scalars(select(Dataset).where(Dataset.source_id == source.id))
+    return next((dataset for dataset in found if dataset.template == recipe.mapping), None)
+
+
+def load_recipe_sample(session: Session, settings: Settings, store: ArtifactStore, recipe: Recipe) -> Dataset:
+    with recipe.data_path().open("rb") as stream:
+        added = add_source(session, store, recipe.data, stream)
+    source = added.source
+    if added.outcome == Outcome.CREATED:
+        source.description = f"Sample for the {recipe.name} recipe: synthetic data, no real customers."
+        source.tags = [SAMPLE_TAG]
+    dataset = recipe_dataset(session, source, recipe)
+    if dataset is None:
+        name = free_dataset_name(session, f"{recipe.name} sample", None)
+        dataset = add_dataset(session, settings, store, name, source, template=dict(recipe.mapping))
+        dataset.description = recipe.summary or None
+    if latest_version(dataset) is None:
+        take_version(session, settings, dataset)
+    return dataset

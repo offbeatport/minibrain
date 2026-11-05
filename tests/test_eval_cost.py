@@ -13,8 +13,10 @@ from minibrain.ml.context import JobSpec
 from minibrain.registry.files import materialize, store_for
 from minibrain.registry.models import AuditEvent, Snapshot
 from minibrain.registry.prices import DevicePrices, eval_cost
-from tests.conftest import LABELS, Harness, fake_adapter
-from tests.test_flow import SLUG, create_with_dataset
+from minibrain.tasks.contracts import label_set
+from minibrain.tasks.prompting import Prompting
+from tests.conftest import LABELS, Harness, fake_adapter, scored_answers
+from tests.test_flow import SLUG, create_on_data, create_with_dataset
 
 BATCH_SECONDS = 0.4
 VERSIONS = f"/api/minibrains/{SLUG}/versions"
@@ -70,29 +72,29 @@ def measured(device_seconds: float, requests: int = 30, pool: str = "local", dev
 
 
 def result(accuracy: float, device_seconds: float, p50: float) -> dict[str, Any]:
-    split = {"examples": 30, "accuracy": accuracy, "macro_f1": accuracy, "invalid_rate": 0.0}
     return {
+        "accuracy": accuracy,
         "metrics": {
-            "eval": split,
-            "golden": split | {"examples": 20},
             "latency": {"p50_ms": p50, "p95_ms": p50 * 2},
             "prompt_tokens": 80,
             "device": "cuda",
             "cost": measured(device_seconds),
-        }
+        },
     }
 
 
 def complete(harness: Harness, kind: str, body: dict[str, Any], outputs: dict[str, str] | None = None) -> None:
     claim = harness.claim([kind])
     assert claim is not None, f"no {kind} job queued"
+    if "accuracy" in body:
+        answers = scored_answers(harness, claim["job_id"], body["accuracy"])
+        body = {"metrics": body["metrics"], "answers": answers}
     payload = {"token": claim["token"], "result": body, "outputs": outputs or {}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", payload).status_code == 204
 
 
 def two_versions(harness: Harness) -> None:
-    create_with_dataset(harness)
-    assert harness.client.post(VERSIONS, json={"kind": "prompt"}).status_code == 201
+    create_on_data(harness)
     complete(harness, "eval", result(accuracy=0.54, device_seconds=6.0, p50=120.0))
     assert harness.client.post(VERSIONS, json={"kind": "lora", "max_rows": 120}).status_code == 201
     adapter = harness.upload(fake_adapter(), "adapter", "tar", "adapter")
@@ -111,13 +113,18 @@ def test_eval_times_the_device_per_batch_of_held_out_rows(
         return runtimes[-1]
 
     monkeypatch.setattr(evaluate, "Runtime", runtime)
+    prompting = Prompting("Pick a label.", label_set(sorted(LABELS))).as_dict()
     raw = {"snapshot": str(path), "version_kind": "prompt", "slug": SLUG, "number": 0, "base_model": "qwen3-0.6b"}
+    raw |= {"prompting": prompting, "answer_tokens": 24}
     spec = JobSpec(raw=raw | {"pool": "gpu-a"}, result_path=tmp_path / "result.json")
     evaluate.main(spec)
-    metrics = json.loads(spec.result_path.read_text())["metrics"]
+    written = json.loads(spec.result_path.read_text())
+    metrics = written["metrics"]
     assert runtimes[0].batches == [1] + [1] * 20 + [8, 8, 8, 6]
     assert set(runtimes[0].choices) == {tuple(sorted(LABELS))}
-    assert metrics["decoding"] == "labels"
+    assert metrics["decoding"] == "constrained"
+    assert [len(written["answers"][name]) for name in ("golden", "eval")] == [20, 30]
+    assert "eval" not in metrics
     cost = metrics["cost"]
     assert cost | {"device_name": None, "prompt_tokens": None} == {
         "source": "device_time",

@@ -2,20 +2,25 @@ import hashlib
 import json
 from typing import Any
 
-from minibrain.data.snapshot import Example
-from minibrain.tasks.classify import score
-from tests.conftest import LABELS, Harness, fake_adapter
-from tests.test_flow import SLUG, create_with_dataset
+from minibrain.tasks.contracts import label_set
+from minibrain.tasks.examples import Example, single
+from minibrain.tasks.graders import LabelAccuracy, grade
+from tests.conftest import LABELS, Harness, fake_adapter, scored_answers
+from tests.test_flow import SLUG, TIMING, create_on_data, store_metrics
 
 CARD = f"/api/minibrains/{SLUG}/versions"
 
 
 def examples(count: int) -> list[Example]:
-    return [Example(input=f"held out {index}", label=LABELS[index % 4]) for index in range(count)]
+    return [single(f"held out {index}", LABELS[index % 4]) for index in range(count)]
+
+
+def score(rows: list[Example], outputs: list[str]) -> dict[str, Any]:
+    return grade([LabelAccuracy(LABELS)], label_set(LABELS), rows, outputs)
 
 
 def answers(rows: list[Example], wrong: int) -> list[str]:
-    outputs = [row.label for row in rows]
+    outputs = [row.expected for row in rows]
     for index in range(wrong):
         outputs[index * 4] = "bug" if index % 3 else "not a label"
     return outputs
@@ -25,8 +30,8 @@ def metrics(wrong: int) -> dict[str, Any]:
     held = examples(30)
     golden = examples(20)
     return {
-        "golden": score(golden, answers(golden, wrong // 2), LABELS),
-        "eval": score(held, answers(held, wrong), LABELS),
+        "golden": score(golden, answers(golden, wrong // 2)),
+        "eval": score(held, answers(held, wrong)),
         "latency": {"p50_ms": 41.25, "p95_ms": 80.5},
         "prompt_tokens": 48,
         "device": "cpu",
@@ -36,14 +41,20 @@ def metrics(wrong: int) -> dict[str, Any]:
 def complete(harness: Harness, kind: str, result: dict[str, Any], outputs: dict[str, str] | None = None) -> None:
     claim = harness.claim([kind])
     assert claim is not None, f"no {kind} job queued"
+    if kind == "eval":
+        result = {"metrics": TIMING, "answers": scored_answers(harness, claim["job_id"], 1.0)}
     body = {"token": claim["token"], "result": result, "outputs": outputs or {}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
 
 
+def scored(harness: Harness, number: int, wrong: int) -> None:
+    complete(harness, "eval", {})
+    store_metrics(harness, SLUG, number, metrics(wrong))
+
+
 def trained_card(harness: Harness) -> dict[str, Any]:
-    create_with_dataset(harness)
-    assert harness.client.post(CARD, json={"kind": "prompt"}).status_code == 201
-    complete(harness, "eval", {"metrics": metrics(wrong=6)})
+    create_on_data(harness)
+    scored(harness, 0, wrong=6)
     assert harness.client.post(f"{CARD}/0/promote").status_code == 200
     assert harness.client.post(CARD, json={"kind": "lora", "max_rows": 120, "epochs": 2}).status_code == 201
     summary = {"max_rows": 120, "epochs": 2.0, "rank": 16, "alpha": 32, "learning_rate": 2e-4, "micro_batch": 8}
@@ -51,7 +62,7 @@ def trained_card(harness: Harness) -> dict[str, Any]:
     summary |= {"device": "cpu", "examples": 120, "train_seconds": 9.5, "train_loss": 0.43219}
     adapter = harness.upload(fake_adapter(), "adapter", "tar", "adapter")
     complete(harness, "train", {"summary": summary}, {"adapter": adapter})
-    complete(harness, "eval", {"metrics": metrics(wrong=5)})
+    scored(harness, 1, wrong=5)
     assert harness.client.post(f"{CARD}/1/promote").status_code == 200
     response = harness.client.get(f"{CARD}/1/card")
     assert response.status_code == 200, response.text

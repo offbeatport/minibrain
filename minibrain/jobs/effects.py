@@ -1,24 +1,31 @@
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.jobs.queue import enqueue
-from minibrain.jobs.specs import eval_params
+from minibrain.jobs.specs import eval_params, judge_params
 from minibrain.models.catalog import apply_sync
 from minibrain.models.copies import FOLDER
 from minibrain.models.health import apply_check, apply_repair, set_health
 from minibrain.models.registry import apply_catalogue
-from minibrain.registry.files import MissingArtifactError
+from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import (
     CatalogModel,
     CatalogVariant,
     Job,
     JobKind,
     JobStatus,
+    JudgeScore,
+    Minibrain,
     Model,
     ModelStatus,
+    Version,
+    VersionKind,
     VersionStatus,
     now,
 )
 from minibrain.settings import Settings
+from minibrain.tasks.judge import judge_of, pending_items
+from minibrain.tasks.service import graded, graders_of, judge_keys, judge_scores, split_examples
 
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
@@ -36,7 +43,9 @@ class DomainEffects:
         if job.kind == JobKind.TRAIN:
             self.trained(session, job)
         elif job.kind == JobKind.EVAL:
-            self.evaluated(job)
+            self.evaluated(session, job)
+        elif job.kind == JobKind.JUDGE:
+            self.judged(session, job)
         elif job.kind in TRANSFERS:
             self.transferred(session, job)
         elif job.kind == JobKind.CATALOG_SYNC:
@@ -49,6 +58,8 @@ class DomainEffects:
     def on_failure(self, session: Session, job: Job) -> None:
         if job.version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
             job.version.status = VersionStatus.FAILED
+        if job.version is not None and job.kind == JobKind.JUDGE:
+            job.version.status = VersionStatus.READY
         model = session.get(Model, job.model_id) if job.model_id else None
         if model is not None and job.kind in TRANSFERS:
             model.status = ModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else ModelStatus.FAILED
@@ -68,7 +79,7 @@ class DomainEffects:
             return
         if job.kind == JobKind.TRAIN:
             job.version.status = VersionStatus.TRAINING
-        elif job.kind == JobKind.EVAL:
+        elif job.kind in (JobKind.EVAL, JobKind.JUDGE):
             job.version.status = VersionStatus.EVALUATING
 
     def transferred(self, session: Session, job: Job) -> None:
@@ -91,6 +102,27 @@ class DomainEffects:
         model.last_used_at = now()
         forget_removal(model)
         set_health(model, None)
+        self.score_waiting(session, model.id)
+
+    def score_waiting(self, session: Session, base: str) -> None:
+        waiting = session.scalars(
+            select(Version)
+            .join(Minibrain)
+            .where(
+                Minibrain.base_model == base,
+                Version.kind == VersionKind.PROMPT,
+                Version.status == VersionStatus.READY,
+                Version.metrics.is_(None),
+                Version.snapshot_id.is_not(None),
+            )
+        )
+        for version in waiting:
+            if version.snapshot is None or not version.snapshot.counts:
+                continue
+            version.status = VersionStatus.EVALUATING
+            session.flush()
+            params = eval_params(session, self.settings, version)
+            enqueue(session, JobKind.EVAL, params, version.minibrain_id, version.id, f"eval:{version.id}")
 
     def verified(self, session: Session, job: Job) -> None:
         model = session.get(Model, job.model_id) if job.model_id else None
@@ -131,9 +163,39 @@ class DomainEffects:
             idempotency_key=f"eval:{version.id}",
         )
 
-    def evaluated(self, job: Job) -> None:
+    def evaluated(self, session: Session, job: Job) -> None:
         version = job.version
         if version is None:
             return
-        version.metrics = dict((job.result or {}).get("metrics", {}))
+        result = job.result or {}
+        answers = result.get("answers") or {}
+        store = store_for(self.settings)
+        version.metrics = dict(result.get("metrics", {})) | graded(session, store, version, answers)
+        examples = split_examples(session, store, version)
+        judge = judge_of(graders_of(version, judge_scores(session, judge_keys(version, examples, answers))))
+        items = [
+            item
+            for name, rows in examples.items()
+            for item in (pending_items(judge, rows, answers.get(name, [])) if judge is not None else [])
+        ]
+        if judge is None or not items:
+            version.status = VersionStatus.READY
+            return
+        unique = list({item.key: item for item in items}.values())
+        params = judge_params(session, self.settings, version, judge, unique) | {"eval_job": job.id}
+        enqueue(session, JobKind.JUDGE, params, version.minibrain_id, version.id, f"judge:{version.id}:{job.id}")
+
+    def judged(self, session: Session, job: Job) -> None:
+        version = job.version
+        scores = dict((job.result or {}).get("scores") or {})
+        for key, value in scores.items():
+            if session.get(JudgeScore, key) is None:
+                judge, revision = str(job.params.get("judge")), str(job.params.get("judge_version") or "")
+                session.add(JudgeScore(key=key, score=float(value), judge=judge, judge_version=revision))
+        session.flush()
+        source = session.get(Job, job.params.get("eval_job"))
+        if version is None or source is None:
+            return
+        answers = (source.result or {}).get("answers") or {}
+        version.metrics = dict(version.metrics or {}) | graded(session, store_for(self.settings), version, answers)
         version.status = VersionStatus.READY

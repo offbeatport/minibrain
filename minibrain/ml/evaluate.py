@@ -1,8 +1,9 @@
 import statistics
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from minibrain.data.snapshot import Example, read_labels, read_split
+from minibrain.data.snapshot import read_split
 from minibrain.ml.completion import Completion
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import device_name
@@ -10,10 +11,11 @@ from minibrain.ml.runtime import Runtime
 from minibrain.registry.models import VersionKind
 from minibrain.registry.prices import DEVICE_TIME
 from minibrain.registry.service import adapter_name
-from minibrain.tasks.classify import build_messages, latency, score
+from minibrain.tasks.examples import Example
+from minibrain.tasks.prompting import Prompting
 
 BATCH_SIZE = 8
-MAX_NEW_TOKENS = 24
+ANSWER_TOKENS = 24
 REPORT_EVERY = 40
 
 
@@ -26,6 +28,17 @@ class Pass:
 
 def mean_of(values: list[int]) -> float:
     return statistics.mean(values) if values else 0.0
+
+
+def latency(seconds: Sequence[float]) -> dict[str, float]:
+    milliseconds = [value * 1000 for value in seconds]
+    if len(milliseconds) < 2:
+        value = milliseconds[0] if milliseconds else 0.0
+        return {"p50_ms": value, "p95_ms": value}
+    return {
+        "p50_ms": statistics.median(milliseconds),
+        "p95_ms": statistics.quantiles(milliseconds, n=20, method="inclusive")[-1],
+    }
 
 
 def measured_cost(run: Pass, device: str, name: str, pool: str | None) -> dict[str, Any]:
@@ -46,9 +59,10 @@ class Evaluation:
     def __init__(self, spec: JobSpec, runtime: Runtime, total: int) -> None:
         self.spec = spec
         self.runtime = runtime
-        self.snapshot = spec.path("snapshot")
-        self.labels = read_labels(self.snapshot)
-        self.shots = read_split(self.snapshot, "shots")
+        self.prompting = Prompting.from_dict(spec.raw["prompting"])
+        constraint = self.prompting.constraint()
+        self.choices = constraint.options() if constraint is not None else ()
+        self.max_tokens = int(spec.raw.get("answer_tokens") or ANSWER_TOKENS)
         self.total = max(total, 1)
         self.done = 0
         self.adapter: str | None = None
@@ -58,22 +72,22 @@ class Evaluation:
             runtime.ensure_adapter(self.adapter, adapter_dir)
 
     def prompts(self, examples: list[Example]) -> list[str]:
-        kind = self.spec.raw["version_kind"]
-        return [self.runtime.render(build_messages(kind, e.input, self.labels, self.shots)) for e in examples]
+        return [self.runtime.render(self.prompting.messages(example.messages())) for example in examples]
 
     def advance(self, count: int) -> None:
         self.done += count
         if self.done % REPORT_EVERY < count or self.done == self.total:
             report(self.done / self.total, evaluated=self.done, of=self.total)
 
+    def generate(self, prompts: list[str]) -> list[Completion]:
+        return self.runtime.generate(prompts, self.adapter, self.max_tokens, self.choices)
+
     def run(self, examples: list[Example], batch_size: int) -> Pass:
         prompts = self.prompts(examples)
         completions: list[Completion] = []
         seconds = 0.0
         for start in range(0, len(prompts), batch_size):
-            batch = self.runtime.generate(
-                prompts[start : start + batch_size], self.adapter, MAX_NEW_TOKENS, self.labels
-            )
+            batch = self.generate(prompts[start : start + batch_size])
             completions += batch
             seconds += max((c.seconds for c in batch), default=0.0)
             self.advance(len(batch))
@@ -86,21 +100,19 @@ def main(spec: JobSpec) -> None:
     held_out = read_split(snapshot, "eval")
     runtime = Runtime(spec.base)
     evaluation = Evaluation(spec, runtime, len(golden) + len(held_out))
-    runtime.generate(evaluation.prompts(golden[:1]), evaluation.adapter, MAX_NEW_TOKENS, evaluation.labels)
+    evaluation.generate(evaluation.prompts(golden[:1]))
     golden_pass = evaluation.run(golden, batch_size=1)
     eval_pass = evaluation.run(held_out, batch_size=BATCH_SIZE)
-    labels = evaluation.labels
     golden_completions = golden_pass.completions
     metrics = {
-        "golden": score(golden, [c.text for c in golden_completions], labels),
-        "eval": score(held_out, [c.text for c in eval_pass.completions], labels),
         "latency": latency([c.seconds for c in golden_completions]),
         "prompt_tokens": mean_of([c.prompt_tokens for c in golden_completions]),
         "device": runtime.device,
-        "decoding": "labels",
+        "decoding": "constrained" if evaluation.choices else "free",
         "cost": measured_cost(eval_pass, runtime.device, device_name(runtime.device), spec.raw.get("pool")),
     }
-    write_result(spec, {"metrics": metrics})
+    answers = {"golden": [c.text for c in golden_completions], "eval": [c.text for c in eval_pass.completions]}
+    write_result(spec, {"metrics": metrics, "answers": answers})
     report(1.0, latency=metrics["latency"], prompt_tokens=metrics["prompt_tokens"], device=metrics["device"])
 
 
