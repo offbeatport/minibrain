@@ -25,6 +25,7 @@ import {
 import { useState } from "react";
 import type { CatalogEntry, CatalogResponse, ModelRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { discoverListHref } from "~/lib/modelsSearch";
 import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
 import { discoverHref } from "./Discover";
 import { TIERS } from "./DiscoverFilters";
@@ -439,8 +440,17 @@ export function BasePicker({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <Trigger value={value} />
             <DialogContent className="flex h-[min(46rem,calc(100%-2rem))] flex-col sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>Choose a base model</DialogTitle>
+                <DialogHeader className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-9">
+                    <DialogTitle className="pr-0">Choose a base model</DialogTitle>
+                    <a
+                        href={discoverListHref()}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        Explore in Discover
+                        <ExternalLink aria-hidden="true" className="size-3.5" />
+                    </a>
                 </DialogHeader>
                 <TabbedSearchList
                     tabs={tabs}
