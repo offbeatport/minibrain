@@ -50,6 +50,7 @@ export const SOURCE_CHOICES: { group: SourceGroupId; label: string; detail: stri
 
 export type SourceAdder = {
     choose: () => void;
+    drop: (files: File[]) => void;
     addSample: (file: string) => void;
     pending: "upload" | "sample" | null;
     error: unknown;
@@ -195,15 +196,18 @@ export function useSourceAdder(onAdded: (source: SourceAdded) => void): SourceAd
             unwrap(api.POST("/api/samples/{file}", { params: { path: { file } } })),
         onSuccess: added,
     });
-    const choose = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
+    const send = (file: File | undefined) => {
+        if (file && !upload.isPending) {
             upload.mutate({ file, nameTaken: "fail" });
         }
+    };
+    const choose = (event: ChangeEvent<HTMLInputElement>) => {
+        send(event.target.files?.[0]);
         event.target.value = "";
     };
     return {
         choose: () => input.current?.click(),
+        drop: (files) => send(files[0]),
         addSample: (file) => sample.mutate(file),
         pending: upload.isPending ? "upload" : sample.isPending ? "sample" : null,
         error: (question ? null : upload.error) ?? sample.error,

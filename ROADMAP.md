@@ -956,7 +956,9 @@ keys, and `/v1` stays key-only.
   Lakehouse), shown only once it has a source; an empty Sources points to Add source, and a link to an empty group
   opens Sources. Lakehouse holds Iceberg and Delta Lake tables, each with its format's `FileTypeIcon` and a format
   badge (`group:iceberg` links open it). One "Add source" menu: Upload a file, Connect a folder, S3 path, Database
-  table or query, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format first), and the samples. A source
+  table or query, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format first), and the samples. Uploads
+  also takes a file dropped on it (the kit's `DropZone`, with Choose a file for keyboard and click), through the same
+  checks as the button: the same content opens the existing source, a taken name asks Replace or Keep both. A source
   shows its table name, columns, stats, first rows and the datasets that read it; a folder also shows its file count,
   size and last change; a connected source shows its connection, path, table or query, and
   how its changes are tracked.
@@ -1429,6 +1431,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Add model offered six tasks but only Classify works: the others are listed under Coming and cannot be picked.
   "Preview of 5–10 examples" is unticked (the preview is a table of rows, not chat transcripts) and "Eval vs base" says
   what it is (a prompt-only version on the base; no teacher yet).
+- [x] Data → Uploads takes a dropped file: obp-ui's `DropZone` (dashed 1px edge, a quiet solid edge and fill while
+  dragging, a Choose a file button), through the same duplicate and Replace / Keep both flow as the upload button.
 
 ## Risks to verify early
 

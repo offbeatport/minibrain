@@ -14,6 +14,7 @@ import {
 import {
     Badge,
     Button,
+    DropZone,
     DropdownMenuItem,
     DropdownMenuSeparator,
     EmptyState,
@@ -44,6 +45,7 @@ import { type DatasetFolder, useDatasetFolders, useFolderRoots } from "~/api/dat
 import { useDatasets, useSources } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
+import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import {
@@ -319,23 +321,20 @@ function GroupDetail({
                     value={bytes(members.reduce((sum, source) => sum + source.size, 0))}
                 />
             </div>
-            {members.length === 0 ? (
-                <EmptyState
-                    variant="panel"
-                    title="No files yet"
-                    className="mx-0 mt-0"
-                    action={
-                        <div className="mt-3 flex justify-center">
-                            <AddSourceMenu adder={adder} onAdd={onAdd} />
-                        </div>
-                    }
-                >
-                    Upload a CSV, TSV, JSON or Parquet file, or add one of the samples. Then make a
-                    dataset from it under Datasets.
-                </EmptyState>
-            ) : (
-                table
-            )}
+            <DropZone
+                accept={DATA_FILE_TYPES}
+                disabled={adder.pending !== null}
+                title={adder.pending === "upload" ? "Uploading…" : "Drop a data file here"}
+                activeTitle="Drop to upload"
+                description={
+                    members.length === 0
+                        ? "CSV, TSV, JSON, JSON Lines or Parquet. Then make a dataset from it under Datasets, or start from a sample in Add source."
+                        : "CSV, TSV, JSON, JSON Lines or Parquet. A file already uploaded is not stored twice."
+                }
+                inputLabel="Data file to upload"
+                onFiles={adder.drop}
+            />
+            {table}
         </div>
     );
 }

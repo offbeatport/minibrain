@@ -6,7 +6,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Data
 - **Upload sources** · shipped · product, ml
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
-  UI: Data › Add source › Upload a file · API: POST /api/sources
+  UI: Data › Add source › Upload a file, Data › Uploads › drop a file · API: POST /api/sources
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.
   UI: Data › Add source › Upload a file · API: POST /api/sources, POST /api/samples/{file}
