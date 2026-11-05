@@ -433,8 +433,10 @@ old provider stay readable as long as its settings stay in place.
 | Encrypt older files | `minibrain keys encrypt-existing` | Encrypt existing files | Encrypts files written before encryption at rest, in place |
 
 - Re-wrapping rewrites only the header: unwrap with the old key, wrap with the new one, write the free slot, sync,
-  then clear the old slot. File bodies are never re-encrypted. Bucket objects are uploaded again with the new header
-  and the same body. Secrets are resealed in the same pass.
+  then clear the old slot. File bodies are never re-encrypted. A bucket object is rewritten in the bucket: a multipart
+  upload whose first part is the new header and the object's first 5 MiB, and whose other parts the bucket copies from
+  the old object (`UploadPartCopy`, pinned to its ETag), so only 5 MiB leave main however large the file; an object
+  under 5 MiB is sent again whole. Secrets are resealed in the same pass.
 - Older local key versions stay readable until a pass finds nothing uses them and the new key is at least an hour
   old; the leader runs that check on its own and then drops them from the key file (`--retire-now` skips the wait
   when no server is running). Vault, HSM and KMS keep their versions: retire them there.

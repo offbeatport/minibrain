@@ -145,21 +145,19 @@ def visit_remote(store: ArtifactStore, artifact_id: str, keys: Keys, plan: Plan,
     try:
         head = remote.head(artifact_id)
         state = state_of(head, keys)
-        work = (not state.sealed and plan.encrypt) or (state.sealed and not state.current and plan.rewrap)
-        if work and sealing:
+        if state.sealed and not state.current and plan.rewrap and sealing:
+            fresh = rewrap_head(head, keys, context)
+            if fresh is not None:
+                remote.rewrite_head(artifact_id, fresh)
+            tally.rewrapped += 1
+            state = state_of(remote.head(artifact_id), keys)
+        elif not state.sealed and plan.encrypt and sealing:
             store.cache.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(dir=store.cache, prefix=".rekey-") as scratch:
                 local = Path(scratch) / artifact_id
                 remote.download(artifact_id, local)
-                if state.sealed:
-                    fresh = rewrap_head(head_of(local), keys, context)
-                    if fresh is not None:
-                        with local.open("r+b") as handle:
-                            handle.write(fresh)
-                    tally.rewrapped += 1
-                else:
-                    encrypt_in_place(local, keys, context, artifact_id)
-                    tally.encrypted += 1
+                encrypt_in_place(local, keys, context, artifact_id)
+                tally.encrypted += 1
                 remote.replace(local, artifact_id)
             state = state_of(remote.head(artifact_id), keys)
         tally.seen(state)

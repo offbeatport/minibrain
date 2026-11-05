@@ -16,6 +16,8 @@ from minibrain.registry.settings_store import read, write
 from minibrain.settings import Settings
 
 KEY = "storage"
+FIRST_PART = 5 * 1024 * 1024
+COPY_PART = 5 * 1024 * 1024 * 1024
 CREDENTIAL_FILE = "storage_s3_secret"
 CREDENTIAL_ENV = "MINIBRAIN_STORAGE_S3_SECRET"
 LOCAL = "local"
@@ -175,6 +177,37 @@ class BucketBlobs:
 
     def sign(self, artifact_id: str, seconds: int) -> str:
         return str(self.fs.sign(self.key(artifact_id), expiration=seconds))
+
+    def rewrite_head(self, artifact_id: str, head: bytes) -> None:
+        path = self.key(artifact_id)
+        size = int(self.fs.info(path)["size"])
+        if size <= FIRST_PART + len(head):
+            self.fs.pipe_file(path, head + bytes(self.fs.cat_file(path, start=len(head), end=size)))
+            return
+        bucket, key = path.split("/", 1)
+        etag = self.fs.call_s3("head_object", Bucket=bucket, Key=key)["ETag"]
+        first = head + bytes(self.fs.cat_file(path, start=len(head), end=FIRST_PART))
+        upload = self.fs.call_s3("create_multipart_upload", Bucket=bucket, Key=key)["UploadId"]
+        target = {"Bucket": bucket, "Key": key, "UploadId": upload}
+        try:
+            parts = [
+                {"PartNumber": 1, "ETag": self.fs.call_s3("upload_part", PartNumber=1, Body=first, **target)["ETag"]}
+            ]
+            for number, start in enumerate(range(FIRST_PART, size, COPY_PART), start=2):
+                copied = self.fs.call_s3(
+                    "upload_part_copy",
+                    PartNumber=number,
+                    CopySource={"Bucket": bucket, "Key": key},
+                    CopySourceRange=f"bytes={start}-{min(start + COPY_PART, size) - 1}",
+                    CopySourceIfMatch=etag,
+                    **target,
+                )
+                parts.append({"PartNumber": number, "ETag": copied["CopyPartResult"]["ETag"]})
+            self.fs.call_s3("complete_multipart_upload", MultipartUpload={"Parts": parts}, **target)
+        except BaseException:
+            self.fs.call_s3("abort_multipart_upload", **target)
+            raise
+        self.fs.invalidate_cache(path)
 
 
 def bucket_for(config: StorageConfig, secret: str) -> BucketBlobs | None:

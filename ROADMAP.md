@@ -505,8 +505,10 @@ the UI says version.
   Nothing depends on a listing, an append or a lock: the `artifacts` table says what exists, and deletes, retention and
   key passes start from it (a key pass also lists the store, only to find strays; a registered object it cannot find
   blocks retiring the key). The one change in place is re-wrapping a key header, which never touches the content or
-  its id: the folder rewrites a header slot, the bucket takes the object again whole. Uploads from workers stream into
-  the store, never into memory.
+  its id: the folder rewrites a header slot; the bucket gets a multipart upload whose first part is the new header and
+  the first 5 MiB and whose other parts it copies from the old object itself (`UploadPartCopy`, pinned to the old
+  ETag), so only 5 MiB travel however large the object (one under 5 MiB is sent again whole). Uploads from workers
+  stream into the store, never into memory.
 - What under `MINIBRAIN_HOME` is data and what is a cache. Data: `minibrain.db`, `keys/`, `secrets/`, `artifacts/` (the
   folder store) and `models/` (base weights when Storage is the folder). Caches and scratch, safe to wipe while
   minibrain is stopped: `cache/` (unpacked artifacts), `staging/` (DuckDB databases built from uploads, rebuilt from
@@ -1342,8 +1344,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] A local engine's first start included downloading its model, which could exceed the 600 s startup limit for very
   large models. Fetching the working copy is now its own step before loading, with progress (`docs/serving.md`), and
   each file gets a fresh signed link.
-- [ ] Key rotation re-uploads every bucket object whole, which is slow for large weights. Re-wrap only the key header,
-  or use the bucket's server-side copy.
+- [x] Key rotation re-uploaded every bucket object whole, which is slow for large weights. It sends the new header and
+  the first 5 MiB and the bucket copies the rest server-side (Artifact storage).
 - [ ] Delete Copy to the bucket (moving bases from main's disk when Storage switches to S3); it only served older
   installs.
 - [ ] Delete the job format version check that turns away older workers; there are no older workers.
