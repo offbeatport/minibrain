@@ -503,10 +503,8 @@ export function AddModelPage() {
                                 plan={plan}
                                 accepted={accepted}
                                 onAccepted={setAccepted}
+                                error={shown.licence}
                             />
-                            {shown.licence && (
-                                <p className="text-sm text-destructive">{shown.licence}</p>
-                            )}
                         </div>
                     )}
                 </Card>

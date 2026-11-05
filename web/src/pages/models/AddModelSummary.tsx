@@ -111,12 +111,14 @@ export function Licence({
     plan,
     accepted,
     onAccepted,
+    error,
 }: {
     id?: string;
     option: BaseOption | null;
     plan: SourcePlan;
     accepted: boolean;
     onAccepted: (accepted: boolean) => void;
+    error?: string | null;
 }) {
     const entry = plan.target.kind === "catalogue" ? plan.target.entry : option?.entry;
     if (!entry) {
@@ -137,12 +139,22 @@ export function Licence({
                     id={id}
                     checked={accepted}
                     onCheckedChange={(value) => onAccepted(value === true)}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error && id ? `${id}-error` : undefined}
                     className="mt-px"
                 />
                 <span>
                     {`I accept the ${entry.license_name} for this install. `}
                     <ReadLink href={entry.license_url} />
                     <span className="mt-0.5 block text-muted-foreground">{use}</span>
+                    {error && (
+                        <span
+                            id={id ? `${id}-error` : undefined}
+                            className="mt-1 block text-destructive"
+                        >
+                            {error}
+                        </span>
+                    )}
                 </span>
             </Label>
         );
