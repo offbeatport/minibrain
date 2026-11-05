@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import io
 import os
@@ -6,7 +5,6 @@ import stat
 from pathlib import Path
 
 import pytest
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fsspec.implementations.memory import MemoryFileSystem
 from sqlalchemy import select
 
@@ -179,13 +177,13 @@ def test_workers_get_plaintext_and_store_their_outputs_encrypted(harness: Harnes
 
 def test_files_written_before_encryption_stay_readable(harness: Harness) -> None:
     store = store_for(harness.settings)
-    payload = b"legacy plaintext artifact"
+    payload = b"plaintext artifact"
     plain = ArtifactStore(store.root, store.cache)
-    legacy = plain.put_stream(io.BytesIO(payload))
-    assert store.path(legacy.id).read_bytes() == payload
-    with store.open(legacy.id) as stream:
+    unsealed = plain.put_stream(io.BytesIO(payload))
+    assert store.path(unsealed.id).read_bytes() == payload
+    with store.open(unsealed.id) as stream:
         assert stream.read() == payload
-    assert store.materialize(legacy.id, "file", "log.txt").read_bytes() == payload
+    assert store.materialize(unsealed.id, "file", "log.txt").read_bytes() == payload
 
 
 @pytest.mark.both_stores
@@ -229,25 +227,12 @@ def test_the_bucket_only_ever_holds_ciphertext(harness: Harness, monkeypatch: py
     MemoryFileSystem.store.clear()
 
 
-def test_connection_secrets_use_the_same_key_and_old_ones_still_open(settings: Settings) -> None:
+def test_connection_secrets_use_the_install_key(settings: Settings) -> None:
     settings.home.mkdir(parents=True)
-    legacy_key = AESGCM.generate_key(bit_length=256)
-    legacy_file = settings.home / "secrets" / "master.key"
-    legacy_file.parent.mkdir()
-    legacy_file.write_text(base64.b64encode(legacy_key).decode())
-    nonce = os.urandom(12)
-    old_token = (
-        "aesgcm1:"
-        + base64.b64encode(
-            nonce + AESGCM(legacy_key).encrypt(nonce, b"old-password", b"minibrain.connection.1")
-        ).decode()
-    )
-    assert vault.unseal(settings, old_token, "minibrain.connection.1") == "old-password"
-    assert not legacy_file.exists()
-    moved = (settings.home / "keys" / "master.key").read_text().strip()
-    assert base64.b64decode(moved) == legacy_key
     fresh = vault.seal(settings, "new-password", "minibrain.connection.1")
     assert fresh.startswith("envelope1:") and vault.unseal(settings, fresh, "minibrain.connection.1") == "new-password"
+    assert (settings.home / "keys" / "master.key").is_file()
+    assert not (settings.home / "secrets").exists()
 
 
 def test_a_second_main_never_makes_its_own_key(harness: Harness) -> None:

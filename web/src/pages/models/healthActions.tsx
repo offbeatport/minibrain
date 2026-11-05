@@ -54,19 +54,6 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
             run: () => unwrap(api.POST("/api/models/base/{key}/repair", target(row))),
         };
     }
-    if (action.kind === "download_again") {
-        return {
-            title: `Download ${row.name} again?`,
-            description: (
-                <p>
-                    Downloads its files again from the model hub at the pinned revision. Each file
-                    must match the SHA-256 saved at install.
-                </p>
-            ),
-            confirmLabel: "Download again",
-            run: () => unwrap(api.POST("/api/models/base/{key}/repair", target(row))),
-        };
-    }
     if (action.kind === "verify") {
         return {
             title: `Verify ${row.name}'s files?`,

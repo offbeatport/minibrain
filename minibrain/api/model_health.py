@@ -19,12 +19,11 @@ from minibrain.models.health import (
     missing_message,
 )
 from minibrain.models.registry import TRANSFER_KINDS, gguf_file, missing_files, model_folder
-from minibrain.models.sources import FOLDER, HUB, S3
+from minibrain.models.sources import HUB
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import pools
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
-    SYSTEM_ACTOR,
     CatalogVariant,
     Job,
     JobKind,
@@ -51,7 +50,6 @@ LABELS: dict[str, str] = {
     "verify": "Verify files",
     "open_base": "Open base model",
     "retrain": "Train again",
-    "download_again": "Download again",
 }
 STOPPED = (JobStatus.FAILED, JobStatus.CANCELLED)
 
@@ -90,8 +88,7 @@ def noun(job: Job | None, model: Model) -> str:
     if job is None:
         return "Download" if model.source == "download" else "Import"
     if job.kind == JobKind.REPAIR:
-        restoring = "Download" if model.status == ModelStatus.EVICTED else "Repair"
-        return restoring if job.params.get("source") == HUB else "Re-import"
+        return "Repair" if job.params.get("source") == HUB else "Re-import"
     return "Download" if job.kind == JobKind.DOWNLOAD else "Import"
 
 
@@ -107,7 +104,7 @@ def stopped(model: Model, job: Job | None, context: HealthContext) -> Health:
     else:
         detail += " Try again; files already complete are kept."
     actions = [act("resume", "Resume" if resumable or cancelled else "Retry")]
-    if (model.status == ModelStatus.AVAILABLE and what == "Repair") or model.status == ModelStatus.EVICTED:
+    if model.status == ModelStatus.AVAILABLE and what == "Repair":
         actions.append(act("reimport"))
     if model.status != ModelStatus.AVAILABLE:
         actions.append(act("remove"))
@@ -210,50 +207,12 @@ def capability(model: Model, context: HealthContext) -> Health | None:
     return Health(state="cant_run", label="Can't run here", detail=detail, actions=actions)
 
 
-def original_location(model: Model) -> str | None:
-    kind, _, location = (model.source_path or "").partition(":")
-    return location if kind in (FOLDER, S3) and location else None
-
-
-def removed_by_person(model: Model) -> bool:
-    return model.evicted_by is not None and model.evicted_by != SYSTEM_ACTOR
-
-
-def evicted(model: Model, context: HealthContext) -> Health:
-    when = f" on {model.evicted_at:%Y-%m-%d}" if model.evicted_at else ""
-    if removed_by_person(model):
-        detail = (
-            f"{model.evicted_by} removed its files{when} to free the disk. Its record, licence acceptance, API keys "
-            "and the models built on it stay."
-        )
-    else:
-        detail = (
-            f"Its files were removed{when} to free space while no model, version, deployment or job used it. Its "
-            "record, licence acceptance and API keys stay."
-        )
-    location = original_location(model)
-    copy = f", such as {location}" if location else ""
-    if repairable(model, context):
-        detail += (
-            f" Download again fetches the same files from {hub.endpoint()} and checks each against the SHA-256 "
-            f"saved at install; Re-import copies them from a folder or S3 path{copy}."
-        )
-        actions = [act("download_again"), act("reimport"), act("remove")]
-    else:
-        detail += f" Re-import it from a folder or S3 path that holds the same files{copy}."
-        actions = [act("reimport"), act("remove")]
-    label = "Files removed" if removed_by_person(model) else "Removed to free space"
-    return Health(state="evicted", label=label, detail=detail, actions=actions)
-
-
 def base_health(model: Model, job: Job | None, context: HealthContext) -> Health | None:
     if job is not None and job.status in ACTIVE_JOB_STATUSES:
         return None
     failed = transfer_failure(model, job, context)
     if failed is not None:
         return failed
-    if model.status == ModelStatus.EVICTED:
-        return evicted(model, context)
     if model.status in STOPPED:
         return stopped(model, None, context)
     if model.status != ModelStatus.AVAILABLE:
@@ -271,8 +230,7 @@ def base_health(model: Model, job: Job | None, context: HealthContext) -> Health
 def custom_health(base: Health | None, base_name: str) -> Health | None:
     if base is None:
         return None
-    shown = "Missing files" if base.state == "evicted" else base.label
-    label = f"Base {shown[0].lower()}{shown[1:]}"
+    label = f"Base {base.label[0].lower()}{base.label[1:]}"
     return Health(
         state="base_unusable",
         label=label,

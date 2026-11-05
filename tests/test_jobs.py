@@ -144,13 +144,13 @@ def test_unknown_output_artifacts_are_refused(harness: Harness) -> None:
 def test_concurrent_claims_take_each_job_once(harness: Harness) -> None:
     with harness.sessions() as session:
         for index in range(20):
-            enqueue(session, JobKind.PREPARE, {"n": index})
+            enqueue(session, JobKind.VERIFY, {"n": index})
         session.commit()
     claimed: list[int] = []
     lock = threading.Lock()
 
     def take(worker_id: str) -> None:
-        worker = WorkerInfo(id=worker_id, host="h", kinds=[JobKind.PREPARE], gpus=0)
+        worker = WorkerInfo(id=worker_id, host="h", kinds=[JobKind.VERIFY], gpus=0)
         while (claim := harness.queue.claim(worker)) is not None:
             with lock:
                 claimed.append(claim.job_id)
@@ -167,17 +167,17 @@ def test_concurrent_claims_take_each_job_once(harness: Harness) -> None:
 def test_gpu_slots_limit_heavy_jobs_only(harness: Harness) -> None:
     lora_job(harness)
     with harness.sessions() as session:
-        enqueue(session, JobKind.PREPARE, {})
+        enqueue(session, JobKind.VERIFY, {})
         session.commit()
-    assert harness.claim(["train", "prepare"], worker_id="w") is not None
-    second = harness.claim(["train", "prepare"], worker_id="w")
-    assert second is not None and second["kind"] == "prepare"
+    assert harness.claim(["train", "verify"], worker_id="w") is not None
+    second = harness.claim(["train", "verify"], worker_id="w")
+    assert second is not None and second["kind"] == "verify"
 
 
 def test_idempotency_key_dedupes_active_jobs(harness: Harness) -> None:
     with harness.sessions() as session:
-        first = enqueue(session, JobKind.PREPARE, {}, idempotency_key="k")
-        second = enqueue(session, JobKind.PREPARE, {}, idempotency_key="k")
+        first = enqueue(session, JobKind.VERIFY, {}, idempotency_key="k")
+        second = enqueue(session, JobKind.VERIFY, {}, idempotency_key="k")
         session.commit()
         assert first.id == second.id
 

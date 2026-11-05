@@ -1058,23 +1058,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/sources": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Model Sources */
-        get: operations["model_sources_api_models_sources_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/models/inspect": {
         parameters: {
             query?: never;
@@ -3020,7 +3003,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "available" | "downloading" | "importing" | "missing" | "not_downloaded" | "evicted" | "none";
+            state: "available" | "downloading" | "importing" | "missing" | "not_downloaded" | "none";
             /** Progress */
             progress?: number | null;
             /** Job Id */
@@ -3078,11 +3061,6 @@ export interface components {
             publisher?: string | null;
             /** Size Bytes */
             size_bytes?: number | null;
-            /**
-             * Stages
-             * @default []
-             */
-            stages?: components["schemas"]["Stage"][];
             /** Score */
             score?: number | null;
             /** Metric */
@@ -5037,7 +5015,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "corrupt" | "missing" | "download_failed" | "no_space" | "needs_access" | "source_gone" | "cant_run" | "no_memory" | "base_changed" | "base_unusable" | "evicted";
+            state: "corrupt" | "missing" | "download_failed" | "no_space" | "needs_access" | "source_gone" | "cant_run" | "no_memory" | "base_changed" | "base_unusable";
             /** Label */
             label: string;
             /** Detail */
@@ -5053,7 +5031,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain" | "download_again";
+            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain";
             /** Label */
             label: string;
         };
@@ -5910,11 +5888,6 @@ export interface components {
             publisher?: string | null;
             /** Size Bytes */
             size_bytes?: number | null;
-            /**
-             * Stages
-             * @default []
-             */
-            stages?: components["schemas"]["Stage"][];
             /** Score */
             score?: number | null;
             /** Metric */
@@ -7027,23 +7000,6 @@ export interface components {
              * @default 0
              */
             judge_pending?: number;
-        };
-        /** Stage */
-        Stage: {
-            /**
-             * Key
-             * @enum {string}
-             */
-            key: "data" | "train" | "evaluate" | "deploy";
-            /**
-             * State
-             * @enum {string}
-             */
-            state: "todo" | "active" | "done" | "failed";
-            /** Label */
-            label: string;
-            /** Progress */
-            progress?: number | null;
         };
         /** StorageCheck */
         StorageCheck: {
@@ -10107,28 +10063,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelRow"][];
-                };
-            };
-        };
-    };
-    model_sources_api_models_sources_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
                 };
             };
         };

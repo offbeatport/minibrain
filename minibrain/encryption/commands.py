@@ -17,7 +17,7 @@ def lines(kind: str, current: str, where: str, tally: Tally, records: list[dict[
         f"Current key: {kind}:{current}" if current else "Current key: none",
         f"Files: {tally.files} ({tally.current} under the current key, {tally.older} under older keys, "
         f"{tally.plain} not encrypted, {tally.damaged} unreadable)",
-        f"Secrets: {tally.secrets} ({tally.secrets_older} under older keys or the old format)",
+        f"Secrets: {tally.secrets} ({tally.secrets_older} under older keys)",
     ]
     if tally.encrypted or tally.rewrapped or tally.resealed or tally.removed:
         found.append(

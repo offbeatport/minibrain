@@ -79,7 +79,6 @@ from minibrain.data.shared import (
     table_of,
     tables_of,
 )
-from minibrain.data.snapshot import is_parquet
 from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_version, version_if_mapped, versions_of
 from minibrain.data.sources import (
     SourceError,
@@ -611,17 +610,10 @@ def get_snapshot(session: Session, snapshot_id: int) -> Snapshot:
     return found
 
 
-def snapshot_file(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
-    location = snapshot_location(session, store, snapshot)
-    if not is_parquet(location):
-        raise ConflictError(f"the data {snapshot.hash[:12]} was saved before Parquet files and cannot be compared")
-    return location
-
-
 @router.get("/snapshots/{snapshot_id}/diff/{other_id}", dependencies=[Depends(builder)])
 def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: StoreDep) -> SnapshotDiff:
     before, after = get_snapshot(session, snapshot_id), get_snapshot(session, other_id)
-    found = compare(snapshot_file(session, store, before), snapshot_file(session, store, after))
+    found = compare(snapshot_location(session, store, before), snapshot_location(session, store, after))
     return SnapshotDiff(
         before=snapshot_info(before),
         after=snapshot_info(after),

@@ -251,13 +251,6 @@ function AddedStatus({ entry }: { entry: CatalogEntry }) {
             </StatusText>
         );
     }
-    if (states.some((state) => state.state === "evicted")) {
-        return (
-            <StatusText tone="neutral" className="text-sm">
-                Removed to free space
-            </StatusText>
-        );
-    }
     return null;
 }
 

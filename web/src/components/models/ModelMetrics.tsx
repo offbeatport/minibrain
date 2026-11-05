@@ -1,64 +1,7 @@
-import { Check, ChevronRight, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
-import { Fragment } from "react";
-import type { ModelStage, ModelUsage } from "~/api/client";
+import type { ModelUsage } from "~/api/client";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
-
-const STAGE_NAMES: Record<ModelStage["key"], string> = {
-    data: "Data",
-    train: "Train",
-    evaluate: "Evaluate",
-    deploy: "Deploy",
-};
-
-function StageMark({ state }: { state: ModelStage["state"] }) {
-    if (state === "done") {
-        return <Check aria-hidden="true" className="size-3.5 shrink-0 text-success" />;
-    }
-    if (state === "failed") {
-        return <X aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />;
-    }
-    return (
-        <span
-            aria-hidden="true"
-            className={cn(
-                "size-2 shrink-0 rounded-full",
-                state === "active" ? "bg-info" : "border border-faint",
-            )}
-        />
-    );
-}
-
-export function Stages({ stages }: { stages: ModelStage[] }) {
-    return (
-        <ol className="flex items-center gap-1 text-sm whitespace-nowrap">
-            {stages.map((stage, index) => (
-                <Fragment key={stage.key}>
-                    {index > 0 && (
-                        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-faint" />
-                    )}
-                    <li
-                        className={cn(
-                            "flex items-center gap-1.5",
-                            stage.state === "todo" && "text-muted-foreground",
-                            stage.state === "failed" && "text-destructive",
-                        )}
-                    >
-                        <StageMark state={stage.state} />
-                        <span className="sr-only">{`${STAGE_NAMES[stage.key]}: `}</span>
-                        <span className="tabular-nums">
-                            {stage.label}
-                            {stage.state === "active" && stage.progress
-                                ? ` · ${Math.round(stage.progress * 100)}%`
-                                : ""}
-                        </span>
-                    </li>
-                </Fragment>
-            ))}
-        </ol>
-    );
-}
 
 function recentDays(total: number): string[] {
     const today = new Date();

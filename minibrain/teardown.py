@@ -499,16 +499,14 @@ class Teardowns:
             drop(session, teardown)
             self.finish(session, record)
             return
-        remove_folder(self.settings.minibrain_dir(minibrain.slug))
         adapters = {version.adapter_artifact_id for version in minibrain.versions if version.adapter_artifact_id}
-        owned = {snapshot.artifact_id for snapshot in minibrain.snapshots if snapshot.artifact_id}
         removed = {"versions": len(minibrain.versions), "key_scopes": len(minibrain.key_scopes)}
         drop(session, teardown)
         session.delete(minibrain)
         session.flush()
         drop_orphan_keys(session)
         removed["snapshots"] = cleanup(session, self.settings)
-        removed["artifacts"] = drop_artifacts(session, self.settings, adapters | owned)
+        removed["artifacts"] = drop_artifacts(session, self.settings, adapters)
         self.finish(session, record, removed=removed)
 
     def delete_base(self, session: Session, teardown: Teardown) -> None:

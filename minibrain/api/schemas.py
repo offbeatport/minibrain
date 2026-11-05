@@ -913,7 +913,7 @@ class InfrastructureInfo(BaseModel):
     snapshots: SnapshotUsage | None = None
 
 
-AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "evicted", "none"]
+AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]
 ActivityState = Literal["running", "queued", "failed", "ready", "needs_examples", "idle"]
 DeploymentState = Literal["running", "starting", "unhealthy", "stopping", "stop_failed", "not_deployed"]
 
@@ -939,13 +939,6 @@ class Deployment(BaseModel):
     versions: list[int] = Field(default_factory=list)
 
 
-class Stage(BaseModel):
-    key: Literal["data", "train", "evaluate", "deploy"]
-    state: Literal["todo", "active", "done", "failed"]
-    label: str
-    progress: float | None = None
-
-
 class Usage(BaseModel):
     days: list[str]
     daily: list[int]
@@ -967,7 +960,6 @@ HealthState = Literal[
     "no_memory",
     "base_changed",
     "base_unusable",
-    "evicted",
 ]
 HealthActionKind = Literal[
     "repair",
@@ -982,7 +974,6 @@ HealthActionKind = Literal[
     "verify",
     "open_base",
     "retrain",
-    "download_again",
 ]
 
 
@@ -1037,7 +1028,6 @@ class ModelRow(BaseModel):
     needed_bytes: int | None
     publisher: str | None = None
     size_bytes: int | None = None
-    stages: list[Stage] = []
     score: float | None = None
     metric: str | None = None
     usage: Usage | None = None

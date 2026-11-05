@@ -10,7 +10,6 @@ import { percent } from "~/lib/format";
 import { describeLine, useInvalidate, useJobLog } from "~/lib/jobs";
 
 const KIND_TITLES: Record<string, string> = {
-    prepare: "Building dataset",
     train: "Training",
     eval: "Scoring",
     download: "Downloading",

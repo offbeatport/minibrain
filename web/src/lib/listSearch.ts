@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 
 export type ListSearch<K extends string> = Partial<Record<K, string>>;
 
-export function hrefWith(path: string, params: URLSearchParams): string {
+function hrefWith(path: string, params: URLSearchParams): string {
     const text = params.toString().replaceAll("%2C", ",").replaceAll("%40", "@");
     return text ? `${path}?${text}` : path;
 }

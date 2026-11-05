@@ -1,16 +1,14 @@
 import base64
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.artifacts import ArtifactStore
 from minibrain.encryption.envelope import is_sealed, parse_header
 from minibrain.encryption.sealed import artifact_context, unwrap_any
-from minibrain.models.copies import BUCKET, FOLDER, file_entry
+from minibrain.models.copies import file_entry
 from minibrain.models.health import CORRUPT, MISSING, WRONG_SIZE, content_hash
-from minibrain.registry.files import register
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, Artifact, Job, JobKind, Model, ModelStatus
 
 WEIGHTS = "weights"
@@ -24,10 +22,6 @@ class BucketError(Exception):
 
 def writes_bucket(store: ArtifactStore) -> bool:
     return store.writes_remote and store.remote is not None
-
-
-def store_name(store: ArtifactStore) -> str:
-    return BUCKET if writes_bucket(store) else FOLDER
 
 
 def hashes_of(model: Model) -> list[str]:
@@ -128,16 +122,3 @@ def sweep_weights(session: Session, store: ArtifactStore) -> int:
         return 0
     stored = set(session.scalars(select(Artifact.id).where(Artifact.kind == WEIGHTS)))
     return drop_objects(session, store, stored - referenced(session))
-
-
-def copy_file(session: Session, store: ArtifactStore, folder: Path, entry: dict[str, Any]) -> int:
-    expected = entry.get("sha256")
-    if not expected:
-        raise BucketError(f"{entry['path']} has no saved SHA-256; verify the model's files first")
-    target = folder / str(entry["path"])
-    if session.get(Artifact, expected) is not None and store.remote is not None and store.remote.has(expected):
-        return 0
-    with target.open("rb") as stream:
-        stored = store.put_stream(stream, expected=expected)
-    register(session, stored.id, WEIGHTS, Packing.FILE, Path(str(entry["path"])).name, stored.size)
-    return stored.size

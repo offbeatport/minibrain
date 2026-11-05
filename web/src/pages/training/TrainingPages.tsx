@@ -48,7 +48,6 @@ const ANY_TIME = "any";
 const KIND_NAMES: Record<string, string> = {
     train: "Training",
     eval: "Scoring",
-    prepare: "Data build",
 };
 
 function kindName(job: JobInfo): string {

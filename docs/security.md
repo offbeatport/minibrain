@@ -36,10 +36,6 @@ log with who, before and after.
   `MINIBRAIN_POLICY_REQUEST_BODIES` locks it for every model too, unless `request_bodies_locked: false` is set beside it.
 - `POST /v1/feedback` without `input` for a model that does not keep them returns 422 and names the model's switch.
 - Gateways, standalone ones included, get each model's value in their config snapshot, within a second of a change.
-- Upgrading: migration 0034 sets each existing model's switch to what the install did before (on only where both
-  Request logs and Request inputs and answers were on, in the database, `minibrain.yaml` or the environment). The
-  `request_logs` policy is gone; a `minibrain.yaml` or `MINIBRAIN_POLICY_REQUEST_LOGS` value for it is ignored with a
-  warning in the log.
 
 ## Accounts and sign-in
 
@@ -352,8 +348,7 @@ would hash to, which the content-addressed file name already revealed.
 | AWS KMS | A symmetric KMS key | KMS `Encrypt` and `Decrypt` through botocore, the context's SHA-256 as encryption context | KMS rotates key material itself; point minibrain at a new key ARN to move every data key |
 
 Local key file. The file holds one base64 256-bit key per line; the last line is the current key and the others stay
-readable. An install that kept its connection secrets under `<home>/secrets/master.key` moves that key into
-`keys/master.key` on first start, so there is one key for everything. Back the key up separately from the data: a
+readable. The same key seals files and connection secrets, so there is one key for everything. Back the key up separately from the data: a
 backup that holds both protects nothing, and data whose key is lost cannot be read. With more than one main, every
 main needs the same key file: mount it from your secret store and set `MINIBRAIN_MASTER_KEY_FILE`. A main that finds
 the install already encrypting under a local key it does not have refuses to make its own and says so.
@@ -448,14 +443,12 @@ old provider stay readable as long as its settings stay in place.
 - Rotation answers "a key version should no longer be used"; it does not make copies of files taken before the
   rotation unreadable to someone who also has the old key.
 
-### Upgrading an existing install
+### Turning it on later
 
-Encryption at rest is on by default for new and existing installs: on first start after the upgrade, main makes the
-local key (or moves `secrets/master.key` into `keys/`), every new file is encrypted, and files already stored stay
-readable as they are. Run `minibrain keys encrypt-existing` or press Encrypt existing files when convenient. On by
-default because encryption at rest is part of what the install claims to buyers, reads of both kinds keep working, and
-older files can be encrypted later without downtime. Set the master key to Off (`MINIBRAIN_POLICY_ENCRYPTION=off`)
-only for a multi-main install whose mains do not share a key file yet.
+Encryption at rest is on by default: on first start main makes the local key and every file is encrypted. Set the
+master key to Off (`MINIBRAIN_POLICY_ENCRYPTION=off`) only for a multi-main install whose mains do not share a key file
+yet. Turned on again, every new file is encrypted and files stored while it was off stay readable as they are; run
+`minibrain keys encrypt-existing` or press Encrypt existing files when convenient, without downtime.
 
 ### Performance
 

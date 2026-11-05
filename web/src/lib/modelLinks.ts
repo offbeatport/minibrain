@@ -40,7 +40,7 @@ export function modelAibomHref(slug: string, number: number): string {
 
 export function jobHref(job: JobInfo): string | null {
     if (job.minibrain) {
-        return job.kind === "prepare" ? modelDataHref(job.minibrain) : `/training?job=${job.id}`;
+        return `/training?job=${job.id}`;
     }
     return job.model ? `/models/base/${encodeURIComponent(job.model)}` : null;
 }

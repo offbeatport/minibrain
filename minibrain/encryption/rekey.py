@@ -235,9 +235,8 @@ def visit_secrets(session: Session, keys: Keys, plan: Plan, tally: Tally) -> Non
                 tally.resealed += 1
                 stale = False
             wrapped = wrapped_of(getter())
-            if wrapped is not None:
-                ref = f"{wrapped.provider}:{wrapped.key}"
-                tally.keys[ref] = tally.keys.get(ref, 0) + 1
+            ref = f"{wrapped.provider}:{wrapped.key}"
+            tally.keys[ref] = tally.keys.get(ref, 0) + 1
             if stale:
                 tally.secrets_older += 1
         except Exception as error:

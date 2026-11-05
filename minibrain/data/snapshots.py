@@ -19,13 +19,12 @@ from minibrain.data.snapshot import (
     SnapshotError,
     answer_labels,
     clean,
-    is_parquet,
     pairs,
     read_rows,
     split,
 )
 from minibrain.data.sources import copy_rows, merge_rows
-from minibrain.registry.files import ArtifactKind, snapshot_location, store_file, store_for
+from minibrain.registry.files import ArtifactKind, store_file, store_for
 from minibrain.registry.models import Artifact, Dataset, Minibrain, Snapshot, Version, now
 from minibrain.registry.service import ConflictError, latest_snapshot, latest_version
 from minibrain.settings import Settings
@@ -131,12 +130,9 @@ def version_if_mapped(session: Session, settings: Settings, dataset: Dataset | N
     return take_version(session, settings, dataset)
 
 
-def plain_copy(session: Session, settings: Settings, snapshot: Snapshot, target: Path) -> bool:
-    if snapshot.artifact_id is None or not is_parquet(snapshot_location(session, store_for(settings), snapshot)):
-        return False
+def plain_copy(settings: Settings, snapshot: Snapshot, target: Path) -> None:
     with store_for(settings).open(snapshot.artifact_id) as stream, target.open("wb") as sink:
         shutil.copyfileobj(stream, sink)
-    return True
 
 
 def with_feedback(session: Session, settings: Settings, minibrain: Minibrain, version: Snapshot) -> Snapshot:
@@ -146,8 +142,7 @@ def with_feedback(session: Session, settings: Settings, minibrain: Minibrain, ve
     settings.work_dir().mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=settings.work_dir()) as scratch:
         target = Path(scratch) / SNAPSHOT_FILE
-        if not plain_copy(session, settings, version, target):
-            return version
+        plain_copy(settings, version, target)
         _, added = merge_rows(target, [(encode_turns(row.turns), row.input, row.expected) for row in extra])
         if added == 0:
             return version
@@ -244,8 +239,7 @@ def latest_ids(session: Session) -> set[int]:
 def doomed_snapshots(session: Session) -> list[Snapshot]:
     keep = load_limits(session).keep_snapshots
     used = set(session.scalars(select(Version.snapshot_id)))
-    used |= set(session.scalars(select(Minibrain.snapshot_id).where(Minibrain.snapshot_id.is_not(None))))
-    candidates = list(session.scalars(select(Snapshot).where(Snapshot.minibrain_id.is_(None))))
+    candidates = list(session.scalars(select(Snapshot)))
     used |= {snapshot.base_id for snapshot in candidates if snapshot.id in used and snapshot.base_id is not None}
     newest = latest_ids(session)
     doomed: list[Snapshot] = []
@@ -265,7 +259,7 @@ def doomed_snapshots(session: Session) -> list[Snapshot]:
 
 def cleanup(session: Session, settings: Settings) -> int:
     doomed = doomed_snapshots(session)
-    artifacts = {snapshot.artifact_id for snapshot in doomed if snapshot.artifact_id}
+    artifacts = {snapshot.artifact_id for snapshot in doomed}
     for snapshot in doomed:
         session.delete(snapshot)
     session.flush()

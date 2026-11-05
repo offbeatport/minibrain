@@ -474,9 +474,3 @@ def cached(key: tuple[Any, ...], build: Callable[[], RemoteState]) -> RemoteStat
         for stale in [item for item, (expires, _) in STATES.items() if expires <= moment]:
             STATES.pop(stale, None)
     return state
-
-
-def forget(source_id: int) -> None:
-    with STATES_LOCK:
-        for key in [key for key in STATES if key[0] == source_id]:
-            STATES.pop(key, None)

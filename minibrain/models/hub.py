@@ -31,10 +31,6 @@ def file_url(repo: str, revision: str, path: str) -> str:
     return f"{endpoint()}/{repo}/resolve/{revision}/{path}"
 
 
-def metadata_url(repo: str, revision: str) -> str:
-    return f"{endpoint()}/api/models/{repo}/revision/{revision}?blobs=true"
-
-
 class Connectivity:
     def __init__(self) -> None:
         self.checked_at = 0.0

@@ -39,8 +39,6 @@ def logged(harness: Harness) -> list[tuple[str | None, str | None]]:
 
 def test_request_metadata_is_always_logged_without_inputs(harness: Harness) -> None:
     headers = servable(harness)
-    assert "request_logs" not in policies(harness)
-    assert set_policy(harness, "request_logs", False) == 403
     response_id = chat(harness, headers)
     harness.flush_logs()
     with harness.sessions() as session:
@@ -113,7 +111,7 @@ def test_the_config_file_and_environment_lock_it_too(
 ) -> None:
     headers = servable(harness)
     yaml = tmp_path / "minibrain.yaml"
-    yaml.write_text("policy:\n  request_bodies: true\n  request_logs: false\n")
+    yaml.write_text("policy:\n  request_bodies: true\n")
     monkeypatch.setenv("MINIBRAIN_CONFIG", str(yaml))
     found = policies(harness)
     assert (

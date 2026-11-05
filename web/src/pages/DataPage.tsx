@@ -25,16 +25,13 @@ import {
     uploadSource,
 } from "~/api/client";
 import {
-    isActiveJob,
     keys,
     useDatasets,
     useGolden,
-    useJobs,
     useMinibrain,
     useMinibrains,
     usePreview,
 } from "~/api/queries";
-import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
@@ -354,9 +351,6 @@ const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
 
 function DatasetSection({ detail }: { detail: MinibrainDetail }) {
     const refresh = useRefresh(detail.slug);
-    const { data: jobs } = useJobs(detail.slug);
-    const latest = (jobs ?? []).find((job) => job.kind === "prepare");
-    const building = latest !== undefined && isActiveJob(latest);
     const build = useMutation({
         mutationFn: () =>
             unwrap(
@@ -366,12 +360,6 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
             ),
         onSuccess: () => refresh(),
     });
-    const finishedId = latest?.status === "succeeded" ? latest.id : null;
-    useEffect(() => {
-        if (finishedId !== null) {
-            refresh();
-        }
-    }, [finishedId, refresh]);
     const golden = useGolden(detail.slug, Boolean(detail.snapshot));
     const [showGolden, setShowGolden] = useState(false);
     if (!detail.mapping.sql) {
@@ -383,23 +371,12 @@ function DatasetSection({ detail }: { detail: MinibrainDetail }) {
             title="Dataset version"
             caption="The saved copy of the dataset's rows that new versions train on, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
-                <Button
-                    size="sm"
-                    onClick={() => build.mutate()}
-                    disabled={build.isPending || building}
-                >
-                    {build.isPending || building
-                        ? "Saving…"
-                        : snapshot
-                          ? "Update"
-                          : "Save version 1"}
+                <Button size="sm" onClick={() => build.mutate()} disabled={build.isPending}>
+                    {build.isPending ? "Saving…" : snapshot ? "Update" : "Save version 1"}
                 </Button>
             }
         >
             <ErrorLine error={build.error} />
-            {latest && latest.status !== "succeeded" && (
-                <JobPanel job={latest} slug={detail.slug} />
-            )}
             {snapshot ? (
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-6">

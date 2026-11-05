@@ -307,7 +307,7 @@ Data is shared across models:
   or a `messages` column of chat turns. Columns mode picks one source and a mapping template (an input and a label
   column, templates such as `Subject: {subject}\n\n{body}` for the user turn, or the messages column, picked for chat
   JSONL uploads) and compiles the SELECT; SQL mode joins, unions, filters and cleans across sources. A dataset over
-  one source can still say `FROM source`.
+  one source can also say `FROM source`.
   Each custom model points at one dataset, and several models can use the same dataset to compare fairly.
   Dataset names are unique within their folder, like files in a folder, case aside; slugs stay unique across the
   install. A typed name that is taken is refused with a 409 naming the dataset that holds it and a free name
@@ -686,10 +686,8 @@ once it matches; only deleting a base removes its files.
 
 - A base stays until someone deletes it, and deleting it removes its files. A base with models built on it is deleted
   together with them, once the cascade checkbox in the delete dialog is ticked.
-- Rows an earlier cache budget left in status `evicted` keep "Removed to free space" with Download again or Re-import
-  (the repair job, checked against the saved SHA-256 list).
-- Where a base's main copy lives follows Settings → Storage when it is downloaded, imported, repaired or downloaded
-  again (`models.store`, migration 0039). Folder: main's `<home>/models/<id>`, as before. S3: each file is an object in
+- Where a base's main copy lives follows Settings → Storage when it is downloaded, imported or repaired
+  (`models.store`). Folder: main's `<home>/models/<id>`. S3: each file is an object in
   the bucket under its SHA-256, sealed with its own data key like every artifact and registered as a `weights`
   artifact; identical files are stored once.
 - Files reach the bucket one at a time. The job checks a file's size and SHA-256 in `<home>/work/models/<id>`, the
@@ -709,8 +707,7 @@ once it matches; only deleting a base removes its files.
   unwraps with the master key; the answer is `Cache-Control: no-store`. The machine decrypts with AES-256-GCM through
   `cryptography`, checks the plaintext SHA-256 and keeps the data key in memory only. A data key opens that one object;
   the node channel carried the plaintext itself before.
-- Working copies are not the removed cache: no budget, no pins, nothing removed to free space, and the bucket is the
-  copy that counts. The Models list and health read the database (an `artifacts` row per file), never a working copy,
+- Working copies have no budget and nothing is removed to free space; the bucket is the copy that counts. The Models list and health read the database (an `artifacts` row per file), never a working copy,
   so a model does not go missing with one. Verify files reads every object through signed links; Repair writes a
   damaged object again.
 - Deleting a base deletes its bucket objects (unless another model has the same file), main's working copy and its
@@ -989,8 +986,6 @@ keys, and `/v1` stays key-only.
     pool. It can always be downloaded now and run later.
   - `?model=<catalogue id>&variant=` and `?base=<key>` preselect the base, `?dataset=` the training data, and
     `?source=import` opens Import.
-- Old links redirect: `?minibrain=<slug>` on Training, Evaluations and Playground becomes `?model=<slug>`;
-  `/deployments?minibrain=<slug>` goes to `/deployments/<slug>`; `/m/<slug>/<tab>` goes to the matching page.
 - Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
   General: You (appearance; profile once accounts exist), the model catalogue, recipe and splits. Security: the
   policies, locked when set by config, with a link to their changes in the audit log. Accounts (admin) once accounts
@@ -1475,6 +1470,14 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Deleted Copy to the bucket (moving bases from main's disk when Storage switches to S3) and the repair seed behind
   it; it only served older installs.
 - [x] Deleted the job format version check that turned away older workers; there are no older workers.
+- [x] Deleted every path kept for old installs: the `evicted` base status with Download again and its Re-import
+  restore (`evicted_at`, `evicted_by` and the unused `pinned` column), the move of `secrets/master.key` and the
+  `aesgcm1` secret format, the startup backfill of snapshot folders (`snapshots.directory`, `versions.adapter_dir`)
+  and the non-Parquet guards, model-owned snapshots from before shared datasets (`snapshots.minibrain_id`,
+  `minibrains.snapshot_id`) and `<home>/minibrains/<slug>`, the retired `request_logs` policy warning, the stamp for
+  databases made before Alembic, audit labels for actions nothing records (`model.evict`, `model.remove_files*`,
+  `settings.model_cache`) and the redirects for old UI links (`/m/<slug>`, `?minibrain=`, `/compute`,
+  `/data/datasets/<slug>`, `/models?tab=discover`, `/profile`, `/preferences`).
 - [x] Deleted inline secrets in `policy.otel_headers` and `auth.oidc.client_secret`: the headers are named with
   `secret_env` or `secret_file` (or `OTEL_EXPORTER_OTLP_HEADERS`), the client secret with `MINIBRAIN_OIDC_CLIENT_SECRET`
   or `client_secret_file`, and a value written in `minibrain.yaml` stops the start.

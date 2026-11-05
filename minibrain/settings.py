@@ -17,9 +17,6 @@ class Settings:
     def database_url(self) -> str:
         return self.database or f"sqlite:///{self.home / 'minibrain.db'}"
 
-    def minibrain_dir(self, slug: str) -> Path:
-        return self.home / "minibrains" / slug
-
     def artifacts_dir(self) -> Path:
         return self.home / "artifacts"
 

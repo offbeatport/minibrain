@@ -6,22 +6,21 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fsspec.implementations.memory import MemoryFileSystem
 from sqlalchemy import select
 
 from minibrain import object_store
 from minibrain.artifacts import ArtifactStore
-from minibrain.connections import vault
 from minibrain.encryption import envelope, keys, rekey
 from minibrain.encryption.envelope import HEADER
+from minibrain.encryption.providers import LocalKeys
 from minibrain.registry.files import store_for
-from minibrain.registry.models import AuditEvent, Connection
+from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read
 from tests.conftest import Harness, stored_bytes, tickets_csv
 
 
-def legacy_store(harness: Harness) -> ArtifactStore:
+def plain_store(harness: Harness) -> ArtifactStore:
     store = store_for(harness.settings)
     return ArtifactStore(store.root, store.cache)
 
@@ -43,8 +42,8 @@ def run(harness: Harness, plan: rekey.Plan) -> rekey.Tally:
 
 def test_encrypt_existing_seals_old_files_in_place_and_drops_plain_copies(harness: Harness) -> None:
     store = store_for(harness.settings)
-    old = legacy_store(harness)
-    payloads = [b"legacy snapshot rows " * 5000, b"", tickets_csv(30)]
+    old = plain_store(harness)
+    payloads = [b"plain dataset rows " * 5000, b"", tickets_csv(30)]
     ids = [old.put_stream(io.BytesIO(payload)).id for payload in payloads]
     damaged = hashlib.sha256(b"something else").hexdigest()
     (store.root / damaged[:2]).mkdir(parents=True, exist_ok=True)
@@ -74,42 +73,6 @@ def test_encrypt_existing_seals_old_files_in_place_and_drops_plain_copies(harnes
     assert (again.encrypted, again.current, again.plain) == (0, 4, 0)
 
 
-def legacy_token(key: bytes, plaintext: str, context: str) -> str:
-    nonce = os.urandom(12)
-    return (
-        "aesgcm1:" + base64.b64encode(nonce + AESGCM(key).encrypt(nonce, plaintext.encode(), context.encode())).decode()
-    )
-
-
-def test_old_connection_secrets_move_to_the_envelope_format(harness: Harness) -> None:
-    created = harness.client.post(
-        "/api/connections",
-        json={
-            "name": "Warehouse",
-            "kind": "postgres",
-            "host": "db.internal",
-            "port": 5432,
-            "database": "analytics",
-            "user": "ro",
-            "ssl_mode": "require",
-            "secret": "first-password",
-        },
-    )
-    assert created.status_code == 201, created.text
-    ring = keys.keys_for(harness.settings).local_ring()
-    assert ring is not None
-    with harness.sessions() as session:
-        row = session.scalars(select(Connection)).one()
-        row.secret = legacy_token(ring.legacy_keys()[0], "old-password", f"minibrain.connection.{row.id}")
-        session.commit()
-    tally = run(harness, rekey.Plan(encrypt=True))
-    assert (tally.secrets, tally.resealed, tally.secrets_older) == (1, 1, 0)
-    with harness.sessions() as session:
-        row = session.scalars(select(Connection)).one()
-        assert (row.secret or "").startswith("envelope1:")
-        assert vault.unseal(harness.settings, row.secret or "", f"minibrain.connection.{row.id}") == "old-password"
-
-
 @pytest.mark.both_stores
 def test_rotation_rewraps_every_header_and_leaves_the_bodies_alone(harness: Harness) -> None:
     store = store_for(harness.settings)
@@ -129,8 +92,8 @@ def test_rotation_rewraps_every_header_and_leaves_the_bodies_alone(harness: Harn
     assert (tally.rewrapped, tally.older, tally.current) == (2, 0, 2)
     assert stored_bytes(store, first)[HEADER:] == body
     assert header_key(stored_bytes(store, first)) == after == header_key(stored_bytes(store, second))
-    ring = service.local_ring()
-    assert ring is not None and ring.known() == [old, after]
+    ring = LocalKeys(keys.key_file(harness.settings), may_create=False)
+    assert ring.known() == [old, after]
     with harness.sessions() as session:
         assert rekey.retire_unused(session, service, tally, rekey.GRACE, "tester") == []
         assert rekey.retire_unused(session, service, tally, timedelta(0), "tester") == [f"local:{old}"]
@@ -246,7 +209,7 @@ def test_the_bucket_is_encrypted_and_rotated_in_place(harness: Harness, monkeypa
 
 
 def test_the_leader_runs_requested_passes_and_records_them(harness: Harness) -> None:
-    old = legacy_store(harness)
+    old = plain_store(harness)
     stored = old.put_stream(io.BytesIO(b"old rows")).id
     with harness.sessions() as session:
         task = rekey.request(session, rekey.ENCRYPT, "admin@example.com")
@@ -265,7 +228,7 @@ def test_the_leader_runs_requested_passes_and_records_them(harness: Harness) -> 
 
 
 def test_settings_show_the_key_counts_and_queue_passes(harness: Harness) -> None:
-    old = legacy_store(harness)
+    old = plain_store(harness)
     old.put_stream(io.BytesIO(b"old rows"))
     queued = harness.client.post("/api/settings/encryption/tasks", json={"kind": "encrypt"})
     assert queued.status_code == 200, queued.text

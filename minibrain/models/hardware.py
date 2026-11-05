@@ -130,10 +130,6 @@ def report() -> NodeReport:
     )
 
 
-def detect() -> Hardware:
-    return report().hardware()
-
-
 def needed_bytes(weights_bytes: int) -> int:
     return int(weights_bytes * INFERENCE_OVERHEAD) + FIXED_OVERHEAD
 

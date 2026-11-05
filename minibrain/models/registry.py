@@ -445,16 +445,6 @@ def check_repair(session: Session, model: Model, source: str, connection_id: int
     policy.outbound(hub.endpoint())
 
 
-def hub_repairable(session: Session, model: Model) -> bool:
-    policy = load_policy(session)
-    return (
-        bool(model.repo and model.revision and model.files)
-        and not hub.offline()
-        and policy.outbound_allowed(hub.endpoint())
-        and policy["model_sources"] != "imports"
-    )
-
-
 def start_repair(session: Session, settings: Settings, model: Model) -> Job:
     ensure_idle(session, model)
     if not model.files:

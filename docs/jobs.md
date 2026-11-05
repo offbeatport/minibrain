@@ -4,10 +4,11 @@ Every long-running task is a job on one contract. `main` owns job state; workers
 
 | Kind | Does | Produces |
 |---|---|---|
-| `prepare` | Reads the source, applies the mapping or SQL, cleans, splits, hashes | Snapshot |
 | `train` | LoRA training on a snapshot | Adapter, checkpoints |
 | `eval` | Scores a version on the held-out and test splits | Eval results |
+| `judge` | Scores answers with a judge model and caches each score | Judge scores |
 | `download` / `import` | Fetches pinned model weights from the hub, a mirror, S3 or a folder | Model files |
+| `verify` / `repair` | Re-hashes a base's files; fetches the damaged ones again | File states, model files |
 | `catalog_sync` | Reads our catalogue URL | Catalogue entries |
 | `label` | Teacher labels rows or generates Q&A | Labelled data |
 | `index` | Embeds sources, builds the retrieval index | Index |

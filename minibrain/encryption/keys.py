@@ -25,7 +25,6 @@ from minibrain.settings import Settings
 KEY_ENV = "MINIBRAIN_MASTER_KEY_FILE"
 KEY_DIR = "keys"
 KEY_FILE = "master.key"
-LEGACY_KEY = "master.key"
 OFF = "off"
 POLICY = "encryption"
 RECORDS = "encryption.keys"
@@ -53,7 +52,7 @@ def key_file(settings: Settings) -> KeyFile:
     explicit = os.environ.get(KEY_ENV, "").strip()
     if explicit:
         return KeyFile(Path(explicit).expanduser(), mounted=True)
-    return KeyFile(settings.home / KEY_DIR / KEY_FILE, mounted=False, legacy=settings.home / "secrets" / LEGACY_KEY)
+    return KeyFile(settings.home / KEY_DIR / KEY_FILE, mounted=False)
 
 
 def local_provider(settings: Settings, _values: dict[str, Any], may_create: bool) -> KeyProvider:
@@ -161,12 +160,6 @@ class Keys:
             return True
         target = self.target()
         return wrapped.provider == target.kind and wrapped.key == target.current()
-
-    def local_ring(self) -> LocalKeys | None:
-        try:
-            return LocalKeys(key_file(self.settings), may_create=False)
-        except KeyUnavailableError:
-            return None
 
 
 KEYS: dict[tuple[str, str], Keys] = {}

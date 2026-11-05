@@ -105,7 +105,6 @@ const AVAILABILITY_LABELS: Record<string, string> = {
     importing: "Importing",
     missing: "Missing files",
     not_downloaded: "Not downloaded",
-    evicted: "Removed to free space",
 };
 const AVAILABILITY_TONES: Record<string, Tone> = {
     available: "success",
@@ -113,7 +112,6 @@ const AVAILABILITY_TONES: Record<string, Tone> = {
     importing: "info",
     missing: "destructive",
     not_downloaded: "neutral",
-    evicted: "neutral",
 };
 const ACTIVITY_TONES: Record<string, Tone> = {
     running: "info",
@@ -158,10 +156,7 @@ export function Availability({ row }: { row: ModelRow }) {
     if (state === "none") {
         return <span className="text-muted-foreground">—</span>;
     }
-    const label =
-        state === "evicted" && row.health?.state === "evicted"
-            ? row.health.label
-            : AVAILABILITY_LABELS[state];
+    const label = AVAILABILITY_LABELS[state];
     const moving = state === "downloading" || state === "importing";
     const subject = moving && row.kind === "custom" ? `${label} base` : label;
     return (

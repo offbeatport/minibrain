@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session, object_session
 
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.connections.store import get_connection, resolve
-from minibrain.data.dataset_folders import free_dataset_name
 from minibrain.data.delta import DELTA, LOG, delta_state, local_path, refuse_remote
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
 from minibrain.data.names import free_name, same_name
@@ -451,24 +450,6 @@ def sources_in(session: Session, sql: str, fallback: Sequence[Source] = ()) -> l
     if not found:
         raise SourceError("the query reads no source: use one of the table names listed beside the editor")
     return sorted(found, key=lambda source: source.table_name)
-
-
-def attach_upload(
-    session: Session,
-    settings: Settings,
-    store: ArtifactStore,
-    minibrain: Minibrain,
-    filename: str,
-    stream: BinaryIO,
-) -> Dataset:
-    source = add_source(session, store, filename, stream).source
-    dataset = minibrain.dataset
-    if dataset is not None and len(dataset.minibrains) == 1:
-        map_columns(settings, store, dataset, source)
-        return dataset
-    created = add_dataset(session, settings, store, free_dataset_name(session, minibrain.name, None), source)
-    minibrain.dataset = created
-    return created
 
 
 def dataset_of(minibrain: Minibrain) -> Dataset:

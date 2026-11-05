@@ -46,18 +46,14 @@ const ACTIONS: Record<string, string> = {
     "model.delete": "Model delete started",
     "model.delete_finished": "Model delete finished",
     "model.deploy": "Model deployed",
-    "model.evict": "Model files removed",
     "model.reimport": "Model re-imported",
     "model.request_bodies": "Request inputs and answers changed",
     "model.relocate": "Model moved",
-    "model.remove_files": "Model files removal started",
-    "model.remove_files_finished": "Model files removal finished",
     "model.repair": "Model repaired",
     "model.undeploy": "Model undeploy started",
     "model.undeploy_finished": "Model undeploy finished",
     "model.verify": "Model files checked",
     "policy.update": "Policy changed",
-    "settings.model_cache": "Model cache changed",
     "storage.update": "Storage changed",
     "version.card": "Model card edited",
     "version.create": "Version created",
@@ -202,9 +198,6 @@ export function targetLabel(event: AuditEvent, policies: Map<string, PolicyInfo>
     if (event.action === "audit.prune") {
         return "Audit log";
     }
-    if (event.action === "settings.model_cache") {
-        return "Model cache";
-    }
     const name = typeof detail.name === "string" && detail.name ? detail.name : event.target;
     const version = event.action.startsWith("version.") ? event.target.split("@")[1] : undefined;
     return version && name !== event.target ? `${name} v${version}` : name;
@@ -278,10 +271,6 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "feedback.reject": () => "Kept out of the training data",
     "model.delete": (detail) =>
         typeof detail.size_bytes === "number" ? `Freed ${bytes(detail.size_bytes)}` : "Deleted",
-    "model.evict": (detail) =>
-        typeof detail.size_bytes === "number"
-            ? `Freed ${bytes(detail.size_bytes)} to stay under the cache budget`
-            : "Removed to stay under the cache budget",
     "model.reimport": (detail) => `From ${plainValue(detail.source)}`,
     "model.relocate": (detail) => `${plainValue(detail.from)} → ${plainValue(detail.to)}`,
     "model.repair": (detail) => `From ${plainValue(detail.source)}`,

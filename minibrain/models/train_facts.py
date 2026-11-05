@@ -68,10 +68,6 @@ def trainer_machines(found: list[Pool]) -> list[Machine]:
     ]
 
 
-def pool_trainers(pool: Pool) -> list[Machine]:
-    return trainer_machines([pool])
-
-
 @lru_cache(maxsize=32)
 def longest_example(location: str, max_rows: int) -> tuple[int, int]:
     examples = read_split(location, "train")[:max_rows]

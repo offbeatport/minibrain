@@ -18,7 +18,6 @@ class KindPolicy:
 
 
 POLICIES: dict[str, KindPolicy] = {
-    JobKind.PREPARE: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=1), needs_gpu=False),
     JobKind.TRAIN: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=24), needs_gpu=True),
     JobKind.EVAL: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=4), needs_gpu=True),
     JobKind.JUDGE: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=4), needs_gpu=True),

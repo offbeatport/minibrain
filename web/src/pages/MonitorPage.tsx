@@ -56,7 +56,6 @@ const STATES: { key: string; label: string }[] = [
 ];
 
 const KINDS: Record<string, string> = {
-    prepare: "Data build",
     train: "Training",
     eval: "Scoring",
     download: "Download",

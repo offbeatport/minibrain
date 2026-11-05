@@ -40,7 +40,6 @@ class FeedbackStatus(StrEnum):
 
 
 class JobKind(StrEnum):
-    PREPARE = "prepare"
     TRAIN = "train"
     EVAL = "eval"
     DOWNLOAD = "download"
@@ -57,7 +56,6 @@ class ModelStatus(StrEnum):
     AVAILABLE = "available"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    EVICTED = "evicted"
 
 
 class TeardownKind(StrEnum):
@@ -210,9 +208,6 @@ class Minibrain(Base):
     graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     promotion: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
-    snapshot_id: Mapped[int | None] = mapped_column(
-        ForeignKey("snapshots.id", ondelete="SET NULL", use_alter=True), default=None
-    )
     current_version: Mapped[int | None] = mapped_column(default=None)
     deployed: Mapped[bool] = mapped_column(default=False, server_default=false())
     last_version: Mapped[int] = mapped_column(default=-1, server_default="-1")
@@ -223,10 +218,6 @@ class Minibrain(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="minibrains")
-    snapshot: Mapped["Snapshot | None"] = relationship(foreign_keys=[snapshot_id], post_update=True)
-    snapshots: Mapped[list["Snapshot"]] = relationship(
-        back_populates="minibrain", cascade="all, delete-orphan", foreign_keys="Snapshot.minibrain_id"
-    )
     versions: Mapped[list["Version"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
     key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="minibrain", cascade="all, delete-orphan")
@@ -242,15 +233,13 @@ class Snapshot(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    minibrain_id: Mapped[int | None] = mapped_column(ForeignKey("minibrains.id", ondelete="CASCADE"), default=None)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     number: Mapped[int | None] = mapped_column(default=None)
     base_id: Mapped[int | None] = mapped_column(
         ForeignKey("snapshots.id", ondelete="SET NULL", name="fk_snapshots_base"), default=None
     )
     hash: Mapped[str]
-    directory: Mapped[str | None] = mapped_column(default=None)
-    artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
     counts: Mapped[dict[str, int]] = mapped_column(JSON)
     labels: Mapped[list[str]] = mapped_column(JSON)
     rows: Mapped[int] = mapped_column(default=0, server_default="0")
@@ -263,7 +252,6 @@ class Snapshot(Base):
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     feedback_rows: Mapped[int] = mapped_column(default=0, server_default="0")
 
-    minibrain: Mapped[Minibrain | None] = relationship(back_populates="snapshots", foreign_keys=[minibrain_id])
     dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
     versions: Mapped[list["Version"]] = relationship(back_populates="snapshot")
     base: Mapped["Snapshot | None"] = relationship(remote_side="Snapshot.id", back_populates="copies")
@@ -286,7 +274,6 @@ class Version(Base):
     shots: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     graders: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    adapter_dir: Mapped[str | None] = mapped_column(default=None)
     adapter_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
     base_hash: Mapped[str | None] = mapped_column(default=None)
     recipe: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -582,8 +569,6 @@ class Model(Base):
     health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
-    evicted_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    evicted_by: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

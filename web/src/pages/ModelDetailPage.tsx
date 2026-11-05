@@ -134,18 +134,10 @@ function HealthNotice({
         return null;
     }
     const actions = run ? health.actions.filter(shown) : [];
-    const removed = health.state === "evicted";
     return (
-        <div
-            className={cn(
-                "flex flex-wrap items-start justify-between gap-3 rounded-md border p-3 text-sm",
-                removed
-                    ? "border-info/40 bg-info-soft"
-                    : "border-destructive/40 bg-destructive-soft",
-            )}
-        >
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive-soft p-3 text-sm">
             <div className="flex min-w-0 max-w-3xl flex-col gap-1">
-                <StatusText tone={removed ? "info" : "destructive"} className="font-semibold">
+                <StatusText tone="destructive" className="font-semibold">
                     {health.label}
                 </StatusText>
                 <p>{health.detail}</p>

@@ -141,8 +141,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
         const variant = entry.variants.find((item) => item.id === state.variant) ?? bestFit(entry);
         const installed = entry.added.find(
             (added) =>
-                added.variant_id === variant.id &&
-                !["not_downloaded", "evicted"].includes(added.availability.state),
+                added.variant_id === variant.id && added.availability.state !== "not_downloaded",
         );
         const data = catalog.data;
         const blocked = installed

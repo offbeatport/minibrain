@@ -30,11 +30,6 @@ from minibrain.tasks.service import graded, graders_of, judge_keys, judge_scores
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
 
 
-def forget_removal(model: Model) -> None:
-    model.evicted_at = None
-    model.evicted_by = None
-
-
 class DomainEffects:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -100,7 +95,6 @@ class DomainEffects:
         model.error = None
         model.verified_at = now()
         model.last_used_at = now()
-        forget_removal(model)
         set_health(model, None)
         self.score_waiting(session, model.id)
 
@@ -135,15 +129,11 @@ class DomainEffects:
         model = session.get(Model, job.model_id) if job.model_id else None
         if model is None:
             return
-        restored = model.status == ModelStatus.EVICTED
         apply_repair(model, list((job.result or {}).get("files", [])))
         model.store = str(job.params.get("store") or model.store)
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()
-        if restored:
-            model.last_used_at = now()
-            forget_removal(model)
 
     def trained(self, session: Session, job: Job) -> None:
         version = job.version

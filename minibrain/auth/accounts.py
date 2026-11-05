@@ -172,10 +172,6 @@ def checked_session(session: Session, token: str) -> tuple[LoginSession | None, 
     return row, None
 
 
-def live_session(session: Session, token: str) -> LoginSession | None:
-    return checked_session(session, token)[0]
-
-
 def end_session(session: Session, token: str) -> None:
     session.execute(delete(LoginSession).where(LoginSession.token_hash == token_digest(token)))
 

@@ -244,10 +244,10 @@ def infrastructure(
 
 
 def snapshot_usage(session: Session) -> SnapshotUsage:
-    snapshots = session.scalars(select(Snapshot).where(Snapshot.minibrain_id.is_(None))).all()
+    snapshots = session.scalars(select(Snapshot)).all()
     used = set(session.scalars(select(Version.snapshot_id)))
     used |= {snapshot.base_id for snapshot in snapshots if snapshot.id in used and snapshot.base_id is not None}
-    stored = {snapshot.artifact_id: snapshot.size for snapshot in snapshots if snapshot.artifact_id}
+    stored = {snapshot.artifact_id: snapshot.size for snapshot in snapshots}
     return SnapshotUsage(
         count=len(snapshots),
         size=sum(stored.values()),

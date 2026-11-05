@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
-import { type JobInfo, type MinibrainDetail, type VersionCreate, api, unwrap } from "~/api/client";
+import { type MinibrainDetail, type VersionCreate, api, unwrap } from "~/api/client";
 import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
@@ -238,11 +238,9 @@ function prepareHint(dataset: string, mapped: boolean, preparing: boolean): stri
 
 function AddTrainingData({
     detail,
-    jobs,
     onPrepared,
 }: {
     detail: MinibrainDetail;
-    jobs: JobInfo[];
     onPrepared: () => void;
 }) {
     const slug = detail.slug;
@@ -250,8 +248,6 @@ function AddTrainingData({
     const datasets = useDatasets();
     const [dataset, setDataset] = useState(detail.dataset ?? "");
     const mapped = Boolean(datasets.data?.find((item) => item.slug === dataset)?.mapping.sql);
-    const job = jobs.find((item) => item.kind === "prepare");
-    const preparing = job !== undefined && isActiveJob(job);
     const prepare = useMutation({
         mutationFn: async () => {
             const path = { params: { path: { slug } } };
@@ -261,7 +257,7 @@ function AddTrainingData({
         onSuccess: onPrepared,
         onSettled: invalidate,
     });
-    const busy = prepare.isPending || preparing;
+    const busy = prepare.isPending;
     return (
         <PanelSection
             icon={Database}
@@ -283,18 +279,6 @@ function AddTrainingData({
                         </output>
                     </div>
                     <ErrorLine error={prepare.error} />
-                    {job && job.status !== "succeeded" && (
-                        <>
-                            {!isActiveJob(job) && (
-                                <p className="text-sm text-destructive">
-                                    {job.status === "cancelled"
-                                        ? "Preparing was cancelled. Prepare again when you are ready."
-                                        : "Preparing failed. Check the columns, or choose other data with more labelled rows, then prepare again."}
-                                </p>
-                            )}
-                            <JobPanel job={job} slug={slug} />
-                        </>
-                    )}
                 </div>
             </div>
         </PanelSection>
@@ -309,17 +293,10 @@ export function Training({ slug }: { slug: string }) {
         return null;
     }
     if (!detail.snapshot) {
-        return (
-            <AddTrainingData
-                detail={detail}
-                jobs={jobs ?? []}
-                onPrepared={() => setPrepared(true)}
-            />
-        );
+        return <AddTrainingData detail={detail} onPrepared={() => setPrepared(true)} />;
     }
-    const versionJobs = (jobs ?? []).filter((job) => job.kind !== "prepare");
-    const active = versionJobs.filter(isActiveJob);
-    const finished = versionJobs.filter((job) => !isActiveJob(job)).slice(0, FINISHED_SHOWN);
+    const active = (jobs ?? []).filter(isActiveJob);
+    const finished = (jobs ?? []).filter((job) => !isActiveJob(job)).slice(0, FINISHED_SHOWN);
     return (
         <>
             <CreateVersion detail={detail} focusTrain={prepared} />

@@ -39,7 +39,6 @@ class KeyProvider(Protocol):
 class KeyFile:
     path: Path
     mounted: bool
-    legacy: Path | None = None
 
 
 def key_id(key: bytes) -> str:
@@ -117,11 +116,7 @@ class LocalKeys:
             return
         if self.source.mounted:
             raise KeyUnavailableError(f"the master key file {path} does not exist")
-        legacy = self.source.legacy
-        if legacy is not None and legacy.is_file():
-            create_exclusive(path, ring_text(parse_ring(legacy, legacy.read_text())))
-            legacy.unlink(missing_ok=True)
-        elif may_create:
+        if may_create:
             create_exclusive(path, ring_text([new_key()]))
         else:
             raise KeyUnavailableError(
@@ -163,9 +158,6 @@ class LocalKeys:
             return open_bytes(master, wrapped.blob, wrap_context(context))
         except EnvelopeError as error:
             raise EnvelopeError(f"the data key does not open with local master key {wrapped.key}") from error
-
-    def legacy_keys(self) -> list[bytes]:
-        return list(reversed(self.refresh()))
 
     def rotate(self) -> str:
         if self.source.mounted:

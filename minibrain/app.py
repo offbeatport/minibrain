@@ -76,7 +76,7 @@ from minibrain.policy import load as load_policy
 from minibrain.provision import check_config
 from minibrain.recent_logs import capture
 from minibrain.registry.db import make_sessions, migrate
-from minibrain.registry.files import MissingArtifactError, backfill, store_for
+from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
 from minibrain.registry.service import ConflictError, ModelNameError, NameTakenError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
@@ -93,7 +93,7 @@ from minibrain.versions import library_version
 
 EXPIRY_SECONDS = 5.0
 API_PREFIXES = ("api/", "v1/", "internal/", "healthz", "readyz", "metrics")
-RETIRED_PATHS = frozenset({"docs", "docs/oauth2-redirect", "redoc", "openapi.json"})
+FASTAPI_DOC_PATHS = frozenset({"docs", "docs/oauth2-redirect", "redoc", "openapi.json"})
 
 ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
@@ -139,7 +139,7 @@ def mount_web(app: FastAPI, dist: Path, ui_url: str | None = None) -> None:
 
     @app.get("/{path:path}", include_in_schema=False)
     def web(path: str, request: Request) -> Response:
-        if path.startswith(API_PREFIXES) or path in RETIRED_PATHS:
+        if path.startswith(API_PREFIXES) or path in FASTAPI_DOC_PATHS:
             raise HTTPException(status_code=404)
         if ui_url:
             query = f"?{request.url.query}" if request.url.query else ""
@@ -219,7 +219,6 @@ def create_app(
     with sessions() as session:
         ensure_master_key(session, keys_for(settings), SYSTEM_ACTOR)
         session.commit()
-        backfill(session, settings)
         seed(session)
         sync_declared(session)
         csrf_key = ensure_csrf_key(session)

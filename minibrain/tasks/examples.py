@@ -97,10 +97,6 @@ def encode_turns(turns: Sequence[Turn]) -> str:
     return json.dumps([turn.as_message() for turn in turns], ensure_ascii=False, separators=(",", ":"))
 
 
-def decode_turns(text: str) -> tuple[Turn, ...]:
-    return tuple(Turn(str(item["role"]), str(item["content"])) for item in json.loads(text))
-
-
 def as_record(example: Example) -> dict[str, Any]:
     return {"messages": example.messages(), "expected": example.expected}
 

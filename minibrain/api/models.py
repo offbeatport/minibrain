@@ -41,7 +41,6 @@ from minibrain.models.registry import (
     start_verify,
     store_label,
 )
-from minibrain.models.sources import configured
 from minibrain.models.usage import touch
 from minibrain.registry.models import AuditEvent, CatalogModel, Model, ModelStatus, now
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -142,11 +141,6 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
 @router.get("", dependencies=[Depends(viewer)])
 def list_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
     return all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
-
-
-@router.get("/sources", dependencies=[Depends(viewer)])
-def model_sources() -> list[dict[str, Any]]:
-    return configured()
 
 
 @router.post("/inspect", dependencies=[Depends(admin)])

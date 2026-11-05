@@ -97,11 +97,7 @@ def latest_version(dataset: Dataset) -> Snapshot | None:
 
 
 def latest_snapshot(minibrain: Minibrain) -> Snapshot | None:
-    if minibrain.dataset is not None:
-        return latest_version(minibrain.dataset)
-    if minibrain.snapshot is not None:
-        return minibrain.snapshot
-    return max(minibrain.snapshots, key=lambda snapshot: snapshot.id, default=None)
+    return latest_version(minibrain.dataset) if minibrain.dataset is not None else None
 
 
 def find_version(minibrain: Minibrain, number: int) -> Version | None:
@@ -167,9 +163,3 @@ def drop_orphan_keys(session: Session) -> None:
     session.flush()
     session.execute(delete(ApiKey).where(~ApiKey.scopes.any()), execution_options={"synchronize_session": False})
     session.expire_all()
-
-
-def find_key(session: Session, raw: str) -> ApiKey | None:
-    if not raw.startswith(KEY_PREFIX):
-        return None
-    return session.scalar(select(ApiKey).where(ApiKey.digest == key_digest(raw)))

@@ -1,5 +1,5 @@
 import { Badge } from "obp-ui";
-import type { JobInfo, VersionInfo } from "~/api/client";
+import type { JobInfo } from "~/api/client";
 
 type Variant = "success" | "info" | "approval" | "neutral" | "warning" | "destructive";
 
@@ -37,14 +37,6 @@ export function versionStateLabel(state: string): string {
 export function VersionState({ version }: { version: { status: string; live: boolean } }) {
     if (version.live) {
         return <Badge variant="success">Live</Badge>;
-    }
-    const badge = VERSION_BADGE[version.status] ?? { variant: "neutral", label: version.status };
-    return <Badge variant={badge.variant}>{badge.label}</Badge>;
-}
-
-export function VersionStatus({ version }: { version: VersionInfo }) {
-    if (version.current) {
-        return <Badge variant="success">Current</Badge>;
     }
     const badge = VERSION_BADGE[version.status] ?? { variant: "neutral", label: version.status };
     return <Badge variant={badge.variant}>{badge.label}</Badge>;

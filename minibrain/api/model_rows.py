@@ -17,7 +17,6 @@ from minibrain.api.schemas import (
     DeploymentState,
     Health,
     ModelRow,
-    Stage,
     TeardownInfo,
     Usage,
     VersionRow,
@@ -28,7 +27,6 @@ from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
 from minibrain.models.registry import files_present
 from minibrain.models.rules import publisher_of
-from minibrain.models.sources import HUB
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     CatalogVariant,
@@ -57,7 +55,6 @@ from minibrain.tasks.service import decision, held_out_score, version_metric
 FAILED_LABELS: dict[str, str] = {
     JobKind.TRAIN: "Training failed",
     JobKind.EVAL: "Scoring failed",
-    JobKind.PREPARE: "Dataset build failed",
     JobKind.DOWNLOAD: "Download failed",
     JobKind.IMPORT: "Import failed",
     JobKind.VERIFY: "Verify failed",
@@ -92,8 +89,6 @@ def running_progress(job: Job) -> float | None:
 
 def version_label(job: Job) -> str:
     number = job.version.number if job.version is not None else None
-    if job.kind == JobKind.PREPARE:
-        return "Building dataset"
     verb = "training" if job.kind == JobKind.TRAIN else "evaluating"
     return f"v{number} {verb}" if number is not None else verb.capitalize()
 
@@ -136,66 +131,8 @@ def custom_activity(minibrain: Minibrain, jobs: list[Job]) -> Activity:
     return Activity(state="idle", label="No active jobs")
 
 
-def data_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
-    job = active.get(JobKind.PREPARE)
-    if job is not None:
-        return Stage(key="data", state="active", label="Building dataset", progress=running_progress(job))
-    snapshot = latest_snapshot(minibrain)
-    if snapshot is not None:
-        return Stage(key="data", state="done", label=f"{sum(snapshot.counts.values()):,} examples")
-    if failed is not None and failed.kind == JobKind.PREPARE:
-        return Stage(key="data", state="failed", label="Dataset build failed")
-    return Stage(key="data", state="todo", label="Add training data")
-
-
-def train_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
-    job = active.get(JobKind.TRAIN)
-    if job is not None:
-        return Stage(key="train", state="active", label=version_label(job), progress=running_progress(job))
-    if failed is not None and failed.kind == JobKind.TRAIN:
-        return Stage(key="train", state="failed", label=FAILED_LABELS[JobKind.TRAIN])
-    built = [v.number for v in minibrain.versions if v.status != VersionStatus.FAILED]
-    if built:
-        return Stage(key="train", state="done", label=f"v{max(built)}")
-    return Stage(key="train", state="todo", label="Train")
-
-
 def scored(minibrain: Minibrain) -> list[Version]:
     return [v for v in minibrain.versions if v.status == VersionStatus.READY and v.metrics]
-
-
-def evaluate_stage(minibrain: Minibrain, active: dict[str, Job], failed: Job | None) -> Stage:
-    job = active.get(JobKind.EVAL)
-    if job is not None:
-        return Stage(key="evaluate", state="active", label=version_label(job), progress=running_progress(job))
-    if failed is not None and failed.kind == JobKind.EVAL:
-        return Stage(key="evaluate", state="failed", label=FAILED_LABELS[JobKind.EVAL])
-    latest = max(scored(minibrain), key=lambda v: v.number, default=None)
-    score = held_out_score(latest) if latest is not None else None
-    if latest is not None and score is not None:
-        return Stage(key="evaluate", state="done", label=f"{score:.0%} on v{latest.number}")
-    return Stage(key="evaluate", state="todo", label="Score")
-
-
-def deploy_stage(minibrain: Minibrain) -> Stage:
-    if minibrain.deployed:
-        live = f"v{minibrain.current_version}" if minibrain.current_version is not None else "Base model"
-        return Stage(key="deploy", state="done", label=f"{live} live")
-    return Stage(key="deploy", state="todo", label="Not deployed")
-
-
-def custom_stages(minibrain: Minibrain, jobs: list[Job]) -> list[Stage]:
-    active: dict[str, Job] = {}
-    for job in jobs:
-        if job.status in ACTIVE_JOB_STATUSES:
-            active.setdefault(job.kind, job)
-    failed = jobs[0] if jobs and jobs[0].status == JobStatus.FAILED else None
-    return [
-        data_stage(minibrain, active, failed),
-        train_stage(minibrain, active, failed),
-        evaluate_stage(minibrain, active, failed),
-        deploy_stage(minibrain),
-    ]
 
 
 def promotion_of(minibrain: Minibrain, version: Version) -> DecisionInfo | None:
@@ -407,7 +344,6 @@ def custom_row(
         versions=version_rows(minibrain, jobs, version_usage or {}, base_hash, prices),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
-        stages=custom_stages(minibrain, jobs),
         score=held_out_score(shown) if shown is not None else None,
         metric=version_metric(shown) if shown is not None else None,
         usage=usage,
@@ -423,27 +359,7 @@ def base_availability(model: Model, job: Job | None, settings: Settings) -> Avai
         return Availability(state=state, progress=progress, job_id=job.id if job else None)
     if model.status == ModelStatus.AVAILABLE:
         return Availability(state="available" if files_present(settings, model) else "missing")
-    if model.status == ModelStatus.EVICTED:
-        return restoring_availability(job)
     return Availability(state="not_downloaded", job_id=job.id if job else None)
-
-
-def restoring(job: Job | None) -> bool:
-    return job is not None and job.kind == JobKind.REPAIR and job.status in ACTIVE_JOB_STATUSES
-
-
-def restoring_availability(job: Job | None) -> Availability:
-    if job is None or not restoring(job):
-        return Availability(state="evicted")
-    state: AvailabilityState = "downloading" if job.params.get("source") == HUB else "importing"
-    return Availability(state=state, progress=running_progress(job), job_id=job.id)
-
-
-def restored_label(activity: Activity, job: Job | None) -> Activity:
-    if job is None or not restoring(job):
-        return activity
-    verb = "Downloading again" if job.params.get("source") == HUB else "Re-importing"
-    return activity.model_copy(update={"label": activity.label.replace("Repairing", verb)})
 
 
 def base_activity(job: Job | None) -> Activity:
@@ -465,8 +381,6 @@ def base_row(
 ) -> ModelRow:
     availability = base_availability(model, job, settings)
     activity = base_activity(job)
-    if model.status == ModelStatus.EVICTED:
-        activity = restored_label(activity, job)
     problem = base_health(model, job, context or HealthContext(settings=settings, hub_ok=False))
     variant = model.variant
     latest = variant.latest_revision if variant is not None else None

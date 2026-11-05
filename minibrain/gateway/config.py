@@ -177,10 +177,6 @@ def base_route(model: Model) -> Route:
     return base_route_for(model.id)
 
 
-def removed_problem(model: Model) -> str:
-    return f"{model.name}'s files were removed; download it again on the Models page."
-
-
 def build_config(session: Session, store: ArtifactStore, settings: Settings, engines: Replicas) -> GatewayConfig:
     policy = load_policy(session)
     teardowns = list(session.scalars(select(Teardown)))
@@ -203,9 +199,6 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     problems: dict[str, str] = {}
     for key in sorted({route.base_model for route in routes.values()}):
         model = session.get(Model, key)
-        if model is not None and model.status == ModelStatus.EVICTED:
-            problems[key] = removed_problem(model)
-            continue
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()
         except NotFoundError:

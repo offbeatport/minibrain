@@ -96,7 +96,6 @@ ROUTE_ROLES = {
     ("POST", "/api/sources/iceberg"): "builder",
     ("POST", "/api/sources/delta"): "builder",
     ("GET", "/api/models"): "viewer",
-    ("GET", "/api/models/sources"): "viewer",
     ("POST", "/api/models/inspect"): "admin",
     ("POST", "/api/models/import"): "admin",
     ("GET", "/api/models/base/{key}"): "viewer",
@@ -307,7 +306,7 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     assert all(check["examples"] == [] for check in detail["snapshot"]["checks"])
 
 
-def test_the_old_fastapi_docs_are_gone(harness: Harness) -> None:
+def test_fastapi_doc_paths_are_not_served(harness: Harness) -> None:
     harness.settings.web_dist.mkdir(parents=True, exist_ok=True)
     (harness.settings.web_dist / "index.html").write_text("<!doctype html>")
     anonymous = TestClient(harness.app)

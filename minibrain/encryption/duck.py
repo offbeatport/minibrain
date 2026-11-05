@@ -45,10 +45,6 @@ def staged_url(store: "ArtifactStore", relative: str) -> str:
     return f"{PROTOCOL}://{token_of(store)}/{STAGED}/{relative}"
 
 
-def is_sealed_url(location: str) -> bool:
-    return location.startswith(f"{PROTOCOL}://")
-
-
 class SealingFile(io.RawIOBase):
     def __init__(self, path: Path, keys: KeySource | None, context: bytes) -> None:
         super().__init__()

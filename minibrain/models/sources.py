@@ -31,14 +31,6 @@ class HubGoneError(Exception):
         self.path = path
 
 
-class ModelSource(Protocol):
-    def describe(self) -> str: ...
-
-    def files(self) -> list[dict[str, Any]]: ...
-
-    def chunks(self, path: str) -> Iterator[bytes]: ...
-
-
 class FileSource(Protocol):
     def describe(self) -> str: ...
 
@@ -64,14 +56,6 @@ def location_url(kind: str, location: str) -> str:
     if base is None:
         raise FinalError("Give a full s3:// URL, or set MINIBRAIN_MODELS_S3_URL to a bucket prefix")
     return f"{base}/{location.strip('/')}"
-
-
-def configured() -> list[dict[str, Any]]:
-    return [
-        {"type": HUB, "label": "Hugging Face endpoint", "location": hub.endpoint(), "available": not hub.offline()},
-        {"type": S3, "label": "S3-compatible bucket", "location": s3_base(), "available": True},
-        {"type": FOLDER, "label": "Folder on the server", "location": None, "available": True},
-    ]
 
 
 def connection_filesystem(url: str) -> Any | None:

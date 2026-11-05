@@ -244,13 +244,6 @@ export function useBaseModel(key: string) {
     });
 }
 
-export function useModelSources() {
-    return useQuery({
-        queryKey: ["models", "sources"],
-        queryFn: () => unwrap(api.GET("/api/models/sources")),
-    });
-}
-
 export function usePresets() {
     return useQuery({
         queryKey: keys.presets,

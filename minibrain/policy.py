@@ -353,7 +353,6 @@ OTEL_ENV = {
 }
 OTEL_SIGNAL_ENDPOINTS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
 TRUE = {"1", "true", "yes", "on"}
-RETIRED = {"request_logs": "request metadata is always logged; request_bodies sets whether inputs and answers are kept"}
 Sealer = Callable[[str, str], str]
 
 
@@ -464,11 +463,6 @@ def coerce(field: Field, value: Any) -> Any:
     return choice
 
 
-@functools.cache
-def retired(name: str, source: str) -> None:
-    log.warning("%s sets %s, which is no longer a policy: %s", source, name, RETIRED[name])
-
-
 def implied_locks(found: dict[str, tuple[str, Any]]) -> dict[str, tuple[str, Any]]:
     if "request_bodies" in found and "request_bodies_locked" not in found:
         return {"request_bodies_locked": (found["request_bodies"][0], True)}
@@ -506,8 +500,6 @@ def locked_sources() -> dict[str, tuple[str, Any]]:
     for name, value in from_file().items():
         if name in BY_NAME:
             found[name] = ("config file", from_config(BY_NAME[name], value))
-        elif name in RETIRED:
-            retired(name, "minibrain.yaml")
     auth = config_section("auth")
     if "default_role" in auth:
         found["default_role"] = ("config file", coerce(BY_NAME["default_role"], auth["default_role"]))
@@ -515,9 +507,6 @@ def locked_sources() -> dict[str, tuple[str, Any]]:
     for name, variable in ENV.items():
         if os.environ.get(variable):
             found[name] = ("environment", coerce(BY_NAME[name], os.environ[variable]))
-    for name in RETIRED:
-        if os.environ.get(f"MINIBRAIN_POLICY_{name.upper()}"):
-            retired(name, f"MINIBRAIN_POLICY_{name.upper()}")
     if os.environ.get("MINIBRAIN_OFFLINE", "").strip().lower() in {"1", "true", "yes"}:
         found["network"] = ("environment", "offline")
     return found | implied_locks(found)

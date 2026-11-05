@@ -50,10 +50,6 @@ def artifact_context(artifact_id: str) -> bytes:
     return f"minibrain.artifact.{artifact_id}".encode()
 
 
-def file_context(name: str) -> bytes:
-    return f"minibrain.file.{name}".encode()
-
-
 def unwrap_any(keys: KeySource, header: Header, context: bytes) -> bytes:
     failures: list[Exception] = []
     for slot in header.slots:

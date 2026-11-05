@@ -5,13 +5,12 @@ from typing import Any
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import DateTime, create_engine, event, inspect
+from sqlalchemy import DateTime, create_engine, event
 from sqlalchemy.engine import Dialect, Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.types import TypeDecorator
 
 MIGRATIONS = Path(__file__).parent / "migrations"
-BASELINE = "0001"
 
 
 class Base(DeclarativeBase):
@@ -76,9 +75,6 @@ def migrate(url: str) -> None:
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
     config.attributes["engine"] = engine
-    tables = set(inspect(engine).get_table_names())
-    if "minibrains" in tables and "alembic_version" not in tables:
-        command.stamp(config, BASELINE)
     command.upgrade(config, "head")
     check_foreign_keys(engine)
     engine.dispose()

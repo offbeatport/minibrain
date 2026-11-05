@@ -78,7 +78,7 @@ def test_queries_must_be_one_select_over_known_sources(harness: Harness) -> None
     assert ran.status_code == 200 and len(ran.json()["rows"]) == 4
 
 
-def test_legacy_source_alias_works_for_single_source_datasets(harness: Harness) -> None:
+def test_a_single_source_dataset_can_say_from_source(harness: Harness) -> None:
     tickets = upload(harness, "tickets.csv", tickets_csv())
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": tickets["id"]})
     mapped = harness.client.put(

@@ -22,26 +22,14 @@ def custom_row(harness: Harness, slug: str) -> dict:
     return next(row for row in harness.client.get("/api/models").json() if row["key"] == slug)
 
 
-def test_stages_follow_the_model_from_data_to_deployment(harness: Harness) -> None:
+def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
     harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Support Triage"})
-    stages = custom_row(harness, SLUG)["stages"]
-    assert [(stage["key"], stage["state"], stage["label"]) for stage in stages] == [
-        ("data", "todo", "Add training data"),
-        ("train", "done", "v0"),
-        ("evaluate", "todo", "Score"),
-        ("deploy", "todo", "Not deployed"),
-    ]
     give_data(harness, SLUG)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.8)
     deploy(harness, 1)
     row = custom_row(harness, SLUG)
-    assert [stage["state"] for stage in row["stages"]] == ["done", "done", "done", "done"]
-    assert [stage["label"] for stage in row["stages"]][1:] == ["v1", "80% on v1", "v1 live"]
-    assert row["stages"][0]["label"].endswith(" examples")
     assert (row["score"], row["metric"]) == (0.8, "label_accuracy")
-    add_version(harness, "lora")
-    assert custom_row(harness, SLUG)["stages"][1]["state"] == "active"
 
 
 def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> None:

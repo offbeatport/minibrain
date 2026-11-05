@@ -2,12 +2,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.encryption.keys import keys_for
-from minibrain.registry.models import Artifact, Snapshot, Version
+from minibrain.registry.models import Artifact, Snapshot
 from minibrain.settings import Settings
 
 
@@ -46,11 +45,6 @@ def store_file(session: Session, store: ArtifactStore, path: Path, kind: str) ->
     return register(session, stored.id, kind, Packing.FILE, path.name, stored.size)
 
 
-def store_dir(session: Session, store: ArtifactStore, path: Path, kind: str, name: str) -> Artifact:
-    stored = store.put_dir(path)
-    return register(session, stored.id, kind, Packing.TAR, name, stored.size)
-
-
 def ref(session: Session, artifact_id: str | None) -> dict[str, Any] | None:
     if artifact_id is None:
         return None
@@ -68,34 +62,7 @@ def materialize(session: Session, store: ArtifactStore, artifact_id: str) -> Pat
 
 
 def snapshot_location(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
-    if snapshot.artifact_id is not None:
-        found = ref(session, snapshot.artifact_id)
-        if found is not None and found["packing"] == Packing.FILE:
-            return store.url(found["id"], found["name"])
-        return str(materialize(session, store, snapshot.artifact_id))
-    if snapshot.directory is None:
+    found = ref(session, snapshot.artifact_id)
+    if found is None:
         raise MissingArtifactError(f"snapshot {snapshot.hash[:12]} has no files")
-    return snapshot.directory
-
-
-def adapter_dir(session: Session, store: ArtifactStore, version: Version) -> Path | None:
-    if version.adapter_artifact_id is not None:
-        return materialize(session, store, version.adapter_artifact_id)
-    return Path(version.adapter_dir) if version.adapter_dir else None
-
-
-def backfill(session: Session, settings: Settings) -> int:
-    store = store_for(settings)
-    moved = 0
-    for snapshot in session.scalars(select(Snapshot).where(Snapshot.artifact_id.is_(None))):
-        if snapshot.directory and Path(snapshot.directory).is_dir():
-            artifact = store_dir(session, store, Path(snapshot.directory), ArtifactKind.SNAPSHOT, "snapshot")
-            snapshot.artifact_id = artifact.id
-            moved += 1
-    for version in session.scalars(select(Version).where(Version.adapter_artifact_id.is_(None))):
-        if version.adapter_dir and Path(version.adapter_dir).is_dir():
-            artifact = store_dir(session, store, Path(version.adapter_dir), ArtifactKind.ADAPTER, "adapter")
-            version.adapter_artifact_id = artifact.id
-            moved += 1
-    session.commit()
-    return moved
+    return store.url(found["id"], found["name"])

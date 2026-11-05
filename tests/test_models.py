@@ -339,12 +339,6 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
     }
     harness.client.post("/api/minibrains", json={"labels": ["billing", "bug"], "name": "Draft"})
     assert rows(harness)["draft"]["activity"]["label"] == "v0 ready"
-    assert rows(harness)["draft"]["stages"][0] == {
-        "key": "data",
-        "state": "todo",
-        "label": "Add training data",
-        "progress": None,
-    }
     harness.client.patch("/api/minibrains/draft", json={"tags": ["x"]})
     assert rows(harness)["draft"]["tags"] == ["x"]
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import duckdb
 
-from minibrain.encryption.duck import is_sealed_url, register
+from minibrain.encryption.duck import register
 from minibrain.tasks.contracts import MAX_LABELS
 from minibrain.tasks.examples import ASSISTANT, Example, Turn, turns_of, well_formed
 
@@ -103,10 +103,6 @@ def read_rows(path: Path | str) -> list[Row]:
 @lru_cache(maxsize=8)
 def parquet_splits(path: str) -> dict[str, list[Example]]:
     return split(clean(read_rows(path)))
-
-
-def is_parquet(location: str) -> bool:
-    return is_sealed_url(location) or Path(location).is_file()
 
 
 def labels_of(splits: dict[str, list[Example]]) -> list[str]:

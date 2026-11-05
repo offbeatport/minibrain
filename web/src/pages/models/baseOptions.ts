@@ -75,10 +75,8 @@ export function trainableVariant(entry: CatalogEntry): CatalogVariantInfo | unde
     return byFit(entry.variants.filter(trainable));
 }
 
-const GONE = new Set(["not_downloaded", "evicted"]);
-
 function present(added: AddedInfo): boolean {
-    return !GONE.has(added.availability.state);
+    return added.availability.state !== "not_downloaded";
 }
 
 function variantOf(
@@ -196,7 +194,9 @@ export function localBases(entries: CatalogEntry[], rows: ModelRow[]): BaseOptio
     return rows
         .filter(
             (row) =>
-                row.kind === "base" && !linked.has(row.key) && !GONE.has(row.availability.state),
+                row.kind === "base" &&
+                !linked.has(row.key) &&
+                row.availability.state !== "not_downloaded",
         )
         .map(localOption);
 }

@@ -3405,32 +3405,6 @@
         }
       }
     },
-    "/api/models/sources": {
-      "get": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Model Sources",
-        "operationId": "model_sources_api_models_sources_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response Model Sources Api Models Sources Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/models/inspect": {
       "post": {
         "tags": [
@@ -10064,7 +10038,6 @@
               "importing",
               "missing",
               "not_downloaded",
-              "evicted",
               "none"
             ],
             "title": "State"
@@ -10265,14 +10238,6 @@
               }
             ],
             "title": "Size Bytes"
-          },
-          "stages": {
-            "items": {
-              "$ref": "#/components/schemas/Stage"
-            },
-            "type": "array",
-            "title": "Stages",
-            "default": []
           },
           "score": {
             "anyOf": [
@@ -16425,8 +16390,7 @@
               "cant_run",
               "no_memory",
               "base_changed",
-              "base_unusable",
-              "evicted"
+              "base_unusable"
             ],
             "title": "State"
           },
@@ -16478,8 +16442,7 @@
               "try_again",
               "verify",
               "open_base",
-              "retrain",
-              "download_again"
+              "retrain"
             ],
             "title": "Kind"
           },
@@ -19196,14 +19159,6 @@
               }
             ],
             "title": "Size Bytes"
-          },
-          "stages": {
-            "items": {
-              "$ref": "#/components/schemas/Stage"
-            },
-            "type": "array",
-            "title": "Stages",
-            "default": []
           },
           "score": {
             "anyOf": [
@@ -22753,52 +22708,6 @@
           "scores"
         ],
         "title": "SplitScore"
-      },
-      "Stage": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": [
-              "data",
-              "train",
-              "evaluate",
-              "deploy"
-            ],
-            "title": "Key"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "todo",
-              "active",
-              "done",
-              "failed"
-            ],
-            "title": "State"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "progress": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Progress"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "state",
-          "label"
-        ],
-        "title": "Stage"
       },
       "StorageCheck": {
         "properties": {

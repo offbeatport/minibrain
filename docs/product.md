@@ -119,7 +119,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Discover › model › Download · API: POST /api/catalog/{catalog_id}/download
 - **Import base models** · shipped · admin
   Import weights from a folder or S3 path, checked before copying.
-  UI: Models › Add model › Import · API: GET /api/models/sources, POST /api/models/inspect, POST /api/models/import · Config: MINIBRAIN_MODELS_S3_URL
+  UI: Models › Add model › Import · API: POST /api/models/inspect, POST /api/models/import · Config: MINIBRAIN_MODELS_S3_URL
 - **Models list** · shipped · product, ml
   See custom and base models with status, version and traffic.
   UI: Models · API: GET /api/models

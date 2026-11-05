@@ -9,7 +9,7 @@ import yaml
 from pydantic import BaseModel, Field, StringConstraints, ValidationError
 
 from minibrain.api.schemas import DataSettingsUpdate
-from minibrain.policy import BY_NAME, RETIRED, LockedError, PolicyError, coerce, config_path, from_config
+from minibrain.policy import BY_NAME, LockedError, PolicyError, coerce, config_path, from_config
 
 log = logging.getLogger("minibrain")
 
@@ -204,8 +204,6 @@ def unknown_keys(name: str, section: dict[str, Any], known: Any) -> list[str]:
 def policy_problems(config: dict[str, Any]) -> list[str]:
     warnings = []
     for name, value in raw_section(config, "policy").items():
-        if name in RETIRED:
-            continue
         field_ = BY_NAME.get(name)
         if field_ is None:
             warnings.append(f"minibrain.yaml: unknown policy {name}, ignored")
