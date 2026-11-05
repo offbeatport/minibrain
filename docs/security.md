@@ -72,6 +72,7 @@ People sign in to the UI and `/api`; apps call `/v1` with API keys only, and wor
 ```yaml
 auth:
   default_role: none                  # none, viewer, builder or admin for people with no mapped group
+  admins: [ada@corp.example]          # emails or user names that are always admins; locked in Settings > Accounts
   roles:                              # identity provider group -> role; locked in Settings > Accounts
     minibrain-admins: admin
     ml-team: builder
@@ -80,7 +81,7 @@ auth:
   oidc:
     issuer: https://keycloak.corp/realms/corp
     client_id: minibrain
-    client_secret: ...                # or MINIBRAIN_OIDC_CLIENT_SECRET; omit for a public client
+    client_secret_file: /run/secrets/oidc   # or MINIBRAIN_OIDC_CLIENT_SECRET; omit for a public client
     label: Keycloak
     groups_claim: groups
 ```
@@ -91,7 +92,7 @@ auth:
 |---|---|---|
 | Setup link | The default, native and Docker | The first start with no accounts prints a one-time link that creates the admin |
 | Environment | Automated deploys | `MINIBRAIN_ADMIN_EMAIL` and `MINIBRAIN_ADMIN_PASSWORD_FILE` create the admin on the first start |
-| Single sign-on | OIDC or proxy headers | A group mapped to admin in `minibrain.yaml`; no local admin and no setup link |
+| Single sign-on | OIDC or proxy headers | A group mapped to admin, or a person in `auth.admins`, in `minibrain.yaml`; no local admin and no setup link |
 | Command line | Recovery | `minibrain admin create` adds an admin; `minibrain admin reset-password` sets a new password |
 
 Setup link:
@@ -118,8 +119,8 @@ Environment, for automated deploys:
 - A missing or unreadable password file, a password under 12 characters or a malformed email stops the start with
   the reason.
 
-Single sign-on only: with `auth.oidc` or `auth.proxy` set and `auth.roles` mapping a group to admin (or
-`auth.default_role: admin`), no local admin is needed. minibrain issues no setup link; the first page is sign-in, and
+Single sign-on only: with `auth.oidc` or `auth.proxy` set and `auth.roles` mapping a group to admin, `auth.admins`
+listing people by email or user name (or `auth.default_role: admin`), no local admin is needed. minibrain issues no setup link; the first page is sign-in, and
 whoever signs in from the admin group is an admin. `minibrain admin create` still adds a local admin, such as a
 break-glass account. With single sign-on but no admin group, the setup link is issued as usual.
 

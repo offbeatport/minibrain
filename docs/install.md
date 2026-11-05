@@ -584,6 +584,110 @@ export MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY=/path/to/duckdb-extensions
 DuckDB still checks each extension's signature when it loads it. `minibrain extensions` and Settings → Connections show
 what is installed.
 
+## Config file
+
+`minibrain.yaml` provisions a whole install: policies, sign-in, storage, data limits, prices, the catalogue schedule
+and connections. It lives at `$MINIBRAIN_HOME/minibrain.yaml` (`/data/minibrain.yaml` in Docker), or wherever
+`MINIBRAIN_CONFIG` points. Without it, everything is set in the UI.
+
+- Anything the file sets is locked in the UI: the row shows "Set by config file" and saving it is refused (409).
+  Leave a setting out to keep it editable. `storage:` is all or nothing: once it is there, the UI's storage settings
+  are ignored.
+- `MINIBRAIN_<SECTION>_<KEY>` sets the same keys from the environment and wins over the file, such as
+  `MINIBRAIN_DATA_ROW_LIMIT=500000` or `MINIBRAIN_STORAGE_BUCKET=ml-artifacts` (`storage`, `data`, `catalogue` and
+  `compute.currency`). Policies keep `MINIBRAIN_POLICY_<NAME>`. The UI shows "Set by environment".
+- Secrets never go in the file. Name them instead: `secret_env` (an environment variable) or `secret_file` (a file
+  such as a Docker or Kubernetes secret). A `secret`, `password` or `token` key stops the start with the reason.
+- main checks the file when it starts. A bad value stops it with the key named (`data.row_limit: Input should be
+  greater than or equal to 100`); an unknown section or key is logged as a warning and ignored.
+- `minibrain config export` prints the install's current settings in this format, with every secret named but
+  never included, and a comment listing what to provide on the new server. `minibrain config export >
+  minibrain.yaml` round-trips: starting on it gives the same settings, now locked.
+
+```yaml
+policy:                               # Settings > Security; every name is in docs/security.md
+  network: allowlist                  # open, allowlist or offline
+  allowed_hosts: [hf-mirror.internal, minio.internal]
+  model_sources: approved             # approved, any or imports
+  log_retention_days: 30
+  session_idle_minutes: 480
+  encryption: vault                   # local, vault, hsm, kms or off
+  vault_address: https://vault.internal:8200
+
+auth:                                 # Settings > Accounts
+  default_role: none                  # role for people whose groups map to none
+  admins: [ada@corp.example, grace]   # emails or user names that are admins; needs oidc or proxy below
+  roles:                              # identity provider group -> viewer, builder or admin
+    minibrain-admins: admin
+    ml-team: builder
+  proxy:
+    addresses: [10.0.0.10/32]         # identity headers count only from these addresses
+  oidc:
+    issuer: https://keycloak.corp/realms/corp
+    client_id: minibrain
+    client_secret_file: /run/secrets/oidc   # or MINIBRAIN_OIDC_CLIENT_SECRET
+
+logging:
+  format: json                        # text or json
+
+metrics:
+  addresses: [10.0.0.20/32]           # Prometheus scrapers
+  token_file: /run/secrets/metrics    # or MINIBRAIN_METRICS_TOKEN
+
+storage:                              # Settings > Storage: where artifacts live
+  kind: s3                            # local (under the home folder) or s3
+  endpoint: https://minio.internal:9000
+  bucket: ml-artifacts
+  prefix: minibrain
+  region: ""                          # empty unless the store asks for one
+  access_key: AKIAEXAMPLE             # the key ID, not a secret
+  secret_file: /run/secrets/s3        # or secret_env: NAME; MINIBRAIN_STORAGE_S3_SECRET by default
+
+data:                                 # Settings > Data
+  row_limit: 200000                   # most rows in one dataset version
+  keep_snapshots: 5                   # unused versions kept per dataset
+  checks_off: [personal_data]         # duplicates, conflicts, balance, leakage, length, personal_data
+  majority_share: 0.9                 # warn when one label holds more than this share
+  min_label_rows: 10                  # warn when a label has fewer rows
+
+compute:                              # Settings > General > Compute prices
+  currency: EUR
+  prices:                             # per hour of one pool's GPU time, by pool name
+    local: 2.5
+    a100: 3.2
+
+catalogue:
+  daily_sync: true                    # look for a newer model catalogue once a day
+
+connections:                          # Settings > Connections; keep their ids across restarts by name
+  - name: Exports bucket
+    kind: s3
+    endpoint: https://minio.internal:9000
+    bucket: exports
+    access_key: AKIAEXPORTS
+    secret_env: EXPORTS_S3_SECRET
+  - name: Warehouse
+    kind: postgres                    # or mysql
+    host: db.internal
+    port: 5432
+    database: analytics
+    user: reader
+    ssl_mode: verify-full
+    secret_file: /run/secrets/warehouse
+```
+
+Notes:
+
+- Connections from the file show "Set in minibrain.yaml" and cannot be edited or deleted in the UI. Each keeps its
+  id while its name stays, so sources and imports that use it keep working; renaming it in the file makes a new one.
+  One removed from the file stays, marked, while sources still use it. A connection the UI made becomes managed by
+  the file when the file names it.
+- `auth.admins` names people who sign in with single sign-on or through the proxy; they are admins whatever their
+  groups, need no setup link, and their role is locked. Without `auth.oidc` or `auth.proxy`, it is logged as a
+  warning and the setup link works as before.
+- Pools and machines are not in the file: machines join a pool when their worker or engine starts with `--pool`.
+  Prices are set by pool name, so they apply once a machine joins.
+
 ## Upgrading
 
 Back up the data directory first: stop minibrain and copy the folder, and dump the database too if it is in Postgres.
@@ -630,4 +734,4 @@ installs download the set for the new version. Paths are versioned, so both sets
 | `gateway/`, `engines/`, `worker/` | Copies kept by the gateway, engines and the worker | No: fetched again |
 | `duckdb/extensions/` | Installed DuckDB extensions | No: install again |
 | `huggingface/` | The Hugging Face cache, in Docker. Native installs use `~/.cache/huggingface` | No |
-| `minibrain.yaml` | Optional settings for locked-down installs | Yes |
+| `minibrain.yaml` | Optional settings that provision the install ([Config file](#config-file)) | Yes |

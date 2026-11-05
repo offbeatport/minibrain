@@ -901,6 +901,21 @@ target:
   min_score: 0.85
 ```
 
+
+## Config file
+
+Done (2026-11-05). One `minibrain.yaml` per install, apart from the per-minibrain file above: everything an admin sets
+in the UI can be provisioned from it, so a locked-down or GitOps install starts fully configured with no clicks.
+
+- Sections: `policy`, `auth` (with `admins`, roles by group, proxy, OIDC), `logging`, `metrics`, `storage`, `data`,
+  `compute` (currency and prices by pool), `catalogue` and `connections`. Pools and machines stay runtime: they join
+  with `--pool`.
+- Set in the file or by `MINIBRAIN_<SECTION>_<KEY>` means locked in the UI; the API refuses the change with 409.
+- Secrets are named, never written: `secret_env` or `secret_file`. A secret in the file stops the start.
+- main validates the file at startup and names the key; unknown keys are warnings.
+- `minibrain config export` prints the effective settings in the same format without secrets, and round-trips.
+- Next: hot reload on file change, and a JSON Schema for editors.
+
 ## Observability
 
 Off by default, and only ever towards systems the customer runs. Details: `docs/observability.md`.
