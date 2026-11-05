@@ -66,10 +66,14 @@ export function chosenSettings(choices: TrainingChoices): Chosen {
     ) as Chosen;
 }
 
-export function useTrainingPlan(slug: string, snapshot: number | null, choices: TrainingChoices) {
+export function useTrainingPlan(
+    slug: string,
+    datasetVersion: number | null,
+    choices: TrainingChoices,
+) {
     const query = {
         ...chosenSettings(choices),
-        ...(snapshot === null ? {} : { snapshot_id: snapshot }),
+        ...(datasetVersion === null ? {} : { dataset_version_id: datasetVersion }),
     };
     return useQuery({
         queryKey: [...keys.model(slug), "training-plan", query],

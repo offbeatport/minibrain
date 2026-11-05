@@ -350,6 +350,38 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("dataset_id", "source_id"),
     )
     op.create_table(
+        "dataset_versions",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("dataset_id", sa.Integer(), nullable=True),
+        sa.Column("number", sa.Integer(), nullable=True),
+        sa.Column("base_id", sa.Integer(), nullable=True),
+        sa.Column("hash", sa.String(), nullable=False),
+        sa.Column("artifact_id", sa.String(), nullable=False),
+        sa.Column("counts", sa.JSON(), nullable=False),
+        sa.Column("labels", sa.JSON(), nullable=False),
+        sa.Column("rows", sa.Integer(), nullable=False),
+        sa.Column("size", sa.BigInteger(), nullable=False),
+        sa.Column("fingerprints", sa.JSON(), nullable=True),
+        sa.Column("sql", sa.String(), nullable=True),
+        sa.Column("saved", sa.Boolean(), nullable=False),
+        sa.Column("checks", sa.JSON(), nullable=True),
+        sa.Column("created_at", TIMESTAMP, nullable=False),
+        sa.Column("taken_at", TIMESTAMP, nullable=True),
+        sa.Column("feedback_rows", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["artifact_id"],
+            ["artifacts.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["base_id"], ["dataset_versions.id"], name="fk_dataset_versions_base", ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(["dataset_id"], ["datasets.id"], ondelete="SET NULL"),
+        sa.PrimaryKeyConstraint("id"),
+        sqlite_autoincrement=True,
+    )
+    op.create_index("ix_dataset_versions_hash", "dataset_versions", ["dataset_id", "hash"], unique=False)
+    op.create_index("uq_dataset_versions_number", "dataset_versions", ["dataset_id", "number"], unique=True)
+    op.create_table(
         "models",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("slug", sa.String(), nullable=False),
@@ -375,36 +407,6 @@ def upgrade() -> None:
         sa.UniqueConstraint("slug"),
         sqlite_autoincrement=True,
     )
-    op.create_table(
-        "snapshots",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("dataset_id", sa.Integer(), nullable=True),
-        sa.Column("number", sa.Integer(), nullable=True),
-        sa.Column("base_id", sa.Integer(), nullable=True),
-        sa.Column("hash", sa.String(), nullable=False),
-        sa.Column("artifact_id", sa.String(), nullable=False),
-        sa.Column("counts", sa.JSON(), nullable=False),
-        sa.Column("labels", sa.JSON(), nullable=False),
-        sa.Column("rows", sa.Integer(), nullable=False),
-        sa.Column("size", sa.BigInteger(), nullable=False),
-        sa.Column("fingerprints", sa.JSON(), nullable=True),
-        sa.Column("sql", sa.String(), nullable=True),
-        sa.Column("saved", sa.Boolean(), nullable=False),
-        sa.Column("checks", sa.JSON(), nullable=True),
-        sa.Column("created_at", TIMESTAMP, nullable=False),
-        sa.Column("taken_at", TIMESTAMP, nullable=True),
-        sa.Column("feedback_rows", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["artifact_id"],
-            ["artifacts.id"],
-        ),
-        sa.ForeignKeyConstraint(["base_id"], ["snapshots.id"], name="fk_snapshots_base", ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["dataset_id"], ["datasets.id"], ondelete="SET NULL"),
-        sa.PrimaryKeyConstraint("id"),
-        sqlite_autoincrement=True,
-    )
-    op.create_index("ix_snapshots_dataset_hash", "snapshots", ["dataset_id", "hash"], unique=False)
-    op.create_index("uq_snapshots_dataset_number", "snapshots", ["dataset_id", "number"], unique=True)
     op.create_table(
         "api_key_scopes",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -502,7 +504,7 @@ def upgrade() -> None:
         "versions",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("model_id", sa.Integer(), nullable=False),
-        sa.Column("snapshot_id", sa.Integer(), nullable=True),
+        sa.Column("dataset_version_id", sa.Integer(), nullable=True),
         sa.Column("number", sa.Integer(), nullable=False),
         sa.Column("kind", sa.String(), nullable=False),
         sa.Column("status", sa.String(), nullable=False),
@@ -523,11 +525,11 @@ def upgrade() -> None:
             ["adapter_artifact_id"],
             ["artifacts.id"],
         ),
-        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
-            ["snapshot_id"],
-            ["snapshots.id"],
+            ["dataset_version_id"],
+            ["dataset_versions.id"],
         ),
+        sa.ForeignKeyConstraint(["model_id"], ["models.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("model_id", "number"),
         sqlite_autoincrement=True,
@@ -579,7 +581,7 @@ def upgrade() -> None:
         ["idempotency_key"],
         unique=True,
         sqlite_where=ACTIVE,
-        postgresql_where=ACTIVE,
+        postgresql_where=sa.text("status IN ('queued', 'running')"),
     )
     op.create_table(
         "job_attempts",
@@ -628,8 +630,8 @@ def downgrade() -> None:
     op.drop_table("request_logs")
     op.drop_table("feedback")
     op.drop_table("api_key_scopes")
-    op.drop_table("snapshots")
     op.drop_table("models")
+    op.drop_table("dataset_versions")
     op.drop_table("dataset_sources")
     op.drop_table("datasets")
     op.drop_table("base_models")

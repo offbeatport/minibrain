@@ -102,7 +102,7 @@ def test_replace_changes_the_content_so_datasets_reading_it_need_an_update(harne
     created = harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": first["id"]})
     assert created.status_code == 201, created.text
     assert created.json()["changed"]["data"] is False
-    assert created.json()["snapshot"]["number"] == 1
+    assert created.json()["dataset_version"]["number"] == 1
     replaced = send(harness, "TICKETS.csv", tickets_csv(120), "replace")
     assert replaced.status_code == 200, replaced.text
     body = replaced.json()
@@ -119,7 +119,7 @@ def test_replace_changes_the_content_so_datasets_reading_it_need_an_update(harne
     assert artifacts(harness) == 2
     dataset = harness.client.get("/api/datasets/tickets").json()
     assert dataset["changed"]["data"] is True and dataset["rows"] == 120
-    update = harness.client.post("/api/datasets/tickets/snapshots")
+    update = harness.client.post("/api/datasets/tickets/versions")
     assert update.status_code == 201, update.text
     assert (update.json()["number"], update.json()["rows"]) == (2, 120)
     same = send(harness, "tickets.csv", tickets_csv(120), "replace")

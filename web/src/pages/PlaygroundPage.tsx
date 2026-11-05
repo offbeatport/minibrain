@@ -92,7 +92,7 @@ function Playground({ slug }: { slug: string }) {
     const { data: detail } = useModel(slug);
     const { data: versions } = useVersions(slug);
     const can = useCan();
-    const golden = useGolden(slug, can.build && Boolean(detail?.snapshot));
+    const golden = useGolden(slug, can.build && Boolean(detail?.dataset_version));
     const ready = (versions ?? [])
         .filter((version) => version.status === "ready")
         .map((v) => v.number);

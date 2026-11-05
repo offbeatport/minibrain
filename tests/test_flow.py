@@ -12,9 +12,9 @@ SLUG = "support-triage"
 
 
 def build_dataset(harness: Harness) -> dict[str, Any]:
-    response = harness.client.post(f"/api/models/{SLUG}/snapshots")
+    response = harness.client.post(f"/api/models/{SLUG}/dataset-versions")
     assert response.status_code == 201, response.text
-    return response.json()["snapshot"]
+    return response.json()["dataset_version"]
 
 
 def create_model(harness: Harness, name: str = "Support Triage") -> dict[str, Any]:
@@ -98,13 +98,13 @@ def test_upload_guesses_mapping_and_previews(harness: Harness) -> None:
     assert len(preview["rows"]) == 20
 
 
-def test_snapshot_is_taken_from_the_dataset_without_a_job(harness: Harness) -> None:
-    snapshot = create_with_dataset(harness)
-    assert snapshot["counts"] == {"golden": 20, "eval": 30, "shots": 4, "train": 146}
-    assert snapshot["labels"] == ["account", "billing", "bug", "feature"]
-    assert (snapshot["rows"], snapshot["saved"], snapshot["dataset"]) == (200, True, SLUG)
+def test_dataset_version_is_taken_from_the_dataset_without_a_job(harness: Harness) -> None:
+    dataset_version = create_with_dataset(harness)
+    assert dataset_version["counts"] == {"golden": 20, "eval": 30, "shots": 4, "train": 146}
+    assert dataset_version["labels"] == ["account", "billing", "bug", "feature"]
+    assert (dataset_version["rows"], dataset_version["saved"], dataset_version["dataset"]) == (200, True, SLUG)
     again = build_dataset(harness)
-    assert (again["hash"], again["id"]) == (snapshot["hash"], snapshot["id"])
+    assert (again["hash"], again["id"]) == (dataset_version["hash"], dataset_version["id"])
     golden = harness.client.get(f"/api/models/{SLUG}/golden").json()
     assert len(golden) == 20
     assert harness.client.get(f"/api/jobs?model={SLUG}&kind=prepare").json()["items"] == []

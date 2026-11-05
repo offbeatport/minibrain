@@ -419,7 +419,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
 }
 
 function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const usage = info?.snapshots;
+    const usage = info?.dataset_versions;
     return (
         <PanelSection
             icon={Archive}

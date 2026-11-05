@@ -84,7 +84,7 @@ def test_v0_is_scored_at_once_when_the_model_starts_with_data(harness: Harness) 
     created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
     [v0] = versions(harness, "router")
-    assert (v0["status"], v0["shots"], v0["snapshot_dataset"]) == ("evaluating", 4, dataset)
+    assert (v0["status"], v0["shots"], v0["dataset_slug"]) == ("evaluating", 4, dataset)
     assert sorted(created.json()["contract"]["labels"]) == sorted(LABELS)
     finish(harness, "eval", accuracy=0.9)
     [v0] = versions(harness, "router")

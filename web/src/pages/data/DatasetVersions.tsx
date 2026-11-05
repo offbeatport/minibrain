@@ -4,7 +4,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { useState } from "react";
 import { type DatasetSummary, api, unwrap } from "~/api/client";
-import { type ChangeInfo, type SnapshotInfo, dataKeys, useSnapshots } from "~/api/dataQueries";
+import {
+    type ChangeInfo,
+    type DatasetVersionInfo,
+    dataKeys,
+    useDatasetVersions,
+} from "~/api/dataQueries";
 import { keys } from "~/api/queries";
 import { ErrorLine, Section } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
@@ -14,28 +19,28 @@ import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { VersionDiffDialog, compareParam, parseCompare, versionName } from "./VersionDiff";
 import { modelHref, useModelNames } from "./parts";
 
-export function takenAt(snapshot: SnapshotInfo): string {
-    return snapshot.taken_at ?? snapshot.created_at;
+export function takenAt(datasetVersion: DatasetVersionInfo): string {
+    return datasetVersion.taken_at ?? datasetVersion.created_at;
 }
 
-export function shortId(snapshot: SnapshotInfo): string {
-    return snapshot.hash.slice(0, 12);
+export function shortId(datasetVersion: DatasetVersionInfo): string {
+    return datasetVersion.hash.slice(0, 12);
 }
 
-function shortName(snapshot: SnapshotInfo): string {
-    return snapshot.number === null || snapshot.number === undefined
-        ? versionName(snapshot)
-        : `v${snapshot.number}`;
+function shortName(datasetVersion: DatasetVersionInfo): string {
+    return datasetVersion.number === null || datasetVersion.number === undefined
+        ? versionName(datasetVersion)
+        : `v${datasetVersion.number}`;
 }
 
 export function changeText(
     changed: ChangeInfo | null | undefined,
-    snapshot: SnapshotInfo,
+    datasetVersion: DatasetVersionInfo,
 ): string | null {
     if (!changed) {
         return null;
     }
-    const since = shortName(snapshot);
+    const since = shortName(datasetVersion);
     if (changed.dataset) {
         return `The model now uses another dataset than ${since}`;
     }
@@ -52,7 +57,7 @@ export function useVersionRefresh(slug: string) {
     const client = useQueryClient();
     return () =>
         Promise.all([
-            client.invalidateQueries({ queryKey: dataKeys.snapshots(slug) }),
+            client.invalidateQueries({ queryKey: dataKeys.datasetVersions(slug) }),
             client.invalidateQueries({ queryKey: keys.dataset(slug) }),
             client.invalidateQueries({ queryKey: keys.datasets, exact: true }),
             client.invalidateQueries({ queryKey: ["model"] }),
@@ -65,7 +70,7 @@ export function UpdateVersion({ dataset, label = "Update" }: { dataset: string; 
     const update = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/datasets/{slug}/snapshots", {
+                api.POST("/api/datasets/{slug}/versions", {
                     params: { path: { slug: dataset } },
                 }),
             ),
@@ -88,18 +93,18 @@ export function UpdateVersion({ dataset, label = "Update" }: { dataset: string; 
 
 export function ChangeNotice({
     changed,
-    snapshot,
+    datasetVersion,
     dataset,
     after,
 }: {
     changed: ChangeInfo | null | undefined;
-    snapshot: SnapshotInfo | null | undefined;
+    datasetVersion: DatasetVersionInfo | null | undefined;
     dataset?: string | null;
     after?: string;
 }) {
     const can = useCan();
-    const text = snapshot ? changeText(changed, snapshot) : null;
-    if (!text || !snapshot) {
+    const text = datasetVersion ? changeText(changed, datasetVersion) : null;
+    if (!text || !datasetVersion) {
         return null;
     }
     return (
@@ -107,7 +112,7 @@ export function ChangeNotice({
             <p className="text-sm">
                 <StatusText tone="warning">{text}</StatusText>
                 <span className="text-muted-foreground">
-                    {` · ${shortName(snapshot)} saved ${relativeTime(takenAt(snapshot))}. ${after ?? "Update to save the next version."}`}
+                    {` · ${shortName(datasetVersion)} saved ${relativeTime(takenAt(datasetVersion))}. ${after ?? "Update to save the next version."}`}
                 </span>
             </p>
             {dataset && can.build && <UpdateVersion dataset={dataset} />}
@@ -116,7 +121,7 @@ export function ChangeNotice({
 }
 
 export function FirstVersionNotice({ dataset }: { dataset: DatasetSummary }) {
-    if (dataset.snapshot || !dataset.mapping.sql) {
+    if (dataset.dataset_version || !dataset.mapping.sql) {
         return null;
     }
     return (
@@ -149,14 +154,14 @@ export function RowLimitNotice({ rows, limit }: { rows: number | null; limit: nu
     );
 }
 
-function UsedBy({ snapshot }: { snapshot: SnapshotInfo }) {
+function UsedBy({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
     const nameOf = useModelNames();
-    if (snapshot.versions.length === 0) {
+    if (datasetVersion.versions.length === 0) {
         return <span className="text-muted-foreground">–</span>;
     }
     return (
         <span className="flex min-w-0 flex-wrap gap-x-2">
-            {snapshot.versions.map((tag) => {
+            {datasetVersion.versions.map((tag) => {
                 const [slug, number] = tag.split("@");
                 return (
                     <Link key={tag} href={modelHref(slug)} className="truncate text-primary">
@@ -168,8 +173,8 @@ function UsedBy({ snapshot }: { snapshot: SnapshotInfo }) {
     );
 }
 
-function ChecksSummary({ snapshot }: { snapshot: SnapshotInfo }) {
-    const checks = snapshot.checks ?? [];
+function ChecksSummary({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
+    const checks = datasetVersion.checks ?? [];
     if (checks.length === 0) {
         return <span className="text-muted-foreground">Not run</span>;
     }
@@ -183,11 +188,11 @@ function ChecksSummary({ snapshot }: { snapshot: SnapshotInfo }) {
     );
 }
 
-const VERSION_COLUMNS: ColumnDef<SnapshotInfo, unknown>[] = [
+const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
     {
         id: "version",
         header: "Version",
-        accessorFn: (snapshot) => snapshot.number ?? 0,
+        accessorFn: (datasetVersion) => datasetVersion.number ?? 0,
         cell: ({ row }) => (
             <span className="font-semibold tabular-nums">{`Version ${row.original.number}`}</span>
         ),
@@ -195,7 +200,7 @@ const VERSION_COLUMNS: ColumnDef<SnapshotInfo, unknown>[] = [
     {
         id: "taken",
         header: "Saved",
-        accessorFn: (snapshot) => takenAt(snapshot),
+        accessorFn: (datasetVersion) => takenAt(datasetVersion),
         cell: ({ row }) => (
             <Tooltip>
                 <TooltipTrigger asChild>
@@ -208,13 +213,13 @@ const VERSION_COLUMNS: ColumnDef<SnapshotInfo, unknown>[] = [
     {
         id: "rows",
         header: "Rows",
-        accessorFn: (snapshot) => snapshot.rows,
+        accessorFn: (datasetVersion) => datasetVersion.rows,
         cell: ({ row }) => <span className="tabular-nums">{count(row.original.rows)}</span>,
     },
     {
         id: "labels",
         header: "Labels",
-        accessorFn: (snapshot) => snapshot.labels.length,
+        accessorFn: (datasetVersion) => datasetVersion.labels.length,
         cell: ({ row }) => (
             <span className="tabular-nums">{count(row.original.labels.length)}</span>
         ),
@@ -223,32 +228,34 @@ const VERSION_COLUMNS: ColumnDef<SnapshotInfo, unknown>[] = [
         id: "checks",
         header: "Checks",
         enableSorting: false,
-        cell: ({ row }) => <ChecksSummary snapshot={row.original} />,
+        cell: ({ row }) => <ChecksSummary datasetVersion={row.original} />,
     },
     {
         id: "used",
         header: "Used by",
         enableSorting: false,
-        cell: ({ row }) => <UsedBy snapshot={row.original} />,
+        cell: ({ row }) => <UsedBy datasetVersion={row.original} />,
     },
     {
         id: "size",
         header: "Size",
-        accessorFn: (snapshot) => snapshot.size,
+        accessorFn: (datasetVersion) => datasetVersion.size,
         cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.size)}</span>,
     },
     {
         id: "id",
         header: "SHA-256",
-        accessorFn: (snapshot) => snapshot.hash,
+        accessorFn: (datasetVersion) => datasetVersion.hash,
         cell: ({ row }) => (
             <span className="font-mono text-muted-foreground">{shortId(row.original)}</span>
         ),
     },
 ];
 
-function ordered(pair: string[], snapshots: SnapshotInfo[]): [number, number] | null {
-    const picked = snapshots.filter((snapshot) => pair.includes(String(snapshot.id)));
+function ordered(pair: string[], datasetVersions: DatasetVersionInfo[]): [number, number] | null {
+    const picked = datasetVersions.filter((datasetVersion) =>
+        pair.includes(String(datasetVersion.id)),
+    );
     if (picked.length !== 2) {
         return null;
     }
@@ -257,13 +264,13 @@ function ordered(pair: string[], snapshots: SnapshotInfo[]): [number, number] | 
 }
 
 export function VersionsSection({ dataset }: { dataset: DatasetSummary }) {
-    const snapshots = useSnapshots(dataset.slug);
+    const datasetVersions = useDatasetVersions(dataset.slug);
     const router = useRouter();
     const requested = useRouterState({
         select: (state) => parseCompare((state.location.search as { compare?: unknown }).compare),
     });
     const [selected, setSelected] = useState<string[]>([]);
-    const rows = snapshots.data ?? [];
+    const rows = datasetVersions.data ?? [];
     const pair = ordered(selected, rows);
     const close = () => {
         const params = new URLSearchParams(window.location.search);
@@ -292,14 +299,14 @@ export function VersionsSection({ dataset }: { dataset: DatasetSummary }) {
             }
             flush
         >
-            <ErrorLine error={snapshots.error} />
+            <ErrorLine error={datasetVersions.error} />
             <DataGrid
                 columns={VERSION_COLUMNS}
                 rows={rows}
-                getRowId={(snapshot) => String(snapshot.id)}
+                getRowId={(datasetVersion) => String(datasetVersion.id)}
                 selectedIds={selected}
                 onSelectedIdsChange={(ids) => setSelected(ids.slice(-2))}
-                loading={snapshots.isLoading}
+                loading={datasetVersions.isLoading}
                 loadingRows={2}
                 maxHeight="320px"
                 storageKey="minibrain.data.versions"

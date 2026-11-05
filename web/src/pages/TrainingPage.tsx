@@ -15,7 +15,7 @@ import {
 } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
 import { type ModelDetail, type VersionCreate, api, unwrap } from "~/api/client";
-import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
+import { type DatasetVersionInfo, useDatasetVersions } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useModel } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
@@ -38,22 +38,22 @@ const FINISHED_SHOWN = 5;
 
 function DataLine({
     detail,
-    snapshot,
+    datasetVersion,
 }: {
     detail: ModelDetail;
-    snapshot: SnapshotInfo | null | undefined;
+    datasetVersion: DatasetVersionInfo | null | undefined;
 }) {
-    if (!snapshot) {
+    if (!datasetVersion) {
         return null;
     }
     const name = detail.dataset_name ?? "Training data";
     const version =
-        snapshot.number === null || snapshot.number === undefined
+        datasetVersion.number === null || datasetVersion.number === undefined
             ? ""
-            : `, version ${snapshot.number}`;
+            : `, version ${datasetVersion.number}`;
     return (
         <p className="text-sm text-muted-foreground tabular-nums">
-            {`${name}${version}: ${count(snapshot.counts.train)} training rows, ${count(snapshot.counts.golden)} in the test set, ${count(snapshot.labels.length)} labels. Accepted feedback joins these rows when a version starts. `}
+            {`${name}${version}: ${count(datasetVersion.counts.train)} training rows, ${count(datasetVersion.counts.golden)} in the test set, ${count(datasetVersion.labels.length)} labels. Accepted feedback joins these rows when a version starts. `}
             <Link
                 href={`/data?model=${encodeURIComponent(detail.slug)}`}
                 className="text-primary hover:underline"
@@ -69,7 +69,7 @@ function VersionPicker({
     value,
     onChange,
 }: {
-    versions: SnapshotInfo[];
+    versions: DatasetVersionInfo[];
     value: string;
     onChange: (value: string) => void;
 }) {
@@ -112,11 +112,11 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
     const [maxRows, setMaxRows] = useState<number | null>(Number(preset.rows) || 3000);
     const [epochs, setEpochs] = useState<number | null>(Number(preset.epochs) || 1);
     const [choices, setChoices] = useState<TrainingChoices>(NO_CHOICES);
-    const versions = useSnapshots(detail.dataset ?? "", Boolean(detail.dataset));
+    const versions = useDatasetVersions(detail.dataset ?? "", Boolean(detail.dataset));
     const options = versions.data ?? [];
     const [picked, setPicked] = useState<string | null>(null);
     const chosen = options.find((item) => String(item.id) === picked);
-    const shown = chosen ?? detail.snapshot;
+    const shown = chosen ?? detail.dataset_version;
     const settings = { ...choices, max_rows: maxRows, epochs };
     const plan = useTrainingPlan(slug, chosen?.id ?? null, settings);
     const [breaking, setBreaking] = useState<{ body: VersionCreate; reason: string } | null>(null);
@@ -125,7 +125,7 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
             unwrap(
                 api.POST("/api/models/{slug}/versions", {
                     params: { path: { slug } },
-                    body: chosen ? { ...body, snapshot_id: chosen.id } : body,
+                    body: chosen ? { ...body, dataset_version_id: chosen.id } : body,
                 }),
             ),
         onSuccess: invalidate,
@@ -148,7 +148,7 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
             caption="Score the base model with a prompt first. Train when the score shows a gap worth closing."
         >
             <div className="mb-4 flex flex-col gap-3">
-                <DataLine detail={detail} snapshot={shown} />
+                <DataLine detail={detail} datasetVersion={shown} />
                 {options.length > 0 && (
                     <VersionPicker
                         versions={options}
@@ -158,7 +158,7 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
                 )}
                 <ModelDataNotice slug={slug} />
             </div>
-            <ModelChecks snapshot={shown} />
+            <ModelChecks datasetVersion={shown} />
             <TrainingPlanPanel
                 plan={plan.data}
                 error={plan.error}
@@ -252,7 +252,7 @@ function AddTrainingData({
         mutationFn: async () => {
             const path = { params: { path: { slug } } };
             await unwrap(api.PUT("/api/models/{slug}/dataset", { ...path, body: { dataset } }));
-            return unwrap(api.POST("/api/models/{slug}/snapshots", path));
+            return unwrap(api.POST("/api/models/{slug}/dataset-versions", path));
         },
         onSuccess: onPrepared,
         onSettled: invalidate,
@@ -292,7 +292,7 @@ export function Training({ slug }: { slug: string }) {
     if (!detail) {
         return null;
     }
-    if (!detail.snapshot) {
+    if (!detail.dataset_version) {
         return <AddTrainingData detail={detail} onPrepared={() => setPrepared(true)} />;
     }
     const active = (jobs ?? []).filter(isActiveJob);

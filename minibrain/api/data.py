@@ -21,6 +21,8 @@ from minibrain.api.schemas import (
     DatasetSummary,
     DataSettings,
     DataSettingsUpdate,
+    DatasetVersionDiff,
+    DatasetVersionInfo,
     DeltaSourceCreate,
     DiffRow,
     DismissRequest,
@@ -37,19 +39,25 @@ from minibrain.api.schemas import (
     QueryResponse,
     RelabelInfo,
     SampleInfo,
-    SnapshotDiff,
-    SnapshotInfo,
     SourceAdded,
     SourceKind,
     SourceRef,
     SourceStats,
     SourceSummary,
 )
-from minibrain.api.views import change_info, mapping_info, snapshot_info
+from minibrain.api.views import change_info, dataset_version_info, mapping_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.data.dataset_folders import folder_or_root, require_free_dataset_name
+from minibrain.data.dataset_versions import (
+    changes_since,
+    cleanup,
+    latest_of,
+    take_version,
+    version_if_mapped,
+    versions_of,
+)
 from minibrain.data.delta import DELTA
 from minibrain.data.diff import compare
 from minibrain.data.folders import allowed_roots
@@ -79,7 +87,6 @@ from minibrain.data.shared import (
     table_of,
     tables_of,
 )
-from minibrain.data.snapshots import changes_since, cleanup, latest_of, take_version, version_if_mapped, versions_of
 from minibrain.data.sources import (
     SourceError,
     Table,
@@ -97,8 +104,8 @@ from minibrain.data.sources import (
 )
 from minibrain.data.templates import Template, pair_template, template_sql
 from minibrain.policy import PolicyError, locked_sources
-from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import AuditEvent, Dataset, Snapshot, Source, now
+from minibrain.registry.files import dataset_version_location
+from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags
@@ -222,14 +229,14 @@ def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> 
     )
 
 
-def dataset_changes(settings: Settings, dataset: Dataset, latest: Snapshot | None) -> ChangeInfo | None:
+def dataset_changes(settings: Settings, dataset: Dataset, latest: DatasetVersion | None) -> ChangeInfo | None:
     try:
         return change_info(changes_since(settings, dataset, latest))
     except SourceError:
         return None
 
 
-def known_splits(latest: Snapshot | None, changed: ChangeInfo | None) -> dict[str, int] | None:
+def known_splits(latest: DatasetVersion | None, changed: ChangeInfo | None) -> dict[str, int] | None:
     if latest is None or not latest.counts or changed is None or changed.data or changed.query:
         return None
     return dict(latest.counts)
@@ -269,7 +276,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         models=[model.slug for model in dataset.models],
         model_names=[model.name for model in dataset.models],
         splits=known_splits(latest, changed),
-        snapshot=snapshot_info(latest) if latest is not None else None,
+        dataset_version=dataset_version_info(latest) if latest is not None else None,
         changed=changed,
         row_limit=load_limits(session).row_limit if session is not None else DataLimits().row_limit,
         folder_id=dataset.folder_id,
@@ -574,8 +581,8 @@ def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> Non
     released = sorted(model.slug for model in dataset.models)
     for model in list(dataset.models):
         model.dataset_id = None
-    for snapshot in dataset.snapshots:
-        snapshot.dataset = None
+    for dataset_version in dataset.versions:
+        dataset_version.dataset = None
     session.add(
         AuditEvent(
             actor=current_actor(),
@@ -590,33 +597,35 @@ def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> Non
     session.commit()
 
 
-@router.get("/datasets/{slug}/snapshots", dependencies=[Depends(builder)])
-def list_snapshots(slug: str, session: SessionDep) -> list[SnapshotInfo]:
-    return [snapshot_info(snapshot) for snapshot in versions_of(get_dataset(session, slug))]
+@router.get("/datasets/{slug}/versions", dependencies=[Depends(builder)])
+def list_dataset_versions(slug: str, session: SessionDep) -> list[DatasetVersionInfo]:
+    return [dataset_version_info(dataset_version) for dataset_version in versions_of(get_dataset(session, slug))]
 
 
-@router.post("/datasets/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
-def save_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> SnapshotInfo:
-    snapshot = take_version(session, settings, get_dataset(session, slug))
+@router.post("/datasets/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
+def save_dataset_version(slug: str, session: SessionDep, settings: SettingsDep) -> DatasetVersionInfo:
+    dataset_version = take_version(session, settings, get_dataset(session, slug))
     cleanup(session, settings)
     session.commit()
-    return snapshot_info(snapshot)
+    return dataset_version_info(dataset_version)
 
 
-def get_snapshot(session: Session, snapshot_id: int) -> Snapshot:
-    found = session.get(Snapshot, snapshot_id)
+def get_dataset_version(session: Session, dataset_version_id: int) -> DatasetVersion:
+    found = session.get(DatasetVersion, dataset_version_id)
     if found is None:
-        raise NotFoundError(f"no dataset version {snapshot_id}")
+        raise NotFoundError(f"no dataset version {dataset_version_id}")
     return found
 
 
-@router.get("/snapshots/{snapshot_id}/diff/{other_id}", dependencies=[Depends(builder)])
-def diff_snapshots(snapshot_id: int, other_id: int, session: SessionDep, store: StoreDep) -> SnapshotDiff:
-    before, after = get_snapshot(session, snapshot_id), get_snapshot(session, other_id)
-    found = compare(snapshot_location(session, store, before), snapshot_location(session, store, after))
-    return SnapshotDiff(
-        before=snapshot_info(before),
-        after=snapshot_info(after),
+@router.get("/dataset-versions/{dataset_version_id}/diff/{other_id}", dependencies=[Depends(builder)])
+def diff_dataset_versions(
+    dataset_version_id: int, other_id: int, session: SessionDep, store: StoreDep
+) -> DatasetVersionDiff:
+    before, after = get_dataset_version(session, dataset_version_id), get_dataset_version(session, other_id)
+    found = compare(dataset_version_location(session, store, before), dataset_version_location(session, store, after))
+    return DatasetVersionDiff(
+        before=dataset_version_info(before),
+        after=dataset_version_info(after),
         added=found.added,
         removed=found.removed,
         relabelled=found.relabelled,

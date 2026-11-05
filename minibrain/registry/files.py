@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore, Packing
 from minibrain.encryption.keys import keys_for
-from minibrain.registry.models import Artifact, Snapshot
+from minibrain.registry.models import Artifact, DatasetVersion
 from minibrain.settings import Settings
 
 
@@ -16,7 +16,7 @@ class MissingArtifactError(Exception):
 
 class ArtifactKind(StrEnum):
     SOURCE = "source"
-    SNAPSHOT = "snapshot"
+    DATASET_VERSION = "dataset_version"
     ADAPTER = "adapter"
     LOG = "log"
 
@@ -61,8 +61,8 @@ def materialize(session: Session, store: ArtifactStore, artifact_id: str) -> Pat
     return store.materialize(found["id"], found["packing"], found["name"])
 
 
-def snapshot_location(session: Session, store: ArtifactStore, snapshot: Snapshot) -> str:
-    found = ref(session, snapshot.artifact_id)
+def dataset_version_location(session: Session, store: ArtifactStore, dataset_version: DatasetVersion) -> str:
+    found = ref(session, dataset_version.artifact_id)
     if found is None:
-        raise MissingArtifactError(f"snapshot {snapshot.hash[:12]} has no files")
+        raise MissingArtifactError(f"dataset version {dataset_version.hash[:12]} has no files")
     return store.url(found["id"], found["name"])

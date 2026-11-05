@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from minibrain.data.snapshot import read_split
+from minibrain.data.splits import read_split
 from minibrain.ml.completion import Completion
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import device_name
@@ -95,9 +95,9 @@ class Evaluation:
 
 
 def main(spec: JobSpec) -> None:
-    snapshot = spec.path("snapshot")
-    golden = read_split(snapshot, "golden")
-    held_out = read_split(snapshot, "eval")
+    dataset_version = spec.path("dataset_version")
+    golden = read_split(dataset_version, "golden")
+    held_out = read_split(dataset_version, "eval")
     runtime = Runtime(spec.base)
     evaluation = Evaluation(spec, runtime, len(golden) + len(held_out))
     evaluation.generate(evaluation.prompts(golden[:1]))

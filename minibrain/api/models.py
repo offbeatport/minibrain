@@ -39,7 +39,8 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import Role, allows
 from minibrain.base_models import DEFAULT_BASE_MODEL
-from minibrain.data import snapshot
+from minibrain.data import splits
+from minibrain.data.dataset_versions import cleanup, take_version, version_if_mapped
 from minibrain.data.samples import load_recipe_sample
 from minibrain.data.shared import (
     aliases_for,
@@ -48,12 +49,11 @@ from minibrain.data.shared import (
     sources_in,
     tables_of,
 )
-from minibrain.data.snapshots import cleanup, take_version, version_if_mapped
 from minibrain.models.registry import ACTIVE_STATUSES, base_hash, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.presets import Preset, preset
 from minibrain.presets.recipes import Recipe, recipe
-from minibrain.registry.files import snapshot_location
+from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import (
     AuditEvent,
     BaseModel,
@@ -69,7 +69,7 @@ from minibrain.registry.service import (
     create_model,
     free_model_name,
     get_model,
-    latest_snapshot,
+    latest_dataset_version,
     list_models,
 )
 from minibrain.settings import Settings
@@ -133,10 +133,10 @@ def rule_from(info: PromotionInfo | None, fallback: Rule) -> dict[str, Any]:
 
 def first_version(session: Session, settings: Settings, store: ArtifactStore, model: Model) -> None:
     dataset = model.dataset
-    snapshot = latest_snapshot(model)
-    if dataset is not None and snapshot is None:
-        snapshot = version_if_mapped(session, settings, dataset)
-    start_version(session, settings, store, model, VersionKind.PROMPT, snapshot)
+    dataset_version = latest_dataset_version(model)
+    if dataset is not None and dataset_version is None:
+        dataset_version = version_if_mapped(session, settings, dataset)
+    start_version(session, settings, store, model, VersionKind.PROMPT, dataset_version)
 
 
 def configured(session: Session, settings: Settings, store: ArtifactStore, body: ModelCreate, base: str) -> Model:
@@ -191,10 +191,10 @@ def update(slug: str, body: ModelUpdate, session: SessionDep, settings: Settings
 @router.get("/{slug}", dependencies=[Depends(viewer)])
 def read(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     found = detail(settings, get_model(session, slug))
-    if sees_rows() or found.snapshot is None:
+    if sees_rows() or found.dataset_version is None:
         return found
-    checks = [check.model_copy(update={"examples": []}) for check in found.snapshot.checks]
-    return found.model_copy(update={"snapshot": found.snapshot.model_copy(update={"checks": checks})})
+    checks = [check.model_copy(update={"examples": []}) for check in found.dataset_version.checks]
+    return found.model_copy(update={"dataset_version": found.dataset_version.model_copy(update={"checks": checks})})
 
 
 @router.delete("/{slug}", status_code=202, dependencies=[Depends(builder)])
@@ -336,8 +336,8 @@ def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreD
     return dataset_preview_of(settings, store, dataset_of(get_model(session, slug)))
 
 
-@router.post("/{slug}/snapshots", status_code=201, dependencies=[Depends(builder)])
-def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+@router.post("/{slug}/dataset-versions", status_code=201, dependencies=[Depends(builder)])
+def build_dataset_version(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
     take_version(session, settings, dataset_of(model))
     cleanup(session, settings)
@@ -347,10 +347,10 @@ def build_snapshot(slug: str, session: SessionDep, settings: SettingsDep) -> Mod
 
 @router.get("/{slug}/golden", dependencies=[Depends(builder)])
 def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
-    current = latest_snapshot(get_model(session, slug))
+    current = latest_dataset_version(get_model(session, slug))
     if current is None or not current.counts:
         return []
-    examples = snapshot.read_split(snapshot_location(session, store, current), "golden")
+    examples = splits.read_split(dataset_version_location(session, store, current), "golden")
     return [ExampleInfo(input=example.input, expected=example.expected) for example in examples]
 
 

@@ -347,48 +347,54 @@ function DatasetSection({ detail }: { detail: ModelDetail }) {
     const build = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/models/{slug}/snapshots", {
+                api.POST("/api/models/{slug}/dataset-versions", {
                     params: { path: { slug: detail.slug } },
                 }),
             ),
         onSuccess: () => refresh(),
     });
-    const golden = useGolden(detail.slug, Boolean(detail.snapshot));
+    const golden = useGolden(detail.slug, Boolean(detail.dataset_version));
     const [showGolden, setShowGolden] = useState(false);
     if (!detail.mapping.sql) {
         return null;
     }
-    const snapshot = detail.snapshot;
+    const datasetVersion = detail.dataset_version;
     return (
         <Section
             title="Dataset version"
             caption="The saved copy of the dataset's rows that new versions train on, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
                 <Button size="sm" onClick={() => build.mutate()} disabled={build.isPending}>
-                    {build.isPending ? "Saving…" : snapshot ? "Update" : "Save version 1"}
+                    {build.isPending ? "Saving…" : datasetVersion ? "Update" : "Save version 1"}
                 </Button>
             }
         >
             <ErrorLine error={build.error} />
-            {snapshot ? (
+            {datasetVersion ? (
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-6">
-                        <Stat label="Test set" value={count(snapshot.counts.golden)} />
-                        <Stat label="Held-out" value={count(snapshot.counts.eval)} />
-                        <Stat label="Few-shot" value={count(snapshot.counts.shots)} />
-                        <Stat label="Training" value={count(snapshot.counts.train)} />
-                        <Stat label="Labels" value={count(snapshot.labels.length)} />
+                        <Stat label="Test set" value={count(datasetVersion.counts.golden)} />
+                        <Stat label="Held-out" value={count(datasetVersion.counts.eval)} />
+                        <Stat label="Few-shot" value={count(datasetVersion.counts.shots)} />
+                        <Stat label="Training" value={count(datasetVersion.counts.train)} />
+                        <Stat label="Labels" value={count(datasetVersion.labels.length)} />
                         <Stat
                             label="Version"
-                            value={snapshot.number == null ? "–" : count(snapshot.number)}
+                            value={
+                                datasetVersion.number == null ? "–" : count(datasetVersion.number)
+                            }
                         />
                         <Stat
                             label="SHA-256"
-                            value={<span className="font-mono">{snapshot.hash.slice(0, 12)}</span>}
+                            value={
+                                <span className="font-mono">
+                                    {datasetVersion.hash.slice(0, 12)}
+                                </span>
+                            }
                         />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Saved {dateTime(snapshot.taken_at ?? snapshot.created_at)}
+                        Saved {dateTime(datasetVersion.taken_at ?? datasetVersion.created_at)}
                     </p>
                     <div>
                         <Button

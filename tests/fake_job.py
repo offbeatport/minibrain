@@ -19,8 +19,10 @@ if __name__ == "__main__":
         (Path(out) / "adapter_config.json").write_text('{"r": 16}')
     answers = {}
     if spec.get("version_kind"):
-        from minibrain.data.snapshot import read_split
+        from minibrain.data.splits import read_split
 
-        answers = {name: [row.expected for row in read_split(spec["snapshot"], name)] for name in ("golden", "eval")}
+        answers = {
+            name: [row.expected for row in read_split(spec["dataset_version"], name)] for name in ("golden", "eval")
+        }
     result = {"summary": {"fake": True}, "metrics": {"device": "cpu"}, "answers": answers}
     Path(spec["result"]).write_text(json.dumps(result))

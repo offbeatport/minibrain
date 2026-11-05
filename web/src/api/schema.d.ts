@@ -348,7 +348,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/snapshots": {
+    "/api/models/{slug}/dataset-versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -357,8 +357,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Build Snapshot */
-        post: operations["build_snapshot_api_models__slug__snapshots_post"];
+        /** Build Dataset Version */
+        post: operations["build_dataset_version_api_models__slug__dataset_versions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -745,33 +745,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/datasets/{slug}/snapshots": {
+    "/api/datasets/{slug}/versions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Snapshots */
-        get: operations["list_snapshots_api_datasets__slug__snapshots_get"];
+        /** List Dataset Versions */
+        get: operations["list_dataset_versions_api_datasets__slug__versions_get"];
         put?: never;
-        /** Save Snapshot */
-        post: operations["save_snapshot_api_datasets__slug__snapshots_post"];
+        /** Save Dataset Version */
+        post: operations["save_dataset_version_api_datasets__slug__versions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/snapshots/{snapshot_id}/diff/{other_id}": {
+    "/api/dataset-versions/{dataset_version_id}/diff/{other_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Diff Snapshots */
-        get: operations["diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get"];
+        /** Diff Dataset Versions */
+        get: operations["diff_dataset_versions_api_dataset_versions__dataset_version_id__diff__other_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3266,16 +3266,16 @@ export interface components {
             /** Dataset Version */
             dataset_version?: number | null;
             /**
-             * Snapshot Feedback Rows
+             * Dataset Version Feedback Rows
              * @default 0
              */
-            snapshot_feedback_rows?: number;
-            /** Snapshot Hash */
-            snapshot_hash: string;
-            /** Snapshot Rows */
-            snapshot_rows: number;
-            /** Snapshot Taken At */
-            snapshot_taken_at: string;
+            dataset_version_feedback_rows?: number;
+            /** Dataset Version Hash */
+            dataset_version_hash: string;
+            /** Dataset Version Rows */
+            dataset_version_rows: number;
+            /** Dataset Version Taken At */
+            dataset_version_taken_at: string;
             /** Query */
             query: string | null;
             splits: components["schemas"]["CardSplits"];
@@ -4094,8 +4094,8 @@ export interface components {
         DataSettings: {
             /** Row Limit */
             row_limit: number;
-            /** Keep Snapshots */
-            keep_snapshots: number;
+            /** Keep Versions */
+            keep_versions: number;
             /** Checks Off */
             checks_off?: ("duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data")[];
             /**
@@ -4117,8 +4117,8 @@ export interface components {
         DataSettingsUpdate: {
             /** Row Limit */
             row_limit?: number | null;
-            /** Keep Snapshots */
-            keep_snapshots?: number | null;
+            /** Keep Versions */
+            keep_versions?: number | null;
             /** Checks Off */
             checks_off?: ("duplicates" | "conflicts" | "balance" | "leakage" | "length" | "personal_data")[] | null;
             /** Majority Share */
@@ -4236,7 +4236,7 @@ export interface components {
             splits: {
                 [key: string]: number;
             } | null;
-            snapshot?: components["schemas"]["SnapshotInfo"] | null;
+            dataset_version?: components["schemas"]["DatasetVersionInfo"] | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
             /**
              * Row Limit
@@ -4250,6 +4250,81 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** DatasetVersionDiff */
+        DatasetVersionDiff: {
+            before: components["schemas"]["DatasetVersionInfo"];
+            after: components["schemas"]["DatasetVersionInfo"];
+            /** Added */
+            added: number;
+            /** Removed */
+            removed: number;
+            /** Relabelled */
+            relabelled: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Labels */
+            labels: components["schemas"]["LabelShiftInfo"][];
+            /** Added Rows */
+            added_rows: components["schemas"]["DiffRow"][];
+            /** Removed Rows */
+            removed_rows: components["schemas"]["DiffRow"][];
+            /** Relabelled Rows */
+            relabelled_rows: components["schemas"]["RelabelInfo"][];
+        };
+        /** DatasetVersionInfo */
+        DatasetVersionInfo: {
+            /** Id */
+            id: number;
+            /** Hash */
+            hash: string;
+            /** Dataset */
+            dataset: string | null;
+            /** Number */
+            number?: number | null;
+            /** Base Number */
+            base_number?: number | null;
+            /** Rows */
+            rows: number;
+            /** Size */
+            size: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Labels */
+            labels: string[];
+            /** Saved */
+            saved: boolean;
+            /** Versions */
+            versions: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Taken At */
+            taken_at: string | null;
+            /** Checks */
+            checks?: components["schemas"]["CheckInfo"][];
+            /**
+             * Feedback Rows
+             * @default 0
+             */
+            feedback_rows?: number;
+        };
+        /** DatasetVersionUsage */
+        DatasetVersionUsage: {
+            /** Count */
+            count: number;
+            /** Size */
+            size: number;
+            /** For Versions */
+            for_versions: number;
+            /** Saved */
+            saved: number;
+            /** Keep */
+            keep: number;
         };
         /** DecisionInfo */
         DecisionInfo: {
@@ -5138,7 +5213,7 @@ export interface components {
             web: string;
             /** Stores */
             stores: components["schemas"]["StoreInfo"][];
-            snapshots?: components["schemas"]["SnapshotUsage"] | null;
+            dataset_versions?: components["schemas"]["DatasetVersionUsage"] | null;
         };
         /** InspectRequest */
         InspectRequest: {
@@ -5754,7 +5829,7 @@ export interface components {
             dataset?: string | null;
             /** Dataset Name */
             dataset_name?: string | null;
-            snapshot: components["schemas"]["SnapshotInfo"] | null;
+            dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
             /** Models */
             models: string[];
@@ -6654,7 +6729,7 @@ export interface components {
             dataset?: string | null;
             /** Dataset Name */
             dataset_name?: string | null;
-            snapshot: components["schemas"]["SnapshotInfo"] | null;
+            dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
             /** Models */
             models: string[];
@@ -6758,81 +6833,6 @@ export interface components {
              * @default false
              */
             proxy?: boolean;
-        };
-        /** SnapshotDiff */
-        SnapshotDiff: {
-            before: components["schemas"]["SnapshotInfo"];
-            after: components["schemas"]["SnapshotInfo"];
-            /** Added */
-            added: number;
-            /** Removed */
-            removed: number;
-            /** Relabelled */
-            relabelled: number;
-            /** Unchanged */
-            unchanged: number;
-            /** Labels */
-            labels: components["schemas"]["LabelShiftInfo"][];
-            /** Added Rows */
-            added_rows: components["schemas"]["DiffRow"][];
-            /** Removed Rows */
-            removed_rows: components["schemas"]["DiffRow"][];
-            /** Relabelled Rows */
-            relabelled_rows: components["schemas"]["RelabelInfo"][];
-        };
-        /** SnapshotInfo */
-        SnapshotInfo: {
-            /** Id */
-            id: number;
-            /** Hash */
-            hash: string;
-            /** Dataset */
-            dataset: string | null;
-            /** Number */
-            number?: number | null;
-            /** Base Number */
-            base_number?: number | null;
-            /** Rows */
-            rows: number;
-            /** Size */
-            size: number;
-            /** Counts */
-            counts: {
-                [key: string]: number;
-            };
-            /** Labels */
-            labels: string[];
-            /** Saved */
-            saved: boolean;
-            /** Versions */
-            versions: string[];
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Taken At */
-            taken_at: string | null;
-            /** Checks */
-            checks?: components["schemas"]["CheckInfo"][];
-            /**
-             * Feedback Rows
-             * @default 0
-             */
-            feedback_rows?: number;
-        };
-        /** SnapshotUsage */
-        SnapshotUsage: {
-            /** Count */
-            count: number;
-            /** Size */
-            size: number;
-            /** For Versions */
-            for_versions: number;
-            /** Saved */
-            saved: number;
-            /** Keep */
-            keep: number;
         };
         /** SourceAdded */
         SourceAdded: {
@@ -7363,8 +7363,8 @@ export interface components {
              * @enum {string}
              */
             kind: "prompt" | "lora";
-            /** Snapshot Id */
-            snapshot_id?: number | null;
+            /** Dataset Version Id */
+            dataset_version_id?: number | null;
             /**
              * Breaking
              * @default false
@@ -7381,19 +7381,19 @@ export interface components {
             status: string;
             /** Current */
             current: boolean;
-            /** Snapshot Hash */
-            snapshot_hash: string | null;
-            /** Snapshot Id */
-            snapshot_id: number | null;
-            /** Snapshot Dataset */
-            snapshot_dataset?: string | null;
-            /** Snapshot Number */
-            snapshot_number?: number | null;
+            /** Dataset Version Hash */
+            dataset_version_hash: string | null;
+            /** Dataset Version Id */
+            dataset_version_id: number | null;
+            /** Dataset Slug */
+            dataset_slug?: string | null;
+            /** Dataset Version Number */
+            dataset_version_number?: number | null;
             /**
-             * Snapshot Rows
+             * Dataset Version Rows
              * @default 0
              */
-            snapshot_rows?: number;
+            dataset_version_rows?: number;
             /** Recipe */
             recipe: {
                 [key: string]: unknown;
@@ -8260,7 +8260,7 @@ export interface operations {
             };
         };
     };
-    build_snapshot_api_models__slug__snapshots_post: {
+    build_dataset_version_api_models__slug__dataset_versions_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -9264,7 +9264,7 @@ export interface operations {
             };
         };
     };
-    list_snapshots_api_datasets__slug__snapshots_get: {
+    list_dataset_versions_api_datasets__slug__versions_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9281,7 +9281,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SnapshotInfo"][];
+                    "application/json": components["schemas"]["DatasetVersionInfo"][];
                 };
             };
             /** @description Validation Error */
@@ -9295,7 +9295,7 @@ export interface operations {
             };
         };
     };
-    save_snapshot_api_datasets__slug__snapshots_post: {
+    save_dataset_version_api_datasets__slug__versions_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -9312,7 +9312,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SnapshotInfo"];
+                    "application/json": components["schemas"]["DatasetVersionInfo"];
                 };
             };
             /** @description Validation Error */
@@ -9326,12 +9326,12 @@ export interface operations {
             };
         };
     };
-    diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get: {
+    diff_dataset_versions_api_dataset_versions__dataset_version_id__diff__other_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                snapshot_id: number;
+                dataset_version_id: number;
                 other_id: number;
             };
             cookie?: never;
@@ -9344,7 +9344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SnapshotDiff"];
+                    "application/json": components["schemas"]["DatasetVersionDiff"];
                 };
             };
             /** @description Validation Error */
@@ -11402,7 +11402,7 @@ export interface operations {
                 learning_rate?: number | null;
                 epochs?: number | null;
                 max_rows?: number | null;
-                snapshot_id?: number | null;
+                dataset_version_id?: number | null;
             };
             header?: never;
             path: {

@@ -385,7 +385,7 @@ class Worker:
         spec |= {key: params[key] for key in ("slug", "number", "base_model") if key in params}
         if "base_spec" in params:
             spec["base_spec"] = self.base_copy(params["base_spec"])
-        spec["snapshot"] = self.material(params.get("snapshot"))
+        spec["dataset_version"] = self.material(params.get("dataset_version"))
         if claim["kind"] == JobKind.TRAIN:
             spec |= {
                 "recipe": params["recipe"],

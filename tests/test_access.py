@@ -47,7 +47,7 @@ ROUTE_ROLES = {
     ("PUT", "/api/models/{slug}/request-bodies"): "builder",
     ("POST", "/api/models/{slug}/query"): "builder",
     ("GET", "/api/models/{slug}/preview"): "builder",
-    ("POST", "/api/models/{slug}/snapshots"): "builder",
+    ("POST", "/api/models/{slug}/dataset-versions"): "builder",
     ("GET", "/api/models/{slug}/golden"): "builder",
     ("GET", "/api/sources"): "builder",
     ("POST", "/api/sources"): "builder",
@@ -70,9 +70,9 @@ ROUTE_ROLES = {
     ("GET", "/api/datasets/{slug}/preview"): "builder",
     ("POST", "/api/datasets/{slug}/query"): "builder",
     ("DELETE", "/api/datasets/{slug}"): "builder",
-    ("GET", "/api/datasets/{slug}/snapshots"): "builder",
-    ("POST", "/api/datasets/{slug}/snapshots"): "builder",
-    ("GET", "/api/snapshots/{snapshot_id}/diff/{other_id}"): "builder",
+    ("GET", "/api/datasets/{slug}/versions"): "builder",
+    ("POST", "/api/datasets/{slug}/versions"): "builder",
+    ("GET", "/api/dataset-versions/{dataset_version_id}/diff/{other_id}"): "builder",
     ("PUT", "/api/datasets/{slug}/checks/{check}/dismissal"): "builder",
     ("DELETE", "/api/datasets/{slug}/checks/{check}/dismissal"): "builder",
     ("GET", "/api/settings/data"): "builder",
@@ -303,7 +303,7 @@ def test_viewers_get_scores_without_data_rows(harness: Harness) -> None:
     assert people.admin.get(f"/api/jobs/{job}").json()["result"] is not None
     assert people.viewer.get(f"/api/jobs/{job}").json()["result"] is None
     detail = people.viewer.get(f"/api/models/{SLUG}").json()
-    assert all(check["examples"] == [] for check in detail["snapshot"]["checks"])
+    assert all(check["examples"] == [] for check in detail["dataset_version"]["checks"])
 
 
 def test_fastapi_doc_paths_are_not_served(harness: Harness) -> None:

@@ -58,7 +58,7 @@ MODELS: dict[str, type[BaseModel]] = {
 }
 ENV_KEYS = {
     "storage": ("kind", "endpoint", "bucket", "prefix", "region", "access_key"),
-    "data": ("row_limit", "keep_snapshots", "checks_off", "majority_share", "min_label_rows"),
+    "data": ("row_limit", "keep_versions", "checks_off", "majority_share", "min_label_rows"),
     "compute": ("currency",),
     "catalogue": ("daily_sync",),
 }

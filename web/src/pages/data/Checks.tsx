@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Link } from "obp-ui";
 import { api, succeed } from "~/api/client";
-import type { SnapshotInfo } from "~/api/dataQueries";
+import type { DatasetVersionInfo } from "~/api/dataQueries";
 import type { components } from "~/api/schema";
 import { ErrorLine, Section } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
@@ -91,14 +91,14 @@ function Finding({
 }
 
 export function ChecksReport({
-    snapshot,
+    datasetVersion,
     dataset,
 }: {
-    snapshot: SnapshotInfo;
+    datasetVersion: DatasetVersionInfo;
     dataset: string | null;
 }) {
     const actions = useDismiss(dataset ?? "");
-    const checks = [...(snapshot.checks ?? [])].sort(
+    const checks = [...(datasetVersion.checks ?? [])].sort(
         (left, right) => ORDER.indexOf(left.status) - ORDER.indexOf(right.status),
     );
     const open = checks.filter((check) => check.status !== "ok" && !check.dismissed);
@@ -157,28 +157,30 @@ export function ChecksReport({
 }
 
 export function ChecksSection({
-    snapshot,
+    datasetVersion,
     dataset,
 }: {
-    snapshot: SnapshotInfo | null | undefined;
+    datasetVersion: DatasetVersionInfo | null | undefined;
     dataset: string;
 }) {
-    if (!snapshot) {
+    if (!datasetVersion) {
         return null;
     }
     return (
         <Section
             title="Checks"
-            caption={`On version ${snapshot.number ?? "–"}, saved ${relativeTime(snapshot.taken_at ?? snapshot.created_at)}. Warnings do not block training; an empty dataset or a single label stops a version from being saved. Turn checks on or off under Settings, Data.`}
+            caption={`On version ${datasetVersion.number ?? "–"}, saved ${relativeTime(datasetVersion.taken_at ?? datasetVersion.created_at)}. Warnings do not block training; an empty dataset or a single label stops a version from being saved. Turn checks on or off under Settings, Data.`}
         >
-            <ChecksReport snapshot={snapshot} dataset={dataset} />
+            <ChecksReport datasetVersion={datasetVersion} dataset={dataset} />
         </Section>
     );
 }
 
-export function ModelChecks({ snapshot }: { snapshot: SnapshotInfo | null | undefined }) {
-    const all = snapshot?.checks ?? [];
-    if (!snapshot || all.length === 0) {
+export function ModelChecks({
+    datasetVersion,
+}: { datasetVersion: DatasetVersionInfo | null | undefined }) {
+    const all = datasetVersion?.checks ?? [];
+    if (!datasetVersion || all.length === 0) {
         return null;
     }
     const open = all.filter(
@@ -188,13 +190,13 @@ export function ModelChecks({ snapshot }: { snapshot: SnapshotInfo | null | unde
         <div className="mb-4 flex flex-col gap-2">
             <p className="text-sm text-muted-foreground">
                 {open.length === 0
-                    ? `Checks on version ${snapshot.number ?? "–"} passed.`
-                    : `Checks on version ${snapshot.number ?? "–"} found ${open.length === 1 ? "one thing" : `${open.length} things`} to look at. Training still runs.`}
-                {snapshot.dataset && (
+                    ? `Checks on version ${datasetVersion.number ?? "–"} passed.`
+                    : `Checks on version ${datasetVersion.number ?? "–"} found ${open.length === 1 ? "one thing" : `${open.length} things`} to look at. Training still runs.`}
+                {datasetVersion.dataset && (
                     <>
                         {" "}
                         <Link
-                            href={itemHref({ kind: "dataset", id: snapshot.dataset })}
+                            href={itemHref({ kind: "dataset", id: datasetVersion.dataset })}
                             className="text-primary hover:underline"
                         >
                             Open the dataset
@@ -202,7 +204,9 @@ export function ModelChecks({ snapshot }: { snapshot: SnapshotInfo | null | unde
                     </>
                 )}
             </p>
-            {open.length > 0 && <ChecksReport snapshot={snapshot} dataset={snapshot.dataset} />}
+            {open.length > 0 && (
+                <ChecksReport datasetVersion={datasetVersion} dataset={datasetVersion.dataset} />
+            )}
         </div>
     );
 }

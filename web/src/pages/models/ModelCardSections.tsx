@@ -322,7 +322,7 @@ function datasetVersion(data: ModelCard["training_data"]): string {
     if (data.dataset_version === null || data.dataset_version === undefined) {
         return NONE;
     }
-    const rows = data.snapshot_feedback_rows ?? 0;
+    const rows = data.dataset_version_feedback_rows ?? 0;
     return rows > 0
         ? `Version ${data.dataset_version}, plus ${count(rows)} ${rows === 1 ? "row" : "rows"} from feedback`
         : `Version ${data.dataset_version}`;
@@ -356,10 +356,14 @@ export function DataSection({ card }: { card: ModelCard }) {
                         ["Dataset version", datasetVersion(data)],
                         [
                             "SHA-256",
-                            <Hash key="snapshot" value={data.snapshot_hash} label="data hash" />,
+                            <Hash
+                                key="dataset-version"
+                                value={data.dataset_version_hash}
+                                label="data hash"
+                            />,
                         ],
-                        ["Rows", <Numeric key="rows" value={count(data.snapshot_rows)} />],
-                        ["Saved", when(data.snapshot_taken_at)],
+                        ["Rows", <Numeric key="rows" value={count(data.dataset_version_rows)} />],
+                        ["Saved", when(data.dataset_version_taken_at)],
                         [
                             "Splits",
                             <Numeric

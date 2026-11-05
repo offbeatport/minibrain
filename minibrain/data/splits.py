@@ -22,7 +22,7 @@ LABEL_CHARS = 100
 Row = tuple[str | None, str | None, str | None]
 
 
-class SnapshotError(Exception):
+class DatasetVersionError(Exception):
     pass
 
 
@@ -74,7 +74,7 @@ def pick_shots(pool: list[Example], labelled: bool) -> list[Example]:
 
 def split(examples: list[Example], seed: int = SEED) -> dict[str, list[Example]]:
     if len(examples) < MIN_ROWS:
-        raise SnapshotError(f"need at least {MIN_ROWS} labelled rows after cleaning, found {len(examples)}")
+        raise DatasetVersionError(f"need at least {MIN_ROWS} labelled rows after cleaning, found {len(examples)}")
     shuffled = examples[:]
     random.Random(seed).shuffle(shuffled)
     golden_size = min(GOLDEN_MAX, len(shuffled) // 10)

@@ -33,21 +33,21 @@ from minibrain.api.card_schemas import (
 )
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS
-from minibrain.data.snapshot import SPLITS, SnapshotError, read_split
-from minibrain.data.snapshots import version_number
+from minibrain.data.dataset_versions import version_number
+from minibrain.data.splits import SPLITS, DatasetVersionError, read_split
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
-from minibrain.registry.files import MissingArtifactError, snapshot_location, store_for
+from minibrain.registry.files import MissingArtifactError, dataset_version_location, store_for
 from minibrain.registry.models import (
     AttemptOutcome,
     AuditEvent,
     BaseModel,
     BaseModelStatus,
+    DatasetVersion,
     Job,
     JobKind,
     JobStatus,
     Model,
-    Snapshot,
     Source,
     Version,
     VersionKind,
@@ -166,11 +166,13 @@ def base_card(session: Session, model: Model, version: Version) -> CardBaseModel
     )
 
 
-def snapshot_splits(session: Session, settings: Settings, snapshot: Snapshot) -> dict[str, list[Example]] | None:
+def dataset_version_splits(
+    session: Session, settings: Settings, dataset_version: DatasetVersion
+) -> dict[str, list[Example]] | None:
     try:
-        path = snapshot_location(session, store_for(settings), snapshot)
+        path = dataset_version_location(session, store_for(settings), dataset_version)
         return {name: read_split(path, name) for name in SPLITS}
-    except (MissingArtifactError, ArtifactError, SnapshotError, OSError, duckdb.Error):
+    except (MissingArtifactError, ArtifactError, DatasetVersionError, OSError, duckdb.Error):
         return None
 
 
@@ -214,19 +216,19 @@ def check_card(item: dict[str, Any]) -> CardCheck:
     )
 
 
-def data_card(session: Session, snapshot: Snapshot, splits: dict[str, list[Example]] | None) -> CardData:
-    counts = snapshot.counts or {}
-    checks = [check_card(item) for item in snapshot.checks or []]
-    dataset = snapshot.dataset
+def data_card(session: Session, dataset_version: DatasetVersion, splits: dict[str, list[Example]] | None) -> CardData:
+    counts = dataset_version.counts or {}
+    checks = [check_card(item) for item in dataset_version.checks or []]
+    dataset = dataset_version.dataset
     return CardData(
         dataset_slug=dataset.slug if dataset is not None else None,
         dataset_name=dataset.name if dataset is not None else None,
-        dataset_version=version_number(snapshot),
-        snapshot_feedback_rows=snapshot.feedback_rows,
-        snapshot_hash=snapshot.hash,
-        snapshot_rows=snapshot.rows or sum(counts.values()),
-        snapshot_taken_at=stamp(snapshot.taken_at or snapshot.created_at) or "",
-        query=snapshot.sql,
+        dataset_version=version_number(dataset_version),
+        dataset_version_feedback_rows=dataset_version.feedback_rows,
+        dataset_version_hash=dataset_version.hash,
+        dataset_version_rows=dataset_version.rows or sum(counts.values()),
+        dataset_version_taken_at=stamp(dataset_version.taken_at or dataset_version.created_at) or "",
+        query=dataset_version.sql,
         splits=CardSplits(
             train=int(counts.get("train", 0)),
             held_out=int(counts.get("eval", 0)),
@@ -234,7 +236,9 @@ def data_card(session: Session, snapshot: Snapshot, splits: dict[str, list[Examp
             few_shot=int(counts.get("shots", 0)),
         ),
         label_balance=label_balance(splits) if splits is not None else None,
-        sources=[source_card(session, table, value) for table, value in sorted((snapshot.fingerprints or {}).items())],
+        sources=[
+            source_card(session, table, value) for table, value in sorted((dataset_version.fingerprints or {}).items())
+        ],
         checks=checks,
         personal_data=next((check for check in checks if check.check == "personal_data"), None),
     )
@@ -386,7 +390,7 @@ def comparison(version: Version, other: Version, prices: DevicePrices) -> CardCo
     return CardComparison(
         number=other.number,
         kind=other.kind,
-        same_data=other.snapshot_id == version.snapshot_id,
+        same_data=other.dataset_version_id == version.dataset_version_id,
         held_out_accuracy=rounded(theirs),
         held_out_macro_f1=rounded(metric_values(held_out(other)).get("macro_f1")),
         test_accuracy=rounded(main_of(metrics.get("golden"), version_metric(other))),
@@ -405,7 +409,9 @@ def prompt_baseline(model: Model, version: Version) -> Version | None:
         for other in model.versions
         if other.kind == VersionKind.PROMPT and other.number < version.number and is_scored(other)
     ]
-    return max(earlier, key=lambda other: (other.snapshot_id == version.snapshot_id, other.number), default=None)
+    return max(
+        earlier, key=lambda other: (other.dataset_version_id == version.dataset_version_id, other.number), default=None
+    )
 
 
 def previous_version(model: Model, version: Version) -> Version | None:
@@ -537,9 +543,11 @@ def build_card(session: Session, settings: Settings, model: Model, version: Vers
     events = card_events(session, model)
     history = history_of(events, model, version.number)
     creator = creator_of(events, model, version.number)
-    if version.snapshot is None:
+    if version.dataset_version is None:
         raise ConflictError(f"{model.slug}@{version.number} has no data yet, so there is nothing to put on a card")
-    data = data_card(session, version.snapshot, snapshot_splits(session, settings, version.snapshot))
+    data = data_card(
+        session, version.dataset_version, dataset_version_splits(session, settings, version.dataset_version)
+    )
     evaluation = evaluation_card(session, model, version)
     return ModelCard(
         version=CardVersion(
@@ -552,7 +560,9 @@ def build_card(session: Session, settings: Settings, model: Model, version: Vers
             created_at=stamp(version.created_at) or "",
             created_by=creator,
         ),
-        purpose=CardPurpose(description=model.description, task=model.preset, labels=sorted(version.snapshot.labels)),
+        purpose=CardPurpose(
+            description=model.description, task=model.preset, labels=sorted(version.dataset_version.labels)
+        ),
         base_model=base_card(session, model, version),
         training_data=data,
         training=training_card(session, model, version),

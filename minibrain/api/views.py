@@ -10,6 +10,7 @@ from minibrain.api.schemas import (
     ColumnInfo,
     ConfusionInfo,
     ContractInfo,
+    DatasetVersionInfo,
     DecisionInfo,
     EvalCost,
     FieldScoreInfo,
@@ -26,7 +27,6 @@ from minibrain.api.schemas import (
     PromotionInfo,
     RequestBodiesInfo,
     ScoreInfo,
-    SnapshotInfo,
     SourceInfo,
     SplitScore,
     TeardownInfo,
@@ -34,8 +34,8 @@ from minibrain.api.schemas import (
     TeardownState,
     VersionInfo,
 )
+from minibrain.data.dataset_versions import Changes, changes_since, version_number
 from minibrain.data.shared import table_of
-from minibrain.data.snapshots import Changes, changes_since, version_number
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import plain_columns
 from minibrain.policy import bodies_choice
@@ -45,10 +45,10 @@ from minibrain.registry.models import (
     ApiKey,
     BaseModel,
     Dataset,
+    DatasetVersion,
     Job,
     JobAttempt,
     Model,
-    Snapshot,
     Teardown,
     TeardownKind,
     TeardownStatus,
@@ -57,7 +57,7 @@ from minibrain.registry.models import (
     VersionStatus,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost
-from minibrain.registry.service import find_version, latest_snapshot
+from minibrain.registry.service import find_version, latest_dataset_version
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
 from minibrain.tasks.contracts import Contract
@@ -144,32 +144,35 @@ def mapping_info(dataset: Dataset | None) -> MappingInfo:
     return MappingInfo(input_column=input_column, label_column=label_column, template=dataset.template, sql=dataset.sql)
 
 
-def snapshot_info(snapshot: Snapshot) -> SnapshotInfo:
-    users = [*snapshot.versions, *(version for copy in snapshot.copies for version in copy.versions)]
-    return SnapshotInfo(
-        id=snapshot.id,
-        hash=snapshot.hash,
-        dataset=snapshot.dataset.slug if snapshot.dataset is not None else None,
-        number=snapshot.number,
-        base_number=snapshot.base.number if snapshot.base is not None else None,
-        rows=snapshot.rows or sum(snapshot.counts.values()),
-        size=snapshot.size,
-        counts=snapshot.counts,
-        labels=snapshot.labels,
-        saved=snapshot.saved,
+def dataset_version_info(dataset_version: DatasetVersion) -> DatasetVersionInfo:
+    users = [
+        *dataset_version.model_versions,
+        *(version for copy in dataset_version.copies for version in copy.model_versions),
+    ]
+    return DatasetVersionInfo(
+        id=dataset_version.id,
+        hash=dataset_version.hash,
+        dataset=dataset_version.dataset.slug if dataset_version.dataset is not None else None,
+        number=dataset_version.number,
+        base_number=dataset_version.base.number if dataset_version.base is not None else None,
+        rows=dataset_version.rows or sum(dataset_version.counts.values()),
+        size=dataset_version.size,
+        counts=dataset_version.counts,
+        labels=dataset_version.labels,
+        saved=dataset_version.saved,
         versions=sorted({f"{version.model.slug}@{version.number}" for version in users}),
-        created_at=snapshot.created_at,
-        taken_at=snapshot.taken_at,
-        checks=check_infos(snapshot),
-        feedback_rows=snapshot.feedback_rows,
+        created_at=dataset_version.created_at,
+        taken_at=dataset_version.taken_at,
+        checks=check_infos(dataset_version),
+        feedback_rows=dataset_version.feedback_rows,
     )
 
 
-def check_infos(snapshot: Snapshot) -> list[CheckInfo]:
-    dismissed = (snapshot.dataset.dismissed if snapshot.dataset is not None else None) or {}
+def check_infos(dataset_version: DatasetVersion) -> list[CheckInfo]:
+    dismissed = (dataset_version.dataset.dismissed if dataset_version.dataset is not None else None) or {}
     return [
         CheckInfo.model_validate(item | {"dismissed": dismissed.get(str(item["check"])) == item["signature"]})
-        for item in snapshot.checks or []
+        for item in dataset_version.checks or []
     ]
 
 
@@ -181,7 +184,7 @@ def model_changes(settings: Settings, model: Model) -> ChangeInfo | None:
     if model.dataset is None:
         return None
     try:
-        return change_info(changes_since(settings, model.dataset, latest_snapshot(model)))
+        return change_info(changes_since(settings, model.dataset, latest_dataset_version(model)))
     except SourceError:
         return None
 
@@ -277,18 +280,22 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
     metrics = version.metrics or {}
     latency = metrics.get("latency") or {}
     job = latest_job(model, version)
-    snapshot = version.snapshot
+    dataset_version = version.dataset_version
     ready = version.status == VersionStatus.READY
     return VersionInfo(
         number=version.number,
         kind=version.kind,
         status=version.status,
         current=model.current_version == version.number,
-        snapshot_hash=snapshot.hash if snapshot is not None else None,
-        snapshot_id=snapshot.id if snapshot is not None else None,
-        snapshot_dataset=snapshot.dataset.slug if snapshot is not None and snapshot.dataset is not None else None,
-        snapshot_number=version_number(snapshot) if snapshot is not None else None,
-        snapshot_rows=(snapshot.rows or sum(snapshot.counts.values())) if snapshot is not None else 0,
+        dataset_version_hash=dataset_version.hash if dataset_version is not None else None,
+        dataset_version_id=dataset_version.id if dataset_version is not None else None,
+        dataset_slug=dataset_version.dataset.slug
+        if dataset_version is not None and dataset_version.dataset is not None
+        else None,
+        dataset_version_number=version_number(dataset_version) if dataset_version is not None else None,
+        dataset_version_rows=(dataset_version.rows or sum(dataset_version.counts.values()))
+        if dataset_version is not None
+        else 0,
         recipe=version.recipe,
         golden=split_score(metrics, "golden"),
         held_out=split_score(metrics, "eval"),
@@ -351,7 +358,7 @@ def bodies_info(model: Model) -> RequestBodiesInfo:
 
 
 def detail(settings: Settings, model: Model) -> ModelDetail:
-    current = latest_snapshot(model)
+    current = latest_dataset_version(model)
     return ModelDetail(
         slug=model.slug,
         name=model.name,
@@ -367,7 +374,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         mapping=mapping_info(model.dataset),
         dataset=model.dataset.slug if model.dataset else None,
         dataset_name=model.dataset.name if model.dataset else None,
-        snapshot=snapshot_info(current) if current is not None else None,
+        dataset_version=dataset_version_info(current) if current is not None else None,
         changed=model_changes(settings, model),
         models=model_names(model),
         request_bodies=bodies_info(model),

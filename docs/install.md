@@ -652,7 +652,7 @@ storage:                              # Settings > Storage: where artifacts live
 
 data:                                 # Settings > Data
   row_limit: 200000                   # most rows in one dataset version
-  keep_snapshots: 5                   # unused versions kept per dataset
+  keep_versions: 5                    # unused versions kept per dataset
   checks_off: [personal_data]         # duplicates, conflicts, balance, leakage, length, personal_data
   majority_share: 0.9                 # warn when one label holds more than this share
   min_label_rows: 10                  # warn when a label has fewer rows

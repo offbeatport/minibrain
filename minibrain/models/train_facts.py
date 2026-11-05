@@ -2,7 +2,7 @@ from functools import lru_cache
 
 from sqlalchemy.orm import Session
 
-from minibrain.data.snapshot import read_split
+from minibrain.data.splits import read_split
 from minibrain.ml.planner import Base, Machine, estimated_tokens
 from minibrain.models.registry import base_config, quantization
 from minibrain.models.rules import context_of, shape_of

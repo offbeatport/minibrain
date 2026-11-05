@@ -13,7 +13,7 @@ from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
 from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, Submission, suggestion
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Model
-from minibrain.registry.service import NotFoundError, get_model, latest_snapshot
+from minibrain.registry.service import NotFoundError, get_model, latest_dataset_version
 from minibrain.tasks.service import contract_of
 
 router = APIRouter(prefix="/api", tags=["feedback"])
@@ -234,8 +234,8 @@ def labels_for(session: Session, model: Model) -> list[str]:
     contract = contract_of(model).labels
     if contract is None:
         return []
-    snapshot = latest_snapshot(model)
-    known = set(contract) | set(snapshot.labels if snapshot is not None else [])
+    dataset_version = latest_dataset_version(model)
+    known = set(contract) | set(dataset_version.labels if dataset_version is not None else [])
     accepted = select(Feedback.label).where(Feedback.model_id == model.id, Feedback.status == FeedbackStatus.ACCEPTED)
     known |= {label for label in session.scalars(accepted.distinct()) if label}
     return sorted(known)

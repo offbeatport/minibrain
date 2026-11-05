@@ -1,5 +1,5 @@
 from minibrain.data.checks import CheckLimits, Finding, run_checks
-from minibrain.data.snapshot import Row, clean, split
+from minibrain.data.splits import Row, clean, split
 from minibrain.tasks.examples import Example, Turn, encode_turns, single
 from tests.conftest import Harness, tickets_csv
 
@@ -109,7 +109,7 @@ def report_of(response: dict) -> dict[str, dict]:
 
 def test_a_version_carries_its_report_and_hard_stops_refuse_it(harness: Harness) -> None:
     dataset(harness)
-    report = report_of(harness.client.post("/api/datasets/tickets/snapshots").json())
+    report = report_of(harness.client.post("/api/datasets/tickets/versions").json())
     assert report["duplicates"]["status"] == "ok" and report["leakage"]["status"] == "ok"
     single = {"sql": "SELECT text AS input, 'billing' AS label FROM tickets"}
     refused = harness.client.put("/api/datasets/tickets/mapping", json=single)
@@ -123,13 +123,13 @@ def test_dismissed_warnings_return_when_their_result_changes(harness: Harness) -
     dataset(
         harness, "SELECT text AS input, category AS label FROM tickets UNION ALL SELECT 'ticket 1 about bug', 'bug'"
     )
-    duplicate = report_of(harness.client.post("/api/datasets/tickets/snapshots").json())["duplicates"]
+    duplicate = report_of(harness.client.post("/api/datasets/tickets/versions").json())["duplicates"]
     assert (duplicate["status"], duplicate["dismissed"]) == ("warning", False)
     dismissed = harness.client.put(
         "/api/datasets/tickets/checks/duplicates/dismissal", json={"signature": duplicate["signature"]}
     )
     assert dismissed.status_code == 204
-    latest = report_of(harness.client.get("/api/datasets/tickets").json()["snapshot"])
+    latest = report_of(harness.client.get("/api/datasets/tickets").json()["dataset_version"])
     assert latest["duplicates"]["dismissed"] is True
     harness.client.put(
         "/api/datasets/tickets/mapping",
@@ -138,7 +138,7 @@ def test_dismissed_warnings_return_when_their_result_changes(harness: Harness) -
             "UNION ALL SELECT 'ticket 1 about bug', 'bug' UNION ALL SELECT 'ticket 2 about account', 'account'"
         },
     )
-    again = report_of(harness.client.post("/api/datasets/tickets/snapshots").json())
+    again = report_of(harness.client.post("/api/datasets/tickets/versions").json())
     assert again["duplicates"]["dismissed"] is False and again["duplicates"]["count"] == 2
     assert harness.client.delete("/api/datasets/tickets/checks/duplicates/dismissal").status_code == 204
     settings = harness.client.put("/api/settings/data", json={"majority_share": 0.6, "min_label_rows": 3}).json()

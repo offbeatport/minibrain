@@ -162,7 +162,7 @@ recipe, which fills the form and loads the sample to try before using real data.
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
 | Version | Prompt-only (model + instructions + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its contract and number, graders and eval result. Immutable. Version 0 is always prompt-only and is created with the model |
-| Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it. Internally a snapshot |
+| Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Data build, training or eval run by the worker |
 | Preset | Classify or Custom today (Extract, General, Rewrite, Text-to-SQL coming); sets the contract, mapping, prompts, graders, checks and promotion rule defaults |
@@ -217,7 +217,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - At-least-once execution: jobs write to a temporary location and commit atomically; training resumes from its last
   checkpoint after a lost lease.
 - Progress is events: workers post them, the UI follows over SSE. Logs are artifacts read by offset.
-- Artifacts are referenced by SHA-256 ID, never by path: sources, snapshots, adapters, checkpoints, eval results, logs,
+- Artifacts are referenced by SHA-256 ID, never by path: sources, dataset versions, adapters, checkpoints, eval results, logs,
   batch outputs. Base model weights are pinned by repo and revision, and each file by its SHA-256.
 - The gateway is separate from management: routing lives in memory, refreshed on version changes, with no database
   read per request. Engines are children with health checks.
@@ -486,8 +486,7 @@ dataset and on the Training page before a run starts:
 ### Dataset versions
 
 A dataset saves its rows when it is created, and each refresh is a new version, so what the preview shows and what
-trains are the same rows. "Snapshot" is the internal name (the `snapshots` table, `/api/datasets/<slug>/snapshots`);
-the UI says version.
+trains are the same rows (the `dataset_versions` table, `/api/datasets/<slug>/versions`).
 
 - Saved when a dataset is created with its columns or SQL (version 1), when its query or columns are saved, and with
   Update on the dataset (or on Training, when its sources changed). A dataset created with no columns picked has no
@@ -498,7 +497,7 @@ the UI says version.
   once. Training, evaluation and serving read only these examples, never columns: a multi-turn example trains on every
   assistant turn and is scored on the last one. Rows identical to the latest version make no new version (Update then only records
   the sources' new fingerprints); rows identical to an older one make the next version, sharing its file.
-- Versions are numbered per dataset (`snapshots.number`, unique per dataset) and listed newest first: number, saved,
+- Versions are numbered per dataset (`dataset_versions.number`, unique per dataset) and listed newest first: number, saved,
   rows, labels, checks, the model versions that use it, size and hash. A copy with merged feedback has no number of
   its own.
 - Saving a query and saving its version are one step: a query that cannot be saved as a version (over the row limit,
@@ -514,7 +513,7 @@ the UI says version.
   list with sizes and modification times; for a Delta table, its version and newest log file). A version records
   its sources' fingerprints and the query; the dataset, the model page and the Training page say "Sources changed
   since v3" or "Query changed since v3" and offer Update. Nothing updates on its own.
-- Training and scoring pick a dataset version of the model's dataset (`snapshot_id` on `POST
+- Training and scoring pick a dataset version of the model's dataset (`dataset_version_id` on `POST
   /api/models/<slug>/versions`), the latest by default; a run never reads the live query. A model's data is its
   dataset's latest version.
 - Feedback: a model's accepted feedback rows merge into the picked version when a model version starts, as a
@@ -731,7 +730,7 @@ once it matches; only deleting a base removes its files.
   routing the model's names and every engine of its base has drained its requests in flight through those names and
   unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
   Ten minutes without that is Stop failed, naming what did not confirm.
-- Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, snapshots only it
+- Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, dataset versions only it
   uses and API key scopes. A base with models built on it answers 409 with their names unless
   the call says `cascade=true`; the cascade deletes them first, then the base.
 - Audit: `model.delete` and `model.undeploy` when a person starts one (`retry` on a retry), and `model.delete_finished`
@@ -1151,7 +1150,7 @@ v1, the evidence regulated buyers ask for first:
 - SBOM (CycloneDX) for every image and Python dependency set. Built: CI uploads Python (uv export from `uv.lock`)
   and web (syft from `web/pnpm-lock.yaml`) SBOMs beside the wheel; each release adds an SBOM per image (syft against
   the image it pushes), attached to the release and attested on the image. Details: `docs/security.md`.
-- AI bill of materials per version: base model weights hash, license, training data snapshot hash, recipe, eval result.
+- AI bill of materials per version: base model weights hash, license, training dataset version hash, recipe, eval result.
   Built: a deterministic CycloneDX 1.6 ML-BOM per version (`aibom.json`, Download AI-BOM on the model card) with
   the adapter's SHA-256, the sources' fingerprints and its own SHA-256, validated against the schema in tests.
 - Signed images and update bundles (cosign), verified offline. Built for releases: keyless Sigstore signing from the
@@ -1164,7 +1163,7 @@ v1, the evidence regulated buyers ask for first:
   out-of-order commits on Postgres just seal later); `minibrain audit verify`, `GET /api/audit/chain` and the Audit log
   page report the first break; SIEM export is RFC 5424 over TLS, TCP or UDP with a stored cursor. Format, canonical
   form and guarantees: `docs/security.md`.
-- Encryption at rest for snapshots, staging files and adapters. Built: every stored file (uploads, snapshots,
+- Encryption at rest for dataset versions, staging files and adapters. Built: every stored file (uploads, dataset versions,
   adapters, logs, staging databases, base weights in a bucket; local folder or S3 bucket) is sealed with its own
   AES-256-GCM data key in a chunked STREAM format, wrapped by a master key from a local key file (default), HashiCorp
   Vault Transit, a PKCS#11 HSM or AWS KMS (FIPS endpoints); content hashes stay over the plaintext. DuckDB reads sealed
@@ -1424,7 +1423,7 @@ Everything in the v1 scope below, after M1.
 - Version diff (scores; the data diff is done)
 - Notifications bell in the top bar: failed jobs, results ready to review, models that need examples, missing
   files
-- Batch jobs (Run → Batch jobs): run a version over a file, snapshot or SQL query in the background, on the job
+- Batch jobs (Run → Batch jobs): run a version over a file, dataset version or SQL query in the background, on the job
   worker; resumable, with progress; results as CSV or Parquet with inputs, outputs and the version; OpenAI-compatible
   `/v1/files` and `/v1/batches`
 - Preset recipes
@@ -1493,6 +1492,11 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   `/api/base-models/{key}/…`, the import routes are `/api/base-models/inspect` and `/api/base-models/import`, and the
   Models list (models you own and bases) is `GET /api/all-models`. Jobs carry `model` and `base_model`; gateway key
   owners are `model:<id>` and `base:<key>`, and a gateway config without `owners` is no longer read.
+- [x] "Snapshot" is "dataset version" in code, API and docs, as in the UI: the `dataset_versions` table and
+  `DatasetVersion`, `dataset_version_id` on model versions, `/api/datasets/{slug}/versions`,
+  `/api/models/{slug}/dataset-versions`, `/api/dataset-versions/{id}/diff/{other_id}`, the `dataset_version` job
+  input and `data.keep_versions` in `minibrain.yaml`. Iceberg's snapshots, the catalogue snapshot and the gateway's
+  config snapshot keep their names.
 - [x] S3 locations differing only by a trailing slash counted as different sources; an S3 or Iceberg path is compared
   without its trailing slashes.
 - [x] Prototype pages (`/proto/*`, such as `/proto/logos`) were reachable in production builds. Their routes are

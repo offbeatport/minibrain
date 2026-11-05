@@ -1,7 +1,7 @@
 from scripts.check_product import AREAS, INVENTORY, ROOT, Surface, check, cli_commands, surface
 
 SURFACE = Surface(
-    routes=frozenset({"GET /api/datasets", "POST /api/datasets/{slug}/snapshots", "POST /v1/chat/completions"}),
+    routes=frozenset({"GET /api/datasets", "POST /api/datasets/{slug}/versions", "POST /v1/chat/completions"}),
     commands=frozenset({"minibrain serve", "minibrain keys rotate"}),
     sections=frozenset({"data", "auth"}),
     policies=frozenset({"network"}),
@@ -11,7 +11,7 @@ SURFACE = Surface(
 DATA = """\
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
-  UI: Data · API: GET /api/datasets, POST /api/datasets/{slug}/snapshots · Config: data.row_limit
+  UI: Data · API: GET /api/datasets, POST /api/datasets/{slug}/versions · Config: data.row_limit
 - **Recipes** · planned · product
   Start a model from a worked use case.
   Roadmap: Recipes
@@ -63,7 +63,7 @@ def test_features_keep_the_shape() -> None:
     data = """\
 - **Dataset versions** · done · admin
   Train on exactly the rows you checked, every time, on every model, in every pool.
-  API: GET /api/datasets, POST /api/datasets/{slug}/snapshots, GET /api/gone · Config: data, nowhere.key
+  API: GET /api/datasets, POST /api/datasets/{slug}/versions, GET /api/gone · Config: data, nowhere.key
 - **Recipes** · planned · product
   Start a model from a worked use case.
   UI: Models

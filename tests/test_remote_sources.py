@@ -258,9 +258,9 @@ def test_database_tables_read_in_place_and_track_changes(harness: Harness, shop:
     sql = "SELECT body AS input, category AS label FROM tickets"
     dataset = harness.client.post("/api/datasets", json={"name": "Tickets", "sql": sql}).json()
     assert dataset["rows"] == 160
-    snapshot = harness.client.post(f"/api/datasets/{dataset['slug']}/snapshots")
-    assert snapshot.status_code == 201, snapshot.text
-    assert snapshot.json()["rows"] == 160
+    saved = harness.client.post(f"/api/datasets/{dataset['slug']}/versions")
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["rows"] == 160
     assert harness.client.get(f"/api/datasets/{dataset['slug']}").json()["changed"]["data"] is False
     with duckdb.connect(str(shop)) as writer:
         writer.execute("INSERT INTO tickets VALUES (999, 'late ticket', 'bug', TIMESTAMP '2026-02-01')")

@@ -19,10 +19,10 @@ from minibrain.app import create_app
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
 from minibrain.auth.roles import Role
-from minibrain.data.snapshot import read_split
+from minibrain.data.splits import read_split
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
-from minibrain.registry.files import snapshot_location
+from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import Job
 from minibrain.serve.backend import CompletionRequest
 from minibrain.settings import Settings
@@ -140,9 +140,9 @@ def scored_answers(harness: Harness, job_id: int, accuracy: float) -> dict[str, 
     with harness.sessions() as session:
         job = session.get(Job, job_id)
         version = job.version if job is not None else None
-        if version is None or version.snapshot is None:
+        if version is None or version.dataset_version is None:
             raise RuntimeError(f"job {job_id} scores no version with data")
-        location = snapshot_location(session, harness.app.state.store, version.snapshot)
+        location = dataset_version_location(session, harness.app.state.store, version.dataset_version)
         labels = version_contract(version).labels or LABELS
         splits = {name: read_split(location, name) for name in ("golden", "eval")}
     answers: dict[str, list[str]] = {}

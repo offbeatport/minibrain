@@ -48,10 +48,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
-  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/snapshots, POST /api/datasets/{slug}/snapshots, POST /api/models/{slug}/snapshots · Config: data.row_limit, data.keep_snapshots
+  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, POST /api/models/{slug}/dataset-versions · Config: data.row_limit, data.keep_versions
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
-  UI: Data › dataset › Versions › Compare · API: GET /api/snapshots/{snapshot_id}/diff/{other_id}
+  UI: Data › dataset › Versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
 - **Change detection** · shipped · product, ml
   Know when sources or the query changed since the last version.
   UI: Data › dataset, Training › model

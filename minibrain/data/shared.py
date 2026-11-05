@@ -48,7 +48,7 @@ from minibrain.data.templates import (
     template_sql,
 )
 from minibrain.registry.files import ArtifactKind, register
-from minibrain.registry.models import Artifact, Dataset, DatasetFolder, Model, Snapshot, Source, Version, now
+from minibrain.registry.models import Artifact, Dataset, DatasetFolder, DatasetVersion, Model, Source, Version, now
 from minibrain.registry.service import ConflictError, NameTakenError, NotFoundError, slugify
 from minibrain.settings import Settings
 
@@ -219,7 +219,7 @@ def store_upload(session: Session, store: ArtifactStore, filename: str, stream: 
 
 
 def artifact_in_use(session: Session, artifact_id: str) -> bool:
-    references = (Source.artifact_id, Snapshot.artifact_id, Version.adapter_artifact_id)
+    references = (Source.artifact_id, DatasetVersion.artifact_id, Version.adapter_artifact_id)
     return any(
         session.scalar(select(column).where(column == artifact_id).limit(1)) is not None for column in references
     )

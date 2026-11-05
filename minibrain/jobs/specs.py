@@ -15,13 +15,13 @@ from minibrain.tasks.judge import Item
 from minibrain.tasks.service import prompting_of
 
 
-def snapshot_ref(session: Session, version: Version) -> dict[str, Any]:
-    if version.snapshot is None:
+def dataset_version_ref(session: Session, version: Version) -> dict[str, Any]:
+    if version.dataset_version is None:
         raise MissingArtifactError(f"{version.model.slug}@{version.number} has no dataset version")
-    snapshot = ref(session, version.snapshot.artifact_id)
-    if snapshot is None:
-        raise MissingArtifactError(f"snapshot {version.snapshot.hash[:12]} has no artifact")
-    return snapshot
+    dataset_version = ref(session, version.dataset_version.artifact_id)
+    if dataset_version is None:
+        raise MissingArtifactError(f"dataset version {version.dataset_version.hash[:12]} has no artifact")
+    return dataset_version
 
 
 def base_spec(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
@@ -35,7 +35,7 @@ def train_params(session: Session, settings: Settings, version: Version) -> dict
         "number": version.number,
         "base_model": version.model.base_model,
         "base_spec": base_spec(session, settings, version),
-        "snapshot": snapshot_ref(session, version),
+        "dataset_version": dataset_version_ref(session, version),
         "recipe": DEFAULT_RECIPE | dict(version.recipe),
         "plan_base": base_facts(session, settings, version.model.base_model).as_dict(),
         "prompting": prompting_of(version).as_dict(),
@@ -49,7 +49,7 @@ def eval_params(session: Session, settings: Settings, version: Version) -> dict[
         "base_model": version.model.base_model,
         "base_spec": base_spec(session, settings, version),
         "version_kind": version.kind,
-        "snapshot": snapshot_ref(session, version),
+        "dataset_version": dataset_version_ref(session, version),
         "adapter": ref(session, version.adapter_artifact_id),
         "prompting": prompting_of(version).as_dict(),
         "answer_tokens": preset(version.model.preset).answer_tokens,

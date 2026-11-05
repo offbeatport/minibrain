@@ -13,7 +13,7 @@ from minibrain.api.schemas import (
     TrainingPlanQuery,
     TrainingSettings,
 )
-from minibrain.data.snapshots import dataset_version, require_splits
+from minibrain.data.dataset_versions import chosen_dataset_version, require_splits
 from minibrain.ml.planner import (
     REFERENCE_SEQ,
     Base,
@@ -30,8 +30,8 @@ from minibrain.ml.planner import (
 from minibrain.models.hardware import NodeReport
 from minibrain.models.train_facts import base_facts, catalogue_base, longest_example, trainer_machines
 from minibrain.registry.compute import pools
-from minibrain.registry.files import snapshot_location, store_for
-from minibrain.registry.models import CatalogModel, CatalogVariant, Model, Snapshot
+from minibrain.registry.files import dataset_version_location, store_for
+from minibrain.registry.models import CatalogModel, CatalogVariant, DatasetVersion, Model
 from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 
@@ -69,12 +69,12 @@ def training_plan(
     settings: InstallSettings,
     node: NodeReport,
     model: Model,
-    snapshot: Snapshot,
+    dataset_version: DatasetVersion,
     body: TrainingSettings,
 ) -> tuple[Plan, int]:
-    require_splits(snapshot)
+    require_splits(dataset_version)
     chosen = planner_settings(body)
-    location = snapshot_location(session, store_for(settings), snapshot)
+    location = dataset_version_location(session, store_for(settings), dataset_version)
     rows, longest = longest_example(location, chosen.max_rows)
     machines = trainer_machines(pools(session, node))
     try:
@@ -155,11 +155,11 @@ def get_training_plan(
     node: LocalNodeDep,
 ) -> TrainingPlanInfo:
     model = get_model(session, slug)
-    snapshot = dataset_version(session, model, query.snapshot_id)
-    found, longest = training_plan(session, settings, node, model, snapshot, query)
+    dataset_version = chosen_dataset_version(session, model, query.dataset_version_id)
+    found, longest = training_plan(session, settings, node, model, dataset_version, query)
     default = found
     if found.settings.overrides():
-        default, _ = training_plan(session, settings, node, model, snapshot, TrainingSettings())
+        default, _ = training_plan(session, settings, node, model, dataset_version, TrainingSettings())
     return plan_info(found, default, longest)
 
 

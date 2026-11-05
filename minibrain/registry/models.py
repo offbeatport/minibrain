@@ -191,7 +191,7 @@ class Dataset(Base):
         secondary=dataset_sources, back_populates="datasets", order_by="Source.name"
     )
     models: Mapped[list["Model"]] = relationship(back_populates="dataset")
-    snapshots: Mapped[list["Snapshot"]] = relationship(back_populates="dataset", order_by="Snapshot.id")
+    versions: Mapped[list["DatasetVersion"]] = relationship(back_populates="dataset", order_by="DatasetVersion.id")
 
 
 class Model(Base):
@@ -225,11 +225,11 @@ class Model(Base):
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
 
-class Snapshot(Base):
-    __tablename__ = "snapshots"
+class DatasetVersion(Base):
+    __tablename__ = "dataset_versions"
     __table_args__ = (
-        Index("uq_snapshots_dataset_number", "dataset_id", "number", unique=True),
-        Index("ix_snapshots_dataset_hash", "dataset_id", "hash"),
+        Index("uq_dataset_versions_number", "dataset_id", "number", unique=True),
+        Index("ix_dataset_versions_hash", "dataset_id", "hash"),
         {"sqlite_autoincrement": True},
     )
 
@@ -237,7 +237,7 @@ class Snapshot(Base):
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     number: Mapped[int | None] = mapped_column(default=None)
     base_id: Mapped[int | None] = mapped_column(
-        ForeignKey("snapshots.id", ondelete="SET NULL", name="fk_snapshots_base"), default=None
+        ForeignKey("dataset_versions.id", ondelete="SET NULL", name="fk_dataset_versions_base"), default=None
     )
     hash: Mapped[str]
     artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"))
@@ -253,10 +253,10 @@ class Snapshot(Base):
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     feedback_rows: Mapped[int] = mapped_column(default=0)
 
-    dataset: Mapped["Dataset | None"] = relationship(back_populates="snapshots")
-    versions: Mapped[list["Version"]] = relationship(back_populates="snapshot")
-    base: Mapped["Snapshot | None"] = relationship(remote_side="Snapshot.id", back_populates="copies")
-    copies: Mapped[list["Snapshot"]] = relationship(back_populates="base")
+    dataset: Mapped["Dataset | None"] = relationship(back_populates="versions")
+    model_versions: Mapped[list["Version"]] = relationship(back_populates="dataset_version")
+    base: Mapped["DatasetVersion | None"] = relationship(remote_side="DatasetVersion.id", back_populates="copies")
+    copies: Mapped[list["DatasetVersion"]] = relationship(back_populates="base")
 
 
 class Version(Base):
@@ -265,7 +265,7 @@ class Version(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"))
-    snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("snapshots.id"), default=None)
+    dataset_version_id: Mapped[int | None] = mapped_column(ForeignKey("dataset_versions.id"), default=None)
     number: Mapped[int]
     kind: Mapped[str]
     status: Mapped[str]
@@ -284,7 +284,7 @@ class Version(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
     model: Mapped[Model] = relationship(back_populates="versions")
-    snapshot: Mapped[Snapshot | None] = relationship(back_populates="versions")
+    dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")
 
 
 class Worker(Base):

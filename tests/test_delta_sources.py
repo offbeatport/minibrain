@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from minibrain.data import delta, extensions
 from minibrain.data.sources import SourceError, Table, run_query, statement_tables
-from minibrain.registry.models import Snapshot
+from minibrain.registry.models import DatasetVersion
 from tests.conftest import LABELS, Harness
 
 EXTENSIONS = os.environ.get("MINIBRAIN_TEST_DUCKDB_EXTENSIONS")
@@ -122,7 +122,7 @@ def test_dataset_sql_cannot_call_the_delta_scanner() -> None:
 
 
 @pytest.mark.skipif(not EXTENSIONS, reason="needs a folder of DuckDB extensions")
-def test_delta_tables_read_in_place_and_snapshot_their_version(
+def test_delta_tables_read_in_place_and_save_their_version(
     harness: Harness, lake: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(extensions.DIRECTORY_ENV, str(EXTENSIONS))
@@ -145,16 +145,18 @@ def test_delta_tables_read_in_place_and_snapshot_their_version(
     assert stats["rows"] == 150
     created = harness.client.post("/api/datasets", json={"name": "Lake", "source_id": source["id"]})
     assert created.status_code == 201, created.text
-    first = harness.client.post("/api/datasets/lake/snapshots")
+    first = harness.client.post("/api/datasets/lake/versions")
     assert first.status_code == 201, first.text
     assert first.json()["rows"] == 150 and first.json()["checks"]
     write(table, 150, 60)
     summary = harness.client.get("/api/datasets/lake").json()
     assert summary["changed"] == {"data": True, "query": False, "dataset": False}
-    second = harness.client.post("/api/datasets/lake/snapshots").json()
+    second = harness.client.post("/api/datasets/lake/versions").json()
     assert second["rows"] == 210
     with harness.sessions() as session:
-        prints = [found.fingerprints or {} for found in session.scalars(select(Snapshot).order_by(Snapshot.id))]
+        prints = [
+            found.fingerprints or {} for found in session.scalars(select(DatasetVersion).order_by(DatasetVersion.id))
+        ]
     assert prints[0]["lake_tickets"].startswith("v0-") and prints[1]["lake_tickets"].startswith("v1-")
     pinned = Table(name="pinned", remote=delta.DeltaReader(root=str(table), version=0))
     assert run_query([pinned], "SELECT count(*) FROM pinned", None).rows == [[150]]

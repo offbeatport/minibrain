@@ -1,5 +1,5 @@
 from tests.conftest import Harness, tickets_csv
-from tests.test_shared_data import snapshot_hash, upload
+from tests.test_shared_data import dataset_version_hash, upload
 
 
 def test_description_and_tags_round_trip_on_sources_and_datasets(harness: Harness) -> None:
@@ -41,7 +41,7 @@ def test_dataset_created_with_the_picked_columns(harness: Harness) -> None:
     sql = "SELECT text AS input, category AS label FROM source WHERE category IN ('bug', 'billing')"
     by_sql = harness.client.post("/api/datasets", json={"name": "Bugs", "source_id": source["id"], "sql": sql}).json()
     assert (by_sql["mapping"]["sql"], by_sql["mapping"]["input_column"]) == (sql, None)
-    assert (by_sql["snapshot"]["number"], by_sql["snapshot"]["rows"]) == (1, 100)
+    assert (by_sql["dataset_version"]["number"], by_sql["dataset_version"]["rows"]) == (1, 100)
     bad = {"name": "Broken", "source_id": source["id"], "input_column": "nope", "label_column": "text"}
     assert harness.client.post("/api/datasets", json=bad).status_code == 422
     assert [dataset["slug"] for dataset in harness.client.get("/api/datasets").json()] == ["bugs", "reversed"]
@@ -76,7 +76,10 @@ def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"})
     harness.client.put("/api/models/triage/dataset", json={"dataset": "tickets"})
     splits = harness.client.get("/api/datasets/tickets").json()["splits"]
-    assert snapshot_hash(harness, "triage") == harness.client.get("/api/datasets/tickets").json()["snapshot"]["hash"]
+    assert (
+        dataset_version_hash(harness, "triage")
+        == harness.client.get("/api/datasets/tickets").json()["dataset_version"]["hash"]
+    )
     assert sum(splits.values()) == 200
     harness.client.patch("/api/datasets/tickets", json={"description": "still the same rows"})
     assert harness.client.get("/api/datasets/tickets").json()["splits"] == splits

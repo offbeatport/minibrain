@@ -54,7 +54,7 @@ def test_encrypt_existing_seals_old_files_in_place_and_drops_plain_copies(harnes
     (staged.parent / "staging.duckdb.wal").write_bytes(b"plain wal")
     cached = store.cache / ids[0]
     cached.mkdir(parents=True)
-    (cached / "snapshot.parquet").write_bytes(payloads[0])
+    (cached / "dataset_version.parquet").write_bytes(payloads[0])
     before = run(harness, rekey.Plan())
     assert (before.plain, before.damaged) == (5, 0)
     tally = run(harness, rekey.Plan(encrypt=True))

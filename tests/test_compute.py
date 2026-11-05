@@ -96,7 +96,7 @@ def test_infrastructure_reports_the_setup_and_where_data_lives(harness: Harness)
     assert info["setup"] == "one_machine"
     stores = {store["name"]: store for store in info["stores"]}
     assert set(stores) == {"Database", "Model files", "Dataset versions", "Uploads, adapters and results"}
-    assert info["snapshots"] == {"count": 0, "size": 0, "for_versions": 0, "saved": 0, "keep": 5}
+    assert info["dataset_versions"] == {"count": 0, "size": 0, "for_versions": 0, "saved": 0, "keep": 5}
     assert stores["Database"]["kind"] == "sqlite" and stores["Database"]["location"].endswith("minibrain.db")
     assert stores["Model files"]["free_bytes"] > 0 and stores["Model files"]["used_bytes"] == 0
     join_rack(harness)

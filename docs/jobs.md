@@ -4,7 +4,7 @@ Every long-running task is a job on one contract. `main` owns job state; workers
 
 | Kind | Does | Produces |
 |---|---|---|
-| `train` | LoRA training on a snapshot | Adapter, checkpoints |
+| `train` | LoRA training on a dataset version | Adapter, checkpoints |
 | `eval` | Scores a version on the held-out and test splits | Eval results |
 | `judge` | Scores answers with a judge model and caches each score | Judge scores |
 | `download` / `import` | Fetches pinned model weights from the hub, a mirror, S3 or a folder | Model files |
@@ -12,7 +12,7 @@ Every long-running task is a job on one contract. `main` owns job state; workers
 | `catalog_sync` | Reads our catalogue URL | Catalogue entries |
 | `label` | Teacher labels rows or generates Q&A | Labelled data |
 | `index` | Embeds sources, builds the retrieval index | Index |
-| `batch` | Runs a version over a file, snapshot or query | Batch results |
+| `batch` | Runs a version over a file, dataset version or query | Batch results |
 
 ## Lifecycle
 
@@ -74,7 +74,7 @@ sequenceDiagram
     MA->>MA: Store job (queued)
     WK->>MA: Claim (long-poll up to 25 s)
     MA-->>WK: Job, lease token (60 s)
-    WK->>MA: Download snapshot by artifact ID
+    WK->>MA: Download the dataset version by artifact ID
     WK->>CH: Start child process
     loop Every 15 s
         WK->>MA: Heartbeat, progress events

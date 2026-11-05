@@ -88,7 +88,7 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
     assert (base["key"], base["repo"], base["licence_use"]) == ("qwen3-0.6b", "Qwen/Qwen3-0.6B", "commercial")
     assert base["licence_name"] == "Apache 2.0"
     data = card["training_data"]
-    assert (data["dataset_slug"], data["snapshot_rows"]) == (SLUG, 200)
+    assert (data["dataset_slug"], data["dataset_version_rows"]) == (SLUG, 200)
     assert data["splits"] == {"train": 146, "held_out": 30, "test": 20, "few_shot": 4}
     assert [row["rows"] for row in data["label_balance"]] == [50, 50, 50, 50]
     assert sum(row["train"] for row in data["label_balance"]) == 146

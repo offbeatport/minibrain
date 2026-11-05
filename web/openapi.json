@@ -991,13 +991,13 @@
         }
       }
     },
-    "/api/models/{slug}/snapshots": {
+    "/api/models/{slug}/dataset-versions": {
       "post": {
         "tags": [
           "models"
         ],
-        "summary": "Build Snapshot",
-        "operationId": "build_snapshot_api_models__slug__snapshots_post",
+        "summary": "Build Dataset Version",
+        "operationId": "build_dataset_version_api_models__slug__dataset_versions_post",
         "parameters": [
           {
             "name": "slug",
@@ -2340,13 +2340,13 @@
         }
       }
     },
-    "/api/datasets/{slug}/snapshots": {
+    "/api/datasets/{slug}/versions": {
       "get": {
         "tags": [
           "data"
         ],
-        "summary": "List Snapshots",
-        "operationId": "list_snapshots_api_datasets__slug__snapshots_get",
+        "summary": "List Dataset Versions",
+        "operationId": "list_dataset_versions_api_datasets__slug__versions_get",
         "parameters": [
           {
             "name": "slug",
@@ -2366,9 +2366,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SnapshotInfo"
+                    "$ref": "#/components/schemas/DatasetVersionInfo"
                   },
-                  "title": "Response List Snapshots Api Datasets  Slug  Snapshots Get"
+                  "title": "Response List Dataset Versions Api Datasets  Slug  Versions Get"
                 }
               }
             }
@@ -2389,8 +2389,8 @@
         "tags": [
           "data"
         ],
-        "summary": "Save Snapshot",
-        "operationId": "save_snapshot_api_datasets__slug__snapshots_post",
+        "summary": "Save Dataset Version",
+        "operationId": "save_dataset_version_api_datasets__slug__versions_post",
         "parameters": [
           {
             "name": "slug",
@@ -2408,7 +2408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SnapshotInfo"
+                  "$ref": "#/components/schemas/DatasetVersionInfo"
                 }
               }
             }
@@ -2426,21 +2426,21 @@
         }
       }
     },
-    "/api/snapshots/{snapshot_id}/diff/{other_id}": {
+    "/api/dataset-versions/{dataset_version_id}/diff/{other_id}": {
       "get": {
         "tags": [
           "data"
         ],
-        "summary": "Diff Snapshots",
-        "operationId": "diff_snapshots_api_snapshots__snapshot_id__diff__other_id__get",
+        "summary": "Diff Dataset Versions",
+        "operationId": "diff_dataset_versions_api_dataset_versions__dataset_version_id__diff__other_id__get",
         "parameters": [
           {
-            "name": "snapshot_id",
+            "name": "dataset_version_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Snapshot Id"
+              "title": "Dataset Version Id"
             }
           },
           {
@@ -2459,7 +2459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SnapshotDiff"
+                  "$ref": "#/components/schemas/DatasetVersionDiff"
                 }
               }
             }
@@ -5542,7 +5542,7 @@
             }
           },
           {
-            "name": "snapshot_id",
+            "name": "dataset_version_id",
             "in": "query",
             "required": false,
             "schema": {
@@ -5554,7 +5554,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Snapshot Id"
+              "title": "Dataset Version Id"
             }
           }
         ],
@@ -11064,22 +11064,22 @@
             ],
             "title": "Dataset Version"
           },
-          "snapshot_feedback_rows": {
+          "dataset_version_feedback_rows": {
             "type": "integer",
-            "title": "Snapshot Feedback Rows",
+            "title": "Dataset Version Feedback Rows",
             "default": 0
           },
-          "snapshot_hash": {
+          "dataset_version_hash": {
             "type": "string",
-            "title": "Snapshot Hash"
+            "title": "Dataset Version Hash"
           },
-          "snapshot_rows": {
+          "dataset_version_rows": {
             "type": "integer",
-            "title": "Snapshot Rows"
+            "title": "Dataset Version Rows"
           },
-          "snapshot_taken_at": {
+          "dataset_version_taken_at": {
             "type": "string",
-            "title": "Snapshot Taken At"
+            "title": "Dataset Version Taken At"
           },
           "query": {
             "anyOf": [
@@ -11138,9 +11138,9 @@
         "required": [
           "dataset_slug",
           "dataset_name",
-          "snapshot_hash",
-          "snapshot_rows",
-          "snapshot_taken_at",
+          "dataset_version_hash",
+          "dataset_version_rows",
+          "dataset_version_taken_at",
           "query",
           "splits",
           "label_balance",
@@ -13498,11 +13498,11 @@
             "minimum": 100.0,
             "title": "Row Limit"
           },
-          "keep_snapshots": {
+          "keep_versions": {
             "type": "integer",
             "maximum": 1000.0,
             "minimum": 0.0,
-            "title": "Keep Snapshots"
+            "title": "Keep Versions"
           },
           "checks_off": {
             "items": {
@@ -13544,7 +13544,7 @@
         "type": "object",
         "required": [
           "row_limit",
-          "keep_snapshots"
+          "keep_versions"
         ],
         "title": "DataSettings"
       },
@@ -13563,7 +13563,7 @@
             ],
             "title": "Row Limit"
           },
-          "keep_snapshots": {
+          "keep_versions": {
             "anyOf": [
               {
                 "type": "integer",
@@ -13574,7 +13574,7 @@
                 "type": "null"
               }
             ],
-            "title": "Keep Snapshots"
+            "title": "Keep Versions"
           },
           "checks_off": {
             "anyOf": [
@@ -14018,10 +14018,10 @@
             ],
             "title": "Splits"
           },
-          "snapshot": {
+          "dataset_version": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SnapshotInfo"
+                "$ref": "#/components/schemas/DatasetVersionInfo"
               },
               {
                 "type": "null"
@@ -14078,6 +14078,229 @@
           "updated_at"
         ],
         "title": "DatasetSummary"
+      },
+      "DatasetVersionDiff": {
+        "properties": {
+          "before": {
+            "$ref": "#/components/schemas/DatasetVersionInfo"
+          },
+          "after": {
+            "$ref": "#/components/schemas/DatasetVersionInfo"
+          },
+          "added": {
+            "type": "integer",
+            "title": "Added"
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed"
+          },
+          "relabelled": {
+            "type": "integer",
+            "title": "Relabelled"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/LabelShiftInfo"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "added_rows": {
+            "items": {
+              "$ref": "#/components/schemas/DiffRow"
+            },
+            "type": "array",
+            "title": "Added Rows"
+          },
+          "removed_rows": {
+            "items": {
+              "$ref": "#/components/schemas/DiffRow"
+            },
+            "type": "array",
+            "title": "Removed Rows"
+          },
+          "relabelled_rows": {
+            "items": {
+              "$ref": "#/components/schemas/RelabelInfo"
+            },
+            "type": "array",
+            "title": "Relabelled Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "before",
+          "after",
+          "added",
+          "removed",
+          "relabelled",
+          "unchanged",
+          "labels",
+          "added_rows",
+          "removed_rows",
+          "relabelled_rows"
+        ],
+        "title": "DatasetVersionDiff"
+      },
+      "DatasetVersionInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "base_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Number"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "versions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "taken_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taken At"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckInfo"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "feedback_rows": {
+            "type": "integer",
+            "title": "Feedback Rows",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "hash",
+          "dataset",
+          "rows",
+          "size",
+          "counts",
+          "labels",
+          "saved",
+          "versions",
+          "created_at",
+          "taken_at"
+        ],
+        "title": "DatasetVersionInfo"
+      },
+      "DatasetVersionUsage": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "for_versions": {
+            "type": "integer",
+            "title": "For Versions"
+          },
+          "saved": {
+            "type": "integer",
+            "title": "Saved"
+          },
+          "keep": {
+            "type": "integer",
+            "title": "Keep"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "size",
+          "for_versions",
+          "saved",
+          "keep"
+        ],
+        "title": "DatasetVersionUsage"
       },
       "DecisionInfo": {
         "properties": {
@@ -16784,10 +17007,10 @@
             "type": "array",
             "title": "Stores"
           },
-          "snapshots": {
+          "dataset_versions": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SnapshotUsage"
+                "$ref": "#/components/schemas/DatasetVersionUsage"
               },
               {
                 "type": "null"
@@ -18764,10 +18987,10 @@
             ],
             "title": "Dataset Name"
           },
-          "snapshot": {
+          "dataset_version": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SnapshotInfo"
+                "$ref": "#/components/schemas/DatasetVersionInfo"
               },
               {
                 "type": "null"
@@ -18838,7 +19061,7 @@
           "active_jobs",
           "source",
           "mapping",
-          "snapshot",
+          "dataset_version",
           "models",
           "request_bodies",
           "contract",
@@ -21562,10 +21785,10 @@
             ],
             "title": "Dataset Name"
           },
-          "snapshot": {
+          "dataset_version": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SnapshotInfo"
+                "$ref": "#/components/schemas/DatasetVersionInfo"
               },
               {
                 "type": "null"
@@ -21651,7 +21874,7 @@
           "active_jobs",
           "source",
           "mapping",
-          "snapshot",
+          "dataset_version",
           "models",
           "request_bodies",
           "contract",
@@ -21905,229 +22128,6 @@
         },
         "type": "object",
         "title": "SignInMethods"
-      },
-      "SnapshotDiff": {
-        "properties": {
-          "before": {
-            "$ref": "#/components/schemas/SnapshotInfo"
-          },
-          "after": {
-            "$ref": "#/components/schemas/SnapshotInfo"
-          },
-          "added": {
-            "type": "integer",
-            "title": "Added"
-          },
-          "removed": {
-            "type": "integer",
-            "title": "Removed"
-          },
-          "relabelled": {
-            "type": "integer",
-            "title": "Relabelled"
-          },
-          "unchanged": {
-            "type": "integer",
-            "title": "Unchanged"
-          },
-          "labels": {
-            "items": {
-              "$ref": "#/components/schemas/LabelShiftInfo"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "added_rows": {
-            "items": {
-              "$ref": "#/components/schemas/DiffRow"
-            },
-            "type": "array",
-            "title": "Added Rows"
-          },
-          "removed_rows": {
-            "items": {
-              "$ref": "#/components/schemas/DiffRow"
-            },
-            "type": "array",
-            "title": "Removed Rows"
-          },
-          "relabelled_rows": {
-            "items": {
-              "$ref": "#/components/schemas/RelabelInfo"
-            },
-            "type": "array",
-            "title": "Relabelled Rows"
-          }
-        },
-        "type": "object",
-        "required": [
-          "before",
-          "after",
-          "added",
-          "removed",
-          "relabelled",
-          "unchanged",
-          "labels",
-          "added_rows",
-          "removed_rows",
-          "relabelled_rows"
-        ],
-        "title": "SnapshotDiff"
-      },
-      "SnapshotInfo": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "hash": {
-            "type": "string",
-            "title": "Hash"
-          },
-          "dataset": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset"
-          },
-          "number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Number"
-          },
-          "base_number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Number"
-          },
-          "rows": {
-            "type": "integer",
-            "title": "Rows"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "counts": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Counts"
-          },
-          "labels": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Labels"
-          },
-          "saved": {
-            "type": "boolean",
-            "title": "Saved"
-          },
-          "versions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Versions"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "taken_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Taken At"
-          },
-          "checks": {
-            "items": {
-              "$ref": "#/components/schemas/CheckInfo"
-            },
-            "type": "array",
-            "title": "Checks"
-          },
-          "feedback_rows": {
-            "type": "integer",
-            "title": "Feedback Rows",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "hash",
-          "dataset",
-          "rows",
-          "size",
-          "counts",
-          "labels",
-          "saved",
-          "versions",
-          "created_at",
-          "taken_at"
-        ],
-        "title": "SnapshotInfo"
-      },
-      "SnapshotUsage": {
-        "properties": {
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "for_versions": {
-            "type": "integer",
-            "title": "For Versions"
-          },
-          "saved": {
-            "type": "integer",
-            "title": "Saved"
-          },
-          "keep": {
-            "type": "integer",
-            "title": "Keep"
-          }
-        },
-        "type": "object",
-        "required": [
-          "count",
-          "size",
-          "for_versions",
-          "saved",
-          "keep"
-        ],
-        "title": "SnapshotUsage"
       },
       "SourceAdded": {
         "properties": {
@@ -23769,7 +23769,7 @@
             ],
             "title": "Kind"
           },
-          "snapshot_id": {
+          "dataset_version_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -23778,7 +23778,7 @@
                 "type": "null"
               }
             ],
-            "title": "Snapshot Id"
+            "title": "Dataset Version Id"
           },
           "breaking": {
             "type": "boolean",
@@ -23810,7 +23810,7 @@
             "type": "boolean",
             "title": "Current"
           },
-          "snapshot_hash": {
+          "dataset_version_hash": {
             "anyOf": [
               {
                 "type": "string"
@@ -23819,9 +23819,9 @@
                 "type": "null"
               }
             ],
-            "title": "Snapshot Hash"
+            "title": "Dataset Version Hash"
           },
-          "snapshot_id": {
+          "dataset_version_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -23830,9 +23830,9 @@
                 "type": "null"
               }
             ],
-            "title": "Snapshot Id"
+            "title": "Dataset Version Id"
           },
-          "snapshot_dataset": {
+          "dataset_slug": {
             "anyOf": [
               {
                 "type": "string"
@@ -23841,9 +23841,9 @@
                 "type": "null"
               }
             ],
-            "title": "Snapshot Dataset"
+            "title": "Dataset Slug"
           },
-          "snapshot_number": {
+          "dataset_version_number": {
             "anyOf": [
               {
                 "type": "integer"
@@ -23852,11 +23852,11 @@
                 "type": "null"
               }
             ],
-            "title": "Snapshot Number"
+            "title": "Dataset Version Number"
           },
-          "snapshot_rows": {
+          "dataset_version_rows": {
             "type": "integer",
-            "title": "Snapshot Rows",
+            "title": "Dataset Version Rows",
             "default": 0
           },
           "recipe": {
@@ -24034,8 +24034,8 @@
           "kind",
           "status",
           "current",
-          "snapshot_hash",
-          "snapshot_id",
+          "dataset_version_hash",
+          "dataset_version_id",
           "recipe",
           "golden",
           "held_out",

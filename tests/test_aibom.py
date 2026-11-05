@@ -74,8 +74,8 @@ def test_trained_version_is_a_valid_cyclonedx_ml_bom(harness: Harness) -> None:
     assert facts["minibrain:training:train_loss"] == "0.4322"
     assert model["externalReferences"][0]["type"] == "model-card"
     parameters = model["modelCard"]["modelParameters"]
-    snapshot = by_type(bom, "data")[0]
-    assert parameters["datasets"] == [{"ref": snapshot["bom-ref"]}]
+    dataset_version = by_type(bom, "data")[0]
+    assert parameters["datasets"] == [{"ref": dataset_version["bom-ref"]}]
     assert parameters["approach"] == {"type": "supervised"}
     assert parameters["modelArchitecture"] == "LoRA adapter on Qwen/Qwen3-0.6B"
     assert sorted(entry["value"] for entry in model["modelCard"]["properties"]) == sorted(LABELS)
@@ -103,17 +103,17 @@ def test_trained_version_is_a_valid_cyclonedx_ml_bom(harness: Harness) -> None:
     assert adapter["mime-type"] == "application/x-tar"
 
     data = card["training_data"]
-    assert snapshot["hashes"] == [{"alg": "SHA-256", "content": data["snapshot_hash"]}]
-    assert props(snapshot)["minibrain:snapshot:train_rows"] == "146"
-    assert props(snapshot)["minibrain:snapshot:check:personal_data"] == "ok"
+    assert dataset_version["hashes"] == [{"alg": "SHA-256", "content": data["dataset_version_hash"]}]
+    assert props(dataset_version)["minibrain:dataset_version:train_rows"] == "146"
+    assert props(dataset_version)["minibrain:dataset_version:check:personal_data"] == "ok"
     source = by_type(bom, "data")[1]
     assert source["hashes"] == [{"alg": "SHA-256", "content": hashlib.sha256(tickets_csv()).hexdigest()}]
     assert data["sources"][0]["fingerprint"] == source["hashes"][0]["content"]
     assert props(source)["minibrain:source:kind"] == "upload"
 
     graph = {entry["ref"]: entry["dependsOn"] for entry in bom["dependencies"]}
-    assert graph[model["bom-ref"]] == [base["bom-ref"], adapter["bom-ref"], snapshot["bom-ref"]]
-    assert graph[snapshot["bom-ref"]] == [source["bom-ref"]]
+    assert graph[model["bom-ref"]] == [base["bom-ref"], adapter["bom-ref"], dataset_version["bom-ref"]]
+    assert graph[dataset_version["bom-ref"]] == [source["bom-ref"]]
     refs = [model["bom-ref"]] + [component["bom-ref"] for component in bom["components"]]
     assert sorted(graph) == sorted(refs)
 

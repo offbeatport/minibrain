@@ -221,8 +221,8 @@ def check_lines(card: ModelCard) -> list[str]:
 def version_text(data: CardData) -> str | None:
     if data.dataset_version is None:
         return None
-    if data.snapshot_feedback_rows:
-        return f"{data.dataset_version}, plus {data.snapshot_feedback_rows:,} rows from feedback"
+    if data.dataset_version_feedback_rows:
+        return f"{data.dataset_version}, plus {data.dataset_version_feedback_rows:,} rows from feedback"
     return str(data.dataset_version)
 
 
@@ -235,9 +235,9 @@ def data_section(card: ModelCard) -> list[str]:
     rows: Facts = [
         ("Dataset", f"{data.dataset_name} ({data.dataset_slug})" if data.dataset_slug else None),
         ("Dataset version", version_text(data)),
-        ("SHA-256", code(data.snapshot_hash)),
-        ("Rows", f"{data.snapshot_rows:,}"),
-        ("Saved", when(data.snapshot_taken_at)),
+        ("SHA-256", code(data.dataset_version_hash)),
+        ("Rows", f"{data.dataset_version_rows:,}"),
+        ("Saved", when(data.dataset_version_taken_at)),
         ("Splits", split_text),
     ]
     lines = section("## Training data", facts(rows))

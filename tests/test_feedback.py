@@ -5,10 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from minibrain.data.snapshot import read_rows
+from minibrain.data.splits import read_rows
 from minibrain.gateway.standalone import create_gateway_app
-from minibrain.registry.files import snapshot_location, store_for
-from minibrain.registry.models import AuditEvent, Feedback, RequestLog, Snapshot
+from minibrain.registry.files import dataset_version_location, store_for
+from minibrain.registry.models import AuditEvent, DatasetVersion, Feedback, RequestLog
 from tests.conftest import FakeBackend, Harness
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 from tests.test_gateway import CHAT, Down, servable
@@ -143,11 +143,11 @@ def test_review_actions_change_status_and_are_audited(harness: Harness) -> None:
         }
 
 
-def snapshot_rows(harness: Harness, snapshot_id: int) -> dict[str, str]:
+def dataset_version_rows(harness: Harness, dataset_version_id: int) -> dict[str, str]:
     with harness.sessions() as session:
-        snapshot = session.get(Snapshot, snapshot_id)
-        assert snapshot is not None
-        location = snapshot_location(session, store_for(harness.settings), snapshot)
+        dataset_version = session.get(DatasetVersion, dataset_version_id)
+        assert dataset_version is not None
+        location = dataset_version_location(session, store_for(harness.settings), dataset_version)
     return {text or "": label or "" for _, text, label in read_rows(location)}
 
 
@@ -164,29 +164,29 @@ def test_accepted_feedback_joins_the_rows_a_new_version_trains_on(harness: Harne
     summary = harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()
     assert summary == summary | {"version": 0, "total": 5, "accepted": 3, "pending": 1, "rows": 3}
     detail = harness.client.get(f"/api/models/{SLUG}").json()
-    assert (detail["snapshot"]["id"], detail["snapshot"]["feedback_rows"]) == (before["id"], 0)
+    assert (detail["dataset_version"]["id"], detail["dataset_version"]["feedback_rows"]) == (before["id"], 0)
     version = add_version(harness, "prompt")
-    assert (version["snapshot_number"], version["snapshot_rows"]) == (before["number"], 201)
+    assert (version["dataset_version_number"], version["dataset_version_rows"]) == (before["number"], 201)
     with harness.sessions() as session:
-        copy = session.get(Snapshot, version["snapshot_id"])
+        copy = session.get(DatasetVersion, version["dataset_version_id"])
         assert copy is not None
         assert (copy.base_id, copy.feedback_rows, copy.number) == (before["id"], 2, None)
         assert copy.hash != before["hash"]
-    rows = snapshot_rows(harness, version["snapshot_id"])
+    rows = dataset_version_rows(harness, version["dataset_version_id"])
     assert rows["ticket 0 about billing"] == "bug" and rows["my card was declined"] == "billing"
     assert rows["ticket 2 about account"] == "account" and rows["ticket 3 about feature"] == "feature"
-    assert snapshot_rows(harness, before["id"])["ticket 0 about billing"] == "billing"
+    assert dataset_version_rows(harness, before["id"])["ticket 0 about billing"] == "billing"
     finish(harness, "eval")
     again = add_version(harness, "prompt")
-    assert again["snapshot_id"] == version["snapshot_id"]
+    assert again["dataset_version_id"] == version["dataset_version_id"]
     later = harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()
     assert (later["version"], later["total"], later["accepted"], later["rows"]) == (2, 0, 0, 3)
 
 
-def test_saving_a_dataset_snapshot_leaves_feedback_out(harness: Harness) -> None:
+def test_saving_a_dataset_version_leaves_feedback_out(harness: Harness) -> None:
     before = create_with_dataset(harness)
     review(harness, played(harness, "ticket 0 about billing", "down", correction="bug"), "accept")
-    saved = harness.client.post(f"/api/datasets/{before['dataset']}/snapshots").json()
+    saved = harness.client.post(f"/api/datasets/{before['dataset']}/versions").json()
     assert (saved["hash"], saved["feedback_rows"]) == (before["hash"], 0)
 
 

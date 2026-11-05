@@ -519,12 +519,12 @@ export const DATA = {
         ),
     }),
     versionRetention: section("Version retention", {
-        keepSnapshots: aka(
-            ["snapshot retention"],
+        keepVersions: aka(
+            ["dataset version retention"],
             setting(
                 "Keep the last unused versions per dataset",
                 "Older ones are removed with their files.",
-                ["retention", "snapshots", "cleanup", "delete", "prune"],
+                ["retention", "versions", "cleanup", "delete", "prune"],
             ),
         ),
     }),

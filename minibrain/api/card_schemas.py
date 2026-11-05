@@ -80,10 +80,10 @@ class CardData(BaseModel):
     dataset_slug: str | None
     dataset_name: str | None
     dataset_version: int | None = None
-    snapshot_feedback_rows: int = 0
-    snapshot_hash: str
-    snapshot_rows: int
-    snapshot_taken_at: str
+    dataset_version_feedback_rows: int = 0
+    dataset_version_hash: str
+    dataset_version_rows: int
+    dataset_version_taken_at: str
     query: str | None
     splits: CardSplits
     label_balance: list[CardLabelRows] | None

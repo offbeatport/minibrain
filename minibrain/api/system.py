@@ -10,11 +10,11 @@ from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
+    DatasetVersionUsage,
     DeviceInfo,
     InfrastructureInfo,
     InstallSettings,
     LoadedModel,
-    SnapshotUsage,
     StorageCheck,
     StorageSettings,
     StorageUpdate,
@@ -24,7 +24,7 @@ from minibrain.api.schemas import (
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.data.limits import load_limits
-from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
+from minibrain.data.splits import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.models.bucket import WEIGHTS, writes_bucket
 from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
@@ -37,7 +37,7 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, Job, Snapshot, Version
+from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, DatasetVersion, Job, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -225,9 +225,9 @@ def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
     database = database_store(settings)
-    kept = (ArtifactKind.SNAPSHOT, WEIGHTS)
+    kept = (ArtifactKind.DATASET_VERSION, WEIGHTS)
     artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind.not_in(kept)))
-    usage = snapshot_usage(session)
+    usage = dataset_version_usage(session)
     return InfrastructureInfo(
         setup=setup_of(session, node, database),
         host=node.host,
@@ -239,21 +239,25 @@ def infrastructure(
             artifact_store("Dataset versions", settings, store, usage.size),
             artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
         ],
-        snapshots=usage,
+        dataset_versions=usage,
     )
 
 
-def snapshot_usage(session: Session) -> SnapshotUsage:
-    snapshots = session.scalars(select(Snapshot)).all()
-    used = set(session.scalars(select(Version.snapshot_id)))
-    used |= {snapshot.base_id for snapshot in snapshots if snapshot.id in used and snapshot.base_id is not None}
-    stored = {snapshot.artifact_id: snapshot.size for snapshot in snapshots}
-    return SnapshotUsage(
-        count=len(snapshots),
+def dataset_version_usage(session: Session) -> DatasetVersionUsage:
+    dataset_versions = session.scalars(select(DatasetVersion)).all()
+    used = set(session.scalars(select(Version.dataset_version_id)))
+    used |= {
+        dataset_version.base_id
+        for dataset_version in dataset_versions
+        if dataset_version.id in used and dataset_version.base_id is not None
+    }
+    stored = {dataset_version.artifact_id: dataset_version.size for dataset_version in dataset_versions}
+    return DatasetVersionUsage(
+        count=len(dataset_versions),
         size=sum(stored.values()),
-        for_versions=sum(snapshot.id in used for snapshot in snapshots),
-        saved=sum(snapshot.saved and snapshot.id not in used for snapshot in snapshots),
-        keep=load_limits(session).keep_snapshots,
+        for_versions=sum(dataset_version.id in used for dataset_version in dataset_versions),
+        saved=sum(dataset_version.saved and dataset_version.id not in used for dataset_version in dataset_versions),
+        keep=load_limits(session).keep_versions,
     )
 
 

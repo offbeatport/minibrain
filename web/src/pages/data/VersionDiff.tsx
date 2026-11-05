@@ -18,10 +18,10 @@ import { count } from "~/lib/format";
 import { exactTime } from "~/lib/time";
 
 type Schemas = components["schemas"];
-type VersionDiff = Schemas["SnapshotDiff"];
+type VersionDiff = Schemas["DatasetVersionDiff"];
 type DiffRow = Schemas["DiffRow"];
 type RelabelInfo = Schemas["RelabelInfo"];
-type SnapshotInfo = Schemas["SnapshotInfo"];
+type DatasetVersionInfo = Schemas["DatasetVersionInfo"];
 type Sample = "added" | "removed" | "relabelled";
 
 export function compareParam(before: number, after: number): string {
@@ -78,25 +78,25 @@ const RELABEL_COLUMNS: ColumnDef<RelabelInfo, unknown>[] = [
     },
 ];
 
-export function versionName(snapshot: SnapshotInfo): string {
-    if (snapshot.number !== null && snapshot.number !== undefined) {
-        return `Version ${snapshot.number}`;
+export function versionName(datasetVersion: DatasetVersionInfo): string {
+    if (datasetVersion.number !== null && datasetVersion.number !== undefined) {
+        return `Version ${datasetVersion.number}`;
     }
-    if (snapshot.base_number !== null && snapshot.base_number !== undefined) {
-        return `Version ${snapshot.base_number} with feedback`;
+    if (datasetVersion.base_number !== null && datasetVersion.base_number !== undefined) {
+        return `Version ${datasetVersion.base_number} with feedback`;
     }
     return "Earlier data";
 }
 
-function heading(snapshot: SnapshotInfo, role: string) {
+function heading(datasetVersion: DatasetVersionInfo, role: string) {
     return (
         <span className="flex flex-col">
-            <span className="font-semibold">{`${role}: ${versionName(snapshot)}`}</span>
+            <span className="font-semibold">{`${role}: ${versionName(datasetVersion)}`}</span>
             <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                {exactTime(snapshot.taken_at ?? snapshot.created_at)}
+                {exactTime(datasetVersion.taken_at ?? datasetVersion.created_at)}
             </span>
             <span className="font-mono text-sm font-normal text-muted-foreground">
-                {snapshot.hash.slice(0, 12)}
+                {datasetVersion.hash.slice(0, 12)}
             </span>
         </span>
     );
@@ -242,11 +242,11 @@ export function VersionDiffDialog({
 }) {
     const [before, after] = pair ?? [0, 0];
     const diff = useQuery({
-        queryKey: ["snapshots", "diff", before, after] as const,
+        queryKey: ["dataset-versions", "diff", before, after] as const,
         queryFn: () =>
             unwrap(
-                api.GET("/api/snapshots/{snapshot_id}/diff/{other_id}", {
-                    params: { path: { snapshot_id: before, other_id: after } },
+                api.GET("/api/dataset-versions/{dataset_version_id}/diff/{other_id}", {
+                    params: { path: { dataset_version_id: before, other_id: after } },
                 }),
             ),
         enabled: pair !== null,

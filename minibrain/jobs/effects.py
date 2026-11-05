@@ -107,11 +107,11 @@ class DomainEffects:
                 Version.kind == VersionKind.PROMPT,
                 Version.status == VersionStatus.READY,
                 Version.metrics.is_(None),
-                Version.snapshot_id.is_not(None),
+                Version.dataset_version_id.is_not(None),
             )
         )
         for version in waiting:
-            if version.snapshot is None or not version.snapshot.counts:
+            if version.dataset_version is None or not version.dataset_version.counts:
                 continue
             version.status = VersionStatus.EVALUATING
             session.flush()

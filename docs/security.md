@@ -133,7 +133,7 @@ password, or read it with `--password-stdin`, and record `command line` as the a
 | Internal network | Gateways, mains, Postgres, S3 | The edge; GPU pools reach main only | gateway 8100, main 8000, Postgres 5432, S3 443 |
 | GPU network | Workers, engines | Engines: gateways only. Workers: nothing | Outbound HTTPS to main 8000, and to the bucket endpoint when Storage is S3 |
 
-- GPU boxes need no internet access: engines and workers pull adapters and snapshots from `main`, and base weights
+- GPU boxes need no internet access: engines and workers pull adapters and dataset versions from `main`, and base weights
   from `main` or, when Storage is S3, from the bucket on links `main` signs. They never hold bucket keys.
 - Workers and engines hold a shared token (`MINIBRAIN_WORKER_TOKEN`, `MINIBRAIN_GATEWAY_TOKEN`), never database
   credentials.
@@ -263,22 +263,22 @@ locked when `minibrain.yaml` (`policy:`) or `MINIBRAIN_POLICY_<NAME>` sets it.
 
 | Kept by main | Encrypted | Notes |
 |---|---|---|
-| Uploads, snapshots, adapters, job logs (the artifact store) | Yes, in the local folder and in an S3 bucket | The bucket only ever holds ciphertext (client-side encryption). Snapshots older than Parquet snapshots (folders packed as tar) are still unpacked into main's cache when read |
+| Uploads, dataset versions, adapters, job logs (the artifact store) | Yes, in the local folder and in an S3 bucket | The bucket only ever holds ciphertext (client-side encryption) |
 | Staging databases built from uploads (`<home>/staging`) | Yes | Built in a private temporary folder, sealed, and the plaintext removed straight away |
 | Connection secrets and sealed settings (OpenTelemetry headers) | Yes, same master key | One AES-256-GCM envelope per value, the row's id as associated data |
 | The database (SQLite or Postgres) | No | Request inputs and answers kept for the models you choose live there: put SQLite on an encrypted volume, or use Postgres with storage encryption |
 | Base model weights in an S3 bucket | Yes | Each file is a sealed artifact under its SHA-256, like every other one |
 | Base model weights on main's disk (`<home>/models`, Storage set to the folder) | No | Public weights; imported private weights are not encrypted by minibrain either |
 
-Main never writes decrypted copies of these files. DuckDB reads snapshots, uploads and staging databases through a
+Main never writes decrypted copies of these files. DuckDB reads dataset versions, uploads and staging databases through a
 filesystem that decrypts on the fly, a chunk at a time, so queries, previews, diffs and the gateway's prompt context
 work on the encrypted files directly (the sandbox still refuses every path it was not given). The trade-off is a
 little CPU per read (measured below) instead of a decrypted cache on disk.
 
 Workers, engines and gateways are different: training, evaluation and serving read plain files, and those machines
 hold no master key. Main decrypts an artifact when a worker or engine pulls it over HTTPS, and the worker's or
-engine's own home (`<home>/worker`, `<home>/engines`, `<home>/gateway`) holds plain working copies of the snapshots
-and adapters it uses. Put those folders on an encrypted volume (or tmpfs) on GPU boxes; they are caches and can be
+engine's own home (`<home>/worker`, `<home>/engines`, `<home>/gateway`) holds plain working copies of the dataset
+versions and adapters it uses. Put those folders on an encrypted volume (or tmpfs) on GPU boxes; they are caches and can be
 wiped at any time. A worker's outputs are encrypted the moment main stores them.
 
 ### Base weights on other machines
@@ -334,7 +334,7 @@ A sealed file is a 4,096-byte header followed by the body in chunks.
 - Plaintext size is the file size minus the header and 16 bytes per chunk, so random access needs no index.
 
 Content hashes stay over the plaintext: an artifact's id is still the SHA-256 of its plain bytes. Identical uploads
-and snapshots are still stored once, a re-taken snapshot still matches its earlier copy, and model cards and AI-BOMs
+and dataset versions are still stored once, a re-saved version still matches its earlier copy, and model cards and AI-BOMs
 keep the hashes customers can check against their own files. The hash says only what any copy of the same content
 would hash to, which the content-addressed file name already revealed.
 
@@ -523,12 +523,12 @@ change it.
 | Part | CycloneDX | Holds |
 |---|---|---|
 | The version | `metadata.component`, `machine-learning-model` | Name, number, kind, status, who created it; the recipe (`minibrain:recipe:*`), training and evaluation runs (`minibrain:training:*`, `minibrain:evaluation:*`) as properties; a `model-card` reference to `card.json` |
-| Model card | `metadata.component.modelCard` | Task, architecture (LoRA adapter on the base, or the base with the task prompt and few-shot examples), the snapshot as its dataset, the labels; held-out and test accuracy, macro F1, invalid-answer rate, per-label precision, recall, F1 and support, latency p50 and p95 (`quantitativeAnalysis.performanceMetrics`, sliced by split and label); intended use and every derived and written limit (`considerations`) |
+| Model card | `metadata.component.modelCard` | Task, architecture (LoRA adapter on the base, or the base with the task prompt and few-shot examples), the dataset version as its dataset, the labels; held-out and test accuracy, macro F1, invalid-answer rate, per-label precision, recall, F1 and support, latency p50 and p95 (`quantitativeAnalysis.performanceMetrics`, sliced by split and label); intended use and every derived and written limit (`considerations`) |
 | Base model | component, `machine-learning-model` | Repository and revision, `pkg:huggingface` purl, the licence (SPDX ID where one exists, else its name and URL), the content hash as SHA-256, whether it was recorded when training started, who accepted the licence |
 | Adapter | component, `file` (LoRA versions only) | The adapter archive's artifact ID, which is the SHA-256 of the tar, its size |
-| Training snapshot | component, `data` | The snapshot hash as SHA-256, rows per split, when it was taken, the SQL, every data check and its result, personal data findings as `sensitiveData` |
+| Training dataset version | component, `data` | The dataset version hash as SHA-256, rows per split, when it was taken, the SQL, every data check and its result, personal data findings as `sensitiveData` |
 | Sources | component, `data`, one per table | Table, source kind and fingerprint; uploads also carry the file's SHA-256 as a hash. Folder and remote fingerprints are SHA-256 over a listing or the source's state, so they stay a property |
-| Dependencies | `dependencies` | The version on the base, the adapter and the snapshot; the adapter on the base; the snapshot on its sources |
+| Dependencies | `dependencies` | The version on the base, the adapter and the dataset version; the adapter on the base; the dataset version on its sources |
 
 The output is deterministic: the same version gives the same bytes. `metadata.timestamp` is the newest of the
 version's creation, its training and evaluation finish times, the base model's licence acceptance and the last card

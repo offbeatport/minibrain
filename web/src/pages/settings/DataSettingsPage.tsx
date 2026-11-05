@@ -11,7 +11,7 @@ import { SourceBadge } from "~/components/SourceBadge";
 import { count } from "~/lib/format";
 import { DATA, type Setting } from "~/pages/settings/settingsIndex";
 
-type NumberKey = "row_limit" | "keep_snapshots" | "min_label_rows";
+type NumberKey = "row_limit" | "keep_versions" | "min_label_rows";
 
 const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 const PERCENT: Intl.NumberFormatOptions = { style: "percent", maximumFractionDigits: 0 };
@@ -193,13 +193,13 @@ export function DataSettingsPage() {
                 >
                     <SettingsGroup>
                         <NumberSetting
-                            id="keep-snapshots-field"
-                            anchor={DATA.versionRetention.settings.keepSnapshots.anchor}
-                            label={DATA.versionRetention.settings.keepSnapshots.label}
-                            description={`Default 5. ${DATA.versionRetention.settings.keepSnapshots.description}`}
-                            value={data?.keep_snapshots}
-                            field="keep_snapshots"
-                            locked={data?.locked?.keep_snapshots}
+                            id="keep-versions-field"
+                            anchor={DATA.versionRetention.settings.keepVersions.anchor}
+                            label={DATA.versionRetention.settings.keepVersions.label}
+                            description={`Default 5. ${DATA.versionRetention.settings.keepVersions.description}`}
+                            value={data?.keep_versions}
+                            field="keep_versions"
+                            locked={data?.locked?.keep_versions}
                             min={0}
                             max={1000}
                         />

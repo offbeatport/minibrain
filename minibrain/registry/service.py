@@ -11,9 +11,9 @@ from minibrain.registry.models import (
     ApiKey,
     BaseModel,
     Dataset,
+    DatasetVersion,
     KeyScope,
     Model,
-    Snapshot,
     Version,
     now,
 )
@@ -91,12 +91,12 @@ def create_model(session: Session, name: str, preset: str, base_model: str) -> M
     return model
 
 
-def latest_version(dataset: Dataset) -> Snapshot | None:
-    numbered = [snapshot for snapshot in dataset.snapshots if snapshot.number is not None]
-    return max(numbered, key=lambda snapshot: snapshot.number or 0, default=None)
+def latest_version(dataset: Dataset) -> DatasetVersion | None:
+    numbered = [dataset_version for dataset_version in dataset.versions if dataset_version.number is not None]
+    return max(numbered, key=lambda dataset_version: dataset_version.number or 0, default=None)
 
 
-def latest_snapshot(model: Model) -> Snapshot | None:
+def latest_dataset_version(model: Model) -> DatasetVersion | None:
     return latest_version(model.dataset) if model.dataset is not None else None
 
 

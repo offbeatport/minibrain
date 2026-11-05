@@ -53,8 +53,8 @@ from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
 from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.feedback import FeedbackError, database_feedback
-from minibrain.data.snapshot import SnapshotError
 from minibrain.data.sources import SourceError
+from minibrain.data.splits import DatasetVersionError
 from minibrain.encryption.envelope import EnvelopeError
 from minibrain.encryption.keys import EncryptionError, ensure_master_key, keys_for
 from minibrain.encryption.providers import KeyUnavailableError
@@ -105,7 +105,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     SourceError: 422,
     TagError: 422,
     ModelNameError: 422,
-    SnapshotError: 422,
+    DatasetVersionError: 422,
     FeedbackError: 422,
     ArtifactError: 422,
     EngineUnavailableError: 503,

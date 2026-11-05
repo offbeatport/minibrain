@@ -5,10 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
-from minibrain.data.snapshot import SnapshotError, read_split
+from minibrain.data.splits import DatasetVersionError, read_split
 from minibrain.presets import Preset, preset, render
-from minibrain.registry.files import snapshot_location
-from minibrain.registry.models import JudgeScore, Model, Snapshot, Version, VersionKind, VersionStatus
+from minibrain.registry.files import dataset_version_location
+from minibrain.registry.models import DatasetVersion, JudgeScore, Model, Version, VersionKind, VersionStatus
 from minibrain.registry.service import ConflictError
 from minibrain.tasks.contracts import (
     FREE_TEXT,
@@ -78,27 +78,29 @@ def latest_version_of(model: Model) -> Version | None:
     return max(model.versions, key=lambda item: item.number, default=None)
 
 
-def data_labels(session: Session, store: ArtifactStore, snapshot: Snapshot) -> list[str]:
-    if snapshot.labels:
-        return list(snapshot.labels)
+def data_labels(session: Session, store: ArtifactStore, dataset_version: DatasetVersion) -> list[str]:
+    if dataset_version.labels:
+        return list(dataset_version.labels)
     try:
-        location = snapshot_location(session, store, snapshot)
+        location = dataset_version_location(session, store, dataset_version)
         examples = [example for name in ("golden", "eval", "shots", "train") for example in read_split(location, name)]
-    except SnapshotError:
+    except DatasetVersionError:
         return []
     found = sorted({example.expected for example in examples})
     return found if len(found) <= MAX_LABELS else []
 
 
-def contract_with_data(session: Session, store: ArtifactStore, model: Model, snapshot: Snapshot | None) -> Contract:
+def contract_with_data(
+    session: Session, store: ArtifactStore, model: Model, dataset_version: DatasetVersion | None
+) -> Contract:
     current = contract_of(model)
     if not preset_of(model).labels_from_data:
         return current
-    if snapshot is None:
+    if dataset_version is None:
         if current.labels is None:
             raise ConflictError(f"{model.name} needs at least two labels: type them, or pick a dataset")
         return current
-    labels = data_labels(session, store, snapshot)
+    labels = data_labels(session, store, dataset_version)
     if len(labels) < 2:
         raise ConflictError(
             f"{model.name} classifies into labels found in its data, and this dataset version has "
@@ -142,10 +144,10 @@ def instructions_for(model: Model, contract: Contract, kind: VersionKind) -> str
     return chosen.instructions(contract, trained=trained)
 
 
-def shots_of(session: Session, store: ArtifactStore, snapshot: Snapshot | None) -> list[dict[str, Any]]:
-    if snapshot is None or not snapshot.counts:
+def shots_of(session: Session, store: ArtifactStore, dataset_version: DatasetVersion | None) -> list[dict[str, Any]]:
+    if dataset_version is None or not dataset_version.counts:
         return []
-    return [as_record(shot) for shot in read_split(snapshot_location(session, store, snapshot), "shots")]
+    return [as_record(shot) for shot in read_split(dataset_version_location(session, store, dataset_version), "shots")]
 
 
 def next_version_number(model: Model) -> int:
@@ -159,20 +161,20 @@ def new_version(
     store: ArtifactStore,
     model: Model,
     kind: VersionKind,
-    snapshot: Snapshot | None,
+    dataset_version: DatasetVersion | None,
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
 ) -> Version:
-    contract = contract_with_data(session, store, model, snapshot)
+    contract = contract_with_data(session, store, model, dataset_version)
     number = checked_contract(model, contract, breaking)
     graders = checked_graders(model.graders or preset_of(model).default_graders(contract), contract)
     model.contract = contract.as_dict()
     model.breaking_confirmed = False
     model.graders = graders
-    scored = snapshot is not None and bool(snapshot.counts)
+    scored = dataset_version is not None and bool(dataset_version.counts)
     version = Version(
         model=model,
-        snapshot=snapshot,
+        dataset_version=dataset_version,
         number=next_version_number(model),
         kind=kind,
         status=VersionStatus.TRAINING if kind == VersionKind.LORA else VersionStatus.EVALUATING,
@@ -180,7 +182,7 @@ def new_version(
         contract=contract.as_dict(),
         contract_number=number,
         instructions=instructions_for(model, contract, kind),
-        shots=[] if kind == VersionKind.LORA else shots_of(session, store, snapshot),
+        shots=[] if kind == VersionKind.LORA else shots_of(session, store, dataset_version),
         graders=graders,
     )
     if kind == VersionKind.PROMPT and not scored:
@@ -214,9 +216,9 @@ def graders_of(version: Version, found: Mapping[str, float] | None = None) -> li
 
 
 def split_examples(session: Session, store: ArtifactStore, version: Version) -> dict[str, list[Example]]:
-    if version.snapshot is None:
+    if version.dataset_version is None:
         return {}
-    location = snapshot_location(session, store, version.snapshot)
+    location = dataset_version_location(session, store, version.dataset_version)
     return {name: read_split(location, name) for name in ("golden", "eval")}
 
 

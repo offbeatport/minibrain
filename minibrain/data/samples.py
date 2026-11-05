@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
 from minibrain.data.dataset_folders import free_dataset_name
+from minibrain.data.dataset_versions import take_version
 from minibrain.data.shared import Added, NameTaken, Outcome, add_dataset, add_source
-from minibrain.data.snapshots import take_version
 from minibrain.presets.recipes import Recipe
 from minibrain.registry.models import Dataset, Source
 from minibrain.registry.service import NotFoundError, latest_version

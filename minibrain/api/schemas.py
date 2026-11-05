@@ -209,7 +209,7 @@ class CheckInfo(BaseModel):
     dismissed: bool
 
 
-class SnapshotInfo(BaseModel):
+class DatasetVersionInfo(BaseModel):
     id: int
     hash: str
     dataset: str | None
@@ -248,9 +248,9 @@ class DiffRow(BaseModel):
     label: str
 
 
-class SnapshotDiff(BaseModel):
-    before: SnapshotInfo
-    after: SnapshotInfo
+class DatasetVersionDiff(BaseModel):
+    before: DatasetVersionInfo
+    after: DatasetVersionInfo
     added: int
     removed: int
     relabelled: int
@@ -282,7 +282,7 @@ class DatasetSummary(BaseModel):
     models: list[str]
     model_names: list[str] = []
     splits: dict[str, int] | None
-    snapshot: SnapshotInfo | None = None
+    dataset_version: DatasetVersionInfo | None = None
     changed: ChangeInfo | None = None
     row_limit: int = 0
     folder_id: int | None = None
@@ -364,7 +364,7 @@ CheckName = Literal["duplicates", "conflicts", "balance", "leakage", "length", "
 
 class DataSettings(BaseModel):
     row_limit: int = Field(ge=100, le=50_000_000)
-    keep_snapshots: int = Field(ge=0, le=1000)
+    keep_versions: int = Field(ge=0, le=1000)
     checks_off: list[CheckName] = Field(default_factory=list)
     majority_share: float = Field(default=0.9, ge=0.5, le=1.0)
     min_label_rows: int = Field(default=10, ge=1, le=100_000)
@@ -373,13 +373,13 @@ class DataSettings(BaseModel):
 
 class DataSettingsUpdate(BaseModel):
     row_limit: int | None = Field(default=None, ge=100, le=50_000_000)
-    keep_snapshots: int | None = Field(default=None, ge=0, le=1000)
+    keep_versions: int | None = Field(default=None, ge=0, le=1000)
     checks_off: list[CheckName] | None = None
     majority_share: float | None = Field(default=None, ge=0.5, le=1.0)
     min_label_rows: int | None = Field(default=None, ge=1, le=100_000)
 
 
-class SnapshotUsage(BaseModel):
+class DatasetVersionUsage(BaseModel):
     count: int
     size: int
     for_versions: int
@@ -509,11 +509,11 @@ class VersionInfo(BaseModel):
     kind: str
     status: str
     current: bool
-    snapshot_hash: str | None
-    snapshot_id: int | None
-    snapshot_dataset: str | None = None
-    snapshot_number: int | None = None
-    snapshot_rows: int = 0
+    dataset_version_hash: str | None
+    dataset_version_id: int | None
+    dataset_slug: str | None = None
+    dataset_version_number: int | None = None
+    dataset_version_rows: int = 0
     recipe: dict[str, Any]
     golden: SplitScore | None
     held_out: SplitScore | None
@@ -583,7 +583,7 @@ class ModelDetail(ModelSummary):
     mapping: MappingInfo
     dataset: str | None = None
     dataset_name: str | None = None
-    snapshot: SnapshotInfo | None
+    dataset_version: DatasetVersionInfo | None
     changed: ChangeInfo | None = None
     models: list[str]
     request_bodies: RequestBodiesInfo
@@ -660,12 +660,12 @@ class TrainingSettings(BaseModel):
 
 class VersionCreate(TrainingSettings):
     kind: Literal["prompt", "lora"]
-    snapshot_id: int | None = None
+    dataset_version_id: int | None = None
     breaking: bool = False
 
 
 class TrainingPlanQuery(TrainingSettings):
-    snapshot_id: int | None = None
+    dataset_version_id: int | None = None
 
 
 class TrainingOptionInfo(BaseModel):
@@ -910,7 +910,7 @@ class InfrastructureInfo(BaseModel):
     home: str
     web: str
     stores: list[StoreInfo]
-    snapshots: SnapshotUsage | None = None
+    dataset_versions: DatasetVersionUsage | None = None
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]

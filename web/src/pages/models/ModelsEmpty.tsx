@@ -13,7 +13,7 @@ export function ModelsEmpty() {
         mutationFn: () => unwrap(api.POST("/api/models/sample")),
         onSuccess: async (created) => {
             await refresh();
-            const rows = `${created.name}: ${created.snapshot?.rows ?? 0} sample tickets`;
+            const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} sample tickets`;
             toast({
                 title: "Ticket routing recipe added",
                 description:

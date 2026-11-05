@@ -48,7 +48,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.prices import DevicePrices, load_prices
-from minibrain.registry.service import latest_snapshot
+from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.service import decision, held_out_score, version_metric
 
@@ -126,7 +126,7 @@ def custom_activity(model: Model, jobs: list[Job]) -> Activity:
     ready = candidate(model)
     if ready is not None:
         return Activity(state="ready", label=f"v{ready.number} ready", version=ready.number)
-    if latest_snapshot(model) is None:
+    if latest_dataset_version(model) is None:
         return Activity(state="needs_examples", label="Needs examples")
     return Activity(state="idle", label="No active jobs")
 

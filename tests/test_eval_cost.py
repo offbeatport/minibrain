@@ -11,7 +11,7 @@ from minibrain.ml import evaluate
 from minibrain.ml.completion import Completion
 from minibrain.ml.context import JobSpec
 from minibrain.registry.files import materialize, store_for
-from minibrain.registry.models import AuditEvent, Snapshot
+from minibrain.registry.models import AuditEvent, DatasetVersion
 from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.tasks.contracts import label_set
 from minibrain.tasks.prompting import Prompting
@@ -49,12 +49,12 @@ class FakeRuntime:
         ]
 
 
-def snapshot_path(harness: Harness) -> Path:
+def dataset_version_path(harness: Harness) -> Path:
     create_with_dataset(harness)
     with harness.sessions() as session:
-        snapshot = session.scalars(select(Snapshot)).one()
-        assert snapshot.artifact_id is not None
-        return materialize(session, store_for(harness.settings), snapshot.artifact_id)
+        dataset_version = session.scalars(select(DatasetVersion)).one()
+        assert dataset_version.artifact_id is not None
+        return materialize(session, store_for(harness.settings), dataset_version.artifact_id)
 
 
 def measured(device_seconds: float, requests: int = 30, pool: str = "local", device: str = "cuda") -> dict[str, Any]:
@@ -105,7 +105,7 @@ def two_versions(harness: Harness) -> None:
 def test_eval_times_the_device_per_batch_of_held_out_rows(
     harness: Harness, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    path = snapshot_path(harness)
+    path = dataset_version_path(harness)
     runtimes: list[FakeRuntime] = []
 
     def runtime(spec: BaseModelSpec) -> FakeRuntime:
@@ -114,7 +114,13 @@ def test_eval_times_the_device_per_batch_of_held_out_rows(
 
     monkeypatch.setattr(evaluate, "Runtime", runtime)
     prompting = Prompting("Pick a label.", label_set(sorted(LABELS))).as_dict()
-    raw = {"snapshot": str(path), "version_kind": "prompt", "slug": SLUG, "number": 0, "base_model": "qwen3-0.6b"}
+    raw = {
+        "dataset_version": str(path),
+        "version_kind": "prompt",
+        "slug": SLUG,
+        "number": 0,
+        "base_model": "qwen3-0.6b",
+    }
     raw |= {"prompting": prompting, "answer_tokens": 24}
     spec = JobSpec(raw=raw | {"pool": "gpu-a"}, result_path=tmp_path / "result.json")
     evaluate.main(spec)

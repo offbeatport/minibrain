@@ -69,7 +69,7 @@ def test_settings_from_the_file_are_used_and_locked(
     assert (data["row_limit"], data["checks_off"]) == (5000, ["personal_data"])
     assert data["locked"] == {"row_limit": "config file", "checks_off": "config file"}
     assert client.put("/api/settings/data", json={"row_limit": 9000}).status_code == 409
-    assert client.put("/api/settings/data", json={"keep_snapshots": 7}).status_code == 200
+    assert client.put("/api/settings/data", json={"keep_versions": 7}).status_code == 200
     prices = client.get("/api/compute/prices").json()
     assert (prices["currency"], prices["currency_locked"]) == ("EUR", "config file")
     assert [(pool["hourly_price"], pool["locked"]) for pool in prices["pools"] if pool["pool"] == "local"] == [
@@ -82,7 +82,7 @@ def test_settings_from_the_file_are_used_and_locked(
     assert client.put("/api/catalog/settings", json={"daily_sync": False}).status_code == 409
     config_file.unlink()
     with harness.sessions() as session:
-        assert load_limits(session).row_limit == 200_000 and load_limits(session).keep_snapshots == 7
+        assert load_limits(session).row_limit == 200_000 and load_limits(session).keep_versions == 7
         assert load_prices(session).currency == "USD" and load_config(session).kind == "local"
 
 

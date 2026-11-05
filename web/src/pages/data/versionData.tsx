@@ -12,12 +12,12 @@ function previousOf(version: VersionInfo, versions: VersionInfo[]): VersionInfo 
         .sort((left, right) => right.number - left.number)[0];
 }
 
-export function snapshotDiffHref(before: VersionInfo, after: VersionInfo): string | null {
-    const dataset = after.snapshot_dataset ?? before.snapshot_dataset;
-    if (!dataset || !before.snapshot_id || !after.snapshot_id) {
+export function datasetVersionDiffHref(before: VersionInfo, after: VersionInfo): string | null {
+    const dataset = after.dataset_slug ?? before.dataset_slug;
+    if (!dataset || !before.dataset_version_id || !after.dataset_version_id) {
         return null;
     }
-    return `${itemHref({ kind: "dataset", id: dataset })}&compare=${compareParam(before.snapshot_id, after.snapshot_id)}`;
+    return `${itemHref({ kind: "dataset", id: dataset })}&compare=${compareParam(before.dataset_version_id, after.dataset_version_id)}`;
 }
 
 function AccuracyChange({ version, previous }: { version: VersionInfo; previous?: VersionInfo }) {
@@ -41,10 +41,10 @@ function DataChange({ version, previous }: { version: VersionInfo; previous?: Ve
     if (!previous) {
         return <span className="text-muted-foreground">–</span>;
     }
-    if (previous.snapshot_id === version.snapshot_id) {
+    if (previous.dataset_version_id === version.dataset_version_id) {
         return <span className="text-muted-foreground">Same data</span>;
     }
-    const href = snapshotDiffHref(previous, version);
+    const href = datasetVersionDiffHref(previous, version);
     return href ? (
         <Link href={href} className="text-primary hover:underline">
             {`Compare with v${previous.number}`}
@@ -87,7 +87,7 @@ export function ModelDataNotice({ slug }: { slug: string }) {
     return (
         <ChangeNotice
             changed={detail.data?.changed}
-            snapshot={detail.data?.snapshot}
+            datasetVersion={detail.data?.dataset_version}
             dataset={detail.data?.dataset}
             after="New versions train on it until the dataset is updated."
         />
@@ -108,11 +108,11 @@ export function DataVersus({
     if (!version || !other || other.number === version.number) {
         return <span className="text-muted-foreground">–</span>;
     }
-    if (other.snapshot_id === version.snapshot_id) {
+    if (other.dataset_version_id === version.dataset_version_id) {
         return <span className="font-normal text-muted-foreground">Same data</span>;
     }
     const [before, after] = other.number < version.number ? [other, version] : [version, other];
-    const href = snapshotDiffHref(before, after);
+    const href = datasetVersionDiffHref(before, after);
     return href ? (
         <Link href={href} className="font-normal text-primary hover:underline">
             Compare data

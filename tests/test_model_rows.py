@@ -75,7 +75,7 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     body = first.json()
     assert (body["name"], body["source"]["file"]) == ("Ticket routing", "tickets.csv")
     assert body["mapping"]["template"] == {"user": "Subject: {subject}\n\n{body}", "assistant": "{queue}"}
-    assert body["snapshot"]["rows"] == 240
+    assert body["dataset_version"]["rows"] == 240
     again = harness.client.post("/api/models/sample").json()
     assert (again["name"], again["dataset"]) == ("Ticket routing 2", body["dataset"])
 

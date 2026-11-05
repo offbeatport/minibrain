@@ -10,7 +10,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.data.snapshots import cleanup
+from minibrain.data.dataset_versions import cleanup
 from minibrain.gateway.config import LocalConfig, served_bases
 from minibrain.leader import Leader
 from minibrain.models.bucket import drop_weights, sweep_weights
@@ -22,10 +22,10 @@ from minibrain.registry.models import (
     Artifact,
     AuditEvent,
     BaseModel,
+    DatasetVersion,
     Job,
     KeyScope,
     Model,
-    Snapshot,
     Teardown,
     TeardownKind,
     TeardownStatus,
@@ -341,7 +341,10 @@ def drop_artifacts(session: Session, settings: Settings, candidates: set[str]) -
     for artifact_id in sorted(candidates):
         if session.scalar(select(Version.id).where(Version.adapter_artifact_id == artifact_id).limit(1)) is not None:
             continue
-        if session.scalar(select(Snapshot.id).where(Snapshot.artifact_id == artifact_id).limit(1)) is not None:
+        if (
+            session.scalar(select(DatasetVersion.id).where(DatasetVersion.artifact_id == artifact_id).limit(1))
+            is not None
+        ):
             continue
         found = session.get(Artifact, artifact_id)
         if found is not None:
@@ -507,7 +510,7 @@ class Teardowns:
         session.delete(model)
         session.flush()
         drop_orphan_keys(session)
-        removed["snapshots"] = cleanup(session, self.settings)
+        removed["dataset_versions"] = cleanup(session, self.settings)
         removed["artifacts"] = drop_artifacts(session, self.settings, adapters)
         self.finish(session, record, removed=removed)
 

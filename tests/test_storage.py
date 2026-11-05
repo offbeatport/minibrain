@@ -99,10 +99,10 @@ def test_artifacts_go_to_the_bucket_and_the_secret_never_comes_back(harness: Har
     assert harness.client.get(f"/api/sources/{other['id']}").json()["rows"] == 120
     assert harness.client.get(f"/api/sources/{before['id']}").json()["rows"] == 200
     harness.client.post("/api/datasets", json={"name": "More", "source_id": other["id"]})
-    snapshot = harness.client.post("/api/datasets/more/snapshots").json()
-    assert store.remote is not None and store.remote.has(snapshot["hash"])
+    dataset_version = harness.client.post("/api/datasets/more/versions").json()
+    assert store.remote is not None and store.remote.has(dataset_version["hash"])
     headers = {"Authorization": f"Bearer {harness.token}"}
-    pulled = harness.client.get(f"/internal/worker/artifacts/{snapshot['hash']}", headers=headers)
+    pulled = harness.client.get(f"/internal/worker/artifacts/{dataset_version['hash']}", headers=headers)
     assert pulled.status_code == 200 and pulled.content[:4] == b"PAR1"
     stores = {item["name"]: item for item in harness.client.get("/api/system/infrastructure").json()["stores"]}
     assert stores["Dataset versions"]["kind"] == "s3" and stores["Dataset versions"]["free_bytes"] is None

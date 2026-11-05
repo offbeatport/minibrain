@@ -15,7 +15,7 @@ from transformers import TrainerCallback, TrainerControl, TrainerState, Training
 from trl.trainer.sft_config import SFTConfig
 from trl.trainer.sft_trainer import SFTTrainer
 
-from minibrain.data.snapshot import read_split
+from minibrain.data.splits import read_split
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
@@ -109,7 +109,7 @@ def example_rows(spec: JobSpec, prompting: Prompting, example: Example) -> list[
 
 
 def training_examples(spec: JobSpec, max_rows: int | None) -> list[Example]:
-    return read_split(spec.path("snapshot"), "train")[:max_rows]
+    return read_split(spec.path("dataset_version"), "train")[:max_rows]
 
 
 def training_rows(spec: JobSpec, prompting: Prompting, examples: list[Example]) -> Dataset:

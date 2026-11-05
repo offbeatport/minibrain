@@ -4,7 +4,7 @@ import type { components } from "./schema";
 
 type Schemas = components["schemas"];
 
-export type SnapshotInfo = Schemas["SnapshotInfo"];
+export type DatasetVersionInfo = Schemas["DatasetVersionInfo"];
 export type ChangeInfo = Schemas["ChangeInfo"];
 export type DataSettings = Schemas["DataSettings"];
 export type DatasetFolder = Schemas["DatasetFolderInfo"];
@@ -12,7 +12,7 @@ export type DatasetFolder = Schemas["DatasetFolderInfo"];
 export const dataKeys = {
     folderRoots: ["data", "folders"] as const,
     datasetFolders: ["datasetFolders"] as const,
-    snapshots: (slug: string) => ["datasets", slug, "snapshots"] as const,
+    datasetVersions: (slug: string) => ["datasets", slug, "versions"] as const,
     settings: ["settings", "data"] as const,
 };
 
@@ -30,11 +30,11 @@ export function useDatasetFolders() {
     });
 }
 
-export function useSnapshots(slug: string, enabled = true) {
+export function useDatasetVersions(slug: string, enabled = true) {
     return useQuery({
-        queryKey: dataKeys.snapshots(slug),
+        queryKey: dataKeys.datasetVersions(slug),
         queryFn: () =>
-            unwrap(api.GET("/api/datasets/{slug}/snapshots", { params: { path: { slug } } })),
+            unwrap(api.GET("/api/datasets/{slug}/versions", { params: { path: { slug } } })),
         enabled: enabled && slug !== "",
     });
 }

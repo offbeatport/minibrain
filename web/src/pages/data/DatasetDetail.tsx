@@ -354,7 +354,7 @@ export function DatasetDetail({
             <FirstVersionNotice dataset={dataset} />
             <ChangeNotice
                 changed={dataset.changed}
-                snapshot={dataset.snapshot}
+                datasetVersion={dataset.dataset_version}
                 dataset={dataset.slug}
                 after="Models keep training on it until you update."
             />
@@ -371,7 +371,7 @@ export function DatasetDetail({
                         label="Splits"
                         value={
                             <span className="font-normal text-muted-foreground">
-                                {dataset.snapshot
+                                {dataset.dataset_version
                                     ? "Unknown since the change"
                                     : "Set by the first version"}
                             </span>
@@ -380,7 +380,7 @@ export function DatasetDetail({
                 )}
             </div>
             <VersionsSection dataset={dataset} />
-            <ChecksSection snapshot={dataset.snapshot} dataset={dataset.slug} />
+            <ChecksSection datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             {mapped && preview.data && (
                 <Section
                     title="Label balance"

@@ -104,7 +104,7 @@ def add_custom(harness: Harness, name: str, trained: bool = False) -> str:
     ).json()["slug"]
     if trained:
         give_data(harness, slug)
-        assert harness.client.post(f"/api/models/{slug}/snapshots").status_code == 201
+        assert harness.client.post(f"/api/models/{slug}/dataset-versions").status_code == 201
         created = harness.client.post(f"/api/models/{slug}/versions", json={"kind": "lora", "max_rows": 100})
         assert created.status_code == 201, created.text
         finish(harness, "train")

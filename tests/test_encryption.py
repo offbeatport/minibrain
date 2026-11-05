@@ -134,13 +134,13 @@ def sealed_name(path: Path) -> bool:
 
 
 @pytest.mark.both_stores
-def test_uploads_snapshots_and_staging_are_encrypted_at_rest(harness: Harness) -> None:
+def test_uploads_dataset_versions_and_staging_are_encrypted_at_rest(harness: Harness) -> None:
     data = tickets_csv()
     source = harness.client.post("/api/sources", files={"file": ("tickets.csv", data, "text/csv")})
     assert source.status_code == 201, source.text
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source.json()["id"]})
-    snapshot = harness.client.post("/api/datasets/tickets/snapshots")
-    assert snapshot.status_code == 201, snapshot.text
+    dataset_version = harness.client.post("/api/datasets/tickets/versions")
+    assert dataset_version.status_code == 201, dataset_version.text
     home = harness.settings.home
     store = store_for(harness.settings)
     with harness.sessions() as session:

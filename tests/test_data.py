@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from minibrain.data import snapshot
+from minibrain.data import splits
 from minibrain.data.sources import (
     SourceError,
     Table,
@@ -92,7 +92,7 @@ def test_chat_rows_split_off_the_last_answer(tmp_path: Path) -> None:
         ("user: a\nassistant: b\nuser: c", "bug"),
         ("", None),
     ]
-    examples = snapshot.clean(found)
+    examples = splits.clean(found)
     assert [example.expected for example in examples] == ["billing", "bug"]
     assert len(examples[1].turns) == 3
     quality = assess(tables, "SELECT messages FROM source")
@@ -128,27 +128,27 @@ def test_parse_errors_point_at_the_line_and_column() -> None:
     assert str(raised.value) == ('syntax error at or near "tickets"\n\nLINE 2:   label FORM tickets\n' + " " * 21 + "^")
 
 
-def row(text: str, expected: str) -> snapshot.Row:
+def row(text: str, expected: str) -> splits.Row:
     return (encode_turns(single(text, expected).turns) if text else None, text, expected)
 
 
 def test_split_is_disjoint_and_deterministic() -> None:
     rows = [row(f"text {index}", f"label {index % 7}") for index in range(400)] + [row("", "x"), row("text 1", "dup")]
-    examples = snapshot.clean(rows)
+    examples = splits.clean(rows)
     assert len(examples) == 400
-    first, second = snapshot.split(examples), snapshot.split(examples)
+    first, second = splits.split(examples), splits.split(examples)
     assert first == second
-    inputs = [{example.input for example in first[name]} for name in snapshot.SPLITS]
+    inputs = [{example.input for example in first[name]} for name in splits.SPLITS]
     assert sum(len(group) for group in inputs) == len(set().union(*inputs))
     assert len({shot.expected for shot in first["shots"]}) == len(first["shots"]) == 7
 
 
 def test_free_text_answers_are_not_a_label_set() -> None:
-    examples = snapshot.clean([row(f"question {index}", f"answer number {index}") for index in range(120)])
-    assert snapshot.answer_labels(examples) == []
-    assert len(snapshot.split(examples)["shots"]) == snapshot.TEXT_SHOTS
+    examples = splits.clean([row(f"question {index}", f"answer number {index}") for index in range(120)])
+    assert splits.answer_labels(examples) == []
+    assert len(splits.split(examples)["shots"]) == splits.TEXT_SHOTS
 
 
 def test_split_needs_enough_rows() -> None:
-    with pytest.raises(snapshot.SnapshotError):
-        snapshot.split(snapshot.clean([row("a", "b")] * 50))
+    with pytest.raises(splits.DatasetVersionError):
+        splits.split(splits.clean([row("a", "b")] * 50))

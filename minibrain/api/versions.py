@@ -19,7 +19,7 @@ from minibrain.api.training_plan import refuse, require_trainable, training_plan
 from minibrain.api.views import detail, version_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
-from minibrain.data.snapshots import cleanup, require_splits, training_snapshot
+from minibrain.data.dataset_versions import cleanup, require_splits, training_dataset_version
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.routes import OpenAIError, conformed, prompting, response_id, run
 from minibrain.jobs.queue import enqueue
@@ -33,9 +33,9 @@ from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     AuditEvent,
     BaseModel,
+    DatasetVersion,
     JobKind,
     Model,
-    Snapshot,
     Version,
     VersionKind,
     VersionStatus,
@@ -68,18 +68,18 @@ def start_version(
     store: ArtifactStore,
     model: Model,
     kind: VersionKind,
-    snapshot: Snapshot | None,
+    dataset_version: DatasetVersion | None,
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
 ) -> Version:
-    version = new_version(session, store, model, kind, snapshot, recipe, breaking)
+    version = new_version(session, store, model, kind, dataset_version, recipe, breaking)
     audit_version(
         session,
         model,
         number=version.number,
         action="version.create",
         kind=str(kind),
-        snapshot=snapshot.hash if snapshot is not None else None,
+        dataset_version=dataset_version.hash if dataset_version is not None else None,
         recipe=dict(version.recipe),
         contract=version.contract_number,
     )
@@ -128,14 +128,14 @@ def add_version(
     require_usable(session, settings, model.base_model)
     if kind == VersionKind.LORA:
         require_trainable(session, settings, model)
-    snapshot = training_snapshot(session, settings, model, body.snapshot_id)
-    require_splits(snapshot)
+    dataset_version = training_dataset_version(session, settings, model, body.dataset_version_id)
+    require_splits(dataset_version)
     recipe: dict[str, Any] = {}
     if kind == VersionKind.LORA:
-        found, _ = training_plan(session, settings, node, model, snapshot, body)
+        found, _ = training_plan(session, settings, node, model, dataset_version, body)
         refuse(found)
         recipe = found.recipe()
-    version = start_version(session, settings, store, model, kind, snapshot, recipe, body.breaking)
+    version = start_version(session, settings, store, model, kind, dataset_version, recipe, body.breaking)
     session.commit()
     return version_info(model, version)
 

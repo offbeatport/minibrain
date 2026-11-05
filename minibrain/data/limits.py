@@ -10,7 +10,7 @@ from minibrain.registry.settings_store import read, write
 KEY = "data.limits"
 LABELS = {
     "row_limit": "Most rows in one version",
-    "keep_snapshots": "Unused versions kept per dataset",
+    "keep_versions": "Unused versions kept per dataset",
     "checks_off": "Version checks",
     "majority_share": "The label share that warns",
     "min_label_rows": "The fewest rows per label",
@@ -20,7 +20,7 @@ LABELS = {
 @dataclass(frozen=True)
 class DataLimits:
     row_limit: int = 200_000
-    keep_snapshots: int = 5
+    keep_versions: int = 5
     checks_off: tuple[str, ...] = ()
     majority_share: float = 0.9
     min_label_rows: int = 10

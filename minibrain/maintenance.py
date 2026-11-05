@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.data.snapshots import cleanup
+from minibrain.data.dataset_versions import cleanup
 from minibrain.leader import Leader
 from minibrain.policy import load
 from minibrain.registry.audit_chain import head_of, prune_cut, seal_all

@@ -54,7 +54,7 @@ class Refs:
     version: str
     card: str
     base: str
-    snapshot: str
+    dataset_version: str
     adapter: str | None
 
 
@@ -110,7 +110,7 @@ def refs_of(card: ModelCard, adapter: Adapter | None) -> Refs:
         version=f"minibrain:{card.version.id}",
         card=f"model-card:{card.version.id}",
         base=f"base-model:{card.base_model.key}",
-        snapshot=f"snapshot:{card.training_data.snapshot_hash}",
+        dataset_version=f"dataset-version:{card.training_data.dataset_version_hash}",
         adapter=f"adapter:{adapter.sha256}" if adapter is not None else None,
     )
 
@@ -187,40 +187,40 @@ def dataset_entry(data: CardData) -> dict[str, Any]:
     personal = data.personal_data
     flagged = [personal.detail] if personal is not None and personal.status == "warning" else []
     described = (
-        f"{data.snapshot_rows} labelled rows: {splits.train} train, {splits.held_out} held-out, {splits.test} test, "
-        f"{splits.few_shot} few-shot"
+        f"{data.dataset_version_rows} labelled rows: {splits.train} train, {splits.held_out} held-out, "
+        f"{splits.test} test, {splits.few_shot} few-shot"
     )
     return kept(
         {
             "type": "dataset",
-            "name": data.dataset_name or data.dataset_slug or "snapshot",
+            "name": data.dataset_name or data.dataset_slug or "dataset_version",
             "description": described,
             "sensitiveData": flagged,
         }
     )
 
 
-def snapshot_component(data: CardData, refs: Refs) -> dict[str, Any]:
+def dataset_version_component(data: CardData, refs: Refs) -> dict[str, Any]:
     splits = data.splits
     values: Values = [
         ("dataset", data.dataset_slug),
-        ("rows", data.snapshot_rows),
+        ("rows", data.dataset_version_rows),
         ("train_rows", splits.train),
         ("held_out_rows", splits.held_out),
         ("test_rows", splits.test),
         ("few_shot_rows", splits.few_shot),
-        ("taken_at", data.snapshot_taken_at),
+        ("taken_at", data.dataset_version_taken_at),
         ("query", data.query),
     ]
     return kept(
         {
             "type": "data",
-            "bom-ref": refs.snapshot,
-            "name": data.dataset_slug or "snapshot",
-            "version": data.snapshot_taken_at,
-            "hashes": sha256_hashes(data.snapshot_hash),
+            "bom-ref": refs.dataset_version,
+            "name": data.dataset_slug or "dataset_version",
+            "version": data.dataset_version_taken_at,
+            "hashes": sha256_hashes(data.dataset_version_hash),
             "data": [dataset_entry(data)],
-            "properties": props("snapshot:", values + check_values(data)),
+            "properties": props("dataset_version:", values + check_values(data)),
         }
     )
 
@@ -298,7 +298,7 @@ def model_card(card: ModelCard, refs: Refs) -> dict[str, Any]:
             "approach": {"type": "supervised"} if trained else None,
             "task": TASKS.get(card.purpose.task, card.purpose.task),
             "modelArchitecture": architecture(card),
-            "datasets": [{"ref": refs.snapshot}],
+            "datasets": [{"ref": refs.dataset_version}],
             "inputs": [{"format": "text"}],
             "outputs": [{"format": "label"}],
         }
@@ -389,11 +389,11 @@ def dependencies(card: ModelCard, refs: Refs) -> list[dict[str, Any]]:
     sources = [source_ref(source) for source in card.training_data.sources]
     adapter = [refs.adapter] if refs.adapter else []
     found = [
-        {"ref": refs.version, "dependsOn": [refs.base, *adapter, refs.snapshot]},
+        {"ref": refs.version, "dependsOn": [refs.base, *adapter, refs.dataset_version]},
         {"ref": refs.base, "dependsOn": []},
     ]
     found += [{"ref": ref, "dependsOn": [refs.base]} for ref in adapter]
-    found.append({"ref": refs.snapshot, "dependsOn": sources})
+    found.append({"ref": refs.dataset_version, "dependsOn": sources})
     return found + [{"ref": ref, "dependsOn": []} for ref in sources]
 
 
@@ -401,7 +401,7 @@ def components(card: ModelCard, adapter: Adapter | None, refs: Refs) -> list[dic
     found = [base_component(card.base_model, refs)]
     if adapter is not None:
         found.append(adapter_component(card, adapter, refs))
-    found.append(snapshot_component(card.training_data, refs))
+    found.append(dataset_version_component(card.training_data, refs))
     return found + [source_component(source) for source in card.training_data.sources]
 
 
