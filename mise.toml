@@ -46,12 +46,13 @@ description = "Backend tests"
 run = "uv run pytest -q"
 
 [tasks.check]
-description = "Tests, lint, format, crypto rules and type checks for backend and web; CI runs the same"
+description = "Tests, lint, format, crypto rules, product inventory and type checks for backend and web; CI runs the same"
 run = [
     "uv run pytest -q",
     "uv run ruff check .",
     "uv run ruff format --check .",
     "uv run python scripts/check_crypto.py",
+    "uv run python scripts/check_product.py",
     "uv run pyright",
     "shellcheck install.sh scripts/*.sh",
     "pnpm --dir web lint",
