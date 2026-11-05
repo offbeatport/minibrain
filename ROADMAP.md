@@ -1421,6 +1421,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   `/api/models/{slug}/…` and `/api/models/base/{key}` becomes `/api/base-models/{key}`; the UI already says model.
 - [x] S3 locations differing only by a trailing slash counted as different sources; an S3 or Iceberg path is compared
   without its trailing slashes.
+- [x] Prototype pages (`/proto/*`, such as `/proto/logos`) were reachable in production builds. Their routes are
+  registered only in development (`import.meta.env.DEV`), and the build leaves them and their code out.
 
 ## Risks to verify early
 

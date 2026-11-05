@@ -36,7 +36,6 @@ import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { ModelCardPage } from "./pages/models/ModelCardPage";
-import { LogosPage } from "./pages/proto/LogosPage";
 import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -61,6 +60,14 @@ const ApiReferencePage = lazyRouteComponent(
 
 function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
+}
+
+function prototypePages(): AnyRoute[] {
+    if (!import.meta.env.DEV) {
+        return [];
+    }
+    const logos = lazyRouteComponent(() => import("./pages/proto/LogosPage"), "LogosPage");
+    return [globalPage("/proto/logos", logos)];
 }
 
 function guarded(role: Role, Component: RouteComponent): RouteComponent {
@@ -193,7 +200,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/settings/storage", guarded("admin", StorageSettingsPage)),
     globalPage("/settings/connections", guarded("admin", ConnectionsSettingsPage)),
     globalPage("/settings/install", guarded("admin", InstallSettingsPage)),
-    globalPage("/proto/logos", LogosPage),
+    ...prototypePages(),
     movedToSettings("/profile"),
     movedToSettings("/preferences"),
     legacyTabRoute,
