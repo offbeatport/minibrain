@@ -29,7 +29,10 @@ import {
     localBases,
     logoPublisher,
     searchText,
+    servesOnly,
+    servingCopies,
 } from "./baseOptions";
+import { formatName, quantized } from "./formats";
 import { RUNS_HERE_INFO, useRunsHere } from "./runsHere";
 
 export type PickerTab = "catalogue" | "mine" | "import";
@@ -61,6 +64,14 @@ function installState(option: BaseOption): InstallState | null {
 function Availability({ option }: { option: BaseOption }) {
     const state = installState(option);
     return state ? <Badge variant={state.variant}>{state.text}</Badge> : null;
+}
+
+function ServeOnly({ option, className }: { option: BaseOption; className?: string }) {
+    return servesOnly(option) ? (
+        <Badge variant="warning" className={className}>
+            Serve only
+        </Badge>
+    ) : null;
 }
 
 function Amount({
@@ -121,10 +132,12 @@ function Resources({ option }: { option: BaseOption }) {
 }
 
 function factsOf(option: BaseOption): string[] {
+    const variant = option.variant;
     return [
         option.kind === "custom" ? null : option.publisher,
         option.params ? `${option.params} parameters` : null,
         option.entry?.license_name ?? null,
+        variant && (quantized(variant) || servesOnly(option)) ? formatName(variant) : null,
     ].filter((fact): fact is string => Boolean(fact));
 }
 
@@ -138,6 +151,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className="truncate text-base font-semibold">{option.name}</span>
                     {recommended && <Badge variant="info">Recommended</Badge>}
+                    <ServeOnly option={option} />
                 </span>
                 {facts.length > 0 && (
                     <span className="truncate text-muted-foreground">{facts.join(" · ")}</span>
@@ -160,8 +174,12 @@ function descriptionOf(option: BaseOption): string | null {
 
 const FIT_RANK: Record<FitLevel, number> = { fits: 0, limited: 1, unknown: 2, insufficient: 3 };
 
+function trainableFirst(left: BaseOption, right: BaseOption): number {
+    return Number(servesOnly(left)) - Number(servesOnly(right));
+}
+
 function rows(group: string, options: BaseOption[]): Row[] {
-    return options.map((option) => ({ group, option }));
+    return [...options].sort(trainableFirst).map((option) => ({ group, option }));
 }
 
 function groupOf(
@@ -205,6 +223,7 @@ function Trigger({ value }: { value: PickerValue }) {
                                         {state.text}
                                     </Badge>
                                 )}
+                                <ServeOnly option={option} className="shrink-0" />
                             </span>
                             <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
                                 {facts.length > 0 && (
@@ -277,23 +296,24 @@ export function BasePicker({
     const entries = catalog?.entries ?? [];
     const runsSomewhere = useRunsHere(catalog);
     const everything = entries.map((entry) => catalogueOption(entry));
-    const catalogue = everything.filter(
-        (option) =>
-            (tiers.length === 0 || tiers.includes(option.entry?.tier ?? "")) &&
-            (!runsHere || runsSomewhere(option.entry)) &&
-            (uses.length === 0 || uses.includes(option.licence ?? "unknown")),
-    );
+    const shown = (option: BaseOption) =>
+        (tiers.length === 0 || tiers.includes(option.entry?.tier ?? "")) &&
+        (!runsHere || runsSomewhere(option.entry)) &&
+        (uses.length === 0 || uses.includes(option.licence ?? "unknown"));
+    const catalogue = everything.filter(shown);
+    const copies = entries.flatMap(servingCopies).filter(shown);
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
     const custom = customOptions(entries, models);
     const imported = localBases(entries, models);
     const suggested = [...picks.here, ...picks.unchecked].slice(0, 3).map((pick) => pick.key);
-    const ordered = [...catalogue].sort((left, right) => {
+    const ordered = [...catalogue, ...copies].sort((left, right) => {
         const a = suggested.indexOf(left.key);
         const b = suggested.indexOf(right.key);
         if (a !== b) {
             return (a === -1 ? suggested.length : a) - (b === -1 ? suggested.length : b);
         }
         return (
+            trainableFirst(left, right) ||
             FIT_RANK[left.fit] - FIT_RANK[right.fit] ||
             (right.entry?.popularity ?? 0) - (left.entry?.popularity ?? 0)
         );

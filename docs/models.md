@@ -14,9 +14,10 @@
 - Every generation stays; older ones show "Newer version available".
 - Size tiers: S ≤4B, M 7–14B, L 24–35B or a small mixture of experts, XL 70B+ (multi-GPU).
 - Default order: recommended for the selected pool; also by popularity, size or name. Filters: hardware fit levels on
-  the selected pool, latest generation only, download access, publisher, task, size and licence (long
-  groups show five options and "Show more"), with removable chips. Columns can be shown or hidden; a row opens the
-  model's page (`/discover/<id>`): variants with fit, requirements, licence and files.
+  the selected pool, latest generation only, download access, publisher, task, size, format (full precision or
+  quantized) and licence (long groups show five options and "Show more"), with removable chips. Columns can be shown
+  or hidden; a row opens the model's page (`/discover/<id>`): formats with fit, requirements, licence and files.
+- Formats read "Full precision · BF16" or "Quantized · Q8_0" / "Quantized · FP8". Quantized formats are serve only.
 - Catalogue updates: Settings → General → Model catalogue (Check for updates, or every day).
 
 ## Add from Hugging Face

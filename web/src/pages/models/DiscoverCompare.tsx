@@ -41,6 +41,7 @@ import {
 } from "./Discover";
 import { TIERS, licenceOf, licenceUseLabel } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
+import { FormatHelp, formatName, formatUse, schemes } from "./formats";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
@@ -54,13 +55,14 @@ const USE_TONES: Record<CatalogEntry["license_use"], Tone> = {
     unknown: "neutral",
 };
 
-const SKELETON_ROWS = ["parameters", "memory", "download", "runtimes", "licence", "use"];
+const SKELETON_ROWS = ["parameters", "formats", "memory", "download", "runtimes", "licence", "use"];
 
 type Variant = CatalogEntry["variants"][number];
 
 type Attribute = {
     id: string;
     label: string;
+    info?: ReactNode;
     key: (entry: CatalogEntry) => string;
     render?: (entry: CatalogEntry, entries: CatalogEntry[]) => ReactNode;
     amount?: (entry: CatalogEntry) => number;
@@ -102,7 +104,9 @@ function VariantList({
                     key={variant.id}
                     className="flex flex-wrap items-center justify-between gap-x-2"
                 >
-                    <span className="min-w-0 truncate text-muted-foreground">{variant.label}</span>
+                    <span className="min-w-0 truncate text-muted-foreground">
+                        {formatName(variant)}
+                    </span>
                     <span className="ml-auto flex items-center gap-1.5 tabular-nums">
                         {best !== undefined && value(variant) === best && (
                             <Badge variant="accent">{bestLabel}</Badge>
@@ -115,8 +119,26 @@ function VariantList({
     );
 }
 
+function FormatList({ entry }: { entry: CatalogEntry }) {
+    return (
+        <ul className="flex flex-col gap-1">
+            {entry.variants.map((variant) => (
+                <li
+                    key={variant.id}
+                    className="flex flex-wrap items-center justify-between gap-x-2"
+                >
+                    <span className="min-w-0 truncate">{formatName(variant)}</span>
+                    <span className="ml-auto text-muted-foreground">{formatUse(variant)}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 function sizedVariants(entry: CatalogEntry, value: (variant: Variant) => number): string {
-    return entry.variants.map((variant) => `${variant.label}:${bytes(value(variant))}`).join("|");
+    return entry.variants
+        .map((variant) => `${formatName(variant)}:${bytes(value(variant))}`)
+        .join("|");
 }
 
 const needed = (variant: Variant) => variant.fit.needed_bytes;
@@ -143,6 +165,13 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                             <span className="text-muted-foreground">{`Size ${tierLabel(entry)}`}</span>
                         </div>
                     ),
+                },
+                {
+                    id: "formats",
+                    label: "Formats",
+                    info: <FormatHelp />,
+                    key: (entry) => schemes(entry).join(" · "),
+                    render: (entry) => <FormatList entry={entry} />,
                 },
                 {
                     id: "memory",
@@ -689,7 +718,14 @@ export function DiscoverComparePage() {
               title: group.title,
               rows: group.attributes.map((attribute) => ({
                   id: attribute.id,
-                  label: attribute.label,
+                  label: attribute.info ? (
+                      <span className="inline-flex items-center gap-1.5">
+                          {attribute.label}
+                          <InfoTip label="What the formats mean">{attribute.info}</InfoTip>
+                      </span>
+                  ) : (
+                      attribute.label
+                  ),
                   differs: comparing && new Set(entries.map(attribute.key)).size > 1,
                   cells: entries.map((entry) =>
                       attribute.render ? attribute.render(entry, entries) : attribute.key(entry),

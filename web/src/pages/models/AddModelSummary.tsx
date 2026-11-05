@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
-import { Checkbox, Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
+import { Button, Checkbox, InfoTip, Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
 import type { ReactNode } from "react";
-import type { CatalogResponse, CatalogVariantInfo } from "~/api/client";
+import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
@@ -9,23 +9,29 @@ import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
-import { type BaseOption, logoPublisher } from "./baseOptions";
+import { type BaseOption, logoPublisher, trainableVariant } from "./baseOptions";
+import { FormatHelp, fileType, formatName, formatUse, scheme, trainable } from "./formats";
 
-function Block({ title, children }: { title?: string; children: ReactNode }) {
+function Block({
+    title,
+    info,
+    children,
+}: {
+    title?: string;
+    info?: ReactNode;
+    children: ReactNode;
+}) {
     return (
         <div className="flex flex-col gap-3 px-panel py-4">
-            {title && <span className="text-sm font-medium">{title}</span>}
+            {title && (
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                    {title}
+                    {info}
+                </span>
+            )}
             {children}
         </div>
     );
-}
-
-function formatTitle(variant: CatalogVariantInfo): string {
-    return variant.format === "gguf" ? "Compressed" : "Full precision";
-}
-
-function formatUse(variant: CatalogVariantInfo): string {
-    return variant.format === "gguf" ? "Serve only" : "Trainable";
 }
 
 function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control?: ReactNode }) {
@@ -34,12 +40,12 @@ function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control
             <span className="flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-2 font-medium">
                     {control}
-                    {formatTitle(variant)}
+                    {formatName(variant)}
                 </span>
                 <span className="text-sm tabular-nums">{bytes(variant.size_bytes)}</span>
             </span>
             <span className="text-sm text-muted-foreground">
-                {`${variant.label.replace(/\s*safetensors/i, "")} · ${formatUse(variant)} · ${bytes(variant.fit.needed_bytes)} memory`}
+                {`${fileType(variant)} · ${formatUse(variant)} · ${bytes(variant.fit.needed_bytes)} memory`}
             </span>
         </span>
     );
@@ -94,6 +100,62 @@ function Formats({
         );
     }
     return <span className="text-sm text-muted-foreground">As installed</span>;
+}
+
+function installed(entry: CatalogEntry, variant: CatalogVariantInfo): boolean {
+    return entry.added.some(
+        (added) => added.variant_id === variant.id && added.availability.state === "available",
+    );
+}
+
+function ServeOnlyNotice({
+    entry,
+    variant,
+    onVariant,
+    onPickAnother,
+}: {
+    entry: CatalogEntry | null;
+    variant: CatalogVariantInfo;
+    onVariant: (variant: string) => void;
+    onPickAnother: () => void;
+}) {
+    const full = entry ? trainableVariant(entry) : undefined;
+    const next = full ? (
+        entry && installed(entry, full) ? (
+            `${scheme(full)} is already on this install.`
+        ) : (
+            <>
+                {`Switching downloads ${scheme(full)}, `}
+                <span className="whitespace-nowrap tabular-nums">{bytes(full.size_bytes)}</span>.
+            </>
+        )
+    ) : (
+        "The catalogue has no full-precision format of this model."
+    );
+    return (
+        <div className="flex flex-col gap-2.5">
+            <StatusText tone="warning">{`${scheme(variant)} can't be fine-tuned`}</StatusText>
+            <p className="text-sm text-muted-foreground">
+                Quantized formats serve only; training needs full precision. {next}
+            </p>
+            <div>
+                {full ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onVariant(full.id)}
+                    >
+                        {`Use ${formatName(full)}`}
+                    </Button>
+                ) : (
+                    <Button type="button" variant="outline" size="sm" onClick={onPickAnother}>
+                        Pick another
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
 }
 
 function ReadLink({ href }: { href: string }) {
@@ -186,6 +248,7 @@ export function AddModelSummary({
     onPickAnother: () => void;
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
+    const entry = plan.target.kind === "catalogue" ? plan.target.entry : (option?.entry ?? null);
     const onDisk = need ? null : (variant?.size_bytes ?? option?.size ?? null);
     const facts = [option?.publisher, option?.params, option?.entry?.license_name].filter(Boolean);
     return (
@@ -206,13 +269,22 @@ export function AddModelSummary({
                     )}
                 </div>
             </div>
-            <Block title="Format">
+            <Block
+                title="Format"
+                info={
+                    <InfoTip label="What the formats mean">
+                        <FormatHelp />
+                    </InfoTip>
+                }
+            >
                 <Formats plan={plan} variant={variant} onVariant={onVariant} />
-                {variant?.format === "gguf" && (
-                    <p className="text-sm text-muted-foreground">
-                        Compressed formats serve but can't be trained. Pick Full precision to train
-                        it.
-                    </p>
+                {variant && !trainable(variant) && (
+                    <ServeOnlyNotice
+                        entry={entry}
+                        variant={variant}
+                        onVariant={onVariant}
+                        onPickAnother={onPickAnother}
+                    />
                 )}
             </Block>
             <Block>

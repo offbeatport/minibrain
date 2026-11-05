@@ -49,6 +49,7 @@ import {
     runsHerePatch,
 } from "./DiscoverFilters";
 import { cancelJob, useModelsRefresh } from "./dialogs";
+import { FormatHelp, schemes } from "./formats";
 import { RUNS_HERE_INFO, type RunsHere, useRunsHere } from "./runsHere";
 
 export function leastMemory(entry: CatalogEntry): number {
@@ -360,7 +361,7 @@ export function compareHref(ids: string[], pool?: string, onlyDifferences = fals
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-const COLUMNS_KEY = "minibrain.discover.columns.v3";
+const COLUMNS_KEY = "minibrain.discover.columns.v4";
 
 const HIDDEN_COLUMNS = [
     "newer",
@@ -425,6 +426,12 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             meta: { info: CONTEXT_INFO },
             accessorFn: (entry) => entry.context_tokens ?? 0,
             cell: ({ row }) => contextText(row.original) ?? muted("—"),
+        },
+        {
+            id: "formats",
+            header: "Formats",
+            meta: { info: <FormatHelp /> },
+            accessorFn: (entry) => schemes(entry).join(" · "),
         },
         {
             id: "memory",
@@ -546,9 +553,11 @@ const SKELETON_GROUPS: { id: string; title?: string; rows: number }[] = [
     { id: "toggles", rows: 2 },
     { id: "task", title: "Task", rows: 5 },
     { id: "size", title: "Size", rows: 4 },
+    { id: "format", title: "Format", rows: 2 },
     { id: "publisher", title: "Publisher", rows: 6 },
     { id: "commercial", title: "Commercial use", rows: 3 },
-    { id: "licence", title: "Licence", rows: 4 },
+    { id: "licence", title: "Licence", rows: 3 },
+    { id: "access", title: "Access", rows: 2 },
 ];
 
 const SKELETON_WIDTHS = ["70%", "52%", "64%", "46%", "58%", "40%"];

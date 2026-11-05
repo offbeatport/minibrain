@@ -1,6 +1,7 @@
 import type { CatalogEntry, CatalogVariantInfo, FitInfo, ModelRow } from "~/api/client";
 import { parameters } from "./Discover";
 import { FIT_ORDER, type LicenceUse } from "./DiscoverFilters";
+import { trainable } from "./formats";
 import { runnable } from "./runsHere";
 
 export type TaskKey = "classify" | "extract" | "rewrite" | "sql" | "distill" | "answer";
@@ -70,38 +71,67 @@ function byFit(variants: CatalogVariantInfo[]): CatalogVariantInfo | undefined {
     )[0];
 }
 
-function trainableVariant(entry: CatalogEntry): CatalogVariantInfo {
-    const trainable = entry.variants.filter((variant) => variant.format !== "gguf");
-    return byFit(trainable) ?? byFit(entry.variants) ?? entry.variants[0];
+export function trainableVariant(entry: CatalogEntry): CatalogVariantInfo | undefined {
+    return byFit(entry.variants.filter(trainable));
 }
 
 const GONE = new Set(["not_downloaded", "evicted"]);
 
-function onInstall(entry: CatalogEntry): AddedInfo | undefined {
+function present(added: AddedInfo): boolean {
+    return !GONE.has(added.availability.state);
+}
+
+function variantOf(
+    entry: CatalogEntry,
+    id: string | null | undefined,
+): CatalogVariantInfo | undefined {
+    return entry.variants.find((variant) => variant.id === id);
+}
+
+function installedTrainable(entry: CatalogEntry): AddedInfo | undefined {
+    const copies = entry.added.filter((added) => {
+        const variant = variantOf(entry, added.variant_id);
+        return present(added) && (!variant || trainable(variant));
+    });
+    return copies.find((added) => added.availability.state === "available") ?? copies[0];
+}
+
+function preferredVariant(entry: CatalogEntry): CatalogVariantInfo {
+    const installed = installedTrainable(entry);
     return (
-        entry.added.find((added) => added.availability.state === "available") ??
-        entry.added.find((added) => !GONE.has(added.availability.state))
+        variantOf(entry, installed?.variant_id) ??
+        trainableVariant(entry) ??
+        byFit(entry.variants) ??
+        entry.variants[0]
     );
 }
 
+function addedFor(entry: CatalogEntry, variant: CatalogVariantInfo, chosen: boolean) {
+    const copies = entry.added.filter(present);
+    return (
+        copies.find((added) => added.variant_id === variant.id) ??
+        (chosen ? undefined : copies.find((added) => !variantOf(entry, added.variant_id)))
+    );
+}
+
+export function servesOnly(option: BaseOption | null): boolean {
+    return Boolean(option?.variant && !trainable(option.variant));
+}
+
 export function catalogueOption(entry: CatalogEntry, variantId?: string): BaseOption {
-    const added = variantId
-        ? entry.added.find((item) => item.variant_id === variantId)
-        : onInstall(entry);
-    const variant =
-        entry.variants.find((item) => item.id === (variantId ?? added?.variant_id)) ??
-        trainableVariant(entry);
-    const present = added && !GONE.has(added.availability.state) ? added : null;
+    const picked = variantOf(entry, variantId);
+    const variant = picked ?? preferredVariant(entry);
+    const added = addedFor(entry, variant, Boolean(picked)) ?? null;
     return {
-        key: `entry:${entry.id}`,
+        key: `entry:${entry.id}:${variant.id}`,
         kind: "catalogue",
         name: entry.name,
         publisher: entry.provider,
         params: parameters(entry),
         entry,
         variant,
-        added: present,
-        baseKey: present?.key ?? null,
+        added,
+        baseKey: added?.key ?? null,
         size: variant.size_bytes,
         fit: variant.fit.level,
         licence: entry.license_use,
@@ -150,6 +180,15 @@ export function baseOptionFor(
     }
     const row = rows.find((item) => item.kind === "base" && item.key === key);
     return row ? localOption(row) : null;
+}
+
+export function servingCopies(entry: CatalogEntry): BaseOption[] {
+    const main = preferredVariant(entry);
+    return entry.added
+        .filter((added) => present(added) && added.variant_id !== main.id)
+        .map((added) => variantOf(entry, added.variant_id))
+        .filter((variant): variant is CatalogVariantInfo => Boolean(variant && !trainable(variant)))
+        .map((variant) => catalogueOption(entry, variant.id));
 }
 
 export function localBases(entries: CatalogEntry[], rows: ModelRow[]): BaseOption[] {

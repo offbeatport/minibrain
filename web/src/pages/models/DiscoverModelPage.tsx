@@ -24,6 +24,7 @@ import {
     releasedText,
 } from "./Discover";
 import { useModelsRefresh } from "./dialogs";
+import { FormatHelp, formatName, formatUse } from "./formats";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
@@ -97,7 +98,13 @@ function variantColumns(
     onDownload: (variant: CatalogVariantInfo) => void,
 ): ColumnDef<CatalogVariantInfo, unknown>[] {
     return [
-        { id: "label", header: "Variant", accessorFn: (variant) => variant.label },
+        {
+            id: "format",
+            header: "Format",
+            meta: { info: <FormatHelp /> },
+            accessorFn: formatName,
+        },
+        { id: "use", header: "Training", accessorFn: formatUse },
         {
             id: "size",
             header: "Download size",
@@ -231,7 +238,7 @@ export function DiscoverModelPage() {
                         <About entry={entry} catalog={data} />
                         <PanelSection
                             icon={Layers}
-                            title="Variants"
+                            title="Formats"
                             description="Memory needed is estimated from the weights' size; real use also depends on context length and batch size."
                             bare
                         >

@@ -45,6 +45,7 @@ import {
     baseOptionFor,
     catalogueOption,
     recommend,
+    servesOnly,
 } from "./baseOptions";
 import { splitTags, useModelsRefresh } from "./dialogs";
 
@@ -351,7 +352,9 @@ export function AddModelPage() {
                 title: "Model added",
                 description: need
                     ? `${created.name}. ${need.verb === "import" ? "Importing" : "Downloading"} ${option?.name ?? "the base model"} (${bytes(need.size)}) first.`
-                    : `${created.name} is ready to train.`,
+                    : servesOnly(option)
+                      ? `${created.name}. Its base serves but can't be fine-tuned.`
+                      : `${created.name} is ready to train.`,
                 tone: "success",
             });
             router.history.push(modelsHref());

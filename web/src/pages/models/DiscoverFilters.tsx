@@ -1,8 +1,9 @@
-import { Button, Checkbox, Label, cn } from "obp-ui";
+import { Button, Checkbox, InfoTip, Label, cn } from "obp-ui";
 import { Fragment, type ReactNode, useState } from "react";
 import type { CatalogEntry, CatalogVariantInfo, FitInfo } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { ModelsSearch, ModelsSearchKey } from "~/lib/modelsSearch";
+import { FORMAT_KINDS, FormatHelp, formatKinds } from "./formats";
 import type { RunsHere } from "./runsHere";
 
 const READY = "ready";
@@ -43,7 +44,15 @@ export function licenceUseLabel(use: LicenceUse): string {
     return LICENCE_USES.find((item) => item.value === use)?.label ?? use;
 }
 
-type Facet = "access" | "publishers" | "tasks" | "tiers" | "uses" | "licences" | "latest";
+type Facet =
+    | "access"
+    | "publishers"
+    | "tasks"
+    | "tiers"
+    | "formats"
+    | "uses"
+    | "licences"
+    | "latest";
 
 export type Filters = Record<Facet, string[]> & { q: string; runs: RunsHere | null };
 
@@ -52,13 +61,22 @@ const FACET_KEYS: Record<Facet, ModelsSearchKey> = {
     publishers: "provider",
     tasks: "task",
     tiers: "tier",
+    formats: "format",
     uses: "use",
     licences: "licence",
     latest: "latest",
 };
 
 const FACETS = Object.keys(FACET_KEYS) as Facet[];
-const PANEL_FACETS: Facet[] = ["tasks", "tiers", "uses", "licences", "publishers", "access"];
+const PANEL_FACETS: Facet[] = [
+    "tasks",
+    "tiers",
+    "formats",
+    "uses",
+    "licences",
+    "publishers",
+    "access",
+];
 
 export function licenceOf(entry: CatalogEntry): string {
     return entry.license_name || entry.license;
@@ -69,6 +87,7 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
     publishers: (entry) => [entry.provider],
     tasks: (entry) => entry.capabilities,
     tiers: (entry) => [entry.tier],
+    formats: formatKinds,
     uses: (entry) => [entry.license_use],
     licences: (entry) => [licenceOf(entry)],
     latest: (entry) => (entry.superseded_by ? [] : [YES]),
@@ -77,6 +96,7 @@ const FACET_VALUES: Record<Facet, (entry: CatalogEntry) => string[]> = {
 const LABELS: Partial<Record<Facet, Record<string, string>>> = {
     access: Object.fromEntries(ACCESS.map((item) => [item.value, item.label])),
     tiers: Object.fromEntries(TIERS.map((item) => [item.value, item.label])),
+    formats: Object.fromEntries(FORMAT_KINDS.map((item) => [item.value, item.label])),
     uses: Object.fromEntries(LICENCE_USES.map((item) => [item.value, item.label])),
 };
 
@@ -99,6 +119,7 @@ export function readFilters(search: ModelsSearch, runsHere: RunsHere): Filters {
         publishers: list(search.provider),
         tasks: list(search.task),
         tiers: list(search.tier),
+        formats: list(search.format),
         uses: list(search.use),
         licences: list(search.licence),
         latest: list(search.latest),
@@ -134,6 +155,7 @@ const FILTERS_CLEARED: ModelsSearch = {
     provider: "",
     task: "",
     tier: "",
+    format: "",
     licence: "",
     use: "",
     fits: "",
@@ -312,6 +334,18 @@ export function FilterPanel({
                         TIERS.map((tier) => tier.value),
                     )}
                 />
+            </Group>
+            <Group
+                title={
+                    <span className="flex items-center gap-1.5">
+                        Format
+                        <InfoTip label="What the formats mean">
+                            <FormatHelp />
+                        </InfoTip>
+                    </span>
+                }
+            >
+                {FORMAT_KINDS.map((kind) => option("formats", kind.value))}
             </Group>
             <Group title="Publisher">
                 <OptionList

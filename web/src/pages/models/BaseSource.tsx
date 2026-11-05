@@ -214,8 +214,8 @@ function SourcesHelp() {
             </dl>
             <p className="opacity-75">
                 Files must be in Hugging Face format: config.json, tokenizer files and .safetensors
-                weights. GGUF serves but can't be fine-tuned. Every file gets a SHA-256 record, so
-                the model can be verified and repaired later.
+                weights. Quantized weights, such as GGUF or FP8, serve but can't be fine-tuned.
+                Every file gets a SHA-256 record, so the model can be verified and repaired later.
             </p>
         </div>
     );
@@ -298,12 +298,6 @@ function KindCards({
 
 export function looksLikeSource(text: string): boolean {
     return text.trim().includes("/");
-}
-
-export function formatLabel(variant: CatalogVariantInfo): string {
-    return variant.format === "gguf"
-        ? `Compressed (${variant.label}) · serve only`
-        : `Full precision (${variant.label}) · trainable`;
 }
 
 function HubResult({ repo }: { repo: string }) {
