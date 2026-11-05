@@ -694,10 +694,10 @@ function cardHeadline(card: ModelCard): string | null {
         return null;
     }
     return headline(
-        { number: baseline.number, accuracy: baseline.held_out_accuracy, cost: baseline.cost },
+        { number: baseline.number, score: baseline.held_out_accuracy, cost: baseline.cost },
         {
             number: card.version.number,
-            accuracy: card.evaluation.held_out?.accuracy,
+            score: card.evaluation.held_out?.accuracy,
             cost: card.evaluation.cost,
         },
     );

@@ -193,6 +193,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minibrains/name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Default Name */
+        get: operations["default_name_api_minibrains_name_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minibrains/{slug}": {
         parameters: {
             query?: never;
@@ -358,6 +375,91 @@ export interface paths {
         /** Golden */
         get: operations["golden_api_minibrains__slug__golden_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/contract/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Contract */
+        post: operations["check_contract_api_minibrains__slug__contract_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/contract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Contract */
+        put: operations["update_contract_api_minibrains__slug__contract_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/graders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Graders */
+        put: operations["update_graders_api_minibrains__slug__graders_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/promotion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Promotion */
+        put: operations["update_promotion_api_minibrains__slug__promotion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/instructions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Instructions */
+        put: operations["update_instructions_api_minibrains__slug__instructions_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1534,6 +1636,91 @@ export interface paths {
         put?: never;
         /** Complete */
         post: operations["complete_api_minibrains__slug__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minibrains/{slug}/versions/{number}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Version */
+        post: operations["test_version_api_minibrains__slug__versions__number__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Presets */
+        get: operations["list_presets_api_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Recipes */
+        get: operations["list_recipes_api_recipes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recipes/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Recipe */
+        get: operations["read_recipe_api_recipes__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recipes/{key}/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Load Sample */
+        post: operations["load_sample_api_recipes__key__sample_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2896,8 +3083,10 @@ export interface components {
              * @default []
              */
             stages?: components["schemas"]["Stage"][];
-            /** Accuracy */
-            accuracy?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Metric */
+            metric?: string | null;
             usage?: components["schemas"]["Usage"] | null;
             /** Revision */
             revision?: string | null;
@@ -3644,11 +3833,8 @@ export interface components {
             text: string;
             /** Version */
             version?: number | null;
-            /**
-             * Max Tokens
-             * @default 24
-             */
-            max_tokens?: number;
+            /** Max Tokens */
+            max_tokens?: number | null;
         };
         /** CompleteResponse */
         CompleteResponse: {
@@ -3658,8 +3844,12 @@ export interface components {
             model: string;
             /** Output */
             output: string;
-            /** Label */
-            label: string | null;
+            /** Answer */
+            answer: string | null;
+            /** Valid */
+            valid: boolean;
+            /** Contract */
+            contract?: number | null;
             /** Latency Ms */
             latency_ms: number;
             /** Prompt Tokens */
@@ -3678,6 +3868,15 @@ export interface components {
              * @enum {string}
              */
             finish_reason: "stop" | "length";
+        };
+        /** ConfusionInfo */
+        ConfusionInfo: {
+            /** Gold */
+            gold: string;
+            /** Predicted */
+            predicted: string | null;
+            /** Count */
+            count: number;
         };
         /** ConnectionBody */
         ConnectionBody: {
@@ -3872,6 +4071,47 @@ export interface components {
             /** Id */
             id?: number | null;
         };
+        /** ContractChange */
+        ContractChange: {
+            /** Path */
+            path: string;
+            /** Detail */
+            detail: string;
+            /** Breaking */
+            breaking: boolean;
+        };
+        /** ContractCheck */
+        ContractCheck: {
+            /** Changes */
+            changes: components["schemas"]["ContractChange"][];
+            /** Breaking */
+            breaking: boolean;
+            /** Against */
+            against: number | null;
+        };
+        /** ContractInfo */
+        ContractInfo: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "json";
+            /** Json Schema */
+            json_schema?: {
+                [key: string]: unknown;
+            } | null;
+            /** Labels */
+            labels?: string[] | null;
+        };
+        /** ContractUpdate */
+        ContractUpdate: {
+            contract: components["schemas"]["ContractInfo"];
+            /**
+             * Breaking
+             * @default false
+             */
+            breaking?: boolean;
+        };
         /** DataSettings */
         DataSettings: {
             /** Row Limit */
@@ -3936,6 +4176,10 @@ export interface components {
             input_column?: string | null;
             /** Label Column */
             label_column?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: string;
+            } | null;
             /** Sql */
             sql?: string | null;
             /** Folder Id */
@@ -4028,6 +4272,13 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** DecisionInfo */
+        DecisionInfo: {
+            /** Passed */
+            passed: boolean;
+            /** Checks */
+            checks: components["schemas"]["RuleCheckInfo"][];
         };
         /** DeltaSourceCreate */
         DeltaSourceCreate: {
@@ -4389,8 +4640,8 @@ export interface components {
         ExampleInfo: {
             /** Input */
             input: string;
-            /** Label */
-            label: string;
+            /** Expected */
+            expected: string;
         };
         /** ExtensionInfo */
         ExtensionInfo: {
@@ -4664,6 +4915,13 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** FieldScoreInfo */
+        FieldScoreInfo: {
+            /** Field */
+            field: string;
+            /** Accuracy */
+            accuracy: number;
+        };
         /** FitInfo */
         FitInfo: {
             /**
@@ -4719,6 +4977,35 @@ export interface components {
             name: string;
             /** Memory Bytes */
             memory_bytes: number;
+        };
+        /** GraderConfig */
+        GraderConfig: {
+            /** Name */
+            name: string;
+            /** Rubric */
+            rubric?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Fields */
+            fields?: string[] | null;
+        };
+        /** GraderKindInfo */
+        GraderKindInfo: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Contracts */
+            contracts: string[];
+            /** Metrics */
+            metrics: string[];
+        };
+        /** GradersUpdate */
+        GradersUpdate: {
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5029,6 +5316,11 @@ export interface components {
             /** Arch */
             arch: string;
         };
+        /** InstructionsUpdate */
+        InstructionsUpdate: {
+            /** Instructions */
+            instructions: string;
+        };
         /** JobDetail */
         JobDetail: {
             /** Id */
@@ -5223,6 +5515,23 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** LabelScoreInfo */
+        LabelScoreInfo: {
+            /** Label */
+            label: string;
+            /** Support */
+            support: number;
+            /** Predicted */
+            predicted: number;
+            /** Correct */
+            correct: number;
+            /** Precision */
+            precision: number | null;
+            /** Recall */
+            recall: number | null;
+            /** F1 */
+            f1: number | null;
+        };
         /** LabelShiftInfo */
         LabelShiftInfo: {
             /** Label */
@@ -5274,6 +5583,8 @@ export interface components {
             status: number;
             /** Latency Ms */
             latency_ms: number;
+            /** Contract */
+            contract?: number | null;
             /**
              * Prompt Tokens
              * @default 0
@@ -5318,6 +5629,10 @@ export interface components {
             input_column: string | null;
             /** Label Column */
             label_column: string | null;
+            /** Template */
+            template?: {
+                [key: string]: string;
+            } | null;
             /** Sql */
             sql: string | null;
         };
@@ -5329,6 +5644,10 @@ export interface components {
             input_column?: string | null;
             /** Label Column */
             label_column?: string | null;
+            /** Template */
+            template?: {
+                [key: string]: string;
+            } | null;
             /** Sql */
             sql?: string | null;
         };
@@ -5358,16 +5677,21 @@ export interface components {
             /** Base Model */
             base_model?: string | null;
             /**
-             * Task
+             * Preset
              * @default classify
              * @enum {string}
              */
-            task?: "classify" | "extract" | "rewrite" | "sql" | "distill" | "answer";
-            /**
-             * Sample
-             * @default false
-             */
-            sample?: boolean;
+            preset?: "classify" | "custom";
+            /** Labels */
+            labels?: string[];
+            contract?: components["schemas"]["ContractInfo"] | null;
+            /** Instructions */
+            instructions?: string | null;
+            /** Graders */
+            graders?: components["schemas"]["GraderConfig"][] | null;
+            promotion?: components["schemas"]["PromotionInfo"] | null;
+            /** Dataset */
+            dataset?: string | null;
         };
         /** MinibrainDetail */
         MinibrainDetail: {
@@ -5375,8 +5699,8 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Task */
-            task: string;
+            /** Preset */
+            preset: string;
             /** Base Model */
             base_model: string;
             /** Current Version */
@@ -5386,8 +5710,10 @@ export interface components {
              * @default false
              */
             deployed?: boolean;
-            /** Current Accuracy */
-            current_accuracy: number | null;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
             /** Versions */
             versions: number;
             /** Active Jobs */
@@ -5404,6 +5730,14 @@ export interface components {
             models: string[];
             request_bodies: components["schemas"]["RequestBodiesInfo"];
             teardown?: components["schemas"]["TeardownInfo"] | null;
+            contract: components["schemas"]["ContractInfo"];
+            /** Contract Number */
+            contract_number: number;
+            /** Instructions */
+            instructions: string;
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            promotion: components["schemas"]["PromotionInfo"];
         };
         /** MinibrainSummary */
         MinibrainSummary: {
@@ -5411,8 +5745,8 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Task */
-            task: string;
+            /** Preset */
+            preset: string;
             /** Base Model */
             base_model: string;
             /** Current Version */
@@ -5422,8 +5756,10 @@ export interface components {
              * @default false
              */
             deployed?: boolean;
-            /** Current Accuracy */
-            current_accuracy: number | null;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
             /** Versions */
             versions: number;
             /** Active Jobs */
@@ -5579,8 +5915,10 @@ export interface components {
              * @default []
              */
             stages?: components["schemas"]["Stage"][];
-            /** Accuracy */
-            accuracy?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Metric */
+            metric?: string | null;
             usage?: components["schemas"]["Usage"] | null;
             /** Revision */
             revision?: string | null;
@@ -5611,6 +5949,11 @@ export interface components {
             description?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /** NameSuggestion */
+        NameSuggestion: {
+            /** Name */
+            name: string;
         };
         /**
          * NameTaken
@@ -5763,6 +6106,15 @@ export interface components {
             /** Role Locked */
             role_locked: boolean;
         };
+        /** PlannedPresetInfo */
+        PlannedPresetInfo: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Hint */
+            hint: string;
+        };
         /** PlaygroundFeedback */
         PlaygroundFeedback: {
             /**
@@ -5849,6 +6201,53 @@ export interface components {
             /** Locked */
             locked?: string | null;
         };
+        /** PresetInfo */
+        PresetInfo: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "classify" | "custom";
+            /** Label */
+            label: string;
+            /** Noun */
+            noun: string;
+            /** Hint */
+            hint: string;
+            /**
+             * Contract
+             * @enum {string}
+             */
+            contract: "labels" | "choose";
+            /** Mapping */
+            mapping: {
+                [key: string]: string;
+            };
+            /** Prompts */
+            prompts: {
+                [key: string]: string;
+            };
+            /** Graders */
+            graders: {
+                [key: string]: components["schemas"]["GraderConfig"][];
+            };
+            /** Checks */
+            checks: string[];
+            promotion: components["schemas"]["PromotionInfo"];
+            /** View */
+            view: string | null;
+            /** Answer Tokens */
+            answer_tokens: number;
+        };
+        /** PresetsResponse */
+        PresetsResponse: {
+            /** Presets */
+            presets: components["schemas"]["PresetInfo"][];
+            /** Planned */
+            planned: components["schemas"]["PlannedPresetInfo"][];
+            /** Graders */
+            graders: components["schemas"]["GraderKindInfo"][];
+        };
         /** PreviewResponse */
         PreviewResponse: {
             /** Rows */
@@ -5867,6 +6266,16 @@ export interface components {
             input: string | null;
             /** Label */
             label: string | null;
+        };
+        /** PromotionInfo */
+        PromotionInfo: {
+            /** Thresholds */
+            thresholds?: components["schemas"]["ThresholdInfo"][];
+            /**
+             * Beats Live
+             * @default true
+             */
+            beats_live?: boolean;
         };
         /** QualityInfo */
         QualityInfo: {
@@ -5896,6 +6305,47 @@ export interface components {
             columns: string[];
             /** Rows */
             rows: (string | null)[][];
+        };
+        /** RecipeInfo */
+        RecipeInfo: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Preset
+             * @enum {string}
+             */
+            preset: "classify" | "custom";
+            /** Summary */
+            summary: string;
+            /** Base */
+            base: string | null;
+            /** Data */
+            data: string;
+            /** Mapping */
+            mapping: {
+                [key: string]: string;
+            };
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            promotion: components["schemas"]["PromotionInfo"];
+            contract?: components["schemas"]["ContractInfo"] | null;
+            /** Instructions */
+            instructions?: string | null;
+            /** Readme */
+            readme: string;
+        };
+        /** RecipeSample */
+        RecipeSample: {
+            /** Dataset */
+            dataset: string;
+            /** Dataset Name */
+            dataset_name: string;
+            /** Rows */
+            rows: number;
+            /** Labels */
+            labels: string[];
         };
         /** RelabelInfo */
         RelabelInfo: {
@@ -5959,6 +6409,8 @@ export interface components {
             custom: boolean;
             /** Version */
             version: number | null;
+            /** Contract */
+            contract?: number | null;
             /** Key Id */
             key_id: number | null;
             /** Key Name */
@@ -6099,6 +6551,8 @@ export interface components {
             custom: boolean;
             /** Version */
             version: number | null;
+            /** Contract */
+            contract?: number | null;
             /** Key Id */
             key_id: number | null;
             /** Key Name */
@@ -6174,6 +6628,17 @@ export interface components {
             group: string;
             role: components["schemas"]["Role"];
         };
+        /** RuleCheckInfo */
+        RuleCheckInfo: {
+            /** Name */
+            name: string;
+            /** Passed */
+            passed: boolean;
+            /** Detail */
+            detail: string;
+            /** Actual */
+            actual?: number | null;
+        };
         /** S3SourceCreate */
         S3SourceCreate: {
             /** Connection Id */
@@ -6191,8 +6656,8 @@ export interface components {
             slug: string;
             /** Name */
             name: string;
-            /** Task */
-            task: string;
+            /** Preset */
+            preset: string;
             /** Base Model */
             base_model: string;
             /** Current Version */
@@ -6202,8 +6667,10 @@ export interface components {
              * @default false
              */
             deployed?: boolean;
-            /** Current Accuracy */
-            current_accuracy: number | null;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
             /** Versions */
             versions: number;
             /** Active Jobs */
@@ -6220,6 +6687,14 @@ export interface components {
             models: string[];
             request_bodies: components["schemas"]["RequestBodiesInfo"];
             teardown?: components["schemas"]["TeardownInfo"] | null;
+            contract: components["schemas"]["ContractInfo"];
+            /** Contract Number */
+            contract_number: number;
+            /** Instructions */
+            instructions: string;
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            promotion: components["schemas"]["PromotionInfo"];
             /** Base Name */
             base_name: string;
             /** Download Bytes */
@@ -6241,6 +6716,17 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+        };
+        /** ScoreInfo */
+        ScoreInfo: {
+            /** Grader */
+            grader: string;
+            /** Version */
+            version: number;
+            /** Metric */
+            metric: string;
+            /** Value */
+            value: number;
         };
         /** SessionInfo */
         SessionInfo: {
@@ -6526,12 +7012,21 @@ export interface components {
         SplitScore: {
             /** Examples */
             examples: number;
-            /** Accuracy */
-            accuracy: number;
-            /** Macro F1 */
-            macro_f1: number;
             /** Invalid Rate */
             invalid_rate: number;
+            /** Scores */
+            scores: components["schemas"]["ScoreInfo"][];
+            /** Labels */
+            labels?: components["schemas"]["LabelScoreInfo"][];
+            /** Confusion */
+            confusion?: components["schemas"]["ConfusionInfo"][];
+            /** Fields */
+            fields?: components["schemas"]["FieldScoreInfo"][];
+            /**
+             * Judge Pending
+             * @default 0
+             */
+            judge_pending?: number;
         };
         /** Stage */
         Stage: {
@@ -6732,6 +7227,18 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
+        /** ThresholdInfo */
+        ThresholdInfo: {
+            /** Metric */
+            metric: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: ">=" | "<=" | ">" | "<" | "==";
+            /** Value */
+            value: number;
+        };
         /** TokenBody */
         TokenBody: {
             /** Token */
@@ -6902,6 +7409,11 @@ export interface components {
             kind: "prompt" | "lora";
             /** Snapshot Id */
             snapshot_id?: number | null;
+            /**
+             * Breaking
+             * @default false
+             */
+            breaking?: boolean;
         };
         /** VersionInfo */
         VersionInfo: {
@@ -6914,9 +7426,9 @@ export interface components {
             /** Current */
             current: boolean;
             /** Snapshot Hash */
-            snapshot_hash: string;
+            snapshot_hash: string | null;
             /** Snapshot Id */
-            snapshot_id: number;
+            snapshot_id: number | null;
             /** Snapshot Dataset */
             snapshot_dataset?: string | null;
             /** Snapshot Number */
@@ -6947,6 +7459,27 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            contract: components["schemas"]["ContractInfo"];
+            /** Contract Number */
+            contract_number: number;
+            /** Instructions */
+            instructions: string;
+            /**
+             * Shots
+             * @default 0
+             */
+            shots?: number;
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            /** Main Metric */
+            main_metric: string | null;
+            /** Score */
+            score: number | null;
+            promotion?: components["schemas"]["DecisionInfo"] | null;
+            /** Live At */
+            live_at?: string | null;
+            /** View */
+            view?: string | null;
         };
         /** VersionRow */
         VersionRow: {
@@ -6958,8 +7491,16 @@ export interface components {
             status: string;
             /** Live */
             live: boolean;
-            /** Accuracy */
-            accuracy: number | null;
+            /** Score */
+            score: number | null;
+            /** Metric */
+            metric?: string | null;
+            promotion?: components["schemas"]["DecisionInfo"] | null;
+            /**
+             * Was Live
+             * @default false
+             */
+            was_live?: boolean;
             /** Progress */
             progress: number | null;
             /** Job Id */
@@ -6978,6 +7519,32 @@ export interface components {
             /** Latency P95 Ms */
             latency_p95_ms?: number | null;
             cost?: components["schemas"]["EvalCost"] | null;
+        };
+        /** VersionTest */
+        VersionTest: {
+            /** Messages */
+            messages: components["schemas"]["ChatMessage"][];
+            /** Expected */
+            expected?: string | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
+        };
+        /** VersionTestResult */
+        VersionTestResult: {
+            /** Output */
+            output: string;
+            /** Answer */
+            answer: string | null;
+            /** Valid */
+            valid: boolean;
+            /** Scores */
+            scores: components["schemas"]["ScoreInfo"][];
+            /** Latency Ms */
+            latency_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
         };
         /** WorkerBody */
         WorkerBody: {
@@ -7381,6 +7948,37 @@ export interface operations {
             };
         };
     };
+    default_name_api_minibrains_name_get: {
+        parameters: {
+            query?: {
+                preset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameSuggestion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_api_minibrains__slug__get: {
         parameters: {
             query?: never;
@@ -7755,6 +8353,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExampleInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_contract_api_minibrains__slug__contract_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractInfo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_contract_api_minibrains__slug__contract_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_graders_api_minibrains__slug__graders_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradersUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_promotion_api_minibrains__slug__promotion_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionInfo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_instructions_api_minibrains__slug__instructions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstructionsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MinibrainDetail"];
                 };
             };
             /** @description Validation Error */
@@ -10533,6 +11306,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_version_api_minibrains__slug__versions__number__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionTest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_presets_api_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresetsResponse"];
+                };
+            };
+        };
+    };
+    list_recipes_api_recipes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeInfo"][];
+                };
+            };
+        };
+    };
+    read_recipe_api_recipes__key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    load_sample_api_recipes__key__sample_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeSample"];
                 };
             };
             /** @description Validation Error */

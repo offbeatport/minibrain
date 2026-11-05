@@ -26,6 +26,7 @@ import { StatusText } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
+import { metricName } from "~/lib/metrics";
 import { RETRY_LABELS, busyTearingDown, retryTeardown, setDeployed } from "~/lib/teardown";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
@@ -36,9 +37,9 @@ function serving(detail: MinibrainDetail): string {
     if (detail.current_version === null || detail.current_version === undefined) {
         return `Serving base model ${detail.base_model} until you deploy a version`;
     }
-    return detail.current_accuracy === null || detail.current_accuracy === undefined
+    return detail.current_score === null || detail.current_score === undefined
         ? `Serving v${detail.current_version}`
-        : `Serving v${detail.current_version} · ${percent(detail.current_accuracy)} held-out accuracy`;
+        : `Serving v${detail.current_version} · ${percent(detail.current_score)} ${metricName(detail.main_metric).toLowerCase()} held out`;
 }
 
 function DeployToggle({ row, deployed }: { row: ModelRow; deployed: boolean }) {
@@ -144,7 +145,7 @@ function serves(row: ModelRow): string {
         return `Base model ${row.base_model}`;
     }
     const kind = KIND_NAMES[current.kind] ?? current.kind;
-    const score = current.accuracy === null ? "" : ` · ${Math.round(current.accuracy * 100)}%`;
+    const score = current.score === null ? "" : ` · ${Math.round(current.score * 100)}%`;
     return `v${current.number} · ${kind}${score}`;
 }
 
@@ -311,10 +312,10 @@ function VersionHistory({ row }: { row: ModelRow }) {
                     <StatusText tone="info">
                         {item.original.status === "training" ? "Training" : "Scoring"}
                     </StatusText>
-                ) : item.original.accuracy === null ? (
+                ) : item.original.score === null ? (
                     <span className="text-muted-foreground">Not scored</span>
                 ) : (
-                    <span className="tabular-nums">{`${Math.round(item.original.accuracy * 100)}%`}</span>
+                    <span className="tabular-nums">{`${Math.round(item.original.score * 100)}%`}</span>
                 ),
         },
         {

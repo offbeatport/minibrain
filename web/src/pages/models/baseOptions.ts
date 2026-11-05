@@ -4,7 +4,7 @@ import { FIT_ORDER, type LicenceUse } from "./DiscoverFilters";
 import { trainable } from "./formats";
 import { runnable } from "./runsHere";
 
-export type TaskKey = "classify" | "extract" | "rewrite" | "sql" | "distill" | "answer";
+export type TaskKey = "classify" | "custom" | "extract" | "general" | "rewrite" | "sql";
 
 export type FitLevel = FitInfo["level"];
 
@@ -45,10 +45,10 @@ const TASK_NEEDS: Record<TaskKey, TaskNeeds> = {
         tiers: { S: 2, M: 3, L: 2, XL: 1 },
         avoid: ["Reasoning"],
     },
+    custom: { capability: "Chat", tiers: { S: 2, M: 3, L: 2, XL: 1 } },
+    general: { capability: "Chat", tiers: { S: 1, M: 3, L: 3, XL: 2 } },
     rewrite: { capability: "Chat", tiers: { S: 1, M: 3, L: 2, XL: 1 }, avoid: ["Code"] },
     sql: { capability: "Chat", tiers: { S: 1, M: 3, L: 2, XL: 1 }, prefer: "Code" },
-    distill: { capability: "Chat", tiers: { S: 3, M: 2, L: 1, XL: 0 }, avoid: ["Reasoning"] },
-    answer: { capability: "Chat", tiers: { S: 1, M: 3, L: 3, XL: 2 } },
 };
 
 const RUNS_HERE = 3;

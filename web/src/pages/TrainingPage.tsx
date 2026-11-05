@@ -3,6 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { Database } from "lucide-react";
 import {
     Button,
+    ConfirmDialog,
     Field,
     Link,
     NumberField,
@@ -18,7 +19,7 @@ import { type SnapshotInfo, useSnapshots } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useMinibrain } from "~/api/queries";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
-import { ErrorLine, PanelSection, Section } from "~/components/Section";
+import { ErrorLine, PanelSection, Section, errorMessage } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useInvalidate } from "~/lib/jobs";
 import { relativeTime } from "~/lib/time";
@@ -118,6 +119,7 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
     const shown = chosen ?? detail.snapshot;
     const settings = { ...choices, max_rows: maxRows, epochs };
     const plan = useTrainingPlan(slug, chosen?.id ?? null, settings);
+    const [breaking, setBreaking] = useState<{ body: VersionCreate; reason: string } | null>(null);
     const create = useMutation({
         mutationFn: (body: VersionCreate) =>
             unwrap(
@@ -127,6 +129,12 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                 }),
             ),
         onSuccess: invalidate,
+        onError: (error, body) => {
+            const reason = errorMessage(error) ?? "";
+            if (!body.breaking && reason.includes("breaking change")) {
+                setBreaking({ body, reason });
+            }
+        },
     });
     const train = () => {
         if (maxRows !== null && epochs !== null) {
@@ -197,7 +205,20 @@ function CreateVersion({ detail, focusTrain }: { detail: MinibrainDetail; focusT
                     </Button>
                 </div>
             </div>
-            <ErrorLine error={create.error} />
+            <ErrorLine error={breaking ? null : create.error} />
+            <ConfirmDialog
+                open={breaking !== null}
+                onOpenChange={(open) => !open && setBreaking(null)}
+                title="This version breaks the contract"
+                description={breaking?.reason ?? ""}
+                confirmLabel="Create it anyway"
+                destructive
+                onConfirm={() => {
+                    const body = breaking?.body;
+                    setBreaking(null);
+                    return body ? create.mutateAsync({ ...body, breaking: true }) : undefined;
+                }}
+            />
         </Section>
     );
 }

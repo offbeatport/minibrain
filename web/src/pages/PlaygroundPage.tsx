@@ -81,7 +81,7 @@ function Reply({
             <ChatBubble role="assistant" text={asCode(reply.output) || "(empty)"} />
             <p className="text-sm text-muted-foreground">
                 <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}{" "}
-                · {reply.label ? "valid label" : "not a known label"}
+                · {reply.valid ? "meets the contract" : "breaks the contract"}
             </p>
             <AnswerFeedback slug={slug} input={input} reply={reply} labels={labels} />
         </div>
@@ -101,6 +101,7 @@ function Playground({ slug }: { slug: string }) {
     const [text, setText] = useState("");
     const [history, setHistory] = useState<Exchange[]>([]);
     const chosen = primary || String(detail?.current_version ?? ready[0] ?? "");
+    const labels = detail?.contract.labels ?? [];
     const run = useMutation({
         mutationFn: async (input: string) => {
             const targets = [chosen, compare].filter((value) => value && value !== NONE);
@@ -145,7 +146,7 @@ function Playground({ slug }: { slug: string }) {
         <>
             <Section
                 title="Try it"
-                caption="Each message is classified on its own. Pick a second version to compare answers side by side."
+                caption="Each message is answered on its own, held to the version's contract. Pick a second version to compare answers side by side."
             >
                 <form onSubmit={submit} className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-3">
@@ -169,7 +170,9 @@ function Playground({ slug }: { slug: string }) {
                         value={text}
                         onChange={(event) => setText(event.target.value)}
                         rows={3}
-                        placeholder="Type an input to classify"
+                        placeholder={
+                            labels.length > 0 ? "Type an input to classify" : "Type a message"
+                        }
                         aria-label="Input"
                     />
                     <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +188,9 @@ function Playground({ slug }: { slug: string }) {
                                 className="max-w-64 truncate"
                                 onClick={() => setText(sample.input)}
                             >
-                                {sample.input}
+                                <span className="truncate">
+                                    {sample.input.replace(/\s+/g, " ")}
+                                </span>
                             </Button>
                         ))}
                     </div>
@@ -203,7 +208,7 @@ function Playground({ slug }: { slug: string }) {
                                     slug={slug}
                                     input={exchange.text}
                                     reply={reply}
-                                    labels={detail?.snapshot?.labels ?? []}
+                                    labels={labels}
                                 />
                             ))}
                         </div>

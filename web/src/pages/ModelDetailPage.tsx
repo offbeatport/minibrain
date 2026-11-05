@@ -25,7 +25,15 @@ import {
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { type BaseModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
-import { isActiveJob, keys, useBaseModel, useJobs, useModels, useVersions } from "~/api/queries";
+import {
+    isActiveJob,
+    keys,
+    useBaseModel,
+    useJobs,
+    useMinibrain,
+    useModels,
+    useVersions,
+} from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
 import { Facts } from "~/components/Facts";
 import { FeedbackSince } from "~/components/FeedbackSince";
@@ -38,6 +46,7 @@ import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
+import { metricName } from "~/lib/metrics";
 import {
     deploymentPageHref,
     evaluationsHref,
@@ -59,6 +68,7 @@ import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { ModelDataNotice, withDataColumns } from "./data/versionData";
 import { DeleteModelsDialog } from "./models/DeleteModelsDialog";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
+import { TaskSection } from "./models/TaskSection";
 import {
     ConfirmAction,
     type Confirmation,
@@ -538,15 +548,21 @@ const VERSION_COLUMNS: ColumnDef<VersionInfo, unknown>[] = [
     },
     { header: "Status", id: "status", cell: ({ row }) => row.original.status },
     {
-        header: "Held-out accuracy",
-        id: "accuracy",
-        cell: ({ row }) => percent(row.original.held_out?.accuracy),
+        header: "Held-out score",
+        id: "score",
+        cell: ({ row }) =>
+            row.original.score === null ? (
+                "–"
+            ) : (
+                <span className="tabular-nums">{`${percent(row.original.score)} ${metricName(row.original.main_metric).toLowerCase()}`}</span>
+            ),
     },
     { header: "Created", id: "created", cell: ({ row }) => exactTime(row.original.created_at) },
 ];
 
 function CustomModelView({ row }: { row: ModelRow }) {
     const versions = useVersions(row.key);
+    const detail = useMinibrain(row.key);
     const can = useCan();
     const refresh = useModelsRefresh();
     const jobs = useJobs(row.key);
@@ -627,6 +643,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}
+            {detail.data && <TaskSection detail={detail.data} />}
             <PanelSection
                 icon={History}
                 title="Revisions"

@@ -12,6 +12,9 @@ import {
     DialogTitle,
     InfoTip,
     Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { useMemo } from "react";
 import { type ModelRow, type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
@@ -24,10 +27,17 @@ import {
     versionState,
     versionStateLabel,
 } from "~/components/StatusBadge";
+import {
+    GraderScores,
+    PresetResults,
+    PromotionDecision,
+    ScoredBy,
+} from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
 import { costSortValue, costText, deviceTime, headline, measuredOn, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
+import { metricName, metricOf } from "~/lib/metrics";
 import { modelCardHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { DataVersus } from "./data/versionData";
@@ -66,10 +76,10 @@ function readTarget(value: string | undefined): Target | null {
 
 function change(line: Line): number | null {
     const { version, live } = line;
-    if (!live || live === version || version.accuracy === null || live.accuracy === null) {
+    if (!live || live === version || version.score === null || live.score === null) {
         return null;
     }
-    return version.accuracy - live.accuracy;
+    return version.metric === live.metric ? version.score - live.score : null;
 }
 
 function Change({ line }: { line: Line }) {
@@ -96,7 +106,7 @@ function baselineOf(line: Line): ModelVersionRow | undefined {
         (version) =>
             version.number < line.version.number &&
             version.status === "ready" &&
-            version.accuracy !== null,
+            version.score !== null,
     );
     const prompts = earlier
         .filter((version) => version.kind === "prompt")
@@ -139,12 +149,24 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
             accessorFn: (line) => KIND_NAMES[line.version.kind] ?? line.version.kind,
         },
         {
-            id: "accuracy",
-            header: "Held-out accuracy",
-            accessorFn: (line) => line.version.accuracy ?? -1,
+            id: "score",
+            header: "Held-out score",
+            accessorFn: (line) => line.version.score ?? -1,
             cell: ({ row }) => (
-                <span className="tabular-nums">{percent(row.original.version.accuracy)}</span>
+                <span className="tabular-nums">
+                    {percent(row.original.version.score)}
+                    {row.original.version.score !== null && (
+                        <span className="text-muted-foreground">{` ${metricName(row.original.version.metric).toLowerCase()}`}</span>
+                    )}
+                </span>
             ),
+        },
+        {
+            id: "rule",
+            header: "Promotion rule",
+            accessorFn: (line) =>
+                line.version.promotion ? Number(line.version.promotion.passed) : -1,
+            cell: ({ row }) => <RuleCell version={row.original.version} />,
         },
         {
             id: "change",
@@ -196,8 +218,72 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
     ];
 }
 
+function RuleCell({ version }: { version: ModelVersionRow }) {
+    if (!version.promotion) {
+        return <span className="text-muted-foreground">–</span>;
+    }
+    return version.promotion.passed ? (
+        <span className="text-success">Passes</span>
+    ) : (
+        <span className="text-warning">Does not pass</span>
+    );
+}
+
 function deployable(version: ModelVersionRow): boolean {
-    return version.status === "ready" && !version.live;
+    return (
+        version.status === "ready" &&
+        !version.live &&
+        (version.was_live || Boolean(version.promotion?.passed))
+    );
+}
+
+function blockedReason(version: ModelVersionRow): string | null {
+    if (version.status !== "ready" || version.live || deployable(version)) {
+        return null;
+    }
+    const failed = (version.promotion?.checks ?? []).filter((check) => !check.passed);
+    return (
+        failed.map((check) => `${check.name}: ${check.detail}`).join("; ") ||
+        "It does not pass the promotion rule."
+    );
+}
+
+function DeployButton({
+    version,
+    size,
+    pending,
+    onDeploy,
+}: {
+    version: ModelVersionRow;
+    size?: "xs";
+    pending: boolean;
+    onDeploy: () => void;
+}) {
+    const reason = blockedReason(version);
+    if (reason === null) {
+        return deployable(version) ? (
+            <Button
+                variant={size ? "outline" : "default"}
+                size={size}
+                disabled={pending}
+                onClick={onDeploy}
+            >
+                {`Deploy v${version.number}`}
+            </Button>
+        ) : null;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="inline-flex">
+                    <Button variant="outline" size={size} disabled>
+                        {`Deploy v${version.number}`}
+                    </Button>
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{`Blocked by the promotion rule: ${reason}`}</TooltipContent>
+        </Tooltip>
+    );
 }
 
 function usePromote() {
@@ -257,7 +343,10 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
             {summary && <p className="text-base font-semibold tabular-nums">{summary}</p>}
             <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <Stat label="Status" value={<VersionState version={version} />} />
-                <Stat label="Held-out" value={percent(info?.held_out?.accuracy)} />
+                <Stat
+                    label={`Held-out ${metricName(info?.main_metric).toLowerCase()}`}
+                    value={percent(info?.score)}
+                />
                 <Stat label="vs live" value={<Change line={line} />} />
                 <Stat
                     label="Data vs live"
@@ -269,9 +358,8 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                         />
                     }
                 />
-                <Stat label="Test set" value={percent(info?.golden?.accuracy)} />
-                <Stat label="Macro F1" value={info?.held_out?.macro_f1.toFixed(3) ?? "–"} />
-                <Stat label="Invalid" value={percent(info?.held_out?.invalid_rate)} />
+                <Stat label="Test set" value={percent(metricOf(info?.golden, info?.main_metric))} />
+                <Stat label="Breaks the contract" value={percent(info?.held_out?.invalid_rate)} />
                 <Stat label="p50" value={milliseconds(info?.latency_p50_ms)} />
                 <Stat label="p95" value={milliseconds(info?.latency_p95_ms)} />
                 <Stat
@@ -290,6 +378,10 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
             {cost?.device_name && (
                 <p className="text-sm text-muted-foreground">{measuredOn(cost)}</p>
             )}
+            {info?.held_out && <GraderScores split={info.held_out} main={info.main_metric} />}
+            {info && <ScoredBy version={info} />}
+            {info?.promotion && <PromotionDecision decision={info.promotion} />}
+            {info && <PresetResults version={info} />}
             {info && info.mistakes.length > 0 && (
                 <div className="flex min-w-0 flex-col gap-2">
                     <div>
@@ -311,18 +403,17 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                 <Button variant="outline" asChild>
                     <Link href={modelCardHref(model.key, version.number)}>Model card</Link>
                 </Button>
-                {can.build && deployable(version) && (
-                    <Button
-                        disabled={promote.isPending}
-                        onClick={() =>
+                {can.build && (
+                    <DeployButton
+                        version={version}
+                        pending={promote.isPending}
+                        onDeploy={() =>
                             promote.mutate(
                                 { slug: model.key, number: version.number },
                                 { onSuccess: onDone },
                             )
                         }
-                    >
-                        {`Deploy v${version.number}`}
-                    </Button>
+                    />
                 )}
             </DialogFooter>
         </>
@@ -401,7 +492,7 @@ export function EvaluationsPage() {
         <Page wide>
             <PageHeader
                 title="Evaluations"
-                caption="Every version of every model, scored on its test set and held-out rows. Deploy the best one."
+                caption="Every version of every model, scored by its graders on its test set and held-out rows. A version goes live only when it passes its model's promotion rule."
             />
             <div className="flex flex-wrap items-center gap-2">
                 <CheckboxSelect
@@ -437,23 +528,21 @@ export function EvaluationsPage() {
                 columnPicker
                 onOpen={(line) => update({ version: lineKey(line) })}
                 rowLabel={(line) =>
-                    `${line.model.name} v${line.version.number}, ${percent(line.version.accuracy)} held-out, ${versionStateLabel(versionState(line.version))}`
+                    `${line.model.name} v${line.version.number}, ${percent(line.version.score)} held-out, ${versionStateLabel(versionState(line.version))}`
                 }
                 rowActions={(line) =>
-                    can.build && deployable(line.version) ? (
-                        <Button
-                            variant="outline"
+                    can.build ? (
+                        <DeployButton
+                            version={line.version}
                             size="xs"
-                            disabled={promote.isPending}
-                            onClick={() =>
+                            pending={promote.isPending}
+                            onDeploy={() =>
                                 promote.mutate({
                                     slug: line.model.key,
                                     number: line.version.number,
                                 })
                             }
-                        >
-                            {`Deploy v${line.version.number}`}
-                        </Button>
+                        />
                     ) : null
                 }
                 empty={

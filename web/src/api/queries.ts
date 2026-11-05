@@ -23,6 +23,8 @@ export const keys = {
     sources: ["sources"] as const,
     sourceRows: (id: number) => ["sources", id, "rows"] as const,
     sourceStats: (id: number) => ["sources", id, "stats"] as const,
+    presets: ["presets"] as const,
+    recipes: ["recipes"] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -246,5 +248,21 @@ export function useModelSources() {
     return useQuery({
         queryKey: ["models", "sources"],
         queryFn: () => unwrap(api.GET("/api/models/sources")),
+    });
+}
+
+export function usePresets() {
+    return useQuery({
+        queryKey: keys.presets,
+        queryFn: () => unwrap(api.GET("/api/presets")),
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
+export function useRecipes() {
+    return useQuery({
+        queryKey: keys.recipes,
+        queryFn: () => unwrap(api.GET("/api/recipes")),
+        staleTime: Number.POSITIVE_INFINITY,
     });
 }

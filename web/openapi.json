@@ -483,6 +483,49 @@
         }
       }
     },
+    "/api/minibrains/name": {
+      "get": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Default Name",
+        "operationId": "default_name_api_minibrains_name_get",
+        "parameters": [
+          {
+            "name": "preset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "classify",
+              "title": "Preset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameSuggestion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/minibrains/{slug}": {
       "patch": {
         "tags": [
@@ -1019,6 +1062,266 @@
                     "$ref": "#/components/schemas/ExampleInfo"
                   },
                   "title": "Response Golden Api Minibrains  Slug  Golden Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/contract/check": {
+      "post": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Check Contract",
+        "operationId": "check_contract_api_minibrains__slug__contract_check_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractInfo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractCheck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/contract": {
+      "put": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Update Contract",
+        "operationId": "update_contract_api_minibrains__slug__contract_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/graders": {
+      "put": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Update Graders",
+        "operationId": "update_graders_api_minibrains__slug__graders_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradersUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/promotion": {
+      "put": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Update Promotion",
+        "operationId": "update_promotion_api_minibrains__slug__promotion_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionInfo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/instructions": {
+      "put": {
+        "tags": [
+          "minibrains"
+        ],
+        "summary": "Update Instructions",
+        "operationId": "update_instructions_api_minibrains__slug__instructions_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstructionsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinibrainDetail"
                 }
               }
             }
@@ -4896,6 +5199,197 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CompleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/minibrains/{slug}/versions/{number}/test": {
+      "post": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Test Version",
+        "operationId": "test_version_api_minibrains__slug__versions__number__test_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionTest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionTestResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "List Presets",
+        "operationId": "list_presets_api_presets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recipes": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "List Recipes",
+        "operationId": "list_recipes_api_recipes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecipeInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Recipes Api Recipes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recipes/{key}": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Read Recipe",
+        "operationId": "read_recipe_api_recipes__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recipes/{key}/sample": {
+      "post": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Load Sample",
+        "operationId": "load_sample_api_recipes__key__sample_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeSample"
                 }
               }
             }
@@ -9780,7 +10274,7 @@
             "title": "Stages",
             "default": []
           },
-          "accuracy": {
+          "score": {
             "anyOf": [
               {
                 "type": "number"
@@ -9789,7 +10283,18 @@
                 "type": "null"
               }
             ],
-            "title": "Accuracy"
+            "title": "Score"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
           },
           "usage": {
             "anyOf": [
@@ -12349,11 +12854,17 @@
             "title": "Version"
           },
           "max_tokens": {
-            "type": "integer",
-            "maximum": 512.0,
-            "minimum": 1.0,
-            "title": "Max Tokens",
-            "default": 24
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
           }
         },
         "type": "object",
@@ -12376,7 +12887,7 @@
             "type": "string",
             "title": "Output"
           },
-          "label": {
+          "answer": {
             "anyOf": [
               {
                 "type": "string"
@@ -12385,7 +12896,22 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Answer"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract"
           },
           "latency_ms": {
             "type": "number",
@@ -12405,7 +12931,8 @@
           "id",
           "model",
           "output",
-          "label",
+          "answer",
+          "valid",
           "latency_ms",
           "prompt_tokens",
           "completion_tokens"
@@ -12438,6 +12965,36 @@
           "finish_reason"
         ],
         "title": "CompletionChoice"
+      },
+      "ConfusionInfo": {
+        "properties": {
+          "gold": {
+            "type": "string",
+            "title": "Gold"
+          },
+          "predicted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicted"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gold",
+          "predicted",
+          "count"
+        ],
+        "title": "ConfusionInfo"
       },
       "ConnectionBody": {
         "properties": {
@@ -12852,6 +13409,122 @@
         ],
         "title": "ConnectionTestBody"
       },
+      "ContractChange": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "breaking": {
+            "type": "boolean",
+            "title": "Breaking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "detail",
+          "breaking"
+        ],
+        "title": "ContractChange"
+      },
+      "ContractCheck": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ContractChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "breaking": {
+            "type": "boolean",
+            "title": "Breaking"
+          },
+          "against": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Against"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes",
+          "breaking",
+          "against"
+        ],
+        "title": "ContractCheck"
+      },
+      "ContractInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "json"
+            ],
+            "title": "Kind"
+          },
+          "json_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Schema"
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ContractInfo"
+      },
+      "ContractUpdate": {
+        "properties": {
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "breaking": {
+            "type": "boolean",
+            "title": "Breaking",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract"
+        ],
+        "title": "ContractUpdate"
+      },
       "DataSettings": {
         "properties": {
           "row_limit": {
@@ -13111,6 +13784,20 @@
               }
             ],
             "title": "Label Column"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
           },
           "sql": {
             "anyOf": [
@@ -13426,6 +14113,27 @@
           "updated_at"
         ],
         "title": "DatasetSummary"
+      },
+      "DecisionInfo": {
+        "properties": {
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCheckInfo"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "passed",
+          "checks"
+        ],
+        "title": "DecisionInfo"
       },
       "DeltaSourceCreate": {
         "properties": {
@@ -14467,15 +15175,15 @@
             "type": "string",
             "title": "Input"
           },
-          "label": {
+          "expected": {
             "type": "string",
-            "title": "Label"
+            "title": "Expected"
           }
         },
         "type": "object",
         "required": [
           "input",
-          "label"
+          "expected"
         ],
         "title": "ExampleInfo"
       },
@@ -15337,6 +16045,24 @@
         ],
         "title": "FeedbackSummary"
       },
+      "FieldScoreInfo": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "accuracy"
+        ],
+        "title": "FieldScoreInfo"
+      },
       "FitInfo": {
         "properties": {
           "level": {
@@ -15500,6 +16226,115 @@
           "memory_bytes"
         ],
         "title": "GpuInfo"
+      },
+      "GraderConfig": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "rubric": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GraderConfig"
+      },
+      "GraderKindInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "contracts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Contracts"
+          },
+          "metrics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "description",
+          "contracts",
+          "metrics"
+        ],
+        "title": "GraderKindInfo"
+      },
+      "GradersUpdate": {
+        "properties": {
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Graders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graders"
+        ],
+        "title": "GradersUpdate"
       },
       "HTTPValidationError": {
         "properties": {
@@ -16497,6 +17332,20 @@
         ],
         "title": "InstallSoftware"
       },
+      "InstructionsUpdate": {
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Instructions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instructions"
+        ],
+        "title": "InstructionsUpdate"
+      },
       "JobDetail": {
         "properties": {
           "id": {
@@ -17108,6 +17957,70 @@
         ],
         "title": "LabelCount"
       },
+      "LabelScoreInfo": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "support": {
+            "type": "integer",
+            "title": "Support"
+          },
+          "predicted": {
+            "type": "integer",
+            "title": "Predicted"
+          },
+          "correct": {
+            "type": "integer",
+            "title": "Correct"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision"
+          },
+          "recall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recall"
+          },
+          "f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "support",
+          "predicted",
+          "correct",
+          "precision",
+          "recall",
+          "f1"
+        ],
+        "title": "LabelScoreInfo"
+      },
       "LabelShiftInfo": {
         "properties": {
           "label": {
@@ -17258,6 +18171,17 @@
             "type": "number",
             "title": "Latency Ms"
           },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract"
+          },
           "prompt_tokens": {
             "type": "integer",
             "title": "Prompt Tokens",
@@ -17401,6 +18325,20 @@
             ],
             "title": "Label Column"
           },
+          "template": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
+          },
           "sql": {
             "anyOf": [
               {
@@ -17455,6 +18393,20 @@
               }
             ],
             "title": "Label Column"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
           },
           "sql": {
             "anyOf": [
@@ -17529,23 +18481,78 @@
             ],
             "title": "Base Model"
           },
-          "task": {
+          "preset": {
             "type": "string",
             "enum": [
               "classify",
-              "extract",
-              "rewrite",
-              "sql",
-              "distill",
-              "answer"
+              "custom"
             ],
-            "title": "Task",
+            "title": "Preset",
             "default": "classify"
           },
-          "sample": {
-            "type": "boolean",
-            "title": "Sample",
-            "default": false
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "graders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraderConfig"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graders"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromotionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
           }
         },
         "type": "object",
@@ -17564,9 +18571,9 @@
             "type": "string",
             "title": "Name"
           },
-          "task": {
+          "preset": {
             "type": "string",
-            "title": "Task"
+            "title": "Preset"
           },
           "base_model": {
             "type": "string",
@@ -17588,7 +18595,18 @@
             "title": "Deployed",
             "default": false
           },
-          "current_accuracy": {
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "current_score": {
             "anyOf": [
               {
                 "type": "number"
@@ -17597,7 +18615,7 @@
                 "type": "null"
               }
             ],
-            "title": "Current Accuracy"
+            "title": "Current Score"
           },
           "versions": {
             "type": "integer",
@@ -17681,23 +18699,49 @@
                 "type": "null"
               }
             ]
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "contract_number": {
+            "type": "integer",
+            "title": "Contract Number"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "title": "Graders"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionInfo"
           }
         },
         "type": "object",
         "required": [
           "slug",
           "name",
-          "task",
+          "preset",
           "base_model",
           "current_version",
-          "current_accuracy",
+          "current_score",
           "versions",
           "active_jobs",
           "source",
           "mapping",
           "snapshot",
           "models",
-          "request_bodies"
+          "request_bodies",
+          "contract",
+          "contract_number",
+          "instructions",
+          "graders",
+          "promotion"
         ],
         "title": "MinibrainDetail"
       },
@@ -17711,9 +18755,9 @@
             "type": "string",
             "title": "Name"
           },
-          "task": {
+          "preset": {
             "type": "string",
-            "title": "Task"
+            "title": "Preset"
           },
           "base_model": {
             "type": "string",
@@ -17735,7 +18779,18 @@
             "title": "Deployed",
             "default": false
           },
-          "current_accuracy": {
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "current_score": {
             "anyOf": [
               {
                 "type": "number"
@@ -17744,7 +18799,7 @@
                 "type": "null"
               }
             ],
-            "title": "Current Accuracy"
+            "title": "Current Score"
           },
           "versions": {
             "type": "integer",
@@ -17759,10 +18814,10 @@
         "required": [
           "slug",
           "name",
-          "task",
+          "preset",
           "base_model",
           "current_version",
-          "current_accuracy",
+          "current_score",
           "versions",
           "active_jobs"
         ],
@@ -18150,7 +19205,7 @@
             "title": "Stages",
             "default": []
           },
-          "accuracy": {
+          "score": {
             "anyOf": [
               {
                 "type": "number"
@@ -18159,7 +19214,18 @@
                 "type": "null"
               }
             ],
-            "title": "Accuracy"
+            "title": "Score"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
           },
           "usage": {
             "anyOf": [
@@ -18314,6 +19380,19 @@
         },
         "type": "object",
         "title": "ModelUpdate"
+      },
+      "NameSuggestion": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "NameSuggestion"
       },
       "NameTaken": {
         "type": "string",
@@ -18763,6 +19842,29 @@
         ],
         "title": "PersonInfo"
       },
+      "PlannedPresetInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "hint"
+        ],
+        "title": "PlannedPresetInfo"
+      },
       "PlaygroundFeedback": {
         "properties": {
           "rating": {
@@ -19049,6 +20151,135 @@
         ],
         "title": "PoolPrice"
       },
+      "PresetInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "classify",
+              "custom"
+            ],
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "noun": {
+            "type": "string",
+            "title": "Noun"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "contract": {
+            "type": "string",
+            "enum": [
+              "labels",
+              "choose"
+            ],
+            "title": "Contract"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Mapping"
+          },
+          "prompts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Prompts"
+          },
+          "graders": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/GraderConfig"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Graders"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionInfo"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
+          },
+          "answer_tokens": {
+            "type": "integer",
+            "title": "Answer Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "noun",
+          "hint",
+          "contract",
+          "mapping",
+          "prompts",
+          "graders",
+          "checks",
+          "promotion",
+          "view",
+          "answer_tokens"
+        ],
+        "title": "PresetInfo"
+      },
+      "PresetsResponse": {
+        "properties": {
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PresetInfo"
+            },
+            "type": "array",
+            "title": "Presets"
+          },
+          "planned": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedPresetInfo"
+            },
+            "type": "array",
+            "title": "Planned"
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderKindInfo"
+            },
+            "type": "array",
+            "title": "Graders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "presets",
+          "planned",
+          "graders"
+        ],
+        "title": "PresetsResponse"
+      },
       "PreviewResponse": {
         "properties": {
           "rows": {
@@ -19124,6 +20355,24 @@
           "label"
         ],
         "title": "PreviewRow"
+      },
+      "PromotionInfo": {
+        "properties": {
+          "thresholds": {
+            "items": {
+              "$ref": "#/components/schemas/ThresholdInfo"
+            },
+            "type": "array",
+            "title": "Thresholds"
+          },
+          "beats_live": {
+            "type": "boolean",
+            "title": "Beats Live",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "PromotionInfo"
       },
       "QualityInfo": {
         "properties": {
@@ -19215,6 +20464,132 @@
           "rows"
         ],
         "title": "QueryResponse"
+      },
+      "RecipeInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "preset": {
+            "type": "string",
+            "enum": [
+              "classify",
+              "custom"
+            ],
+            "title": "Preset"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "data": {
+            "type": "string",
+            "title": "Data"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Mapping"
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "title": "Graders"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionInfo"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "readme": {
+            "type": "string",
+            "title": "Readme"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "preset",
+          "summary",
+          "base",
+          "data",
+          "mapping",
+          "graders",
+          "promotion",
+          "readme"
+        ],
+        "title": "RecipeInfo"
+      },
+      "RecipeSample": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "dataset_name": {
+            "type": "string",
+            "title": "Dataset Name"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "dataset_name",
+          "rows",
+          "labels"
+        ],
+        "title": "RecipeSample"
       },
       "RelabelInfo": {
         "properties": {
@@ -19356,6 +20731,17 @@
               }
             ],
             "title": "Version"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract"
           },
           "key_id": {
             "anyOf": [
@@ -19769,6 +21155,17 @@
             ],
             "title": "Version"
           },
+          "contract": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract"
+          },
           "key_id": {
             "anyOf": [
               {
@@ -20027,6 +21424,40 @@
         ],
         "title": "RoleMapping"
       },
+      "RuleCheckInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "passed",
+          "detail"
+        ],
+        "title": "RuleCheckInfo"
+      },
       "S3SourceCreate": {
         "properties": {
           "connection_id": {
@@ -20087,9 +21518,9 @@
             "type": "string",
             "title": "Name"
           },
-          "task": {
+          "preset": {
             "type": "string",
-            "title": "Task"
+            "title": "Preset"
           },
           "base_model": {
             "type": "string",
@@ -20111,7 +21542,18 @@
             "title": "Deployed",
             "default": false
           },
-          "current_accuracy": {
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "current_score": {
             "anyOf": [
               {
                 "type": "number"
@@ -20120,7 +21562,7 @@
                 "type": "null"
               }
             ],
-            "title": "Current Accuracy"
+            "title": "Current Score"
           },
           "versions": {
             "type": "integer",
@@ -20205,6 +21647,27 @@
               }
             ]
           },
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "contract_number": {
+            "type": "integer",
+            "title": "Contract Number"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "title": "Graders"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionInfo"
+          },
           "base_name": {
             "type": "string",
             "title": "Base Name"
@@ -20225,10 +21688,10 @@
         "required": [
           "slug",
           "name",
-          "task",
+          "preset",
           "base_model",
           "current_version",
-          "current_accuracy",
+          "current_score",
           "versions",
           "active_jobs",
           "source",
@@ -20236,6 +21699,11 @@
           "snapshot",
           "models",
           "request_bodies",
+          "contract",
+          "contract_number",
+          "instructions",
+          "graders",
+          "promotion",
           "base_name",
           "download_bytes"
         ],
@@ -20283,6 +21751,34 @@
           "credit"
         ],
         "title": "SampleInfo"
+      },
+      "ScoreInfo": {
+        "properties": {
+          "grader": {
+            "type": "string",
+            "title": "Grader"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grader",
+          "version",
+          "metric",
+          "value"
+        ],
+        "title": "ScoreInfo"
       },
       "SessionInfo": {
         "properties": {
@@ -21212,25 +22708,49 @@
             "type": "integer",
             "title": "Examples"
           },
-          "accuracy": {
-            "type": "number",
-            "title": "Accuracy"
-          },
-          "macro_f1": {
-            "type": "number",
-            "title": "Macro F1"
-          },
           "invalid_rate": {
             "type": "number",
             "title": "Invalid Rate"
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreInfo"
+            },
+            "type": "array",
+            "title": "Scores"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/LabelScoreInfo"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "confusion": {
+            "items": {
+              "$ref": "#/components/schemas/ConfusionInfo"
+            },
+            "type": "array",
+            "title": "Confusion"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldScoreInfo"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "judge_pending": {
+            "type": "integer",
+            "title": "Judge Pending",
+            "default": 0
           }
         },
         "type": "object",
         "required": [
           "examples",
-          "accuracy",
-          "macro_f1",
-          "invalid_rate"
+          "invalid_rate",
+          "scores"
         ],
         "title": "SplitScore"
       },
@@ -21720,6 +23240,38 @@
           "completion_tokens"
         ],
         "title": "TestResponse"
+      },
+      "ThresholdInfo": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[A-Za-z_][\\w.]*$",
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              ">=",
+              "<=",
+              ">",
+              "<",
+              "=="
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "value"
+        ],
+        "title": "ThresholdInfo"
       },
       "TokenBody": {
         "properties": {
@@ -22318,6 +23870,11 @@
               }
             ],
             "title": "Snapshot Id"
+          },
+          "breaking": {
+            "type": "boolean",
+            "title": "Breaking",
+            "default": false
           }
         },
         "type": "object",
@@ -22345,11 +23902,25 @@
             "title": "Current"
           },
           "snapshot_hash": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Snapshot Hash"
           },
           "snapshot_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Snapshot Id"
           },
           "snapshot_dataset": {
@@ -22468,6 +24039,84 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "contract_number": {
+            "type": "integer",
+            "title": "Contract Number"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "shots": {
+            "type": "integer",
+            "title": "Shots",
+            "default": 0
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "title": "Graders"
+          },
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "live_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live At"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View"
           }
         },
         "type": "object",
@@ -22486,7 +24135,13 @@
           "prompt_tokens",
           "mistakes",
           "job",
-          "created_at"
+          "created_at",
+          "contract",
+          "contract_number",
+          "instructions",
+          "graders",
+          "main_metric",
+          "score"
         ],
         "title": "VersionInfo"
       },
@@ -22508,7 +24163,7 @@
             "type": "boolean",
             "title": "Live"
           },
-          "accuracy": {
+          "score": {
             "anyOf": [
               {
                 "type": "number"
@@ -22517,7 +24172,33 @@
                 "type": "null"
               }
             ],
-            "title": "Accuracy"
+            "title": "Score"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "was_live": {
+            "type": "boolean",
+            "title": "Was Live",
+            "default": false
           },
           "progress": {
             "anyOf": [
@@ -22616,7 +24297,7 @@
           "kind",
           "status",
           "live",
-          "accuracy",
+          "score",
           "progress",
           "job_id",
           "error",
@@ -22624,6 +24305,100 @@
           "created_at"
         ],
         "title": "VersionRow"
+      },
+      "VersionTest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Messages"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "VersionTest"
+      },
+      "VersionTestResult": {
+        "properties": {
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreInfo"
+            },
+            "type": "array",
+            "title": "Scores"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output",
+          "answer",
+          "valid",
+          "scores",
+          "latency_ms",
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "title": "VersionTestResult"
       },
       "WorkerBody": {
         "properties": {

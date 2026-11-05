@@ -13,13 +13,13 @@ export function ModelsEmpty() {
         mutationFn: () => unwrap(api.POST("/api/minibrains/sample")),
         onSuccess: async (created) => {
             await refresh();
-            const messages = `${created.name}: ${created.source?.rows ?? 0} messages`;
+            const rows = `${created.name}: ${created.snapshot?.rows ?? 0} sample tickets`;
             toast({
-                title: "Sample added",
+                title: "Ticket routing recipe added",
                 description:
                     created.download_bytes === null
-                        ? `${messages} on ${created.base_name}, ready to train.`
-                        : `${messages}. Downloading ${created.base_name} (${bytes(created.download_bytes)}) to train it.`,
+                        ? `${rows}. Version 0 on ${created.base_name} is being scored.`
+                        : `${rows}. Downloading ${created.base_name} (${bytes(created.download_bytes)}); version 0 is scored once it is here.`,
                 tone: "success",
             });
         },
@@ -36,7 +36,8 @@ export function ModelsEmpty() {
             <div className="flex flex-col items-center gap-1">
                 <h2 className="text-lg font-semibold">No models yet</h2>
                 <p className="text-base text-muted-foreground">
-                    Add a base model to get started, or try the sample first.
+                    Add a base model to get started, or try the Ticket routing recipe with its
+                    sample tickets.
                 </p>
             </div>
             <Button

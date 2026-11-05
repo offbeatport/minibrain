@@ -705,7 +705,7 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
 function failedLabel(entry: Entry): string {
     const { model, version } = entry;
     if (version) {
-        return version.kind === "lora" && version.accuracy === null
+        return version.kind === "lora" && version.score === null
             ? "Training failed"
             : "Scoring failed";
     }
@@ -817,7 +817,7 @@ function summary(entry: Entry): string {
 function VersionCell({ entry }: { entry: Entry }) {
     const { model, version } = entry;
     if (version) {
-        const score = version.accuracy === null ? "" : ` · ${Math.round(version.accuracy * 100)}%`;
+        const score = version.score === null ? "" : ` · ${Math.round(version.score * 100)}%`;
         return (
             <span className="tabular-nums">
                 {`v${version.number}`}

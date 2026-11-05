@@ -5,7 +5,7 @@ type FullCost = components["schemas"]["EvalCost"];
 
 export type EvalCost = Pick<FullCost, "device" | "device_seconds_per_1k" | "per_1k" | "currency">;
 
-type Side = { number: number; accuracy?: number | null; cost?: EvalCost | null };
+type Side = { number: number; score?: number | null; cost?: EvalCost | null };
 
 const NONE = "–";
 const SAME_BAND = 1.05;
@@ -105,13 +105,13 @@ function relation(base: EvalCost, mine: EvalCost, number: number): string | null
 }
 
 export function headline(base: Side, mine: Side): string | null {
-    if (base.accuracy === null || base.accuracy === undefined) {
+    if (base.score === null || base.score === undefined) {
         return null;
     }
-    if (mine.accuracy === null || mine.accuracy === undefined) {
+    if (mine.score === null || mine.score === undefined) {
         return null;
     }
-    const scores = `v${base.number} ${percent(base.accuracy)} → v${mine.number} ${percent(mine.accuracy)}`;
+    const scores = `v${base.number} ${percent(base.score)} → v${mine.number} ${percent(mine.score)}`;
     const found = base.cost && mine.cost ? relation(base.cost, mine.cost, base.number) : null;
     return found ? `${scores} at ${found}` : scores;
 }

@@ -14,15 +14,15 @@ function previousOf(version: VersionInfo, versions: VersionInfo[]): VersionInfo 
 
 export function snapshotDiffHref(before: VersionInfo, after: VersionInfo): string | null {
     const dataset = after.snapshot_dataset ?? before.snapshot_dataset;
-    if (!dataset || !before.snapshot_dataset || !after.snapshot_dataset) {
+    if (!dataset || !before.snapshot_id || !after.snapshot_id) {
         return null;
     }
     return `${itemHref({ kind: "dataset", id: dataset })}&compare=${compareParam(before.snapshot_id, after.snapshot_id)}`;
 }
 
 function AccuracyChange({ version, previous }: { version: VersionInfo; previous?: VersionInfo }) {
-    const now = version.held_out?.accuracy;
-    const then = previous?.held_out?.accuracy;
+    const now = version.score;
+    const then = previous?.main_metric === version.main_metric ? previous?.score : null;
     if (now === undefined || then === undefined || now === null || then === null) {
         return <span className="text-muted-foreground">–</span>;
     }

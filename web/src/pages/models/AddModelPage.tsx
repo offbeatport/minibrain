@@ -1,38 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import {
-    BookOpen,
-    Braces,
-    ChevronLeft,
-    Database,
-    FlaskConical,
-    type LucideIcon,
-    PenLine,
-    Tags,
-    X,
-} from "lucide-react";
-import {
-    Button,
-    Card,
-    CubePlus,
-    Field,
-    InfoTip,
-    Input,
-    Link,
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectSeparator,
-    SelectTrigger,
-    SelectValue,
-    Textarea,
-    useToast,
-} from "obp-ui";
+import { ChevronLeft, X } from "lucide-react";
+import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
-import { keys, useCatalog, useModels } from "~/api/queries";
+import { type CatalogEntry, type ModelRow, type RecipeSample, api, unwrap } from "~/api/client";
+import { keys, useCatalog, useModels, usePresets, useRecipes } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
@@ -42,6 +14,21 @@ import { AddModelSummary, Licence } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import { RecipePicker } from "./RecipePicker";
+import {
+    ClassifyFields,
+    CustomFields,
+    EMPTY_TASK,
+    PresetSelect,
+    PromotionEditor,
+    type TaskDraft,
+    contractOf,
+    defaultGraders,
+    graderConfigs,
+    metricsFor,
+    schemaProblem,
+    splitLabels,
+} from "./TaskFields";
 import {
     type BaseOption,
     type TaskKey,
@@ -52,73 +39,61 @@ import {
 } from "./baseOptions";
 import { splitTags, useModelsRefresh } from "./dialogs";
 
-const TASKS: {
-    key: TaskKey;
-    label: string;
-    noun: string;
-    hint: string;
-    ready: boolean;
-    icon: LucideIcon;
-}[] = [
-    {
-        key: "classify",
-        label: "Classify",
-        noun: "classification",
-        hint: "Text → one label",
-        ready: true,
-        icon: Tags,
-    },
-    {
-        key: "extract",
-        label: "Extract",
-        noun: "extraction",
-        hint: "Text → fields",
-        ready: false,
-        icon: Braces,
-    },
-    {
-        key: "rewrite",
-        label: "Rewrite",
-        noun: "rewriting",
-        hint: "Text → text in your style",
-        ready: false,
-        icon: PenLine,
-    },
-    {
-        key: "sql",
-        label: "Text-to-SQL",
-        noun: "text-to-SQL",
-        hint: "Question → SQL",
-        ready: false,
-        icon: Database,
-    },
-    {
-        key: "distill",
-        label: "Distill",
-        noun: "distillation",
-        hint: "Copy a larger model",
-        ready: false,
-        icon: FlaskConical,
-    },
-    {
-        key: "answer",
-        label: "Answer",
-        noun: "answering questions",
-        hint: "Questions over documents",
-        ready: false,
-        icon: BookOpen,
-    },
+type Problems = {
+    model?: string;
+    name?: string;
+    labels?: string;
+    schema?: string;
+    graders?: string;
+    rubric?: string;
+    licence?: string;
+};
+
+const PROBLEM_ORDER: (keyof Problems)[] = [
+    "model",
+    "name",
+    "labels",
+    "schema",
+    "graders",
+    "rubric",
+    "licence",
 ];
-
-type Problems = { model?: string; name?: string; licence?: string };
-
-const PROBLEM_ORDER: (keyof Problems)[] = ["model", "name", "licence"];
 
 const PROBLEM_TARGETS: Record<keyof Problems, string> = {
     model: "base-model",
     name: "create-name",
+    labels: "create-labels",
+    schema: "create-schema",
+    graders: "create-graders",
+    rubric: "create-rubric",
     licence: "create-licence",
 };
+
+const NOUNS: Record<string, string> = { classify: "Classifier", custom: "Custom" };
+
+function takenNames(rows: ModelRow[]): Set<string> {
+    return new Set(
+        rows.flatMap((row) => [
+            row.name.trim().toLowerCase(),
+            row.key.toLowerCase(),
+            slugOf(row.key),
+        ]),
+    );
+}
+
+function isTaken(name: string, taken: Set<string>): boolean {
+    return taken.has(name.trim().toLowerCase()) || taken.has(slugOf(name));
+}
+
+function nextFree(noun: string, taken: Set<string>, numbered = true): string {
+    for (let number = 1; number < 10_000; number++) {
+        const candidate = number === 1 && !numbered ? noun : `${noun} ${number}`;
+        if (!isTaken(candidate, taken)) {
+            return candidate;
+        }
+    }
+    return noun;
+}
 
 function slugOf(name: string): string {
     return name
@@ -162,37 +137,7 @@ function initialPick(params: Search): Picked | null {
 }
 
 function taskOf(value: string): TaskKey {
-    return TASKS.find((task) => task.key === value)?.key ?? "classify";
-}
-
-function taskItem(task: (typeof TASKS)[number]) {
-    const Icon = task.icon;
-    return (
-        <SelectItem key={task.key} value={task.key} disabled={!task.ready} description={task.hint}>
-            <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
-            {task.label}
-        </SelectItem>
-    );
-}
-
-function TaskSelect({ value, onChange }: { value: TaskKey; onChange: (task: TaskKey) => void }) {
-    return (
-        <Field id="create-task" label="Task">
-            <Select value={value} onValueChange={(next) => onChange(taskOf(String(next ?? "")))}>
-                <SelectTrigger id="create-task" className="w-full">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {TASKS.filter((task) => task.ready).map(taskItem)}
-                    <SelectSeparator />
-                    <SelectGroup>
-                        <SelectLabel>Coming</SelectLabel>
-                        {TASKS.filter((task) => !task.ready).map(taskItem)}
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
-        </Field>
-    );
+    return value === "custom" ? "custom" : "classify";
 }
 
 function chosenOption(
@@ -218,14 +163,23 @@ export function AddModelPage() {
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useModels();
     const catalog = useCatalog();
-    const [task, setTask] = useState<TaskKey>("classify");
+    const presets = usePresets();
+    const recipes = useRecipes();
+    const [task, setTaskKey] = useState<TaskKey>("classify");
+    const [draft, setDraft] = useState<TaskDraft>(EMPTY_TASK);
+    const [recipe, setRecipe] = useState<{
+        key: string;
+        name: string;
+        sample: RecipeSample;
+    } | null>(null);
+    const [nameEdited, setNameEdited] = useState(false);
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
     const [checked, setChecked] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
     const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "import" : "catalogue");
     const [copy, setCopy] = useState<CopySource | null>(null);
-    const [name, setName] = useState("");
+    const [typedName, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
     const [dataset, setDataset] = useState(
@@ -247,6 +201,58 @@ export function AddModelPage() {
         connection: current?.kind === "import" ? current.connection : null,
     });
     const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
+    const setTask = (next: TaskKey) => {
+        setTaskKey(next);
+        const graders = defaultGraders(presets.data, next, draft);
+        setDraft({ ...draft, graders: next === "custom" ? graders : [] });
+    };
+    const loadRecipe = useMutation({
+        mutationFn: async (key: string) => {
+            const sample = await unwrap(
+                api.POST("/api/recipes/{key}/sample", { params: { path: { key } } }),
+            );
+            return { key, sample };
+        },
+        onSuccess: async ({ key, sample }) => {
+            const found = recipes.data?.find((item) => item.key === key);
+            if (!found) {
+                return;
+            }
+            await client.invalidateQueries({ queryKey: keys.datasets });
+            setRecipe({ key, name: found.name, sample });
+            setTaskKey(taskOf(found.preset));
+            setDataset(sample.dataset);
+            setDescription(found.summary);
+            setDraft({
+                ...EMPTY_TASK,
+                instructions: found.instructions ?? "",
+                graders: found.graders.map((item) => item.name),
+                promotion: found.promotion,
+            });
+            setName(nextFree(found.name, takenNames(rows), false));
+            setNameEdited(true);
+            if (found.base) {
+                const entry = entries.find((item) => item.id === found.base);
+                choose(
+                    entry
+                        ? { kind: "catalogue", id: entry.id, variant: "" }
+                        : { kind: "base", key: found.base },
+                );
+            }
+        },
+        onError: (error) =>
+            toast({
+                title: "The recipe was not loaded",
+                description: errorMessage(error),
+                tone: "destructive",
+            }),
+    });
+    const clearRecipe = () => {
+        setRecipe(null);
+        setDataset(params.dataset === undefined ? "" : String(params.dataset));
+        setDraft(EMPTY_TASK);
+        setNameEdited(false);
+    };
     const startFrom = useMutation({
         mutationFn: async (row: ModelRow) => {
             const path = { params: { path: { slug: row.key } } };
@@ -268,7 +274,7 @@ export function AddModelPage() {
                 .sort((a, b) => b.number - a.number);
             const trained =
                 trainedVersions.find((version) => version.current) ?? trainedVersions[0];
-            setTask(taskOf(detail.task));
+            setTask(taskOf(detail.preset));
             choose({ kind: "base", key: detail.base_model });
             setDataset(detail.dataset ?? "");
             setCopy({
@@ -316,33 +322,44 @@ export function AddModelPage() {
         }
         choose({ kind: "import", text: found.text, connection: found.connection });
     };
+    const taken = takenNames(rows);
     const suggestedName = copy
-        ? `${copy.name} copy`
-        : (option?.name ?? (current?.kind === "import" ? plan.name : undefined) ?? "");
+        ? nextFree(`${copy.name} copy`, taken, false)
+        : nextFree(NOUNS[task] ?? "Model", taken);
+    const name = nameEdited ? typedName : suggestedName;
+    const baseKey =
+        option?.kind === "local" && option.baseKey ? option.baseKey : (option?.entry?.id ?? "");
+    const labels = splitLabels(draft.labels);
+    const found = recipe?.sample.labels ?? [];
+    const graders = graderConfigs(task, draft, baseKey);
+    const metrics =
+        task === "classify"
+            ? metricsFor(presets.data, ["label_accuracy"])
+            : metricsFor(presets.data, draft.graders);
+    const bases = rows
+        .filter((row) => row.kind === "base")
+        .map((row) => ({ key: row.key, name: row.name }));
     const add = useMutation({
         mutationFn: async () => {
             const baseModel =
                 option?.kind === "local" && option.baseKey ? option.baseKey : await plan.run();
-            const created = await unwrap(
+            return unwrap(
                 api.POST("/api/minibrains", {
                     body: {
-                        name: name.trim() || suggestedName,
+                        name: name.trim(),
                         description: description.trim(),
                         tags: splitTags(tags),
                         base_model: baseModel || null,
-                        task,
+                        preset: task === "custom" ? "custom" : "classify",
+                        labels,
+                        contract: contractOf(task, draft),
+                        instructions: draft.instructions.trim() || null,
+                        graders,
+                        promotion: draft.promotion,
+                        dataset: dataset || null,
                     },
                 }),
             );
-            if (dataset) {
-                await unwrap(
-                    api.PUT("/api/minibrains/{slug}/dataset", {
-                        params: { path: { slug: created.slug } },
-                        body: { dataset },
-                    }),
-                );
-            }
-            return created;
         },
         onError: (error) => {
             toast({
@@ -359,7 +376,7 @@ export function AddModelPage() {
                     ? `${created.name}. ${need.verb === "import" ? "Importing" : "Downloading"} ${option?.name ?? "the base model"} (${bytes(need.size)}) first.`
                     : servesOnly(option)
                       ? `${created.name}. Its base serves but can't be fine-tuned.`
-                      : `${created.name} is ready to train.`,
+                      : `${created.name}: v0 is ready to try in the Playground.`,
                 tone: "success",
             });
             router.history.push(modelsHref());
@@ -367,14 +384,13 @@ export function AddModelPage() {
     });
     const baseReady =
         (option?.kind === "local" ? Boolean(option.baseKey) : plan.ready) && !diskBlocks(need);
-    const finalName = name.trim() || suggestedName;
+    const finalName = name.trim();
     const changeVariant = (variant: string) => {
         if (option?.entry) {
             setPicked({ kind: "catalogue", id: option.entry.id, variant });
             setAccepted(false);
         }
     };
-    const takenSlugs = new Set(rows.filter((row) => row.kind === "custom").map((row) => row.key));
     const licencePending =
         plan.target.kind === "catalogue" && !plan.installedKey && !plan.blocked && !accepted;
     const problems: Problems = {
@@ -388,15 +404,31 @@ export function AddModelPage() {
                     : current?.kind === "import" && !plan.ready && !licencePending
                       ? "Check the import location first."
                       : undefined,
-        name: !/[A-Za-z0-9]/.test(finalName)
-            ? "Use at least one letter or number."
-            : takenSlugs.has(slugOf(finalName))
-              ? `A model called ${finalName} already exists. Pick another name.`
-              : undefined,
+        name: !finalName
+            ? "Name the model."
+            : !/[A-Za-z0-9]/.test(finalName)
+              ? "Use at least one letter or number."
+              : isTaken(finalName, taken)
+                ? `A model called ${finalName} already exists. Pick another name.`
+                : undefined,
+        labels:
+            task === "classify" && !dataset && labels.length < 2
+                ? "Add at least two labels, or start from a recipe or a dataset."
+                : undefined,
+        schema:
+            task === "custom" && draft.answer === "json" ? schemaProblem(draft.schema) : undefined,
+        graders:
+            task === "custom" && draft.graders.length === 0
+                ? "Pick at least one grader."
+                : undefined,
+        rubric:
+            task === "custom" && draft.graders.includes("judge") && !draft.rubric.trim()
+                ? "Write the rubric the judge scores against."
+                : undefined,
         licence: licencePending ? "Accept the licence to download this model." : undefined,
     };
     const shown = checked ? problems : {};
-    const ready = baseReady && !problems.model && !problems.name && !problems.licence;
+    const ready = baseReady && PROBLEM_ORDER.every((field) => !problems[field]);
     const submit = (event: FormEvent) => {
         event.preventDefault();
         setChecked(true);
@@ -427,7 +459,7 @@ export function AddModelPage() {
             </Link>
             <PageHeader
                 title="Add model"
-                caption="Pick a base model and name it. Train it on your data later, from its page."
+                caption="Pick a task, a base model and a name. Version 0 answers at once with a prompt; train later from its page."
             />
             <form
                 onSubmit={submit}
@@ -435,7 +467,18 @@ export function AddModelPage() {
                 className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch"
             >
                 <Card className="gap-field p-panel">
-                    <TaskSelect value={task} onChange={setTask} />
+                    <RecipePicker
+                        recipes={recipes.data ?? []}
+                        chosen={recipe}
+                        loading={loadRecipe.isPending}
+                        onPick={(key) => loadRecipe.mutate(key)}
+                        onClear={clearRecipe}
+                    />
+                    <PresetSelect
+                        presets={presets.data}
+                        value={task}
+                        onChange={(next) => setTask(taskOf(next))}
+                    />
                     <div className="flex flex-col gap-3">
                         <Field id="base-model" label="Model" error={shown.model}>
                             <BasePicker
@@ -467,15 +510,45 @@ export function AddModelPage() {
                             onClearCopy={() => setCopy(null)}
                         />
                     </div>
-                    <Field id="create-name" label="Name" error={shown.name}>
+                    <Field
+                        id="create-name"
+                        label="Name"
+                        error={problems.name && (checked || nameEdited) ? problems.name : undefined}
+                    >
                         <Input
                             id="create-name"
-                            aria-invalid={Boolean(shown.name)}
+                            required
+                            aria-invalid={Boolean(problems.name && (checked || nameEdited))}
                             value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder={suggestedName || "IT ticket classifier"}
+                            onChange={(event) => {
+                                setNameEdited(true);
+                                setName(event.target.value);
+                            }}
                         />
                     </Field>
+                    {task === "classify" ? (
+                        <ClassifyFields
+                            draft={draft}
+                            onChange={setDraft}
+                            found={found}
+                            error={shown.labels}
+                        />
+                    ) : (
+                        <CustomFields
+                            draft={draft}
+                            onChange={setDraft}
+                            presets={presets.data}
+                            bases={bases}
+                            base={baseKey}
+                            problems={shown}
+                        />
+                    )}
+                    <PromotionEditor
+                        id="create-promotion"
+                        value={draft.promotion}
+                        metrics={metrics}
+                        onChange={(promotion) => setDraft({ ...draft, promotion })}
+                    />
                     <Field id="create-description" label={<Optional label="Description" />}>
                         <Textarea
                             id="create-description"
