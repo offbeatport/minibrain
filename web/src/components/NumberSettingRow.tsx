@@ -9,6 +9,7 @@ type NumberOptions = Pick<
 
 export function NumberSettingRow({
     id,
+    anchor,
     label,
     description,
     value,
@@ -18,6 +19,7 @@ export function NumberSettingRow({
     ...options
 }: NumberOptions & {
     id: string;
+    anchor?: string;
     label: ReactNode;
     description?: ReactNode;
     value: number | undefined;
@@ -38,6 +40,7 @@ export function NumberSettingRow({
         <form onSubmit={submit} noValidate>
             <SettingsRow
                 id={id}
+                anchor={anchor}
                 label={label}
                 description={description}
                 error={errorMessage(error)}

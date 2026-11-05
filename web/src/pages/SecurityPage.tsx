@@ -37,6 +37,7 @@ import { SettingsLayout } from "~/components/SettingsLayout";
 import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
 import { EncryptionSettings } from "~/pages/settings/EncryptionSettings";
+import { SECURITY, type SettingsSection, policyAnchor } from "~/pages/settings/settingsIndex";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 
@@ -45,41 +46,24 @@ const AUDIT = ["audit"] as const;
 const POLICY_CHANGES = auditHref({ action: "policy.update" });
 const INSTALL_PATH = "/settings/install";
 
-type Group = { icon: LucideIcon; title: string; names: string[]; description?: ReactNode };
+type Group = { icon: LucideIcon; section: SettingsSection; description?: ReactNode };
+
+const NESTED = new Set(["licences"]);
 
 const GROUPS: Group[] = [
-    {
-        icon: Globe,
-        title: "Network",
-        names: ["network", "allowed_hosts"],
-    },
-    {
-        icon: Box,
-        title: "Models",
-        names: ["model_sources", "licence_mode", "safetensors_only"],
-    },
-    {
-        icon: FolderLock,
-        title: "Data",
-        names: ["data_folders"],
-    },
-    {
-        icon: LogIn,
-        title: "Sign-in",
-        names: ["default_role", "session_idle_minutes", "session_hours"],
-        description: "Applies when accounts are on.",
-    },
+    { icon: Globe, section: SECURITY.network },
+    { icon: Box, section: SECURITY.models },
+    { icon: FolderLock, section: SECURITY.data },
+    { icon: LogIn, section: SECURITY.signIn, description: "Applies when accounts are on." },
     {
         icon: KeyRound,
-        title: "Request logs and API keys",
-        names: ["request_bodies", "request_bodies_locked", "log_retention_days", "key_expiry_days"],
+        section: SECURITY.requestLogs,
         description:
             "Every /v1 call's time, model, version, key, status, latency, tokens and response ID are always logged; they hold no content.",
     },
     {
         icon: ScrollText,
-        title: "Audit log export",
-        names: ["siem_protocol", "siem_host", "siem_port", "siem_ca_bundle"],
+        section: SECURITY.auditExport,
         description: (
             <>
                 {"The "}
@@ -92,14 +76,7 @@ const GROUPS: Group[] = [
     },
     {
         icon: Radar,
-        title: "OpenTelemetry export",
-        names: [
-            "otel_protocol",
-            "otel_endpoint",
-            "otel_headers",
-            "otel_service_name",
-            "otel_ca_bundle",
-        ],
+        section: SECURITY.otel,
         description: (
             <>
                 {"Prometheus scraping and JSON logs are set in minibrain.yaml; "}
@@ -111,6 +88,12 @@ const GROUPS: Group[] = [
         ),
     },
 ];
+
+function policyNames(section: SettingsSection): string[] {
+    return Object.values(section.settings).flatMap((item) =>
+        item.policy && !NESTED.has(item.policy) ? [item.policy] : [],
+    );
+}
 
 const SOURCE_LABEL: Record<string, string> = {
     "config file": "Set by config file",
@@ -216,6 +199,7 @@ function TextRow({ policy }: { policy: PolicyInfo }) {
         <form onSubmit={submit}>
             <SettingsRow
                 id={id}
+                anchor={policyAnchor(policy.name)}
                 wide
                 label={policy.label}
                 description={policy.description}
@@ -254,6 +238,7 @@ function HeadersRow({ policy }: { policy: PolicyInfo }) {
         return (
             <SettingsRow
                 id={id}
+                anchor={policyAnchor(policy.name)}
                 label={policy.label}
                 description={
                     <>
@@ -285,6 +270,7 @@ function HeadersRow({ policy }: { policy: PolicyInfo }) {
         <form onSubmit={submit}>
             <SettingsRow
                 id={id}
+                anchor={policyAnchor(policy.name)}
                 wide
                 label={policy.label}
                 description={policy.description}
@@ -322,6 +308,7 @@ function NumberRow({ policy }: { policy: PolicyInfo }) {
     return (
         <NumberSettingRow
             id={policyId(policy)}
+            anchor={policyAnchor(policy.name)}
             label={policy.label}
             description={policy.description}
             value={typeof policy.value === "number" ? policy.value : undefined}
@@ -341,6 +328,7 @@ function SwitchRow({ policy }: { policy: PolicyInfo }) {
     return (
         <SettingsRow
             id={id}
+            anchor={policyAnchor(policy.name)}
             toggle
             label={policy.label}
             description={policy.description}
@@ -363,6 +351,7 @@ function ChoiceRow({ policy }: { policy: PolicyInfo }) {
     return (
         <SettingsRow
             id={id}
+            anchor={policyAnchor(policy.name)}
             label={policy.label}
             description={policy.description}
             error={errorMessage(change.error)}
@@ -398,6 +387,7 @@ function ChoiceListRow({ policy }: { policy: PolicyInfo }) {
         );
     return (
         <SettingsRow
+            anchor={policyAnchor(policy.name)}
             label={policy.label}
             description={policy.description}
             error={errorMessage(change.error)}
@@ -422,6 +412,7 @@ function ChoiceListRow({ policy }: { policy: PolicyInfo }) {
 function LockedRow({ policy }: { policy: PolicyInfo }) {
     return (
         <SettingsRow
+            anchor={policyAnchor(policy.name)}
             label={policy.label}
             description={policy.description}
             disabled
@@ -513,13 +504,14 @@ function LicencesRow({ mode, list }: { mode: PolicyInfo; list: PolicyInfo | unde
     return (
         <SettingsRow
             id="licence-any"
+            anchor={SECURITY.models.settings.licenceMode.anchor}
             toggle
             disabled={mode.locked}
-            label="Allow any licence"
+            label={SECURITY.models.settings.licenceMode.label}
             description={
                 anyLicence
                     ? "Includes non-commercial and custom terms we have not reviewed. Check each model's licence yourself."
-                    : "Only the licences ticked below, each reviewed for commercial use."
+                    : SECURITY.models.settings.licenceMode.description
             }
             error={errorMessage(change.error ?? listChange.error)}
             control={
@@ -557,13 +549,14 @@ export function SecurityPage() {
                 {policies.data &&
                     GROUPS.map((group) => (
                         <PanelSection
-                            key={group.title}
+                            key={group.section.anchor}
                             icon={group.icon}
-                            title={group.title}
+                            anchor={group.section.anchor}
+                            title={group.section.title}
                             description={group.description}
                         >
                             <SettingsGroup>
-                                {group.names.map((name) => {
+                                {policyNames(group.section).map((name) => {
                                     const policy = byName.get(name);
                                     if (!policy) {
                                         return null;

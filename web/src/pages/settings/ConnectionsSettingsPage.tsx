@@ -34,6 +34,7 @@ import {
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { StatusText } from "~/components/models/StatusText";
+import { CONNECTIONS } from "~/pages/settings/settingsIndex";
 
 const SSL_MODES: Record<"postgres" | "mysql", string[]> = {
     postgres: ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"],
@@ -532,7 +533,8 @@ function Extensions() {
     return (
         <PanelSection
             icon={Puzzle}
-            title="DuckDB extensions"
+            anchor={CONNECTIONS.extensions.anchor}
+            title={CONNECTIONS.extensions.title}
             description="S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
         >
             <ErrorLine error={extensions.error} />
@@ -602,11 +604,14 @@ export function ConnectionsSettingsPage() {
             <PanelSections>
                 <PanelSection
                     icon={Cable}
-                    title="Buckets and databases"
+                    anchor={CONNECTIONS.connections.anchor}
+                    title={CONNECTIONS.connections.title}
                     description="Each endpoint must be allowed by the network policy. Secrets are write-only."
                     actions={
                         !formOpen && (
-                            <Button onClick={() => setEditing("new")}>Add connection</Button>
+                            <Button onClick={() => setEditing("new")}>
+                                {CONNECTIONS.connections.settings.add.label}
+                            </Button>
                         )
                     }
                     bare

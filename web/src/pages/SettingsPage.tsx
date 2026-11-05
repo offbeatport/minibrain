@@ -24,6 +24,7 @@ import { CURRENCIES } from "~/lib/cost";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { useModelsRefresh } from "./models/dialogs";
+import { GENERAL } from "./settings/settingsIndex";
 
 const SPLIT_LABELS: Record<string, string> = {
     golden: "Test set (max)",
@@ -34,11 +35,18 @@ const SPLIT_LABELS: Record<string, string> = {
 
 function Appearance() {
     return (
-        <PanelSection icon={Palette} title="Appearance">
+        <PanelSection
+            icon={Palette}
+            anchor={GENERAL.appearance.anchor}
+            title={GENERAL.appearance.title}
+        >
             <ThemeChoice />
         </PanelSection>
     );
 }
+
+const CATALOGUE = GENERAL.catalogue;
+const PRICES = GENERAL.prices;
 
 function ModelCatalogue() {
     const refresh = useModelsRefresh();
@@ -62,10 +70,11 @@ function ModelCatalogue() {
         ? `Checked for updates ${relativeTime(data.synced_at)}`
         : "Using the catalogue bundled with this release";
     return (
-        <PanelSection icon={BookMarked} title="Model catalogue">
+        <PanelSection icon={BookMarked} anchor={CATALOGUE.anchor} title={CATALOGUE.title}>
             <SettingsGroup>
                 <SettingsRow
-                    label="Catalogue updates"
+                    anchor={CATALOGUE.settings.catalogueUpdates.anchor}
+                    label={CATALOGUE.settings.catalogueUpdates.label}
                     description={`${checked}${data?.sync_job?.status === "failed" ? "; the last check failed" : ""}.`}
                     error={errorMessage(sync.error)}
                     control={
@@ -79,19 +88,20 @@ function ModelCatalogue() {
                     }
                 />
                 <SettingsRow
-                    id="daily-sync"
+                    id="daily-sync-switch"
+                    anchor={CATALOGUE.settings.dailySync.anchor}
                     toggle
                     disabled={data?.offline_forced}
-                    label="Check every day"
+                    label={CATALOGUE.settings.dailySync.label}
                     description={
                         data?.offline_forced
                             ? "Off while this install cannot reach the model hub."
-                            : "Looks for a newer catalogue once a day."
+                            : CATALOGUE.settings.dailySync.description
                     }
                     error={errorMessage(daily.error)}
                     control={
                         <Switch
-                            id="daily-sync"
+                            id="daily-sync-switch"
                             checked={dailyOn ?? settings.data?.daily_sync ?? false}
                             disabled={data?.offline_forced}
                             readOnly={daily.isPending}
@@ -132,8 +142,9 @@ function CurrencyRow({ value }: { value: string | undefined }) {
     return (
         <SettingsRow
             id="price-currency"
-            label="Currency"
-            description="Used for every price below. No exchange rates: changing it relabels the prices."
+            anchor={PRICES.settings.currency.anchor}
+            label={PRICES.settings.currency.label}
+            description={PRICES.settings.currency.description}
             error={errorMessage(save.error)}
             control={
                 <Select
@@ -200,7 +211,8 @@ function ComputePrices() {
     return (
         <PanelSection
             icon={Coins}
-            title="Compute prices"
+            anchor={PRICES.anchor}
+            title={PRICES.title}
             description="Scoring measures GPU time per request. A price per hour turns it into cost per 1,000 requests; without one, Evaluations and model cards show the time."
         >
             <ErrorLine error={prices.error} />
@@ -224,7 +236,11 @@ export function SettingsPage() {
                 <Appearance />
                 {can.admin && <ModelCatalogue />}
                 {can.admin && <ComputePrices />}
-                <PanelSection icon={GraduationCap} title="Default training recipe">
+                <PanelSection
+                    icon={GraduationCap}
+                    anchor={GENERAL.recipe.anchor}
+                    title={GENERAL.recipe.title}
+                >
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (
                             <Stat
@@ -235,7 +251,11 @@ export function SettingsPage() {
                         ))}
                     </div>
                 </PanelSection>
-                <PanelSection icon={Split} title="Dataset splits">
+                <PanelSection
+                    icon={Split}
+                    anchor={GENERAL.splits.anchor}
+                    title={GENERAL.splits.title}
+                >
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.splits ?? {}).map(([key, value]) => (
                             <Stat key={key} label={SPLIT_LABELS[key] ?? key} value={count(value)} />

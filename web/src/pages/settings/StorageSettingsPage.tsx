@@ -16,11 +16,13 @@ import type { components } from "~/api/schema";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { StatusText } from "~/components/models/StatusText";
+import { STORAGE, type Setting } from "~/pages/settings/settingsIndex";
 
 type StorageSettings = components["schemas"]["StorageSettings"];
 type StorageUpdate = components["schemas"]["StorageUpdate"];
 
-const STORAGE = ["settings", "storage"] as const;
+const STORAGE_KEY = ["settings", "storage"] as const;
+const TEXT = STORAGE.location.settings;
 
 type Draft = {
     kind: StorageUpdate["kind"];
@@ -50,7 +52,7 @@ function bodyOf(draft: Draft): StorageUpdate {
 
 function TextField({
     id,
-    label,
+    text,
     hint,
     value,
     placeholder,
@@ -59,7 +61,7 @@ function TextField({
     onChange,
 }: {
     id: string;
-    label: string;
+    text: Setting;
     hint?: string;
     value: string;
     placeholder?: string;
@@ -70,8 +72,9 @@ function TextField({
     return (
         <SettingsRow
             id={id}
+            anchor={text.anchor}
             wide
-            label={label}
+            label={text.label}
             description={hint}
             control={
                 <Input
@@ -100,7 +103,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
     const save = useMutation({
         mutationFn: () => unwrap(api.PUT("/api/settings/storage", { body: bodyOf(draft) })),
         onSuccess: async (saved) => {
-            client.setQueryData(STORAGE, saved);
+            client.setQueryData(STORAGE_KEY, saved);
             test.reset();
             await client.invalidateQueries({ queryKey: ["infrastructure"] });
         },
@@ -140,8 +143,8 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                 <SettingsGroup className="mt-0 border-t">
                     <TextField
                         id="s3-endpoint"
-                        label="Endpoint"
-                        hint="minibrain connects to this address only."
+                        text={TEXT.endpoint}
+                        hint={TEXT.endpoint.description}
                         value={draft.endpoint}
                         placeholder="https://minio.internal:9000"
                         mono
@@ -149,7 +152,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                     />
                     <TextField
                         id="s3-bucket"
-                        label="Bucket"
+                        text={TEXT.bucket}
                         value={draft.bucket}
                         placeholder="ml-artifacts"
                         mono
@@ -157,16 +160,16 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                     />
                     <TextField
                         id="s3-prefix"
-                        label="Prefix"
-                        hint="A folder inside the bucket."
+                        text={TEXT.prefix}
+                        hint={TEXT.prefix.description}
                         value={draft.prefix}
                         mono
                         onChange={(prefix) => set({ prefix })}
                     />
                     <TextField
                         id="s3-region"
-                        label="Region"
-                        hint="Leave empty unless the store asks for one."
+                        text={TEXT.region}
+                        hint={TEXT.region.description}
                         value={draft.region}
                         placeholder="us-east-1"
                         mono
@@ -174,19 +177,19 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                     />
                     <TextField
                         id="s3-access-key"
-                        label="Access key"
+                        text={TEXT.accessKey}
                         value={draft.access_key}
                         mono
                         onChange={(access_key) => set({ access_key })}
                     />
                     <TextField
                         id="s3-secret"
-                        label="Secret key"
+                        text={TEXT.secret}
                         type="password"
                         hint={
                             settings.secret_from_environment
                                 ? "Set by the MINIBRAIN_STORAGE_S3_SECRET environment variable."
-                                : "Kept on this server and never shown again."
+                                : TEXT.secret.description
                         }
                         value={draft.secret}
                         placeholder={settings.secret_set ? "Saved; leave empty to keep it" : ""}
@@ -224,7 +227,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
 
 export function StorageSettingsPage() {
     const settings = useQuery({
-        queryKey: STORAGE,
+        queryKey: STORAGE_KEY,
         queryFn: () => unwrap(api.GET("/api/settings/storage")),
     });
     return (
@@ -233,7 +236,8 @@ export function StorageSettingsPage() {
             <PanelSections>
                 <PanelSection
                     icon={HardDrive}
-                    title="Where artifacts live"
+                    anchor={STORAGE.location.anchor}
+                    title={STORAGE.location.title}
                     description="Uploads, dataset versions, adapters and logs. New ones go to the place chosen here; ones already stored stay readable where they are."
                 >
                     {settings.data && (

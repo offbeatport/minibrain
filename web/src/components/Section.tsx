@@ -35,8 +35,12 @@ export function Section({
     );
 }
 
+const FLASH =
+    "relative isolate before:pointer-events-none before:absolute before:-inset-x-2.5 before:-inset-y-1 before:-z-10 before:rounded-md before:bg-highlight before:opacity-0 before:transition-opacity before:duration-150 group-data-flash/panel:before:opacity-100 motion-reduce:before:transition-none";
+
 export function PanelSection({
     icon: Icon,
+    anchor,
     title,
     description,
     actions,
@@ -44,6 +48,7 @@ export function PanelSection({
     children,
 }: {
     icon: LucideIcon;
+    anchor?: string;
     title: string;
     description?: ReactNode;
     actions?: ReactNode;
@@ -51,8 +56,11 @@ export function PanelSection({
     children: ReactNode;
 }) {
     return (
-        <section className={cn("flex flex-col gap-2", bare && CARD_GRID)}>
-            <header className="flex flex-wrap items-end justify-between gap-3">
+        <section
+            id={anchor}
+            className={cn("group/panel flex scroll-my-24 flex-col gap-2", bare && CARD_GRID)}
+        >
+            <header className={cn("flex flex-wrap items-end justify-between gap-3", FLASH)}>
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="flex items-center gap-2 text-lg font-semibold">
                         <Icon

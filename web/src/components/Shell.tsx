@@ -12,6 +12,7 @@ import {
 } from "obp-ui/shell";
 import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
+import { SettingsSearch } from "~/components/SettingsSearch";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
 import { SECTIONS, SETTINGS_PAGES, isSettingsPath, visibleTo } from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
@@ -74,6 +75,7 @@ function SettingsNavigation({ pathname }: { pathname: string }) {
     const shown = visibleTo(usePerson()?.role);
     return (
         <>
+            <SettingsSearch />
             <NavItem
                 icon={ArrowLeft}
                 label="Back"

@@ -55,6 +55,7 @@ import {
 import { count } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { exactTime, relativeTime } from "~/lib/time";
+import { AUDIT } from "~/pages/settings/settingsIndex";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Policies = Map<string, PolicyInfo>;
@@ -494,7 +495,8 @@ function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
     const state = siem ? siemState(siem) : CHECKING;
     return (
         <SettingsRow
-            label="SIEM export"
+            anchor={AUDIT.integrity.settings.siem.anchor}
+            label={AUDIT.integrity.settings.siem.label}
             description={
                 <>
                     {siem?.target && (
@@ -520,7 +522,8 @@ function Integrity() {
     return (
         <PanelSection
             icon={ShieldCheck}
-            title="Integrity"
+            anchor={AUDIT.integrity.anchor}
+            title={AUDIT.integrity.title}
             description="Every event carries a SHA-256 hash of its fields and of the event before it, so an edit or a deletion breaks the chain."
             actions={
                 <Button
@@ -534,7 +537,8 @@ function Integrity() {
         >
             <SettingsGroup>
                 <SettingsRow
-                    label="Hash chain"
+                    anchor={AUDIT.integrity.settings.hashChain.anchor}
+                    label={AUDIT.integrity.settings.hashChain.label}
                     description={chain.data ? chainText(chain.data) : "Checking every event…"}
                     error={errorMessage(chain.error)}
                     control={<ChainBadge chain={chain.data} />}
@@ -608,11 +612,12 @@ function Retention({ policy }: { policy: PolicyInfo }) {
         </Select>
     );
     return (
-        <PanelSection icon={Timer} title="Retention">
+        <PanelSection icon={Timer} anchor={AUDIT.retention.anchor} title={AUDIT.retention.title}>
             <SettingsGroup>
                 <SettingsRow
                     id={policy.locked ? undefined : "audit-retention"}
-                    label="Keep audit events"
+                    anchor={AUDIT.retention.settings.keep.anchor}
+                    label={AUDIT.retention.settings.keep.label}
                     description={
                         days === 0
                             ? "Every event is kept. Pick a period to delete older events for good."

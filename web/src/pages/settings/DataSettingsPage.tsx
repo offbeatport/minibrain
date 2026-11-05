@@ -8,6 +8,7 @@ import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { count } from "~/lib/format";
+import { DATA, type Setting } from "~/pages/settings/settingsIndex";
 
 type NumberKey = "row_limit" | "keep_snapshots" | "min_label_rows";
 
@@ -15,38 +16,15 @@ const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 const PERCENT: Intl.NumberFormatOptions = { style: "percent", maximumFractionDigits: 0 };
 type CheckName = NonNullable<DataSettings["checks_off"]>[number];
 
-const CHECKS: { name: CheckName; label: string; description: string }[] = [
-    {
-        name: "duplicates",
-        label: "Repeated inputs",
-        description: "Rows whose input repeats an earlier one.",
-    },
-    {
-        name: "conflicts",
-        label: "Conflicting labels",
-        description: "The same input with different labels.",
-    },
-    {
-        name: "balance",
-        label: "Label balance",
-        description: "One label holding most rows, or labels with very few rows.",
-    },
-    {
-        name: "leakage",
-        label: "Train and test overlap",
-        description: "Test or held-out inputs that also appear in training.",
-    },
-    {
-        name: "length",
-        label: "Empty or long inputs",
-        description: "Inputs left empty, or longer than a training example holds (estimated).",
-    },
-    {
-        name: "personal_data",
-        label: "Personal data",
-        description:
-            "Emails, phone numbers, card numbers and IBANs, found by pattern. It can miss names and addresses.",
-    },
+const TEXT = DATA.checks.settings;
+
+const CHECKS: { name: CheckName; text: Setting }[] = [
+    { name: "duplicates", text: TEXT.duplicates },
+    { name: "conflicts", text: TEXT.conflicts },
+    { name: "balance", text: TEXT.balance },
+    { name: "leakage", text: TEXT.leakage },
+    { name: "length", text: TEXT.length },
+    { name: "personal_data", text: TEXT.personalData },
 ];
 
 function useSaveSettings() {
@@ -94,9 +72,10 @@ function MajorityShare({ value }: { value: number | undefined }) {
     const save = useSaveSettings();
     return (
         <NumberSettingRow
-            id="majority-share"
-            label="Warn when one label holds more than"
-            description="Default 90%."
+            id="majority-share-field"
+            anchor={TEXT.majorityShare.anchor}
+            label={TEXT.majorityShare.label}
+            description={TEXT.majorityShare.description}
             value={value}
             min={0.5}
             max={1}
@@ -127,7 +106,8 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
     return (
         <PanelSection
             icon={ListChecks}
-            title="Version checks"
+            anchor={DATA.checks.anchor}
+            title={DATA.checks.title}
             description="Run on every dataset version. Warnings never block training; an empty dataset or a single label stops the version from being saved."
         >
             <SettingsGroup>
@@ -135,9 +115,10 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                     <SettingsRow
                         key={check.name}
                         id={`check-${check.name}`}
+                        anchor={check.text.anchor}
                         toggle
-                        label={check.label}
-                        description={check.description}
+                        label={check.text.label}
+                        description={check.text.description}
                         error={changed === check.name ? errorMessage(save.error) : undefined}
                         control={
                             <Switch
@@ -152,9 +133,10 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                 ))}
                 <MajorityShare value={data?.majority_share} />
                 <NumberSetting
-                    id="min-label-rows"
-                    label="Warn when a label has fewer rows than"
-                    description="Default 10."
+                    id="min-label-rows-field"
+                    anchor={TEXT.minLabelRows.anchor}
+                    label={TEXT.minLabelRows.label}
+                    description={TEXT.minLabelRows.description}
                     value={data?.min_label_rows}
                     field="min_label_rows"
                     min={1}
@@ -174,13 +156,15 @@ export function DataSettingsPage() {
             <PanelSections>
                 <PanelSection
                     icon={Rows3}
-                    title="Version size"
+                    anchor={DATA.versionSize.anchor}
+                    title={DATA.versionSize.title}
                     description="Each dataset version copies the query's rows. A larger result is refused with a hint to filter or sample in the query."
                 >
                     <SettingsGroup>
                         <NumberSetting
-                            id="row-limit"
-                            label="Most rows in one version"
+                            id="row-limit-field"
+                            anchor={DATA.versionSize.settings.rowLimit.anchor}
+                            label={DATA.versionSize.settings.rowLimit.label}
                             description={`Default ${count(200_000)}.`}
                             value={data?.row_limit}
                             field="row_limit"
@@ -194,14 +178,16 @@ export function DataSettingsPage() {
                 </PanelSection>
                 <PanelSection
                     icon={Archive}
-                    title="Version retention"
+                    anchor={DATA.versionRetention.anchor}
+                    title={DATA.versionRetention.title}
                     description="Dataset versions a model version uses are always kept, and so is each dataset's latest. This sets how many versions no model uses stay per dataset."
                 >
                     <SettingsGroup>
                         <NumberSetting
-                            id="keep-snapshots"
-                            label="Keep the last unused versions per dataset"
-                            description="Default 5. Older ones are removed with their files."
+                            id="keep-snapshots-field"
+                            anchor={DATA.versionRetention.settings.keepSnapshots.anchor}
+                            label={DATA.versionRetention.settings.keepSnapshots.label}
+                            description={`Default 5. ${DATA.versionRetention.settings.keepSnapshots.description}`}
                             value={data?.keep_snapshots}
                             field="keep_snapshots"
                             min={0}

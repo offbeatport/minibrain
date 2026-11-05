@@ -53,8 +53,12 @@ import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
 import { relativeTime } from "~/lib/time";
+import { ACCOUNTS } from "~/pages/settings/settingsIndex";
 
 type RoleChoice = Role | "none";
+
+const PEOPLE = ACCOUNTS.people;
+const SIGN_IN = ACCOUNTS.signIn.settings;
 
 const ROLE_CHOICES: { value: RoleChoice; label: string; description: string }[] = [
     { value: "viewer", label: "Viewer", description: "Sees models, scores and deployments" },
@@ -464,12 +468,13 @@ function People() {
     return (
         <PanelSection
             icon={Users}
-            title="People"
+            anchor={PEOPLE.anchor}
+            title={PEOPLE.title}
             description="Everyone who can sign in. Turning someone off signs them out at once."
             actions={
                 <Button variant="outline" onClick={() => setAdding(true)}>
                     <UserPlus />
-                    Invite person
+                    {PEOPLE.settings.invite.label}
                 </Button>
             }
             bare
@@ -510,17 +515,20 @@ function SignInSources() {
     return (
         <PanelSection
             icon={KeyRound}
-            title="Sign-in and roles"
+            anchor={ACCOUNTS.signIn.anchor}
+            title={ACCOUNTS.signIn.title}
             description="Set in minibrain.yaml on the server, so they cannot be changed here."
         >
             <SettingsGroup>
                 <SettingsRow
-                    label="Passwords"
-                    description="People an admin adds here sign in with a password they choose."
+                    anchor={SIGN_IN.passwords.anchor}
+                    label={SIGN_IN.passwords.label}
+                    description={SIGN_IN.passwords.description}
                     control={<Badge variant="success">On</Badge>}
                 />
                 <SettingsRow
-                    label="Single sign-on"
+                    anchor={SIGN_IN.sso.anchor}
+                    label={SIGN_IN.sso.label}
                     description={
                         info?.oidc_issuer
                             ? `OpenID Connect with ${info.oidc_issuer}, authorization code with PKCE.`
@@ -533,7 +541,8 @@ function SignInSources() {
                     }
                 />
                 <SettingsRow
-                    label="Reverse proxy"
+                    anchor={SIGN_IN.proxy.anchor}
+                    label={SIGN_IN.proxy.label}
                     description={
                         info?.proxy_addresses.length
                             ? `Trusts user, email and groups headers from ${info.proxy_addresses.join(", ")} only.`
@@ -546,7 +555,8 @@ function SignInSources() {
                     }
                 />
                 <SettingsRow
-                    label="Role for people with no mapped group"
+                    anchor={SIGN_IN.defaultRole.anchor}
+                    label={SIGN_IN.defaultRole.label}
                     description={
                         info?.default_role_locked
                             ? "Set by auth.default_role in minibrain.yaml."

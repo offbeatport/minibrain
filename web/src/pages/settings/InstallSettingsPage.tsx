@@ -21,6 +21,7 @@ import { SettingsLayout } from "~/components/SettingsLayout";
 import { SoftwareMark } from "~/components/SoftwareMark";
 import { count } from "~/lib/format";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { INSTALL, type Setting } from "~/pages/settings/settingsIndex";
 
 type InstallInfo = components["schemas"]["InstallInfo"];
 type Network = components["schemas"]["InstallNetwork"];
@@ -34,6 +35,13 @@ const NETWORK_MODES: Record<Network["mode"], [string, string]> = {
     allowlist: ["Allowlist", "Only the allowed hosts are reached."],
     open: ["Open", "Any host the features below need can be reached."],
 };
+
+const SOFTWARE = INSTALL.software.settings;
+const LOCATIONS = INSTALL.locations.settings;
+const CATALOGUE = INSTALL.catalogue.settings;
+const COMPUTE = INSTALL.compute.settings;
+const NETWORK = INSTALL.network.settings;
+const OBSERVABILITY = INSTALL.observability.settings;
 
 const LOCK_SOURCES: Record<string, string> = {
     environment: "Set by environment",
@@ -69,25 +77,32 @@ function Path({ value, label }: { value: string; label: string }) {
 }
 
 function Row({
-    label,
+    text,
     description,
     children,
 }: {
-    label: string;
+    text: Setting;
     description?: ReactNode;
     children: ReactNode;
 }) {
-    return <SettingsRow label={label} description={description} control={children} />;
+    return (
+        <SettingsRow
+            anchor={text.anchor}
+            label={text.label}
+            description={description}
+            control={children}
+        />
+    );
 }
 
 function SoftwareRow({
-    label,
+    text,
     mark,
     fallback,
     description,
     children,
 }: {
-    label: string;
+    text: Setting;
     mark: string;
     fallback?: ReactNode;
     description?: ReactNode;
@@ -95,10 +110,11 @@ function SoftwareRow({
 }) {
     return (
         <SettingsRow
+            anchor={text.anchor}
             label={
                 <span className="flex items-center gap-2.5">
                     <SoftwareMark name={mark} fallback={fallback} />
-                    {label}
+                    {text.label}
                 </span>
             }
             description={description}
@@ -129,15 +145,16 @@ function Software({ info }: { info: InstallInfo }) {
     return (
         <PanelSection
             icon={Package}
-            title="Software"
+            anchor={INSTALL.software.anchor}
+            title={INSTALL.software.title}
             actions={<CopyButton value={versionsText(info)} label="Copy versions" />}
         >
             <SettingsGroup>
-                <SoftwareRow label="minibrain" mark="minibrain">
+                <SoftwareRow text={SOFTWARE.minibrain} mark="minibrain">
                     <Text>{software.minibrain}</Text>
                 </SoftwareRow>
                 <SoftwareRow
-                    label="Build"
+                    text={SOFTWARE.build}
                     mark="git"
                     description={
                         software.commit ? "The commit this install was built from." : undefined
@@ -152,23 +169,23 @@ function Software({ info }: { info: InstallInfo }) {
                         <Muted>Not recorded</Muted>
                     )}
                 </SoftwareRow>
-                <SoftwareRow label="Python" mark="python">
+                <SoftwareRow text={SOFTWARE.python} mark="python">
                     {version(software.python)}
                 </SoftwareRow>
-                <SoftwareRow label="DuckDB" mark="duckdb">
+                <SoftwareRow text={SOFTWARE.duckdb} mark="duckdb">
                     {version(software.duckdb)}
                 </SoftwareRow>
-                <SoftwareRow label="PyTorch" mark="pytorch">
+                <SoftwareRow text={SOFTWARE.pytorch} mark="pytorch">
                     {version(software.torch)}
                 </SoftwareRow>
-                <SoftwareRow label="Transformers" mark="transformers">
+                <SoftwareRow text={SOFTWARE.transformers} mark="transformers">
                     {version(software.transformers)}
                 </SoftwareRow>
-                <SoftwareRow label="Operating system" mark={software.system}>
+                <SoftwareRow text={SOFTWARE.os} mark={software.system}>
                     <Text>{software.system}</Text>
                 </SoftwareRow>
                 <SoftwareRow
-                    label="Architecture"
+                    text={SOFTWARE.arch}
                     mark="cpu"
                     fallback={<Cpu className="text-muted-foreground" />}
                 >
@@ -195,19 +212,23 @@ function Locations({ info }: { info: InstallInfo }) {
     const sqlite = places.database_kind === "sqlite";
     const s3 = places.storage_kind === "s3";
     return (
-        <PanelSection icon={FolderTree} title="Locations">
+        <PanelSection
+            icon={FolderTree}
+            anchor={INSTALL.locations.anchor}
+            title={INSTALL.locations.title}
+        >
             <SettingsGroup>
-                <Row label="Server">
+                <Row text={LOCATIONS.server}>
                     <Text>{places.host}</Text>
                 </Row>
                 <Row
-                    label="Home folder"
+                    text={LOCATIONS.home}
                     description="Settings, secrets, the database and model files."
                 >
                     <Path value={places.home} label="Home folder" />
                 </Row>
                 <Row
-                    label="Database"
+                    text={LOCATIONS.database}
                     description={
                         sqlite
                             ? `SQLite, ${bytes(places.database_bytes)}`
@@ -217,7 +238,7 @@ function Locations({ info }: { info: InstallInfo }) {
                     <Path value={places.database_location} label="Database location" />
                 </Row>
                 <Row
-                    label="Artifact storage"
+                    text={LOCATIONS.artifactStorage}
                     description={s3 ? "S3-compatible bucket" : "Local folder on this server"}
                 >
                     <Path
@@ -226,11 +247,11 @@ function Locations({ info }: { info: InstallInfo }) {
                     />
                 </Row>
                 {s3 && places.storage_endpoint && (
-                    <Row label="Storage endpoint">
+                    <Row text={LOCATIONS.storageEndpoint}>
                         <Path value={places.storage_endpoint} label="Storage endpoint" />
                     </Row>
                 )}
-                <Row label="Web UI" description={webDescription(places)}>
+                <Row text={LOCATIONS.web} description={webDescription(places)}>
                     <Path value={places.web_path} label="Web UI folder" />
                 </Row>
             </SettingsGroup>
@@ -246,10 +267,14 @@ function Catalogue({ info }: { info: InstallInfo }) {
     const catalogue = info.catalogue;
     const current = catalogue.snapshot ?? catalogue.bundled_snapshot;
     return (
-        <PanelSection icon={BookMarked} title="Model catalogue">
+        <PanelSection
+            icon={BookMarked}
+            anchor={INSTALL.catalogue.anchor}
+            title={INSTALL.catalogue.title}
+        >
             <SettingsGroup>
                 <Row
-                    label="Catalogue version"
+                    text={CATALOGUE.version}
                     description={
                         current === catalogue.bundled_snapshot
                             ? "The catalogue bundled with this release."
@@ -258,10 +283,13 @@ function Catalogue({ info }: { info: InstallInfo }) {
                 >
                     <Text>{snapshotText(current)}</Text>
                 </Row>
-                <Row label="Entries" description={`Model information from ${catalogue.source}.`}>
+                <Row
+                    text={CATALOGUE.entries}
+                    description={`Model information from ${catalogue.source}.`}
+                >
                     <Text>{count(catalogue.entries)}</Text>
                 </Row>
-                <Row label="Checked for updates">
+                <Row text={CATALOGUE.checked}>
                     {catalogue.synced_at ? (
                         <TimeText value={catalogue.synced_at} />
                     ) : (
@@ -269,7 +297,7 @@ function Catalogue({ info }: { info: InstallInfo }) {
                     )}
                 </Row>
                 <Row
-                    label="Model files verified"
+                    text={CATALOGUE.verified}
                     description={`Last hash check across ${count(catalogue.models)} models on this install.`}
                 >
                     {catalogue.models_verified_at ? (
@@ -301,7 +329,8 @@ function Compute({ info }: { info: InstallInfo }) {
     return (
         <PanelSection
             icon={Server}
-            title="Compute"
+            anchor={INSTALL.compute.anchor}
+            title={INSTALL.compute.title}
             actions={
                 <Button variant="outline" asChild>
                     <Link href="/infrastructure">Open Infrastructure</Link>
@@ -309,20 +338,20 @@ function Compute({ info }: { info: InstallInfo }) {
             }
         >
             <SettingsGroup>
-                <Row label="Pools">
+                <Row text={COMPUTE.pools}>
                     <Text>{count(compute.pools)}</Text>
                 </Row>
-                <Row label="Machines">
+                <Row text={COMPUTE.machines}>
                     <Text>{`${count(compute.machines_online)} of ${count(compute.machines)} online`}</Text>
                 </Row>
                 <Row
-                    label="Workers online"
+                    text={COMPUTE.workers}
                     description="Processes that run training and evaluation jobs."
                 >
                     <Text>{count(compute.workers_online)}</Text>
                 </Row>
                 <Row
-                    label="Engines online"
+                    text={COMPUTE.engines}
                     description="Model servers reporting in the last 30 seconds."
                 >
                     <Text>{count(compute.engines_online)}</Text>
@@ -339,7 +368,8 @@ function NetworkSection({ info }: { info: InstallInfo }) {
     return (
         <PanelSection
             icon={Globe}
-            title="Network"
+            anchor={INSTALL.network.anchor}
+            title={INSTALL.network.title}
             description="Where this install may connect."
             actions={
                 <Button variant="outline" asChild>
@@ -348,14 +378,14 @@ function NetworkSection({ info }: { info: InstallInfo }) {
             }
         >
             <SettingsGroup>
-                <Row label="Outbound access" description={explanation}>
+                <Row text={NETWORK.outbound} description={explanation}>
                     <div className="flex items-center gap-2">
                         {network.locked && lock && <Badge variant="neutral">{lock}</Badge>}
                         <Text>{mode}</Text>
                     </div>
                 </Row>
                 {network.mode === "allowlist" && (
-                    <Row label="Allowed hosts">
+                    <Row text={NETWORK.allowedHosts}>
                         {network.allowed_hosts.length > 0 ? (
                             <Text mono>{network.allowed_hosts.join(", ")}</Text>
                         ) : (
@@ -364,7 +394,7 @@ function NetworkSection({ info }: { info: InstallInfo }) {
                     </Row>
                 )}
                 {network.endpoints.map((endpoint) => (
-                    <Row
+                    <SettingsRow
                         key={endpoint.name}
                         label={endpoint.name}
                         description={
@@ -378,18 +408,19 @@ function NetworkSection({ info }: { info: InstallInfo }) {
                                 )}
                             </>
                         }
-                    >
-                        {endpoint.by_policy ? (
-                            <Badge variant={endpoint.allowed ? "info" : "neutral"}>
-                                {endpoint.allowed ? "Allowed" : "Blocked"}
-                            </Badge>
-                        ) : (
-                            <Text>Always used</Text>
-                        )}
-                    </Row>
+                        control={
+                            endpoint.by_policy ? (
+                                <Badge variant={endpoint.allowed ? "info" : "neutral"}>
+                                    {endpoint.allowed ? "Allowed" : "Blocked"}
+                                </Badge>
+                            ) : (
+                                <Text>Always used</Text>
+                            )
+                        }
+                    />
                 ))}
                 <Row
-                    label="Telemetry"
+                    text={NETWORK.telemetry}
                     description="No usage data, crash reports or analytics go to the minibrain developers or any third party."
                 >
                     <Text>None</Text>
@@ -414,7 +445,8 @@ function Observability({ info }: { info: InstallInfo }) {
     return (
         <PanelSection
             icon={Radar}
-            title="Observability"
+            anchor={INSTALL.observability.anchor}
+            title={INSTALL.observability.title}
             description="Metrics, traces and logs for your own monitoring."
             actions={
                 <Button variant="outline" asChild>
@@ -424,13 +456,13 @@ function Observability({ info }: { info: InstallInfo }) {
         >
             <SettingsGroup>
                 <Row
-                    label="OpenTelemetry export"
+                    text={OBSERVABILITY.otel}
                     description="Traces and metrics of /v1 requests, jobs and workers, sent only to your collector."
                 >
                     <Text>{observability.otlp ? "On" : "Off"}</Text>
                 </Row>
                 <Row
-                    label="Prometheus"
+                    text={OBSERVABILITY.prometheus}
                     description={
                         observability.metrics
                             ? scrapeAccess(observability)
@@ -440,7 +472,7 @@ function Observability({ info }: { info: InstallInfo }) {
                     <Text>{observability.metrics ? "On" : "Off"}</Text>
                 </Row>
                 <Row
-                    label="Log format"
+                    text={OBSERVABILITY.logFormat}
                     description="JSON writes one line per event to standard output. Set MINIBRAIN_LOG_FORMAT or logging.format in minibrain.yaml."
                 >
                     <Text>{observability.log_format === "json" ? "JSON" : "Text"}</Text>
@@ -467,7 +499,7 @@ export function InstallSettingsPage() {
                     </InfoTip>
                     <Button variant="outline" asChild>
                         <a href={DIAGNOSTICS} download>
-                            Download diagnostics
+                            {INSTALL.diagnostics.settings.download.label}
                         </a>
                     </Button>
                 </>

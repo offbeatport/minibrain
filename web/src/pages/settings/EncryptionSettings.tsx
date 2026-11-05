@@ -20,6 +20,7 @@ import type { components } from "~/api/schema";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { exactTime, relativeTime } from "~/lib/time";
+import { SECURITY, policyAnchor } from "~/pages/settings/settingsIndex";
 
 type EncryptionStatus = components["schemas"]["EncryptionStatus"];
 type EncryptionField = components["schemas"]["EncryptionField"];
@@ -100,9 +101,11 @@ function FieldRow({
     onChange: (value: unknown) => void;
 }) {
     const id = `encryption-${field.name.replaceAll("_", "-")}`;
+    const anchor = policyAnchor(field.name);
     if (field.locked) {
         return (
             <SettingsRow
+                anchor={anchor}
                 label={field.label}
                 description={field.description}
                 disabled
@@ -121,6 +124,7 @@ function FieldRow({
         return (
             <SettingsRow
                 id={id}
+                anchor={anchor}
                 toggle
                 label={field.label}
                 description={field.description}
@@ -138,6 +142,7 @@ function FieldRow({
         return (
             <SettingsRow
                 id={id}
+                anchor={anchor}
                 label={field.label}
                 description={field.description}
                 control={
@@ -164,6 +169,7 @@ function FieldRow({
     return (
         <SettingsRow
             id={id}
+            anchor={anchor}
             wide
             label={field.label}
             description={field.description}
@@ -427,7 +433,8 @@ export function EncryptionSettings() {
     return (
         <PanelSection
             icon={Lock}
-            title="Encryption at rest"
+            anchor={SECURITY.encryption.anchor}
+            title={SECURITY.encryption.title}
             description="Each stored file has its own data key; the master key here wraps it. Uploads, dataset versions, adapters, logs and staging copies are encrypted."
         >
             <ErrorLine error={status.error} />
