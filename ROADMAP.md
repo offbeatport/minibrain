@@ -1329,6 +1329,8 @@ Everything in the v1 scope below, after M1.
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [x] Switching the OS from dark to light with the page open left some Cobalt colours dark (`--input-background`):
+  the preset is applied with obp-ui's `applyPresetStyle`, which clears every preset property before setting a mode.
 - [ ] Quantized bases in the bucket are not refused for training up front: the check reads `config.json` from main's
   disk, which a bucket model may not have. Read it from the saved file list or the bucket instead.
 - [ ] A local engine's first start includes downloading its model, which can exceed the 600 s startup limit for very
