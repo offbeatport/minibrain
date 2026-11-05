@@ -487,74 +487,82 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                 }
               : null;
     return (
-        <div className="flex flex-col gap-4">
-            <KindCards
-                active={active}
-                onChoose={(item) => {
-                    setChosen(item.kind);
-                    setText(item.start);
-                    field.current?.focus();
-                }}
-            />
-            <div className="flex flex-col gap-label">
-                <span className="flex items-center gap-1.5">
-                    <label htmlFor="base-source" className="text-sm font-medium">
-                        Model id, link, S3 path or folder
-                    </label>
-                    <InfoTip label="Where models can come from">
-                        <SourcesHelp />
-                    </InfoTip>
-                </span>
-                <div className="relative">
-                    <KindIcon
-                        kind={active}
-                        className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                        ref={field}
-                        id="base-source"
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter" && pick) {
-                                event.preventDefault();
-                                onUse(pick);
-                            }
-                        }}
-                        placeholder={hint}
-                        className="pl-8 font-mono"
-                    />
-                </div>
-            </div>
-            {plan.target.kind === "empty" && (
-                <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Paste where the model is</span>
-                    <span>
-                        minibrain reads its files and checks them before anything is copied.
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="-m-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-1">
+                <KindCards
+                    active={active}
+                    onChoose={(item) => {
+                        setChosen(item.kind);
+                        setText(item.start);
+                        field.current?.focus();
+                    }}
+                />
+                <div className="flex flex-col gap-label">
+                    <span className="flex items-center gap-1.5">
+                        <label htmlFor="base-source" className="text-sm font-medium">
+                            Model id, link, S3 path or folder
+                        </label>
+                        <InfoTip label="Where models can come from">
+                            <SourcesHelp />
+                        </InfoTip>
                     </span>
+                    <div className="relative">
+                        <KindIcon
+                            kind={active}
+                            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                            ref={field}
+                            id="base-source"
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && pick) {
+                                    event.preventDefault();
+                                    onUse(pick);
+                                }
+                            }}
+                            placeholder={hint}
+                            className="pl-8 font-mono"
+                        />
+                    </div>
                 </div>
-            )}
-            {plan.target.kind === "catalogue" && (
-                <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm">
-                    <PublisherLogo
-                        publisher={plan.target.entry.provider}
-                        name={plan.target.entry.name}
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate font-semibold">{plan.target.entry.name}</span>
-                        <span className="truncate text-muted-foreground">
-                            {`In the catalogue · ${plan.target.entry.params_b.toFixed(1)}B parameters · ${plan.target.entry.license_name}`}
+                {plan.target.kind === "empty" && (
+                    <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                            Paste where the model is
                         </span>
-                    </span>
-                    <StatusText tone="success">Tested revision</StatusText>
-                </div>
-            )}
-            {plan.target.kind === "hub" && <HubResult repo={plan.target.repo} />}
-            {text.trim().startsWith("s3://") && (
-                <ConnectionChoice value={connection} found={plan.found} onChange={setConnection} />
-            )}
-            <PathResult plan={plan} />
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                        <span>
+                            minibrain reads its files and checks them before anything is copied.
+                        </span>
+                    </div>
+                )}
+                {plan.target.kind === "catalogue" && (
+                    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm">
+                        <PublisherLogo
+                            publisher={plan.target.entry.provider}
+                            name={plan.target.entry.name}
+                        />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate font-semibold">{plan.target.entry.name}</span>
+                            <span className="truncate text-muted-foreground">
+                                {`In the catalogue · ${plan.target.entry.params_b.toFixed(1)}B parameters · ${plan.target.entry.license_name}`}
+                            </span>
+                        </span>
+                        <StatusText tone="success">Tested revision</StatusText>
+                    </div>
+                )}
+                {plan.target.kind === "hub" && <HubResult repo={plan.target.repo} />}
+                {text.trim().startsWith("s3://") && (
+                    <ConnectionChoice
+                        value={connection}
+                        found={plan.found}
+                        onChange={setConnection}
+                    />
+                )}
+                <PathResult plan={plan} />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                 <span className="text-sm text-muted-foreground">
                     {plan.target.kind === "catalogue"
                         ? "Downloads into this install; every file gets a SHA-256."
