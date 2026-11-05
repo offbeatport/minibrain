@@ -1344,6 +1344,9 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [ ] Delete the job format version check that turns away older workers; there are no older workers.
 - [ ] Delete inline secrets in `policy.otel_headers` and `auth.oidc.client_secret`; they become env or file references
   like every other secret.
+- [ ] Rename after the task engine lands: `Minibrain` and the `minibrains` table become `Model` and `models` (a
+  model you own), today's `Model` becomes `BaseModel` and `base_models`, `/api/minibrains/{slug}/…` becomes
+  `/api/models/{slug}/…` and `/api/models/base/{key}` becomes `/api/base-models/{key}`; the UI already says model.
 
 ## Risks to verify early
 
