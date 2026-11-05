@@ -1,18 +1,18 @@
 import { Boxes, ChevronDown, HardDrive, type LucideIcon, MemoryStick } from "lucide-react";
 import {
     Badge,
-    Checkbox,
-    CheckboxSelect,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    InfoTip,
-    Label,
+    FilterMenu,
     TabbedSearchList,
     type TabbedSearchListGroup,
     type TabbedSearchListTab,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { useState } from "react";
 import type { CatalogResponse, ModelRow } from "~/api/client";
@@ -63,13 +63,28 @@ function Availability({ option }: { option: BaseOption }) {
     return state ? <Badge variant={state.variant}>{state.text}</Badge> : null;
 }
 
-function Amount({ icon: Icon, label, bytes }: { icon: LucideIcon; label: string; bytes: number }) {
+function Amount({
+    icon: Icon,
+    label,
+    help,
+    bytes,
+}: {
+    icon: LucideIcon;
+    label: string;
+    help: string;
+    bytes: number;
+}) {
     return (
-        <span className="flex items-center gap-1">
-            <Icon aria-hidden="true" className="size-4 shrink-0" />
-            <span className="sr-only">{`${label}: `}</span>
-            {`${gigabytes(bytes)} GB`}
-        </span>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 rounded-sm">
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    <span className="sr-only">{`${label}: `}</span>
+                    {`${gigabytes(bytes)} GB`}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{help}</TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -81,11 +96,23 @@ function Resources({ option }: { option: BaseOption }) {
     }
     return (
         <span className="flex items-center gap-3 text-muted-foreground tabular-nums">
-            {memory ? <Amount icon={MemoryStick} label="Memory needed" bytes={memory} /> : null}
+            {memory ? (
+                <Amount
+                    icon={MemoryStick}
+                    label="Memory needed"
+                    help="Memory needed: GPU or unified memory it takes to run"
+                    bytes={memory}
+                />
+            ) : null}
             {disk ? (
                 <Amount
                     icon={HardDrive}
                     label={installState(option) ? "On disk" : "Download"}
+                    help={
+                        installState(option)
+                            ? "On disk: space its files take on this install"
+                            : "Download: disk space it takes once added"
+                    }
                     bytes={disk}
                 />
             ) : null}
@@ -275,43 +302,49 @@ export function BasePicker({
         {
             value: "catalogue",
             label: "Catalogue",
-            toolbar: (
-                <div className="flex flex-wrap items-center gap-2">
-                    <CheckboxSelect
-                        label="Size"
-                        allLabel="Any size"
-                        noun="sizes"
-                        options={TIERS.map((tier) => ({
-                            ...tier,
-                            count: count((option) => option.entry?.tier === tier.value),
-                        }))}
-                        value={tiers}
-                        onValueChange={setTiers}
-                        className="w-40"
-                    />
-                    <CheckboxSelect
-                        label="Licence use"
-                        allLabel="Any licence"
-                        noun="licence uses"
-                        options={USE_FILTERS.map((item) => ({
-                            ...item,
-                            count: count((option) => option.licence === item.value),
-                        }))}
-                        value={uses}
-                        onValueChange={setUses}
-                        className="w-48"
-                    />
-                    <span className="ml-auto flex items-center gap-1.5">
-                        <Label className="flex items-center gap-2 font-normal">
-                            <Checkbox
-                                checked={runsHere}
-                                onCheckedChange={(checked) => setRunsHere(checked === true)}
-                            />
-                            Runs here
-                        </Label>
-                        <InfoTip label="What runs here means">{RUNS_HERE_INFO}</InfoTip>
-                    </span>
-                </div>
+            actions: (
+                <FilterMenu
+                    sections={[
+                        {
+                            kind: "options",
+                            key: "size",
+                            title: "Size",
+                            options: TIERS.map((tier) => ({
+                                ...tier,
+                                count: count((option) => option.entry?.tier === tier.value),
+                            })),
+                            value: tiers,
+                            onValueChange: setTiers,
+                        },
+                        {
+                            kind: "options",
+                            key: "licence",
+                            title: "Licence use",
+                            options: USE_FILTERS.map((item) => ({
+                                ...item,
+                                count: count((option) => option.licence === item.value),
+                            })),
+                            value: uses,
+                            onValueChange: setUses,
+                        },
+                        {
+                            kind: "toggle",
+                            key: "runs-here",
+                            title: "Compute",
+                            label: "Runs here",
+                            info: RUNS_HERE_INFO,
+                            count: count((option) => runsSomewhere(option.entry)),
+                            checked: runsHere,
+                            onCheckedChange: setRunsHere,
+                        },
+                    ]}
+                    summary={`${catalogue.length} of ${everything.length} models`}
+                    onClear={() => {
+                        setTiers([]);
+                        setUses([]);
+                        setRunsHere(false);
+                    }}
+                />
             ),
             groups: [
                 {
