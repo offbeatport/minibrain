@@ -1,3 +1,4 @@
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,8 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from minibrain import storage
+from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS, QWEN_STOP_TOKENS, BaseModelSpec
 from minibrain.connections.imports import check_connection_policy, pick_connection
+from minibrain.encryption.envelope import EnvelopeError
 from minibrain.jobs.queue import enqueue
 from minibrain.ml.context import FinalError
 from minibrain.models import hub
@@ -39,6 +42,7 @@ from minibrain.storage import missing_room, staging_room
 ACTIVE_STATUSES = (ModelStatus.DOWNLOADING, ModelStatus.IMPORTING)
 MAIN_DISK = "Main server disk"
 COPY_REASON = "copy"
+CONFIG_FILE = "config.json"
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
 
 
@@ -108,6 +112,36 @@ def resolve_spec(session: Session, settings: Settings, key: str) -> BaseModelSpe
     if builtin is None:
         raise NotFoundError(f"base model {key} is not available on this install")
     return builtin
+
+
+def config_bytes(settings: Settings, model: Model) -> bytes | None:
+    if model.store != BUCKET:
+        local = model_folder(settings, model) / CONFIG_FILE
+        return local.read_bytes() if local.is_file() else None
+    entry = next((entry for entry in model.files if entry.get("path") == CONFIG_FILE and entry.get("sha256")), None)
+    if entry is None:
+        return None
+    with store_for(settings).open(str(entry["sha256"])) as stream:
+        return stream.read()
+
+
+def base_config(settings: Settings, model: Model) -> dict[str, Any] | None:
+    try:
+        raw = config_bytes(settings, model)
+        found = json.loads(raw) if raw is not None else None
+    except (OSError, ValueError, ArtifactError, EnvelopeError):
+        return None
+    return found if isinstance(found, dict) else None
+
+
+def quantization(session: Session, settings: Settings, key: str) -> str | None:
+    if resolve_spec(session, settings, key).format == "gguf":
+        return "gguf"
+    model = session.get(Model, key)
+    config = base_config(settings, model) if model is not None else None
+    found = config.get("quantization_config") if config else None
+    method = found.get("quant_method") if isinstance(found, dict) else None
+    return str(method) if method else None
 
 
 def model_id_for(variant: CatalogVariant) -> str:

@@ -1337,8 +1337,8 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   the preset is applied with obp-ui's `applyPresetStyle`, which clears every preset property before setting a mode.
 - [x] Training on a Mac used the CPU: training now picks CUDA (or ROCm), Intel XPU, the Apple GPU, then CPU, in bf16 or
   fp16 where the GPU has it and fp32 on MPS, with the MPS fallback in Platforms.
-- [ ] Quantized bases in the bucket are not refused for training up front: the check reads `config.json` from main's
-  disk, which a bucket model may not have. Read it from the saved file list or the bucket instead.
+- [x] Quantized bases in the bucket were not refused for training up front: the check read `config.json` from main's
+  disk, which a bucket model may not have. It reads it through the store from the saved file list.
 - [ ] A local engine's first start includes downloading its model, which can exceed the 600 s startup limit for very
   large models. Fetch the working copy as its own step before the engine starts, with progress.
 - [ ] Key rotation re-uploads every bucket object whole, which is slow for large weights. Re-wrap only the key header,

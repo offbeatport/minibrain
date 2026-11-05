@@ -19,7 +19,7 @@ from minibrain.gateway.routes import response_id, run
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.models.health import base_changed
-from minibrain.models.registry import base_hash, base_readiness, require_usable, resolve_spec
+from minibrain.models.registry import base_hash, base_readiness, quantization, require_usable
 from minibrain.models.usage import touch
 from minibrain.registry.models import ACTIVE_JOB_STATUSES, AuditEvent, JobKind, Minibrain, Model, VersionKind
 from minibrain.registry.prices import load_prices
@@ -66,10 +66,10 @@ def add_version(slug: str, body: VersionCreate, session: SessionDep, settings: S
     if readiness == "missing":
         raise ConflictError(f"{minibrain.base_model} is no longer on this install")
     require_usable(session, settings, minibrain.base_model)
-    quantization = resolve_spec(session, settings, minibrain.base_model).quantization()
-    if kind == VersionKind.LORA and quantization:
+    quantized = quantization(session, settings, minibrain.base_model)
+    if kind == VersionKind.LORA and quantized:
         raise ConflictError(
-            f"{minibrain.base_model} has {quantization.upper()} weights, which can be served but not fine-tuned; "
+            f"{minibrain.base_model} has {quantized.upper()} weights, which can be served but not fine-tuned; "
             "train on its full-precision format"
         )
     recipe = {key: value for key, value in (("max_rows", body.max_rows), ("epochs", body.epochs)) if value is not None}

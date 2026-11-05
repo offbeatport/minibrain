@@ -201,3 +201,22 @@ def test_an_import_goes_to_the_bucket_and_main_needs_room_for_one_file(
     monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=0, total=GIB))
     short = harness.client.post("/api/catalog/tiny/download", json={"variant": "tiny:bf16", "accept_license": True})
     assert short.status_code == 409 and "pass the largest file to the bucket" in short.json()["detail"]
+
+
+@pytest.mark.parametrize("store_kind", [BUCKET])
+@pytest.mark.usefixtures("hub")
+def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness: Harness, tmp_path: Path) -> None:
+    folder = tmp_path / "corp-fp8"
+    folder.mkdir()
+    for name, data in FILES.items():
+        (folder / name).write_bytes(data)
+    config = {"architectures": ["Qwen3ForCausalLM"], "quantization_config": {"quant_method": "fp8"}}
+    (folder / "config.json").write_text(json.dumps(config))
+    base = harness.client.post("/api/models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
+    assert harness.worker(kinds=["import"]).run_once()
+    imported = harness.client.get(f"/api/models/base/{base['key']}").json()
+    assert imported["store"] == "s3" and not Path(imported["storage_path"]).exists()
+    assert harness.client.post("/api/minibrains", json={"name": "On FP8", "base_model": base["key"]}).status_code == 201
+    trained = harness.client.post("/api/minibrains/on-fp8/versions", json={"kind": "lora"})
+    assert trained.status_code == 409
+    assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]

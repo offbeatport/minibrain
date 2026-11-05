@@ -1,4 +1,3 @@
-import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,19 +22,6 @@ class BaseModelSpec:
         if self.path and (Path(self.path) / "config.json").is_file():
             return self.path, None
         return self.repo, self.revision
-
-    def quantization(self) -> str | None:
-        if self.format == "gguf":
-            return "gguf"
-        if not self.path:
-            return None
-        try:
-            config = json.loads((Path(self.path) / "config.json").read_text())
-        except (OSError, ValueError):
-            return None
-        settings = config.get("quantization_config") if isinstance(config, dict) else None
-        method = settings.get("quant_method") if isinstance(settings, dict) else None
-        return str(method) if method else None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"stop_tokens": list(self.stop_tokens)}
