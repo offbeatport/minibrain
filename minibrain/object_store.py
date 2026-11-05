@@ -173,6 +173,9 @@ class BucketBlobs:
     def head(self, artifact_id: str) -> bytes:
         return bytes(self.fs.cat_file(self.key(artifact_id), start=0, end=HEADER))
 
+    def sign(self, artifact_id: str, seconds: int) -> str:
+        return str(self.fs.sign(self.key(artifact_id), expiration=seconds))
+
 
 def bucket_for(config: StorageConfig, secret: str) -> BucketBlobs | None:
     if not config.endpoint or not config.bucket or not config.access_key or not secret:

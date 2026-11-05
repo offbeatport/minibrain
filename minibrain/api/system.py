@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, make_url, select
+from sqlalchemy import ColumnElement, func, make_url, select
 from sqlalchemy.orm import Session
 
 from minibrain import provision
@@ -14,6 +14,7 @@ from minibrain.api.schemas import (
     InfrastructureInfo,
     InstallSettings,
     LoadedModel,
+    ModelCopies,
     SnapshotUsage,
     StorageCheck,
     StorageSettings,
@@ -25,8 +26,10 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.data.limits import load_limits
 from minibrain.data.snapshot import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
+from minibrain.models.bucket import WEIGHTS, writes_bucket
+from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
-from minibrain.models.registry import models_dir
+from minibrain.models.registry import copy_to_bucket, models_dir, models_on_main
 from minibrain.object_store import CREDENTIAL_ENV, S3, StorageConfig, StorageError, load_config, read_secret
 from minibrain.object_store import apply as apply_storage
 from minibrain.object_store import check as check_storage
@@ -35,7 +38,7 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, Job, Model, ModelStatus, Snapshot, Version
+from minibrain.registry.models import Artifact, AuditEvent, Job, Model, ModelStatus, Snapshot, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -140,8 +143,28 @@ def secret_reference(found: provision.Provided) -> str | None:
     return f"the environment variable {where}" if kind == "env" else f"the file {where}"
 
 
+def model_store(session: Session, settings: Settings, store: ArtifactStore) -> StoreInfo:
+    if not writes_bucket(store) or store.remote is None:
+        used = session.scalar(select(func.sum(Model.size_bytes)).where(*on_main()))
+        return folder_store("Model files", models_dir(settings), int(used or 0))
+    used = session.scalar(select(func.sum(Model.size_bytes)).where(*available(), Model.store == BUCKET))
+    location = store.remote.describe()
+    return StoreInfo(
+        name="Model files", kind="s3", location=location, used_bytes=int(used or 0), free_bytes=None, total_bytes=None
+    )
+
+
+def available() -> tuple[ColumnElement[bool], ...]:
+    return (Model.status == ModelStatus.AVAILABLE,)
+
+
+def on_main() -> tuple[ColumnElement[bool], ...]:
+    return (*available(), Model.store != BUCKET)
+
+
 def storage_settings(session: Session, settings: Settings, store: ArtifactStore) -> StorageSettings:
     config = load_config(session)
+    local = models_on_main(session) if writes_bucket(store) else []
     found = provision.provided("storage")
     return StorageSettings(
         kind="s3" if config.kind == S3 else "local",
@@ -155,6 +178,8 @@ def storage_settings(session: Session, settings: Settings, store: ArtifactStore)
         secret_reference=secret_reference(found),
         locked=found.locked_by(),
         location=store.remote.describe() if store.writes_remote and store.remote else str(settings.artifacts_dir()),
+        models_on_main=len(local),
+        models_on_main_bytes=sum(model.size_bytes for model in local),
     )
 
 
@@ -196,13 +221,25 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
 
 
+@router.post("/settings/storage/copy-models", dependencies=[Depends(admin)])
+def copy_models(session: SessionDep, settings: SettingsDep) -> ModelCopies:
+    started, skipped = copy_to_bucket(session, settings)
+    if started:
+        names = [model.id for model in started]
+        session.add(
+            AuditEvent(actor=current_actor(), action="storage.copy_models", target="storage", detail={"models": names})
+        )
+    session.commit()
+    return ModelCopies(started=[model.name for model in started], skipped=skipped)
+
+
 @router.get("/system/infrastructure", dependencies=[Depends(viewer)])
 def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
     database = database_store(settings)
-    weights = session.scalar(select(func.sum(Model.size_bytes)).where(Model.status == ModelStatus.AVAILABLE))
-    artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind != ArtifactKind.SNAPSHOT))
+    kept = (ArtifactKind.SNAPSHOT, WEIGHTS)
+    artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind.not_in(kept)))
     usage = snapshot_usage(session)
     return InfrastructureInfo(
         setup=setup_of(session, node, database),
@@ -211,7 +248,7 @@ def infrastructure(
         web=str(settings.web_dist),
         stores=[
             database,
-            folder_store("Model files", models_dir(settings), int(weights or 0)),
+            model_store(session, settings, store),
             artifact_store("Dataset versions", settings, store, usage.size),
             artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
         ],

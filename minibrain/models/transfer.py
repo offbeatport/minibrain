@@ -2,19 +2,23 @@ import errno
 import hashlib
 import json
 import os
+import shutil
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from minibrain.ml.context import FinalError, report
+from minibrain.ml.context import FinalError, JobSpec, report
 from minibrain.models import hub
+from minibrain.models.copies import BUCKET, MANIFEST
 from minibrain.models.files import Progress, file_chunks, sha256_of, valid
 from minibrain.models.health import NEEDS_ACCESS, NO_SPACE, OFFLINE, SOURCE_GONE, content_hash
 from minibrain.models.sources import FileSource, HubAccessError, HubGoneError, HubSource, StorageSource
-from minibrain.storage import RESERVE_BYTES, disk_space, size_text
+from minibrain.storage import RESERVE_BYTES, disk_space, size_text, staging_need
 
-MANIFEST = "minibrain-model.json"
+PUBLISH_POLL_SECONDS = 0.1
 
 Fail = Callable[[str], Exception]
 Ready = Callable[[list[dict[str, Any]]], None]
@@ -34,13 +38,63 @@ def partial_size(target: Path, size: int) -> int:
     return found if found < size else 0
 
 
-def check_room(out: Path, pending: list[dict[str, Any]]) -> None:
-    needed = sum(int(entry["size"]) - partial_size(out / entry["path"], int(entry["size"])) for entry in pending)
+@dataclass(frozen=True)
+class Target:
+    out: Path
+    bucket: bool = False
+    stored: dict[str, str] = field(default_factory=dict)
+    seed: Path | None = None
+
+    @staticmethod
+    def of(spec: JobSpec) -> "Target":
+        seed = spec.optional_path("seed")
+        stored = {str(entry["path"]): str(entry["sha256"]) for entry in spec.raw.get("stored") or []}
+        return Target(out=spec.path("out"), bucket=spec.raw.get("store") == BUCKET, stored=stored, seed=seed)
+
+    def in_bucket(self, entry: dict[str, Any]) -> bool:
+        return self.bucket and bool(entry.get("sha256")) and self.stored.get(str(entry["path"])) == entry["sha256"]
+
+    def publish(self, entry: dict[str, Any]) -> None:
+        if not self.bucket:
+            return
+        target = self.out / str(entry["path"])
+        print(json.dumps({"staged": entry["path"], "sha256": entry["sha256"], "size": entry["size"]}), flush=True)
+        while target.exists():
+            time.sleep(PUBLISH_POLL_SECONDS)
+
+    def seeded(self, entry: dict[str, Any]) -> bool:
+        if self.seed is None:
+            return False
+        source = self.seed / str(entry["path"])
+        if not valid(source, entry):
+            return False
+        target = self.out / str(entry["path"])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.unlink(missing_ok=True)
+        try:
+            os.link(source, target)
+        except OSError:
+            shutil.copyfile(source, target)
+        return True
+
+    def finish(self, record: dict[str, Any]) -> None:
+        if self.bucket:
+            shutil.rmtree(self.out, ignore_errors=True)
+        else:
+            write_manifest(self.out, record)
+
+
+def check_room(out: Path, pending: list[dict[str, Any]], bucket: bool = False) -> None:
+    if bucket:
+        needed = staging_need(pending)
+    else:
+        needed = sum(int(entry["size"]) - partial_size(out / entry["path"], int(entry["size"])) for entry in pending)
     space = disk_space(out)
     if space is None or needed == 0 or needed + RESERVE_BYTES <= space.free:
         return
+    where = "on main's disk to pass each file to the bucket" if bucket else "on the disk that holds models"
     raise FinalError(
-        f"Needs {size_text(needed)}; {size_text(space.free)} free on the disk that holds models ({out}). "
+        f"Needs {size_text(needed)}; {size_text(space.free)} free {where} ({out}). "
         "Free up space, then resume; files already written are kept.",
         NO_SPACE,
     )
@@ -91,27 +145,35 @@ def accept(entry: dict[str, Any], target: Path, digest: str, fail: Fail) -> None
 
 
 def install(
-    source: FileSource, files: list[dict[str, Any]], out: Path, verb: str, fail: Fail, ready: Ready
+    source: FileSource, files: list[dict[str, Any]], target: Target, verb: str, fail: Fail, ready: Ready
 ) -> tuple[list[dict[str, Any]], list[str]]:
+    out = target.out
     out.mkdir(parents=True, exist_ok=True)
     progress = Progress(sum(int(entry["size"]) for entry in files), verb)
     report(0.0, step="checking existing files")
     recorded: list[dict[str, Any]] = []
     pending: list[dict[str, Any]] = []
     for entry in files:
-        target = out / entry["path"]
-        if valid(target, entry):
+        local = out / entry["path"]
+        if target.in_bucket(entry):
             progress.add(int(entry["size"]), entry["path"])
-            recorded.append(entry | {"sha256": entry.get("sha256") or sha256_of(target)})
+            recorded.append(entry)
+        elif valid(local, entry) or target.seeded(entry):
+            progress.add(int(entry["size"]), entry["path"])
+            found = entry | {"sha256": entry.get("sha256") or sha256_of(local)}
+            target.publish(found)
+            recorded.append(found)
         else:
             pending.append(entry)
     if pending:
         ready(pending)
-        check_room(out, pending)
+        check_room(out, pending, target.bucket)
     for entry in pending:
         digest = fetch(source, entry, out, progress)
         accept(entry, out / entry["path"], digest, fail)
-        recorded.append(entry | {"sha256": digest})
+        found = entry | {"sha256": digest}
+        target.publish(found)
+        recorded.append(found)
     return sorted(recorded, key=lambda item: item["path"]), [entry["path"] for entry in pending]
 
 

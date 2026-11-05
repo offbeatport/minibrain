@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.schemas import Health, HealthAction, HealthActionKind
 from minibrain.models import hub
+from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import NodeReport
 from minibrain.models.health import (
     CANT_RUN,
@@ -16,9 +17,8 @@ from minibrain.models.health import (
     base_changed,
     file_states,
     missing_message,
-    size_problems,
 )
-from minibrain.models.registry import TRANSFER_KINDS, gguf_file, model_folder
+from minibrain.models.registry import TRANSFER_KINDS, gguf_file, missing_files, model_folder
 from minibrain.models.sources import FOLDER, HUB, S3
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import pools
@@ -82,7 +82,7 @@ def repairable(model: Model, context: HealthContext) -> bool:
 
 
 def complete_files(model: Model, context: HealthContext) -> int:
-    problems = size_problems(model_folder(context.settings, model), model.files)
+    problems = missing_files(context.settings, model)
     return len(model.files) - len(problems)
 
 
@@ -152,7 +152,12 @@ def corrupt(model: Model, context: HealthContext) -> Health:
 
 
 def missing(model: Model, problems: dict[str, str], context: HealthContext) -> Health:
-    folder = model_folder(context.settings, model)
+    folder = "the bucket" if model.store == BUCKET else model_folder(context.settings, model)
+    if model.store == BUCKET:
+        fix = "Repair downloads them again, or re-import them from a folder or S3 path."
+        actions = [act("repair") if repairable(model, context) else act("reimport"), act("remove")]
+        detail = f"{missing_message(problems)} in {folder}. {fix}"
+        return Health(state="missing", label="Missing files", detail=detail, actions=actions, files=sorted(problems))
     if repairable(model, context):
         fix = "Repair downloads them again, or point to the folder they moved to."
         actions = [act("repair"), act("relocate"), act("remove")]
@@ -257,7 +262,7 @@ def base_health(model: Model, job: Job | None, context: HealthContext) -> Health
         return corrupt(model, context)
     if model.health in (CANT_RUN, NO_MEMORY):
         return load_failure(model, context)
-    problems = size_problems(model_folder(context.settings, model), model.files)
+    problems = missing_files(context.settings, model)
     if problems:
         return missing(model, problems, context)
     return capability(model, context)

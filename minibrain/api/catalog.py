@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain import provision, storage
+from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.model_rows import base_availability, model_job
@@ -30,9 +30,10 @@ from minibrain.jobs.queue import enqueue
 from minibrain.leader import Leader
 from minibrain.models import hub
 from minibrain.models.catalog import DAILY_SYNC_KEY, catalog_url, daily_sync, sync_params, upsert
+from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, Hardware, NodeReport, pool_fit
 from minibrain.models.hubadd import HubAddError, lookup, parse_repo
-from minibrain.models.registry import models_dir, start_download
+from minibrain.models.registry import start_download, weights_space
 from minibrain.models.rules import licence_use
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import Pool, find_pool, pools
@@ -156,7 +157,7 @@ def catalogue(
     entries = session.scalars(select(CatalogModel).order_by(CatalogModel.position))
     synced = [entry.synced_at for entry in session.scalars(select(CatalogModel)) if entry.synced_at is not None]
     sync = latest_sync(session)
-    space = storage.disk_space(models_dir(settings))
+    space = weights_space(session, settings)
     return CatalogResponse(
         entries=[entry_info(session, settings, entry, machines) for entry in entries],
         hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
@@ -166,8 +167,11 @@ def catalogue(
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),
         hub_add_allowed=policy["model_sources"] == "any",
         downloads_allowed=policy["model_sources"] != "imports",
-        store_free_bytes=space.free if space else None,
-        store_total_bytes=space.total if space else None,
+        store_free_bytes=space.free,
+        store_total_bytes=space.total,
+        store_kind="s3" if space.kind == BUCKET else "folder",
+        store_label=space.label,
+        staging_free_bytes=space.staging_free,
         endpoint=hub.endpoint(),
         token_configured=hub.token() is not None,
         synced_at=max(synced, default=None),

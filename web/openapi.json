@@ -7080,6 +7080,27 @@
         }
       }
     },
+    "/api/settings/storage/copy-models": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Copy Models",
+        "operationId": "copy_models_api_settings_storage_copy_models_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCopies"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/infrastructure": {
       "get": {
         "tags": [
@@ -7594,6 +7615,16 @@
             }
           },
           {
+            "name": "x-artifact-replace",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "X-Artifact-Replace"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -7641,6 +7672,212 @@
             "schema": {
               "type": "string",
               "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/worker/models/{model_id}/stored": {
+      "get": {
+        "tags": [
+          "worker"
+        ],
+        "summary": "Stored",
+        "operationId": "stored_internal_worker_models__model_id__stored_get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredFiles"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/worker/bases": {
+      "get": {
+        "tags": [
+          "worker"
+        ],
+        "summary": "Bases",
+        "operationId": "bases_internal_worker_bases_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveBases"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/worker/bases/{key}": {
+      "get": {
+        "tags": [
+          "worker"
+        ],
+        "summary": "Base Weights",
+        "operationId": "base_weights_internal_worker_bases__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseWeights"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/worker/bases/{key}/files/{path}": {
+      "get": {
+        "tags": [
+          "worker"
+        ],
+        "summary": "Base File",
+        "operationId": "base_file_internal_worker_bases__key__files__path__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
             }
           },
           {
@@ -7754,6 +7991,49 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/gateway/bases": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Bases",
+        "operationId": "bases_internal_gateway_bases_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveBases"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -8905,6 +9185,28 @@
               }
             ],
             "title": "Sha256"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
           }
         },
         "type": "object",
@@ -9179,6 +9481,20 @@
             "type": "string",
             "title": "Storage Path"
           },
+          "store": {
+            "type": "string",
+            "enum": [
+              "folder",
+              "s3"
+            ],
+            "title": "Store",
+            "default": "folder"
+          },
+          "store_label": {
+            "type": "string",
+            "title": "Store Label",
+            "default": "Main server disk"
+          },
           "files": {
             "items": {
               "$ref": "#/components/schemas/ModelFile"
@@ -9330,6 +9646,22 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Spec"
+          },
+          "store": {
+            "type": "string",
+            "title": "Store",
+            "default": "folder"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
           },
           "files": {
             "items": {
@@ -10933,6 +11265,31 @@
               }
             ],
             "title": "Store Total Bytes"
+          },
+          "store_kind": {
+            "type": "string",
+            "enum": [
+              "folder",
+              "s3"
+            ],
+            "title": "Store Kind",
+            "default": "folder"
+          },
+          "store_label": {
+            "type": "string",
+            "title": "Store Label",
+            "default": "Main server disk"
+          },
+          "staging_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staging Free Bytes"
           },
           "endpoint": {
             "type": "string",
@@ -16185,6 +16542,29 @@
         ],
         "title": "LabelShiftInfo"
       },
+      "LiveBases": {
+        "properties": {
+          "bases": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Bases"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bases"
+        ],
+        "title": "LiveBases"
+      },
       "LoadedModel": {
         "properties": {
           "base_model": {
@@ -16938,6 +17318,30 @@
           "sha256"
         ],
         "title": "ModelCardExport"
+      },
+      "ModelCopies": {
+        "properties": {
+          "started": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Started"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "started",
+          "skipped"
+        ],
+        "title": "ModelCopies"
       },
       "ModelFile": {
         "properties": {
@@ -20058,6 +20462,16 @@
           "location": {
             "type": "string",
             "title": "Location"
+          },
+          "models_on_main": {
+            "type": "integer",
+            "title": "Models On Main",
+            "default": 0
+          },
+          "models_on_main_bytes": {
+            "type": "integer",
+            "title": "Models On Main Bytes",
+            "default": 0
           }
         },
         "type": "object",
@@ -20215,6 +20629,23 @@
           "size"
         ],
         "title": "StoredArtifact"
+      },
+      "StoredFiles": {
+        "properties": {
+          "files": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "StoredFiles"
       },
       "SystemInfo": {
         "properties": {

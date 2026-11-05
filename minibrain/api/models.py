@@ -25,9 +25,11 @@ from minibrain.api.schemas import (
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
-from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health, size_problems
+from minibrain.models.copies import BUCKET
+from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health
 from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import (
+    missing_files,
     model_folder,
     relocate,
     require_usable,
@@ -37,6 +39,7 @@ from minibrain.models.registry import (
     start_reimport,
     start_repair,
     start_verify,
+    store_label,
 )
 from minibrain.models.sources import configured
 from minibrain.models.usage import touch
@@ -95,7 +98,7 @@ def wake_teardowns(request: Request) -> None:
 
 
 def file_rows(settings: Settings, model: Model) -> list[ModelFile]:
-    sizes = size_problems(model_folder(settings, model), model.files) if model.status == ModelStatus.AVAILABLE else {}
+    sizes = missing_files(settings, model) if model.status == ModelStatus.AVAILABLE else {}
     flagged = file_states(model) if model.health == CORRUPT else {}
     checked = model.verified_at is not None
     rows: list[ModelFile] = []
@@ -119,6 +122,8 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Mod
         latest_revision=model.variant.latest_revision if model.variant else None,
         source_path=model.source_path,
         storage_path=str(model_folder(settings, model)),
+        store="s3" if model.store == BUCKET else "folder",
+        store_label=store_label(session, model),
         files=file_rows(settings, model),
         license=model.license,
         license_name=entry.license_name if entry else None,

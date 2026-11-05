@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.data.snapshots import cleanup
 from minibrain.gateway.config import LocalConfig, served_bases
 from minibrain.leader import Leader
+from minibrain.models.bucket import drop_weights, sweep_weights
 from minibrain.models.registry import model_dir
 from minibrain.registry.compute import live_engines, live_gateways
 from minibrain.registry.files import store_for
@@ -521,12 +522,16 @@ class Teardowns:
         if added:
             raise ConflictError(f"{names(added)} {are(added)} built on {model.name} now; delete them first")
         remove_folder(model_dir(self.settings, model.id))
+        store = store_for(self.settings)
+        objects = drop_weights(session, store, model)
         scopes = session.query(KeyScope).filter(KeyScope.model_id == model.id).delete()
         removed = {"size_bytes": model.size_bytes, "key_scopes": scopes, "models": teardown.detail.get("models", [])}
         removed |= {"kept": model.path} if model.path else {}
         drop(session, teardown)
         session.delete(model)
         session.flush()
+        objects += sweep_weights(session, store)
+        removed |= {"bucket_objects": objects} if objects else {}
         drop_orphan_keys(session)
         self.finish(session, record, removed=removed)
 

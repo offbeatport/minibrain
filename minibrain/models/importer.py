@@ -5,7 +5,7 @@ from typing import Any
 from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
 from minibrain.models.files import Progress, write_stream
 from minibrain.models.sources import StorageSource, location_url
-from minibrain.models.transfer import check_room, disk_full, write_manifest
+from minibrain.models.transfer import Target, check_room, disk_full
 
 TOKENIZER_FILES = ("tokenizer.json", "tokenizer_config.json")
 PICKLE_SUFFIXES = (".bin", ".pt", ".pth", ".pkl", ".ckpt")
@@ -113,14 +113,21 @@ def match(spec: JobSpec, revision: str | None) -> dict[str, Any] | None:
     return next((variant for variant in variants if revision and variant["revision"] == revision), None)
 
 
+def verify_one(variant: dict[str, Any], found: dict[str, Any]) -> None:
+    expected = next((item for item in variant["files"] if item["path"] == found["path"]), None)
+    if expected is None:
+        return
+    wrong_size = found["size"] != expected["size"]
+    if wrong_size or (expected.get("sha256") and found["sha256"] != expected["sha256"]):
+        raise FinalError(f"{expected['path']} does not match the catalogue checksum for {variant['repo']}")
+
+
 def verify(variant: dict[str, Any], copied: dict[str, dict[str, Any]]) -> None:
     for expected in variant["files"]:
         found = copied.get(expected["path"])
         if found is None:
             raise FinalError(f"{expected['path']} is missing; the folder does not match {variant['repo']}")
-        wrong_size = found["size"] != expected["size"]
-        if wrong_size or (expected.get("sha256") and found["sha256"] != expected["sha256"]):
-            raise FinalError(f"{expected['path']} does not match the catalogue checksum for {variant['repo']}")
+        verify_one(variant, found)
 
 
 def main(spec: JobSpec) -> None:
@@ -129,9 +136,10 @@ def main(spec: JobSpec) -> None:
     files = source.files()
     validate(source, files)
     variant = match(spec, detected_revision(source))
-    out = spec.path("out")
+    staging = Target.of(spec)
+    out = staging.out
     out.mkdir(parents=True, exist_ok=True)
-    check_room(out, files)
+    check_room(out, files, staging.bucket)
     progress = Progress(sum(entry["size"] for entry in files), "importing")
     copied: dict[str, dict[str, Any]] = {}
     for entry in files:
@@ -142,12 +150,16 @@ def main(spec: JobSpec) -> None:
             if error.errno == errno.ENOSPC:
                 raise disk_full(out, entry["path"]) from error
             raise
-        copied[entry["path"]] = {"path": entry["path"], "size": target.stat().st_size, "sha256": digest}
+        found = {"path": entry["path"], "size": target.stat().st_size, "sha256": digest}
+        if variant is not None:
+            verify_one(variant, found)
+        copied[entry["path"]] = found
+        staging.publish(found)
     if variant is not None:
         verify(variant, copied)
     manifest = sorted(copied.values(), key=lambda item: item["path"])
     record = {"source": url, "files": manifest, "variant_id": variant["id"] if variant else None}
-    write_manifest(out, record)
+    staging.finish(record)
     result = {"files": manifest, "size_bytes": progress.total, "source": url, "variant_id": record["variant_id"]}
     write_result(spec, result)
     report(1.0, step="verified against the catalogue" if variant else "imported, not verified", files=len(manifest))

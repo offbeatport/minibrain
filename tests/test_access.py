@@ -164,6 +164,7 @@ ROUTE_ROLES = {
     ("GET", "/api/settings/storage"): "admin",
     ("PUT", "/api/settings/storage"): "admin",
     ("POST", "/api/settings/storage/test"): "admin",
+    ("POST", "/api/settings/storage/copy-models"): "admin",
     ("GET", "/api/system/infrastructure"): "viewer",
     ("GET", "/api/settings"): "viewer",
 }

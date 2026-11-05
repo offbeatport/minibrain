@@ -90,13 +90,12 @@ def apply_repair(model: Model, recorded: list[dict[str, Any]]) -> None:
         set_health(model, None)
 
 
-def problem_of(model: Model, folder: Path) -> str | None:
+def problem_of(model: Model, problems: dict[str, str]) -> str | None:
     if model.status != ModelStatus.AVAILABLE:
         return None
     if model.health:
         message = (model.health_detail or {}).get("message")
         return f"{model.name} cannot be loaded: {message or model.health}"
-    problems = size_problems(folder, model.files)
     if problems:
         return f"{model.name} cannot be loaded: {missing_message(problems)}. Repair it on the Models page."
     return None
@@ -117,10 +116,10 @@ def record_loaded(session: Session, key: str) -> None:
         set_health(model, None)
 
 
-def report_problems(session: Session, folder_of: Callable[[Model], Path]) -> int:
+def report_problems(session: Session, problems_of: Callable[[Model], dict[str, str]]) -> int:
     found = 0
     for model in session.scalars(select(Model).where(Model.status == ModelStatus.AVAILABLE)):
-        problem = problem_of(model, folder_of(model))
+        problem = problem_of(model, problems_of(model))
         if problem is not None:
             found += 1
             log.warning("%s", problem)

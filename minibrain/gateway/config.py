@@ -19,7 +19,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.data.snapshot import prompt_context
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
-from minibrain.models.registry import model_folder, resolve_spec
+from minibrain.models.registry import missing_files, resolve_spec
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import GatewayReport, live_engines, record_gateway
 from minibrain.registry.files import ref, snapshot_location
@@ -214,7 +214,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         except NotFoundError:
             routes = {name: route for name, route in routes.items() if route.base_model != key}
             continue
-        problem = problem_of(model, model_folder(settings, model)) if model is not None else None
+        problem = problem_of(model, missing_files(settings, model)) if model is not None else None
         if problem is not None:
             problems[key] = problem
     models: dict[str, list[str]] = {}

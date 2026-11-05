@@ -1,7 +1,4 @@
-import hashlib
 import logging
-import os
-import tempfile
 import threading
 import uuid
 from collections import Counter
@@ -15,8 +12,9 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from minibrain.artifacts import ArtifactStore
+from minibrain.artifacts import ArtifactStore, StreamReader
 from minibrain.base_models import BaseModelSpec
+from minibrain.models.copies import BUCKET, bucket_client, ensure, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
 from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
 from minibrain.serve.backend import (
@@ -31,7 +29,7 @@ from minibrain.serve.backend import (
 from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.serve.structured import Constraint
 from minibrain.telemetry.logs import configure_logging
-from minibrain.worker import HttpClient, StreamReader
+from minibrain.worker import HttpClient
 
 
 class AdapterBody(BaseModel):
@@ -122,6 +120,7 @@ def artifact_fetcher(store: ArtifactStore, http: HttpClient, token: str):
 
 
 ANNOUNCE_SECONDS = 10.0
+PRUNE_EVERY = 60
 
 log = logging.getLogger("minibrain.engine")
 
@@ -152,10 +151,18 @@ def load_failure(error: BaseException, spec: BaseModelSpec, host: str) -> dict[s
 
 
 class Announcer:
-    def __init__(self, client: HttpClient, token: str, body: Callable[[], dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        client: HttpClient,
+        token: str,
+        body: Callable[[], dict[str, Any]],
+        tick: Callable[[], Any] | None = None,
+    ) -> None:
         self.client = client
         self.headers = {"Authorization": f"Bearer {token}"}
         self.body = body
+        self.tick = tick
+        self.count = 0
 
     def announce(self, state: str) -> None:
         body = self.body() | {"state": state}
@@ -167,6 +174,12 @@ class Announcer:
                 self.announce("failed" if failed and failed.is_set() else "ready" if ready.is_set() else "loading")
             except Exception:
                 log.warning("could not reach main to announce this engine")
+            self.count += 1
+            if self.tick is not None and self.count % PRUNE_EVERY == 0:
+                try:
+                    self.tick()
+                except Exception:
+                    log.warning("could not check this machine's model copies against main")
             if stop.wait(ANNOUNCE_SECONDS):
                 return
 
@@ -209,41 +222,38 @@ def load_backend(
     return engine, backend
 
 
-class PulledFileError(Exception):
-    pass
+def listing_of(client: HttpClient, token: str, key: str) -> dict[str, Any]:
+    response = client.request("GET", f"/internal/gateway/bases/{key}", headers={"Authorization": f"Bearer {token}"})
+    response.raise_for_status()
+    return dict(response.json())
 
 
-def pull_file(client: HttpClient, url: str, headers: dict[str, str], target: Path, entry: dict[str, Any]) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, name = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
-    digest = hashlib.sha256()
-    size = 0
-    try:
-        with os.fdopen(descriptor, "wb") as out, client.stream("GET", url, headers=headers) as stream:
-            stream.raise_for_status()
-            for chunk in stream.iter_bytes():
-                out.write(chunk)
-                digest.update(chunk)
-                size += len(chunk)
-        expected = entry.get("sha256")
-        if size != entry["size"] or (expected and digest.hexdigest() != expected):
-            raise PulledFileError(f"{entry['path']} arrived as {size} bytes that do not match the saved SHA-256")
-        os.replace(name, target)
-    finally:
-        Path(name).unlink(missing_ok=True)
+def copy_base(client: HttpClient, token: str, found: dict[str, Any], key: str, folder: Path) -> None:
+    headers = {"Authorization": f"Bearer {token}"}
+    with bucket_client() as bucket:
+        opener = opener_for(found, client, f"/internal/gateway/bases/{key}/files", headers, bucket)
+        ensure(folder, found["files"], opener, found.get("content_hash"))
 
 
 def pull_base(client: HttpClient, token: str, key: str, folder: Path) -> BaseModelSpec:
-    headers = {"Authorization": f"Bearer {token}"}
-    response = client.request("GET", f"/internal/gateway/bases/{key}", headers=headers)
-    response.raise_for_status()
-    found = response.json()
-    for entry in found["files"]:
-        target = folder / entry["path"]
-        if target.is_file() and target.stat().st_size == entry["size"]:
-            continue
-        pull_file(client, f"/internal/gateway/bases/{key}/files/{entry['path']}", headers, target, entry)
+    found = listing_of(client, token, key)
+    copy_base(client, token, found, key, folder)
     return replace(BaseModelSpec.from_dict(found["spec"]), path=str(folder))
+
+
+def local_copy(client: HttpClient, token: str, spec: BaseModelSpec) -> BaseModelSpec:
+    if not spec.path or not spec.content_hash:
+        return spec
+    found = listing_of(client, token, spec.key)
+    if found.get("store") == BUCKET:
+        copy_base(client, token, found, spec.key, Path(spec.path))
+    return spec
+
+
+def prune_engines(client: HttpClient, token: str, root: Path) -> list[str]:
+    response = client.request("GET", "/internal/gateway/bases", headers={"Authorization": f"Bearer {token}"})
+    response.raise_for_status()
+    return prune(root, dict(response.json()["bases"]), lambda entry: entry / "weights")
 
 
 def create_engine_app(
@@ -282,7 +292,9 @@ def create_engine_app(
         if url is not None:
             body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
             body |= {"pool": pool, "hardware": hardware.as_dict(), "managed": managed}
-            announcer = Announcer(client, token, lambda: body | announced())
+            announcer = Announcer(
+                client, token, lambda: body | announced(), lambda: prune_engines(client, token, home.parent)
+            )
             threading.Thread(target=announcer.forever, args=(ready, stop, failed), daemon=True).start()
         if current["backend"] is None:
             try:

@@ -554,6 +554,7 @@ class Model(Base):
     deployed: Mapped[bool] = mapped_column(default=False)
     verified: Mapped[bool] = mapped_column(default=False, server_default=false())
     path: Mapped[str | None] = mapped_column(default=None)
+    store: Mapped[str] = mapped_column(default="folder", server_default="folder")
     health: Mapped[str | None] = mapped_column(default=None)
     health_detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)

@@ -6,12 +6,13 @@ from pathlib import Path
 import pytest
 
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
+from minibrain.models.copies import CopyError
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import Model
 from minibrain.serve import engine as engine_module
 from minibrain.serve import select
 from minibrain.serve.backend import AdapterRef, CompletionRequest, TransformersBackend
-from minibrain.serve.engine import PulledFileError, load_backend, pull_base
+from minibrain.serve.engine import load_backend, pull_base
 from minibrain.serve.select import NoEngineError, choose_engine, installed_engines
 from minibrain.serve.sglang_backend import SglangBackend
 from minibrain.serve.structured import TokenTrie
@@ -139,7 +140,7 @@ def test_remote_engines_pull_weights_from_main_not_the_hub(harness: Harness, hub
     served = Path(harness.client.get("/api/models/base/tiny").json()["storage_path"]) / "config.json"
     served.write_bytes(served.read_bytes().replace(b"{", b"[", 1))
     (tmp_path / "weights" / "config.json").unlink()
-    with pytest.raises(PulledFileError, match=r"config\.json"):
+    with pytest.raises(CopyError, match=r"config\.json"):
         pull_base(harness.client, token, "tiny", tmp_path / "weights")
     assert not (tmp_path / "weights" / "config.json").exists()
     assert not [path for path in (tmp_path / "weights").iterdir() if path.name.startswith(".")]

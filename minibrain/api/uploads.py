@@ -4,8 +4,7 @@ from functools import partial
 import anyio
 from fastapi import Request
 
-from minibrain.artifacts import ArtifactStore, Stored
-from minibrain.worker import StreamReader
+from minibrain.artifacts import ArtifactStore, Stored, StreamReader
 
 
 def body_reader(request: Request) -> StreamReader:
@@ -17,5 +16,5 @@ def body_reader(request: Request) -> StreamReader:
     return StreamReader(iter(partial(anyio.from_thread.run, following), None))
 
 
-async def store_body(store: ArtifactStore, request: Request, expected: str) -> Stored:
-    return await anyio.to_thread.run_sync(store.put_stream, body_reader(request), expected)
+async def store_body(store: ArtifactStore, request: Request, expected: str, replace: bool = False) -> Stored:
+    return await anyio.to_thread.run_sync(store.put_stream, body_reader(request), expected, replace)

@@ -1,19 +1,26 @@
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
+from minibrain import storage
 from minibrain.base_models import BASE_MODELS, QWEN_STOP_TOKENS, BaseModelSpec
 from minibrain.connections.imports import check_connection_policy, pick_connection
 from minibrain.jobs.queue import enqueue
 from minibrain.ml.context import FinalError
 from minibrain.models import hub
+from minibrain.models.bucket import missing_objects, writes_bucket
+from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import MISSING, content_hash, listed, problem_of, size_problems
 from minibrain.models.inspect import source_type_of
+from minibrain.models.sources import FOLDER as FOLDER_SOURCE
 from minibrain.models.sources import HUB, S3, s3_endpoint
+from minibrain.object_store import load_config
 from minibrain.policy import load as load_policy
+from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     CatalogModel,
@@ -27,9 +34,11 @@ from minibrain.registry.models import (
 )
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
-from minibrain.storage import missing_room
+from minibrain.storage import missing_room, staging_room
 
 ACTIVE_STATUSES = (ModelStatus.DOWNLOADING, ModelStatus.IMPORTING)
+MAIN_DISK = "Main server disk"
+COPY_REASON = "copy"
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
 
 
@@ -45,8 +54,30 @@ def model_folder(settings: Settings, model: Model) -> Path:
     return Path(model.path) if model.path else model_dir(settings, model.id)
 
 
+def staging_dir(settings: Settings, model_id: str) -> Path:
+    return settings.work_dir() / "models" / model_id
+
+
+def missing_files(settings: Settings, model: Model) -> dict[str, str]:
+    if model.store != BUCKET:
+        return size_problems(model_folder(settings, model), model.files)
+    session = object_session(model)
+    if session is None:
+        raise NotFoundError(f"{model.id} is not loaded from the database")
+    return missing_objects(session, model)
+
+
 def files_present(settings: Settings, model: Model) -> bool:
-    return bool(model.files) and not size_problems(model_folder(settings, model), model.files)
+    return bool(model.files) and not missing_files(settings, model)
+
+
+def transfer_target(settings: Settings, model: Model) -> dict[str, Any]:
+    if not writes_bucket(store_for(settings)):
+        return {"store": FOLDER, "out": str(model_folder(settings, model))}
+    target = {"store": BUCKET, "out": str(staging_dir(settings, model.id))}
+    if model.store == FOLDER and model.files:
+        target["seed"] = str(model_folder(settings, model))
+    return target
 
 
 def gguf_file(model: Model) -> str | None:
@@ -91,12 +122,36 @@ def download_params(settings: Settings, model: Model, variant: CatalogVariant, g
         "revision": model.revision,
         "files": model.files,
         "gated": gated,
-        "out": str(model_folder(settings, model)),
-    }
+    } | transfer_target(settings, model)
+
+
+@dataclass(frozen=True)
+class WeightsSpace:
+    kind: str
+    label: str
+    free: int | None
+    total: int | None
+    staging_free: int | None
+
+
+def weights_space(session: Session, settings: Settings) -> WeightsSpace:
+    if writes_bucket(store_for(settings)):
+        staging = storage.disk_space(settings.work_dir())
+        label = f"S3 · {load_config(session).bucket}"
+        return WeightsSpace(BUCKET, label, None, None, staging.free if staging else None)
+    space = storage.disk_space(models_dir(settings))
+    return WeightsSpace(FOLDER, MAIN_DISK, space.free if space else None, space.total if space else None, None)
+
+
+def store_label(session: Session, model: Model) -> str:
+    return f"S3 · {load_config(session).bucket}" if model.store == BUCKET else MAIN_DISK
 
 
 def ensure_room(settings: Settings, model_id: str, files: list[dict[str, Any]], size: int) -> None:
-    problem = missing_room(model_dir(settings, model_id), files, size)
+    if writes_bucket(store_for(settings)):
+        problem = staging_room(staging_dir(settings, model_id), files)
+    else:
+        problem = missing_room(model_dir(settings, model_id), files, size)
     if problem is not None:
         raise ConflictError(problem)
 
@@ -152,9 +207,8 @@ def import_params(session: Session, settings: Settings, model: Model) -> dict[st
         "location": location,
         "variant_id": model.variant_id,
         "catalog": catalogue_manifests(session),
-        "out": str(model_folder(settings, model)),
         "connection_id": model.connection_id,
-    }
+    } | transfer_target(settings, model)
 
 
 def apply_catalogue(model: Model, entry: CatalogModel, variant: CatalogVariant) -> None:
@@ -313,7 +367,7 @@ def require_usable(session: Session, settings: Settings, key: str) -> None:
     model = session.get(Model, key)
     if model is None:
         return
-    problem = problem_of(model, model_folder(settings, model))
+    problem = problem_of(model, missing_files(settings, model))
     if problem is not None:
         raise ConflictError(problem)
 
@@ -327,7 +381,12 @@ def start_verify(session: Session, settings: Settings, model: Model) -> Job:
     if model.status != ModelStatus.AVAILABLE or not model.files:
         raise ConflictError(f"{model.name} is {model.status}; verify its files once they are installed")
     ensure_idle(session, model)
-    params = {"model_id": model.id, "folder": str(model_folder(settings, model)), "files": list(model.files)}
+    params = {
+        "model_id": model.id,
+        "folder": str(model_folder(settings, model)),
+        "files": list(model.files),
+        "store": model.store,
+    }
     return enqueue(session, JobKind.VERIFY, params, idempotency_key=f"verify:{model.id}", model_id=model.id)
 
 
@@ -343,9 +402,8 @@ def repair_params(
         "model_id": model.id,
         "name": model.name,
         "files": list(model.files),
-        "out": str(model_folder(settings, model)),
         "source": source,
-    }
+    } | transfer_target(settings, model)
     if source != HUB:
         return params | {"location": location, "connection_id": connection_id}
     entry = session.get(CatalogModel, model.catalog_id) if model.catalog_id else None
@@ -423,6 +481,8 @@ def size_mismatch(folder: Path, model: Model, problems: dict[str, str]) -> str:
 def relocate(session: Session, settings: Settings, model: Model, location: str) -> Job:
     if model.status != ModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; only installed models can point to a new location")
+    if model.store == BUCKET:
+        raise ConflictError(f"{model.name}'s files are in the bucket; re-import it from that folder instead")
     ensure_idle(session, model)
     folder = Path(location.strip()).expanduser()
     if not folder.is_absolute():
@@ -436,3 +496,37 @@ def relocate(session: Session, settings: Settings, model: Model, location: str) 
     model.path = None if managed.exists() and folder.resolve() == managed.resolve() else str(folder)
     model.updated_at = now()
     return start_verify(session, settings, model)
+
+
+def models_on_main(session: Session) -> list[Model]:
+    query = select(Model).where(Model.status == ModelStatus.AVAILABLE, Model.store == FOLDER).order_by(Model.id)
+    return list(session.scalars(query))
+
+
+def copy_refusal(session: Session, settings: Settings, model: Model) -> str | None:
+    if model.teardown is not None:
+        return "being deleted"
+    if active_job(session, model) is not None:
+        return "a job is running"
+    if content_hash(model.files) is None:
+        return "verify its files first"
+    if missing_files(settings, model):
+        return "files are missing on main; repair it first"
+    return None
+
+
+def copy_to_bucket(session: Session, settings: Settings) -> tuple[list[Model], list[str]]:
+    if not writes_bucket(store_for(settings)):
+        raise ConflictError("Storage is the local folder; choose an S3 bucket first")
+    started: list[Model] = []
+    skipped: list[str] = []
+    for model in models_on_main(session):
+        refusal = copy_refusal(session, settings, model)
+        if refusal is not None:
+            skipped.append(f"{model.name}: {refusal}")
+            continue
+        location = str(model_folder(settings, model))
+        params = repair_params(session, settings, model, FOLDER_SOURCE, location) | {"reason": COPY_REASON}
+        enqueue(session, JobKind.REPAIR, params, idempotency_key=f"repair:{model.id}", model_id=model.id)
+        started.append(model)
+    return started, skipped

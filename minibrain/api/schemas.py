@@ -610,6 +610,13 @@ class StorageSettings(BaseModel):
     secret_reference: str | None = None
     locked: str | None = None
     location: str
+    models_on_main: int = 0
+    models_on_main_bytes: int = 0
+
+
+class ModelCopies(BaseModel):
+    started: list[str]
+    skipped: list[str]
 
 
 class StorageUpdate(BaseModel):
@@ -795,6 +802,8 @@ class BaseModelDetail(ModelRow):
     latest_revision: str | None
     source_path: str | None
     storage_path: str
+    store: Literal["folder", "s3"] = "folder"
+    store_label: str = "Main server disk"
     files: list[ModelFile]
     license: str | None
     license_name: str | None
@@ -961,6 +970,9 @@ class CatalogResponse(BaseModel):
     downloads_allowed: bool
     store_free_bytes: int | None
     store_total_bytes: int | None = None
+    store_kind: Literal["folder", "s3"] = "folder"
+    store_label: str = "Main server disk"
+    staging_free_bytes: int | None = None
     endpoint: str
     token_configured: bool
     synced_at: datetime | None

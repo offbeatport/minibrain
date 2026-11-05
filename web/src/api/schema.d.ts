@@ -2121,6 +2121,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/storage/copy-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Models */
+        post: operations["copy_models_api_settings_storage_copy_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/infrastructure": {
         parameters: {
             query?: never;
@@ -2326,6 +2343,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/worker/models/{model_id}/stored": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stored */
+        get: operations["stored_internal_worker_models__model_id__stored_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/worker/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bases */
+        get: operations["bases_internal_worker_bases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/worker/bases/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base Weights */
+        get: operations["base_weights_internal_worker_bases__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/worker/bases/{key}/files/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Base File */
+        get: operations["base_file_internal_worker_bases__key__files__path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/gateway/engines": {
         parameters: {
             query?: never;
@@ -2354,6 +2439,23 @@ export interface paths {
         put?: never;
         /** Report Gateway */
         post: operations["report_gateway_internal_gateway_gateways_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/gateway/bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bases */
+        get: operations["bases_internal_gateway_bases_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2743,6 +2845,10 @@ export interface components {
             size: number;
             /** Sha256 */
             sha256?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Key */
+            key?: string | null;
         };
         /** BaseModelDetail */
         BaseModelDetail: {
@@ -2821,6 +2927,17 @@ export interface components {
             source_path: string | null;
             /** Storage Path */
             storage_path: string;
+            /**
+             * Store
+             * @default folder
+             * @enum {string}
+             */
+            store?: "folder" | "s3";
+            /**
+             * Store Label
+             * @default Main server disk
+             */
+            store_label?: string;
             /** Files */
             files: components["schemas"]["ModelFile"][];
             /** License */
@@ -2855,6 +2972,13 @@ export interface components {
             spec: {
                 [key: string]: unknown;
             };
+            /**
+             * Store
+             * @default folder
+             */
+            store?: string;
+            /** Content Hash */
+            content_hash?: string | null;
             /** Files */
             files: components["schemas"]["BaseFile"][];
         };
@@ -3278,6 +3402,19 @@ export interface components {
             store_free_bytes: number | null;
             /** Store Total Bytes */
             store_total_bytes?: number | null;
+            /**
+             * Store Kind
+             * @default folder
+             * @enum {string}
+             */
+            store_kind?: "folder" | "s3";
+            /**
+             * Store Label
+             * @default Main server disk
+             */
+            store_label?: string;
+            /** Staging Free Bytes */
+            staging_free_bytes?: number | null;
             /** Endpoint */
             endpoint: string;
             /** Token Configured */
@@ -5021,6 +5158,13 @@ export interface components {
             /** After */
             after: number;
         };
+        /** LiveBases */
+        LiveBases: {
+            /** Bases */
+            bases: {
+                [key: string]: string | null;
+            };
+        };
         /** LoadedModel */
         LoadedModel: {
             /** Base Model */
@@ -5259,6 +5403,13 @@ export interface components {
              * @default SHA-256 of the UTF-8 bytes of the card serialised as JSON with keys sorted, no whitespace and non-ASCII characters kept, as json.dumps(card, sort_keys=True, separators=(',', ':'), ensure_ascii=False) writes it
              */
             canonical_form?: string;
+        };
+        /** ModelCopies */
+        ModelCopies: {
+            /** Started */
+            started: string[];
+            /** Skipped */
+            skipped: string[];
         };
         /** ModelFile */
         ModelFile: {
@@ -6254,6 +6405,16 @@ export interface components {
             locked?: string | null;
             /** Location */
             location: string;
+            /**
+             * Models On Main
+             * @default 0
+             */
+            models_on_main?: number;
+            /**
+             * Models On Main Bytes
+             * @default 0
+             */
+            models_on_main_bytes?: number;
         };
         /** StorageUpdate */
         StorageUpdate: {
@@ -6314,6 +6475,13 @@ export interface components {
             id: string;
             /** Size */
             size: number;
+        };
+        /** StoredFiles */
+        StoredFiles: {
+            /** Files */
+            files: {
+                [key: string]: unknown;
+            }[];
         };
         /** SystemInfo */
         SystemInfo: {
@@ -11091,6 +11259,26 @@ export interface operations {
             };
         };
     };
+    copy_models_api_settings_storage_copy_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCopies"];
+                };
+            };
+        };
+    };
     infrastructure_api_system_infrastructure_get: {
         parameters: {
             query?: never;
@@ -11469,6 +11657,7 @@ export interface operations {
                 "x-artifact-kind": string;
                 "x-artifact-packing": string;
                 "x-artifact-name": string;
+                "x-artifact-replace"?: string;
                 authorization?: string;
             };
             path: {
@@ -11485,6 +11674,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoredArtifact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stored_internal_worker_models__model_id__stored_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                model_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredFiles"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bases_internal_worker_bases_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveBases"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_weights_internal_worker_bases__key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseWeights"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_file_internal_worker_bases__key__files__path__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                key: string;
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -11552,6 +11872,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bases_internal_gateway_bases_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveBases"];
+                };
             };
             /** @description Validation Error */
             422: {

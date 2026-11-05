@@ -54,3 +54,18 @@ def missing_room(folder: Path, files: list[dict[str, Any]], size: int) -> str | 
         f"Needs {size_text(needed)}; {size_text(space.free)} free on the disk that holds models ({folder}). "
         "Delete unused models or free up space."
     )
+
+
+def staging_need(files: list[dict[str, Any]]) -> int:
+    return 2 * max((int(entry["size"]) for entry in files), default=0)
+
+
+def staging_room(folder: Path, files: list[dict[str, Any]]) -> str | None:
+    space = disk_space(folder)
+    needed = staging_need(files)
+    if space is None or needed + RESERVE_BYTES <= space.free:
+        return None
+    return (
+        f"Needs {size_text(needed)} on main's disk to pass the largest file to the bucket; {size_text(space.free)} "
+        f"free ({folder}). Free up space on main."
+    )

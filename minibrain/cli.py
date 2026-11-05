@@ -148,15 +148,19 @@ def engine(args: argparse.Namespace) -> None:
     import httpx
 
     from minibrain.base_models import BaseModelSpec
-    from minibrain.serve.engine import create_engine_app, pull_base
+    from minibrain.serve.engine import create_engine_app, local_copy, prune_engines, pull_base
     from minibrain.settings import load_settings
 
     settings = load_settings()
     token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
     client = httpx.Client(base_url=args.main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     if args.spec:
-        spec = BaseModelSpec.from_dict(json.loads(args.spec))
+        spec = local_copy(client, token, BaseModelSpec.from_dict(json.loads(args.spec)))
     elif args.model:
+        try:
+            prune_engines(client, token, settings.home / "engines")
+        except httpx.HTTPError:
+            print("could not check this machine's model copies against main", flush=True)
         spec = pull_base(client, token, args.model, settings.home / "engines" / args.model / "weights")
     else:
         raise SystemExit("minibrain engine needs --model")
@@ -199,6 +203,8 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None,
         gpus=gpus,
         pool=pool,
         hardware=report().as_dict(),
+        models=settings.home / "models" if parent is not None else None,
+        prune=parent is None,
     )
     stop = threading.Event()
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()

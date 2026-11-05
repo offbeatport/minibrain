@@ -3,9 +3,12 @@ import time
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from minibrain.api.bases import BaseWeights, LiveBases, live
+from minibrain.api.bases import base_file as file_of
+from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
@@ -13,12 +16,13 @@ from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
 from minibrain.jobs.queue import EventIn, WorkerInfo
+from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
 from minibrain.registry.compute import record_node
 from minibrain.registry.files import register
-from minibrain.registry.models import Artifact, Job, JobKind
+from minibrain.registry.models import Artifact, Job, JobKind, Model
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.versions import JOB_PROTOCOL, library_version
@@ -208,11 +212,14 @@ async def upload_artifact(
     x_artifact_kind: Annotated[str, Header()],
     x_artifact_packing: Annotated[str, Header()],
     x_artifact_name: Annotated[str, Header()],
+    x_artifact_replace: Annotated[str, Header()] = "",
 ) -> StoredArtifact:
     if x_artifact_packing not in (Packing.FILE, Packing.TAR) or not is_artifact_id(artifact_id):
         raise HTTPException(status_code=422, detail="bad artifact id or packing")
+    if x_artifact_kind == WEIGHTS and not writes_bucket(store):
+        raise HTTPException(status_code=422, detail="Storage is no longer a bucket; start the transfer again")
     try:
-        stored = await store_body(store, request, artifact_id)
+        stored = await store_body(store, request, artifact_id, replace=x_artifact_replace == "1")
     except ArtifactError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     register(session, stored.id, x_artifact_kind, x_artifact_packing, x_artifact_name, stored.size)
@@ -225,3 +232,32 @@ def download_artifact(artifact_id: str, store: StoreDep) -> StreamingResponse:
     if not is_artifact_id(artifact_id) or not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")
+
+
+class StoredFiles(BaseModel):
+    files: list[dict[str, Any]]
+
+
+@router.get("/models/{model_id}/stored")
+def stored(model_id: str, session: SessionDep, store: StoreDep) -> StoredFiles:
+    model = session.get(Model, model_id)
+    if model is None:
+        raise HTTPException(status_code=404, detail=f"model {model_id} not found")
+    return StoredFiles(files=stored_files(session, store, model))
+
+
+@router.get("/bases")
+def bases(session: SessionDep) -> LiveBases:
+    return live(session)
+
+
+@router.get("/bases/{key}")
+def base_weights(
+    key: str, session: SessionDep, settings: SettingsDep, store: StoreDep, response: Response
+) -> BaseWeights:
+    return weights_of(session, settings, store, key, response)
+
+
+@router.get("/bases/{key}/files/{path:path}")
+def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -> FileResponse:
+    return file_of(session, settings, key, path)

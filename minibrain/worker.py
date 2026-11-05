@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import platform
+import queue
 import shutil
 import signal
 import subprocess
@@ -17,9 +18,11 @@ from typing import IO, Any, BinaryIO, Protocol
 
 import httpx
 
-from minibrain.artifacts import CHUNK, ArtifactStore, Packing
+from minibrain.artifacts import CHUNK, ArtifactStore, Packing, StreamReader
 from minibrain.ml.context import FINAL_EXIT
+from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.health import size_problems
 from minibrain.registry.models import JobKind
 from minibrain.telemetry.logs import configure_logging
 from minibrain.versions import JOB_PROTOCOL
@@ -34,6 +37,9 @@ MODULES: dict[str, str] = {
     JobKind.REPAIR: "minibrain.models.repair",
 }
 PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, JobKind.VERIFY, JobKind.REPAIR)
+TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
+WEIGHTS = "weights"
+PRUNE_SECONDS = 600.0
 REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
@@ -91,6 +97,12 @@ class WorkerConfig:
     host: str = field(default_factory=platform.node)
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = field(default_factory=dict)
+    models: Path | None = None
+    prune: bool = True
+
+    @property
+    def models_dir(self) -> Path:
+        return self.models or self.home / "models"
 
 
 class MainClient:
@@ -173,6 +185,25 @@ class MainClient:
         )
         return artifact_id
 
+    def upload_file(self, path: Path, artifact_id: str, name: str, replace: bool) -> None:
+        headers = {"X-Artifact-Kind": WEIGHTS, "X-Artifact-Packing": Packing.FILE, "X-Artifact-Name": name}
+        headers |= {"X-Artifact-Replace": "1"} if replace else {}
+        self.call(
+            "PUT",
+            f"/internal/worker/artifacts/{artifact_id}",
+            opener=lambda: file_chunks(path.open("rb")),
+            extra=headers,
+        )
+
+    def stored(self, model_id: str) -> list[dict[str, Any]]:
+        return list(self.call("GET", f"/internal/worker/models/{model_id}/stored").json()["files"])
+
+    def bases(self, key: str) -> dict[str, Any]:
+        return dict(self.call("GET", f"/internal/worker/bases/{key}").json())
+
+    def live_bases(self) -> dict[str, str | None]:
+        return dict(self.call("GET", "/internal/worker/bases").json()["bases"])
+
     def download(self, store: ArtifactStore, artifact_id: str) -> None:
         if store.has(artifact_id):
             return
@@ -187,28 +218,44 @@ def file_chunks(stream: BinaryIO) -> Iterator[bytes]:
             yield chunk
 
 
-class StreamReader:
-    def __init__(self, chunks: Any) -> None:
-        self.chunks = iter(chunks)
-        self.buffer = b""
+class Publisher:
+    def __init__(self, client: MainClient, out: Path, replace: bool) -> None:
+        self.client = client
+        self.out = out
+        self.replace = replace
+        self.error: str | None = None
+        self.queue: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        self.process: subprocess.Popen[bytes] | None = None
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
 
-    def read(self, size: int = -1) -> bytes:
-        while size < 0 or len(self.buffer) < size:
-            chunk = next(self.chunks, None)
-            if chunk is None:
-                break
-            self.buffer += chunk
-        if size < 0:
-            data, self.buffer = self.buffer, b""
-        else:
-            data, self.buffer = self.buffer[:size], self.buffer[size:]
-        return data
+    def staged(self, line: dict[str, Any]) -> None:
+        self.queue.put(line)
+
+    def run(self) -> None:
+        while (item := self.queue.get()) is not None:
+            if self.error is not None:
+                continue
+            path = self.out / str(item["staged"])
+            try:
+                self.client.upload_file(path, str(item["sha256"]), str(item["staged"]), self.replace)
+                path.unlink(missing_ok=True)
+            except Exception as error:
+                self.error = f"could not store {item['staged']} in the bucket: {type(error).__name__}: {error}"
+                if self.process is not None:
+                    stop_group(self.process)
+
+    def finish(self) -> str | None:
+        self.queue.put(None)
+        self.thread.join()
+        return self.error
 
 
 class LineCollector:
-    def __init__(self, stream: IO[bytes], log_path: Path) -> None:
+    def __init__(self, stream: IO[bytes], log_path: Path, publisher: Publisher | None = None) -> None:
         self.stream = stream
         self.log_path = log_path
+        self.publisher = publisher
         self.pending: list[dict[str, Any]] = []
         self.tail: list[str] = []
         self.lock = threading.Lock()
@@ -227,6 +274,8 @@ class LineCollector:
         parsed = parse_json(line)
         if parsed is not None and "progress" in parsed:
             events.append({"kind": "progress", "message": "", "data": parsed})
+        if parsed is not None and "staged" in parsed and self.publisher is not None:
+            self.publisher.staged(parsed)
         with self.lock:
             self.pending += events
             self.tail = [*self.tail, line][-50:]
@@ -268,8 +317,13 @@ class Worker:
         self.client.stop = stop
         try:
             self.client.register()
+            self.prune_copies()
+            pruned = time.monotonic()
             while not stop.is_set():
                 self.run_once(CLAIM_WAIT_SECONDS)
+                if time.monotonic() - pruned > PRUNE_SECONDS:
+                    self.prune_copies()
+                    pruned = time.monotonic()
         except WorkerStoppedError:
             return
         except IncompatibleWorkerError as error:
@@ -283,6 +337,46 @@ class Worker:
         self.run(claim)
         return True
 
+    def prune_copies(self) -> None:
+        if not self.config.prune:
+            return
+        try:
+            removed = prune(self.config.models_dir, self.client.live_bases(), lambda entry: entry)
+        except Exception:
+            log.warning("could not check this worker's model copies against main")
+            return
+        for key in removed:
+            log.info("removed the working copy of %s; main no longer has that model", key)
+
+    def base_copy(self, spec: dict[str, Any]) -> dict[str, Any]:
+        if not spec.get("content_hash"):
+            return spec
+        listing = self.client.bases(str(spec["key"]))
+        files, content = listing["files"], listing.get("content_hash")
+        local = Path(spec["path"]) if spec.get("path") else None
+        if listing.get("store") != BUCKET and local is not None and not size_problems(local, files):
+            return spec
+        if local is not None and matches(local, files, content):
+            return spec
+        folder = self.config.models_dir / str(spec["key"])
+        files_url = f"/internal/worker/bases/{spec['key']}/files"
+        with bucket_client() as bucket:
+            opener = opener_for(listing, self.client.http, files_url, self.client.headers, bucket)
+            ensure(folder, files, opener, content)
+        return spec | {"path": str(folder)}
+
+    def secrets(self, claim: dict[str, Any]) -> bytes | None:
+        params = claim["params"]
+        if claim["kind"] != JobKind.VERIFY or params.get("store") != BUCKET:
+            return None
+        return json.dumps(self.client.bases(str(params["model_id"]))).encode()
+
+    def publisher(self, claim: dict[str, Any]) -> Publisher | None:
+        params = claim["params"]
+        if claim["kind"] not in TRANSFER_KINDS or params.get("store") != BUCKET:
+            return None
+        return Publisher(self.client, Path(params["out"]), replace=claim["kind"] == JobKind.REPAIR)
+
     def material(self, ref: dict[str, Any] | None) -> str | None:
         if ref is None:
             return None
@@ -292,9 +386,13 @@ class Worker:
     def spec(self, claim: dict[str, Any], workdir: Path, attempt_dir: Path) -> dict[str, Any]:
         params = claim["params"]
         spec: dict[str, Any] = {"result": str(attempt_dir / "result.json")}
+        if claim["kind"] in TRANSFER_KINDS and params.get("store") == BUCKET:
+            spec["stored"] = self.client.stored(str(params["model_id"]))
         if claim["kind"] in PASSTHROUGH_KINDS:
             return params | spec
-        spec |= {key: params[key] for key in ("slug", "number", "base_model", "base_spec") if key in params}
+        spec |= {key: params[key] for key in ("slug", "number", "base_model") if key in params}
+        if "base_spec" in params:
+            spec["base_spec"] = self.base_copy(params["base_spec"])
         spec["snapshot"] = self.material(params["snapshot"])
         if claim["kind"] == JobKind.TRAIN:
             spec |= {
@@ -330,14 +428,21 @@ class Worker:
         shutil.rmtree(attempt_dir, ignore_errors=True)
         attempt_dir.mkdir(parents=True)
         log_path = attempt_dir / "log.txt"
+        publisher: Publisher | None = None
         try:
             spec_path = attempt_dir / "spec.json"
             spec_path.write_text(json.dumps(self.spec(claim, workdir, attempt_dir)))
             arguments = [self.modules[kind], str(spec_path)]
-            exit_code, cancelled, tail = self.supervise(job_id, token, arguments, log_path, claim.get("env") or {})
+            publisher = self.publisher(claim)
+            exit_code, cancelled, tail = self.supervise(
+                job_id, token, arguments, log_path, claim.get("env") or {}, publisher, self.secrets(claim)
+            )
+            stored_error = publisher.finish() if publisher is not None else None
             log = self.upload_log(log_path)
             if cancelled:
                 self.client.fail(job_id, token, "cancelled", False, log)
+            elif stored_error is not None:
+                self.client.fail(job_id, token, stored_error, True, log)
             elif exit_code == 0:
                 result = json.loads((attempt_dir / "result.json").read_text())
                 self.client.complete(job_id, token, result, self.outputs(kind, attempt_dir), log)
@@ -351,10 +456,18 @@ class Worker:
             self.client.fail(job_id, token, f"worker error: {type(error).__name__}: {error}", True, None)
 
     def supervise(
-        self, job_id: int, token: str, arguments: list[str], log_path: Path, env: dict[str, str] | None = None
+        self,
+        job_id: int,
+        token: str,
+        arguments: list[str],
+        log_path: Path,
+        env: dict[str, str] | None = None,
+        publisher: Publisher | None = None,
+        secrets: bytes | None = None,
     ) -> tuple[int, bool, list[str]]:
         process = subprocess.Popen(
             [sys.executable, "-m", *arguments],
+            stdin=subprocess.PIPE if secrets is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -362,7 +475,12 @@ class Worker:
         )
         if process.stdout is None:
             raise RuntimeError("child has no stdout")
-        lines = LineCollector(process.stdout, log_path)
+        if publisher is not None:
+            publisher.process = process
+        if secrets is not None and process.stdin is not None:
+            with process.stdin:
+                process.stdin.write(secrets)
+        lines = LineCollector(process.stdout, log_path, publisher)
         cancelled = False
         last_flush = last_beat = time.monotonic()
         try:

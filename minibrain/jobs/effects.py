@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params
 from minibrain.models.catalog import apply_sync
+from minibrain.models.copies import FOLDER
 from minibrain.models.health import apply_check, apply_repair, set_health
 from minibrain.models.registry import apply_catalogue
 from minibrain.registry.files import MissingArtifactError
@@ -83,6 +84,7 @@ class DomainEffects:
             if entry is not None:
                 apply_catalogue(model, entry, variant)
         model.verified = job.kind == JobKind.DOWNLOAD or variant is not None
+        model.store = str(job.params.get("store") or FOLDER)
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.verified_at = now()
@@ -103,6 +105,7 @@ class DomainEffects:
             return
         restored = model.status == ModelStatus.EVICTED
         apply_repair(model, list((job.result or {}).get("files", [])))
+        model.store = str(job.params.get("store") or model.store)
         model.status = ModelStatus.AVAILABLE
         model.error = None
         model.updated_at = now()

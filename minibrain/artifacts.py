@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import BinaryIO, Protocol, cast
+from typing import Any, BinaryIO, Protocol, cast
 
 from minibrain.encryption import duck
 from minibrain.encryption.envelope import HEADER, Sink, is_sealed, read_exact
@@ -78,6 +78,26 @@ class RemoteBlobs(Protocol):
 
     def head(self, artifact_id: str) -> bytes: ...
 
+    def sign(self, artifact_id: str, seconds: int) -> str: ...
+
+
+class StreamReader:
+    def __init__(self, chunks: Any) -> None:
+        self.chunks = iter(chunks)
+        self.buffer = b""
+
+    def read(self, size: int = -1) -> bytes:
+        while size < 0 or len(self.buffer) < size:
+            chunk = next(self.chunks, None)
+            if chunk is None:
+                break
+            self.buffer += chunk
+        if size < 0:
+            data, self.buffer = self.buffer, b""
+        else:
+            data, self.buffer = self.buffer[:size], self.buffer[size:]
+        return data
+
 
 def staged_context(relative: str) -> bytes:
     return f"minibrain.staging.{relative.split('/', 1)[0]}".encode()
@@ -131,7 +151,7 @@ class ArtifactStore:
         folder.mkdir(parents=True, exist_ok=True)
         return folder
 
-    def put_stream(self, stream: Readable, expected: str | None = None) -> Stored:
+    def put_stream(self, stream: Readable, expected: str | None = None, replace: bool = False) -> Stored:
         with tempfile.NamedTemporaryFile(dir=self.incoming(), delete=False) as temporary:
             try:
                 if self.sealing() and self.keys is not None:
@@ -146,13 +166,15 @@ class ArtifactStore:
             raise ArtifactError(f"content hashes to {artifact_id}, not {expected}")
         if self.writes_remote and self.remote is not None:
             try:
-                if not self.remote.has(artifact_id):
+                if replace:
+                    self.remote.replace(Path(temporary.name), artifact_id)
+                elif not self.remote.has(artifact_id):
                     self.remote.upload(Path(temporary.name), artifact_id)
             finally:
                 Path(temporary.name).unlink(missing_ok=True)
             return Stored(id=artifact_id, size=size)
         target = self.path(artifact_id)
-        if target.exists():
+        if target.exists() and not replace:
             Path(temporary.name).unlink(missing_ok=True)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)

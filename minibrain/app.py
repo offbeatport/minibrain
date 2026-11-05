@@ -65,7 +65,7 @@ from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
 from minibrain.models.catalog import seed
 from minibrain.models.health import report_problems
-from minibrain.models.registry import model_folder
+from minibrain.models.registry import missing_files
 from minibrain.object_store import apply as apply_storage
 from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
@@ -211,7 +211,7 @@ def create_app(
         sync_declared(session)
         csrf_key = ensure_csrf_key(session)
         session.commit()
-        report_problems(session, lambda model: model_folder(settings, model))
+        report_problems(session, lambda model: missing_files(settings, model))
     app = FastAPI(title="minibrain", version="0.0.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.sessions = sessions
