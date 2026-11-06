@@ -300,8 +300,6 @@ def test_gguf_without_llama_cpp_offers_to_add_the_safetensors_variant(settings: 
     model = BaseModel(id="tiny-q8", name="Tiny", files=[{"path": "tiny.gguf", "size": 1}], variant=gguf)
     found = capability(model, HealthContext(settings=settings, hub_ok=True, engines=frozenset({"transformers"})))
     assert found is not None and found.state == "cant_run" and "add BF16 safetensors instead" in found.detail
-    assert [(item.kind, item.label, item.variant) for item in found.actions] == [
-        ("pick_variant", "Add BF16 safetensors instead", "tiny-bf16")
-    ]
+    assert [(item.kind, item.label) for item in found.actions] == [("pick_variant", "View details")]
     ready = HealthContext(settings=settings, hub_ok=True, engines=frozenset({"llamacpp"}))
     assert capability(model, ready) is None

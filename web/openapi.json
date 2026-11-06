@@ -18144,18 +18144,6 @@
           "label": {
             "type": "string",
             "title": "Label"
-          },
-          "variant": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Variant",
-            "description": "The catalogue variant to add instead, for pick_variant."
           }
         },
         "type": "object",

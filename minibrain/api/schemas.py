@@ -1062,7 +1062,6 @@ HealthActionKind = Literal[
 class HealthAction(BaseModel):
     kind: HealthActionKind
     label: str
-    variant: str | None = Field(default=None, description="The catalogue variant to add instead, for pick_variant.")
 
 
 class Health(BaseModel):
