@@ -15,6 +15,8 @@ import type { ReactNode } from "react";
 import { type JobDetail, type JobMetrics, api, unwrap } from "~/api/client";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import { isActiveJob, useJob } from "~/api/queries";
+import { canRetry } from "~/components/JobSelection";
+import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
@@ -49,6 +51,11 @@ function BackLink({ job }: { job: JobDetail | undefined }) {
 }
 
 function Subject({ job }: { job: JobDetail }) {
+    if (job.deleted) {
+        const name = job.model_name ?? job.model ?? job.base_model ?? "Model";
+        const version = job.version === null || job.version === undefined ? "" : ` v${job.version}`;
+        return <ModelName name={`${name}${version}`} deleted />;
+    }
     if (job.model) {
         const version = job.version === null || job.version === undefined ? "" : `@${job.version}`;
         return (
@@ -95,7 +102,7 @@ function Actions({ job }: { job: JobDetail }) {
     if (!can.build) {
         return null;
     }
-    const retriable = job.status === "failed" || job.status === "cancelled";
+    const retriable = canRetry(job);
     return (
         <>
             <ErrorLine error={cancel.error ?? retry.error} />

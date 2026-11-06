@@ -17,6 +17,7 @@ import {
 } from "~/api/requestQueries";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
+import { ModelName } from "~/components/ModelName";
 import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -82,6 +83,9 @@ function NotKept({ detail }: { detail: RequestDetail }) {
                 <SecurityLink />.
             </Note>
         );
+    }
+    if (detail.deleted) {
+        return <Note>Not kept for this model, which has since been deleted.</Note>;
     }
     if (!detail.custom) {
         return (
@@ -210,7 +214,14 @@ function facts(row: RequestRow): [string, ReactNode][] {
                 {`${exactTime(row.at)} (${relativeTime(row.at)})`}
             </span>,
         ],
-        ["Model", row.custom ? `${row.model_name} (${row.model_key})` : row.model_name],
+        [
+            "Model",
+            <ModelName
+                key="model"
+                name={row.custom ? `${row.model_name} (${row.model_key})` : row.model_name}
+                deleted={row.deleted}
+            />,
+        ],
         [
             "Version",
             <span key="version" className="tabular-nums">

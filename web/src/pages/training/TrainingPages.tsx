@@ -27,6 +27,7 @@ import type { JobInfo, ModelSummary } from "~/api/client";
 import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useModels } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
+import { ModelName, withDeleted } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page } from "~/components/Section";
@@ -55,6 +56,10 @@ function kindName(job: JobInfo): string {
 
 function jobName(job: JobInfo): string {
     return job.version === null ? kindName(job) : `${kindName(job)} v${job.version}`;
+}
+
+function modelName(job: JobInfo): string {
+    return job.model_name ?? job.model ?? "Deleted model";
 }
 
 function Status({ job }: { job: JobInfo }) {
@@ -105,7 +110,7 @@ function jobColumns(href: (job: JobInfo) => string): ColumnDef<JobInfo, unknown>
                     href={href(row.original)}
                     className="block truncate font-semibold text-foreground"
                 >
-                    {row.original.model_name ?? "Deleted model"}
+                    <ModelName name={modelName(row.original)} deleted={row.original.deleted} />
                 </Link>
             ),
         },
@@ -278,13 +283,15 @@ export function TrainingListPage() {
         [search.model, search.status, search.q, search.since].join("\n"),
     );
     const columns = useMemo(() => jobColumns((job) => jobPageHref(job.id)), []);
-    const modelOptions = (owned.data ?? []).map((item) =>
-        modelOption({
-            value: item.slug,
-            label: item.name,
-            count: facets.data?.models[item.slug] ?? 0,
-        }),
-    );
+    const deleted = Object.entries(facets.data?.deleted_models ?? {}).map(([slug, name]) => ({
+        value: slug,
+        label: name,
+        deleted: true,
+    }));
+    const modelOptions = [
+        ...(owned.data ?? []).map((item) => ({ value: item.slug, label: item.name })),
+        ...deleted,
+    ].map((item) => modelOption({ ...item, count: facets.data?.models[item.value] ?? 0 }));
     const statusOptions = JOB_STATUSES.map((status) => ({
         value: status,
         label: jobStatusLabel(status),
@@ -366,7 +373,7 @@ export function TrainingListPage() {
                 onOpen={(job) => router.history.push(jobPageHref(job.id))}
                 {...selection.grid}
                 rowLabel={(job) =>
-                    `${job.model_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
+                    `${withDeleted(modelName(job), job.deleted)}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
                 }
                 empty={
                     filtering ? (

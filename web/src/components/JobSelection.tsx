@@ -30,8 +30,9 @@ export function canCancel(job: JobInfo): boolean {
     return isActiveJob(job) && !job.cancel_requested;
 }
 
-export function canRetry(job: JobInfo): boolean {
-    return job.status === "failed" || job.status === "cancelled";
+export function canRetry(job: Pick<JobInfo, "status" | "deleted" | "version_deleted">): boolean {
+    const ended = job.status === "failed" || job.status === "cancelled";
+    return ended && !job.deleted && !job.version_deleted;
 }
 
 function send(action: JobAction, jobs: JobInfo[]): Promise<JobActionResult[]> {
@@ -164,7 +165,7 @@ function JobSelectionBar({
                     icon={RotateCcw}
                     label="Retry"
                     jobs={retriable}
-                    none="None of the selected jobs failed or were cancelled."
+                    none="Only failed or cancelled jobs whose model still exists can be retried."
                     pending={retry.isPending}
                     onClick={() => retry.mutate()}
                 />

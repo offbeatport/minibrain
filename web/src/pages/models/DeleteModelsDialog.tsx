@@ -151,7 +151,7 @@ export function DeleteModelsDialog({
                             ? "Models go with all their versions, data links, scores and API keys. "
                             : ""}
                         {versions ? "Versions go with their adapters, scores and results. " : ""}
-                        This cannot be undone.
+                        Their jobs and request logs stay as history. This cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">

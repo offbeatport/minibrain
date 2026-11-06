@@ -2,6 +2,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import { useModels, useRecentJobs } from "~/api/queries";
+import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
@@ -12,16 +13,14 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         header: "Model",
         id: "model",
-        cell: ({ row }) => {
-            const href = jobHref(row.original);
-            return href ? (
-                <Link className="text-primary" href={href}>
-                    {row.original.model_name ?? row.original.base_model}
-                </Link>
-            ) : (
-                (row.original.model_name ?? row.original.base_model)
-            );
-        },
+        cell: ({ row }) => (
+            <Link className="text-primary" href={jobHref(row.original)}>
+                <ModelName
+                    name={row.original.model_name ?? row.original.base_model ?? "Install"}
+                    deleted={row.original.deleted}
+                />
+            </Link>
+        ),
     },
     {
         header: "Job",

@@ -21,6 +21,7 @@ import { type JobInfo, api, unwrap } from "~/api/client";
 import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob } from "~/api/queries";
 import { JobToolbar, canCancel, canRetry, useJobSelection } from "~/components/JobSelection";
+import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
@@ -167,7 +168,14 @@ const ALL_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
             <span className="font-mono text-muted-foreground">{`#${row.original.id}`}</span>
         ),
     },
-    { id: "subject", header: "For", accessorFn: subject },
+    {
+        id: "subject",
+        header: "For",
+        accessorFn: subject,
+        cell: ({ row }) => (
+            <ModelName name={subject(row.original)} deleted={row.original.deleted} />
+        ),
+    },
     {
         id: "status",
         header: "Status",

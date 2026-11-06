@@ -349,8 +349,8 @@ function deleteVersionConfirmation(entry: Entry, on: Handlers): Confirmation {
     const number = entry.version?.number ?? 0;
     const removed = (
         <p>
-            Its adapter, scores and results are removed. This cannot be undone; the number v{number}{" "}
-            is not reused.
+            Its adapter, scores and results are removed; its jobs and request logs stay as history.
+            This cannot be undone; the number v{number} is not reused.
         </p>
     );
     if (entry.version?.live) {

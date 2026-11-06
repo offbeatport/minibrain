@@ -112,6 +112,8 @@ export function ScorePanel({ job, metrics }: { job: JobDetail; metrics: JobMetri
     const done =
         job.status === "succeeded" &&
         job.model &&
+        !job.deleted &&
+        !job.version_deleted &&
         job.version !== null &&
         job.version !== undefined;
     return (

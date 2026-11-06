@@ -27,6 +27,7 @@ import {
     useRequestList,
     useRequestSummary,
 } from "~/api/requestQueries";
+import { ModelName, withDeleted } from "~/components/ModelName";
 import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
@@ -49,7 +50,21 @@ import { RequestDialog } from "./RequestDetail";
 
 const SEARCH_DELAY_MS = 300;
 
-type FacetOption = { value: string; label: string; count: number; publisher?: string | null };
+type FacetOption = {
+    value: string;
+    label: string;
+    count: number;
+    publisher?: string | null;
+    deleted?: boolean;
+};
+
+function versionOption(option: FacetOption) {
+    return {
+        ...option,
+        label: <ModelName name={option.label} deleted={option.deleted} />,
+        text: withDeleted(option.label, option.deleted),
+    };
+}
 
 function Muted({ children }: { children: ReactNode }) {
     return <span className="text-muted-foreground">{children}</span>;
@@ -103,7 +118,11 @@ const COLUMNS: ColumnDef<RequestRow, unknown>[] = [
         id: "model",
         header: "Model",
         cell: ({ row }) => (
-            <span className="block max-w-56 truncate">{modelLabel(row.original)}</span>
+            <ModelName
+                name={modelLabel(row.original)}
+                deleted={row.original.deleted}
+                className="block max-w-56 truncate"
+            />
         ),
     },
     {
@@ -332,7 +351,9 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                     label="Version"
                     allLabel="All versions"
                     noun="versions"
-                    options={withChosen(facets.data?.versions ?? [], filter.version)}
+                    options={withChosen(facets.data?.versions ?? [], filter.version).map(
+                        versionOption,
+                    )}
                     value={filter.version}
                     onValueChange={(next) => update({ version: next.join(",") })}
                 />
@@ -381,7 +402,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                 total={list.total}
                 onOpen={(row) => update({ request: String(row.id) })}
                 rowLabel={(row) =>
-                    `Request ${row.id}, ${modelLabel(row)}, status ${row.status}, ${exactTime(row.at)}`
+                    `Request ${row.id}, ${withDeleted(modelLabel(row), row.deleted)}, status ${row.status}, ${exactTime(row.at)}`
                 }
                 empty={empty}
                 minWidth="min-w-[1040px]"

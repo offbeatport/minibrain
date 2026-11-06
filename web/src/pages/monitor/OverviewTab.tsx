@@ -11,6 +11,7 @@ import {
     useRequestOverview,
     useRequestSummary,
 } from "~/api/requestQueries";
+import { ModelName, withDeleted } from "~/components/ModelName";
 import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Section } from "~/components/Section";
 import type { ChartSeries } from "~/components/charts/TimeChart";
@@ -73,7 +74,7 @@ function chartSeries(overview: RequestOverview | undefined, slots: Map<string, n
     return (overview?.series ?? []).map(
         (item): ChartSeries => ({
             key: item.key,
-            label: item.label,
+            label: withDeleted(item.label, item.deleted),
             color: item.other ? OTHER_COLOR : SLOT_COLORS[slots.get(item.key) ?? 0],
         }),
     );
@@ -87,7 +88,7 @@ const COLUMNS: ColumnDef<OverviewModel, unknown>[] = [
         accessorFn: (row) => row.label,
         cell: ({ row }) => (
             <span className="block max-w-72 truncate" title={row.original.key}>
-                {row.original.label}
+                <ModelName name={row.original.label} deleted={row.original.deleted} />
             </span>
         ),
     },
@@ -241,7 +242,9 @@ export function OverviewTab({ paused }: { paused: boolean }) {
                                 }),
                             )
                         }
-                        rowLabel={(row) => `${row.label}, ${count(row.requests)} requests`}
+                        rowLabel={(row) =>
+                            `${withDeleted(row.label, row.deleted)}, ${count(row.requests)} requests`
+                        }
                         minWidth="min-w-[860px]"
                     />
                 </Section>

@@ -1,5 +1,6 @@
 import { type ProviderId, ProviderLogo } from "obp-ui";
 import type { ReactNode } from "react";
+import { ModelName, withDeleted } from "./ModelName";
 
 const PROVIDERS: Record<string, ProviderId> = {
     Qwen: "qwen",
@@ -71,10 +72,18 @@ export function ModelLabel({
     );
 }
 
-export function modelOption<T extends { label: string; publisher?: string | null }>(option: T) {
+export function modelOption<
+    T extends { label: string; publisher?: string | null; deleted?: boolean },
+>(option: T) {
     return {
         ...option,
-        label: <ModelLabel publisher={option.publisher} name={option.label} />,
-        text: option.label,
+        label: (
+            <ModelLabel
+                publisher={option.publisher}
+                name={option.label}
+                label={<ModelName name={option.label} deleted={option.deleted} />}
+            />
+        ),
+        text: withDeleted(option.label, option.deleted),
     };
 }
