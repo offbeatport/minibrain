@@ -5,7 +5,7 @@ from typing import Any
 
 from minibrain.data.splits import read_split
 from minibrain.ml.completion import Completion
-from minibrain.ml.context import JobSpec, report, run_child, write_result
+from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.ml.devices import device_name
 from minibrain.ml.runtime import Runtime
 from minibrain.registry.models import VersionKind
@@ -78,7 +78,13 @@ class Evaluation:
     def advance(self, count: int) -> None:
         self.done += count
         if self.done % REPORT_EVERY < count or self.done == self.total:
-            report(self.done / self.total, evaluated=self.done, of=self.total)
+            emit(
+                "score.progress",
+                f"Answered {self.done} of {self.total} rows",
+                progress=self.done / self.total,
+                done=self.done,
+                total=self.total,
+            )
 
     def generate(self, prompts: list[str]) -> list[Completion]:
         found = self.runtime.generate(prompts, self.adapter, self.max_tokens, self.choices)
@@ -115,7 +121,14 @@ def main(spec: JobSpec) -> None:
     }
     answers = {"golden": [c.text for c in golden_completions], "eval": [c.text for c in eval_pass.completions]}
     write_result(spec, {"metrics": metrics, "answers": answers})
-    report(1.0, latency=metrics["latency"], prompt_tokens=metrics["prompt_tokens"], device=metrics["device"])
+    emit(
+        "score.done",
+        f"Answered {evaluation.done} rows on {runtime.device}",
+        progress=1.0,
+        latency=metrics["latency"],
+        prompt_tokens=metrics["prompt_tokens"],
+        device=metrics["device"],
+    )
 
 
 if __name__ == "__main__":

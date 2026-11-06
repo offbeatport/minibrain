@@ -2,7 +2,7 @@ import errno
 import json
 from typing import Any
 
-from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
+from minibrain.ml.context import FinalError, JobSpec, emit, run_child, write_result
 from minibrain.models.files import Progress, write_stream
 from minibrain.models.sources import StorageSource, location_url
 from minibrain.models.transfer import Target, check_room, disk_full
@@ -162,7 +162,8 @@ def main(spec: JobSpec) -> None:
     staging.finish(record)
     result = {"files": manifest, "size_bytes": progress.total, "source": url, "variant_id": record["variant_id"]}
     write_result(spec, result)
-    report(1.0, step="verified against the catalogue" if variant else "imported, not verified", files=len(manifest))
+    done = "Imported and verified against the catalogue" if variant else "Imported, not verified against the catalogue"
+    emit("import.done", done, progress=1.0, files=len(manifest), bytes=progress.total, verified=variant is not None)
 
 
 if __name__ == "__main__":

@@ -372,7 +372,11 @@ class JobAttempt(Base):
 
 class JobEvent(Base):
     __tablename__ = "job_events"
-    __table_args__ = (Index("ix_job_events_job", "job_id", "id"), {"sqlite_autoincrement": True})
+    __table_args__ = (
+        Index("ix_job_events_job", "job_id", "id"),
+        Index("ix_job_events_name", "job_id", "name", "id"),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"))
@@ -381,6 +385,8 @@ class JobEvent(Base):
     message: Mapped[str] = mapped_column(default="")
     data: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    level: Mapped[str] = mapped_column(default="info", server_default="info")
+    name: Mapped[str | None] = mapped_column(default=None)
 
 
 class ApiKey(Base):

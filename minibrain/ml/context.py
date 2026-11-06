@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from minibrain.base_models import BaseModelSpec, base_model
+from minibrain.jobs.output import stamp, utc_now
 
 FINAL_EXIT = 2
 
@@ -41,9 +42,15 @@ def load_spec(path: Path) -> JobSpec:
     return JobSpec(raw=raw, result_path=Path(raw["result"]))
 
 
-def report(progress: float | None = None, **details: Any) -> None:
-    entry = details if progress is None else {"progress": round(max(0.0, min(progress, 1.0)), 4)} | details
-    print(json.dumps(entry), flush=True)
+def emit(event: str, message: str = "", level: str = "info", progress: float | None = None, **fields: Any) -> None:
+    entry: dict[str, Any] = {"ts": stamp(utc_now()), "level": level, "event": event, "message": message}
+    if progress is not None:
+        entry["progress"] = round(max(0.0, min(progress, 1.0)), 4)
+    print(json.dumps(entry | fields, default=str), flush=True)
+
+
+def fail_with(message: str, retryable: bool, code: str | None = None) -> None:
+    emit("job.error", message, "error", retryable=retryable, code=code)
 
 
 def write_result(spec: JobSpec, result: dict[str, Any]) -> None:
@@ -55,10 +62,10 @@ def run_child(main: Callable[[JobSpec], None], final_errors: tuple[type[Exceptio
     try:
         main(spec)
     except (FinalError, *final_errors) as error:
-        code = getattr(error, "code", None)
-        print(json.dumps({"error": str(error), "retryable": False} | ({"code": code} if code else {})), flush=True)
+        fail_with(str(error), False, getattr(error, "code", None))
         sys.exit(FINAL_EXIT)
     except Exception as error:
         traceback.print_exc()
-        print(json.dumps({"error": f"{type(error).__name__}: {error}", "retryable": True}), flush=True)
+        sys.stderr.flush()
+        fail_with(f"{type(error).__name__}: {error}", True)
         sys.exit(1)

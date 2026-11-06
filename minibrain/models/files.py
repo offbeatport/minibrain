@@ -6,10 +6,11 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from minibrain.ml.context import report
+from minibrain.ml.context import emit
 
 CHUNK = 1 << 20
 REPORT_SECONDS = 1.0
+SPEED_WINDOW = 5
 
 
 def sha256_of(path: Path) -> str:
@@ -32,12 +33,27 @@ class Progress:
         self.done = 0
         self.verb = verb
         self.reported = 0.0
+        self.marks: list[tuple[float, int]] = []
+
+    def speed(self, moment: float) -> float | None:
+        self.marks = [*self.marks, (moment, self.done)][-SPEED_WINDOW:]
+        (start, before), (end, after) = self.marks[0], self.marks[-1]
+        return (after - before) / (end - start) if end > start else None
 
     def add(self, count: int, path: str) -> None:
         self.done += count
-        if time.monotonic() - self.reported >= REPORT_SECONDS or self.done >= self.total:
-            self.reported = time.monotonic()
-            report(self.done / self.total, step=f"{self.verb} {path}", bytes=self.done, total=self.total)
+        moment = time.monotonic()
+        if moment - self.reported >= REPORT_SECONDS or self.done >= self.total:
+            self.reported = moment
+            emit(
+                "transfer.progress",
+                f"{self.verb.capitalize()} {path}",
+                progress=self.done / self.total,
+                bytes=self.done,
+                total=self.total,
+                bytes_per_second=self.speed(moment),
+                file=path,
+            )
 
 
 def write_stream(chunks: Iterator[bytes], target: Path, progress: Progress, name: str) -> str:

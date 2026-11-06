@@ -488,6 +488,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Jobs** · shipped · ml, admin
   Follow, cancel and retry every background job with its log.
   UI: Monitor › Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
+- **Job page** · shipped · product, ml, admin
+  See one job's outcome, loss and learning-rate curves, progress and log.
+  UI: Jobs › job, Training › job, Monitor › Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry
+- **Job log** · shipped · ml, admin
+  Read a job's own events apart from library output, by level.
+  UI: Jobs › job › Logs · API: GET /api/jobs/{job_id}/events
 - **OpenTelemetry export** · shipped · admin
   Send traces and metrics to your own collector only.
   UI: Settings › Security › OpenTelemetry export · Policy: otel_protocol, otel_endpoint, otel_headers, otel_service_name, otel_ca_bundle · Config: OTEL_EXPORTER_OTLP_ENDPOINT

@@ -1,4 +1,4 @@
-from minibrain.ml.context import JobSpec, report, run_child, write_result
+from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.ml.runtime import Runtime
 from minibrain.serve.dialects import answer_text
 from minibrain.tasks.judge import Item, grade_value, messages_for, reason_of
@@ -26,8 +26,23 @@ def main(spec: JobSpec) -> None:
             reason = reason_of(text)
             if reason:
                 reasons[item.key] = reason
-        report((start + len(batch)) / max(len(items), 1), judged=start + len(batch), of=len(items))
+        done = start + len(batch)
+        emit(
+            "judge.progress",
+            f"Judged {done} of {len(items)} answers",
+            progress=done / max(len(items), 1),
+            done=done,
+            total=len(items),
+        )
     write_result(spec, {"scores": scores, "reasons": reasons})
+    emit(
+        "judge.done",
+        f"Scored {len(scores)} of {len(items)} answers",
+        progress=1.0,
+        scored=len(scores),
+        total=len(items),
+        device=runtime.device,
+    )
 
 
 if __name__ == "__main__":

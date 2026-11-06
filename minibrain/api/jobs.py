@@ -16,8 +16,10 @@ from minibrain.api.deps import QueueDep, SessionDep, StoreDep
 from minibrain.api.schemas import JobActionResult, JobDetail, JobEventInfo, JobFacets, JobIds, JobInfo, JobPage
 from minibrain.api.views import job_detail, job_info
 from minibrain.auth.identity import current_actor
+from minibrain.jobs.metrics import device_of
+from minibrain.jobs.output import SOURCES, level_of
 from minibrain.jobs.queue import JobStateError, SqlJobQueue
-from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, AuditEvent, Job, JobEvent, Model
+from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, AuditEvent, Job, JobEvent, Model, Worker
 from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -149,15 +151,38 @@ def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     )
 
 
+def serving(job: Job) -> bool:
+    model, version = job.model, job.version
+    return model is not None and version is not None and model.deployed and model.current_version == version.number
+
+
+def worker_host(session: Session, job: Job) -> str | None:
+    attempt = max(job.attempts, key=lambda item: item.number, default=None)
+    if attempt is None:
+        return None
+    worker = session.get(Worker, attempt.worker)
+    return worker.host if worker is not None else None
+
+
 @router.get("/jobs/{job_id}", dependencies=[Depends(viewer)])
 def read_job(job_id: int, session: SessionDep) -> JobDetail:
-    found = job_detail(get_job(session, job_id))
+    job = get_job(session, job_id)
+    context = {"device": device_of(session, job.id), "host": worker_host(session, job), "live": serving(job)}
+    found = job_detail(job).model_copy(update=context)
     return found if sees_rows() else found.model_copy(update={"result": None, "outputs": {}})
 
 
 def event_info(event: JobEvent) -> JobEventInfo:
     return JobEventInfo(
-        id=event.id, attempt=event.attempt, kind=event.kind, message=event.message, data=event.data, at=event.at
+        id=event.id,
+        attempt=event.attempt,
+        kind=event.kind,
+        source=SOURCES.get(event.kind, "library"),
+        level=level_of(event.level),
+        name=event.name,
+        message=event.message,
+        data=event.data,
+        at=event.at,
     )
 
 

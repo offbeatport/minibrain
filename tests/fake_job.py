@@ -4,14 +4,22 @@ import sys
 import time
 from pathlib import Path
 
+from minibrain.ml.context import emit
+
 if __name__ == "__main__":
     spec = json.loads(Path(sys.argv[1]).read_text())
-    print(json.dumps({"progress": 0.5, "step": "half way"}), flush=True)
+    emit("train.step", "half way", progress=0.5, step=1, steps=2, loss=1.5, learning_rate=0.0002)
+    if os.environ.get("FAKE_JOB_NOISE"):
+        print("W1106 15:54:54.156000 56775 redirects.py:35] NOTE: Redirects are currently not supported.", flush=True)
+        print('{"not": "ours"}', flush=True)
+        print("Traceback (most recent call last):", flush=True)
+        print('  File "x.py", line 1, in <module>', flush=True)
+        print("ValueError: noisy", flush=True)
     time.sleep(float(os.environ.get("FAKE_JOB_SECONDS", "0")))
     code = int(os.environ.get("FAKE_JOB_EXIT", "0"))
     if code:
         error = os.environ.get("FAKE_JOB_ERROR", "boom")
-        print(json.dumps({"error": error, "retryable": code != 2}), flush=True)
+        emit("job.error", error, "error", retryable=code != 2)
         sys.exit(code)
     out = spec.get("out") or spec.get("adapter_out")
     if out:

@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from minibrain.ml.context import FinalError, JobSpec, report, run_child, write_result
+from minibrain.ml.context import FinalError, JobSpec, emit, run_child, write_result
 
 REQUIRED = ("id", "repo", "variants")
 
@@ -22,7 +22,7 @@ def main(spec: JobSpec) -> None:
     url = spec.raw.get("url")
     if not url:
         raise FinalError("No catalogue URL configured; the bundled catalogue stays in use")
-    report(0.2, step=f"fetching {url}")
+    emit("sync.fetch", f"Fetching {url}", progress=0.2, url=url)
     with httpx.Client(timeout=httpx.Timeout(30.0), follow_redirects=True) as client:
         response = client.get(url)
     if response.status_code >= 400:
@@ -30,7 +30,13 @@ def main(spec: JobSpec) -> None:
     snapshot = response.json()
     entries = validate(snapshot)
     write_result(spec, {"snapshot": snapshot["snapshot"], "entries": entries})
-    report(1.0, step=f"{len(entries)} entries from snapshot {snapshot['snapshot']}")
+    emit(
+        "sync.done",
+        f"{len(entries)} entries from snapshot {snapshot['snapshot']}",
+        progress=1.0,
+        entries=len(entries),
+        snapshot=snapshot["snapshot"],
+    )
 
 
 if __name__ == "__main__":

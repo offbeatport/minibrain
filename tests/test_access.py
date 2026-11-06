@@ -173,6 +173,7 @@ ROUTE_ROLES = {
     ("GET", "/api/jobs/facets"): "viewer",
     ("GET", "/api/jobs/{job_id}"): "viewer",
     ("GET", "/api/jobs/{job_id}/events"): "viewer",
+    ("GET", "/api/jobs/{job_id}/metrics"): "viewer",
     ("POST", "/api/jobs/cancel"): "builder",
     ("POST", "/api/jobs/retry"): "builder",
     ("POST", "/api/jobs/{job_id}/cancel"): "builder",

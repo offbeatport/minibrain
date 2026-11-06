@@ -1,6 +1,7 @@
 import hmac
 import time
-from typing import Annotated, Any
+from datetime import datetime
+from typing import Annotated, Any, Literal
 
 import pydantic
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
@@ -79,9 +80,12 @@ class HeartbeatResponse(pydantic.BaseModel):
 
 
 class EventBody(pydantic.BaseModel):
-    kind: str
+    kind: Literal["event", "log"]
     message: str = ""
     data: dict[str, Any] | None = None
+    level: Literal["debug", "info", "warning", "error"] = "info"
+    name: str | None = None
+    at: datetime | None = None
 
 
 class EventsBody(TokenBody):
@@ -175,7 +179,11 @@ def heartbeat(job_id: int, body: TokenBody, queue: QueueDep) -> HeartbeatRespons
 
 @router.post("/jobs/{job_id}/events", status_code=204)
 def events(job_id: int, body: EventsBody, queue: QueueDep) -> None:
-    queue.record(job_id, body.token, [EventIn(event.kind, event.message, event.data) for event in body.events])
+    queue.record(
+        job_id,
+        body.token,
+        [EventIn(e.kind, e.message, e.data, e.level, e.name, e.at) for e in body.events],
+    )
 
 
 @router.post("/jobs/{job_id}/complete", status_code=204)

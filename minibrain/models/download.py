@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from minibrain.ml.context import JobSpec, report, run_child, write_result
+from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.models.sources import HubSource
 from minibrain.models.transfer import ChecksumError, Target, hub_errors, hub_ready, install
 
@@ -21,7 +21,7 @@ def main(spec: JobSpec) -> None:
     target.finish({"repo": repo, "revision": revision, "files": recorded})
     size = sum(int(entry["size"]) for entry in files)
     write_result(spec, {"files": recorded, "size_bytes": size, "revision": revision})
-    report(1.0, step="validated", files=len(files))
+    emit("download.done", f"Downloaded and checked {len(files)} files", progress=1.0, files=len(files), bytes=size)
 
 
 if __name__ == "__main__":

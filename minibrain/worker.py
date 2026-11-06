@@ -20,6 +20,7 @@ from typing import IO, Any, BinaryIO, Protocol
 import httpx
 
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing, StreamReader
+from minibrain.jobs.output import OutputParser, structured
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL
@@ -47,6 +48,8 @@ HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
 CLAIM_WAIT_SECONDS = 25.0
 RETRIES = 6
+STAGED = "file.staged"
+JOB_ERROR = "job.error"
 QUIET_ENV = {
     "HF_HUB_DISABLE_PROGRESS_BARS": "1",
     "HF_DATASETS_DISABLE_PROGRESS_BARS": "1",
@@ -250,6 +253,7 @@ class LineCollector:
         self.stream = stream
         self.log_path = log_path
         self.publisher = publisher
+        self.parser = OutputParser()
         self.pending: list[dict[str, Any]] = []
         self.tail: list[str] = []
         self.lock = threading.Lock()
@@ -261,41 +265,30 @@ class LineCollector:
             for raw in iter(self.stream.readline, b""):
                 log.write(raw)
                 log.flush()
-                self.add(raw.decode(errors="replace").rstrip("\n"))
+                self.add(raw.decode(errors="replace").rstrip("\r\n"))
 
     def add(self, line: str) -> None:
-        events: list[dict[str, Any]] = [{"kind": "log", "message": line}]
-        parsed = parse_json(line)
-        if parsed is not None and "progress" in parsed:
-            events.append({"kind": "progress", "message": "", "data": parsed})
-        if parsed is not None and "staged" in parsed and self.publisher is not None:
-            self.publisher.staged(parsed)
         with self.lock:
-            self.pending += events
+            records = self.parser.feed(line)
+            self.pending += records
             self.tail = [*self.tail, line][-50:]
+        for record in records:
+            if record["name"] == STAGED and self.publisher is not None:
+                self.publisher.staged(record["data"] or {})
 
-    def drain(self) -> list[dict[str, Any]]:
+    def drain(self, final: bool = False) -> list[dict[str, Any]]:
         with self.lock:
-            drained, self.pending = self.pending, []
+            drained, self.pending = self.pending + self.parser.flush(final), []
         return drained
-
-
-def parse_json(line: str) -> dict[str, Any] | None:
-    if not line.startswith("{"):
-        return None
-    try:
-        value = json.loads(line)
-    except json.JSONDecodeError:
-        return None
-    return value if isinstance(value, dict) else None
 
 
 def failure_from(tail: list[str], exit_code: int) -> tuple[str, bool, str | None]:
     for line in reversed(tail):
-        parsed = parse_json(line)
-        if parsed is not None and "error" in parsed:
-            code = parsed.get("code")
-            return str(parsed["error"]), bool(parsed.get("retryable", True)), str(code) if code else None
+        entry = structured(line)
+        if entry is not None and entry["event"] == JOB_ERROR:
+            code = entry.get("code")
+            message = str(entry.get("message") or "failed")
+            return message, bool(entry.get("retryable", True)), str(code) if code else None
     return f"exited with code {exit_code}", exit_code != FINAL_EXIT, None
 
 
@@ -498,11 +491,11 @@ class Worker:
             stop_group(process)
             raise
         lines.thread.join(timeout=10)
-        self.flush(job_id, token, lines)
+        self.flush(job_id, token, lines, final=True)
         return process.returncode, cancelled, lines.tail
 
-    def flush(self, job_id: int, token: str, lines: LineCollector) -> None:
-        events = lines.drain()
+    def flush(self, job_id: int, token: str, lines: LineCollector, final: bool = False) -> None:
+        events = lines.drain(final)
         for start in range(0, len(events), 200):
             self.client.events(job_id, token, events[start : start + 200])
 

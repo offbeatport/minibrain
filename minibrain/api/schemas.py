@@ -510,15 +510,75 @@ class JobDetail(JobInfo):
     attempts: list[AttemptInfo]
     result: dict[str, Any] | None
     outputs: dict[str, str]
+    device: str | None = None
+    host: str | None = None
+    live: bool = False
 
 
 class JobEventInfo(BaseModel):
     id: int
     attempt: int
     kind: str
+    source: Literal["minibrain", "library", "system"]
+    level: Literal["debug", "info", "warning", "error"]
+    name: str | None
     message: str
     data: dict[str, Any] | None
     at: datetime
+
+
+class TrainPoint(BaseModel):
+    step: int
+    epoch: float | None = None
+    loss: float | None = None
+    learning_rate: float | None = None
+    grad_norm: float | None = None
+    tokens_per_second: float | None = None
+    memory_bytes: int | None = None
+
+
+class EvalPoint(BaseModel):
+    step: int
+    eval_loss: float
+
+
+class TrainingCurve(BaseModel):
+    points: list[TrainPoint]
+    evals: list[EvalPoint]
+
+
+class TrainingMetrics(TrainingCurve):
+    step: int | None
+    steps: int | None
+    epoch: float | None
+    eta_seconds: float | None
+    tokens_per_second: float | None
+    memory_bytes: int | None
+    rising_from: int | None
+
+
+class PreviousTraining(TrainingCurve):
+    job_id: int
+    version: int | None
+
+
+class TransferMetrics(BaseModel):
+    bytes: int
+    total: int
+    bytes_per_second: float | None
+    file: str | None
+
+
+class CountedMetrics(BaseModel):
+    done: int
+    total: int
+
+
+class JobMetrics(BaseModel):
+    training: TrainingMetrics | None = None
+    previous: PreviousTraining | None = None
+    transfer: TransferMetrics | None = None
+    counted: CountedMetrics | None = None
 
 
 class ScoreInfo(BaseModel):

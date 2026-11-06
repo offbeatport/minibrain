@@ -7819,6 +7819,48 @@
         }
       }
     },
+    "/api/jobs/{job_id}/metrics": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Metrics",
+        "operationId": "job_metrics_api_jobs__job_id__metrics_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/requests/overview": {
       "get": {
         "tags": [
@@ -14741,6 +14783,24 @@
         ],
         "title": "ContractUpdate"
       },
+      "CountedMetrics": {
+        "properties": {
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "done",
+          "total"
+        ],
+        "title": "CountedMetrics"
+      },
       "DataSettings": {
         "properties": {
           "row_limit": {
@@ -16566,10 +16626,32 @@
         ],
         "title": "EvalCost"
       },
+      "EvalPoint": {
+        "properties": {
+          "step": {
+            "type": "integer",
+            "title": "Step"
+          },
+          "eval_loss": {
+            "type": "number",
+            "title": "Eval Loss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "eval_loss"
+        ],
+        "title": "EvalPoint"
+      },
       "EventBody": {
         "properties": {
           "kind": {
             "type": "string",
+            "enum": [
+              "event",
+              "log"
+            ],
             "title": "Kind"
           },
           "message": {
@@ -16588,6 +16670,40 @@
               }
             ],
             "title": "Data"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "debug",
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Level",
+            "default": "info"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
           }
         },
         "type": "object",
@@ -19210,6 +19326,33 @@
             },
             "type": "object",
             "title": "Outputs"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live",
+            "default": false
           }
         },
         "type": "object",
@@ -19434,6 +19577,52 @@
           "finished_at"
         ],
         "title": "JobInfo"
+      },
+      "JobMetrics": {
+        "properties": {
+          "training": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviousTraining"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transfer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransferMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counted": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CountedMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "JobMetrics"
       },
       "JobPage": {
         "properties": {
@@ -22664,6 +22853,47 @@
         ],
         "title": "PreviewRow"
       },
+      "PreviousTraining": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrainPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "evals": {
+            "items": {
+              "$ref": "#/components/schemas/EvalPoint"
+            },
+            "type": "array",
+            "title": "Evals"
+          },
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points",
+          "evals",
+          "job_id",
+          "version"
+        ],
+        "title": "PreviousTraining"
+      },
       "PromotionInfo": {
         "properties": {
           "thresholds": {
@@ -25758,6 +25988,85 @@
         ],
         "title": "TrainFitInfo"
       },
+      "TrainPoint": {
+        "properties": {
+          "step": {
+            "type": "integer",
+            "title": "Step"
+          },
+          "epoch": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epoch"
+          },
+          "loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss"
+          },
+          "learning_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Rate"
+          },
+          "grad_norm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Norm"
+          },
+          "tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Second"
+          },
+          "memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step"
+        ],
+        "title": "TrainPoint"
+      },
       "TrainingDefaults": {
         "properties": {
           "strategy": {
@@ -25826,6 +26135,114 @@
           "max_rows"
         ],
         "title": "TrainingDefaults"
+      },
+      "TrainingMetrics": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrainPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "evals": {
+            "items": {
+              "$ref": "#/components/schemas/EvalPoint"
+            },
+            "type": "array",
+            "title": "Evals"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "epoch": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epoch"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds"
+          },
+          "tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Second"
+          },
+          "memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Bytes"
+          },
+          "rising_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rising From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points",
+          "evals",
+          "step",
+          "steps",
+          "epoch",
+          "eta_seconds",
+          "tokens_per_second",
+          "memory_bytes",
+          "rising_from"
+        ],
+        "title": "TrainingMetrics"
       },
       "TrainingOptionInfo": {
         "properties": {
@@ -26038,6 +26455,48 @@
           "defaults"
         ],
         "title": "TrainingPlanInfo"
+      },
+      "TransferMetrics": {
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "bytes_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes Per Second"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bytes",
+          "total",
+          "bytes_per_second",
+          "file"
+        ],
+        "title": "TransferMetrics"
       },
       "TurnInfo": {
         "properties": {

@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from minibrain.encryption.envelope import EnvelopeError
-from minibrain.ml.context import JobSpec, report, run_child, write_result
+from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.models.copies import BUCKET, CopyError, bucket_chunks, bucket_client
 from minibrain.models.files import Progress, file_chunks
 from minibrain.models.health import CORRUPT, MISSING, WRONG_SIZE
@@ -71,16 +71,18 @@ def main(spec: JobSpec) -> None:
     files: list[dict[str, Any]] = spec.raw["files"]
     progress = Progress(sum(int(entry["size"]) for entry in files), "checking")
     if spec.raw.get("store") == BUCKET:
-        report(0.0, step=f"checking {len(files)} files in the bucket")
+        emit("verify.start", f"Checking {len(files)} files in the bucket", progress=0.0, files=len(files))
         checked = check_bucket(files, progress)
     else:
-        report(0.0, step=f"checking {len(files)} files in {folder}")
+        emit("verify.start", f"Checking {len(files)} files in {folder}", progress=0.0, files=len(files))
         checked = [check(folder, entry, progress) for entry in files]
     bad = [entry for entry in checked if entry["status"] != "ok"]
     for entry in bad:
-        report(step=f"{entry['path']}: {entry['status'].replace('_', ' ')}")
+        status = entry["status"].replace("_", " ")
+        emit("verify.file", f"{entry['path']}: {status}", "warning", path=entry["path"], status=entry["status"])
     write_result(spec, {"files": checked})
-    report(1.0, step=f"{len(checked) - len(bad)} of {len(checked)} files match", bad=len(bad))
+    matched = f"{len(checked) - len(bad)} of {len(checked)} files match"
+    emit("verify.done", matched, "warning" if bad else "info", progress=1.0, files=len(checked), bad=len(bad))
 
 
 if __name__ == "__main__":

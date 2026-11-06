@@ -2290,6 +2290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Metrics */
+        get: operations["job_metrics_api_jobs__job_id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests/overview": {
         parameters: {
             query?: never;
@@ -4445,6 +4462,13 @@ export interface components {
              */
             breaking?: boolean;
         };
+        /** CountedMetrics */
+        CountedMetrics: {
+            /** Done */
+            done: number;
+            /** Total */
+            total: number;
+        };
         /** DataSettings */
         DataSettings: {
             /** Row Limit */
@@ -5030,10 +5054,20 @@ export interface components {
             /** Per 1K */
             per_1k: number | null;
         };
+        /** EvalPoint */
+        EvalPoint: {
+            /** Step */
+            step: number;
+            /** Eval Loss */
+            eval_loss: number;
+        };
         /** EventBody */
         EventBody: {
-            /** Kind */
-            kind: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "event" | "log";
             /**
              * Message
              * @default
@@ -5043,6 +5077,16 @@ export interface components {
             data?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Level
+             * @default info
+             * @enum {string}
+             */
+            level?: "debug" | "info" | "warning" | "error";
+            /** Name */
+            name?: string | null;
+            /** At */
+            at?: string | null;
         };
         /** EventsBody */
         EventsBody: {
@@ -5890,6 +5934,15 @@ export interface components {
             outputs: {
                 [key: string]: string;
             };
+            /** Device */
+            device?: string | null;
+            /** Host */
+            host?: string | null;
+            /**
+             * Live
+             * @default false
+             */
+            live?: boolean;
         };
         /** JobFacets */
         JobFacets: {
@@ -5951,6 +6004,13 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+        };
+        /** JobMetrics */
+        JobMetrics: {
+            training?: components["schemas"]["TrainingMetrics"] | null;
+            previous?: components["schemas"]["PreviousTraining"] | null;
+            transfer?: components["schemas"]["TransferMetrics"] | null;
+            counted?: components["schemas"]["CountedMetrics"] | null;
         };
         /** JobPage */
         JobPage: {
@@ -6999,6 +7059,17 @@ export interface components {
             /** Label */
             label: string | null;
         };
+        /** PreviousTraining */
+        PreviousTraining: {
+            /** Points */
+            points: components["schemas"]["TrainPoint"][];
+            /** Evals */
+            evals: components["schemas"]["EvalPoint"][];
+            /** Job Id */
+            job_id: number;
+            /** Version */
+            version: number | null;
+        };
         /** PromotionInfo */
         PromotionInfo: {
             /** Thresholds */
@@ -8043,6 +8114,23 @@ export interface components {
             /** Basis */
             basis: string;
         };
+        /** TrainPoint */
+        TrainPoint: {
+            /** Step */
+            step: number;
+            /** Epoch */
+            epoch?: number | null;
+            /** Loss */
+            loss?: number | null;
+            /** Learning Rate */
+            learning_rate?: number | null;
+            /** Grad Norm */
+            grad_norm?: number | null;
+            /** Tokens Per Second */
+            tokens_per_second?: number | null;
+            /** Memory Bytes */
+            memory_bytes?: number | null;
+        };
         /** TrainingDefaults */
         TrainingDefaults: {
             /** Strategy */
@@ -8061,6 +8149,27 @@ export interface components {
             epochs: number;
             /** Max Rows */
             max_rows: number;
+        };
+        /** TrainingMetrics */
+        TrainingMetrics: {
+            /** Points */
+            points: components["schemas"]["TrainPoint"][];
+            /** Evals */
+            evals: components["schemas"]["EvalPoint"][];
+            /** Step */
+            step: number | null;
+            /** Steps */
+            steps: number | null;
+            /** Epoch */
+            epoch: number | null;
+            /** Eta Seconds */
+            eta_seconds: number | null;
+            /** Tokens Per Second */
+            tokens_per_second: number | null;
+            /** Memory Bytes */
+            memory_bytes: number | null;
+            /** Rising From */
+            rising_from: number | null;
         };
         /** TrainingOptionInfo */
         TrainingOptionInfo: {
@@ -8124,6 +8233,17 @@ export interface components {
             /** Overrides */
             overrides: string[];
             defaults: components["schemas"]["TrainingDefaults"];
+        };
+        /** TransferMetrics */
+        TransferMetrics: {
+            /** Bytes */
+            bytes: number;
+            /** Total */
+            total: number;
+            /** Bytes Per Second */
+            bytes_per_second: number | null;
+            /** File */
+            file: string | null;
         };
         /** TurnInfo */
         TurnInfo: {
@@ -13629,6 +13749,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_metrics_api_jobs__job_id__metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMetrics"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -2,12 +2,13 @@ import secrets
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.jobs.output import EVENT, STATE
 from minibrain.jobs.policy import LEASE, backoff, policy
 from minibrain.registry.models import (
     FINAL_JOB_STATUSES,
@@ -60,6 +61,9 @@ class EventIn:
     kind: str
     message: str = ""
     data: dict[str, Any] | None = None
+    level: str = "info"
+    name: str | None = None
+    at: datetime | None = None
 
 
 @dataclass
@@ -70,8 +74,24 @@ class WorkerInfo:
     gpus: int = 1
 
 
-def add_event(session: Session, job: Job, kind: str, message: str, data: dict[str, Any] | None = None) -> None:
-    session.add(JobEvent(job_id=job.id, attempt=job.attempt, kind=kind, message=message, data=data))
+def add_event(
+    session: Session,
+    job: Job,
+    kind: str,
+    message: str,
+    data: dict[str, Any] | None = None,
+    level: str = "info",
+    name: str | None = None,
+    at: datetime | None = None,
+) -> None:
+    event = JobEvent(job_id=job.id, attempt=job.attempt, kind=kind, message=message, data=data, level=level, name=name)
+    if at is not None:
+        event.at = at if at.tzinfo is not None else at.replace(tzinfo=UTC)
+    session.add(event)
+
+
+def add_state(session: Session, job: Job, message: str, level: str = "info") -> None:
+    add_event(session, job, STATE, message, level=level)
 
 
 def enqueue(
@@ -110,7 +130,7 @@ def enqueue(
     )
     session.add(job)
     session.flush()
-    add_event(session, job, "state", "queued")
+    add_state(session, job, "queued")
     return job
 
 
@@ -184,7 +204,7 @@ class SqlJobQueue:
                 raise JobStateError(f"job {claimed} vanished during claim")
             session.refresh(job)
             session.add(JobAttempt(job_id=job.id, number=job.attempt, worker=worker.id, started_at=moment))
-            add_event(session, job, "state", f"attempt {job.attempt} started on {worker.host}")
+            add_state(session, job, f"attempt {job.attempt} started on {worker.host}")
             session.commit()
             return Claim(
                 job_id=job.id,
@@ -216,9 +236,9 @@ class SqlJobQueue:
         with self.lock, self.sessions() as session:
             job = self.leased(session, job_id, token)
             for event in events:
-                add_event(session, job, event.kind, event.message, event.data)
+                add_event(session, job, event.kind, event.message, event.data, event.level, event.name, event.at)
                 progress = (event.data or {}).get("progress")
-                if event.kind == "progress" and isinstance(progress, int | float):
+                if event.kind == EVENT and isinstance(progress, int | float):
                     job.progress = max(0.0, min(float(progress), 1.0))
             session.commit()
 
@@ -248,7 +268,10 @@ class SqlJobQueue:
             job.error_code = None
         job.finished_at = self.clock()
         self.release(job)
-        add_event(session, job, "state", status if error is None else f"{status}: {error}")
+        if error is None:
+            add_state(session, job, status, "warning" if status == JobStatus.CANCELLED else "info")
+        else:
+            add_state(session, job, f"{status}: {error}", "error")
         if status == JobStatus.SUCCEEDED:
             self.effects.on_success(session, job)
         else:
@@ -280,7 +303,7 @@ class SqlJobQueue:
             job.run_after = self.clock() + wait
             job.error = error
             self.release(job)
-            add_event(session, job, "state", f"retrying in {int(wait.total_seconds())}s: {error}")
+            add_state(session, job, f"retrying in {int(wait.total_seconds())} s: {error}", "warning")
             return
         self.finish(session, job, JobStatus.FAILED, error)
 
@@ -329,7 +352,7 @@ class SqlJobQueue:
             self.finish(session, job, JobStatus.CANCELLED)
         else:
             job.cancel_requested = True
-            add_event(session, job, "state", "cancel requested")
+            add_state(session, job, "cancel requested", "warning")
 
     def retry(self, session: Session, job: Job) -> Job:
         if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):

@@ -325,7 +325,7 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
     add_version(harness, "lora")
     claim = harness.claim(["train"])
     assert claim is not None
-    progress = [{"kind": "progress", "message": "", "data": {"progress": 0.65}}]
+    progress = [{"kind": "event", "name": "train.step", "message": "", "data": {"progress": 0.65}}]
     harness.internal(f"/jobs/{claim['job_id']}/events", {"token": claim["token"], "events": progress})
     row = rows(harness)[SLUG]
     assert (row["activity"]["label"], row["activity"]["progress"]) == ("v1 training", 0.65)

@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from minibrain.ml.context import JobSpec, report, run_child, write_result
+from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.models.download import TIMEOUT
 from minibrain.models.sources import HUB, HubSource, StorageSource, location_url
 from minibrain.models.transfer import (
@@ -40,7 +40,13 @@ def main(spec: JobSpec) -> None:
     recorded, repaired, origin = run(spec, files)
     Target.of(spec).finish({"source": origin, "files": recorded})
     write_result(spec, {"files": recorded, "repaired": repaired, "source": origin})
-    report(1.0, step=f"replaced {len(repaired)} of {len(files)} files from {origin}", repaired=len(repaired))
+    emit(
+        "repair.done",
+        f"Replaced {len(repaired)} of {len(files)} files from {origin}",
+        progress=1.0,
+        repaired=len(repaired),
+        files=len(files),
+    )
 
 
 if __name__ == "__main__":

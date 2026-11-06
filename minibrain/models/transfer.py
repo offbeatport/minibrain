@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from minibrain.ml.context import FinalError, JobSpec, report
+from minibrain.ml.context import FinalError, JobSpec, emit
 from minibrain.models import hub
 from minibrain.models.copies import BUCKET, MANIFEST
 from minibrain.models.files import Progress, file_chunks, sha256_of, valid
@@ -56,7 +56,14 @@ class Target:
         if not self.bucket:
             return
         target = self.out / str(entry["path"])
-        print(json.dumps({"staged": entry["path"], "sha256": entry["sha256"], "size": entry["size"]}), flush=True)
+        emit(
+            "file.staged",
+            f"Staged {entry['path']} for the bucket",
+            "debug",
+            staged=entry["path"],
+            sha256=entry["sha256"],
+            size=entry["size"],
+        )
         while target.exists():
             time.sleep(PUBLISH_POLL_SECONDS)
 
@@ -133,7 +140,7 @@ def install(
     out = target.out
     out.mkdir(parents=True, exist_ok=True)
     progress = Progress(sum(int(entry["size"]) for entry in files), verb)
-    report(0.0, step="checking existing files")
+    emit("transfer.check", "Checking existing files", progress=0.0, files=len(files))
     recorded: list[dict[str, Any]] = []
     pending: list[dict[str, Any]] = []
     for entry in files:

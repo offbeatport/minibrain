@@ -219,7 +219,10 @@ def test_events_stream_until_the_job_ends(harness: Harness) -> None:
     lora_job(harness)
     claim = harness.claim(["train"])
     assert claim is not None
-    events = [{"kind": "log", "message": "step 1"}, {"kind": "progress", "message": "", "data": {"progress": 0.25}}]
+    events = [
+        {"kind": "log", "message": "step 1"},
+        {"kind": "event", "name": "train.step", "message": "Step 1 of 4", "data": {"progress": 0.25}},
+    ]
     harness.internal(f"/jobs/{claim['job_id']}/events", {"token": claim["token"], "events": events})
     assert job(harness, claim["job_id"])["progress"] == 0.25
     fail(harness, claim, "stop", retryable=False)
