@@ -8,7 +8,6 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     Link,
@@ -23,11 +22,10 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { JobInfo, ModelSummary } from "~/api/client";
 import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
-import { isActiveJob, useJob, useModels } from "~/api/queries";
-import { JobPanel } from "~/components/JobPanel";
+import { isActiveJob, useModels } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
@@ -35,10 +33,9 @@ import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, JobStatus, jobStatusLabel } from "~/components/StatusBadge";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
-import { jobDuration, jobSeconds } from "~/lib/jobs";
-import { listHref, splitList, useListSearch } from "~/lib/listSearch";
+import { jobDuration, jobPageHref, jobSeconds } from "~/lib/jobs";
+import { splitList, useListSearch } from "~/lib/listSearch";
 import { evaluationsHref, trainingHref } from "~/lib/modelLinks";
-import { relativeTime } from "~/lib/time";
 import { Training } from "../TrainingPage";
 import { Updated } from "../models/MyModels";
 
@@ -180,44 +177,6 @@ function orderFrom(sorting: SortingState): JobOrder {
     return sorting[0]?.desc === false ? "oldest" : "newest";
 }
 
-function jobCaption(job: JobInfo): string {
-    const started = job.started_at ? `started ${relativeTime(job.started_at)}` : "not started";
-    const took = job.finished_at ? ` · took ${jobDuration(job)}` : "";
-    return `Job #${job.id} · ${started}${took}`;
-}
-
-function JobDialog({ id, onClose }: { id: number | null; onClose: () => void }) {
-    const job = useJob(id);
-    const data = job.data;
-    return (
-        <Dialog open={id !== null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>
-                        {data ? `${data.model_name ?? "Job"} · ${jobName(data)}` : `Job #${id}`}
-                    </DialogTitle>
-                    <DialogDescription>{data ? jobCaption(data) : "Loading…"}</DialogDescription>
-                </DialogHeader>
-                <ErrorLine error={job.error} />
-                {data && (
-                    <div className="min-w-0">
-                        <JobPanel job={data} slug={data.model ?? ""} />
-                    </div>
-                )}
-                {data?.model && (
-                    <DialogFooter>
-                        <Button variant="outline" asChild>
-                            <Link href={trainingHref(data.model)}>
-                                {`Open ${data.model_name ?? data.model}`}
-                            </Link>
-                        </Button>
-                    </DialogFooter>
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 function ModelChoice({ item }: { item: ModelSummary }) {
     return (
         <>
@@ -283,8 +242,20 @@ function jobId(value: string | undefined): number | null {
     return value && Number.isInteger(id) ? id : null;
 }
 
+function useOldJobLinks(job: string | undefined) {
+    const router = useRouter();
+    useEffect(() => {
+        const id = jobId(job);
+        if (id !== null) {
+            router.history.replace(jobPageHref(id));
+        }
+    }, [job, router]);
+}
+
 export function TrainingListPage() {
     const { search, update } = useListSearch(PATH, KEYS);
+    const router = useRouter();
+    useOldJobLinks(search.job);
     const can = useCan();
     const owned = useModels();
     const [picking, setPicking] = useState(false);
@@ -306,10 +277,7 @@ export function TrainingListPage() {
         jobs.rows,
         [search.model, search.status, search.q, search.since].join("\n"),
     );
-    const columns = useMemo(
-        () => jobColumns((job) => listHref(PATH, { ...search, job: String(job.id) })),
-        [search],
-    );
+    const columns = useMemo(() => jobColumns((job) => jobPageHref(job.id)), []);
     const modelOptions = (owned.data ?? []).map((item) =>
         modelOption({
             value: item.slug,
@@ -395,7 +363,7 @@ export function TrainingListPage() {
                 loadingMore={jobs.loadingMore}
                 onLoadMore={jobs.loadMore}
                 total={jobs.total}
-                onOpen={(job) => update({ job: String(job.id) })}
+                onOpen={(job) => router.history.push(jobPageHref(job.id))}
                 {...selection.grid}
                 rowLabel={(job) =>
                     `${job.model_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
@@ -416,7 +384,6 @@ export function TrainingListPage() {
                 }
                 minWidth="min-w-[760px]"
             />
-            <JobDialog id={jobId(search.job)} onClose={() => update({ job: "" })} />
             <TrainPicker open={picking} onOpenChange={setPicking} />
         </Page>
     );

@@ -240,6 +240,10 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - At-least-once execution: jobs write to a temporary location and commit atomically; training resumes from its last
   checkpoint after a lost lease.
 - Progress is events: workers post them, the UI follows over SSE. Logs are artifacts read by offset.
+- Job output is parsed as the worker reads it (built 2026-11-06): a JSON line with minibrain's shape (`ts`, `level`,
+  `event`, `message` and fields) is a structured event; anything else is a library line with a guessed level (glog
+  `W…`/`E…` prefixes, `Warning:`, `ERROR`), and a traceback with its chained causes is one error. Events keep their
+  level and name in `job_events`, so charts read them by name and never re-parse logs.
 - Artifacts are referenced by SHA-256 ID, never by path: sources, dataset versions, adapters, checkpoints, eval results, logs,
   batch outputs. Base model weights are pinned by repo and revision, and each file by its SHA-256.
 - The gateway is separate from management: routing lives in memory, refreshed on version changes, with no database
@@ -616,7 +620,9 @@ from. They have different endpoints and keys, so they are configured apart.
 - One lock per GPU. Train vs serve contention is a config: dedicated training GPUs, or unload the pool while training.
 - On a single GPU the worker runs the steps in order: load the teacher pool → label / generate → unload → train → eval
   → load the adapter into the serving pool.
-- Progress: a TRL `TrainerCallback` writes to the jobs table and a log file streamed to the UI.
+- Progress: a TRL `TrainerCallback` emits a `train.step` event every step (loss, learning rate, grad norm, epoch,
+  tokens per second, peak memory, time left) and a `train.eval` event with the held-out loss on up to 64 held-out rows
+  at every tenth of the run; scoring, judging and transfers emit their own progress events.
 - Cancel kills the process group. On start, the worker marks orphaned `running` jobs `failed`.
 - One default recipe (rank, alpha, learning rate, epochs), assistant-only loss, a small general instruction mix to
   limit forgetting. How it fits in memory is planned per run (Training memory).
@@ -989,7 +995,7 @@ keys, and `/v1` stays key-only.
 - Training, Evaluations and Feedback cover every model, like Deployments and Monitor. Training and Evaluations are the
   kit's `DataGrid` with model and status filters kept in the URL: `?model=<slug>,<slug>&status=<status>,<status>`.
   - Training lists training and scoring jobs: model, version, job, status, progress, started, duration. A row opens
-    the job's log (`?job=<id>`). "Train a model" picks a model and opens `/training/<slug>`: its training data
+    the job's page (`/jobs/<id>`; the old `?job=<id>` redirects there). "Train a model" picks a model and opens `/training/<slug>`: its training data
     (picking a dataset saves its first version if it has none), new version (the dataset version to use, latest by
     default, then score a prompt or train) and recent jobs.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
@@ -1001,6 +1007,15 @@ keys, and `/v1` stays key-only.
     (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
     right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
     Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
+- A job's page (`/jobs/<id>`, built 2026-11-06) serves every kind; Training rows, Monitor › Jobs rows, a model's jobs
+  and its activity link to it. Outcome first: kind and model@version, status, attempt, device, worker, started and
+  duration, with Cancel and Retry. Then a panel per kind: training charts loss per step (training and held-out on one
+  axis, the previous version's run behind them, a warning when held-out loss rises while training loss falls) and the
+  learning rate as its own chart, with step, time left, tokens per second and peak memory; scoring shows the scores
+  against the live version, the promotion rule and Deploy; downloads and imports show bytes, speed and the file. A
+  "Serving" line links the deployment when the job's version is live. The log sits collapsed under it (open when the
+  job failed): the kit's `LogViewer` with a level filter, library output off by default, search, follow, timestamps,
+  events that open to their fields, copy and download.
 - Monitor has three tabs: Overview (`/monitor`), Jobs (`/monitor/jobs`) and Requests (`/monitor/requests`), every
   `/v1` call as it arrives. Overview charts the request logs for a time range and models
   (`?range=&model=<slug>,<slug>`): requests per minute (stacked), error rate, p50 or p95 latency and tokens in or out,
@@ -1131,7 +1146,7 @@ keys, and `/v1` stays key-only.
 |---|---|
 | Sidebar | `shell`: `AppShell`, `Rail`, `NavItem`, `SectionLabel`, `AccountMenu` |
 | Status | `Badge`: queued `neutral`, training `info`, ready `approval`, live `success`, failed `destructive` |
-| Training logs | `console`: `LogView`, `ConsoleDock` |
+| Job logs | `LogViewer` |
 | Preview, playground, side-by-side eval | `chat`: `ChatBubble`, `AssistantTurn`, `ChatComposer` |
 | Forms, tabs, tables | Primitives |
 

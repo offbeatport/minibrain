@@ -9,6 +9,9 @@ export type ModelCreate = Schemas["ModelCreate"];
 export type LabelProposal = Schemas["LabelProposal"];
 export type VersionInfo = Schemas["VersionInfo"];
 export type JobInfo = Schemas["JobInfo"];
+export type JobDetail = Schemas["JobDetail"];
+export type JobMetrics = Schemas["JobMetrics"];
+export type TrainingMetrics = Schemas["TrainingMetrics"];
 export type PreviewResponse = Schemas["PreviewResponse"];
 export type QueryResponse = Schemas["QueryResponse"];
 export type DatasetVersionInfo = Schemas["DatasetVersionInfo"];
@@ -215,6 +218,18 @@ export async function uploadFile(
     }
     return body as SourceAdded;
 }
+
+export type JobEvent = {
+    id: number;
+    attempt: number;
+    kind: "state" | "event" | "log";
+    source: "minibrain" | "library" | "system";
+    level: "debug" | "info" | "warning" | "error";
+    name: string | null;
+    message: string;
+    data: Record<string, unknown> | null;
+    at: string;
+};
 
 export function jobEventsUrl(jobId: number): string {
     return `/api/jobs/${jobId}/events`;

@@ -61,6 +61,7 @@ import { Requests, failingShare } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { type Abilities, useCan } from "~/lib/access";
+import { jobPageHref } from "~/lib/jobs";
 import {
     deploymentPageHref,
     evaluationsHref,
@@ -149,10 +150,6 @@ function scoped(path: string, row: ModelRow): string {
     return (MODEL_PAGES[path] ?? modelDataHref)(row.key);
 }
 
-function jobHref(row: ModelRow): string {
-    return row.kind === "custom" ? scoped("/training", row) : detailHref(row);
-}
-
 function percent(value: number | null | undefined): string | null {
     return value === null || value === undefined ? null : `${Math.round(value * 100)}%`;
 }
@@ -203,7 +200,7 @@ export function Activity({ row }: { row: ModelRow }) {
             : state === "needs_examples"
               ? scoped("/training", row)
               : jobId
-                ? jobHref(row)
+                ? jobPageHref(jobId)
                 : null;
     return (
         <div className="flex items-center gap-2">

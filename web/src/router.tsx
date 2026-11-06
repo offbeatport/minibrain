@@ -23,6 +23,7 @@ import { PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { JobPage } from "./pages/jobs/JobPage";
 import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
@@ -78,6 +79,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/data", guarded("builder", DataPage)),
     globalPage("/training", TrainingListPage),
     globalPage("/training/$slug", guarded("builder", ModelTrainingPage)),
+    globalPage("/jobs/$id", JobPage),
     globalPage("/evaluations", EvaluationsPage),
     globalPage("/feedback", guarded("builder", FeedbackPage)),
     globalPage("/deployments", DeploymentsPage),

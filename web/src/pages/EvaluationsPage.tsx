@@ -247,7 +247,7 @@ function blockedReason(version: ModelVersionRow): string | null {
     return failed.map(checkSentence).join(" ") || "It does not pass the promotion rule.";
 }
 
-function DeployButton({
+export function DeployButton({
     version,
     size,
     pending,
@@ -285,7 +285,7 @@ function DeployButton({
     );
 }
 
-function usePromote() {
+export function usePromote() {
     const client = useQueryClient();
     return useMutation({
         mutationFn: (target: Target) =>

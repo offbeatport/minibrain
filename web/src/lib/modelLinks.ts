@@ -38,9 +38,6 @@ export function modelAibomHref(slug: string, number: number): string {
     return `/api/models/${encodeURIComponent(slug)}/versions/${number}/aibom.json`;
 }
 
-export function jobHref(job: JobInfo): string | null {
-    if (job.model) {
-        return `/training?job=${job.id}`;
-    }
-    return job.base_model ? `/models/base/${encodeURIComponent(job.base_model)}` : null;
+export function jobHref(job: JobInfo): string {
+    return `/jobs/${job.id}`;
 }
