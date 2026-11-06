@@ -26,13 +26,14 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             with log.open("a") as out:
                 out.write(json.dumps({"path": self.path, "body": body}) + "\n")
-            if self.path == "/load_lora_adapter":
+            if self.path.endswith("/load_lora_adapter"):
                 self.reply(200, {"success": True})
                 return
             if "x-refuse" in json.dumps(body.get("response_format")):
                 self.reply(400, {"object": "error", "message": "grammar compilation failed", "code": 400})
                 return
-            text = f"{body.get('lora_path') or 'base'}:{body['messages'][-1]['content']}"
+            served = body.get("model") if body.get("model") != "qwen3-0.6b" else None
+            text = f"{body.get('lora_path') or served or 'base'}:{body['messages'][-1]['content']}"
             choice = {"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}
             self.reply(200, {"choices": [choice], "usage": {"prompt_tokens": 7, "completion_tokens": 2}})
 

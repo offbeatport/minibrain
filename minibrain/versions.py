@@ -8,6 +8,7 @@ REPORTED = (
     "trl",
     "bitsandbytes",
     "sglang",
+    "vllm",
     "mlx-lm",
     "llama-cpp-python",
 )

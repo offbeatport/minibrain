@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -268,6 +269,7 @@ def create_app(
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
     app.add_exception_handler(gateway.OpenAIError, gateway.openai_error)
+    app.add_exception_handler(RequestValidationError, gateway.invalid_body)
     app.add_middleware(PeerAddress)
     app.add_middleware(Identify)
     app.add_middleware(TrustedProxy)

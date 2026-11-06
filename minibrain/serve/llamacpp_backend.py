@@ -6,10 +6,26 @@ from typing import Any
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import AdapterNotSupportedError, CompletionRequest, OutputFormatError
+from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint, choice_grammar
 from minibrain.serve.weights import gguf_path
 
 CONTEXT_TOKENS = 4096
+ARGUMENTS = {
+    "temperature": "temperature",
+    "top_p": "top_p",
+    "top_k": "top_k",
+    "min_p": "min_p",
+    "presence_penalty": "presence_penalty",
+    "frequency_penalty": "frequency_penalty",
+    "repetition_penalty": "repeat_penalty",
+    "seed": "seed",
+}
+
+
+def sampling_arguments(sampling: Sampling, stops: tuple[str, ...]) -> dict[str, Any]:
+    found = {ARGUMENTS[name]: value for name, value in sampling.given().items() if name in ARGUMENTS}
+    return found | {"stop": [*stops, *sampling.stop]}
 
 
 def grammar(constraint: Constraint | None) -> Any:
@@ -62,9 +78,8 @@ class LlamaCppBackend:
             result = model.create_completion(
                 self.render(model, request.base, request.messages),
                 max_tokens=request.max_tokens,
-                temperature=0.0,
-                stop=list(request.base.stop_tokens),
                 grammar=constrained,
+                **sampling_arguments(request.sampling, request.base.stop_tokens),
             )
         choice = result["choices"][0]
         usage = result.get("usage") or {}

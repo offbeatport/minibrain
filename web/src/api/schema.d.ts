@@ -3737,14 +3737,64 @@ export interface components {
             messages: components["schemas"]["Message"][];
             /**
              * Max Tokens
-             * @description The most tokens to answer with; 64 by default.
+             * @description The most tokens to answer with. Unset: up to the model's context limit.
              */
             max_tokens?: number | null;
             /**
              * Max Completion Tokens
-             * @description The same as max_tokens, under its newer name.
+             * @description The same as max_tokens, under its newer name; it wins when both are set.
              */
             max_completion_tokens?: number | null;
+            /**
+             * Temperature
+             * @description 0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's default; custom models answer at 0, the way their scores were measured.
+             */
+            temperature?: number | null;
+            /**
+             * Top P
+             * @description Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p.
+             */
+            top_p?: number | null;
+            /**
+             * Top K
+             * @description Sample only from the k likeliest tokens. An extension vLLM and SGLang share.
+             */
+            top_k?: number | null;
+            /**
+             * Min P
+             * @description 0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension.
+             */
+            min_p?: number | null;
+            /**
+             * Presence Penalty
+             * @description -2 to 2: above 0 favours tokens that have not appeared yet.
+             */
+            presence_penalty?: number | null;
+            /**
+             * Frequency Penalty
+             * @description -2 to 2: above 0 lowers a token's odds the more often it appeared.
+             */
+            frequency_penalty?: number | null;
+            /**
+             * Repetition Penalty
+             * @description Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension.
+             */
+            repetition_penalty?: number | null;
+            /**
+             * Seed
+             * @description Sample the same way for the same seed and inputs, as far as the engine allows.
+             */
+            seed?: number | null;
+            /**
+             * Stop
+             * @description Up to 4 texts that end the answer; the text itself is not returned.
+             */
+            stop?: string | string[] | null;
+            /**
+             * N
+             * @description How many answers; only 1 is supported.
+             */
+            n?: number | null;
             /**
              * Stream
              * @description Send the answer as server-sent events, ending with data: [DONE].

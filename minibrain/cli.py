@@ -506,7 +506,7 @@ def main() -> None:
     engine_command.add_argument("--port", type=int, default=8200)
     engine_command.add_argument("--url", default=None, help="address gateways use to reach this engine")
     engine_command.add_argument(
-        "--engine", default="auto", choices=["auto", "sglang", "mlx", "transformers", "llamacpp"]
+        "--engine", default="auto", choices=["auto", "sglang", "vllm", "mlx", "transformers", "llamacpp"]
     )
     engine_command.add_argument("--spec", default=None, help=argparse.SUPPRESS)
     engine_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)

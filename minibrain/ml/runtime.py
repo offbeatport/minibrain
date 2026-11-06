@@ -1,7 +1,9 @@
+import copy
 import time
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
+from typing import Any
 
 import torch
 from peft import PeftModel, PeftModelForCausalLM
@@ -11,6 +13,8 @@ from transformers import (
     BatchEncoding,
     GenerationConfig,
     GenerationMixin,
+    LogitsProcessor,
+    LogitsProcessorList,
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
@@ -18,10 +22,12 @@ from transformers import (
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.ml.devices import pick_device, weights_dtype
+from minibrain.serve.sampling import Sampling, stopped_at
 from minibrain.serve.structured import TokenTrie
 
-Message = dict[str, str]
+Message = dict[str, Any]
 AllowedTokens = Callable[[int, torch.Tensor], list[int]]
+CONTEXT_FALLBACK = 4096
 
 
 def choice_filter(trie: TokenTrie, prompt_length: int, stop: int) -> AllowedTokens:
@@ -66,15 +72,62 @@ def render_prompt(tokenizer: PreTrainedTokenizerBase, spec: BaseModelSpec, messa
     return as_text(rendered)
 
 
+class CountPenalty(LogitsProcessor):
+    def __init__(self, prompt_length: int, presence: float, frequency: float) -> None:
+        self.prompt_length = prompt_length
+        self.presence = presence
+        self.frequency = frequency
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        generated = input_ids[:, self.prompt_length :]
+        for row in range(generated.shape[0]):
+            tokens, counts = torch.unique(generated[row], return_counts=True)
+            scores[row, tokens] -= self.presence + self.frequency * counts.to(scores.dtype)
+        return scores
+
+
+def sampled_config(base: GenerationConfig, sampling: Sampling | None) -> GenerationConfig:
+    if sampling is None:
+        return GenerationConfig(do_sample=False)
+    config = copy.deepcopy(base)
+    if sampling.temperature is not None:
+        config.do_sample = sampling.temperature > 0
+        if config.do_sample:
+            config.temperature = sampling.temperature
+    for name in ("top_p", "top_k", "min_p", "repetition_penalty"):
+        value = getattr(sampling, name)
+        if value is not None:
+            setattr(config, name, value)
+    if sampling.stop:
+        config.stop_strings = list(sampling.stop)
+    return config
+
+
+def count_penalty(sampling: Sampling | None, prompt_length: int) -> LogitsProcessorList | None:
+    if sampling is None or (sampling.presence_penalty is None and sampling.frequency_penalty is None):
+        return None
+    penalty = CountPenalty(prompt_length, sampling.presence_penalty or 0.0, sampling.frequency_penalty or 0.0)
+    return LogitsProcessorList([penalty])
+
+
+def context_limit(model: PreTrainedModel | PeftModelForCausalLM, tokenizer: PreTrainedTokenizerBase) -> int:
+    found = getattr(model.config, "max_position_embeddings", None)
+    if isinstance(found, int) and found > 0:
+        return found
+    length = tokenizer.model_max_length
+    return length if isinstance(length, int) and 0 < length < 10**7 else CONTEXT_FALLBACK
+
+
 def generate_tokens(
     model: PreTrainedModel | PeftModelForCausalLM,
     batch: BatchEncoding,
     config: GenerationConfig,
     allowed: AllowedTokens | None = None,
+    **extra: Any,
 ) -> torch.Tensor:
     if not isinstance(model, PeftModelForCausalLM | GenerationMixin):
         raise TypeError(f"{type(model).__name__} cannot generate")
-    output = model.generate(**batch, generation_config=config, prefix_allowed_tokens_fn=allowed)
+    output = model.generate(**batch, generation_config=config, prefix_allowed_tokens_fn=allowed, **extra)
     if not isinstance(output, torch.Tensor):
         raise TypeError(f"expected generated token ids, got {type(output).__name__}")
     return output
@@ -126,14 +179,18 @@ class Runtime:
         self.model.set_adapter(adapter)
         return nullcontext()
 
-    def completion(self, tokens: list[int], prompt_tokens: int, seconds: float) -> Completion:
+    def completion(
+        self, tokens: list[int], prompt_tokens: int, seconds: float, stops: tuple[str, ...] = ()
+    ) -> Completion:
         end = next((index for index, token in enumerate(tokens) if token in self.stop_ids), None)
         kept = tokens if end is None else tokens[:end]
+        text = as_text(self.tokenizer.decode(kept))
+        cut = stopped_at(text, stops)
         return Completion(
-            text=as_text(self.tokenizer.decode(kept)),
+            text=text if cut is None else text[:cut],
             prompt_tokens=prompt_tokens,
             completion_tokens=len(kept) + (0 if end is None else 1),
-            stopped=end is not None,
+            stopped=end is not None or cut is not None,
             seconds=seconds,
         )
 
@@ -142,23 +199,34 @@ class Runtime:
         return TokenTrie([[*self.tokenizer.encode(choice, add_special_tokens=False), stop] for choice in choices])
 
     def generate(
-        self, prompts: list[str], adapter: str | None, max_new_tokens: int, choices: Sequence[str] = ()
+        self,
+        prompts: list[str],
+        adapter: str | None,
+        max_new_tokens: int | None,
+        choices: Sequence[str] = (),
+        sampling: Sampling | None = None,
     ) -> list[Completion]:
         batch = self.tokenizer(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
         prompt_length = batch["input_ids"].shape[1]
         allowed = choice_filter(self.choice_trie(choices), prompt_length, self.stop_ids[0]) if choices else None
-        config = GenerationConfig(
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            eos_token_id=self.stop_ids,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
+        room = max(context_limit(self.model, self.tokenizer) - prompt_length, 1)
+        config = sampled_config(self.model.generation_config, sampling)
+        config.max_new_tokens = min(max_new_tokens or room, room)
+        config.eos_token_id = self.stop_ids
+        config.pad_token_id = self.tokenizer.pad_token_id
+        extra: dict[str, Any] = {"tokenizer": self.tokenizer} if config.stop_strings else {}
+        processors = count_penalty(sampling, prompt_length)
+        if processors is not None:
+            extra["logits_processor"] = processors
+        if sampling is not None and sampling.seed is not None:
+            torch.manual_seed(sampling.seed)
         started = time.perf_counter()
         with self.adapter_scope(adapter), torch.inference_mode():
-            output = generate_tokens(self.model, batch, config, allowed)
+            output = generate_tokens(self.model, batch, config, allowed, **extra)
         seconds = time.perf_counter() - started
         counts = batch["attention_mask"].sum(dim=1).tolist()
+        stops = sampling.stop if sampling is not None else ()
         return [
-            self.completion(row[prompt_length:].tolist(), count, seconds)
+            self.completion(row[prompt_length:].tolist(), count, seconds, stops)
             for row, count in zip(output, counts, strict=True)
         ]

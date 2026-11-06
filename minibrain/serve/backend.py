@@ -1,18 +1,19 @@
 import threading
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
+from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint
 
 if TYPE_CHECKING:
     from minibrain.ml.runtime import Runtime
 
-Message = dict[str, str]
+Message = dict[str, Any]
 MAX_ADAPTERS = 32
 
 
@@ -40,9 +41,10 @@ class CompletionRequest:
     base: BaseModelSpec
     messages: list[Message]
     adapter: AdapterRef | None
-    max_tokens: int
+    max_tokens: int | None
     constraint: Constraint | None = None
     route: str | None = None
+    sampling: Sampling = field(default_factory=Sampling)
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
@@ -98,7 +100,8 @@ class TransformersBackend:
                 self.use_adapter(runtime, request.adapter)
             adapter = request.adapter.name if request.adapter else None
             prompt = runtime.render(request.messages)
-            return runtime.generate([prompt], adapter, request.max_tokens, request.decoding_choices())[0]
+            choices = request.decoding_choices()
+            return runtime.generate([prompt], adapter, request.max_tokens, choices, request.sampling)[0]
 
     def status(self) -> list[dict[str, Any]]:
         return [

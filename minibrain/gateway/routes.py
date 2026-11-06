@@ -9,7 +9,9 @@ from dataclasses import replace
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,6 +30,7 @@ from minibrain.serve.backend import (
     OutputFormatError,
     ServingBackend,
 )
+from minibrain.serve.sampling import MAX_STOPS, Sampling, UnsupportedParameterError
 from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
 from minibrain.tasks.contracts import JSON, Contract
 from minibrain.tasks.prompting import PromptError, Prompting
@@ -36,7 +39,7 @@ from minibrain.telemetry.call import current_call
 router = APIRouter(prefix="/v1")
 log = logging.getLogger("minibrain.gateway")
 
-DEFAULT_MAX_TOKENS = 64
+CHAT_PATH = "/v1/chat/completions"
 TEXT_MAX = 50_000
 COMMENT_MAX = 2_000
 FORMAT = "response_format"
@@ -87,6 +90,22 @@ async def openai_error(_request: Request, error: Exception) -> JSONResponse:
     return JSONResponse(status_code=found.status_code, content=found.body())
 
 
+def openai_validation(error: RequestValidationError) -> OpenAIError:
+    first = error.errors()[0] if error.errors() else {"loc": (), "msg": "The body is not valid."}
+    parts = [str(part) for part in first.get("loc", ()) if part != "body"]
+    param = ".".join(parts) or None
+    message = f"{param}: {first.get('msg')}" if param else str(first.get("msg"))
+    return OpenAIError(400, message, param, "invalid_value")
+
+
+async def invalid_body(request: Request, error: Exception) -> Response:
+    if not isinstance(error, RequestValidationError):
+        return await openai_error(request, error)
+    if request.url.path != CHAT_PATH:
+        return await request_validation_exception_handler(request, error)
+    return await openai_error(request, openai_validation(error))
+
+
 def invalid(param: str, message: str, code: str = "invalid_value") -> OpenAIError:
     return OpenAIError(400, message, param, code)
 
@@ -109,11 +128,58 @@ class ChatCompletionRequest(BaseModel):
     model: str = Field(description=MODEL_HELP)
     messages: list[Message] = Field(description=MESSAGES_HELP)
     max_tokens: int | None = Field(
-        default=None, description=f"The most tokens to answer with; {DEFAULT_MAX_TOKENS} by default."
+        default=None, ge=1, description="The most tokens to answer with. Unset: up to the model's context limit."
     )
-    max_completion_tokens: int | None = Field(default=None, description="The same as max_tokens, under its newer name.")
+    max_completion_tokens: int | None = Field(
+        default=None, ge=1, description="The same as max_tokens, under its newer name; it wins when both are set."
+    )
+    temperature: float | None = Field(
+        default=None,
+        ge=0,
+        le=2,
+        description="0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's "
+        "default; custom models answer at 0, the way their scores were measured.",
+    )
+    top_p: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p.",
+    )
+    top_k: int | None = Field(
+        default=None, ge=1, description="Sample only from the k likeliest tokens. An extension vLLM and SGLang share."
+    )
+    min_p: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension.",
+    )
+    presence_penalty: float | None = Field(
+        default=None, ge=-2, le=2, description="-2 to 2: above 0 favours tokens that have not appeared yet."
+    )
+    frequency_penalty: float | None = Field(
+        default=None, ge=-2, le=2, description="-2 to 2: above 0 lowers a token's odds the more often it appeared."
+    )
+    repetition_penalty: float | None = Field(
+        default=None,
+        gt=0,
+        le=2,
+        description="Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension.",
+    )
+    seed: int | None = Field(
+        default=None, description="Sample the same way for the same seed and inputs, as far as the engine allows."
+    )
+    stop: str | list[str] | None = Field(
+        default=None, description=f"Up to {MAX_STOPS} texts that end the answer; the text itself is not returned."
+    )
+    n: int | None = Field(default=None, ge=1, le=1, description="How many answers; only 1 is supported.")
     stream: bool = Field(default=False, description="Send the answer as server-sent events, ending with data: [DONE].")
     response_format: Any = Field(default=None, description=FORMAT_HELP)
+
+    @property
+    def token_budget(self) -> int | None:
+        return self.max_completion_tokens or self.max_tokens
 
 
 class ModelInfo(BaseModel):
@@ -282,6 +348,38 @@ def requested_format(raw: Any) -> Constraint | None:
     return Constraint(json_schema=schema_format(raw.get("json_schema")))
 
 
+def stops_of(raw: str | list[str] | None) -> tuple[str, ...]:
+    found = [raw] if isinstance(raw, str) else list(raw or [])
+    if len(found) > MAX_STOPS:
+        raise invalid("stop", f"stop takes at most {MAX_STOPS} texts.")
+    if any(not text for text in found):
+        raise invalid("stop", "Each stop text needs at least one character.")
+    return tuple(found)
+
+
+def sampling_of(body: ChatCompletionRequest, route: Route) -> Sampling:
+    sampling = Sampling(
+        temperature=body.temperature,
+        top_p=body.top_p,
+        top_k=body.top_k,
+        min_p=body.min_p,
+        presence_penalty=body.presence_penalty,
+        frequency_penalty=body.frequency_penalty,
+        repetition_penalty=body.repetition_penalty,
+        seed=body.seed,
+        stop=stops_of(body.stop),
+    )
+    return sampling if route.kind == "base" else sampling.or_greedy()
+
+
+def refuse_unsupported(body: ChatCompletionRequest) -> None:
+    extra = body.model_extra or {}
+    if extra.get("logprobs"):
+        raise invalid("logprobs", "logprobs are not returned; leave logprobs unset.", "unsupported_parameter")
+    if extra.get("logit_bias"):
+        raise invalid("logit_bias", "logit_bias is not supported; leave it unset.", "unsupported_parameter")
+
+
 def route_contract(route: Route) -> Contract | None:
     found = prompting(route)
     return found.contract if found is not None else None
@@ -320,9 +418,10 @@ def conformed(requested: Constraint | None, completion: Completion, route: Route
 def completion_request(
     config: GatewayConfig,
     route: Route,
-    messages: list[dict[str, str]],
-    max_tokens: int,
+    messages: list[dict[str, Any]],
+    max_tokens: int | None,
     constraint: Constraint | None = None,
+    sampling: Sampling | None = None,
 ) -> CompletionRequest:
     problem = config.problems.get(route.base_model)
     if problem is not None:
@@ -342,6 +441,7 @@ def completion_request(
         max_tokens=max_tokens,
         constraint=constraint,
         route=route.name,
+        sampling=sampling if sampling is not None else Sampling().or_greedy(),
     )
 
 
@@ -359,17 +459,21 @@ def run(
     backend: ServingBackend,
     config: GatewayConfig,
     route: Route,
-    messages: list[dict[str, str]],
-    max_tokens: int,
+    messages: list[dict[str, Any]],
+    max_tokens: int | None,
     requested: Constraint | None = None,
+    sampling: Sampling | None = None,
 ) -> Completion:
     constraint = requested or task_constraint(route)
+    request = completion_request(config, route, messages, max_tokens, constraint, sampling)
     try:
-        return complete(backend, completion_request(config, route, messages, max_tokens, constraint), bool(requested))
+        return complete(backend, request, bool(requested))
     except EngineUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except OutputFormatError as error:
         raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
+    except UnsupportedParameterError as error:
+        raise invalid(error.param, f"{error.message}.", "unsupported_parameter") from error
 
 
 def plain(messages: list[Message]) -> list[dict[str, str]]:
@@ -394,11 +498,25 @@ def usage(completion: Completion) -> dict[str, int]:
 
 
 def finish_reason(completion: Completion) -> str:
-    return "stop" if completion.stopped else "length"
+    return completion.finish_reason
 
 
 def served_model(route: Route) -> str:
     return route.slug if route.version is None else f"{route.slug}@{route.version}"
+
+
+def sampling_labels(body: ChatCompletionRequest) -> dict[str, Any]:
+    stops = [body.stop] if isinstance(body.stop, str) else body.stop
+    found = {
+        "temperature": body.temperature,
+        "top_p": body.top_p,
+        "top_k": body.top_k,
+        "presence_penalty": body.presence_penalty,
+        "frequency_penalty": body.frequency_penalty,
+        "seed": body.seed,
+        "stop_sequences": stops or None,
+    }
+    return {name: value for name, value in found.items() if value is not None}
 
 
 def note_chat(
@@ -414,7 +532,8 @@ def note_chat(
     call.operation = "chat"
     call.request_model = body.model
     call.model_known = route is not None
-    call.max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
+    call.max_tokens = body.token_budget
+    call.labels |= {f"gen_ai.request.{name}": value for name, value in sampling_labels(body).items()}
     call.response_id = answered
     call.error_type = code
     if route is not None:
@@ -488,9 +607,11 @@ def chat_completions(
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
+        refuse_unsupported(body)
         requested = requested_format(body.response_format)
-        max_tokens = body.max_completion_tokens or body.max_tokens or DEFAULT_MAX_TOKENS
-        completion = run(request.app.state.backend, config, route, plain(body.messages), max_tokens, requested)
+        sampling = sampling_of(body, route)
+        backend = request.app.state.backend
+        completion = run(backend, config, route, plain(body.messages), body.token_budget, requested, sampling)
         completion = conformed(requested, completion, route)
     except (HTTPException, OpenAIError) as error:
         status = error.status_code

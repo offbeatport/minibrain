@@ -12691,16 +12691,127 @@
           "max_tokens": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1.0
               },
               {
                 "type": "null"
               }
             ],
             "title": "Max Tokens",
-            "description": "The most tokens to answer with; 64 by default."
+            "description": "The most tokens to answer with. Unset: up to the model's context limit."
           },
           "max_completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Completion Tokens",
+            "description": "The same as max_tokens, under its newer name; it wins when both are set."
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "description": "0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's default; custom models answer at 0, the way their scores were measured."
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P",
+            "description": "Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p."
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K",
+            "description": "Sample only from the k likeliest tokens. An extension vLLM and SGLang share."
+          },
+          "min_p": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min P",
+            "description": "0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension."
+          },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -2.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Penalty",
+            "description": "-2 to 2: above 0 favours tokens that have not appeared yet."
+          },
+          "frequency_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -2.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Penalty",
+            "description": "-2 to 2: above 0 lowers a token's odds the more often it appeared."
+          },
+          "repetition_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repetition Penalty",
+            "description": "Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension."
+          },
+          "seed": {
             "anyOf": [
               {
                 "type": "integer"
@@ -12709,8 +12820,40 @@
                 "type": "null"
               }
             ],
-            "title": "Max Completion Tokens",
-            "description": "The same as max_tokens, under its newer name."
+            "title": "Seed",
+            "description": "Sample the same way for the same seed and inputs, as far as the engine allows."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop",
+            "description": "Up to 4 texts that end the answer; the text itself is not returned."
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N",
+            "description": "How many answers; only 1 is supported."
           },
           "stream": {
             "type": "boolean",

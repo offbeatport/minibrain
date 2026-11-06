@@ -42,6 +42,7 @@ def with_engines(node: NodeReport, *engines: str) -> NodeReport:
 
 def test_each_node_picks_its_engine_from_hardware_and_format() -> None:
     assert choose_engine(with_engines(LINUX_GPU, "sglang", "transformers", "llamacpp"), "safetensors") == "sglang"
+    assert choose_engine(with_engines(LINUX_GPU, "vllm", "transformers"), "safetensors") == "vllm"
     assert choose_engine(with_engines(MAC, "mlx", "transformers", "llamacpp"), "safetensors") == "mlx"
     assert choose_engine(with_engines(CPU, "transformers", "llamacpp"), "safetensors") == "transformers"
     assert choose_engine(with_engines(CPU, "transformers", "llamacpp"), "gguf") == "llamacpp"
@@ -57,7 +58,10 @@ def test_each_node_picks_its_engine_from_hardware_and_format() -> None:
 def test_installed_engines_follow_platform(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(select, "importable", lambda _module: True)
     monkeypatch.setattr(select, "sglang_python", lambda: "/opt/sglang/bin/python")
+    monkeypatch.setattr(select, "vllm_python", lambda: None)
     assert installed_engines("linux", "x86_64", "cuda") == ["sglang", "transformers", "llamacpp"]
+    monkeypatch.setattr(select, "vllm_python", lambda: "/opt/vllm/bin/python")
+    assert installed_engines("linux", "x86_64", "cuda") == ["sglang", "vllm", "transformers", "llamacpp"]
     assert installed_engines("linux", "x86_64", "rocm")[0] == "sglang"
     assert installed_engines("linux", "x86_64", "cpu") == ["transformers", "llamacpp"]
     assert installed_engines("darwin", "arm64", "mps") == ["mlx", "transformers", "llamacpp"]

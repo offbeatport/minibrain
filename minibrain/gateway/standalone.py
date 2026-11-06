@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse, Response
 
 from minibrain.data.feedback import Submission
@@ -100,6 +101,7 @@ def create_gateway_app(
     app.state.telemetry = gateway_telemetry(app.state.metrics_access)
     app.state.telemetry.refresh()
     app.add_exception_handler(routes.OpenAIError, routes.openai_error)
+    app.add_exception_handler(RequestValidationError, routes.invalid_body)
     app.add_middleware(RequestContext)
     app.include_router(routes.router)
 

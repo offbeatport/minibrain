@@ -44,6 +44,7 @@ const LOOPS: Record<string, string> = {
 
 const ENGINE_LABEL: Record<string, string> = {
     sglang: "SGLang",
+    vllm: "vLLM",
     mlx: "MLX",
     transformers: "Transformers",
     llamacpp: "llama.cpp",

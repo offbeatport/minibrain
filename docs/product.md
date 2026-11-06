@@ -282,6 +282,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **OpenAI-compatible API** · shipped · engineer
   Call any model by name or pinned version, with streaming.
   UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
+- **Sampling settings** · shipped · engineer
+  Set temperature, top_p, top_k, min_p, penalties, seed and stops.
+  API: POST /v1/chat/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access
@@ -295,8 +298,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Chat with one model or version over turns, and compare with another.
   UI: Playground · API: POST /api/models/{slug}/complete
 - **Engines per machine** · shipped · admin
-  Serve on SGLang, MLX, transformers or llama.cpp, on any machine.
-  CLI: minibrain engine · Config: MINIBRAIN_SGLANG_PYTHON
+  Serve on SGLang, vLLM, MLX, transformers or llama.cpp, on any machine.
+  CLI: minibrain engine · Config: MINIBRAIN_SGLANG_PYTHON, MINIBRAIN_VLLM_PYTHON
 - **Runtime adapters on SGLang** · partial · admin
   Load and unload LoRA adapters on SGLang without restarts.
   Roadmap: Serving
@@ -320,9 +323,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Batch jobs** · planned · engineer
   Run a version over a file or query, OpenAI batch compatible.
   Roadmap: v2
-- **vLLM backend** · planned · admin
-  Serve on vLLM, ROCm production images and llama.cpp adapters.
-  Roadmap: v2
+- **vLLM backend** · partial · admin
+  Serve on vLLM; ROCm production images and llama.cpp adapters later.
+  CLI: minibrain engine · Roadmap: v2
 - **Dedicated instances** · planned · admin
   Give high-traffic models their own or merged-adapter instances.
   Roadmap: v2

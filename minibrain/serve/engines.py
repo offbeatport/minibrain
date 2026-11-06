@@ -15,6 +15,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
+from minibrain.serve.sampling import UnsupportedParameterError
 from minibrain.settings import Settings
 from minibrain.supervise import Supervisor
 from minibrain.worker import HttpClient
@@ -171,6 +172,16 @@ def engine_detail(response: Any) -> str:
         return response.text
 
 
+def refusal(response: Any) -> Exception:
+    try:
+        detail = response.json().get("detail")
+    except ValueError:
+        detail = None
+    if isinstance(detail, dict) and detail.get("code") == "unsupported_parameter":
+        return UnsupportedParameterError(str(detail.get("param")), str(detail.get("message")))
+    return OutputFormatError(engine_detail(response))
+
+
 class EngineBackend:
     def __init__(self, engines: Engines, http: HttpClient | None = None, balancer: Balancer | None = None) -> None:
         self.engines = engines
@@ -193,6 +204,7 @@ class EngineBackend:
             "adapter": adapter,
             "max_tokens": request.max_tokens,
             "route": request.route,
+            "sampling": request.sampling.given(),
         }
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)
@@ -233,12 +245,12 @@ class EngineBackend:
             if response.status_code in (FAILED_STATUS, 409):
                 raise EngineUnavailableError(engine_detail(response))
             if response.status_code == 400:
-                raise OutputFormatError(engine_detail(response))
+                raise refusal(response)
             response.raise_for_status()
             self.balancer.mark(url, "ready")
             if tried:
                 self.balancer.rebind(key, url)
-            return Completion(**response.json())
+            return Completion.from_dict(response.json())
 
     def check(self, url: str) -> str:
         try:

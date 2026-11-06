@@ -121,6 +121,9 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 4. Extract, for document processing.
 5. Specialist presets (Classify is done) and the ML-engineer tooling below.
 
+Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine. Not yet: `/v1/embeddings`,
+`/v1/completions`, sizing guidance.
+
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
 when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
 
@@ -288,7 +291,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 | Embeddings | Local open embedding model, pinned (e.g. Qwen3-Embedding-0.6B, Apache-2.0) |
 | Index | LanceDB, embedded on disk: vector + full-text (hybrid) search. DuckDB `vss` persistence is still experimental |
 | Training | torch + transformers + peft + trl + datasets + accelerate |
-| Serving, production | SGLang; vLLM in v2 |
+| Serving, production | SGLang or vLLM |
 | Serving, Apple silicon | MLX (`mlx-lm`), optional extra |
 | Serving, GGUF | llama.cpp (`llama-cpp-python`), optional extra |
 | Serving, fallback and tests | `transformers` backend |
@@ -846,7 +849,11 @@ once it matches; only deleting a base removes its files.
   loaded for labelling jobs and unloaded after. Prompt-only versions are served from it, so they need it permanent.
 - `ServingBackend` interface: `load(model)`, `complete(request)`, `status()`. Implementations: `sglang`
   (production), `mlx` (Apple silicon, PEFT LoRA converted on load), `transformers` (fallback and tests), `llamacpp`
-  (GGUF base models), `vllm` (v2).
+  (GGUF base models), `vllm` (the same OpenAI-server path as SGLang, with runtime LoRA updates; built 2026-11-06,
+  not yet run on a GPU).
+- Requests carry OpenAI's sampling fields plus `top_k`, `min_p` and `repetition_penalty`, passed to every engine
+  (`docs/serving.md`, Sampling); unset fields keep the model's default, custom models answer at temperature 0, and
+  `max_tokens` unset runs to the context limit. An engine that cannot honour a field refuses it with a 400.
 - Engines are never exposed; the gateway proxies every call.
 
 ## API and access
@@ -1462,7 +1469,7 @@ Everything in the v1 scope below, after M1.
 - Multi-GPU and multi-node (Ray), serving pools across nodes
 - Kubernetes launcher: training as Jobs, engine replicas as autoscaled Deployments; cloud VM launcher later
 - sgl-router per pool under the gateway for many SGLang replicas of one model; llm-d on Kubernetes
-- vLLM backend, AMD ROCm production image, LoRA adapters on llama.cpp
+- AMD ROCm production image, LoRA adapters on llama.cpp; the vLLM backend run on GPUs
 - Dedicated or merged-adapter instances for high-traffic models
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings

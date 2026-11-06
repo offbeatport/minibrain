@@ -4,9 +4,9 @@ import sys
 
 from minibrain.models.hardware import NodeReport
 
-ENGINES = ("sglang", "mlx", "transformers", "llamacpp")
-ADAPTER_ENGINES = frozenset({"sglang", "mlx", "transformers"})
-PREFERRED = ("sglang", "mlx")
+ENGINES = ("sglang", "vllm", "mlx", "transformers", "llamacpp")
+ADAPTER_ENGINES = frozenset({"sglang", "vllm", "mlx", "transformers"})
+PREFERRED = ("sglang", "vllm", "mlx")
 GPU_KINDS = frozenset({"cuda", "rocm"})
 
 
@@ -25,10 +25,19 @@ def sglang_python() -> str | None:
     return sys.executable if importable("sglang") else None
 
 
+def vllm_python() -> str | None:
+    explicit = os.environ.get("MINIBRAIN_VLLM_PYTHON")
+    if explicit:
+        return explicit
+    return sys.executable if importable("vllm") else None
+
+
 def installed_engines(system: str, arch: str, accelerator: str) -> list[str]:
     found: list[str] = []
     if system == "linux" and accelerator in GPU_KINDS and sglang_python():
         found.append("sglang")
+    if system == "linux" and accelerator in GPU_KINDS and vllm_python():
+        found.append("vllm")
     if system == "darwin" and arch == "arm64" and importable("mlx_lm"):
         found.append("mlx")
     found.append("transformers")

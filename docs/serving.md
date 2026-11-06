@@ -47,6 +47,32 @@ An inference request never touches the database.
   bottleneck long before gateways or the database.
 - Very high log volume moves to ClickHouse or Parquet in object storage, or to sampling.
 
+## Sampling
+
+`/v1/chat/completions` takes OpenAI's sampling fields and the engine extensions vLLM and SGLang share. A field left
+out is not sent, so the model's default applies: its `generation_config.json` on `transformers` and MLX (greedy when
+it has none), the engine's own default on SGLang, vLLM and llama.cpp. A custom model answers at temperature 0 unless
+the request sets one, the way its scores were measured.
+
+| Field | Range | SGLang, vLLM | llama.cpp | MLX | `transformers` |
+|---|---|---|---|---|---|
+| `max_tokens`, `max_completion_tokens` | 1 or more; unset: the context limit | Passed on | Passed on | Passed on | Passed on |
+| `temperature` | 0 to 2 | Passed on | Passed on | `make_sampler` | `GenerationConfig` |
+| `top_p` | above 0, up to 1 | Passed on | Passed on | `make_sampler` | `GenerationConfig` |
+| `top_k` | 1 or more | Passed on | Passed on | `make_sampler` | `GenerationConfig` |
+| `min_p` | 0 to 1 | Passed on | Passed on | `make_sampler` | `GenerationConfig` |
+| `presence_penalty`, `frequency_penalty` | -2 to 2 | Passed on | Passed on | Logits processor | Logits processor |
+| `repetition_penalty` | above 0, up to 2 | Passed on | `repeat_penalty` | `make_logits_processors` | `GenerationConfig` |
+| `seed` | any integer | Passed on | Passed on | `mx.random.seed` | `torch.manual_seed` |
+| `stop` | up to 4 texts | Passed on, after the model's stop tokens | Passed on | Checked as it decodes | `stop_strings` |
+
+- A value out of range, `n` above 1, `logprobs` or `logit_bias` is a 400 with an OpenAI `error` object naming the
+  field in `param`. So is any body that fails validation on `/v1/chat/completions`.
+- An engine that cannot honour a field (an older `mlx-lm` without `top_k` or `min_p`, or a server that refuses one)
+  answers 400 with `code: unsupported_parameter` and the field in `param`, never silently ignoring it.
+- Without `max_tokens` the answer runs to the end of the model's context (`max_position_embeddings`, or 4,096 tokens
+  for llama.cpp's window).
+
 ## Structured output
 
 `/v1/chat/completions` takes OpenAI's `response_format`: `{"type": "text"}`, `{"type": "json_object"}` or
@@ -80,6 +106,7 @@ hardware and the model's weight format:
 | Node | Weights | Engine |
 |---|---|---|
 | Linux, NVIDIA or AMD (ROCm), SGLang installed | safetensors | SGLang (`--enable-lora`, adapters loaded at runtime) |
+| Linux, NVIDIA or AMD (ROCm), vLLM installed, no SGLang | safetensors | vLLM (`--enable-lora`, runtime LoRA updates on) |
 | Apple silicon, `minibrain[mlx]` | safetensors | MLX (`mlx-lm`; PEFT LoRA converted on load, swapped per request) |
 | Anything else | safetensors | `transformers` + PEFT |
 | Any, `minibrain[llamacpp]` | GGUF | llama.cpp (Metal, CUDA or CPU); base models only |
@@ -104,7 +131,9 @@ hardware and the model's weight format:
 - `main` starts a local engine for a deployed model only when no live replica serves it elsewhere, and starts one
   again when the remote replicas go away.
 - Scale is horizontal: more replicas of the same model, on Kubernetes autoscaled. Heavy engines are optional extras;
-  SGLang pins its own torch and CUDA, so it runs from its own environment (`MINIBRAIN_SGLANG_PYTHON`).
+  SGLang and vLLM pin their own torch and CUDA, so each runs from its own environment (`MINIBRAIN_SGLANG_PYTHON`,
+  `MINIBRAIN_VLLM_PYTHON`). The vLLM engine shares SGLang's request path (an OpenAI-compatible server per base model)
+  and has not been run on a GPU yet.
 
 ## Routing
 
@@ -136,7 +165,7 @@ announces itself.
 | GPUs | Each with its memory |
 | Memory for models | Sum of GPU memory; Apple GPU-usable unified memory; RAM on CPU |
 | CPU, RAM | Cores, bytes |
-| Engines installed | `sglang`, `mlx`, `transformers`, `llamacpp` |
+| Engines installed | `sglang`, `vllm`, `mlx`, `transformers`, `llamacpp` |
 
 - The Compute page lists pools, their machines (online if seen in the last 2 minutes) and the engines serving.
 - Discover judges hardware fit against the selected pool: the best machine in the pool decides. Multi-GPU (XL)

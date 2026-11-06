@@ -26,6 +26,7 @@ from minibrain.serve.backend import (
     ServingBackend,
     TransformersBackend,
 )
+from minibrain.serve.sampling import Sampling, UnsupportedParameterError
 from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.serve.structured import Constraint
 from minibrain.telemetry.logs import configure_logging
@@ -52,11 +53,23 @@ class AdapterBody(BaseModel):
 
 
 class GenerateBody(BaseModel):
-    messages: list[dict[str, str]]
+    messages: list[dict[str, Any]]
     adapter: AdapterBody | None = None
-    max_tokens: int = 64
+    max_tokens: int | None = None
     constraint: Constraint | None = None
     route: str | None = None
+    sampling: dict[str, Any] = {}
+
+    def request(self, spec: BaseModelSpec, adapter: AdapterRef | None) -> CompletionRequest:
+        return CompletionRequest(
+            spec,
+            self.messages,
+            adapter,
+            self.max_tokens,
+            self.constraint,
+            self.route,
+            sampling=Sampling.from_dict(self.sampling),
+        )
 
 
 class DrainBody(BaseModel):
@@ -111,14 +124,6 @@ def unload_adapter(serving: ServingBackend, name: str) -> None:
         unload(name)
 
 
-class GenerateResult(BaseModel):
-    text: str
-    prompt_tokens: int
-    completion_tokens: int
-    stopped: bool
-    seconds: float
-
-
 def artifact_fetcher(store: ArtifactStore, http: HttpClient, token: str):
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -132,6 +137,13 @@ def artifact_fetcher(store: ArtifactStore, http: HttpClient, token: str):
     return materialize
 
 
+UNSUPPORTED = "unsupported_parameter"
+
+
+def unsupported_detail(error: UnsupportedParameterError) -> dict[str, str]:
+    return {"code": UNSUPPORTED, "param": error.param, "message": error.message}
+
+
 ANNOUNCE_SECONDS = 10.0
 PRUNE_EVERY = 60
 
@@ -142,6 +154,7 @@ INSTALL_HINTS = {
     "llama_cpp": "install minibrain[llamacpp] on this machine",
     "mlx_lm": "install minibrain[mlx] on this machine",
     "sglang": "install SGLang on this machine or set MINIBRAIN_SGLANG_PYTHON",
+    "vllm": "install vLLM on this machine or set MINIBRAIN_VLLM_PYTHON",
 }
 
 
@@ -218,6 +231,10 @@ def make_backend(engine: str, materialize: Callable[[dict[str, Any]], Path]) -> 
         from minibrain.serve.sglang_backend import SglangBackend
 
         return SglangBackend(materialize)
+    if engine == "vllm":
+        from minibrain.serve.vllm_backend import VllmBackend
+
+        return VllmBackend(materialize)
     return TransformersBackend(materialize)
 
 
@@ -392,7 +409,7 @@ def create_engine_app(
         }
 
     @app.post("/generate")
-    def generate(body: GenerateBody) -> GenerateResult:
+    def generate(body: GenerateBody) -> dict[str, Any]:
         if current["failure"] is not None:
             raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
@@ -407,14 +424,14 @@ def create_engine_app(
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
         try:
             with flights.flying(body.route, adapter.name if adapter else None):
-                completion = serving.complete(
-                    CompletionRequest(spec, body.messages, adapter, body.max_tokens, body.constraint, body.route)
-                )
+                completion = serving.complete(body.request(spec, adapter))
         except AdapterNotSupportedError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except OutputFormatError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return GenerateResult(**completion.__dict__)
+        except UnsupportedParameterError as error:
+            raise HTTPException(status_code=400, detail=unsupported_detail(error)) from error
+        return completion.as_dict()
 
     @app.post("/drain")
     def drain(body: DrainBody) -> DrainResult:

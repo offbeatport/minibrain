@@ -1,3 +1,4 @@
+import inspect
 import json
 import threading
 import time
@@ -10,8 +11,13 @@ from typing import Any
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest
+from minibrain.serve.sampling import GREEDY_SAMPLING, Sampling, stopped_at
 from minibrain.serve.structured import TokenTrie
 from minibrain.serve.weights import local_dir
+
+CONTEXT_FALLBACK = 4096
+SAMPLER_PARAMETERS = {"temperature": "temp", "top_p": "top_p", "min_p": "min_p", "top_k": "top_k"}
+DEFAULT_KEYS = ("temperature", "top_p", "top_k", "min_p", "repetition_penalty")
 
 PEFT_PREFIX = "base_model.model."
 LORA_A = ".lora_A.weight"
@@ -57,6 +63,42 @@ def convert_peft(path: Path) -> MlxAdapter:
     return MlxAdapter(LoraShape(rank, float(config["lora_alpha"]) / rank, keys), weights)
 
 
+def count_processor(prompt_length: int, presence: float, frequency: float) -> Callable[[Any, Any], Any]:
+    import mlx.core as mx
+
+    def process(tokens: Any, logits: Any) -> Any:
+        generated = tokens[prompt_length:].tolist()
+        if not generated:
+            return logits
+        counts: dict[int, int] = {}
+        for token in generated:
+            counts[token] = counts.get(token, 0) + 1
+        ids = mx.array(list(counts))
+        penalty = mx.array([presence + frequency * count for count in counts.values()], dtype=logits.dtype)
+        logits[:, ids] = logits[:, ids] - penalty
+        return logits
+
+    return process
+
+
+def model_defaults(folder: Path) -> Sampling:
+    try:
+        found = json.loads((folder / "generation_config.json").read_text())
+    except (OSError, ValueError):
+        return GREEDY_SAMPLING
+    if not isinstance(found, dict) or not found.get("do_sample"):
+        return GREEDY_SAMPLING
+    return Sampling(**{key: found[key] for key in DEFAULT_KEYS if isinstance(found.get(key), int | float)})
+
+
+def sampler_supports() -> set[str]:
+    from mlx_lm.sample_utils import make_sampler
+
+    accepted = set(inspect.signature(make_sampler).parameters)
+    found = {name for name, argument in SAMPLER_PARAMETERS.items() if argument in accepted}
+    return found | {"repetition_penalty", "presence_penalty", "frequency_penalty", "seed", "stop"}
+
+
 def choice_processor(trie: TokenTrie, prompt_length: int, stop: int) -> Callable[[Any, Any], Any]:
     import mlx.core as mx
 
@@ -67,6 +109,15 @@ def choice_processor(trie: TokenTrie, prompt_length: int, stop: int) -> Callable
         return logits + mask
 
     return process
+
+
+def context_of(folder: Path) -> int:
+    try:
+        found = json.loads((folder / "config.json").read_text())
+    except (OSError, ValueError):
+        return CONTEXT_FALLBACK
+    value = found.get("max_position_embeddings") if isinstance(found, dict) else None
+    return value if isinstance(value, int) and value > 0 else CONTEXT_FALLBACK
 
 
 class MlxRuntime:
@@ -84,6 +135,9 @@ class MlxRuntime:
             if token in vocabulary:
                 self.tokenizer.add_eos_token(token)
         self.stop: int = stops[0] if stops else self.tokenizer.eos_token_id
+        self.defaults = model_defaults(Path(self.source))
+        self.supported = sampler_supports()
+        self.context = context_of(Path(self.source))
         self.shape: LoraShape | None = None
         self.adapters: OrderedDict[str, MlxAdapter] = OrderedDict()
         self.active: str | None = None
@@ -145,33 +199,67 @@ class MlxRuntime:
         self.model.load_weights(list(adapter.weights.items()), strict=False)
         self.active = name
 
-    def processors(self, choices: Sequence[str], prompt_length: int) -> list[Callable[[Any, Any], Any]] | None:
-        if not choices:
-            return None
-        trie = TokenTrie([[*self.tokenizer.encode(choice, add_special_tokens=False), self.stop] for choice in choices])
-        return [choice_processor(trie, prompt_length, self.stop)]
+    def processors(
+        self, choices: Sequence[str], prompt_length: int, sampling: Sampling
+    ) -> list[Callable[[Any, Any], Any]] | None:
+        from mlx_lm.sample_utils import make_logits_processors
 
-    def generate(self, messages: list[dict[str, str]], max_tokens: int, choices: Sequence[str] = ()) -> Completion:
-        from mlx_lm import stream_generate
+        found: list[Callable[[Any, Any], Any]] = []
+        if choices:
+            tokens = [[*self.tokenizer.encode(choice, add_special_tokens=False), self.stop] for choice in choices]
+            found.append(choice_processor(TokenTrie(tokens), prompt_length, self.stop))
+        if sampling.repetition_penalty is not None:
+            found += make_logits_processors(repetition_penalty=sampling.repetition_penalty)
+        if sampling.presence_penalty is not None or sampling.frequency_penalty is not None:
+            presence, frequency = sampling.presence_penalty or 0.0, sampling.frequency_penalty or 0.0
+            found.append(count_processor(prompt_length, presence, frequency))
+        return found or None
+
+    def sampler(self, sampling: Sampling) -> Callable[[Any], Any]:
         from mlx_lm.sample_utils import make_sampler
 
+        arguments = {
+            SAMPLER_PARAMETERS[name]: value
+            for name, value in sampling.given().items()
+            if name in SAMPLER_PARAMETERS and name in self.supported
+        }
+        return make_sampler(**arguments)
+
+    def generate(
+        self,
+        messages: list[dict[str, Any]],
+        max_tokens: int | None,
+        choices: Sequence[str] = (),
+        sampling: Sampling = GREEDY_SAMPLING,
+    ) -> Completion:
+        import mlx.core as mx
+        from mlx_lm import stream_generate
+
+        sampling.refuse_beyond(self.supported, "MLX")
+        chosen = sampling.over(self.defaults)
         prompt = self.render(messages)
+        room = max(self.context - len(prompt), 1)
+        if chosen.seed is not None:
+            mx.random.seed(chosen.seed)
         started = time.perf_counter()
-        parts: list[str] = []
-        stopped, generated = False, 0
+        text, stopped, generated = "", False, 0
         for response in stream_generate(
             self.model,
             self.tokenizer,
             prompt,
-            max_tokens=max_tokens,
-            sampler=make_sampler(temp=0.0),
-            logits_processors=self.processors(choices, len(prompt)),
+            max_tokens=min(max_tokens or room, room),
+            sampler=self.sampler(chosen),
+            logits_processors=self.processors(choices, len(prompt), chosen),
         ):
-            parts.append(response.text)
+            text += response.text
             generated = response.generation_tokens
             stopped = response.finish_reason == "stop"
+            cut = stopped_at(text, chosen.stop)
+            if cut is not None:
+                text, stopped = text[:cut], True
+                break
         return Completion(
-            text="".join(parts),
+            text=text,
             prompt_tokens=len(prompt),
             completion_tokens=generated,
             stopped=stopped,
@@ -204,7 +292,7 @@ class MlxBackend:
             if request.adapter is not None:
                 runtime.ensure_adapter(request.adapter.name, self.materialize(request.adapter.artifact))
             runtime.activate(request.adapter.name if request.adapter else None)
-            return runtime.generate(request.messages, request.max_tokens, request.decoding_choices())
+            return runtime.generate(request.messages, request.max_tokens, request.decoding_choices(), request.sampling)
 
     def status(self) -> list[dict[str, Any]]:
         return [
