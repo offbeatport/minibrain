@@ -185,7 +185,8 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
     assert "undeploy it first" in harness.client.delete("/api/base-models/tiny").json()["detail"]
     harness.client.post("/api/base-models/tiny/deploy", json={"deployed": False})
     custom = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"}
+        "/api/models",
+        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"},
     ).json()
     assert "Tickets is trained on Tiny" in harness.client.delete("/api/base-models/tiny").json()["detail"]
     assert harness.client.delete(f"/api/models/{custom['slug']}").status_code == 202
@@ -339,7 +340,7 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
         "progress": None,
         "job_id": claim["job_id"],
     }
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Draft"})
+    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Draft"})
     assert rows(harness)["draft"]["activity"]["label"] == "v0 ready"
     harness.client.patch("/api/models/draft", json={"tags": ["x"]})
     assert rows(harness)["draft"]["tags"] == ["x"]
@@ -498,7 +499,8 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
         (folder / name).write_bytes(data)
     base = harness.client.post("/api/base-models/import", json={"name": "Corp base", "location": str(folder)}).json()
     created = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": "On corp", "base_model": base["key"]}
+        "/api/models",
+        json={"preset": "classify", "labels": ["billing", "bug"], "name": "On corp", "base_model": base["key"]},
     )
     assert created.status_code == 201
     pending = harness.client.post("/api/models/on-corp/versions", json={"kind": "prompt"})
@@ -507,7 +509,8 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     trained = harness.client.post("/api/models/on-corp/versions", json={"kind": "lora"})
     assert "pick a dataset" in trained.json()["detail"]
     missing = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": "Nowhere", "base_model": "nope"}
+        "/api/models",
+        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Nowhere", "base_model": "nope"},
     )
     assert missing.status_code == 409
 
@@ -523,7 +526,8 @@ def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: 
     harness.worker(kinds=["import"]).run_once()
     assert (
         harness.client.post(
-            "/api/models", json={"labels": ["billing", "bug"], "name": "On FP8", "base_model": base["key"]}
+            "/api/models",
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "On FP8", "base_model": base["key"]},
         ).status_code
         == 201
     )
@@ -545,7 +549,8 @@ def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> 
     add_tiny(harness)
     download_tiny(harness)
     created = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"}
+        "/api/models",
+        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"},
     )
     assert created.status_code == 201, created.text
     assert rows(harness)["tickets"]["availability"]["state"] == "downloading"

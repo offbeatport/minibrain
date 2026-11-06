@@ -63,12 +63,25 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 
 - Two contracts: free text and a JSON schema. A label set is a JSON schema with one enum field (`label`) and is served
   as the bare label.
+- Add model asks only for a base and a name. Every model starts as a Chat assistant (`general`, the API's default
+  preset; `preset` stays in the API for scripts and tests) and narrows later, in two ways:
+  - When data is attached: if its latest dataset version's expected answers look like a label set (the check's rule:
+    at most 256 short single-line values, each repeated on average), the model page proposes them ("Answers look like
+    labels: billing, bug, refund (+2). Restrict answers to these?"). Accept switches the model to Classify with those
+    labels, its graders and its view, and scores a prompt-only version with them when the data splits; Dismiss keeps
+    it a Chat assistant and is remembered for that dataset version (`PUT
+    /api/models/<slug>/label-proposal/dismissal`), so a later dataset version asks again.
+  - By hand: How it's judged → Answers → Edit picks free text (Chat assistant), one of these labels (Classify) or a
+    JSON schema (Custom), all through `PUT /api/models/<slug>/contract`. A new kind of answer moves the model to that
+    kind's preset and resets its graders and promotion rule to the preset's defaults; the same kind keeps the preset.
 - The contract lives on each version and evolves additively: a new version may add enum values or optional fields
-  freely; removing, renaming, retyping or making a field required is a breaking change that needs an explicit
-  confirmation (`breaking: true` on `PUT /api/models/<slug>/contract` or on the new version), because apps depend
-  on it. Contracts are numbered per model (contract 1, 2, …); every version records its number, and every `/v1`
-  request log records the number it was served with. `POST /api/models/<slug>/contract/check` lists the changes
-  against the latest version first.
+  freely. Until the model has gone live (a version promoted once, `models.first_live_at`) every change is free, a new
+  kind of answer included. After that, removing, renaming, retyping or making a field required, or switching the kind
+  of answer, is a breaking change that needs an explicit confirmation (`breaking: true` on `PUT
+  /api/models/<slug>/contract` or on the new version), because apps depend on it. Contracts are numbered per model
+  (contract 1, 2, …); every version records its number, and every `/v1` request log records the number it was served
+  with. `POST /api/models/<slug>/contract/check` lists the changes against the latest version first and says whether
+  they need that confirmation.
 - Constrained decoding enforces the contract on one path: XGrammar on SGLang and vLLM, a grammar on llama.cpp, a token
   trie on MLX and `transformers`. The gateway checks a JSON answer against the schema and answers 422 when it breaks
   it.
@@ -109,7 +122,7 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 5. Specialist presets (Classify is done) and the ML-engineer tooling below.
 
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
-when attached data looks like a label set, or set in How it's judged).
+when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
 
 ### Order
 
@@ -135,21 +148,24 @@ the mapping template, the version 0 prompt and the trained prompt per contract k
 checks, the default promotion rule and at most a results view. Adding Extract is one such file plus its
 view in the UI; `GET /api/presets` lists the presets, the ones coming and the graders.
 
-- Classify: a label set built from the labels typed in Add model and those found in the data (new ones join it on the
-  next version); mapping `input` → user, `label` → assistant; a version 0 prompt listing the labels and a trained
-  prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least two labels and label balance; the
-  results view shows per-label counts and the confusion matrix, and feedback picks the right label. Try with sample
-  data on the empty Models page creates a Classify model on the travel intents sample.
+- Classify: a label set from the accepted proposal or the labels typed in How it's judged, joined by those found in
+  the data (new ones join it on the next version); mapping `input` → user, `label` → assistant; a version 0 prompt
+  listing the labels and a trained prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least
+  two labels and label balance; the results view shows per-label counts and the confusion matrix, and feedback picks
+  the right label. A version's results view follows its own contract (labels: Classify; free text: Chat assistant),
+  so versions from before a switch keep theirs.
 - General, shown as Chat assistant: a free-text contract over turns; chat JSONL (`messages`, system messages
   dropped) or a question and answer table (`question`/`answer`, `prompt`/`completion`, `input`/`output` and the
   like) as data; every assistant turn trains and the last one is scored; version 0 is the base with the model's
   system prompt (written on the model page) plus a few examples once there is data; graders text similarity, plus the
   judge with a default rubric (correct, follows the instructions, concise) once a judge model is set; no checks; the
   default rule. `expected: data` takes expected answers from the data; the hook for distillation is `expected:
-  teacher`, which will fill them from a teacher model.
-- Custom: free text or a JSON schema pasted in Add model, any graders that fit it (free text: exact match and text
-  similarity; JSON: JSON valid and field match by default), optional instructions as the system prompt, chat JSONL
-  (`messages`) as data.
+  teacher`, which will fill them from a teacher model. Try with sample data on the empty Models page creates a Chat
+  assistant on the travel intents sample (base and name, like Add model); its model page then proposes the five
+  intents as labels, which shows the narrowing flow rather than skipping it.
+- Custom: a JSON schema pasted in How it's judged (free text or labels through the API), any graders that fit it
+  (free text: exact match and text similarity; JSON: JSON valid and field match by default), optional instructions as
+  the system prompt, chat JSONL (`messages`) as data.
 
 ## Concepts
 
@@ -171,8 +187,9 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 
 ## Flow
 
-preset → name + contract → version 0: prompt-only on the base at once, scored by the graders when there is data → stop
-here if it passes the promotion rule and the cost is acceptable.
+base + name → version 0 as a Chat assistant: prompt-only on the base at once, scored by the graders when there is data
+→ narrow the answers (labels proposed from the data, or set in How it's judged) → stop here if it passes the promotion
+rule and the cost is acceptable.
 
 Otherwise: source → DuckDB (query in place or stage) → mapping / SQL → built-in steps → teacher labels + human review
 → dataset version (train/eval split) → quality + PII + preview → LoRA training (worker subprocess) → eval vs base,
@@ -967,19 +984,20 @@ keys, and `/v1` stays key-only.
   model's API link to it, and the copy-paste harness configs stay where they are.
 - Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
   in the browser.
-- Add model (`/models/new`) offers the task (Classify and Custom; Extract, Rewrite and Text-to-SQL as Coming;
-  General is created through the API until Add model's question is settled), then the base model from one picker (the kit's `TabbedSearchList` in a dialog):
-  one search over four tabs. The name is prefilled and required: the task noun and the next free number
-  ("Classifier 1", "Custom 1"), never a name a base or custom model already has, with an inline error when a typed
-  one is taken. Classify takes labels (at least two, unless a dataset brings them); Custom takes free text
-  or a JSON schema, graders that fit it (a judge with its rubric and model) and optional instructions. Both take a
-  promotion rule (thresholds and "at least as good as the live version"). The model page's How it's judged section
-  shows each part as a plain default with an Edit action, collapsed until opened: the labels or contract with its
-  number (a breaking change asks to confirm), the graders with the judge's rubric and model, and the rule. Its
-  Instructions section edits the system prompt; saving makes a prompt-only version that tries it at once.
+- Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
+  one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
+  and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"
+  and the next free number ("Assistant 1"), never a name a base or custom model already has, with an inline error
+  when a typed one is taken. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat
+  assistant, 7B+ works best." Starting from one of your models copies its answers, graders, rule and instructions
+  too. The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
+  part as a plain default with an Edit action, collapsed until opened: the answers (free text, one of these labels or
+  a JSON schema) with the contract number (after going live, a breaking change asks to confirm), the graders with the
+  judge's rubric and model, and the rule. Its Instructions section edits the system prompt; saving makes a
+  prompt-only version that tries it at once.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
-    for the task (capability, size tier, the catalogue's tested default; superseded models left out), then
-    popularity. Being downloaded is not a ranking factor.
+    for a chat assistant (capability, size tier favouring 7B and up, the catalogue's tested default; superseded
+    models left out), then popularity. Being downloaded is not a ranking factor.
   - Catalogue: every entry, with size, fit and licence-use filters. My models: start from a custom model (same base,
     its training data, and its trained version's rows and epochs, carried to the Training page as `?rows=&epochs=`),
     or an imported base. Import: a Hugging Face id or link, an `s3://` path or a folder.

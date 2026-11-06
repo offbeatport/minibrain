@@ -69,7 +69,7 @@ def test_inputs_and_answers_are_kept_per_model_and_audited(harness: Harness) -> 
     assert status(people.viewer, "PUT", PATH, {"kept": True}) == 403
     assert status(people.builder, "PUT", PATH, {"kept": True}) == 200
     assert set_policy(harness, "request_bodies", True) == 200
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"})
     assert bodies_of(harness, "other")["kept"] is True
     assert set_policy(harness, "request_bodies", False) == 200
     assert bodies_of(harness)["kept"] is True and bodies_of(harness, "other")["kept"] is True

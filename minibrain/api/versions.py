@@ -222,6 +222,7 @@ def promote_version(slug: str, number: int, session: SessionDep, settings: Setti
     model.current_version = version.number
     model.deployed = True
     version.live_at = version.live_at or now()
+    model.first_live_at = model.first_live_at or version.live_at
     if (previous, was_deployed) != (number, True):
         audit_version(
             session, model, number=number, action="version.promote", previous=previous, was_deployed=was_deployed

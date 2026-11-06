@@ -21,7 +21,9 @@ def upload(harness: Harness, rows: int = 200, name: str = "tickets.csv") -> dict
 def dataset_with_model(harness: Harness, rows: int = 200) -> dict:
     source = upload(harness, rows)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage"})
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
     harness.client.put(f"/api/models/{SLUG}/dataset", json={"dataset": "tickets"})
     return source
 

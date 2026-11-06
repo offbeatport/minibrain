@@ -49,6 +49,10 @@ function GetStarted() {
                     On Data, upload <span className="font-mono">samples/travel_intents.jsonl</span>{" "}
                     and build the dataset.
                 </li>
+                <li>
+                    On Training, pick it as the model's data; the model page then offers to restrict
+                    its answers to the labels it holds.
+                </li>
                 <li>On Training, score a prompt-only version, then train one.</li>
                 <li>
                     Compare them on Evaluations, promote the better one and call it from

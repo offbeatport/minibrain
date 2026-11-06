@@ -1,26 +1,34 @@
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { Boxes } from "lucide-react";
 import { Button, useToast } from "obp-ui";
 import { api, unwrap } from "~/api/client";
 import { errorMessage } from "~/components/Section";
 import { bytes } from "~/lib/time";
+import { modelHref } from "../data/parts";
 import { useModelsRefresh } from "./dialogs";
 
 export function ModelsEmpty() {
     const refresh = useModelsRefresh();
+    const router = useRouter();
     const toast = useToast();
     const sample = useMutation({
         mutationFn: () => unwrap(api.POST("/api/models/sample")),
         onSuccess: async (created) => {
             await refresh();
             const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} sample messages`;
+            const scored =
+                created.download_bytes === null
+                    ? `Version 0 on ${created.base_name} is being scored`
+                    : `Downloading ${created.base_name} (${bytes(created.download_bytes)}); version 0 is scored once it is here`;
             toast({
                 title: "Sample model added",
-                description:
-                    created.download_bytes === null
-                        ? `${rows}. Version 0 on ${created.base_name} is being scored.`
-                        : `${rows}. Downloading ${created.base_name} (${bytes(created.download_bytes)}); version 0 is scored once it is here.`,
+                description: `${rows}. ${scored}. Its answers look like labels: open it to restrict them.`,
                 tone: "success",
+                action: {
+                    label: "Open",
+                    onClick: () => router.history.push(modelHref(created.slug)),
+                },
             });
         },
         onError: (error) =>
@@ -36,8 +44,8 @@ export function ModelsEmpty() {
             <div className="flex flex-col items-center gap-1">
                 <h2 className="text-lg font-semibold">No models yet</h2>
                 <p className="text-base text-muted-foreground">
-                    Add a base model to get started, or try a classifier on sample travel support
-                    messages.
+                    Add a base model to get started, or try a chat assistant on sample travel
+                    support messages and narrow it to their labels.
                 </p>
             </div>
             <Button

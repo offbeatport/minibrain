@@ -23,7 +23,9 @@ def custom_row(harness: Harness, slug: str) -> dict:
 
 
 def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage"})
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
     give_data(harness, SLUG)
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=0.8)
@@ -33,7 +35,9 @@ def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
 
 
 def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> None:
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage"})
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
     assert custom_row(harness, SLUG)["usage"] is None
     with harness.sessions() as session:
         model = session.query(Model).filter_by(slug=SLUG).one()
@@ -57,7 +61,9 @@ def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> No
 
 
 def test_last_use_is_reported_even_without_recent_requests(harness: Harness) -> None:
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage"})
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
     with harness.sessions() as session:
         model = session.query(Model).filter_by(slug=SLUG).one()
         moment = now() - timedelta(days=12)
@@ -75,12 +81,12 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     body = first.json()
     assert (body["name"], body["preset"], body["source"]["file"]) == (
         "Travel intents",
-        "classify",
+        "general",
         "travel_intents.jsonl",
     )
     assert body["mapping"]["template"] == {"user": "{message}", "assistant": "{intent}"}
     assert body["dataset_version"]["rows"] == 750
-    assert len(body["contract"]["labels"]) == 5
+    assert len(body["label_proposal"]["labels"]) == 5
     again = harness.client.post("/api/models/sample").json()
     assert (again["name"], again["dataset"]) == ("Travel intents 2", body["dataset"])
 
@@ -114,7 +120,9 @@ def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Har
 
 
 def test_rows_count_api_keys(harness: Harness) -> None:
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage"})
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
     add_key(harness, name="app")
     add_key(harness, name="batch")
     assert custom_row(harness, SLUG)["key_count"] == 2

@@ -207,7 +207,7 @@ def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness
     assert harness.worker(kinds=["import"]).run_once()
     imported = harness.client.get(f"/api/base-models/{base['key']}").json()
     assert imported["store"] == "s3" and not Path(imported["storage_path"]).exists()
-    body = {"name": "On FP8", "labels": ["billing", "bug"], "base_model": base["key"]}
+    body = {"name": "On FP8", "preset": "classify", "labels": ["billing", "bug"], "base_model": base["key"]}
     assert harness.client.post("/api/models", json=body).status_code == 201
     trained = harness.client.post("/api/models/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409

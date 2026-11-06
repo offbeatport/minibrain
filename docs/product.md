@@ -139,14 +139,17 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Delete a base and its files, and its models once confirmed.
   UI: Models › Delete · API: DELETE /api/base-models/{key}
 - **Custom models** · shipped · product, ml
-  Create a named model for a task on a chosen base.
+  Pick a base and a name; it starts as a chat assistant.
   UI: Models › Add model · API: GET /api/models, POST /api/models, GET /api/models/name, GET /api/models/{slug}, PATCH /api/models/{slug}, DELETE /api/models/{slug}
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
-  UI: Models › Add model › Classify, Evaluations › version · API: GET /api/presets
+  UI: Models › model › How it's judged › Answers, Evaluations › version · API: GET /api/presets
+- **Label proposal** · shipped · product, ml
+  Offer to restrict a chat assistant to labels found in its data.
+  UI: Models › model · API: PUT /api/models/{slug}/label-proposal/dismissal, PUT /api/models/{slug}/contract
 - **Extract preset** · planned · product, ml
   Pull JSON fields out of text against a schema.
   Roadmap: Task types
@@ -155,13 +158,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **General preset** · partial · product, ml
   A chat assistant in the organisation's language, formats and policies.
-  UI: Models › model › How it's judged, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
+  UI: Models › Add model, Models › model › How it's judged, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
 - **Text-to-SQL preset** · planned · ml
   Answer questions with SQL on your own schema.
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › Add model › Custom · API: PUT /api/models/{slug}/graders
+  UI: Models › model › How it's judged › Answers · API: PUT /api/models/{slug}/graders
 - **Instructions** · shipped · product, ml
   Write the system prompt; a prompt-only version tries it at once.
   UI: Models › model › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
@@ -169,7 +172,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   One engine for chat examples, contracts, graders and promotion rules.
   UI: Models › model › How it's judged
 - **Contracts** · shipped · engineer, ml
-  Free text or a JSON schema per version, extended without breaking apps.
+  Free text or a JSON schema; breaking changes confirmed once live.
   UI: Models › model › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.

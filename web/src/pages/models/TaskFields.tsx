@@ -1,56 +1,23 @@
 import { X } from "lucide-react";
 import {
     Button,
-    CheckboxSelect,
     Field,
-    Input,
     NumberField,
     Select,
     SelectContent,
-    SelectGroup,
     SelectItem,
-    SelectLabel,
-    SelectSeparator,
     SelectTrigger,
     SelectValue,
     Switch,
-    Textarea,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import type {
-    ContractInfo,
-    GraderConfig,
-    PresetsResponse,
-    PromotionInfo,
-    ThresholdInfo,
-} from "~/api/client";
+import type { PresetsResponse, PromotionInfo, ThresholdInfo } from "~/api/client";
 import { metricName } from "~/lib/metrics";
 
-export type AnswerKind = "text" | "json";
-
-export type TaskDraft = {
-    labels: string;
-    answer: AnswerKind;
-    schema: string;
-    graders: string[];
-    rubric: string;
-    judge: string;
-    instructions: string;
-    promotion: PromotionInfo;
-};
-
-export const EMPTY_TASK: TaskDraft = {
-    labels: "",
-    answer: "text",
-    schema: '{\n  "type": "object",\n  "properties": {\n    "total": { "type": "number" }\n  },\n  "required": ["total"]\n}',
-    graders: [],
-    rubric: "",
-    judge: "",
-    instructions: "",
-    promotion: { thresholds: [], beats_live: true },
-};
+export const EXAMPLE_SCHEMA =
+    '{\n  "type": "object",\n  "properties": {\n    "total": { "type": "number" }\n  },\n  "required": ["total"]\n}';
 
 const OPERATORS: ThresholdInfo["op"][] = [">=", "<=", "==", ">", "<"];
 const OPERATOR_NAMES: Record<ThresholdInfo["op"], string> = {
@@ -86,256 +53,9 @@ export function schemaProblem(text: string): string | undefined {
     }
 }
 
-export function contractOf(preset: string, draft: TaskDraft): ContractInfo | null {
-    if (preset !== "custom") {
-        return null;
-    }
-    if (draft.answer === "text") {
-        return { kind: "text" };
-    }
-    return schemaProblem(draft.schema)
-        ? null
-        : { kind: "json", json_schema: JSON.parse(draft.schema) };
-}
-
-function kindOf(preset: string, draft: TaskDraft): string {
-    return preset === "classify" ? "labels" : draft.answer;
-}
-
-export function defaultGraders(
-    presets: PresetsResponse | undefined,
-    preset: string,
-    draft: TaskDraft,
-): string[] {
-    const found = presets?.presets.find((item) => item.key === preset);
-    return (found?.graders[kindOf(preset, draft)] ?? []).map((item) => item.name);
-}
-
-export function graderConfigs(
-    preset: string,
-    draft: TaskDraft,
-    base: string,
-): GraderConfig[] | null {
-    if (preset !== "custom" || draft.graders.length === 0) {
-        return null;
-    }
-    return draft.graders.map((name) =>
-        name === "judge"
-            ? { name, rubric: draft.rubric.trim(), model: draft.judge || base }
-            : { name },
-    );
-}
-
 export function metricsFor(presets: PresetsResponse | undefined, names: string[]): string[] {
     const known = presets?.graders ?? [];
     return names.flatMap((name) => known.find((item) => item.name === name)?.metrics ?? []);
-}
-
-export function PresetSelect({
-    presets,
-    value,
-    onChange,
-}: {
-    presets: PresetsResponse | undefined;
-    value: string;
-    onChange: (preset: string) => void;
-}) {
-    return (
-        <Field id="create-task" label="Task">
-            <Select value={value} onValueChange={(next) => onChange(String(next ?? value))}>
-                <SelectTrigger id="create-task" className="w-full">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {(presets?.presets ?? []).map((item) => (
-                        <SelectItem key={item.key} value={item.key} description={item.hint}>
-                            {item.label}
-                        </SelectItem>
-                    ))}
-                    <SelectSeparator />
-                    <SelectGroup>
-                        <SelectLabel>Coming</SelectLabel>
-                        {(presets?.planned ?? []).map((item) => (
-                            <SelectItem
-                                key={item.key}
-                                value={item.key}
-                                disabled
-                                description={item.hint}
-                            >
-                                {item.label}
-                            </SelectItem>
-                        ))}
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
-        </Field>
-    );
-}
-
-export function ClassifyFields({
-    draft,
-    onChange,
-    found,
-    error,
-}: {
-    draft: TaskDraft;
-    onChange: (draft: TaskDraft) => void;
-    found: string[];
-    error?: string;
-}) {
-    const typed = splitLabels(draft.labels);
-    const extra = found.filter((label) => !typed.includes(label));
-    return (
-        <Field
-            id="create-labels"
-            label={found.length > 0 ? "Labels (optional)" : "Labels"}
-            error={error}
-            hint={
-                found.length > 0
-                    ? `Found in the data: ${found.join(", ")}. Labels you add here join them.`
-                    : "At least two, separated by commas. Labels found in its data later join the set."
-            }
-        >
-            <Input
-                id="create-labels"
-                aria-invalid={Boolean(error)}
-                value={draft.labels}
-                onChange={(event) => onChange({ ...draft, labels: event.target.value })}
-                placeholder={
-                    extra.length > 0 ? extra.slice(0, 4).join(", ") : "billing, bug, account"
-                }
-            />
-        </Field>
-    );
-}
-
-export function CustomFields({
-    draft,
-    onChange,
-    presets,
-    bases,
-    base,
-    problems,
-}: {
-    draft: TaskDraft;
-    onChange: (draft: TaskDraft) => void;
-    presets: PresetsResponse | undefined;
-    bases: { key: string; name: string }[];
-    base: string;
-    problems: { schema?: string; rubric?: string; graders?: string };
-}) {
-    const kind = draft.answer;
-    const options = (presets?.graders ?? [])
-        .filter((item) => item.contracts.includes(kind))
-        .map((item) => ({ value: item.name, label: item.label }));
-    const choose = (answer: AnswerKind) => {
-        const kept = draft.graders.filter((name) =>
-            presets?.graders.find((item) => item.name === name)?.contracts.includes(answer),
-        );
-        onChange({
-            ...draft,
-            answer,
-            graders:
-                kept.length > 0 ? kept : defaultGraders(presets, "custom", { ...draft, answer }),
-        });
-    };
-    return (
-        <>
-            <Field id="create-answer" label="Answer">
-                <Select
-                    value={kind}
-                    onValueChange={(next) => choose(next === "json" ? "json" : "text")}
-                >
-                    <SelectTrigger id="create-answer" className="w-full">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="text" description="Any text, checked by the graders">
-                            Free text
-                        </SelectItem>
-                        <SelectItem value="json" description="JSON held to a schema you paste">
-                            JSON schema
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </Field>
-            {kind === "json" && (
-                <Field
-                    id="create-schema"
-                    label="JSON schema"
-                    error={problems.schema}
-                    hint="Every answer is decoded to match it. Adding optional fields later is free; removing or renaming one needs a confirmation."
-                >
-                    <Textarea
-                        id="create-schema"
-                        aria-invalid={Boolean(problems.schema)}
-                        className="min-h-40 font-mono"
-                        spellCheck={false}
-                        value={draft.schema}
-                        onChange={(event) => onChange({ ...draft, schema: event.target.value })}
-                    />
-                </Field>
-            )}
-            <Field id="create-graders" label="Graders" error={problems.graders}>
-                <CheckboxSelect
-                    label="Graders"
-                    allLabel="No graders"
-                    noun="graders"
-                    options={options}
-                    value={draft.graders}
-                    onValueChange={(graders) => onChange({ ...draft, graders })}
-                />
-            </Field>
-            {draft.graders.includes("judge") && (
-                <>
-                    <Field
-                        id="create-rubric"
-                        label="Judge rubric"
-                        error={problems.rubric}
-                        hint="The judge scores each answer from 1 to 5 against this; scores are cached per answer, rubric and judge."
-                    >
-                        <Textarea
-                            id="create-rubric"
-                            aria-invalid={Boolean(problems.rubric)}
-                            value={draft.rubric}
-                            onChange={(event) => onChange({ ...draft, rubric: event.target.value })}
-                            placeholder="Is the answer correct, complete and polite?"
-                        />
-                    </Field>
-                    <Field id="create-judge" label="Judge model">
-                        <Select
-                            value={draft.judge || base}
-                            onValueChange={(next) =>
-                                onChange({ ...draft, judge: String(next ?? "") })
-                            }
-                        >
-                            <SelectTrigger id="create-judge" className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {bases.map((item) => (
-                                    <SelectItem key={item.key} value={item.key}>
-                                        {item.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                </>
-            )}
-            <Field
-                id="create-instructions"
-                label="Instructions (optional)"
-                hint="The system prompt every version starts from. Leave it empty for the default."
-            >
-                <Textarea
-                    id="create-instructions"
-                    value={draft.instructions}
-                    onChange={(event) => onChange({ ...draft, instructions: event.target.value })}
-                />
-            </Field>
-        </>
-    );
 }
 
 function ThresholdRow({

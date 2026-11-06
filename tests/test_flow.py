@@ -18,7 +18,7 @@ def build_dataset(harness: Harness) -> dict[str, Any]:
 
 
 def create_model(harness: Harness, name: str = "Support Triage") -> dict[str, Any]:
-    response = harness.client.post("/api/models", json={"name": name, "labels": list(LABELS)})
+    response = harness.client.post("/api/models", json={"name": name, "preset": "classify", "labels": list(LABELS)})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -37,7 +37,9 @@ def create_on_data(harness: Harness, name: str = "Support Triage") -> dict[str, 
     source = harness.client.post("/api/sources", files=files).json()
     dataset = harness.client.post("/api/datasets", json={"name": name, "source_id": source["id"]})
     assert dataset.status_code == 201, dataset.text
-    created = harness.client.post("/api/models", json={"name": name, "dataset": dataset.json()["slug"]})
+    created = harness.client.post(
+        "/api/models", json={"name": name, "preset": "classify", "dataset": dataset.json()["slug"]}
+    )
     assert created.status_code == 201, created.text
     return created.json()
 
@@ -279,8 +281,12 @@ def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:
 
 
 def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness) -> None:
-    blank = harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "**** "})
+    blank = harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "**** "}
+    )
     assert blank.status_code == 422 and "letter or number" in blank.json()["detail"]
     assert create_model(harness)["slug"] == SLUG
-    taken = harness.client.post("/api/models", json={"name": "support  triage!", "labels": list(LABELS)})
+    taken = harness.client.post(
+        "/api/models", json={"name": "support  triage!", "preset": "classify", "labels": list(LABELS)}
+    )
     assert taken.status_code == 409 and "support  triage!" in taken.json()["detail"]

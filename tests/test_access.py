@@ -34,6 +34,7 @@ ROUTE_ROLES = {
     ("GET", "/api/models/name"): "viewer",
     ("POST", "/api/models/{slug}/contract/check"): "builder",
     ("PUT", "/api/models/{slug}/contract"): "builder",
+    ("PUT", "/api/models/{slug}/label-proposal/dismissal"): "builder",
     ("PUT", "/api/models/{slug}/graders"): "builder",
     ("PUT", "/api/models/{slug}/promotion"): "builder",
     ("PUT", "/api/models/{slug}/instructions"): "builder",
@@ -232,14 +233,21 @@ def status(client: TestClient, method: str, path: str, body: Any = None) -> int:
 
 
 def test_viewers_see_models_but_change_nothing(team: Team) -> None:
-    assert status(team.builder, "POST", "/api/models", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
+    assert (
+        status(
+            team.builder, "POST", "/api/models", {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"]}
+        )
+        == 201
+    )
     viewer = team.viewer
     assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/models/triage") == 200
     assert status(viewer, "GET", "/api/all-models") == 200
     assert status(viewer, "GET", "/api/jobs") == 200
     assert status(viewer, "GET", "/api/system/infrastructure") == 200
-    refused = viewer.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer))
+    refused = viewer.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer)
+    )
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Builder role"
     assert status(viewer, "GET", "/api/sources") == 403
     assert status(viewer, "GET", "/api/models/triage/preview") == 403
@@ -252,7 +260,10 @@ def test_viewers_see_models_but_change_nothing(team: Team) -> None:
 
 def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     builder = team.builder
-    assert status(builder, "POST", "/api/models", {"name": "Triage", "labels": ["billing", "bug"]}) == 201
+    assert (
+        status(builder, "POST", "/api/models", {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"]})
+        == 201
+    )
     assert status(builder, "GET", "/api/sources") == 200
     assert status(builder, "GET", "/api/keys") == 200
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}

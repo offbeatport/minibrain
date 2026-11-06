@@ -6,6 +6,9 @@ import {
     ConfirmDialog,
     Field,
     Input,
+    Label,
+    RadioGroup,
+    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
@@ -29,7 +32,13 @@ import { useAllModels, useJudgeSetting, usePresets } from "~/api/queries";
 import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { contractSentence, gradersSentence, judgeSentence, ruleSentence } from "~/lib/judging";
-import { PromotionEditor, metricsFor, schemaProblem, splitLabels } from "./TaskFields";
+import {
+    EXAMPLE_SCHEMA,
+    PromotionEditor,
+    metricsFor,
+    schemaProblem,
+    splitLabels,
+} from "./TaskFields";
 
 type Change = { path: string; detail: string; breaking: boolean };
 type Part = "answer" | "graders" | "judge" | "rule";
@@ -55,114 +64,221 @@ function useSaved(title: string, onDone: () => void) {
     };
 }
 
-function contractText(contract: ContractInfo): string {
+type AnswerKind = "text" | "labels" | "json";
+
+const ANSWER_KINDS: { value: AnswerKind; label: string; description: string; noun: string }[] = [
+    {
+        value: "text",
+        label: "Free text",
+        description: "Any answer, over a conversation. A chat assistant.",
+        noun: "a chat assistant",
+    },
+    {
+        value: "labels",
+        label: "One of these labels",
+        description: "Exactly one label from a set, scored by accuracy. A classifier.",
+        noun: "a classifier",
+    },
+    {
+        value: "json",
+        label: "A JSON schema",
+        description: "JSON held to a schema you paste, scored field by field. A custom model.",
+        noun: "a custom model",
+    },
+];
+
+function answerKind(contract: ContractInfo): AnswerKind {
     if (contract.labels) {
-        return contract.labels.join(", ");
+        return "labels";
     }
-    return contract.kind === "json" ? JSON.stringify(contract.json_schema, null, 2) : "";
+    return contract.kind === "json" ? "json" : "text";
 }
 
-function draftContract(contract: ContractInfo, text: string): ContractInfo | null {
-    if (contract.labels) {
-        const labels = splitLabels(text);
-        return labels.length >= 2 ? { kind: "json", labels } : null;
+function startingLabels(detail: ModelDetail): string {
+    const found = detail.contract.labels ?? detail.dataset_version?.labels ?? [];
+    return found.join(", ");
+}
+
+function startingSchema(contract: ContractInfo): string {
+    return contract.kind === "json" && !contract.labels
+        ? JSON.stringify(contract.json_schema, null, 2)
+        : EXAMPLE_SCHEMA;
+}
+
+function draftContract(kind: AnswerKind, labels: string, schema: string): ContractInfo | null {
+    if (kind === "text") {
+        return { kind: "text" };
     }
-    return schemaProblem(text) ? null : { kind: "json", json_schema: JSON.parse(text) };
+    if (kind === "labels") {
+        const found = splitLabels(labels);
+        return found.length >= 2 ? { kind: "json", labels: found } : null;
+    }
+    return schemaProblem(schema) ? null : { kind: "json", json_schema: JSON.parse(schema) };
 }
 
 function Actions({ children }: { children: ReactNode }) {
     return <div className="flex flex-wrap items-center gap-2">{children}</div>;
 }
 
-function ContractEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => void }) {
+export function useContractChange(detail: ModelDetail, onSaved: (saved: ModelDetail) => void) {
     const slug = detail.slug;
-    const [text, setText] = useState(contractText(detail.contract));
-    const [pending, setPending] = useState<Change[] | null>(null);
-    const next = draftContract(detail.contract, text);
-    const labels = Boolean(detail.contract.labels);
-    const problem = labels ? (next ? undefined : "At least two labels.") : schemaProblem(text);
+    const [pending, setPending] = useState<{ contract: ContractInfo; changes: Change[] } | null>(
+        null,
+    );
     const save = useMutation({
-        mutationFn: (breaking: boolean) =>
+        mutationFn: ({ contract, breaking }: { contract: ContractInfo; breaking: boolean }) =>
             unwrap(
                 api.PUT("/api/models/{slug}/contract", {
                     params: { path: { slug } },
-                    body: { contract: next ?? detail.contract, breaking },
+                    body: { contract, breaking },
                 }),
             ),
-        ...useSaved(labels ? "Labels saved" : "Contract saved", onDone),
+        onSuccess: onSaved,
     });
     const check = useMutation({
-        mutationFn: () =>
+        mutationFn: (contract: ContractInfo) =>
             unwrap(
                 api.POST("/api/models/{slug}/contract/check", {
                     params: { path: { slug } },
-                    body: next ?? detail.contract,
+                    body: contract,
                 }),
             ),
-        onSuccess: (found) => {
+        onSuccess: (found, contract) => {
             if (found.breaking) {
-                setPending(found.changes.filter((change) => change.breaking));
+                setPending({ contract, changes: found.changes.filter((item) => item.breaking) });
             } else {
-                save.mutate(false);
+                save.mutate({ contract, breaking: false });
             }
         },
     });
+    const confirm = (
+        <ConfirmDialog
+            open={pending !== null}
+            onOpenChange={(open) => !open && setPending(null)}
+            title="This is a breaking change"
+            description={`${detail.name} has gone live, and apps that call it may stop working: ${(
+                pending?.changes ?? []
+            )
+                .map((change) => `${change.path} ${change.detail}`)
+                .join("; ")}. The next version serves the new answers.`}
+            confirmLabel="Save the breaking change"
+            destructive
+            onConfirm={() =>
+                pending
+                    ? save.mutateAsync({ contract: pending.contract, breaking: true })
+                    : undefined
+            }
+        />
+    );
+    return {
+        change: (contract: ContractInfo) => check.mutate(contract),
+        pending: check.isPending || save.isPending,
+        error: check.error ?? save.error,
+        confirm,
+    };
+}
+
+function ContractEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => void }) {
+    const client = useQueryClient();
+    const toast = useToast();
+    const current = answerKind(detail.contract);
+    const [kind, setKind] = useState<AnswerKind>(current);
+    const [labels, setLabels] = useState(startingLabels(detail));
+    const [schema, setSchema] = useState(startingSchema(detail.contract));
+    const next = draftContract(kind, labels, schema);
+    const initial = draftContract(current, startingLabels(detail), startingSchema(detail.contract));
+    const problem =
+        kind === "labels" && !next
+            ? "At least two labels."
+            : kind === "json"
+              ? schemaProblem(schema)
+              : undefined;
+    const noun = ANSWER_KINDS.find((item) => item.value === kind)?.noun;
+    const changer = useContractChange(detail, async (saved) => {
+        await client.invalidateQueries();
+        toast({
+            title: "Answers saved",
+            description:
+                saved.preset === detail.preset
+                    ? "The next version uses them."
+                    : `${saved.name} is ${noun} now. The next version uses its answers.`,
+            tone: "success",
+        });
+        onDone();
+    });
     return (
         <div className="flex flex-col gap-3">
-            <Field
-                id="contract-text"
-                label={labels ? "Labels" : "JSON schema"}
-                error={problem}
-                hint={
-                    labels
-                        ? "Separated by commas. Labels found in the data join the set on the next version. Removing one needs a confirmation, because apps depend on it."
-                        : "Adding optional fields is free. Removing or renaming one needs a confirmation, because apps depend on it."
+            <RadioGroup
+                aria-label="Answers"
+                value={kind}
+                onValueChange={(value) =>
+                    setKind(ANSWER_KINDS.find((item) => item.value === value)?.value ?? kind)
                 }
+                className="flex flex-col gap-3"
             >
-                {labels ? (
+                {ANSWER_KINDS.map((item) => (
+                    <Label key={item.value} className="flex items-start gap-2 font-normal">
+                        <RadioGroupItem value={item.value} className="mt-0.5" />
+                        <span className="flex flex-col">
+                            <span>{item.label}</span>
+                            <span className="text-sm text-muted-foreground">
+                                {item.description}
+                            </span>
+                        </span>
+                    </Label>
+                ))}
+            </RadioGroup>
+            {kind === "labels" && (
+                <Field
+                    id="contract-labels"
+                    label="Labels"
+                    error={problem}
+                    hint="Separated by commas. Labels found in the data join the set on the next version."
+                >
                     <Input
-                        id="contract-text"
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
+                        id="contract-labels"
+                        value={labels}
+                        placeholder="billing, bug, refund"
+                        onChange={(event) => setLabels(event.target.value)}
                     />
-                ) : (
+                </Field>
+            )}
+            {kind === "json" && (
+                <Field
+                    id="contract-schema"
+                    label="JSON schema"
+                    error={problem}
+                    hint="Every answer is decoded to match it. Adding optional fields later is free."
+                >
                     <Textarea
-                        id="contract-text"
+                        id="contract-schema"
                         className="min-h-40 font-mono"
                         spellCheck={false}
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
+                        value={schema}
+                        onChange={(event) => setSchema(event.target.value)}
                     />
-                )}
-            </Field>
+                </Field>
+            )}
+            <p className="text-sm text-muted-foreground">
+                {detail.went_live
+                    ? "It has gone live: removing or renaming what apps rely on, or switching the kind of answer, needs a confirmation."
+                    : "Free to change until a version goes live."}
+            </p>
             <Actions>
                 <Button
                     disabled={
-                        !next ||
-                        text === contractText(detail.contract) ||
-                        check.isPending ||
-                        save.isPending
+                        !next || JSON.stringify(next) === JSON.stringify(initial) || changer.pending
                     }
-                    onClick={() => check.mutate()}
+                    onClick={() => next && changer.change(next)}
                 >
                     Save
                 </Button>
                 <Button variant="ghost" onClick={onDone}>
                     Cancel
                 </Button>
-                <ErrorLine error={check.error} />
+                <ErrorLine error={changer.error} />
             </Actions>
-            <ConfirmDialog
-                open={pending !== null}
-                onOpenChange={(open) => !open && setPending(null)}
-                title="This is a breaking change"
-                description={`Apps that call ${detail.name} may stop working: ${(pending ?? [])
-                    .map((change) => `${change.path} ${change.detail}`)
-                    .join("; ")}. The next version serves the new contract.`}
-                confirmLabel="Save the breaking change"
-                destructive
-                onConfirm={() => save.mutateAsync(true)}
-            />
+            {changer.confirm}
         </div>
     );
 }
@@ -417,7 +533,6 @@ export function JudgedSection({ detail }: { detail: ModelDetail }) {
     const metrics = metricsFor(presets.data, names);
     const close = () => setOpen(null);
     const toggle = (part: Part) => () => setOpen(open === part ? null : part);
-    const freeText = detail.contract.kind === "text";
     const judgeShown = !detail.contract.labels && (detail.judge.used || Boolean(preset?.rubric));
     return (
         <PanelSection
@@ -429,14 +544,14 @@ export function JudgedSection({ detail }: { detail: ModelDetail }) {
             <SettingsGroup>
                 <JudgedRow
                     part="answer"
-                    label={detail.contract.labels ? "Labels" : "Answer"}
+                    label="Answers"
                     description={contractSentence(
                         detail.contract,
                         detail.contract_number,
                         detail.preset === "general",
                     )}
                     open={open === "answer"}
-                    editable={can.build && !freeText}
+                    editable={can.build}
                     onToggle={toggle("answer")}
                 >
                     <ContractEditor

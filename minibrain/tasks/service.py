@@ -75,6 +75,10 @@ def decision(model: Model, version: Version) -> Decision:
     return decide(rule_of(model), held_out(version), version_metric(version), against)
 
 
+def went_live(model: Model) -> bool:
+    return model.first_live_at is not None
+
+
 def latest_version_of(model: Model) -> Version | None:
     return max(model.versions, key=lambda item: item.number, default=None)
 
@@ -120,7 +124,7 @@ def checked_contract(model: Model, contract: Contract, breaking: bool) -> int:
     if version_contract(previous) == contract:
         return previous.contract_number
     found = breaking_changes(version_contract(previous), contract)
-    if found and not breaking and not model.breaking_confirmed:
+    if found and went_live(model) and not breaking and not model.breaking_confirmed:
         raise BreakingChangeError(
             f"This changes the contract apps use: {described(found)}. Confirm it as a breaking change to go on."
         )

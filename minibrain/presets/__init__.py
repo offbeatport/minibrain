@@ -16,6 +16,7 @@ LABEL_SET = "labels"
 FREE_TEXT_KIND = "text"
 CHOOSE = "choose"
 FROM_DATA = "data"
+ANSWER_PRESETS = {LABEL_SET: "classify", FREE_TEXT_KIND: "general", "json": "custom"}
 EXPECTED = (FROM_DATA,)
 JUDGE = "judge"
 
@@ -81,6 +82,11 @@ class Preset:
     def free_text(self) -> bool:
         return self.contract == FREE_TEXT_KIND
 
+    def fits(self, contract: Contract) -> bool:
+        if self.labels_from_data:
+            return contract.labels is not None
+        return kind_of(contract) == FREE_TEXT_KIND if self.free_text else True
+
     def instructions(self, contract: Contract, trained: bool = False) -> str:
         prompts = self.trained_prompts if trained else self.prompts
         template = prompts.get(kind_of(contract)) or self.prompts.get(kind_of(contract)) or ""
@@ -131,3 +137,13 @@ def preset(key: str) -> Preset:
     if found is None:
         raise PresetError(f"no preset called {key}; pick one of {', '.join(presets())}")
     return found
+
+
+def answer_preset(contract: Contract) -> Preset:
+    return preset(ANSWER_PRESETS[kind_of(contract)])
+
+
+def preset_for(current: Preset, before: Contract, after: Contract) -> Preset:
+    if kind_of(before) == kind_of(after) and current.fits(after):
+        return current
+    return answer_preset(after)

@@ -20,6 +20,7 @@ from minibrain.api.schemas import (
     JudgeInfo,
     KeyInfo,
     KeyModel,
+    LabelProposal,
     LabelScoreInfo,
     MappingInfo,
     Mistake,
@@ -40,6 +41,7 @@ from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import plain_columns
 from minibrain.policy import bodies_choice
+from minibrain.presets import answer_preset
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -61,7 +63,7 @@ from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.registry.service import find_version, latest_dataset_version
 from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
-from minibrain.tasks.contracts import FREE_TEXT, Contract
+from minibrain.tasks.contracts import Contract
 from minibrain.tasks.judges import JUDGE, judge_choice
 from minibrain.tasks.service import (
     contract_of,
@@ -73,9 +75,9 @@ from minibrain.tasks.service import (
     shown_graders,
     version_contract,
     version_metric,
+    went_live,
 )
 
-FREE_TEXT_VIEW = "free_text"
 TEARDOWN_LABELS: dict[tuple[str, str], str] = {
     (TeardownKind.DELETE, TeardownStatus.RUNNING): "Deleting",
     (TeardownKind.DELETE, TeardownStatus.FAILED): "Delete failed",
@@ -280,9 +282,8 @@ def cost_info(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost 
     return None if found is None else EvalCost.model_validate(asdict(found))
 
 
-def view_of(model: Model, version: Version) -> str | None:
-    chosen = preset_of(model).view
-    return chosen or (FREE_TEXT_VIEW if version_contract(version) == FREE_TEXT else None)
+def view_of(version: Version) -> str | None:
+    return answer_preset(version_contract(version)).view
 
 
 def version_info(model: Model, version: Version, prices: DevicePrices | None = None) -> VersionInfo:
@@ -324,7 +325,7 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         score=held_out_score(version),
         promotion=DecisionInfo.model_validate(decision(model, version).as_dict()) if ready else None,
         live_at=version.live_at,
-        view=view_of(model, version),
+        view=view_of(version),
     )
 
 
@@ -387,6 +388,14 @@ def judge_info(session: Session, model: Model, graders: list[dict[str, Any]]) ->
     )
 
 
+def label_proposal(model: Model, current: DatasetVersion | None) -> LabelProposal | None:
+    if current is None or not preset_of(model).free_text or len(current.labels) < 2:
+        return None
+    if current.id in (model.labels_dismissed or []):
+        return None
+    return LabelProposal(dataset_version_id=current.id, dataset_version_number=current.number, labels=current.labels)
+
+
 def detail(settings: Settings, model: Model) -> ModelDetail:
     current = latest_dataset_version(model)
     session = object_session(model)
@@ -421,6 +430,8 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         graders_default=not model.graders,
         judge=judge_info(session, model, graders),
         promotion=PromotionInfo.model_validate(rule_of(model).as_dict()),
+        went_live=went_live(model),
+        label_proposal=label_proposal(model, current),
     )
 
 

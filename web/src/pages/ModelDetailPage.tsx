@@ -69,6 +69,7 @@ import { ModelDataNotice, withDataColumns } from "./data/versionData";
 import { DeleteModelsDialog } from "./models/DeleteModelsDialog";
 import { InstructionsSection } from "./models/InstructionsSection";
 import { JudgedSection } from "./models/JudgedSection";
+import { LabelProposalNotice } from "./models/LabelProposal";
 import { Activity, Availability, Deployment, Updated } from "./models/MyModels";
 import {
     ConfirmAction,
@@ -633,6 +634,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
             <TeardownNotice row={row} canRetry={can.build} onRetried={refresh} />
             <HealthNotice row={row} run={open} />
             <ModelDataNotice slug={row.key} />
+            {can.build && detail.data && <LabelProposalNotice detail={detail.data} />}
             {active.map((job) => (
                 <JobPanel key={job.id} job={job} slug={row.key} />
             ))}

@@ -93,7 +93,9 @@ def test_single_sign_on_signs_people_in_with_pkce(sso: Sso) -> None:
     assert browser.get("/api/sources").status_code == 200
     assert (
         browser.post(
-            "/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(browser)
+            "/api/models",
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"},
+            headers=csrf(browser),
         ).status_code
         == 201
     )

@@ -23,6 +23,7 @@ const LOW_SPACE = 5 * 1024 ** 3;
 export type CopySource = {
     slug: string;
     name: string;
+    answers: string | null;
     datasetName: string | null;
     recipe: { rows: number; epochs: number; version: number } | null;
 };
@@ -240,10 +241,11 @@ function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) 
     const recipe = copy.recipe
         ? `its training settings from version ${copy.recipe.version} (${count(copy.recipe.rows)} rows, ${copy.recipe.epochs} ${copy.recipe.epochs === 1 ? "epoch" : "epochs"}), used when you train it`
         : "default training settings, as it has no trained version yet";
+    const kept = ["the same base model", copy.answers, data].filter(Boolean);
     return (
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft px-3 py-2 text-sm">
             <span className="min-w-0 flex-1">
-                {`Starts from ${copy.name}: the same base model, ${data ? `${data}, and ` : ""}${recipe}.`}
+                {`Starts from ${copy.name}: ${kept.join(", ")}, and ${recipe}.`}
             </span>
             <Button type="button" variant="outline" size="sm" onClick={onClear}>
                 Start fresh

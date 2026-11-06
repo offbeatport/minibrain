@@ -203,7 +203,8 @@ def test_reimport_restores_files_only_from_an_identical_copy(harness: Harness, h
 
 def train_on(harness: Harness, base: str) -> None:
     created = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": "Support Triage", "base_model": base}
+        "/api/models",
+        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage", "base_model": base},
     )
     assert created.status_code == 201
     give_data(harness, SLUG)

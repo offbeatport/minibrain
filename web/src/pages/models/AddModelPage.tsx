@@ -3,7 +3,15 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import { type CatalogEntry, type ModelRow, type PresetsResponse, api, unwrap } from "~/api/client";
+import {
+    type CatalogEntry,
+    type ContractInfo,
+    type ModelCreate,
+    type ModelDetail,
+    type ModelRow,
+    api,
+    unwrap,
+} from "~/api/client";
 import { keys, useAllModels, useCatalog, usePresets } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
@@ -15,24 +23,10 @@ import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
 import {
-    ClassifyFields,
-    CustomFields,
-    EMPTY_TASK,
-    PresetSelect,
-    PromotionEditor,
-    type TaskDraft,
-    contractOf,
-    defaultGraders,
-    graderConfigs,
-    metricsFor,
-    schemaProblem,
-    splitLabels,
-} from "./TaskFields";
-import {
     type BaseOption,
-    type TaskKey,
     baseOptionFor,
     catalogueOption,
+    chatHint,
     recommend,
     servesOnly,
 } from "./baseOptions";
@@ -41,37 +35,49 @@ import { splitTags, useModelsRefresh } from "./dialogs";
 type Problems = {
     model?: string;
     name?: string;
-    labels?: string;
-    schema?: string;
-    graders?: string;
-    rubric?: string;
     licence?: string;
 };
 
-const PROBLEM_ORDER: (keyof Problems)[] = [
-    "model",
-    "name",
-    "labels",
-    "schema",
-    "graders",
-    "rubric",
-    "licence",
-];
+const PROBLEM_ORDER: (keyof Problems)[] = ["model", "name", "licence"];
 
 const PROBLEM_TARGETS: Record<keyof Problems, string> = {
     model: "base-model",
     name: "create-name",
-    labels: "create-labels",
-    schema: "create-schema",
-    graders: "create-graders",
-    rubric: "create-rubric",
     licence: "create-licence",
 };
 
-const NOUNS: Record<string, string> = { classify: "Classifier", custom: "Custom" };
+const STARTING_PRESET = "general";
+const STARTING_NOUN = "Assistant";
 
-function offered(found: PresetsResponse | undefined): PresetsResponse | undefined {
-    return found && { ...found, presets: found.presets.filter((item) => item.key in NOUNS) };
+type CopiedSettings = Pick<
+    ModelCreate,
+    "preset" | "labels" | "contract" | "graders" | "promotion" | "instructions"
+>;
+
+function contractOf(contract: ContractInfo): ContractInfo | null {
+    if (contract.labels) {
+        return { kind: "json", labels: contract.labels };
+    }
+    return contract.kind === "json" ? { kind: "json", json_schema: contract.json_schema } : null;
+}
+
+function settingsOf(detail: ModelDetail): CopiedSettings {
+    const preset = detail.preset as ModelCreate["preset"];
+    return {
+        preset,
+        labels: preset === "classify" ? (detail.contract.labels ?? []) : [],
+        contract: preset === "custom" ? contractOf(detail.contract) : null,
+        graders: detail.graders_default ? null : detail.graders,
+        promotion: detail.promotion,
+        instructions: detail.instructions || null,
+    };
+}
+
+function answersOf(contract: ContractInfo): string | null {
+    if (contract.labels) {
+        return `its ${contract.labels.length} labels`;
+    }
+    return contract.kind === "json" ? "its JSON schema" : null;
 }
 
 function takenNames(rows: ModelRow[]): Set<string> {
@@ -139,10 +145,6 @@ function initialPick(params: Search): Picked | null {
     return params.base ? { kind: "base", key: String(params.base) } : null;
 }
 
-function taskOf(value: string): TaskKey {
-    return value === "custom" ? "custom" : "classify";
-}
-
 function chosenOption(
     current: Picked | null,
     entries: CatalogEntry[],
@@ -166,9 +168,8 @@ export function AddModelPage() {
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useAllModels();
     const catalog = useCatalog();
-    const presets = offered(usePresets().data);
-    const [task, setTaskKey] = useState<TaskKey>("classify");
-    const [draft, setDraft] = useState<TaskDraft>(EMPTY_TASK);
+    const starting = usePresets().data?.presets.find((item) => item.key === STARTING_PRESET);
+    const [copied, setCopied] = useState<CopiedSettings | null>(null);
     const [nameEdited, setNameEdited] = useState(false);
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
@@ -184,7 +185,7 @@ export function AddModelPage() {
     );
     const entries = catalog.data?.entries ?? [];
     const rows = models.data ?? [];
-    const picks = recommend(entries, rows, task);
+    const picks = recommend(entries, rows, "general");
     const top = picks.here[0] ?? picks.unchecked[0] ?? picks.more[0];
     const fallback: Picked | null = top?.entry
         ? { kind: "catalogue", id: top.entry.id, variant: top.variant?.id ?? "" }
@@ -198,11 +199,6 @@ export function AddModelPage() {
         connection: current?.kind === "import" ? current.connection : null,
     });
     const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
-    const setTask = (next: TaskKey) => {
-        setTaskKey(next);
-        const graders = defaultGraders(presets, next, draft);
-        setDraft({ ...draft, graders: next === "custom" ? graders : [] });
-    };
     const startFrom = useMutation({
         mutationFn: async (row: ModelRow) => {
             const path = { params: { path: { slug: row.key } } };
@@ -224,12 +220,13 @@ export function AddModelPage() {
                 .sort((a, b) => b.number - a.number);
             const trained =
                 trainedVersions.find((version) => version.current) ?? trainedVersions[0];
-            setTask(taskOf(detail.preset));
+            setCopied(settingsOf(detail));
             choose({ kind: "base", key: detail.base_model });
             setDataset(detail.dataset ?? "");
             setCopy({
                 slug: detail.slug,
                 name: detail.name,
+                answers: answersOf(detail.contract),
                 datasetName: detail.dataset ? (detail.dataset_name ?? detail.dataset) : null,
                 recipe: trained
                     ? {
@@ -254,8 +251,7 @@ export function AddModelPage() {
             return;
         }
         if (copy) {
-            setCopy(null);
-            setDataset(params.dataset === undefined ? "" : String(params.dataset));
+            clearCopy();
         }
         choose(
             chosen.entry
@@ -263,8 +259,15 @@ export function AddModelPage() {
                 : { kind: "base", key: chosen.baseKey ?? "" },
         );
     };
-    const importPick = (found: ImportPick) => {
+    const clearCopy = () => {
         setCopy(null);
+        setCopied(null);
+        setDataset(params.dataset === undefined ? "" : String(params.dataset));
+    };
+    const importPick = (found: ImportPick) => {
+        if (copy) {
+            clearCopy();
+        }
         if (found.kind === "catalogue") {
             const fresh = catalogueOption(found.entry);
             choose({ kind: "catalogue", id: found.entry.id, variant: fresh.variant?.id ?? "" });
@@ -275,19 +278,8 @@ export function AddModelPage() {
     const taken = takenNames(rows);
     const suggestedName = copy
         ? nextFree(`${copy.name} copy`, taken, false)
-        : nextFree(NOUNS[task] ?? "Model", taken);
+        : nextFree(starting?.noun ?? STARTING_NOUN, taken);
     const name = nameEdited ? typedName : suggestedName;
-    const baseKey =
-        option?.kind === "local" && option.baseKey ? option.baseKey : (option?.entry?.id ?? "");
-    const labels = splitLabels(draft.labels);
-    const graders = graderConfigs(task, draft, baseKey);
-    const metrics =
-        task === "classify"
-            ? metricsFor(presets, ["label_accuracy"])
-            : metricsFor(presets, draft.graders);
-    const bases = rows
-        .filter((row) => row.kind === "base")
-        .map((row) => ({ key: row.key, name: row.name }));
     const add = useMutation({
         mutationFn: async () => {
             const baseModel =
@@ -299,12 +291,7 @@ export function AddModelPage() {
                         description: description.trim(),
                         tags: splitTags(tags),
                         base_model: baseModel || null,
-                        preset: task === "custom" ? "custom" : "classify",
-                        labels,
-                        contract: contractOf(task, draft),
-                        instructions: draft.instructions.trim() || null,
-                        graders,
-                        promotion: draft.promotion,
+                        ...(copied ?? { preset: STARTING_PRESET }),
                         dataset: dataset || null,
                     },
                 }),
@@ -360,20 +347,6 @@ export function AddModelPage() {
               : isTaken(finalName, taken)
                 ? `A model called ${finalName} already exists. Pick another name.`
                 : undefined,
-        labels:
-            task === "classify" && !dataset && labels.length < 2
-                ? "Add at least two labels, or pick a dataset."
-                : undefined,
-        schema:
-            task === "custom" && draft.answer === "json" ? schemaProblem(draft.schema) : undefined,
-        graders:
-            task === "custom" && draft.graders.length === 0
-                ? "Pick at least one grader."
-                : undefined,
-        rubric:
-            task === "custom" && draft.graders.includes("judge") && !draft.rubric.trim()
-                ? "Write the rubric the judge scores against."
-                : undefined,
         licence: licencePending ? "Accept the licence to download this model." : undefined,
     };
     const shown = checked ? problems : {};
@@ -408,7 +381,7 @@ export function AddModelPage() {
             </Link>
             <PageHeader
                 title="Add model"
-                caption="Pick a task, a base model and a name. Version 0 answers at once with a prompt; train later from its page."
+                caption="Pick a base model and a name. It starts as a chat assistant that answers at once; narrow it to labels or a schema and train it later from its page."
             />
             <form
                 onSubmit={submit}
@@ -416,13 +389,13 @@ export function AddModelPage() {
                 className="grid max-w-5xl items-start gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-stretch"
             >
                 <Card className="gap-field p-panel">
-                    <PresetSelect
-                        presets={presets}
-                        value={task}
-                        onChange={(next) => setTask(taskOf(next))}
-                    />
                     <div className="flex flex-col gap-3">
-                        <Field id="base-model" label="Model" error={shown.model}>
+                        <Field
+                            id="base-model"
+                            label="Model"
+                            error={shown.model}
+                            hint={copy ? undefined : chatHint(option)}
+                        >
                             <BasePicker
                                 value={{
                                     option,
@@ -449,7 +422,7 @@ export function AddModelPage() {
                             option={option}
                             plan={plan}
                             copy={copy}
-                            onClearCopy={() => setCopy(null)}
+                            onClearCopy={clearCopy}
                         />
                     </div>
                     <Field
@@ -468,36 +441,13 @@ export function AddModelPage() {
                             }}
                         />
                     </Field>
-                    {task === "classify" ? (
-                        <ClassifyFields
-                            draft={draft}
-                            onChange={setDraft}
-                            found={[]}
-                            error={shown.labels}
-                        />
-                    ) : (
-                        <CustomFields
-                            draft={draft}
-                            onChange={setDraft}
-                            presets={presets}
-                            bases={bases}
-                            base={baseKey}
-                            problems={shown}
-                        />
-                    )}
-                    <PromotionEditor
-                        id="create-promotion"
-                        value={draft.promotion}
-                        metrics={metrics}
-                        onChange={(promotion) => setDraft({ ...draft, promotion })}
-                    />
                     <Field id="create-description" label={<Optional label="Description" />}>
                         <Textarea
                             id="create-description"
                             value={description}
                             onChange={(event) => setDescription(event.target.value)}
                             className="min-h-32"
-                            placeholder="Routes incoming tickets to the right queue"
+                            placeholder="Answers customer questions in our support tone"
                         />
                     </Field>
                     <Field

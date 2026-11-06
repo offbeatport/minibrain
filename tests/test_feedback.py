@@ -42,7 +42,7 @@ def test_feedback_needs_a_key_that_covers_the_model(harness: Harness) -> None:
     response_id = chat(harness, headers)
     body = {"response_id": response_id, "rating": "down", "input": "I was charged twice"}
     assert harness.client.post("/v1/feedback", json={"model": SLUG} | body).status_code == 401
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"})
     other = bearer(harness, ("custom", "other"))
     assert send(harness, other, **body).status_code == 403
     assert send(harness, headers, **(body | {"model": "nope"})).status_code == 404

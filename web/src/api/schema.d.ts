@@ -416,6 +416,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{slug}/label-proposal/dismissal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Dismiss Labels */
+        put: operations["dismiss_labels_api_models__slug__label_proposal_dismissal_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{slug}/graders": {
         parameters: {
             query?: never;
@@ -5625,6 +5642,20 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** LabelDismissal */
+        LabelDismissal: {
+            /** Dataset Version Id */
+            dataset_version_id: number;
+        };
+        /** LabelProposal */
+        LabelProposal: {
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /** Dataset Version Number */
+            dataset_version_number: number | null;
+            /** Labels */
+            labels: string[];
+        };
         /** LabelScoreInfo */
         LabelScoreInfo: {
             /** Label */
@@ -5840,7 +5871,7 @@ export interface components {
             base_model?: string | null;
             /**
              * Preset
-             * @default classify
+             * @default general
              * @enum {string}
              */
             preset?: "general" | "classify" | "custom";
@@ -5905,6 +5936,12 @@ export interface components {
             graders_default: boolean;
             judge: components["schemas"]["JudgeInfo"];
             promotion: components["schemas"]["PromotionInfo"];
+            /**
+             * Went Live
+             * @default false
+             */
+            went_live?: boolean;
+            label_proposal?: components["schemas"]["LabelProposal"] | null;
         };
         /** ModelFile */
         ModelFile: {
@@ -6784,6 +6821,12 @@ export interface components {
             graders_default: boolean;
             judge: components["schemas"]["JudgeInfo"];
             promotion: components["schemas"]["PromotionInfo"];
+            /**
+             * Went Live
+             * @default false
+             */
+            went_live?: boolean;
+            label_proposal?: components["schemas"]["LabelProposal"] | null;
             /** Base Name */
             base_name: string;
             /** Download Bytes */
@@ -8428,6 +8471,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ContractUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_labels_api_models__slug__label_proposal_dismissal_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelDismissal"];
             };
         };
         responses: {

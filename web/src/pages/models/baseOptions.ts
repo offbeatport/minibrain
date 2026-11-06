@@ -54,6 +54,7 @@ const TASK_NEEDS: Record<TaskKey, TaskNeeds> = {
 const RUNS_HERE = 3;
 const NEEDS_MORE = 2;
 const RECENT = 3;
+const CHAT_PARAMS_B = 7;
 
 function taskScore(entry: CatalogEntry, task: TaskKey): number | null {
     const needs = TASK_NEEDS[task];
@@ -269,6 +270,14 @@ export function recommend(
         .filter((option, index, all) => all.findIndex((item) => item.key === option.key) === index)
         .slice(0, RECENT);
     return { recent, here, more, unchecked };
+}
+
+export function chatHint(option: BaseOption | null): string | undefined {
+    const size = option?.entry?.params_b;
+    if (size === undefined || size >= CHAT_PARAMS_B) {
+        return undefined;
+    }
+    return `For a chat assistant, ${CHAT_PARAMS_B}B+ works best. Smaller bases answer faster and suit labels.`;
 }
 
 export function logoPublisher(option: BaseOption | null): string | null {

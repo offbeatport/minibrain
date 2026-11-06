@@ -71,7 +71,7 @@ def test_a_new_model_starts_with_a_prompt_only_v0_ready_to_test(harness: Harness
 
 
 def test_classify_needs_labels_or_data(harness: Harness) -> None:
-    refused = harness.client.post("/api/models", json={"name": "Router"})
+    refused = harness.client.post("/api/models", json={"name": "Router", "preset": "classify"})
     assert refused.status_code == 409
     assert "at least two labels" in refused.json()["detail"]
     assert harness.client.get("/api/models").json() == []
@@ -81,7 +81,7 @@ def test_v0_is_scored_at_once_when_the_model_starts_with_data(harness: Harness) 
     create_model(harness, "Seed")
     upload(harness, "seed", "tickets.csv", tickets_csv())
     dataset = harness.client.get("/api/models/seed").json()["dataset"]
-    body = {"name": "Router", "dataset": dataset}
+    body = {"name": "Router", "preset": "classify", "dataset": dataset}
     created = harness.client.post("/api/models", json=body)
     assert created.status_code == 201, created.text
     [v0] = versions(harness, "router")
@@ -96,8 +96,11 @@ def test_v0_is_scored_at_once_when_the_model_starts_with_data(harness: Harness) 
     assert v0["held_out"]["confusion"] and v0["held_out"]["labels"]
 
 
-def test_new_labels_in_data_extend_the_contract_but_removing_one_needs_a_confirmation(harness: Harness) -> None:
+def test_new_labels_in_data_extend_the_contract_but_removing_one_needs_a_confirmation_once_live(
+    harness: Harness,
+) -> None:
     create_model(harness)
+    assert harness.client.post("/api/models/support-triage/versions/0/promote").status_code == 200
     upload(harness, "support-triage", "tickets.csv", tickets_csv())
     fewer = "SELECT text AS input, CASE WHEN category = 'feature' THEN 'refund' ELSE category END AS label FROM source"
     harness.client.put("/api/models/support-triage/mapping", json={"sql": fewer})
@@ -236,7 +239,9 @@ def test_default_names_count_up_and_names_are_unique_across_base_and_custom_mode
     assert harness.client.get("/api/models/name?preset=custom").json() == {"name": "Custom 1"}
     create_model(harness, "Classifier 1")
     assert harness.client.get("/api/models/name?preset=classify").json() == {"name": "Classifier 2"}
-    taken = harness.client.post("/api/models", json={"name": "classifier 1", "labels": list(LABELS)})
+    taken = harness.client.post(
+        "/api/models", json={"name": "classifier 1", "preset": "classify", "labels": list(LABELS)}
+    )
     assert taken.status_code == 409
 
 
@@ -258,6 +263,7 @@ def test_a_rule_with_a_threshold_blocks_a_version_below_it(harness: Harness) -> 
     dataset = harness.client.get("/api/models/seed").json()["dataset"]
     body = {
         "name": "Gated",
+        "preset": "classify",
         "dataset": dataset,
         "promotion": {"thresholds": [{"metric": "label_accuracy", "op": ">=", "value": 0.85}]},
     }
@@ -272,17 +278,19 @@ def test_a_rule_with_a_threshold_blocks_a_version_below_it(harness: Harness) -> 
     assert harness.client.post("/api/models/gated/versions/0/promote").status_code == 409
 
 
-def test_try_with_sample_data_is_a_classifier_on_travel_intents(harness: Harness) -> None:
+def test_try_with_sample_data_is_a_chat_assistant_offered_the_travel_intents(harness: Harness) -> None:
     created = harness.client.post("/api/models/sample")
     assert created.status_code == 201, created.text
     found = created.json()
-    assert (found["name"], found["preset"], found["dataset_name"]) == ("Travel intents", "classify", "Travel intents")
+    assert (found["name"], found["preset"], found["dataset_name"]) == ("Travel intents", "general", "Travel intents")
+    assert found["contract"] == {"kind": "text", "json_schema": None, "labels": None}
     assert found["promotion"] == {"thresholds": [], "beats_live": True}
-    assert sorted(found["contract"]["labels"]) == [
+    assert found["label_proposal"]["labels"] == [
         "book_flight",
         "book_hotel",
         "car_rental",
         "flight_status",
         "lost_luggage",
     ]
+    assert found["label_proposal"]["dataset_version_id"] == found["dataset_version"]["id"]
     assert harness.client.post("/api/models/sample").json()["name"] == "Travel intents 2"

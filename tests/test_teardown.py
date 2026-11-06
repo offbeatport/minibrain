@@ -100,7 +100,7 @@ def add_base(harness: Harness, key: str = BASE, name: str = "Tiny") -> Path:
 
 def add_custom(harness: Harness, name: str, trained: bool = False) -> str:
     slug = harness.client.post(
-        "/api/models", json={"labels": ["billing", "bug"], "name": name, "base_model": BASE}
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name, "base_model": BASE}
     ).json()["slug"]
     if trained:
         give_data(harness, slug)

@@ -9,7 +9,9 @@ from tests.conftest import Harness
 
 
 def model_id(harness: Harness, name: str) -> int:
-    slug = harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": name}).json()["slug"]
+    slug = harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name}
+    ).json()["slug"]
     with harness.sessions() as session:
         return session.scalars(select(Model.id).where(Model.slug == slug)).one()
 

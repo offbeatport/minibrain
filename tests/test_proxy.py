@@ -139,20 +139,26 @@ def test_proxy_people_need_the_csrf_token_too(proxied: Proxied) -> None:
     client = proxied.client()
     builder = as_person("bea", groups="ml-team")
     assert (
-        client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder).status_code
+        client.post(
+            "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}, headers=builder
+        ).status_code
         == 403
     )
     token = csrf_for(client, builder)
     assert (
         client.post(
-            "/api/models", json={"labels": ["billing", "bug"], "name": "Triage"}, headers=builder | token
+            "/api/models",
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"},
+            headers=builder | token,
         ).status_code
         == 201
     )
     other = as_person("cy", groups="ml-team")
     assert (
         client.post(
-            "/api/models", json={"labels": ["billing", "bug"], "name": "Other"}, headers=other | token
+            "/api/models",
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"},
+            headers=other | token,
         ).status_code
         == 403
     )

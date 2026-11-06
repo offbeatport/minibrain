@@ -497,7 +497,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "classify",
+              "default": "general",
               "title": "Preset"
             }
           }
@@ -1155,6 +1155,58 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContractUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{slug}/label-proposal/dismissal": {
+      "put": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Dismiss Labels",
+        "operationId": "dismiss_labels_api_models__slug__label_proposal_dismissal_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelDismissal"
               }
             }
           }
@@ -18415,6 +18467,52 @@
         ],
         "title": "LabelCount"
       },
+      "LabelDismissal": {
+        "properties": {
+          "dataset_version_id": {
+            "type": "integer",
+            "title": "Dataset Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_version_id"
+        ],
+        "title": "LabelDismissal"
+      },
+      "LabelProposal": {
+        "properties": {
+          "dataset_version_id": {
+            "type": "integer",
+            "title": "Dataset Version Id"
+          },
+          "dataset_version_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version Number"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_version_id",
+          "dataset_version_number",
+          "labels"
+        ],
+        "title": "LabelProposal"
+      },
       "LabelScoreInfo": {
         "properties": {
           "label": {
@@ -19088,7 +19186,7 @@
               "custom"
             ],
             "title": "Preset",
-            "default": "classify"
+            "default": "general"
           },
           "labels": {
             "items": {
@@ -19331,6 +19429,21 @@
           },
           "promotion": {
             "$ref": "#/components/schemas/PromotionInfo"
+          },
+          "went_live": {
+            "type": "boolean",
+            "title": "Went Live",
+            "default": false
+          },
+          "label_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -22088,6 +22201,21 @@
           },
           "promotion": {
             "$ref": "#/components/schemas/PromotionInfo"
+          },
+          "went_live": {
+            "type": "boolean",
+            "title": "Went Live",
+            "default": false
+          },
+          "label_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "base_name": {
             "type": "string",

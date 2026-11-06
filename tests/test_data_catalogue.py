@@ -73,7 +73,7 @@ def test_preview_counts_rows_per_label(harness: Harness) -> None:
 def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
-    harness.client.post("/api/models", json={"labels": ["billing", "bug"], "name": "Triage"})
+    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"})
     harness.client.put("/api/models/triage/dataset", json={"dataset": "tickets"})
     splits = harness.client.get("/api/datasets/tickets").json()["splits"]
     assert (

@@ -20,6 +20,7 @@ from minibrain.api.schemas import (
     GradersUpdate,
     InstructionsUpdate,
     JudgeUpdate,
+    LabelDismissal,
     MappingUpdate,
     ModelCreate,
     ModelDetail,
@@ -52,13 +53,14 @@ from minibrain.data.shared import (
 )
 from minibrain.models.registry import ACTIVE_STATUSES, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
-from minibrain.presets import Preset, preset
+from minibrain.presets import Preset, preset, preset_for
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import (
     AuditEvent,
     BaseModel,
     BaseModelStatus,
     CatalogModel,
+    DatasetVersion,
     Model,
     VersionKind,
     now,
@@ -76,7 +78,14 @@ from minibrain.tags import merged_tags, user_tags
 from minibrain.tasks.contracts import FREE_TEXT, Contract, ContractError, changes, json_contract, label_set
 from minibrain.tasks.judges import installed
 from minibrain.tasks.promotion import Rule, RuleError
-from minibrain.tasks.service import contract_of, latest_version_of, model_graders, version_contract
+from minibrain.tasks.service import (
+    contract_of,
+    latest_version_of,
+    model_graders,
+    preset_of,
+    version_contract,
+    went_live,
+)
 from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
 
 router = APIRouter(prefix="/api/models", tags=["models"])
@@ -100,6 +109,10 @@ def contract_from(info: ContractInfo | None) -> Contract:
 
 def starting_contract(chosen: Preset, body: ModelCreate) -> Contract:
     if chosen.free_text:
+        if body.labels or (body.contract is not None and body.contract.kind != "text"):
+            raise ConflictError(
+                f"A {chosen.label} answers in free text: send preset classify for labels or custom for a JSON schema"
+            )
         return FREE_TEXT
     if not chosen.labels_from_data:
         return contract_from(body.contract)
@@ -164,7 +177,7 @@ def created(model: Model) -> dict[str, Any]:
 
 
 @router.get("/name", dependencies=[Depends(viewer)])
-def default_name(session: SessionDep, preset_key: str = Query(default="classify", alias="preset")) -> NameSuggestion:
+def default_name(session: SessionDep, preset_key: str = Query(default="general", alias="preset")) -> NameSuggestion:
     return NameSuggestion(name=free_model_name(session, preset(preset_key).noun))
 
 
@@ -202,7 +215,7 @@ def delete(
 
 
 SAMPLE_FILE = "travel_intents.jsonl"
-SAMPLE_PRESET = "classify"
+SAMPLE_PRESET = "general"
 
 
 @router.post("/{slug}/deploy", dependencies=[Depends(builder)])
@@ -347,7 +360,8 @@ def contract_check(model: Model, contract: Contract) -> ContractCheck:
     if newest is None:
         return ContractCheck(changes=[], breaking=False, against=None)
     found = [ContractChange(**change.as_dict()) for change in changes(version_contract(newest), contract)]
-    return ContractCheck(changes=found, breaking=any(item.breaking for item in found), against=newest.contract_number)
+    breaking = went_live(model) and any(item.breaking for item in found)
+    return ContractCheck(changes=found, breaking=breaking, against=newest.contract_number)
 
 
 @router.post("/{slug}/contract/check", dependencies=[Depends(builder)])
@@ -355,30 +369,50 @@ def check_contract(slug: str, body: ContractInfo, session: SessionDep) -> Contra
     return contract_check(get_model(session, slug), contract_from(body))
 
 
+def switch_preset(model: Model, contract: Contract) -> None:
+    chosen = preset_for(preset_of(model), contract_of(model), contract)
+    if chosen.key != model.preset:
+        model.preset = chosen.key
+        model.graders = []
+        model.promotion = chosen.promotion.as_dict()
+
+
 @router.put("/{slug}/contract", dependencies=[Depends(builder)])
 def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
     contract = contract_from(body.contract)
-    if preset(model.preset).labels_from_data and contract.labels is None:
-        raise ConflictError(f"{model.name} answers with one label from a set; send labels")
-    if preset(model.preset).free_text and contract != FREE_TEXT:
-        raise ConflictError(f"{model.name} answers in free text; a Custom model takes a JSON schema")
     found = contract_check(model, contract)
     if found.breaking and not body.breaking:
         raise ConflictError("This contract removes or renames what apps rely on; confirm it as a breaking change")
+    before = {"from": contract_of(model).as_dict(), "preset_from": model.preset}
+    switch_preset(model, contract)
     model_graders(session, model, contract)
-    before = contract_of(model).as_dict()
     model.contract = contract.as_dict()
     model.breaking_confirmed = found.breaking
     model.updated_at = now()
     facts = {
         "name": model.name,
+        "preset": model.preset,
         "breaking": found.breaking,
         "changes": [item.model_dump() for item in found.changes],
     }
-    session.add(
-        AuditEvent(actor=current_actor(), action="model.contract", target=slug, detail=facts | {"from": before})
-    )
+    session.add(AuditEvent(actor=current_actor(), action="model.contract", target=slug, detail=facts | before))
+    session.commit()
+    return detail(settings, model)
+
+
+@router.put("/{slug}/label-proposal/dismissal", dependencies=[Depends(builder)])
+def dismiss_labels(slug: str, body: LabelDismissal, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    found = session.get(DatasetVersion, body.dataset_version_id)
+    if found is None or model.dataset_id is None or found.dataset_id != model.dataset_id:
+        raise ConflictError(f"dataset version {body.dataset_version_id} is not a version of {model.name}'s data")
+    dismissed = model.labels_dismissed or []
+    if found.id not in dismissed:
+        model.labels_dismissed = [*dismissed, found.id]
+        facts = {"name": model.name, "dataset_version": found.hash, "labels": len(found.labels)}
+        session.add(AuditEvent(actor=current_actor(), action="model.labels_dismiss", target=slug, detail=facts))
+    model.updated_at = now()
     session.commit()
     return detail(settings, model)
 

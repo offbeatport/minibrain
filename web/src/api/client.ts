@@ -5,6 +5,8 @@ type Schemas = components["schemas"];
 
 export type ModelSummary = Schemas["ModelSummary"];
 export type ModelDetail = Schemas["ModelDetail"];
+export type ModelCreate = Schemas["ModelCreate"];
+export type LabelProposal = Schemas["LabelProposal"];
 export type VersionInfo = Schemas["VersionInfo"];
 export type JobInfo = Schemas["JobInfo"];
 export type PreviewResponse = Schemas["PreviewResponse"];

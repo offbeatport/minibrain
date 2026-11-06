@@ -100,7 +100,7 @@ class ModelCreate(BaseModel):
     description: str = Field(default="", max_length=280)
     tags: list[str] = Field(default_factory=list)
     base_model: str | None = None
-    preset: PresetKey = "classify"
+    preset: PresetKey = "general"
     labels: list[str] = Field(default_factory=list)
     contract: ContractInfo | None = None
     instructions: str | None = Field(default=None, max_length=8000)
@@ -602,6 +602,16 @@ class RequestBodiesUpdate(BaseModel):
     kept: bool
 
 
+class LabelProposal(BaseModel):
+    dataset_version_id: int
+    dataset_version_number: int | None
+    labels: list[str]
+
+
+class LabelDismissal(BaseModel):
+    dataset_version_id: int
+
+
 class ModelDetail(ModelSummary):
     source: SourceInfo | None
     mapping: MappingInfo
@@ -620,6 +630,8 @@ class ModelDetail(ModelSummary):
     graders_default: bool
     judge: JudgeInfo
     promotion: PromotionInfo
+    went_live: bool = False
+    label_proposal: LabelProposal | None = None
 
 
 class SampleDetail(ModelDetail):

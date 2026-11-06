@@ -109,8 +109,9 @@ def test_add_model_defaults_for_a_chat_assistant(harness: Harness) -> None:
     )
     assert "helpful assistant" in v0["instructions"]
     schema = {"kind": "json", "json_schema": {"type": "object", "properties": {"a": {"type": "string"}}}}
-    refused = harness.client.put(f"/api/models/{SLUG}/contract", json={"contract": schema})
-    assert refused.status_code == 409 and "free text" in refused.json()["detail"]
+    narrowed = harness.client.put(f"/api/models/{SLUG}/contract", json={"contract": schema})
+    assert narrowed.status_code == 200, narrowed.text
+    assert (narrowed.json()["preset"], narrowed.json()["contract"]["json_schema"]) == ("custom", schema["json_schema"])
     custom = harness.client.post("/api/models", json={"name": "Free", "preset": "custom"}).json()
     assert custom["judge"]["default_rubric"] is None
     assert versions(harness, "free")[0]["view"] == "free_text"
