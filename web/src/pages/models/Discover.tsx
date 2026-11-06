@@ -371,6 +371,19 @@ function trainHint(entry: CatalogEntry): ReactNode {
     return null;
 }
 
+function MemoryCell({ entry }: { entry: CatalogEntry }) {
+    const train = leastTrainMemory(entry);
+    const hint = trainHint(entry);
+    return (
+        <span className="flex flex-col tabular-nums">
+            <span>{`${memoryNeeded(entry)} to run`}</span>
+            <DataGridDetail className="text-sm text-muted-foreground">
+                {`${train === null ? "Serve only" : `${bytes(train)} to train`}${hint ? ` · ${hint}` : ""}`}
+            </DataGridDetail>
+        </span>
+    );
+}
+
 function TrainMemory({ entry }: { entry: CatalogEntry }) {
     const least = leastTrainMemory(entry);
     if (least === null) {
@@ -387,9 +400,11 @@ function TrainMemory({ entry }: { entry: CatalogEntry }) {
     );
 }
 
-const COLUMNS_KEY = "minibrain.discover.columns.v5";
+const COLUMNS_KEY = "minibrain.discover.columns.v6";
 
 const HIDDEN_COLUMNS = [
+    "formats",
+    "train",
     "newer",
     "publisher",
     "tasks",
@@ -407,7 +422,7 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             enableHiding: false,
             accessorFn: (entry) => entry.name.toLowerCase(),
             cell: ({ row }) => (
-                <div className="flex w-64 items-center gap-3">
+                <div className="flex w-60 items-center gap-3">
                     <PublisherLogo publisher={row.original.provider} name={row.original.name} />
                     <div className="flex min-w-0 flex-col">
                         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -417,6 +432,9 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
                             {row.original.recommended && (
                                 <Badge variant="outline">Recommended</Badge>
                             )}
+                        </span>
+                        <span className="truncate text-sm text-muted-foreground">
+                            {schemes(row.original).join(" · ")}
                         </span>
                         <AddedStatus entry={row.original} />
                         <DataGridDetail
@@ -461,10 +479,12 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
         },
         {
             id: "memory",
-            header: "To run",
-            meta: { info: "Memory the model needs to run, in its smallest format." },
+            header: "Memory",
+            meta: {
+                info: "Memory to run, in the smallest format, and to train, with QLoRA where it fits.",
+            },
             accessorFn: leastMemory,
-            cell: ({ row }) => memoryNeeded(row.original),
+            cell: ({ row }) => <MemoryCell entry={row.original} />,
         },
         {
             id: "train",
