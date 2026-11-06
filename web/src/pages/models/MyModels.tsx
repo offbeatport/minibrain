@@ -687,12 +687,7 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
-                <Button
-                    variant="secondary"
-                    size="xs"
-                    className="hidden md:inline-flex"
-                    onClick={primary.run}
-                >
+                <Button variant="secondary" className="hidden md:inline-flex" onClick={primary.run}>
                     <StepIcon label={primary.label} />
                     {primary.label}
                 </Button>
@@ -701,7 +696,7 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
                 <DropdownMenuTrigger asChild>
                     <Button
                         variant="ghost"
-                        size="icon-xs"
+                        size="icon"
                         disabled={busy}
                         aria-label={`More actions for ${row.name}`}
                     >
