@@ -114,6 +114,10 @@ def record_gateway(session: Session, report: GatewayReport) -> Gateway:
     return gateway
 
 
+def forget_gateway(session: Session, gateway_id: str) -> None:
+    session.execute(delete(Gateway).where(Gateway.id == gateway_id))
+
+
 def live_gateways(session: Session) -> list[Gateway]:
     query = select(Gateway).where(Gateway.seen_at >= now() - GATEWAY_FRESH).order_by(Gateway.id)
     return list(session.scalars(query))

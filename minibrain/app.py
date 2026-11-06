@@ -75,6 +75,7 @@ from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
 from minibrain.provision import check_config
 from minibrain.recent_logs import capture
+from minibrain.registry.compute import forget_gateway
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
@@ -195,6 +196,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             threading.Thread(target=app.state.backend.probe_forever, args=(stop,), daemon=True).start()
     yield
     stop.set()
+    with app.state.sessions() as session:
+        forget_gateway(session, app.state.gateway_config.id)
+        session.commit()
     app.state.leader.release()
     app.state.request_logs.flush()
     app.state.telemetry.shutdown()
