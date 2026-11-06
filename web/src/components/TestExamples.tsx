@@ -60,7 +60,7 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
 
 export function TestExamples({ slug }: { slug: string }) {
     const router = useRouter();
-    const examples = useTestExamples(slug, true);
+    const examples = useTestExamples(slug);
     return (
         <div className="flex flex-col gap-2">
             <DataGrid

@@ -152,12 +152,12 @@ export function useSendFeedback(slug: string) {
     });
 }
 
-export function useTestExamples(slug: string, enabled: boolean) {
+export function useTestExamples(slug: string) {
     return useQuery({
         queryKey: feedbackKeys.examples(slug),
         queryFn: () =>
             unwrap(api.GET("/api/models/{slug}/test-examples", { params: { path: { slug } } })),
-        enabled: Boolean(slug) && enabled,
+        enabled: Boolean(slug),
     });
 }
 
