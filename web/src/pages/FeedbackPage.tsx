@@ -13,7 +13,7 @@ import {
     FEEDBACK_STATUSES,
     feedbackStatusLabel,
     feedbackStatusVariant,
-    originLabel,
+    fromLabel,
     signalLabel,
 } from "~/lib/feedback";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
@@ -112,7 +112,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
         {
             id: "origin",
             header: "From",
-            cell: ({ row }) => originLabel(row.original.origin),
+            cell: ({ row }) => fromLabel(row.original),
         },
         {
             id: "version",

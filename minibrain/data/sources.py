@@ -455,7 +455,7 @@ def copy_rows(
 
 
 FEEDBACK_CHANGES = (
-    "CREATE TABLE changes AS SELECT f.* FROM feedback_rows f WHERE NOT ("
+    "CREATE TABLE changes AS SELECT f.* FROM feedback_rows f WHERE f.split IS NOT NULL OR NOT ("
     "EXISTS (SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.expected = f.expected) AND NOT EXISTS "
     "(SELECT 1 FROM dataset d WHERE trim(d.input) = f.input AND d.expected IS DISTINCT FROM f.expected))"
 )
@@ -465,12 +465,14 @@ FEEDBACK_MERGED = (
 )
 
 
-def merge_rows(target: Path, rows: Sequence[tuple[str, str, str]]) -> tuple[int, int]:
+def merge_rows(target: Path, rows: Sequence[tuple[str, str, str, str | None]]) -> tuple[int, int]:
     merged = target.with_name(f"merged-{target.name}")
     with duckdb.connect() as connection:
         connection.execute(f"CREATE VIEW dataset AS SELECT * FROM read_parquet({quote_literal(str(target))})")
-        connection.execute("CREATE TABLE feedback_rows (messages VARCHAR, input VARCHAR, expected VARCHAR)")
-        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?, ?)", list(rows))
+        connection.execute(
+            "CREATE TABLE feedback_rows (messages VARCHAR, input VARCHAR, expected VARCHAR, split VARCHAR)"
+        )
+        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?, ?, ?)", list(rows))
         connection.execute(FEEDBACK_CHANGES)
         found = connection.execute("SELECT count(*) FROM changes").fetchone()
         changed = int(found[0]) if found else 0

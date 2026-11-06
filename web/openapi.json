@@ -5824,6 +5824,196 @@
         }
       }
     },
+    "/api/playground/sessions": {
+      "get": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "List my Playground chats",
+        "description": "Playground chats are saved for the signed-in person only, encrypted at rest, when the model keeps request inputs and answers. They are deleted with the request logs (Log retention).",
+        "operationId": "list_chats_api_playground_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Chats Api Playground Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Save a Playground chat",
+        "operationId": "create_chat_api_playground_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playground/sessions/{chat_id}": {
+      "get": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Open a Playground chat",
+        "operationId": "read_chat_api_playground_sessions__chat_id__get",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Update or rename a Playground chat",
+        "operationId": "update_chat_api_playground_sessions__chat_id__put",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Delete a Playground chat",
+        "operationId": "delete_chat_api_playground_sessions__chat_id__delete",
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{slug}/training-plan": {
       "get": {
         "tags": [
@@ -6719,6 +6909,103 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FeedbackSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{slug}/test-examples": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Save a test example",
+        "description": "Adds a conversation and its expected answer to the model's accepted feedback, held out for scoring: it joins the held-out rows of the dataset version the next model version starts from, so that version is scored on it. Audited as feedback.example.",
+        "operationId": "save_test_example_api_models__slug__test_examples_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveExampleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "List test examples",
+        "operationId": "list_test_examples_api_models__slug__test_examples_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedbackInfo"
+                  },
+                  "title": "Response List Test Examples Api Models  Slug  Test Examples Get"
                 }
               }
             }
@@ -13015,6 +13302,49 @@
         ],
         "title": "ChangeInfo"
       },
+      "ChatBody": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ChatState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "state"
+        ],
+        "title": "ChatBody"
+      },
       "ChatCompletion": {
         "properties": {
           "id": {
@@ -13352,6 +13682,57 @@
           "model": "support-triage"
         }
       },
+      "ChatDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ChatState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "model",
+          "version",
+          "created_at",
+          "updated_at",
+          "state"
+        ],
+        "title": "ChatDetail"
+      },
       "ChatMessage": {
         "properties": {
           "role": {
@@ -13369,6 +13750,137 @@
           "content"
         ],
         "title": "ChatMessage"
+      },
+      "ChatState": {
+        "properties": {
+          "turns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Turns"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          }
+        },
+        "type": "object",
+        "title": "ChatState"
+      },
+      "ChatSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "model",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChatSummary"
+      },
+      "ChatUpdate": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ChatUpdate"
       },
       "CheckInfo": {
         "properties": {
@@ -14652,6 +15164,14 @@
             "type": "array",
             "title": "Model Names",
             "default": []
+          },
+          "test_examples": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Test Examples",
+            "description": "Test examples from the Playground per model slug, held out for scoring."
           },
           "splits": {
             "anyOf": [
@@ -16072,6 +16592,30 @@
         ],
         "title": "ExampleInfo"
       },
+      "ExampleTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ExampleTurn"
+      },
       "ExtensionInfo": {
         "properties": {
           "name": {
@@ -16452,6 +16996,26 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "held_out": {
+            "type": "boolean",
+            "title": "Held Out",
+            "description": "A test example: always in the held-out rows the next version is scored on."
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExampleTurn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages",
+            "description": "A test example's turns before the expected answer."
+          },
           "related": {
             "items": {
               "$ref": "#/components/schemas/FeedbackInfo"
@@ -16498,6 +17062,7 @@
           "reviewed_at",
           "response_id",
           "created_at",
+          "held_out",
           "related",
           "labels",
           "request"
@@ -16696,6 +17261,26 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "held_out": {
+            "type": "boolean",
+            "title": "Held Out",
+            "description": "A test example: always in the held-out rows the next version is scored on."
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExampleTurn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages",
+            "description": "A test example's turns before the expected answer."
           }
         },
         "type": "object",
@@ -16718,7 +17303,8 @@
           "reviewed_by",
           "reviewed_at",
           "response_id",
-          "created_at"
+          "created_at",
+          "held_out"
         ],
         "title": "FeedbackInfo"
       },
@@ -16917,6 +17503,11 @@
           "rows": {
             "type": "integer",
             "title": "Rows"
+          },
+          "examples": {
+            "type": "integer",
+            "title": "Examples",
+            "description": "Test examples saved from the Playground, held out for scoring."
           }
         },
         "type": "object",
@@ -16926,7 +17517,8 @@
           "total",
           "accepted",
           "pending",
-          "rows"
+          "rows",
+          "examples"
         ],
         "title": "FeedbackSummary"
       },
@@ -21441,6 +22033,23 @@
           "safety_answers": {
             "type": "boolean",
             "title": "Safety Answers"
+          },
+          "chats_saved": {
+            "type": "boolean",
+            "title": "Chats Saved",
+            "description": "Chats with it are saved to the person's Recent list."
+          },
+          "chats_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chats Note",
+            "description": "Why chats with it are not saved, in one line."
           }
         },
         "type": "object",
@@ -21461,7 +22070,9 @@
           "reasoning_choices",
           "context_tokens",
           "safety",
-          "safety_answers"
+          "safety_answers",
+          "chats_saved",
+          "chats_note"
         ],
         "title": "PlaygroundTarget"
       },
@@ -23434,6 +24045,66 @@
           "credit"
         ],
         "title": "SampleInfo"
+      },
+      "SaveExampleBody": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ExampleTurn"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Messages"
+          },
+          "expected": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Expected"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "response_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages",
+          "expected"
+        ],
+        "title": "SaveExampleBody"
       },
       "SavedPresetBody": {
         "properties": {

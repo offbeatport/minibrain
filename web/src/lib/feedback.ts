@@ -35,6 +35,10 @@ export function originLabel(origin: string): string {
     return ORIGINS[origin] ?? origin;
 }
 
+export function fromLabel(item: FeedbackInfo): string {
+    return item.held_out ? "Playground test example" : originLabel(item.origin);
+}
+
 export function ratingLabel(rating: FeedbackInfo["rating"]): string {
     return rating === "up" ? "Marked right" : "Marked wrong";
 }

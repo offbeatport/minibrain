@@ -55,6 +55,10 @@ export function FeedbackSince({ slug }: { slug: string }) {
     const since = data.version === null ? "Feedback so far" : `Feedback since v${data.version}`;
     const waiting =
         data.pending > 0 ? ` ${plural(data.pending, "answer")} waiting for review.` : "";
+    const held =
+        data.examples > 0
+            ? ` ${plural(data.examples, "test example")} from the Playground ${data.examples === 1 ? "is" : "are"} held out for scoring.`
+            : "";
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -64,7 +68,7 @@ export function FeedbackSince({ slug }: { slug: string }) {
                     </p>
                     <p className="text-sm text-muted-foreground tabular-nums">
                         {data.rows > 0
-                            ? `${plural(data.rows, "accepted answer")} ${data.rows === 1 ? "joins" : "join"} the next training data.${waiting}`
+                            ? `${plural(data.rows, "accepted answer")} ${data.rows === 1 ? "joins" : "join"} the next version's data.${held}${waiting}`
                             : `No accepted answers to train on yet.${waiting}`}
                     </p>
                 </div>

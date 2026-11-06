@@ -309,6 +309,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Playground presets** · shipped · product, engineer
   Save, rename and delete named settings, one loading by default.
   UI: Playground › Presets · API: GET /api/playground/presets, POST /api/playground/presets, PUT /api/playground/presets/{preset_id}, DELETE /api/playground/presets/{preset_id}
+- **Playground history** · shipped · product, engineer
+  Reopen, rename and delete your chats, saved encrypted per person.
+  UI: Playground › Recent · API: GET /api/playground/sessions, POST /api/playground/sessions, GET /api/playground/sessions/{chat_id}, PUT /api/playground/sessions/{chat_id}, DELETE /api/playground/sessions/{chat_id} · Policy: request_bodies, log_retention_days
+- **Staff chat** · planned · product, admin
+  A ChatGPT-like app for staff: history, retrieval, sharing, retention.
+  Roadmap: Product priorities
 - **Engines per machine** · shipped · admin
   Serve on SGLang, vLLM, MLX, transformers or llama.cpp, on any machine.
   CLI: minibrain engine · Config: MINIBRAIN_SGLANG_PYTHON, MINIBRAIN_VLLM_PYTHON
@@ -352,6 +358,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Review queue** · partial · product
   Accept, fix or reject feedback by keyboard, disagreements first.
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
+- **Playground test examples** · shipped · product, ml
+  Turn a wrong Playground answer into a test the next version faces.
+  UI: Playground › Save as test example, Models › model › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
   UI: Models › model, Training › model · API: GET /api/models/{slug}/feedback/summary

@@ -1819,6 +1819,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/playground/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List my Playground chats
+         * @description Playground chats are saved for the signed-in person only, encrypted at rest, when the model keeps request inputs and answers. They are deleted with the request logs (Log retention).
+         */
+        get: operations["list_chats_api_playground_sessions_get"];
+        put?: never;
+        /** Save a Playground chat */
+        post: operations["create_chat_api_playground_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playground/sessions/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open a Playground chat */
+        get: operations["read_chat_api_playground_sessions__chat_id__get"];
+        /** Update or rename a Playground chat */
+        put: operations["update_chat_api_playground_sessions__chat_id__put"];
+        post?: never;
+        /** Delete a Playground chat */
+        delete: operations["delete_chat_api_playground_sessions__chat_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{slug}/training-plan": {
         parameters: {
             query?: never;
@@ -2018,6 +2058,27 @@ export interface paths {
         get: operations["feedback_summary_api_models__slug__feedback_summary_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{slug}/test-examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List test examples */
+        get: operations["list_test_examples_api_models__slug__test_examples_get"];
+        put?: never;
+        /**
+         * Save a test example
+         * @description Adds a conversation and its expected answer to the model's accepted feedback, held out for scoring: it joins the held-out rows of the dataset version the next model version starts from, so that version is scored on it. Audited as feedback.example.
+         */
+        post: operations["save_test_example_api_models__slug__test_examples_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3801,6 +3862,16 @@ export interface components {
             /** Dataset */
             dataset: boolean;
         };
+        /** ChatBody */
+        ChatBody: {
+            /** Model */
+            model: string;
+            /** Version */
+            version?: number | null;
+            /** Title */
+            title?: string | null;
+            state: components["schemas"]["ChatState"];
+        };
         /** ChatCompletion */
         ChatCompletion: {
             /**
@@ -3944,12 +4015,78 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ChatDetail */
+        ChatDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Model */
+            model: string;
+            /** Version */
+            version: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            state: components["schemas"]["ChatState"];
+        };
         /** ChatMessage */
         ChatMessage: {
             /** Role */
             role: string;
             /** Content */
             content: string;
+        };
+        /** ChatState */
+        ChatState: {
+            /** Turns */
+            turns?: {
+                [key: string]: unknown;
+            }[];
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /** Preset */
+            preset?: number | null;
+        };
+        /** ChatSummary */
+        ChatSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Model */
+            model: string;
+            /** Version */
+            version: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ChatUpdate */
+        ChatUpdate: {
+            /** Model */
+            model?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Title */
+            title?: string | null;
+            state?: components["schemas"]["ChatState"] | null;
         };
         /** CheckInfo */
         CheckInfo: {
@@ -4416,6 +4553,13 @@ export interface components {
              * @default []
              */
             model_names?: string[];
+            /**
+             * Test Examples
+             * @description Test examples from the Playground per model slug, held out for scoring.
+             */
+            test_examples?: {
+                [key: string]: number;
+            };
             /** Splits */
             splits: {
                 [key: string]: number;
@@ -4891,6 +5035,16 @@ export interface components {
             /** Expected */
             expected: string;
         };
+        /** ExampleTurn */
+        ExampleTurn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+        };
         /** ExtensionInfo */
         ExtensionInfo: {
             /** Name */
@@ -5006,6 +5160,16 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Held Out
+             * @description A test example: always in the held-out rows the next version is scored on.
+             */
+            held_out: boolean;
+            /**
+             * Messages
+             * @description A test example's turns before the expected answer.
+             */
+            messages?: components["schemas"]["ExampleTurn"][] | null;
             /** Related */
             related: components["schemas"]["FeedbackInfo"][];
             /** Labels */
@@ -5077,6 +5241,16 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Held Out
+             * @description A test example: always in the held-out rows the next version is scored on.
+             */
+            held_out: boolean;
+            /**
+             * Messages
+             * @description A test example's turns before the expected answer.
+             */
+            messages?: components["schemas"]["ExampleTurn"][] | null;
         };
         /** FeedbackPage */
         FeedbackPage: {
@@ -5162,6 +5336,11 @@ export interface components {
             pending: number;
             /** Rows */
             rows: number;
+            /**
+             * Examples
+             * @description Test examples saved from the Playground, held out for scoring.
+             */
+            examples: number;
         };
         /** FieldScoreInfo */
         FieldScoreInfo: {
@@ -6619,6 +6798,16 @@ export interface components {
             safety: string | null;
             /** Safety Answers */
             safety_answers: boolean;
+            /**
+             * Chats Saved
+             * @description Chats with it are saved to the person's Recent list.
+             */
+            chats_saved: boolean;
+            /**
+             * Chats Note
+             * @description Why chats with it are not saved, in one line.
+             */
+            chats_note: string | null;
         };
         /** PolicyChoice */
         PolicyChoice: {
@@ -7267,6 +7456,19 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+        };
+        /** SaveExampleBody */
+        SaveExampleBody: {
+            /** Messages */
+            messages: components["schemas"]["ExampleTurn"][];
+            /** Expected */
+            expected: string;
+            /** Output */
+            output?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Response Id */
+            response_id?: string | null;
         };
         /** SavedPresetBody */
         SavedPresetBody: {
@@ -12325,6 +12527,154 @@ export interface operations {
             };
         };
     };
+    list_chats_api_playground_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSummary"][];
+                };
+            };
+        };
+    };
+    create_chat_api_playground_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_chat_api_playground_sessions__chat_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_chat_api_playground_sessions__chat_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_chat_api_playground_sessions__chat_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_training_plan_api_models__slug__training_plan_get: {
         parameters: {
             query?: {
@@ -12748,6 +13098,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedbackSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_test_examples_api_models__slug__test_examples_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_test_example_api_models__slug__test_examples_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveExampleBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackInfo"];
                 };
             };
             /** @description Validation Error */

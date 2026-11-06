@@ -6,6 +6,7 @@ import {
     useQueryClient,
 } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
+import { keys } from "./queries";
 import type { components } from "./schema";
 
 type Schemas = components["schemas"];
@@ -15,6 +16,7 @@ export type FeedbackDetail = Schemas["FeedbackDetail"];
 export type FeedbackSummary = Schemas["FeedbackSummary"];
 export type FeedbackStatus = FeedbackInfo["status"];
 export type PlaygroundFeedback = Schemas["PlaygroundFeedback"];
+export type SaveExampleBody = Schemas["SaveExampleBody"];
 
 export type FeedbackFilter = {
     model?: string[];
@@ -32,6 +34,7 @@ export const feedbackKeys = {
     facets: (filter: FeedbackFilter) => [...ROOT, "facets", filter] as const,
     item: (id: number) => [...ROOT, "item", id] as const,
     summary: (slug: string) => [...ROOT, "summary", slug] as const,
+    examples: (slug: string) => [...ROOT, "examples", slug] as const,
 };
 
 function listOrUndefined(values: string[] | undefined): string[] | undefined {
@@ -146,5 +149,29 @@ export function useSendFeedback(slug: string) {
         mutationFn: (body: PlaygroundFeedback) =>
             unwrap(api.POST("/api/models/{slug}/feedback", { params: { path: { slug } }, body })),
         onSuccess: refresh,
+    });
+}
+
+export function useTestExamples(slug: string, enabled: boolean) {
+    return useQuery({
+        queryKey: feedbackKeys.examples(slug),
+        queryFn: () =>
+            unwrap(api.GET("/api/models/{slug}/test-examples", { params: { path: { slug } } })),
+        enabled: Boolean(slug) && enabled,
+    });
+}
+
+export function useSaveTestExample(slug: string) {
+    const client = useQueryClient();
+    const refresh = useRefreshFeedback();
+    return useMutation({
+        mutationFn: (body: SaveExampleBody) =>
+            unwrap(
+                api.POST("/api/models/{slug}/test-examples", { params: { path: { slug } }, body }),
+            ),
+        onSuccess: () => {
+            refresh();
+            client.invalidateQueries({ queryKey: keys.datasets });
+        },
     });
 }

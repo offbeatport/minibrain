@@ -18,6 +18,7 @@ import {
     type Target,
     type ToolCall,
     type Turn,
+    exampleTurns,
     prettyJson,
 } from "~/lib/playground";
 
@@ -123,6 +124,7 @@ function Answer({
     busy,
     target,
     input,
+    onSaveExample,
 }: {
     turn: AssistantTurn;
     results: Record<string, string>;
@@ -130,6 +132,7 @@ function Answer({
     busy: boolean;
     target: Target | undefined;
     input: string;
+    onSaveExample: (() => void) | null;
 }) {
     const json = turn.json ? prettyJson(turn.content) : null;
     const answered = !turn.streaming && !turn.error && !turn.refusal && turn.meta;
@@ -171,6 +174,13 @@ function Answer({
                     input={input}
                     reply={{ id: turn.meta.responseId, model: target.name, output: turn.content }}
                     labels={target.labels}
+                    actions={
+                        onSaveExample && (
+                            <Button variant="ghost" onClick={onSaveExample} disabled={busy}>
+                                Save as test example
+                            </Button>
+                        )
+                    }
                 />
             )}
         </div>
@@ -182,11 +192,13 @@ export function Conversation({
     target,
     busy,
     onToolResult,
+    onSaveExample,
 }: {
     turns: Turn[];
     target: Target | undefined;
     busy: boolean;
     onToolResult: (call: ToolCall, text: string) => void;
+    onSaveExample: ((answerId: string) => void) | null;
 }) {
     const results = Object.fromEntries(
         turns.flatMap((turn) => (turn.kind === "tool" ? [[turn.callId, turn.content]] : [])),
@@ -211,6 +223,11 @@ export function Conversation({
                         busy={busy}
                         target={target}
                         input={input}
+                        onSaveExample={
+                            onSaveExample && exampleTurns(turns, turn.id)
+                                ? () => onSaveExample(turn.id)
+                                : null
+                        }
                     />
                 );
             })}

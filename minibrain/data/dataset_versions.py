@@ -20,6 +20,7 @@ from minibrain.data.splits import (
     Row,
     answer_labels,
     clean,
+    held_out_inputs,
     pairs,
     read_rows,
     split,
@@ -48,11 +49,13 @@ def over_limit(limit: int) -> str:
     )
 
 
-def split_summary(rows: list[Row]) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
+def split_summary(
+    rows: list[Row], held_out: frozenset[str] = frozenset()
+) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
     examples = clean(rows)
     labels = answer_labels(examples)
     try:
-        splits = split(examples)
+        splits = split(examples, held_out=held_out)
     except DatasetVersionError:
         return {}, labels, None
     return {name: len(splits[name]) for name in SPLITS}, labels, splits
@@ -69,7 +72,7 @@ class Taken:
 
 def checked(session: Session, settings: Settings, target: Path) -> Taken:
     rows_read = read_rows(target)
-    counts, labels, splits = split_summary(rows_read)
+    counts, labels, splits = split_summary(rows_read, held_out_inputs(target))
     findings = run_checks(pairs(rows_read), splits, load_limits(session).checks(), labelled=bool(labels))
     stop = blocking(findings)
     if stop is not None:
@@ -143,7 +146,8 @@ def with_feedback(session: Session, settings: Settings, model: Model, version: D
     with tempfile.TemporaryDirectory(dir=settings.work_dir()) as scratch:
         target = Path(scratch) / DATASET_VERSION_FILE
         plain_copy(settings, version, target)
-        _, added = merge_rows(target, [(encode_turns(row.turns), row.input, row.expected) for row in extra])
+        rows = [(encode_turns(row.example.turns), row.example.input, row.example.expected, row.split) for row in extra]
+        _, added = merge_rows(target, rows)
         if added == 0:
             return version
         result = checked(session, settings, target)

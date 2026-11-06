@@ -362,6 +362,9 @@ export const SECURITY = {
             "logs",
             "purge",
             "keep",
+            "playground",
+            "chats",
+            "history",
         ]),
         keyExpiry: aka(
             ["token expiry"],

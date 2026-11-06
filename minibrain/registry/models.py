@@ -471,6 +471,8 @@ class Feedback(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    messages: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, default=None)
+    split: Mapped[str | None] = mapped_column(default=None)
 
     model: Mapped[Model] = relationship()
 
@@ -673,6 +675,23 @@ class PlaygroundPreset(Base):
     name: Mapped[str]
     settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     is_default: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class PlaygroundSession(Base):
+    __tablename__ = "playground_sessions"
+    __table_args__ = (
+        Index("ix_playground_sessions_user", "user_id", "updated_at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    model: Mapped[str]
+    version: Mapped[int | None] = mapped_column(default=None)
+    title: Mapped[str] = mapped_column(default="")
+    content: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 

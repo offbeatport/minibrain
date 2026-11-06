@@ -32,8 +32,10 @@ from minibrain.ml.completion import Completion
 from minibrain.models.registry import base_config, base_publisher, require_usable, spec_for
 from minibrain.models.safety import install_safety
 from minibrain.models.usage import touch
+from minibrain.policy import load as load_policy
 from minibrain.registry.models import AuditEvent, BaseModelStatus, CatalogModel, Model, PlaygroundPreset, now
 from minibrain.registry.models import BaseModel as BaseRow
+from minibrain.registry.playground_sessions import not_kept
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.serve.backend import AdapterRef
 from minibrain.serve.dialects import detect_guard, reasoning_choices
@@ -68,6 +70,8 @@ class PlaygroundTarget(BaseModel):
     context_tokens: int | None
     safety: str | None = Field(description="The safety model that always checks this target.")
     safety_answers: bool
+    chats_saved: bool = Field(description="Chats with it are saved to the person's Recent list.")
+    chats_note: str | None = Field(description="Why chats with it are not saved, in one line.")
 
 
 class PlaygroundModels(BaseModel):
@@ -117,7 +121,13 @@ def context_of(session: Session, settings: Settings, base: BaseRow) -> int | Non
 
 
 def target(
-    name: str, kind: Literal["custom", "base"], key: str, model_name: str, facts: BaseFacts, route: Route
+    name: str,
+    kind: Literal["custom", "base"],
+    key: str,
+    model_name: str,
+    facts: BaseFacts,
+    route: Route,
+    chats_note: str | None,
 ) -> PlaygroundTarget:
     spec = BaseModelSpec.from_dict(facts.spec)
     contract, labels = contract_kind(route_contract(route))
@@ -140,11 +150,14 @@ def target(
         context_tokens=facts.context,
         safety=safety.get("model"),
         safety_answers=bool(safety.get("answers")),
+        chats_saved=chats_note is None,
+        chats_note=chats_note,
     )
 
 
 def playground_models(session: Session, settings: Settings, config: GatewayConfig) -> PlaygroundModels:
-    names = {model.slug: model.name for model in session.scalars(select(Model))}
+    models = {model.slug: model for model in session.scalars(select(Model))}
+    policy = load_policy(session)
     available = select(BaseRow).where(BaseRow.status == BaseModelStatus.AVAILABLE).order_by(BaseRow.name)
     facts: dict[str, BaseFacts] = {}
     for base in session.scalars(available):
@@ -154,13 +167,22 @@ def playground_models(session: Session, settings: Settings, config: GatewayConfi
     served = {key: BaseFacts(name=key, spec=spec, context=None) for key, spec in config.bases.items()}
     known = served | facts
     custom = [
-        target(name, "custom", route.slug, names.get(route.slug, route.slug), known[route.base_model], route)
+        target(
+            name,
+            "custom",
+            route.slug,
+            models[route.slug].name if route.slug in models else route.slug,
+            known[route.base_model],
+            route,
+            not_kept(policy, models.get(route.slug)),
+        )
         for name, route in sorted(config.routes.items())
         if route.model_id is not None and route.base_model in known
     ]
     install = install_safety(session).as_route()
+    bases_note = not_kept(policy, None)
     bases = [
-        target(key, "base", key, found.name, found, replace(base_route_for(key), safety=install))
+        target(key, "base", key, found.name, found, replace(base_route_for(key), safety=install), bases_note)
         for key, found in facts.items()
         if not BaseModelSpec.from_dict(found.spec).guard
     ]

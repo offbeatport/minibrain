@@ -21,9 +21,10 @@ import {
     useRef,
     useState,
 } from "react";
-import { usePlaygroundModels } from "~/api/playgroundQueries";
+import { useOpenChat, usePlaygroundModels, usePresets, useSaveChat } from "~/api/playgroundQueries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
+import { useCan } from "~/lib/access";
 import { useSearchParam } from "~/lib/listSearch";
 import {
     type AssistantTurn,
@@ -32,17 +33,26 @@ import {
     type Target,
     type ToolCall,
     type Turn,
+    chatState,
+    exampleTurns,
+    lastAnswer,
     messagesOf,
     newId,
     requestBody,
+    settingsOf,
     streamChat,
+    turnsOf,
 } from "~/lib/playground";
 import { Conversation } from "./playground/Conversation";
+import { Recent } from "./playground/Recent";
+import { SaveExample } from "./playground/SaveExample";
 import { SettingsPanel } from "./playground/SettingsPanel";
 import { ViewCode } from "./playground/ViewCode";
 
 const STORAGE_KEY = "minibrain.playground.model";
 const WIDE = "(min-width: 1024px)";
+const WIDEST = "(min-width: 1280px)";
+const SAVE_DELAY_MS = 600;
 
 function remembered(): string | null {
     try {
@@ -60,15 +70,37 @@ function remember(name: string): void {
     }
 }
 
-function useWide(): boolean {
-    const [wide, setWide] = useState(() => window.matchMedia(WIDE).matches);
+function useMedia(media: string): boolean {
+    const [matches, setMatches] = useState(() => window.matchMedia(media).matches);
     useEffect(() => {
-        const query = window.matchMedia(WIDE);
-        const update = () => setWide(query.matches);
+        const query = window.matchMedia(media);
+        const update = () => setMatches(query.matches);
         query.addEventListener("change", update);
         return () => query.removeEventListener("change", update);
-    }, []);
-    return wide;
+    }, [media]);
+    return matches;
+}
+
+function playgroundUrl(model: string | null, chat: number | null): string {
+    const params = new URLSearchParams();
+    if (model) {
+        params.set("model", model);
+    }
+    if (chat !== null) {
+        params.set("chat", String(chat));
+    }
+    const query = params.toString();
+    return query ? `/playground?${query}` : "/playground";
+}
+
+function gridColumns(recent: boolean, settings: boolean): string {
+    if (recent && settings) {
+        return "grid grid-cols-[16rem_minmax(0,1fr)_22rem] items-start gap-4";
+    }
+    if (recent) {
+        return "grid grid-cols-[16rem_minmax(0,1fr)] items-start gap-4";
+    }
+    return settings ? "grid grid-cols-[minmax(0,1fr)_22rem] items-start gap-4" : "flex flex-col";
 }
 
 function chosenTarget(targets: Target[], wanted: (string | null)[]): Target | undefined {
@@ -174,26 +206,129 @@ function Composer({
 
 export function PlaygroundPage() {
     const router = useRouter();
+    const can = useCan();
     const requested = useSearchParam("model");
+    const requestedChat = useSearchParam("chat");
     const models = usePlaygroundModels();
+    const presets = usePresets();
+    const saveChat = useSaveChat();
+    const openChat = useOpenChat();
     const targets = models.data?.targets ?? [];
     const guards = models.data?.guards ?? [];
     const [picked, setPicked] = useState<string | null>(null);
     const target = chosenTarget(targets, [picked, requested, remembered()]);
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+    const [preset, setPreset] = useState<number | null>(null);
     const [turns, setTurns] = useState<Turn[]>([]);
+    const [chatId, setChatId] = useState<number | null>(null);
+    const [openedModel, setOpenedModel] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [panel, setPanel] = useState(true);
     const [drawer, setDrawer] = useState(false);
-    const wide = useWide();
+    const [recentPanel, setRecentPanel] = useState(true);
+    const [recentDrawer, setRecentDrawer] = useState(false);
+    const [exampleFor, setExampleFor] = useState<string | null>(null);
+    const wide = useMedia(WIDE);
+    const widest = useMedia(WIDEST);
     const aborter = useRef<AbortController | null>(null);
     const end = useRef<HTMLDivElement | null>(null);
+    const lastSaved = useRef<string | null>(null);
+    const justOpened = useRef(false);
+    const defaulted = useRef(false);
+    const startChat = useRef(requestedChat);
     const pick = (name: string) => {
         setPicked(name);
+        setOpenedModel(null);
         remember(name);
-        router.history.replace(`/playground?model=${encodeURIComponent(name)}`);
+        router.history.replace(playgroundUrl(name, chatId));
     };
     const loadSettings = useCallback((next: Settings) => setSettings(next), []);
+    useEffect(() => {
+        if (defaulted.current || !presets.data) {
+            return;
+        }
+        defaulted.current = true;
+        const preferred = presets.data.find((item) => item.is_default);
+        if (preferred && !startChat.current) {
+            setPreset(preferred.id);
+            setSettings(settingsOf(preferred.settings));
+        }
+    }, [presets.data]);
+    const open = useCallback(
+        (id: number) => {
+            aborter.current?.abort();
+            defaulted.current = true;
+            openChat.mutate(id, {
+                onSuccess: (chat) => {
+                    justOpened.current = true;
+                    setTurns(turnsOf(chat.state));
+                    setSettings(settingsOf(chat.state.settings));
+                    setPreset(chat.state.preset ?? null);
+                    setChatId(chat.id);
+                    setOpenedModel(chat.model);
+                    setPicked(chat.model);
+                    setRecentDrawer(false);
+                    router.history.replace(playgroundUrl(chat.model, chat.id));
+                },
+            });
+        },
+        [openChat.mutate, router.history],
+    );
+    useEffect(() => {
+        const wanted = Number(startChat.current);
+        if (Number.isInteger(wanted) && wanted > 0) {
+            open(wanted);
+        }
+    }, [open]);
+    const newChat = () => {
+        aborter.current?.abort();
+        setTurns([]);
+        setChatId(null);
+        setOpenedModel(null);
+        lastSaved.current = null;
+        setRecentDrawer(false);
+        router.history.replace(playgroundUrl(target?.name ?? null, null));
+    };
+    const state = useMemo(() => chatState(turns, settings, preset), [turns, settings, preset]);
+    const creating = saveChat.isPending && chatId === null;
+    const saveMutate = saveChat.mutate;
+    useEffect(() => {
+        if (!target || busy || creating || turns.length === 0) {
+            return;
+        }
+        const key = JSON.stringify({ chatId, model: target.name, state });
+        if (justOpened.current) {
+            justOpened.current = false;
+            lastSaved.current = key;
+            return;
+        }
+        if (!target.chats_saved || key === lastSaved.current) {
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            lastSaved.current = key;
+            saveMutate(
+                { id: chatId, model: target.name, version: target.version ?? null, state },
+                {
+                    onSuccess: (saved) => {
+                        if (chatId === null) {
+                            lastSaved.current = JSON.stringify({
+                                chatId: saved.id,
+                                model: target.name,
+                                state,
+                            });
+                            setChatId(saved.id);
+                            router.history.replace(playgroundUrl(target.name, saved.id));
+                        }
+                    },
+                    onError: () => {
+                        lastSaved.current = null;
+                    },
+                },
+            );
+        }, SAVE_DELAY_MS);
+        return () => window.clearTimeout(timer);
+    }, [target, busy, creating, turns.length, chatId, state, saveMutate, router.history]);
     const update = (id: string, change: Partial<AssistantTurn>) =>
         setTurns((all) =>
             all.map((turn) =>
@@ -278,6 +413,13 @@ export function PlaygroundPage() {
             ),
         [target, settings, turns],
     );
+    const examples = target?.kind === "custom" && can.build;
+    const last = lastAnswer(turns);
+    const wholeChat = examples && last && exampleTurns(turns, last.id) ? last : null;
+    const missing =
+        openedModel && models.data && !targets.some((item) => item.name === openedModel)
+            ? `${openedModel} is not available any more, so answers now come from ${target?.model_name ?? "another model"}.`
+            : null;
     const panelBody = target && (
         <SettingsPanel
             targets={targets}
@@ -287,9 +429,25 @@ export function PlaygroundPage() {
             onModel={pick}
             settings={settings}
             onSettings={loadSettings}
+            preset={preset}
+            onPreset={setPreset}
         />
     );
-    const showSettings = () => (wide ? setPanel((open) => !open) : setDrawer(true));
+    const recentBody = (titled: boolean) => (
+        <Recent
+            titled={titled}
+            current={chatId}
+            note={target && !target.chats_saved ? (target.chats_note ?? null) : null}
+            onOpen={open}
+            onNew={newChat}
+            onDeleted={(id) => id === chatId && newChat()}
+            busy={busy}
+        />
+    );
+    const showSettings = () => (wide ? setPanel((shown) => !shown) : setDrawer(true));
+    const showRecent = () => (widest ? setRecentPanel((shown) => !shown) : setRecentDrawer(true));
+    const recentColumn = widest && recentPanel;
+    const settingsColumn = wide && panel;
     return (
         <Page wide>
             <PageHeader
@@ -300,24 +458,40 @@ export function PlaygroundPage() {
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 variant="outline"
+                                aria-expanded={widest ? recentPanel : recentDrawer}
+                                onClick={showRecent}
+                            >
+                                {recentColumn ? "Hide recent" : "Recent"}
+                            </Button>
+                            <Button
+                                variant="outline"
                                 disabled={busy || turns.length === 0}
-                                onClick={() => setTurns([])}
+                                onClick={newChat}
                             >
                                 New chat
                             </Button>
+                            {examples && (
+                                <Button
+                                    variant="outline"
+                                    disabled={busy || !wholeChat}
+                                    onClick={() => wholeChat && setExampleFor(wholeChat.id)}
+                                >
+                                    Save as test example
+                                </Button>
+                            )}
                             <ViewCode body={preview} disabled={!target} />
                             <Button
                                 variant="outline"
                                 aria-expanded={wide ? panel : drawer}
                                 onClick={showSettings}
                             >
-                                {wide && panel ? "Hide settings" : "Settings"}
+                                {settingsColumn ? "Hide settings" : "Settings"}
                             </Button>
                         </div>
                     )
                 }
             />
-            <ErrorLine error={models.error} />
+            <ErrorLine error={models.error ?? openChat.error ?? saveChat.error} />
             {models.data && targets.length === 0 && (
                 <EmptyState
                     variant="panel"
@@ -332,15 +506,17 @@ export function PlaygroundPage() {
                 </EmptyState>
             )}
             {target && (
-                <div
-                    className={
-                        wide && panel
-                            ? "grid grid-cols-[minmax(0,1fr)_22rem] items-start gap-4"
-                            : "flex flex-col"
-                    }
-                >
+                <div className={gridColumns(recentColumn, settingsColumn)}>
+                    {recentColumn && (
+                        <Card className="sticky top-4 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0">
+                            {recentBody(true)}
+                        </Card>
+                    )}
                     <Card className="flex min-h-[32rem] flex-col p-0">
                         <div className="flex-1 overflow-y-auto p-panel">
+                            {missing && (
+                                <p className="mb-4 text-sm text-muted-foreground">{missing}</p>
+                            )}
                             {turns.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
                                     Send a message to {target.model_name}. Answers stream in as the
@@ -353,6 +529,7 @@ export function PlaygroundPage() {
                                     target={target}
                                     busy={busy}
                                     onToolResult={toolResult}
+                                    onSaveExample={examples ? setExampleFor : null}
                                 />
                             )}
                             <div ref={end} />
@@ -364,12 +541,32 @@ export function PlaygroundPage() {
                             onStop={() => aborter.current?.abort()}
                         />
                     </Card>
-                    {wide && panel && (
+                    {settingsColumn && (
                         <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto p-0">
                             {panelBody}
                         </Card>
                     )}
                 </div>
+            )}
+            {target && (
+                <SaveExample
+                    key={exampleFor ?? "closed"}
+                    target={target}
+                    turns={turns}
+                    answerId={exampleFor}
+                    onClose={() => setExampleFor(null)}
+                />
+            )}
+            {!widest && (
+                <Sheet open={recentDrawer} onOpenChange={setRecentDrawer}>
+                    <SheetContent side="left" className="flex flex-col p-0">
+                        <SheetHeader className="px-4 pt-4">
+                            <SheetTitle>Recent</SheetTitle>
+                            <SheetDescription>Your saved chats, for you alone.</SheetDescription>
+                        </SheetHeader>
+                        {recentBody(false)}
+                    </SheetContent>
+                </Sheet>
             )}
             {!wide && (
                 <Sheet open={drawer} onOpenChange={setDrawer}>

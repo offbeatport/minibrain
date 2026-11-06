@@ -26,7 +26,8 @@ from minibrain.encryption.sealed import (
 )
 from minibrain.encryption.secrets import needs_reseal, open_text, seal_text, wrapped_of
 from minibrain.leader import Leader
-from minibrain.registry.models import SYSTEM_ACTOR, Artifact, AuditEvent, Connection, Setting, now
+from minibrain.registry.models import SYSTEM_ACTOR, Artifact, AuditEvent, Connection, PlaygroundSession, Setting, now
+from minibrain.registry.playground_sessions import CONTENT, TITLE, context_of
 from minibrain.registry.settings_store import read, write
 
 TASK = "encryption.task"
@@ -214,6 +215,16 @@ def visit_secrets(session: Session, keys: Keys, plan: Plan, tally: Tally) -> Non
                 f"connection {connection.name}",
             )
         )
+    for chat in session.scalars(select(PlaygroundSession)):
+        for part in (TITLE, CONTENT):
+            targets.append(
+                (
+                    lambda row=chat, field=part: getattr(row, field),
+                    lambda token, row=chat, field=part: setattr(row, field, token),
+                    context_of(chat.id, part),
+                    f"Playground chat {chat.id}",
+                )
+            )
     for row in sealed_settings(session):
         targets.append(
             (

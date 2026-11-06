@@ -82,7 +82,10 @@ function Text({ children, muted = false }: { children: ReactNode; muted?: boolea
 
 function sourceLine(item: FeedbackDetail): string {
     const key = item.request?.key_name ? ` with the key ${item.request.key_name}` : "";
-    return `${item.model_name} · from the ${originLabel(item.origin).toLowerCase()}${key} · ${relativeTime(item.created_at)}`;
+    const from = item.held_out
+        ? "a test example from the playground"
+        : `from the ${originLabel(item.origin).toLowerCase()}`;
+    return `${item.model_name} · ${from}${key} · ${relativeTime(item.created_at)}`;
 }
 
 function relatedText(item: FeedbackInfo): string {

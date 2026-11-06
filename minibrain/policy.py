@@ -116,7 +116,13 @@ FIELDS: tuple[Field, ...] = (
         "list",
         [],
     ),
-    Field("log_retention_days", "Log retention (days)", "Request logs older than this are deleted.", "int", 30),
+    Field(
+        "log_retention_days",
+        "Log retention (days)",
+        "Request logs, and Playground chats with no new message for this long, are deleted.",
+        "int",
+        30,
+    ),
     Field(
         "key_expiry_days",
         "API key expiry (days)",

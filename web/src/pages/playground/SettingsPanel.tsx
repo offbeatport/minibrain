@@ -556,6 +556,8 @@ export function SettingsPanel({
     onModel,
     settings,
     onSettings,
+    preset,
+    onPreset,
 }: {
     targets: Target[];
     guards: Guard[];
@@ -564,6 +566,8 @@ export function SettingsPanel({
     onModel: (name: string) => void;
     settings: Settings;
     onSettings: (next: Settings) => void;
+    preset: number | null;
+    onPreset: (id: number | null) => void;
 }) {
     const change: Change = (next) => onSettings({ ...settings, ...next });
     const note = contractNote(target);
@@ -575,7 +579,12 @@ export function SettingsPanel({
                 {note && <Note>{note}</Note>}
             </div>
             <Group title="Presets">
-                <Presets settings={settings} onLoad={onSettings} />
+                <Presets
+                    settings={settings}
+                    onLoad={onSettings}
+                    chosen={preset}
+                    onChosen={onPreset}
+                />
             </Group>
             <Group title="Settings">
                 <OptionalNumberField

@@ -12,7 +12,7 @@ import {
     TooltipTrigger,
     useToast,
 } from "obp-ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { useSendFeedback } from "~/api/feedbackQueries";
 import { ErrorLine } from "~/components/Section";
 
@@ -115,11 +115,13 @@ export function AnswerFeedback({
     input,
     reply,
     labels,
+    actions,
 }: {
     slug: string;
     input: string;
     reply: Answered;
     labels: string[];
+    actions?: ReactNode;
 }) {
     const toast = useToast();
     const send = useSendFeedback(slug);
@@ -169,6 +171,7 @@ export function AnswerFeedback({
                 <Button variant="ghost" onClick={() => setCorrecting(true)} disabled={correcting}>
                     Correct it
                 </Button>
+                {actions}
             </div>
             {correcting && (
                 <Correction

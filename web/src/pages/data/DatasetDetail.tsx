@@ -191,6 +191,17 @@ export function CreateDataset({
     );
 }
 
+function TestExampleNote({ count: total }: { count: number }) {
+    if (total === 0) {
+        return null;
+    }
+    return (
+        <span className="text-sm text-muted-foreground tabular-nums">
+            {`adds ${count(total)} test ${total === 1 ? "example" : "examples"} from the Playground to the held-out rows of its next version`}
+        </span>
+    );
+}
+
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const refresh = useDataRefresh();
     const models = useAllModels();
@@ -219,10 +230,11 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
                 ) : (
                     <ul className="flex flex-col divide-y rounded-lg border">
                         {dataset.models.map((slug) => (
-                            <li key={slug} className="flex h-9 items-center gap-3 px-3">
+                            <li key={slug} className="flex min-h-9 items-center gap-3 px-3 py-1.5">
                                 <Link href={modelHref(slug)} className="truncate text-primary">
                                     {nameOf(slug)}
                                 </Link>
+                                <TestExampleNote count={dataset.test_examples?.[slug] ?? 0} />
                             </li>
                         ))}
                     </ul>

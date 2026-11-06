@@ -17,6 +17,8 @@ TEXT_SHOTS = 3
 MIN_ROWS = 100
 SEED = 7
 SPLITS = ("golden", "eval", "shots", "train")
+HELD_OUT = "eval"
+SPLIT_COLUMN = "split"
 LABEL_CHARS = 100
 
 Row = tuple[str | None, str | None, str | None]
@@ -72,10 +74,13 @@ def pick_shots(pool: list[Example], labelled: bool) -> list[Example]:
     return shots
 
 
-def split(examples: list[Example], seed: int = SEED) -> dict[str, list[Example]]:
+def split(
+    examples: list[Example], seed: int = SEED, held_out: frozenset[str] = frozenset()
+) -> dict[str, list[Example]]:
     if len(examples) < MIN_ROWS:
         raise DatasetVersionError(f"need at least {MIN_ROWS} labelled rows after cleaning, found {len(examples)}")
-    shuffled = examples[:]
+    pinned = [example for example in examples if example.input in held_out]
+    shuffled = [example for example in examples if example.input not in held_out]
     random.Random(seed).shuffle(shuffled)
     golden_size = min(GOLDEN_MAX, len(shuffled) // 10)
     eval_size = min(EVAL_MAX, len(shuffled) * 15 // 100)
@@ -84,7 +89,7 @@ def split(examples: list[Example], seed: int = SEED) -> dict[str, list[Example]]
     shot_set = set(shots)
     return {
         "golden": shuffled[:golden_size],
-        "eval": shuffled[golden_size : golden_size + eval_size],
+        "eval": shuffled[golden_size : golden_size + eval_size] + pinned,
         "shots": shots,
         "train": [example for example in pool if example not in shot_set],
     }
@@ -100,9 +105,24 @@ def read_rows(path: Path | str) -> list[Row]:
     return [(messages, text, expected) for messages, text, expected in found]
 
 
+def held_out_inputs(path: Path | str) -> frozenset[str]:
+    with duckdb.connect() as connection:
+        register(connection)
+        columns = connection.execute("SELECT * FROM read_parquet(?) LIMIT 0", [str(path)]).description or []
+        if SPLIT_COLUMN not in {column[0] for column in columns}:
+            return frozenset()
+        found = connection.execute(
+            "SELECT CAST(messages AS VARCHAR), CAST(input AS VARCHAR), CAST(expected AS VARCHAR) "
+            "FROM read_parquet(?) WHERE split = ?",
+            [str(path), HELD_OUT],
+        ).fetchall()
+    examples = (example_of(messages, text, expected) for messages, text, expected in found)
+    return frozenset(example.input for example in examples if example is not None)
+
+
 @lru_cache(maxsize=8)
 def parquet_splits(path: str) -> dict[str, list[Example]]:
-    return split(clean(read_rows(path)))
+    return split(clean(read_rows(path)), held_out=held_out_inputs(path))
 
 
 def labels_of(splits: dict[str, list[Example]]) -> list[str]:

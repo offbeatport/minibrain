@@ -342,6 +342,9 @@ class DatasetSummary(BaseModel):
     mapping: MappingInfo
     models: list[str]
     model_names: list[str] = []
+    test_examples: dict[str, int] = Field(
+        default_factory=dict, description="Test examples from the Playground per model slug, held out for scoring."
+    )
     splits: dict[str, int] | None
     dataset_version: DatasetVersionInfo | None = None
     changed: ChangeInfo | None = None

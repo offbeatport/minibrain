@@ -124,8 +124,13 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, tool calling through each family's
 chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss), reasoning off or at an effort with
 `reasoning_content` apart from the answer, token streaming from every engine, and a safety model (Llama Guard,
-ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request, and a Playground with every setting as
-the chat UI for staff. Not yet: `/v1/embeddings`, `/v1/completions`, sizing guidance.
+ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request, and a Playground with every setting,
+Recent chats saved per person and Save as test example. Not yet: `/v1/embeddings`, `/v1/completions`, sizing
+guidance, the staff Chat app.
+
+The staff Chat app comes next and is separate from the Playground: a ChatGPT-like app for everyone in the
+organisation, with per-person history, retrieval over company documents, sharing and admin retention. The Playground
+stays the tool for trying models with the API's settings and turning bad answers into test examples.
 
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
 when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
@@ -188,7 +193,7 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 | Golden set | 20–50 human-verified examples; defines the task and scores every version |
 | Teacher | A larger local open model that labels data, sets the quality bar and serves prompt-only versions. An API teacher is opt-in, off by default |
 | Rebase | Rebuilding a model on a new base model from its dataset version, golden set and config, then comparing it with `current` |
-| Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue |
+| Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue. A test example from the Playground is accepted feedback held out for scoring |
 | Index | The model's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
 
 ## Flow
@@ -536,7 +541,9 @@ trains are the same rows (the `dataset_versions` table, `/api/datasets/<slug>/ve
   dataset's latest version.
 - Feedback: a model's accepted feedback rows merge into the picked version when a model version starts, as a
   feedback copy (`base_id` names the dataset version, no number of its own); feedback that changes nothing reuses the
-  version itself (see Feedback loop).
+  version itself (see Feedback loop). Test examples saved from the Playground merge the same way, marked `split =
+  'eval'` in the copy's Parquet, and the split puts those rows in the held-out split whatever the shuffle says, so the
+  version is scored on them and never trains on them.
 - Diff: any two versions compare by input (trimmed): rows added, removed and relabelled, row counts, and the share of
   rows per label, with samples of each. The model page links each model version to the diff against the one before
   it, next to the change in held-out accuracy; a model version's scores say whether its data matches the live one's.
@@ -831,6 +838,14 @@ once it matches; only deleting a base removes its files.
    other row; sending the worst failures to the golden set waits for golden set authoring.
 5. The model page and the Training page show "Feedback since vN: total (accepted)" and the reviews still waiting;
    "Train with feedback" trains a new version with the last trained version's recipe.
+6. Test examples (built 2026-11-06): Save as test example in the Playground, on the whole conversation or on one
+   answer, opens the conversation up to that answer with the expected answer to fix first (the model's answer, or a
+   label picked from the model's labels). `POST /api/models/<slug>/test-examples` (Builders) stores it as accepted
+   feedback, with its turns (`feedback.messages`) and `split = 'eval'`, audited as `feedback.example`; it goes through
+   step 4 like any accepted row and lands in the held-out split of the next version's data. The model page lists
+   them (Test examples: conversation, expected answer, the model's answer, the version it was found on, who saved it),
+   the Data page says per model in Used by how many it adds, and the Feedback page marks them as Playground test
+   examples, where rejecting one takes it out again.
 
 ## Retrieval
 
@@ -897,7 +912,8 @@ once it matches; only deleting a base removes its files.
   and for base models served through `/v1`; an admin can lock it for every model ("Lock for every model" under
   Settings → Security, or `request_bodies` in `minibrain.yaml` or the environment), and then each model's switch shows
   the locked value and cannot be changed. Gateways, standalone ones included, get each model's value in their config
-  snapshot.
+  snapshot. Playground chats are request content too: they are saved only for a model that keeps them (bases follow
+  the install default), and Log retention deletes them.
 - A context step between auth and the model call retrieves from the model's index (see Retrieval).
 - Citations come back in an extra `citations` field on the response.
 - Login in v1: local accounts, OIDC (Entra, Okta, ADFS, Keycloak), and trusted headers from a reverse proxy. SAML
@@ -1017,6 +1033,17 @@ keys, and `/v1` stays key-only.
   (`openai`, extensions in `extra_body`) and JavaScript. It calls `POST /api/playground/chat/completions`, the `/v1`
   pipeline under the person's session: not request logs, safety blocks audited with the person. Comparing two versions
   side by side moved to Evaluations' answer review.
+- Playground history (built 2026-11-06): a Recent column on the left (from 1280px, a drawer from the left below it,
+  hidden on request) lists the person's chats, newest first, with a filter box, New chat, and Rename and Delete in
+  each row's menu; `?chat=<id>` reopens one. A chat saves itself after each answer (and after a settings change once
+  it has one), titled from its first message, with its turns, model and version, every setting and the preset, in
+  `playground_sessions` through `/api/playground/sessions` (create, list, read, update or rename, delete), scoped to
+  the signed-in person: no route lets anyone, admins included, read another person's chats. The title and the content
+  are sealed at rest with `seal_text` under contexts naming the chat and resealed on key rotation like connection
+  secrets. A chat is saved only when its model keeps request inputs and answers (per model, or the install default
+  for bases, or the admin lock); otherwise nothing is saved and the Recent list says why in one line. Chats with no
+  new message for Log retention (days) are deleted by the leader's hourly purge, with the request logs. No folders,
+  sharing or search beyond the filter: that is the staff Chat app's job.
 - Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
   and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"
@@ -1458,7 +1485,8 @@ Everything in the v1 scope below, after M1.
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
 - [ ] Rebase: rebuild every model on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
-      in the playground → review queue; accepted rows join the next version's training data; "Train with feedback"
+      in the playground → review queue; accepted rows join the next version's training data; "Train with feedback";
+      Save as test example in the Playground → held-out rows of the next version's data
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
       Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
 - [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, image SBOMs per release,

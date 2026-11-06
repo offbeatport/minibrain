@@ -19,7 +19,7 @@ import {
     Switch,
     useToast,
 } from "obp-ui";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useDeletePreset, usePresets, useSavePreset } from "~/api/playgroundQueries";
 import { ErrorLine } from "~/components/Section";
 import { type SavedPreset, type Settings, settingsOf } from "~/lib/playground";
@@ -103,27 +103,21 @@ function NameDialog({
 export function Presets({
     settings,
     onLoad,
-}: { settings: Settings; onLoad: (next: Settings) => void }) {
+    chosen,
+    onChosen: setChosen,
+}: {
+    settings: Settings;
+    onLoad: (next: Settings) => void;
+    chosen: number | null;
+    onChosen: (id: number | null) => void;
+}) {
     const toast = useToast();
     const presets = usePresets();
     const save = useSavePreset();
     const remove = useDeletePreset();
-    const [chosen, setChosen] = useState<number | null>(null);
     const [naming, setNaming] = useState<Naming>(null);
-    const loaded = useRef(false);
     const items: SavedPreset[] = presets.data ?? [];
     const current = items.find((item) => item.id === chosen) ?? null;
-    useEffect(() => {
-        if (loaded.current || !presets.data) {
-            return;
-        }
-        loaded.current = true;
-        const preferred = presets.data.find((item) => item.is_default);
-        if (preferred) {
-            setChosen(preferred.id);
-            onLoad(settingsOf(preferred.settings));
-        }
-    }, [presets.data, onLoad]);
     const pick = (value: string) => {
         if (value === NO_PRESET) {
             setChosen(null);

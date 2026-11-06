@@ -11,9 +11,11 @@ from minibrain.api.access import builder, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
-from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, Submission, suggestion
+from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, SavedExample, Submission, suggestion
+from minibrain.data.splits import HELD_OUT
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Model
 from minibrain.registry.service import NotFoundError, get_model, latest_dataset_version
+from minibrain.tasks.examples import Turn
 from minibrain.tasks.service import contract_of
 
 router = APIRouter(prefix="/api", tags=["feedback"])
@@ -27,6 +29,11 @@ NOBODY = "none"
 
 Signal = Literal["conflict", "unsure", "none"]
 Facet = Literal["status", "model"]
+
+
+class ExampleTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=TEXT_MAX)
 
 
 class FeedbackInfo(BaseModel):
@@ -49,6 +56,10 @@ class FeedbackInfo(BaseModel):
     reviewed_at: datetime | None
     response_id: str | None
     created_at: datetime
+    held_out: bool = Field(description="A test example: always in the held-out rows the next version is scored on.")
+    messages: list[ExampleTurn] | None = Field(
+        default=None, description="A test example's turns before the expected answer."
+    )
 
 
 class FeedbackPage(BaseModel):
@@ -95,6 +106,14 @@ class PlaygroundFeedback(BaseModel):
     response_id: str | None = Field(default=None, max_length=200)
 
 
+class SaveExampleBody(BaseModel):
+    messages: list[ExampleTurn] = Field(min_length=1, max_length=200)
+    expected: str = Field(min_length=1, max_length=TEXT_MAX)
+    output: str | None = Field(default=None, max_length=TEXT_MAX)
+    version: int | None = None
+    response_id: str | None = Field(default=None, max_length=200)
+
+
 class FeedbackSummary(BaseModel):
     version: int | None
     since: datetime | None
@@ -102,6 +121,7 @@ class FeedbackSummary(BaseModel):
     accepted: int
     pending: int
     rows: int
+    examples: int = Field(description="Test examples saved from the Playground, held out for scoring.")
 
 
 def signal_of(item: Feedback) -> Signal:
@@ -132,6 +152,8 @@ def feedback_info(item: Feedback) -> FeedbackInfo:
         reviewed_at=item.reviewed_at,
         response_id=item.response_id,
         created_at=item.created_at,
+        held_out=item.split == HELD_OUT,
+        messages=[ExampleTurn.model_validate(turn) for turn in item.messages] if item.messages else None,
     )
 
 
@@ -308,4 +330,35 @@ def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
         accepted=found.accepted,
         pending=found.pending,
         rows=found.rows,
+        examples=found.examples,
     )
+
+
+@router.post(
+    "/models/{slug}/test-examples",
+    status_code=201,
+    dependencies=[Depends(builder)],
+    summary="Save a test example",
+    description=(
+        "Adds a conversation and its expected answer to the model's accepted feedback, held out for scoring: it joins "
+        "the held-out rows of the dataset version the next model version starts from, so that version is scored on "
+        "it. Audited as feedback.example."
+    ),
+)
+def save_test_example(slug: str, body: SaveExampleBody, session: SessionDep) -> FeedbackInfo:
+    model = get_model(session, slug)
+    saved = SavedExample(
+        turns=tuple(Turn(turn.role, turn.content) for turn in body.messages),
+        expected=body.expected,
+        output=body.output,
+        version=body.version,
+        response_id=body.response_id,
+    )
+    item = store.save_example(session, model, saved, current_actor())
+    session.commit()
+    return feedback_info(item)
+
+
+@router.get("/models/{slug}/test-examples", dependencies=[Depends(builder)], summary="List test examples")
+def list_test_examples(slug: str, session: SessionDep) -> list[FeedbackInfo]:
+    return [feedback_info(item) for item in store.saved_examples(session, get_model(session, slug))]

@@ -6,9 +6,10 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.data.splits import HELD_OUT
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Model, RequestLog, now
-from minibrain.tasks.examples import Example, single
+from minibrain.tasks.examples import ASSISTANT, Example, Turn, single, turns_of, well_formed
 
 UP = "up"
 DOWN = "down"
@@ -47,6 +48,22 @@ class Summary:
     accepted: int
     pending: int
     rows: int
+    examples: int
+
+
+@dataclass(frozen=True)
+class FeedbackRow:
+    example: Example
+    split: str | None
+
+
+@dataclass(frozen=True)
+class SavedExample:
+    turns: tuple[Turn, ...]
+    expected: str
+    output: str | None = None
+    version: int | None = None
+    response_id: str | None = None
 
 
 def cleaned(value: str | None) -> str | None:
@@ -221,6 +238,14 @@ def count(session: Session, where: list[ColumnElement[bool]]) -> int:
     return session.scalar(select(func.count()).select_from(Feedback).where(*where)) or 0
 
 
+def held_out_examples(model_ids: list[int]) -> list[ColumnElement[bool]]:
+    return [
+        Feedback.model_id.in_(model_ids),
+        Feedback.status == FeedbackStatus.ACCEPTED,
+        Feedback.split == HELD_OUT,
+    ]
+
+
 def summary(session: Session, model: Model) -> Summary:
     newest = max(model.versions, key=lambda version: version.number, default=None)
     since = newest.created_at if newest is not None else None
@@ -234,10 +259,19 @@ def summary(session: Session, model: Model) -> Summary:
         accepted=count(session, [*recent, accepted]),
         pending=count(session, [mine, Feedback.status == FeedbackStatus.PENDING]),
         rows=len(training_rows(session, model)),
+        examples=count(session, held_out_examples([model.id])),
     )
 
 
-def training_rows(session: Session, model: Model) -> list[Example]:
+def example_of(item: Feedback) -> Example | None:
+    label = (item.label or "").strip()
+    turns = turns_of(item.messages) if item.messages else (Turn("user", item.input.strip()),)
+    if not label or not turns or not well_formed([*turns, Turn(ASSISTANT, label)]):
+        return None
+    return Example(turns=turns, expected=label) if item.messages else single(turns[0].content, label)
+
+
+def training_rows(session: Session, model: Model) -> list[FeedbackRow]:
     query = (
         select(Feedback)
         .where(
@@ -247,9 +281,63 @@ def training_rows(session: Session, model: Model) -> list[Example]:
         )
         .order_by(Feedback.reviewed_at, Feedback.id)
     )
-    latest: dict[str, Example] = {}
+    latest: dict[str, FeedbackRow] = {}
     for item in session.scalars(query):
-        text, label = item.input.strip(), (item.label or "").strip()
-        if text and label:
-            latest[text] = single(text, label)
+        example = example_of(item)
+        if example is not None:
+            latest[example.input] = FeedbackRow(example=example, split=item.split)
     return list(latest.values())
+
+
+def save_example(session: Session, model: Model, saved: SavedExample, actor: str) -> Feedback:
+    expected = saved.expected.strip()
+    turns = tuple(Turn(turn.role, turn.content.strip()) for turn in saved.turns)
+    if not expected:
+        raise FeedbackError("Enter the expected answer.")
+    if not well_formed([*turns, Turn(ASSISTANT, expected)]):
+        raise FeedbackError(
+            "A test example is a conversation of user and assistant turns that ends with a user message, "
+            "without tool calls."
+        )
+    example = Example(turns=turns, expected=expected)
+    output = cleaned(saved.output)
+    moment = now()
+    item = Feedback(
+        model=model,
+        origin=ORIGIN_PLAYGROUND,
+        response_id=saved.response_id,
+        version=saved.version,
+        rating=UP if output == expected else DOWN,
+        input=example.input,
+        input_key=input_key(example.input),
+        output=output,
+        correction=None if output == expected else expected,
+        status=FeedbackStatus.ACCEPTED,
+        label=expected,
+        priority=REVIEWED_PRIORITY,
+        reviewed_by=actor,
+        reviewed_at=moment,
+        created_at=moment,
+        updated_at=moment,
+        messages=example.messages(),
+        split=HELD_OUT,
+    )
+    session.add(item)
+    session.flush()
+    detail = {"version": saved.version, "turns": len(turns), "split": HELD_OUT}
+    audit(session, item, actor, "feedback.example", detail)
+    refresh_group(session, model.id, item.input_key)
+    return item
+
+
+def saved_examples(session: Session, model: Model) -> list[Feedback]:
+    query = select(Feedback).where(*held_out_examples([model.id]))
+    return list(session.scalars(query.order_by(Feedback.reviewed_at.desc(), Feedback.id.desc())))
+
+
+def example_counts(session: Session, models: list[Model]) -> dict[str, int]:
+    slugs = {model.id: model.slug for model in models}
+    if not slugs:
+        return {}
+    query = select(Feedback.model_id, func.count()).where(*held_out_examples(list(slugs))).group_by(Feedback.model_id)
+    return {slugs[model_id]: int(total) for model_id, total in session.execute(query).all()}

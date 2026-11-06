@@ -60,6 +60,7 @@ from minibrain.data.dataset_versions import (
 )
 from minibrain.data.delta import DELTA
 from minibrain.data.diff import compare
+from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.remote import REMOTE_KINDS
@@ -275,6 +276,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         mapping=mapping_info(dataset),
         models=[model.slug for model in dataset.models],
         model_names=[model.name for model in dataset.models],
+        test_examples=example_counts(session, list(dataset.models)) if session is not None else {},
         splits=known_splits(latest, changed),
         dataset_version=dataset_version_info(latest) if latest is not None else None,
         changed=changed,

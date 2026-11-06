@@ -5,6 +5,9 @@ import type { components } from "~/api/schema";
 export type Target = components["schemas"]["PlaygroundTarget"];
 export type Guard = components["schemas"]["GuardInfo"];
 export type SavedPreset = components["schemas"]["SavedPresetInfo"];
+export type ChatSummary = components["schemas"]["ChatSummary"];
+export type ChatState = components["schemas"]["ChatState"];
+export type ExampleTurn = components["schemas"]["ExampleTurn"];
 
 export type ResponseFormat = "text" | "json_object" | "json_schema";
 
@@ -227,6 +230,44 @@ export function messagesOf(turns: Turn[]): Record<string, unknown>[] {
         }
     }
     return found;
+}
+
+export function exampleTurns(turns: Turn[], answerId: string): ExampleTurn[] | null {
+    const found: ExampleTurn[] = [];
+    for (const turn of turns) {
+        if (turn.id === answerId) {
+            return found.at(-1)?.role === "user" ? found : null;
+        }
+        if (turn.kind === "tool" || (turn.kind === "assistant" && turn.calls.length > 0)) {
+            return null;
+        }
+        if (turn.kind === "user") {
+            found.push({ role: "user", content: turn.content });
+        } else if (turn.content && !turn.refusal && !turn.error) {
+            found.push({ role: "assistant", content: turn.content });
+        }
+    }
+    return null;
+}
+
+export function lastAnswer(turns: Turn[]): AssistantTurn | null {
+    const found = turns.at(-1);
+    return found?.kind === "assistant" && !found.streaming ? found : null;
+}
+
+export function chatState(turns: Turn[], settings: Settings, preset: number | null): ChatState {
+    const stored = turns.map((turn) =>
+        turn.kind === "assistant" && turn.streaming ? { ...turn, streaming: false } : turn,
+    );
+    return {
+        turns: stored as unknown as ChatState["turns"],
+        settings: settings as unknown as ChatState["settings"],
+        preset,
+    };
+}
+
+export function turnsOf(state: ChatState): Turn[] {
+    return (state.turns ?? []) as unknown as Turn[];
 }
 
 export function requestBody(

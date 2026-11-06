@@ -8,6 +8,7 @@ import {
     Files,
     History,
     Info,
+    ListChecks,
     Plug,
     ThumbsUp,
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { TestExamples } from "~/components/TestExamples";
 import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -678,6 +680,16 @@ function CustomModelView({ row }: { row: ModelRow }) {
             >
                 <FeedbackSince slug={row.key} />
             </PanelSection>
+            {can.build && (
+                <PanelSection
+                    icon={ListChecks}
+                    title="Test examples"
+                    description="Conversations saved from the Playground with the answer they should get. Each one joins the held-out rows of the next version's data, so that version is scored on it."
+                    bare
+                >
+                    <TestExamples slug={row.key} />
+                </PanelSection>
+            )}
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
         </>
     );

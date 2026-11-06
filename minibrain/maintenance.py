@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.data.dataset_versions import cleanup
 from minibrain.leader import Leader
 from minibrain.policy import load
+from minibrain.registry import playground_sessions
 from minibrain.registry.audit_chain import head_of, prune_cut, seal_all
 from minibrain.registry.compute import forget_stale
 from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, RequestLog, now
@@ -27,6 +28,10 @@ def purge_request_logs(session: Session) -> int:
     result = session.execute(delete(RequestLog).where(RequestLog.at < now() - timedelta(days=days)))
     session.commit()
     return int(getattr(result, "rowcount", 0) or 0)
+
+
+def purge_playground_sessions(session: Session) -> int:
+    return playground_sessions.purge(session, int(load(session)["log_retention_days"]))
 
 
 def purge_audit_events(session: Session) -> int:
@@ -72,6 +77,7 @@ def purge_forever(sessions: sessionmaker[Session], settings: Settings, stop: thr
                 continue
             with sessions() as session:
                 purge_request_logs(session)
+                purge_playground_sessions(session)
                 purge_audit_events(session)
                 forget_stale(session)
                 cleanup(session, settings)
