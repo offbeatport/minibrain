@@ -28,6 +28,7 @@ import type { JobInfo, ModelSummary } from "~/api/client";
 import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useJob, useModels } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
+import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page } from "~/components/Section";
@@ -301,6 +302,10 @@ export function TrainingListPage() {
     const jobs = useJobList(filter);
     const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
     const filtering = models.length + statuses.length > 0 || Boolean(search.q || search.since);
+    const selection = useJobSelection(
+        jobs.rows,
+        [search.model, search.status, search.q, search.since].join("\n"),
+    );
     const columns = useMemo(
         () => jobColumns((job) => listHref(PATH, { ...search, job: String(job.id) })),
         [search],
@@ -327,7 +332,7 @@ export function TrainingListPage() {
                     can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
                 }
             />
-            <div className="flex flex-wrap items-center gap-2">
+            <JobToolbar selection={selection}>
                 <SearchInput
                     aria-label="Search jobs"
                     placeholder="Search by model or job ID"
@@ -374,7 +379,7 @@ export function TrainingListPage() {
                         Clear filters
                     </Button>
                 )}
-            </div>
+            </JobToolbar>
             <ErrorLine error={jobs.error} />
             <DataGrid
                 columns={columns}
@@ -391,6 +396,7 @@ export function TrainingListPage() {
                 onLoadMore={jobs.loadMore}
                 total={jobs.total}
                 onOpen={(job) => update({ job: String(job.id) })}
+                {...selection.grid}
                 rowLabel={(job) =>
                     `${job.model_name ?? "Deleted model"}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
                 }

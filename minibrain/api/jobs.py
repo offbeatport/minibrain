@@ -1,9 +1,9 @@
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
@@ -13,9 +13,11 @@ from starlette.concurrency import run_in_threadpool
 
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import QueueDep, SessionDep, StoreDep
-from minibrain.api.schemas import JobDetail, JobEventInfo, JobFacets, JobInfo, JobPage
+from minibrain.api.schemas import JobActionResult, JobDetail, JobEventInfo, JobFacets, JobIds, JobInfo, JobPage
 from minibrain.api.views import job_detail, job_info
-from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, Job, JobEvent, Model
+from minibrain.auth.identity import current_actor
+from minibrain.jobs.queue import JobStateError, SqlJobQueue
+from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, AuditEvent, Job, JobEvent, Model
 from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -188,17 +190,63 @@ async def stream_events(job_id: int, request: Request, session: SessionDep, afte
     return StreamingResponse(stream(), media_type="text/event-stream", headers=headers)
 
 
+def audit(session: Session, action: str, subject: Job, **detail: Any) -> None:
+    owner = subject.model.slug if subject.model is not None else subject.base_model_id
+    facts = {"name": f"Job #{subject.id}", "kind": subject.kind} | ({"model": owner} if owner else {}) | detail
+    session.add(AuditEvent(actor=current_actor(), action=action, target=f"job:{subject.id}", detail=facts))
+
+
+def cancel(session: Session, queue: SqlJobQueue, job: Job) -> None:
+    before = job.status
+    queue.cancel(session, job)
+    audit(session, "job.cancel", job, status=before)
+
+
+def retry(session: Session, queue: SqlJobQueue, job: Job) -> Job:
+    again = queue.retry(session, job)
+    audit(session, "job.retry", job, job=again.id)
+    return again
+
+
+def each_job(session: Session, ids: list[int], act: Callable[[Job], Job | None]) -> list[JobActionResult]:
+    results: list[JobActionResult] = []
+    for job_id in dict.fromkeys(ids):
+        job = session.get(Job, job_id)
+        if job is None:
+            results.append(JobActionResult(id=job_id, done=False, status=None, error=f"job {job_id} not found"))
+            continue
+        try:
+            made = act(job)
+        except JobStateError as refused:
+            results.append(JobActionResult(id=job_id, done=False, status=job.status, error=str(refused)))
+            continue
+        retried = job_info(made) if made is not None else None
+        results.append(JobActionResult(id=job_id, done=True, status=job.status, retry=retried))
+    session.commit()
+    return results
+
+
+@router.post("/jobs/cancel", dependencies=[Depends(builder)])
+def cancel_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobActionResult]:
+    return each_job(session, body.ids, lambda job: cancel(session, queue, job))
+
+
+@router.post("/jobs/retry", dependencies=[Depends(builder)])
+def retry_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobActionResult]:
+    return each_job(session, body.ids, lambda job: retry(session, queue, job))
+
+
 @router.post("/jobs/{job_id}/cancel", dependencies=[Depends(builder)])
 def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     job = get_job(session, job_id)
-    queue.cancel(session, job)
+    cancel(session, queue, job)
     session.commit()
     return job_info(job)
 
 
 @router.post("/jobs/{job_id}/retry", status_code=201, dependencies=[Depends(builder)])
 def retry_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
-    again = queue.retry(session, get_job(session, job_id))
+    again = retry(session, queue, get_job(session, job_id))
     session.commit()
     return job_info(again)
 

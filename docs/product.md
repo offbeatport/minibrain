@@ -197,6 +197,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Training list** · shipped · product, ml
   See every training and scoring job across models, filtered.
   UI: Training
+- **Bulk job actions** · shipped · product, ml
+  Tick jobs to cancel or retry them together, each one audited.
+  UI: Training › select jobs, Monitor › Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry
 - **Versions** · shipped · product, ml
   Keep immutable prompt-only and trained versions per model.
   UI: Evaluations · API: GET /api/models/{slug}/versions, DELETE /api/models/{slug}/versions/{number}

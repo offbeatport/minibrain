@@ -2205,6 +2205,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Jobs */
+        post: operations["cancel_jobs_api_jobs_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Jobs */
+        post: operations["retry_jobs_api_jobs_retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -5797,6 +5831,18 @@ export interface components {
             /** Instructions */
             instructions: string;
         };
+        /** JobActionResult */
+        JobActionResult: {
+            /** Id */
+            id: number;
+            /** Done */
+            done: boolean;
+            /** Status */
+            status: string | null;
+            /** Error */
+            error?: string | null;
+            retry?: components["schemas"]["JobInfo"] | null;
+        };
         /** JobDetail */
         JobDetail: {
             /** Id */
@@ -5862,6 +5908,11 @@ export interface components {
             models: {
                 [key: string]: number;
             };
+        };
+        /** JobIds */
+        JobIds: {
+            /** Ids */
+            ids: number[];
         };
         /** JobInfo */
         JobInfo: {
@@ -13426,6 +13477,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_jobs_api_jobs_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionResult"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_jobs_api_jobs_retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobIds"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionResult"][];
+                };
             };
             /** @description Validation Error */
             422: {

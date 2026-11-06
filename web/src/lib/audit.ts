@@ -40,6 +40,8 @@ const ACTIONS: Record<string, string> = {
     "dataset_folder.delete": "Dataset folder deleted",
     "dataset_folder.move": "Dataset folder moved",
     "dataset_folder.rename": "Dataset folder renamed",
+    "job.cancel": "Job cancelled",
+    "job.retry": "Job retried",
     "key.create": "API key created",
     "key.revoke": "API key revoked",
     "key.update": "API key changed",
@@ -272,6 +274,10 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "feedback.accept": (detail) => `Right answer: ${plainValue(detail.label)}`,
     "feedback.fix": (detail) => `Fixed to ${plainValue(detail.label)}`,
     "feedback.reject": () => "Kept out of the training data",
+    "job.cancel": (detail) =>
+        detail.status === "running" ? "Stop requested while running" : "Taken off the queue",
+    "job.retry": (detail) =>
+        typeof detail.job === "number" ? `Queued again as job #${detail.job}` : "Queued again",
     "model.delete": (detail) =>
         typeof detail.size_bytes === "number" ? `Freed ${bytes(detail.size_bytes)}` : "Deleted",
     "model.reimport": (detail) => `From ${plainValue(detail.source)}`,

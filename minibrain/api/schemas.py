@@ -483,6 +483,18 @@ class JobFacets(BaseModel):
     models: dict[str, int]
 
 
+class JobIds(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=1000)
+
+
+class JobActionResult(BaseModel):
+    id: int
+    done: bool
+    status: str | None
+    error: str | None = None
+    retry: JobInfo | None = None
+
+
 class AttemptInfo(BaseModel):
     number: int
     worker: str

@@ -20,6 +20,7 @@ import { useState } from "react";
 import { type JobInfo, api, unwrap } from "~/api/client";
 import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob } from "~/api/queries";
+import { JobToolbar, canCancel, canRetry, useJobSelection } from "~/components/JobSelection";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
@@ -129,20 +130,18 @@ function JobActions({ job }: { job: JobInfo }) {
     });
     return (
         <div className="flex items-center justify-end gap-1">
-            {can.build && isActiveJob(job) && !job.cancel_requested && (
+            {can.build && canCancel(job) && (
                 <Button
                     variant="outline"
-                    size="xs"
                     disabled={act.isPending}
                     onClick={() => act.mutate("cancel")}
                 >
                     Cancel
                 </Button>
             )}
-            {can.build && job.status === "failed" && (
+            {can.build && canRetry(job) && (
                 <Button
                     variant="outline"
-                    size="xs"
                     disabled={act.isPending}
                     onClick={() => act.mutate("retry")}
                 >
@@ -229,6 +228,7 @@ function JobsTab() {
     };
     const jobs = useJobList(filter);
     const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
+    const selection = useJobSelection(jobs.rows, `${state}\n${kind}`);
     const counts = facets.data?.statuses ?? {};
     const tabs = STATES.map((item) => ({
         ...item,
@@ -239,7 +239,7 @@ function JobsTab() {
     }));
     return (
         <>
-            <div className="flex flex-wrap items-center gap-2">
+            <JobToolbar selection={selection}>
                 <SegmentedTabs tabs={tabs} active={state} onSelect={setState} />
                 <Select value={kind} onValueChange={(next) => setKind(String(next))}>
                     <SelectTrigger aria-label="Job kind" className="w-auto min-w-44">
@@ -254,7 +254,7 @@ function JobsTab() {
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
+            </JobToolbar>
             <ErrorLine error={jobs.error} />
             <DataGrid
                 columns={COLUMNS}
@@ -277,6 +277,7 @@ function JobsTab() {
                     }
                 }}
                 rowLabel={(job) => `${KINDS[job.kind] ?? job.kind} job ${job.id}, ${job.status}`}
+                {...selection.grid}
                 empty={<p className="text-muted-foreground">No jobs match.</p>}
                 minWidth="min-w-[760px]"
             />
