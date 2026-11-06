@@ -1,3 +1,4 @@
+import type { CodeLanguage } from "obp-ui";
 import { apiFetch } from "~/api/client";
 import type { components } from "~/api/schema";
 
@@ -300,7 +301,7 @@ function jsValue(value: unknown, depth: number): string {
     return JSON.stringify(value, null, 4).replaceAll("\n", `\n${"    ".repeat(depth)}`);
 }
 
-export type Sample = { id: string; label: string; code: string };
+export type Sample = { id: string; label: string; language: CodeLanguage; code: string };
 
 export function samples(baseUrl: string, body: Record<string, unknown>): Sample[] {
     const curl = [
@@ -332,9 +333,9 @@ export function samples(baseUrl: string, body: Record<string, unknown>): Sample[
         "console.log(reply.choices[0].message.content);",
     ].join("\n");
     return [
-        { id: "curl", label: "curl", code: curl },
-        { id: "python", label: "Python", code: python },
-        { id: "javascript", label: "JavaScript", code: javascript },
+        { id: "curl", label: "curl", language: "bash", code: curl },
+        { id: "python", label: "Python", language: "python", code: python },
+        { id: "javascript", label: "JavaScript", language: "javascript", code: javascript },
     ];
 }
 

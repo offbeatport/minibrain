@@ -1,9 +1,7 @@
-import { Check, Copy } from "lucide-react";
-import { Button, Link, Tabs, TabsContent, TabsList, TabsTrigger } from "obp-ui";
-import { useState } from "react";
+import { type CodeLanguage, CodeTabs, Link } from "obp-ui";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 
-type Harness = { id: string; label: string; file?: string; code: string };
+type Harness = { id: string; label: string; language: CodeLanguage; title?: string; code: string };
 
 const SAMPLE = "I was charged twice";
 
@@ -12,6 +10,7 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "curl",
             label: "curl",
+            language: "bash",
             code: [
                 `curl ${baseUrl}/chat/completions \\`,
                 `  -H "Authorization: Bearer ${key}" \\`,
@@ -22,6 +21,7 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "python",
             label: "Python",
+            language: "python",
             code: [
                 "from openai import OpenAI",
                 "",
@@ -36,6 +36,7 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "javascript",
             label: "JavaScript",
+            language: "javascript",
             code: [
                 'import OpenAI from "openai";',
                 "",
@@ -50,7 +51,8 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "env",
             label: "Environment",
-            file: ".env",
+            language: "bash",
+            title: ".env",
             code: [
                 `OPENAI_BASE_URL=${baseUrl}`,
                 `OPENAI_API_KEY=${key}`,
@@ -60,6 +62,7 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "langchain",
             label: "LangChain",
+            language: "python",
             code: [
                 "from langchain_openai import ChatOpenAI",
                 "",
@@ -70,6 +73,7 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "llamaindex",
             label: "LlamaIndex",
+            language: "python",
             code: [
                 "from llama_index.llms.openai_like import OpenAILike",
                 "",
@@ -85,7 +89,8 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "litellm",
             label: "LiteLLM",
-            file: "config.yaml",
+            language: "yaml",
+            title: "config.yaml",
             code: [
                 "model_list:",
                 `  - model_name: ${model}`,
@@ -98,7 +103,8 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "continue",
             label: "Continue",
-            file: "config.yaml",
+            language: "yaml",
+            title: "config.yaml",
             code: [
                 "models:",
                 `  - name: ${model}`,
@@ -111,28 +117,11 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "openwebui",
             label: "Open WebUI",
-            file: "Settings → Connections → OpenAI API",
+            language: "text",
+            title: "Settings → Connections → OpenAI API",
             code: [`URL: ${baseUrl}`, `Key: ${key}`, `Model: ${model}`].join("\n"),
         },
     ];
-}
-
-function CopyButton({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false);
-    const copy = () =>
-        navigator.clipboard?.writeText(text).then(
-            () => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-            },
-            () => setCopied(false),
-        );
-    return (
-        <Button type="button" variant="outline" size="sm" onClick={copy}>
-            {copied ? <Check /> : <Copy />}
-            {copied ? "Copied" : "Copy"}
-        </Button>
-    );
 }
 
 export function HarnessConfigs({
@@ -147,29 +136,8 @@ export function HarnessConfigs({
     const key = keyValue ?? "YOUR_KEY";
     const items = harnesses(baseUrl, model, key);
     return (
-        <Tabs defaultValue="curl">
-            <div className="overflow-x-auto">
-                <TabsList variant="line">
-                    {items.map((item) => (
-                        <TabsTrigger key={item.id} value={item.id}>
-                            {item.label}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-            </div>
-            {items.map((item) => (
-                <TabsContent key={item.id} value={item.id} className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm text-muted-foreground">
-                            {item.file ?? "Copy, paste and run."}
-                        </span>
-                        <CopyButton text={item.code} />
-                    </div>
-                    <pre className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm">
-                        {item.code}
-                    </pre>
-                </TabsContent>
-            ))}
+        <div className="flex min-w-0 flex-col gap-2">
+            <CodeTabs items={items} title="Copy, paste and run." />
             <p className="text-sm text-muted-foreground">
                 {!keyValue &&
                     "Replace YOUR_KEY with a key from the list below; a new key is filled in here once. "}
@@ -179,6 +147,6 @@ export function HarnessConfigs({
                 </Link>
                 .
             </p>
-        </Tabs>
+        </div>
     );
 }

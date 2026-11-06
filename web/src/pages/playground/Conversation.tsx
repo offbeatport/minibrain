@@ -1,6 +1,7 @@
 import {
     Badge,
     Button,
+    CodeBlock,
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
@@ -49,7 +50,8 @@ function ToolCard({
     busy: boolean;
 }) {
     const [draft, setDraft] = useState("");
-    const shown = prettyJson(call.arguments) ?? call.arguments;
+    const args = prettyJson(call.arguments);
+    const answer = result === undefined ? null : prettyJson(result);
     const field = `tool-result-${call.id}`;
     return (
         <div className="flex flex-col gap-2 rounded-md border bg-card p-3">
@@ -59,16 +61,19 @@ function ToolCard({
                 </span>
                 <span className="font-mono text-sm text-muted-foreground">{call.id}</span>
             </div>
-            <pre className="overflow-x-auto rounded-md bg-secondary p-2 font-mono text-sm">
-                {shown}
-            </pre>
+            <CodeBlock
+                code={args ?? call.arguments}
+                language={args ? "json" : "text"}
+                copyLabel="Copy the arguments"
+            />
             {result !== undefined ? (
-                <div className="flex flex-col gap-1">
-                    <span className="text-sm text-muted-foreground">Result</span>
-                    <pre className="overflow-x-auto rounded-md bg-secondary p-2 font-mono text-sm whitespace-pre-wrap">
-                        {prettyJson(result) ?? result}
-                    </pre>
-                </div>
+                <CodeBlock
+                    code={answer ?? result}
+                    language={answer ? "json" : "text"}
+                    title="Result"
+                    copyLabel="Copy the result"
+                    wrap
+                />
             ) : (
                 <div className="flex flex-col gap-label">
                     <Label htmlFor={field}>Tool result</Label>
@@ -142,9 +147,7 @@ function Answer({
                 </div>
             )}
             {json ? (
-                <pre className="overflow-x-auto rounded-md border bg-secondary p-3 font-mono text-sm">
-                    {json}
-                </pre>
+                <CodeBlock code={json} language="json" copyLabel="Copy the answer" />
             ) : (
                 turn.content && <Markdown content={turn.content} className="text-base" />
             )}

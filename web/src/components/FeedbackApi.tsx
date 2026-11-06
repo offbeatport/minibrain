@@ -1,6 +1,5 @@
 import { ThumbsUp } from "lucide-react";
-import { Link } from "obp-ui";
-import { CopyButton } from "~/components/CopyButton";
+import { CodeBlock, Link } from "obp-ui";
 import { PanelSection } from "~/components/Section";
 import { feedbackForModel } from "~/lib/feedback";
 import { REQUEST_BODIES_ID, deploymentPageHref } from "~/lib/modelLinks";
@@ -77,14 +76,7 @@ export function FeedbackApi({
                     </Link>{" "}
                     join the next training data.
                 </p>
-                <div className="relative">
-                    <pre className="overflow-x-auto rounded-md border bg-secondary p-3 pr-12 font-mono text-sm">
-                        {code}
-                    </pre>
-                    <div className="absolute top-1 right-1">
-                        <CopyButton value={code} label="Copy the feedback call" />
-                    </div>
-                </div>
+                <CodeBlock code={code} language="bash" copyLabel="Copy the feedback call" />
             </div>
         </PanelSection>
     );

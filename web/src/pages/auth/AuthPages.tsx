@@ -5,6 +5,7 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
+    CodeBlock,
     Field,
     FieldGroup,
     InfoTip,
@@ -295,9 +296,13 @@ export function SetupPage() {
                 </span>
             }
             footer={
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                     <span>Lost the link? Run this on the server for a new one:</span>
-                    <code className="font-mono">minibrain admin setup-link</code>
+                    <CodeBlock
+                        code="minibrain admin setup-link"
+                        language="bash"
+                        copyLabel="Copy the command"
+                    />
                 </div>
             }
         >

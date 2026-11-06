@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Check, Copy, KeyRound, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { KeyRound, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
     Button,
     Checkbox,
+    CodeBlock,
     DataGrid,
     Dialog,
     DialogContent,
@@ -198,20 +199,11 @@ function KeyDialog({
 }
 
 function NewSecret({ created, onDismiss }: { created: KeyCreated; onDismiss: () => void }) {
-    const [copied, setCopied] = useState(false);
-    const copy = async () => {
-        await navigator.clipboard.writeText(created.secret);
-        setCopied(true);
-    };
     return (
         <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3 text-sm">
             <div className="font-semibold">{`New key ${created.name}: copy it now, it is not shown again`}</div>
-            <div className="flex flex-wrap items-center gap-2">
-                <code className="break-all font-mono">{created.secret}</code>
-                <Button size="xs" variant="outline" onClick={copy}>
-                    {copied ? <Check /> : <Copy />}
-                    {copied ? "Copied" : "Copy"}
-                </Button>
+            <div className="flex items-center gap-2">
+                <CodeBlock code={created.secret} copyLabel="Copy the key" wrap className="flex-1" />
                 <Button size="xs" variant="ghost" onClick={onDismiss}>
                     Done
                 </Button>

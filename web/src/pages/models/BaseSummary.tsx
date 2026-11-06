@@ -1,5 +1,6 @@
 import {
     Button,
+    CodeBlock,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -10,7 +11,6 @@ import {
 import { useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
-import { CopyButton } from "~/components/CopyButton";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
@@ -189,12 +189,7 @@ function RunElsewhere({
                             secrets/gateway_token in this install's home folder. Then start a worker
                             for training and an engine for serving:
                         </p>
-                        <div className="flex items-start gap-2 rounded-md border bg-muted px-3 py-2">
-                            <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-sm">
-                                {commands}
-                            </pre>
-                            <CopyButton value={commands} label="Copy the commands" />
-                        </div>
+                        <CodeBlock code={commands} language="bash" copyLabel="Copy the commands" />
                         <Link
                             href="/infrastructure/machines"
                             className="w-fit text-primary hover:underline"

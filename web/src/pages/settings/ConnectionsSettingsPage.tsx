@@ -3,6 +3,7 @@ import { Cable, Puzzle } from "lucide-react";
 import {
     Badge,
     Button,
+    CodeBlock,
     ConfirmDialog,
     EmptyState,
     Input,
@@ -563,19 +564,23 @@ function Extensions() {
                         <span className="font-mono break-all">{data.directory}</span>
                     </p>
                     {missing.length > 0 && (
-                        <div className="flex flex-col gap-1 text-sm">
-                            <span>
-                                On a connected machine, save them with{" "}
-                                <code className="font-mono">
-                                    {`minibrain extensions download --to ./duckdb-extensions --platform ${data.platform}`}
-                                </code>
-                                , copy the folder here, then run:
-                            </span>
-                            <code className="rounded-md border bg-muted px-2 py-1 font-mono break-all">
-                                {data.repository
-                                    ? `minibrain extensions install --from ${data.repository}`
-                                    : data.command}
-                            </code>
+                        <div className="flex flex-col gap-2 text-sm">
+                            <span>On a connected machine, save them with:</span>
+                            <CodeBlock
+                                code={`minibrain extensions download --to ./duckdb-extensions --platform ${data.platform}`}
+                                language="bash"
+                                copyLabel="Copy the download command"
+                            />
+                            <span>Copy the folder here, then run:</span>
+                            <CodeBlock
+                                code={
+                                    data.repository
+                                        ? `minibrain extensions install --from ${data.repository}`
+                                        : data.command
+                                }
+                                language="bash"
+                                copyLabel="Copy the install command"
+                            />
                         </div>
                     )}
                 </div>

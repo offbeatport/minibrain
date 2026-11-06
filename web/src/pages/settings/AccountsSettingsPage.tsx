@@ -4,6 +4,7 @@ import { KeyRound, MoreHorizontal, UserPlus, Users } from "lucide-react";
 import {
     Badge,
     Button,
+    CodeBlock,
     DataGrid,
     DataGridDetail,
     Dialog,
@@ -48,7 +49,6 @@ import {
     useSession,
 } from "~/api/authQueries";
 import { api, unwrap } from "~/api/client";
-import { CopyButton } from "~/components/CopyButton";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
@@ -298,8 +298,7 @@ function LinkNotice({ link, onDismiss }: { link: PasswordLink; onDismiss: () => 
                 {`Send this link to ${who}. It sets their password, works once and expires ${relativeTime(link.expires_at)}. It is not shown again.`}
             </div>
             <div className="flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all font-mono">{url}</code>
-                <CopyButton value={url} label="Copy link" />
+                <CodeBlock code={url} copyLabel="Copy link" wrap className="flex-1" />
                 <Button size="xs" variant="ghost" onClick={onDismiss}>
                     Done
                 </Button>

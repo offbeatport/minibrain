@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import {
     Button,
+    CodeBlock,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -558,9 +559,12 @@ export function ConnectedFacts({ source }: { source: SourceSummary }) {
                 <>
                     <dt className="text-muted-foreground">Query</dt>
                     <dd>
-                        <pre className="overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-sm whitespace-pre-wrap">
-                            {source.query}
-                        </pre>
+                        <CodeBlock
+                            code={source.query}
+                            language="sql"
+                            copyLabel="Copy the query"
+                            wrap
+                        />
                     </dd>
                 </>
             ) : (

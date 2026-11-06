@@ -1,18 +1,14 @@
 import {
     Button,
+    CodeTabs,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Link,
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
 } from "obp-ui";
 import { useState } from "react";
-import { CopyButton } from "~/components/CopyButton";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 import { samples } from "~/lib/playground";
 
@@ -35,32 +31,11 @@ export function ViewCode({ body, disabled }: { body: Record<string, unknown>; di
                             SDK does not know go in <span className="font-mono">extra_body</span>.
                         </DialogDescription>
                     </DialogHeader>
-                    <Tabs defaultValue="curl" className="min-w-0">
-                        <TabsList variant="line">
-                            {items.map((item) => (
-                                <TabsTrigger key={item.id} value={item.id}>
-                                    {item.label}
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                        {items.map((item) => (
-                            <TabsContent
-                                key={item.id}
-                                value={item.id}
-                                className="flex flex-col gap-2"
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-sm text-muted-foreground">
-                                        Replace YOUR_KEY with a key.
-                                    </span>
-                                    <CopyButton value={item.code} label={`Copy ${item.label}`} />
-                                </div>
-                                <pre className="max-h-[60vh] overflow-auto rounded-md border bg-secondary p-3 font-mono text-sm">
-                                    {item.code}
-                                </pre>
-                            </TabsContent>
-                        ))}
-                    </Tabs>
+                    <CodeTabs
+                        items={items}
+                        title="Replace YOUR_KEY with a key."
+                        blockClassName="max-h-[60vh]"
+                    />
                     <p className="text-sm text-muted-foreground">
                         Every field is described in the{" "}
                         <Link href={API_REFERENCE_PATH} className="text-primary hover:underline">
