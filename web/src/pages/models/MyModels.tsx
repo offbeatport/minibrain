@@ -5,9 +5,13 @@ import {
     CircleX,
     Eye,
     FlaskConical,
+    Gauge,
     GraduationCap,
+    type LucideIcon,
     MoreHorizontal,
     Pencil,
+    Play,
+    Plug,
     PowerOff,
     Rocket,
     RotateCcw,
@@ -659,6 +663,21 @@ function FailedDeleteItems({ row, on, admin }: { row: ModelRow; on: Handlers; ad
     );
 }
 
+const STEP_ICONS: Record<string, LucideIcon> = {
+    "Use API": Plug,
+    Test: Play,
+    Train: GraduationCap,
+    "Review results": Gauge,
+    Deploy: Rocket,
+    Details: Eye,
+    [REVIEW_LABEL]: Trash2,
+};
+
+function StepIcon({ label }: { label: string }) {
+    const Icon = STEP_ICONS[label] ?? (label.startsWith("Retry") ? RotateCcw : Wrench);
+    return <Icon aria-hidden="true" />;
+}
+
 function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
     const can = useCan();
@@ -669,11 +688,12 @@ function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
         <div className="flex items-center justify-end gap-1">
             {primary && (
                 <Button
-                    variant="outline"
+                    variant="secondary"
                     size="xs"
                     className="hidden md:inline-flex"
                     onClick={primary.run}
                 >
+                    <StepIcon label={primary.label} />
                     {primary.label}
                 </Button>
             )}
