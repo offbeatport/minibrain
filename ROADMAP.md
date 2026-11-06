@@ -861,7 +861,8 @@ once it matches; only deleting a base removes its files.
 - `/v1/chat/completions` with streaming, `/v1/models`.
 - `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema; without
   one, a custom model's contract holds decoding: its labels for a label set, its schema for a JSON contract (checked
-  the same way). A custom model answers the user and assistant turns of the conversation after its instructions
+  the same way). A request's format only narrows a model whose contract is free text; a label or schema contract
+  refuses one with a 400 (built 2026-11-06). A custom model answers the user and assistant turns of the conversation after its instructions
   (prompt-only versions with their few-shot turns first); system messages from the app are dropped.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the model by changing the model name.

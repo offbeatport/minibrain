@@ -32,7 +32,7 @@ from minibrain.serve.backend import (
 )
 from minibrain.serve.sampling import MAX_STOPS, Sampling, UnsupportedParameterError
 from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
-from minibrain.tasks.contracts import JSON, Contract
+from minibrain.tasks.contracts import JSON, TEXT, Contract
 from minibrain.tasks.prompting import PromptError, Prompting
 from minibrain.telemetry.call import current_call
 
@@ -48,7 +48,9 @@ FORMAT_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
 UNCONSTRAINED = "only SGLang and llama.cpp engines constrain decoding, the others check the answer afterwards."
 FORMAT_HELP = (
     'An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or '
-    '{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}.'
+    '{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}. '
+    "A custom model's contract holds by default; a request's format can only narrow a model whose contract is "
+    "free text, so a model answering with labels or its own schema refuses one."
 )
 
 MODEL_HELP = (
@@ -385,6 +387,18 @@ def route_contract(route: Route) -> Contract | None:
     return found.contract if found is not None else None
 
 
+def narrowed(route: Route, requested: Constraint | None) -> Constraint | None:
+    contract = route_contract(route)
+    if requested is None or contract is None or contract.kind == TEXT:
+        return requested
+    held = "one of its labels" if contract.labels is not None else "its JSON schema"
+    message = (
+        f"{served_model(route)} answers with {held}, its contract; response_format can only narrow a model whose "
+        "contract is free text. Leave response_format out to get the contract's answer."
+    )
+    raise invalid(FORMAT, message, "unsupported_value")
+
+
 def task_constraint(route: Route) -> Constraint | None:
     found = prompting(route)
     return found.constraint() if found is not None else None
@@ -608,7 +622,7 @@ def chat_completions(
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
         refuse_unsupported(body)
-        requested = requested_format(body.response_format)
+        requested = narrowed(route, requested_format(body.response_format))
         sampling = sampling_of(body, route)
         backend = request.app.state.backend
         completion = run(backend, config, route, plain(body.messages), body.token_budget, requested, sampling)

@@ -84,6 +84,10 @@ the request sets one, the way its scores were measured.
 | `json_object` | Constrained (schema `{"type": "object"}`) | Constrained (grammar from the schema) | Free, then checked |
 | `json_schema` | Constrained (`response_format` passed on) | Constrained (grammar from the schema) | Constrained when the schema has a finite set of answers (enums, booleans, objects of them); otherwise free, then checked |
 
+- A custom model's contract is the default and stays in force: a request's `response_format` can only narrow a model
+  whose contract is free text. A model that answers with labels or its own JSON schema refuses `json_object` and
+  `json_schema` with a 400 (`param: response_format`, `code: unsupported_value`); `{"type": "text"}` is accepted and
+  changes nothing. Base models take any format.
 - A Classify answer stays the bare label, as before. If an engine refuses the label grammar, the gateway answers
   without it and logs a warning.
 - Every JSON answer is checked against the schema in the gateway, whatever the engine. One that does not parse or
