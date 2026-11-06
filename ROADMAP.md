@@ -94,6 +94,23 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
   in CI with the promotion rule as the gate.
 - Export adapters or merged weights (safetensors, GGUF), with training logs and metrics.
 
+### Product priorities
+
+Set on 2026-11-06. The premise is owning your intelligence: run and adapt strong open models in place of the
+ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not the goal; adapting a strong open one is.
+
+1. A private endpoint that is a drop-in for the OpenAI API: tool calling (function calling) with streaming,
+   `/v1/embeddings`, `/v1/completions` for code completion, a chat UI for staff, and sizing guidance for 30B to 120B
+   models on several GPUs.
+2. Retrieval over company documents with per-user access, for internal knowledge assistants.
+3. Adapting the chat assistant: instructions, fine-tuning on your best answers, distillation from a teacher, DPO from
+   feedback.
+4. Extract, for document processing.
+5. Specialist presets (Classify is done) and the ML-engineer tooling below.
+
+Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
+when attached data looks like a label set, or set in How it's judged).
+
 ### Order
 
 There are no users yet, so the engine is built from scratch with no compatibility layer; today's Classify code is
