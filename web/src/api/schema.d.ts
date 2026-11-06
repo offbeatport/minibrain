@@ -501,6 +501,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-pages/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summarise a model for its page
+         * @description Base keys and custom slugs share one namespace, so a name finds either kind of model.
+         */
+        get: operations["read_model_page_api_model_pages__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources": {
         parameters: {
             query?: never;
@@ -1602,6 +1622,23 @@ export interface paths {
         put?: never;
         /** Add Version */
         post: operations["add_version_api_models__slug__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{slug}/versions/{number}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Files */
+        get: operations["version_files_api_models__slug__versions__number__files_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3384,6 +3421,13 @@ export interface components {
              * @default false
              */
             relocated?: boolean;
+            /**
+             * Parameters
+             * @description Parameter count, from the catalogue or the weights.
+             */
+            parameters?: number | null;
+            /** Context Tokens */
+            context_tokens?: number | null;
         };
         /** BaseWeights */
         BaseWeights: {
@@ -6526,6 +6570,22 @@ export interface components {
             /** Data */
             data: components["schemas"]["ModelInfo"][];
         };
+        /** ModelPage */
+        ModelPage: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "base" | "custom";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** @description Requests per day, p95 latency and error rate over the last 7 days. */
+            traffic: components["schemas"]["ModelTraffic"];
+            /** @description The one step the model page suggests, or none while busy. */
+            next: components["schemas"]["NextAction"] | null;
+        };
         /** ModelRef */
         ModelRef: {
             /**
@@ -6672,6 +6732,29 @@ export interface components {
             /** Active Jobs */
             active_jobs: number;
         };
+        /** ModelTraffic */
+        ModelTraffic: {
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+            /** Days */
+            days: components["schemas"]["TrafficDay"][];
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+        };
         /** ModelUpdate */
         ModelUpdate: {
             /** Name */
@@ -6701,6 +6784,20 @@ export interface components {
             suggestion: string;
             /** Taken */
             taken: number | string;
+        };
+        /** NextAction */
+        NextAction: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "promote" | "deploy" | "review_feedback" | "add_data" | "train" | "create_custom";
+            /** Label */
+            label: string;
+            /** Version */
+            version?: number | null;
+            /** Count */
+            count?: number | null;
         };
         /** NodeInfo */
         NodeInfo: {
@@ -6821,6 +6918,15 @@ export interface components {
              * @default false
              */
             deleted?: boolean;
+        };
+        /** PackedFileInfo */
+        PackedFileInfo: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
         };
         /** PasswordLink */
         PasswordLink: {
@@ -8150,6 +8256,18 @@ export interface components {
             type?: "function";
             function: components["schemas"]["FunctionSpec"];
         };
+        /** TrafficDay */
+        TrafficDay: {
+            /**
+             * Day
+             * Format: date-time
+             */
+            day: string;
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+        };
         /** TrainFitInfo */
         TrainFitInfo: {
             /**
@@ -8378,6 +8496,20 @@ export interface components {
              * @default false
              */
             breaking?: boolean;
+        };
+        /** VersionFiles */
+        VersionFiles: {
+            /** Number */
+            number: number;
+            /**
+             * Artifact Id
+             * @description SHA-256 of the packed adapter; none for a prompt-only version.
+             */
+            artifact_id: string | null;
+            /** Size */
+            size: number | null;
+            /** Files */
+            files: components["schemas"]["PackedFileInfo"][];
         };
         /** VersionInfo */
         VersionInfo: {
@@ -9562,6 +9694,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_model_page_api_model_pages__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelPage"];
                 };
             };
             /** @description Validation Error */
@@ -12221,6 +12384,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_files_api_models__slug__versions__number__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionFiles"];
                 };
             };
             /** @description Validation Error */

@@ -34,6 +34,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
+import { modelPageHref } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import {
@@ -237,7 +238,7 @@ function AddedStatus({ entry }: { entry: CatalogEntry }) {
     const available = entry.added.find((added) => added.availability.state === "available");
     if (available) {
         return (
-            <Link href={`/models/base/${available.key}`} className="w-fit hover:underline">
+            <Link href={modelPageHref(available.key)} className="w-fit hover:underline">
                 <StatusText tone="success" className="text-sm">
                     On this install
                 </StatusText>

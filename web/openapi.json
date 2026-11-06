@@ -1443,6 +1443,49 @@
         }
       }
     },
+    "/api/model-pages/{name}": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Summarise a model for its page",
+        "description": "Base keys and custom slugs share one namespace, so a name finds either kind of model.",
+        "operationId": "read_model_page_api_model_pages__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sources": {
       "get": {
         "tags": [
@@ -5130,6 +5173,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{slug}/versions/{number}/files": {
+      "get": {
+        "tags": [
+          "versions"
+        ],
+        "summary": "Version Files",
+        "operationId": "version_files_api_models__slug__versions__number__files_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionFiles"
                 }
               }
             }
@@ -11455,6 +11549,29 @@
             "type": "boolean",
             "title": "Relocated",
             "default": false
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters",
+            "description": "Parameter count, from the catalogue or the weights."
+          },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
           }
         },
         "type": "object",
@@ -21182,6 +21299,50 @@
         ],
         "title": "ModelList"
       },
+      "ModelPage": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "base",
+              "custom"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "traffic": {
+            "$ref": "#/components/schemas/ModelTraffic",
+            "description": "Requests per day, p95 latency and error rate over the last 7 days."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The one step the model page suggests, or none while busy."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "traffic",
+          "next"
+        ],
+        "title": "ModelPage"
+      },
       "ModelRef": {
         "properties": {
           "kind": {
@@ -21641,6 +21802,68 @@
         ],
         "title": "ModelSummary"
       },
+      "ModelTraffic": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficDay"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "days",
+          "requests",
+          "errors",
+          "error_rate",
+          "p95_ms"
+        ],
+        "title": "ModelTraffic"
+      },
       "ModelUpdate": {
         "properties": {
           "name": {
@@ -21742,6 +21965,54 @@
           "taken"
         ],
         "title": "NameTakenInfo"
+      },
+      "NextAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "promote",
+              "deploy",
+              "review_feedback",
+              "add_data",
+              "train",
+              "create_custom"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "NextAction"
       },
       "NodeInfo": {
         "properties": {
@@ -22082,6 +22353,29 @@
           "custom"
         ],
         "title": "OverviewSeries"
+      },
+      "PackedFileInfo": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256"
+        ],
+        "title": "PackedFileInfo"
       },
       "PasswordLink": {
         "properties": {
@@ -25981,6 +26275,30 @@
         ],
         "title": "ToolSpec"
       },
+      "TrafficDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Day"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "requests",
+          "errors"
+        ],
+        "title": "TrafficDay"
+      },
       "TrainFitInfo": {
         "properties": {
           "level": {
@@ -26846,6 +27164,52 @@
           "kind"
         ],
         "title": "VersionCreate"
+      },
+      "VersionFiles": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id",
+            "description": "SHA-256 of the packed adapter; none for a prompt-only version."
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/PackedFileInfo"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "artifact_id",
+          "size",
+          "files"
+        ],
+        "title": "VersionFiles"
       },
       "VersionInfo": {
         "properties": {

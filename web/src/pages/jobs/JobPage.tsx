@@ -23,7 +23,7 @@ import { JobStatus } from "~/components/StatusBadge";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { MODEL_JOB_KINDS, jobDuration, jobPageHref, jobTitle, useJobEvents } from "~/lib/jobs";
-import { deploymentPageHref } from "~/lib/modelLinks";
+import { deploymentPageHref, modelPageHref } from "~/lib/modelLinks";
 import { JOBS_PATH } from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
 import { JudgePanel, PlainPanel, ScorePanel, TransferPanel } from "./ProgressPanels";
@@ -62,7 +62,7 @@ function Subject({ job }: { job: JobDetail }) {
             <span className="inline-flex flex-wrap items-baseline gap-2">
                 <span>{job.model_name ?? job.model}</span>
                 <Link
-                    href={`/models/custom/${encodeURIComponent(job.model)}`}
+                    href={modelPageHref(job.model)}
                     className="font-mono text-primary hover:underline"
                 >
                     {`${job.model}${version}`}
@@ -73,7 +73,7 @@ function Subject({ job }: { job: JobDetail }) {
     if (job.base_model) {
         return (
             <Link
-                href={`/models/base/${encodeURIComponent(job.base_model)}`}
+                href={modelPageHref(job.base_model)}
                 className="font-mono text-primary hover:underline"
             >
                 {job.base_model}

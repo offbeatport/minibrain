@@ -643,6 +643,19 @@ class Mistake(BaseModel):
     output: str
 
 
+class PackedFileInfo(BaseModel):
+    path: str
+    size: int
+    sha256: str
+
+
+class VersionFiles(BaseModel):
+    number: int
+    artifact_id: str | None = Field(description="SHA-256 of the packed adapter; none for a prompt-only version.")
+    size: int | None
+    files: list[PackedFileInfo]
+
+
 class VersionInfo(BaseModel):
     number: int
     kind: str
@@ -1216,6 +1229,8 @@ class BaseModelDetail(ModelRow):
     verified_at: datetime | None = None
     content_hash: str | None = None
     relocated: bool = False
+    parameters: int | None = Field(default=None, description="Parameter count, from the catalogue or the weights.")
+    context_tokens: int | None = None
 
 
 class ModelUpdate(BaseModel):

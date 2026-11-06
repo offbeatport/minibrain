@@ -9,10 +9,12 @@ from minibrain.api.schemas import (
     AnswerSide,
     ExampleAnswer,
     ModelDetail,
+    PackedFileInfo,
     ScoreInfo,
     TurnInfo,
     VersionAnswers,
     VersionCreate,
+    VersionFiles,
     VersionInfo,
     VersionTest,
     VersionTestResult,
@@ -32,8 +34,10 @@ from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable
 from minibrain.models.usage import touch
 from minibrain.presets import presets
+from minibrain.registry.files import packed_files
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    Artifact,
     AuditEvent,
     BaseModel,
     DatasetVersion,
@@ -111,6 +115,17 @@ def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
     prices = load_prices(session)
     found = [version_info(model, version, prices) for version in versions]
     return found if sees_rows() else [info.model_copy(update={"mistakes": []}) for info in found]
+
+
+@router.get("/models/{slug}/versions/{number}/files", dependencies=[Depends(viewer)])
+def version_files(slug: str, number: int, session: SessionDep, store: StoreDep) -> VersionFiles:
+    version = get_version(get_model(session, slug), number)
+    artifact = session.get(Artifact, version.adapter_artifact_id) if version.adapter_artifact_id else None
+    if artifact is None:
+        return VersionFiles(number=number, artifact_id=version.adapter_artifact_id, size=None, files=[])
+    packed = packed_files(store, artifact)
+    files = [PackedFileInfo(path=item.path, size=item.size, sha256=item.sha256) for item in packed]
+    return VersionFiles(number=number, artifact_id=artifact.id, size=artifact.size, files=files)
 
 
 def answer_side(side: Side | None) -> AnswerSide | None:

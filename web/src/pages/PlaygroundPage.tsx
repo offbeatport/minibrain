@@ -30,10 +30,11 @@ import {
     type AssistantTurn,
     DEFAULT_SETTINGS,
     type Settings,
-    type Target,
     type ToolCall,
     type Turn,
+    carriedTurns,
     chatState,
+    chosenTarget,
     exampleTurns,
     lastAnswer,
     messagesOf,
@@ -101,24 +102,6 @@ function gridColumns(recent: boolean, settings: boolean): string {
         return "grid grid-cols-[16rem_minmax(0,1fr)] items-start gap-4";
     }
     return settings ? "grid grid-cols-[minmax(0,1fr)_22rem] items-start gap-4" : "flex flex-col";
-}
-
-function chosenTarget(targets: Target[], wanted: (string | null)[]): Target | undefined {
-    for (const name of wanted) {
-        if (!name) {
-            continue;
-        }
-        const exact = targets.find((item) => item.name === name);
-        if (exact) {
-            return exact;
-        }
-        const versions = targets.filter((item) => item.kind === "custom" && item.key === name);
-        const latest = versions.sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
-        if (latest) {
-            return latest;
-        }
-    }
-    return targets[0];
 }
 
 function assistantTurn(json: boolean): AssistantTurn {
@@ -219,7 +202,7 @@ export function PlaygroundPage() {
     const target = chosenTarget(targets, [picked, requested, remembered()]);
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
     const [preset, setPreset] = useState<number | null>(null);
-    const [turns, setTurns] = useState<Turn[]>([]);
+    const [turns, setTurns] = useState<Turn[]>(() => carriedTurns(router.state.location.state));
     const [chatId, setChatId] = useState<number | null>(null);
     const [openedModel, setOpenedModel] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);

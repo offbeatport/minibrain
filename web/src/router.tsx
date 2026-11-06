@@ -16,7 +16,6 @@ import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
 import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
-import { BaseModelPage, CustomModelPage } from "./pages/ModelDetailPage";
 import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { PipelinesPage } from "./pages/PlaceholderPages";
@@ -28,6 +27,7 @@ import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { ModelCardPage } from "./pages/models/ModelCardPage";
+import { ModelPage, OldModelLink } from "./pages/models/detail/ModelPage";
 import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -72,9 +72,12 @@ const routeTree = rootRoute.addChildren([
     globalPage("/discover/compare", DiscoverComparePage),
     globalPage("/discover/$id", DiscoverModelPage),
     globalPage("/models/new", guarded("builder", AddModelPage)),
-    globalPage("/models/base/$key", BaseModelPage),
-    globalPage("/models/custom/$slug", CustomModelPage),
-    globalPage("/models/custom/$slug/versions/$number/card", ModelCardPage),
+    globalPage("/models/base/$key", OldModelLink),
+    globalPage("/models/custom/$slug", OldModelLink),
+    globalPage("/models/custom/$slug/versions/$number/card", OldModelLink),
+    globalPage("/models/$name", ModelPage),
+    globalPage("/models/$name/$tab", ModelPage),
+    globalPage("/models/$name/versions/$number/card", ModelCardPage),
     globalPage("/playground", PlaygroundPage),
     globalPage("/data", guarded("builder", DataPage)),
     globalPage("/training", TrainingListPage),

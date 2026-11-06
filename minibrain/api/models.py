@@ -69,6 +69,7 @@ from minibrain.registry.models import (
 )
 from minibrain.registry.service import (
     ConflictError,
+    check_rename,
     create_model,
     free_model_name,
     get_model,
@@ -192,6 +193,7 @@ def default_name(session: SessionDep, preset_key: str = Query(default="general",
 def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
     if body.name is not None:
+        check_rename(session, model.name, body.name)
         model.name = body.name.strip()
     if body.description is not None:
         model.description = body.description.strip()

@@ -523,3 +523,26 @@ export function reasoningOptions(target: Target | undefined): { value: string; l
         label: REASONING_LABELS[value] ?? value,
     }));
 }
+
+export function chosenTarget(targets: Target[], wanted: (string | null)[]): Target | undefined {
+    for (const name of wanted) {
+        if (!name) {
+            continue;
+        }
+        const exact = targets.find((item) => item.name === name);
+        if (exact) {
+            return exact;
+        }
+        const versions = targets.filter((item) => item.kind === "custom" && item.key === name);
+        const latest = versions.sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+        if (latest) {
+            return latest;
+        }
+    }
+    return targets[0];
+}
+
+export function carriedTurns(state: unknown): Turn[] {
+    const carried = (state as { carried?: unknown } | null)?.carried;
+    return Array.isArray(carried) ? (carried as Turn[]) : [];
+}

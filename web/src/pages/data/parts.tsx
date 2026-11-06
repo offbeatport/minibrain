@@ -24,6 +24,7 @@ import { dataKeys } from "~/api/dataQueries";
 import { keys, useAllModels, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
+import { modelPageHref } from "~/lib/modelLinks";
 import { splitTags } from "../models/dialogs";
 import { sourceNameProblem } from "./catalogue";
 
@@ -55,7 +56,7 @@ export function useModelNames() {
 }
 
 export function modelHref(slug: string): string {
-    return `/models/custom/${encodeURIComponent(slug)}`;
+    return modelPageHref(slug);
 }
 
 function TrailStep({

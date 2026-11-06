@@ -710,7 +710,7 @@ once it matches; only deleting a base removes its files.
 - Audit events: `model.verify`, `model.repair`, `model.reimport`, `model.relocate`. Deleting a relocated model keeps
   its external folder.
 - UI: the state is the Models list status cell, the primary action is the row button, the rest are in the row menu.
-  The model page's Files section lists each file with size and hash state, the last verified time and "Verify files".
+  The model page's View files panel lists each file with size and hash state, the last verified time and "Verify files".
 
 ### Base models on disk
 
@@ -1065,6 +1065,25 @@ keys, and `/v1` stays key-only.
   for bases, or the admin lock); otherwise nothing is saved and the Recent list says why in one line. Chats with no
   new message for Log retention (days) are deleted by the leader's hourly purge, with the request logs. No folders,
   sharing or search beyond the filter: that is the staff Chat app's job.
+- A model's page (built 2026-11-06) is one route for both kinds, `/models/<name>`: base keys and custom slugs share
+  one namespace with `/v1`, so create, import, download and rename refuse a name or address another model holds (409),
+  and `new`, `base` and `custom` are reserved. Old `/models/base/<key>` and `/models/custom/<slug>` links redirect. The
+  header carries the name and publisher logo, a Base or Custom badge, Open in Playground, and the deployment status
+  beside Deploy or Undeploy. Tabs are `TabNav` pages with their own URLs, Overview · Versions · Data · API for a custom
+  model and Overview · API for a base; an unknown tab redirects to Overview. Overview answers three questions in
+  compact rows: is it good (the live version's held-out score against v0 and the version before it; a base shows its
+  catalogue facts), is it working (requests per day for 7 days as a small line, p95 latency and error rate, from the
+  request logs as Monitor computes them) and what next (one action computed on the server: deploy a passing version,
+  deploy, review pending feedback, add data, train the next version; for a base, deploy or build a custom model on it).
+  Health and teardown notices sit above them; a Try it box streams one answer through the Playground endpoint (same
+  safety, policy and logging), says when asking loads the model, and Continue in Playground carries the conversation.
+  The facts follow (Built on, task, live version, publisher, parameters, context, licence, memory, updated, the active
+  job while one runs) with a Weights row whose View files opens `/models/<name>/files`: a sheet with each file's size
+  and SHA-256 and Verify files for a base, the live version's adapter files and a link to the base's files for a custom
+  model. Versions is a timeline of attempts, each a fresh run from the base (number, kind, score, data, outcome, date,
+  model card, job), then Instructions and How it's judged. Data holds the training data, feedback and test examples.
+  API lists the model's keys first (Builders) and then the snippets; a key created there shows its secret once with
+  its own Copy and fills into the snippets.
 - Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
   and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"

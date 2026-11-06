@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any
 
 import pytest
@@ -191,6 +192,22 @@ def test_gateway_routes_by_name_and_version(harness: Harness) -> None:
     harness.flush_logs()
     logged = harness.client.get(f"/api/requests?model={SLUG}").json()["items"]
     assert {item["contract"] for item in logged} == {1}
+
+
+def test_version_files_list_the_adapter_with_sha256(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "prompt")
+    finish(harness, "eval")
+    add_version(harness, "lora")
+    finish(harness, "train")
+    prompt_only = harness.client.get(f"/api/models/{SLUG}/versions/1/files").json()
+    assert (prompt_only["artifact_id"], prompt_only["files"]) == (None, [])
+    trained = harness.client.get(f"/api/models/{SLUG}/versions/2/files").json()
+    payload = b'{"r": 16}'
+    assert trained["files"] == [
+        {"path": "adapter_config.json", "size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+    ]
+    assert len(trained["artifact_id"]) == 64
 
 
 def test_gateway_rejects_bad_keys_and_unknown_models(harness: Harness) -> None:

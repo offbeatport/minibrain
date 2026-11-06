@@ -27,7 +27,7 @@ export function deploymentPageHref(slug: string): string {
 }
 
 export function modelCardHref(slug: string, number: number): string {
-    return `/models/custom/${encodeURIComponent(slug)}/versions/${number}/card`;
+    return `/models/${encodeURIComponent(slug)}/versions/${number}/card`;
 }
 
 export function modelCardDownloadHref(slug: string, number: number, format: "md" | "json"): string {
@@ -40,4 +40,11 @@ export function modelAibomHref(slug: string, number: number): string {
 
 export function jobHref(job: JobInfo): string {
     return `/jobs/${job.id}`;
+}
+
+export type ModelTab = "overview" | "versions" | "data" | "api" | "files";
+
+export function modelPageHref(name: string, tab: ModelTab = "overview"): string {
+    const page = `/models/${encodeURIComponent(name)}`;
+    return tab === "overview" ? page : `${page}/${tab}`;
 }

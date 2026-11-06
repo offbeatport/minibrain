@@ -19,6 +19,7 @@ from minibrain.registry.models import (
 )
 
 KEY_PREFIX = "mb_"
+RESERVED_ADDRESSES = frozenset({"new", "base", "custom"})
 
 
 class NotFoundError(Exception):
@@ -62,7 +63,21 @@ def taken_names(session: Session) -> tuple[set[str], set[str]]:
     bases = session.execute(select(BaseModel.name, BaseModel.id)).all()
     names = {name.strip().lower() for name, _ in [*custom, *bases]}
     slugs = {slug for _, slug in custom} | {slugify(key) for _, key in bases} | {key for _, key in bases}
-    return names, slugs
+    return names, slugs | RESERVED_ADDRESSES
+
+
+def address_taken(session: Session, address: str) -> bool:
+    custom = session.scalar(select(Model.id).where(Model.slug == address))
+    return address in RESERVED_ADDRESSES or custom is not None or session.get(BaseModel, address) is not None
+
+
+def check_rename(session: Session, current: str, name: str) -> None:
+    wanted = name.strip().lower()
+    if wanted == current.strip().lower():
+        return
+    names, _ = taken_names(session)
+    if wanted in names:
+        raise ConflictError(f"a model called {name.strip()} already exists; base and custom models share names")
 
 
 def name_taken(session: Session, name: str) -> bool:

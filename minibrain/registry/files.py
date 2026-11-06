@@ -1,10 +1,13 @@
+import hashlib
+import tarfile
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from sqlalchemy.orm import Session
 
-from minibrain.artifacts import ArtifactStore, Packing
+from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.encryption.keys import keys_for
 from minibrain.registry.models import Artifact, DatasetVersion
 from minibrain.settings import Settings
@@ -66,3 +69,43 @@ def dataset_version_location(session: Session, store: ArtifactStore, dataset_ver
     if found is None:
         raise MissingArtifactError(f"dataset version {dataset_version.hash[:12]} has no files")
     return store.url(found["id"], found["name"])
+
+
+@dataclass(frozen=True)
+class PackedFile:
+    path: str
+    size: int
+    sha256: str
+
+
+PACKED: dict[str, list[PackedFile]] = {}
+
+
+def digest(stream: IO[bytes]) -> tuple[int, str]:
+    hasher = hashlib.sha256()
+    size = 0
+    while chunk := stream.read(CHUNK):
+        hasher.update(chunk)
+        size += len(chunk)
+    return size, hasher.hexdigest()
+
+
+def read_packed(store: ArtifactStore, artifact: Artifact) -> list[PackedFile]:
+    with store.open(artifact.id) as stream:
+        if artifact.packing == Packing.FILE:
+            size, sha256 = digest(stream)
+            return [PackedFile(path=artifact.name, size=size, sha256=sha256)]
+        found: list[PackedFile] = []
+        with tarfile.open(fileobj=stream, mode="r|") as archive:
+            for member in archive:
+                content = archive.extractfile(member) if member.isfile() else None
+                if content is not None:
+                    size, sha256 = digest(content)
+                    found.append(PackedFile(path=member.name.removeprefix("./"), size=size, sha256=sha256))
+        return sorted(found, key=lambda item: item.path)
+
+
+def packed_files(store: ArtifactStore, artifact: Artifact) -> list[PackedFile]:
+    if artifact.id not in PACKED:
+        PACKED[artifact.id] = read_packed(store, artifact)
+    return PACKED[artifact.id]

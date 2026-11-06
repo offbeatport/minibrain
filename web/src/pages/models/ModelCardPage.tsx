@@ -24,7 +24,7 @@ import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { modelAibomHref, modelCardDownloadHref } from "~/lib/modelLinks";
+import { modelAibomHref, modelCardDownloadHref, modelPageHref } from "~/lib/modelLinks";
 import {
     ApprovalsSection,
     BaseSection,
@@ -65,7 +65,7 @@ function useModelCard(target: Target) {
 function BackLink({ slug, name }: { slug: string; name: string }) {
     return (
         <Link
-            href={`/models/custom/${encodeURIComponent(slug)}`}
+            href={modelPageHref(slug, "versions")}
             className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
             <ChevronLeft className="size-4" />
@@ -291,8 +291,8 @@ function CardView({
 }
 
 export function ModelCardPage() {
-    const params = useParams({ strict: false }) as { slug?: string; number?: string };
-    const target = { slug: params.slug ?? "", number: Number(params.number) };
+    const params = useParams({ strict: false }) as { name?: string; number?: string };
+    const target = { slug: params.name ?? "", number: Number(params.number) };
     const card = useModelCard(target);
     return (
         <Page>

@@ -41,9 +41,10 @@ from minibrain.models.registry import (
     start_verify,
     store_label,
 )
+from minibrain.models.train_facts import base_facts
 from minibrain.models.usage import touch
 from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, now
-from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.registry.service import ConflictError, NotFoundError, check_rename
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
@@ -111,9 +112,17 @@ def file_rows(settings: Settings, model: BaseModel) -> list[ModelFile]:
     return rows
 
 
+def size_facts(session: Session, settings: Settings, model: BaseModel) -> tuple[int | None, int | None]:
+    if model.status != BaseModelStatus.AVAILABLE:
+        return None, None
+    facts = base_facts(session, settings, model.id)
+    return round(facts.params) or None, facts.context
+
+
 def detail_of(session: Session, settings: Settings, request: Request, model: BaseModel) -> BaseModelDetail:
     row = row_of(session, settings, request, model)
     entry = session.get(CatalogModel, model.catalog_id) if model.catalog_id else None
+    parameters, context = size_facts(session, settings, model)
     return BaseModelDetail(
         **row.model_dump(),
         source=model.source,
@@ -135,6 +144,8 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Bas
         verified_at=model.verified_at,
         content_hash=content_hash(model.files),
         relocated=model.path is not None,
+        parameters=parameters,
+        context_tokens=context,
     )
 
 
@@ -181,6 +192,7 @@ def update_base(
 ) -> BaseModelDetail:
     model = get_base_model(session, key)
     if body.name is not None:
+        check_rename(session, model.name, body.name)
         model.name = body.name.strip()
     if body.description is not None:
         model.description = body.description.strip()

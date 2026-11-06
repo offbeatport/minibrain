@@ -28,6 +28,7 @@ import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
+import { modelPageHref } from "~/lib/modelLinks";
 import { RETRY_LABELS, busyTearingDown, retryTeardown, setDeployed } from "~/lib/teardown";
 import { Deployment as DeploymentCell } from "./models/MyModels";
 
@@ -135,7 +136,7 @@ const KIND_NAMES: Record<string, string> = { lora: "Trained", prompt: "Prompt-on
 export function deploymentHref(row: ModelRow): string {
     return row.kind === "custom"
         ? `/deployments/${encodeURIComponent(row.key)}`
-        : `/models/base/${encodeURIComponent(row.key)}#api`;
+        : modelPageHref(row.key, "api");
 }
 
 function serves(row: ModelRow): string {

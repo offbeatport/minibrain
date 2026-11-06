@@ -66,6 +66,7 @@ import {
     deploymentPageHref,
     evaluationsHref,
     modelDataHref,
+    modelPageHref,
     playgroundHref,
     trainingHref,
 } from "~/lib/modelLinks";
@@ -136,7 +137,7 @@ const DEPLOYMENT_TONES: Record<string, Tone> = {
 };
 
 export function detailHref(row: ModelRow): string {
-    return `/models/${row.kind}/${encodeURIComponent(row.key)}`;
+    return modelPageHref(row.key);
 }
 
 const MODEL_PAGES: Record<string, (slug: string) => string> = {
@@ -230,7 +231,8 @@ export function Deployment({ row, short = false }: { row: ModelRow; short?: bool
     if (state === "not_deployed") {
         return <span className="text-muted-foreground">{label}</span>;
     }
-    const href = row.kind === "custom" ? scoped("/deployments", row) : `${detailHref(row)}#api`;
+    const href =
+        row.kind === "custom" ? scoped("/deployments", row) : modelPageHref(row.key, "api");
     return (
         <Link href={href} className="hover:underline">
             <StatusText tone={DEPLOYMENT_TONES[state] ?? "neutral"}>{label}</StatusText>
@@ -297,7 +299,7 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
             return { label: "Retry", run: () => retry(row).then(on.refresh) };
         }
         if (row.availability.state === "available" && deployed) {
-            return { label: "Use API", run: () => on.open(`${detailHref(row)}#api`) };
+            return { label: "Use API", run: () => on.open(modelPageHref(row.key, "api")) };
         }
         if (row.availability.state === "available") {
             return { label: "Test", run: () => on.test(row) };
@@ -311,7 +313,7 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
         return { label: "Review results", run: () => on.open(scoped("/evaluations", row)) };
     }
     if (deployed) {
-        return { label: "Use API", run: () => on.open(scoped("/deployments", row)) };
+        return { label: "Use API", run: () => on.open(modelPageHref(row.key, "api")) };
     }
     if (row.can_test) {
         return { label: "Test", run: () => on.test(row) };
@@ -394,7 +396,7 @@ function versionAction(entry: Entry, on: Handlers): { label: string; run: () => 
         return healthStep(row, health.actions[0], on);
     }
     if (version.live) {
-        return { label: "Use API", run: () => on.open(scoped("/deployments", row)) };
+        return { label: "Use API", run: () => on.open(modelPageHref(row.key, "api")) };
     }
     if (version.status === "ready") {
         return { label: "Deploy", run: () => promoteVersion(row, version.number).then(on.refresh) };

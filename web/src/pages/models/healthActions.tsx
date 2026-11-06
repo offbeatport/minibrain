@@ -16,7 +16,7 @@ import { type ModelRow, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import type { HealthAction } from "~/components/models/HealthStatus";
-import { trainingHref } from "~/lib/modelLinks";
+import { modelPageHref, trainingHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { AccessSteps } from "./Discover";
 import type { Confirmation } from "./dialogs";
@@ -102,7 +102,7 @@ function link(row: ModelRow, action: HealthAction): string | null {
         return "/discover";
     }
     if (action.kind === "open_base") {
-        return `/models/base/${encodeURIComponent(row.base_model ?? "")}`;
+        return modelPageHref(row.base_model ?? "");
     }
     if (action.kind === "retrain") {
         return trainingHref(row.key);

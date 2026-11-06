@@ -27,6 +27,8 @@ export const keys = {
     judge: ["settings", "judge"] as const,
     safety: ["settings", "safety"] as const,
     answers: (slug: string, number: number) => ["model", slug, "answers", number] as const,
+    versionFiles: (slug: string, number: number) => ["model", slug, "files", number] as const,
+    modelPage: (name: string) => ["all-models", "page", name] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -278,5 +280,27 @@ export function useVersionAnswers(slug: string, number: number, enabled: boolean
                 }),
             ),
         enabled,
+    });
+}
+
+export function useVersionFiles(slug: string, number: number | null | undefined) {
+    return useQuery({
+        queryKey: keys.versionFiles(slug, number ?? -1),
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/models/{slug}/versions/{number}/files", {
+                    params: { path: { slug, number: number ?? 0 } },
+                }),
+            ),
+        enabled: number !== null && number !== undefined,
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
+export function useModelPage(name: string) {
+    return useQuery({
+        queryKey: keys.modelPage(name),
+        queryFn: () => unwrap(api.GET("/api/model-pages/{name}", { params: { path: { name } } })),
+        refetchInterval: 30000,
     });
 }

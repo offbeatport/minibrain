@@ -140,7 +140,7 @@ export function HarnessConfigs({
             <CodeTabs items={items} title="Copy, paste and run." />
             <p className="text-sm text-muted-foreground">
                 {!keyValue &&
-                    "Replace YOUR_KEY with a key from the list below; a new key is filled in here once. "}
+                    "Replace YOUR_KEY with one of the API keys; a key you create is filled in here once. "}
                 Every endpoint, its fields and a client to try calls are in the{" "}
                 <Link href={API_REFERENCE_PATH} className="text-primary hover:underline">
                     API reference

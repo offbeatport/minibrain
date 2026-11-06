@@ -36,7 +36,7 @@ from minibrain.registry.models import (
     JobStatus,
     now,
 )
-from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.registry.service import ConflictError, NotFoundError, address_taken, name_taken
 from minibrain.serve.dialects import detect_guard, detect_reasoning, detect_tools
 from minibrain.settings import Settings
 from minibrain.storage import missing_room, staging_room
@@ -238,6 +238,8 @@ def start_download(
     model = session.get(BaseModel, base_model_id)
     if model is not None and model.status in (*ACTIVE_STATUSES, BaseModelStatus.AVAILABLE):
         raise ConflictError(f"{model.name} is already {model.status}")
+    if model is None and address_taken(session, base_model_id):
+        raise ConflictError(f"another model already uses the name {base_model_id}; rename or delete it first")
     ensure_room(settings, base_model_id, list(variant.files), variant.size_bytes)
     name = entry.name if variant.position == 0 else f"{entry.name} {variant.precision.upper()}"
     if model is None:
@@ -309,8 +311,10 @@ def start_import(
     connection = pick_connection(session, location, connection_id) if source_type == S3 else None
     check_s3_policy(session, source_type, connection.id if connection else None)
     base_model_id = slugify(name)
-    if session.get(BaseModel, base_model_id) is not None:
-        raise ConflictError(f"a model called {base_model_id} already exists")
+    if address_taken(session, base_model_id) or name_taken(session, name):
+        raise ConflictError(
+            f"a model called {name.strip()} already exists, or one with the same address ({base_model_id})"
+        )
     model = BaseModel(
         id=base_model_id,
         source="import",

@@ -13,6 +13,7 @@ import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
+import { modelPageHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { PathResult, type SourcePlan } from "./BaseSource";
 import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
@@ -68,9 +69,7 @@ export function DiskLine({
                     </StatusText>
                     {option.baseKey && (
                         <Button asChild variant="outline" size="sm">
-                            <Link href={`/models/base/${encodeURIComponent(option.baseKey)}`}>
-                                Repair it
-                            </Link>
+                            <Link href={modelPageHref(option.baseKey)}>Repair it</Link>
                         </Button>
                     )}
                     <Button type="button" variant="ghost" size="sm" onClick={onPickAnother}>

@@ -126,15 +126,27 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Models list** · shipped · product, ml
   See custom and base models with status, version and traffic.
   UI: Models · API: GET /api/all-models
-- **Base model page** · shipped · ml, admin
-  See a base's files, revisions, usage and API, and rename it.
-  UI: Models › base model · API: GET /api/base-models/{key}, PATCH /api/base-models/{key}
+- **Model page** · shipped · product, ml, admin
+  One page per model, with Overview, Versions, Data and API tabs.
+  UI: Models › model · API: GET /api/model-pages/{name}, GET /api/base-models/{key}, PATCH /api/base-models/{key}
+- **Model overview** · shipped · product, ml
+  Score against earlier versions, a week of traffic and one next step.
+  UI: Models › model › Overview · API: GET /api/model-pages/{name}
+- **Try a model inline** · shipped · product, ml
+  Ask a question on the model page, then continue in the Playground.
+  UI: Models › model › Overview › Try it · API: POST /api/playground/chat/completions
+- **Model files** · shipped · ml, admin
+  List weights or the live adapter's files with their SHA-256.
+  UI: Models › model › View files · API: GET /api/base-models/{key}, GET /api/models/{slug}/versions/{number}/files
+- **Unique model names** · shipped · product, ml
+  Base and custom models share one namespace of names and API addresses.
+  UI: Models › Add model, Models › model › Edit · API: POST /api/models, PATCH /api/models/{slug}, PATCH /api/base-models/{key}, POST /api/base-models/import
 - **Try a base model** · shipped · product, ml
   Send a prompt to a base model before building on it.
-  UI: Models › base model › Test · API: POST /api/base-models/{key}/test
+  UI: Models › model › Test · API: POST /api/base-models/{key}/test
 - **Base model health** · shipped · admin
   Verify, repair, re-import or relocate damaged weights in one action.
-  UI: Models › base model › Files · API: POST /api/base-models/{key}/verify, POST /api/base-models/{key}/repair, POST /api/base-models/{key}/reimport, POST /api/base-models/{key}/relocate, POST /api/base-models/{key}/retry, POST /api/base-models/{key}/recheck
+  UI: Models › model › View files, Models › model › Overview · API: POST /api/base-models/{key}/verify, POST /api/base-models/{key}/repair, POST /api/base-models/{key}/reimport, POST /api/base-models/{key}/relocate, POST /api/base-models/{key}/retry, POST /api/base-models/{key}/recheck
 - **Delete base models** · shipped · admin
   Delete a base and its files, and its models once confirmed.
   UI: Models › Delete · API: DELETE /api/base-models/{key}
@@ -149,7 +161,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Training, Monitor › Jobs, Monitor › Requests, Monitor › Overview, Jobs › job
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
-  UI: Models › model › How it's judged › Answers, Evaluations › version · API: GET /api/presets
+  UI: Models › model › Versions › How it's judged › Answers, Evaluations › version · API: GET /api/presets
 - **Label proposal** · shipped · product, ml
   Offer to restrict a chat assistant to labels found in its data.
   UI: Models › model · API: PUT /api/models/{slug}/label-proposal/dismissal, PUT /api/models/{slug}/contract
@@ -167,16 +179,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › model › How it's judged › Answers · API: PUT /api/models/{slug}/graders
+  UI: Models › model › Versions › How it's judged › Answers · API: PUT /api/models/{slug}/graders
 - **Instructions** · shipped · product, ml
   Write the system prompt; a prompt-only version tries it at once.
-  UI: Models › model › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
+  UI: Models › model › Versions › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  UI: Models › model › How it's judged
+  UI: Models › model › Versions › How it's judged
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema; breaking changes confirmed once live.
-  UI: Models › model › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
+  UI: Models › model › Versions › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -258,7 +270,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › General › Compute prices · API: GET /api/compute/prices, PUT /api/compute/prices · Config: compute
 - **Model card** · shipped · product, admin
   Generate a model card and validation report for each version.
-  UI: Models › model › version › Model card · API: GET /api/models/{slug}/versions/{number}/card, PUT /api/models/{slug}/versions/{number}/card, GET /api/models/{slug}/versions/{number}/card.json, GET /api/models/{slug}/versions/{number}/card.md
+  UI: Models › model › Versions › Model card · API: GET /api/models/{slug}/versions/{number}/card, PUT /api/models/{slug}/versions/{number}/card, GET /api/models/{slug}/versions/{number}/card.json, GET /api/models/{slug}/versions/{number}/card.md
 - **Golden set authoring** · planned · product
   Write 20 to 50 verified examples before any training.
   Roadmap: Eval and promote
@@ -267,13 +279,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Eval and promote
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
-  UI: Models › model › How it's judged, Evaluations › version · Roadmap: Task types
+  UI: Models › model › Versions › How it's judged, Evaluations › version · Roadmap: Task types
 - **Judge model** · shipped · ml, admin
   Pick the base that judges free-text answers, per install or model.
   UI: Settings › General › Judge model, Models › model › How it's judged · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{slug}/judge
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › Versions › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · planned · product, ml
   Compare two versions' scores, not only their data.
   Roadmap: v2
@@ -284,7 +296,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Deployments, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
-  UI: Models › base model › Deploy · API: POST /api/base-models/{key}/deploy
+  UI: Models › model › Deploy · API: POST /api/base-models/{key}/deploy
 - **OpenAI-compatible API** · shipped · engineer
   Call any model by name or pinned version, streamed token by token.
   UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
@@ -305,7 +317,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   API: POST /v1/chat/completions · Roadmap: API and access
 - **API keys** · shipped · engineer, admin
   Issue keys scoped to models, with expiry and an audit trail.
-  UI: Deployments › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
+  UI: Models › model › API, Deployments › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
   UI: Deployments › model › Connect
@@ -366,10 +378,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
 - **Playground test examples** · shipped · product, ml
   Turn a wrong Playground answer into a test the next version faces.
-  UI: Playground › Save as test example, Models › model › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
+  UI: Playground › Save as test example, Models › model › Data › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
-  UI: Models › model, Training › model · API: GET /api/models/{slug}/feedback/summary
+  UI: Models › model › Data, Training › model · API: GET /api/models/{slug}/feedback/summary
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2
@@ -457,7 +469,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Encryption at rest · Policy: vault_address, vault_mount, vault_key, vault_namespace, vault_auth, vault_role_id, vault_auth_mount, vault_ca_bundle, hsm_library, hsm_token, hsm_key, kms_key, kms_region, kms_endpoint, kms_fips · Config: MINIBRAIN_VAULT_TOKEN, MINIBRAIN_VAULT_TOKEN_FILE, MINIBRAIN_VAULT_SECRET_ID, MINIBRAIN_VAULT_SECRET_ID_FILE, MINIBRAIN_HSM_PIN, MINIBRAIN_HSM_PIN_FILE
 - **AI bill of materials** · shipped · admin
   Download a CycloneDX ML-BOM for each version.
-  UI: Models › model › version › Model card · API: GET /api/models/{slug}/versions/{number}/aibom.json
+  UI: Models › model › Versions › Model card · API: GET /api/models/{slug}/versions/{number}/aibom.json
 - **SBOMs** · shipped · admin
   CycloneDX SBOMs for the Python, web and image dependency sets.
 - **Signed releases** · partial · admin
@@ -520,7 +532,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › This install › Download diagnostics · API: GET /api/system/diagnostics
 - **API reference** · shipped · engineer, ml
   Browse /v1 and /api with this install's examples and try calls.
-  UI: User menu › API reference, Deployments › model › Connect, Models › base model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
+  UI: User menu › API reference, Deployments › model › Connect, Models › model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
 - **OpenAPI schema** · shipped · engineer
   Print the /api and /v1 schema for generated clients.
   CLI: minibrain openapi

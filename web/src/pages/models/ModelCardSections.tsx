@@ -30,6 +30,7 @@ import { PanelSection, Stat } from "~/components/Section";
 import { auditHref } from "~/lib/audit";
 import { costText, deviceTime, duration, headline, measuredOn, money, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
+import { modelPageHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 import { itemHref } from "../data/catalogue";
 
@@ -208,7 +209,7 @@ export function BaseSection({ card }: { card: ModelCard }) {
                         "Name",
                         <Link
                             key="name"
-                            href={`/models/base/${encodeURIComponent(base.key)}`}
+                            href={modelPageHref(base.key)}
                             className="text-primary hover:underline"
                         >
                             {base.name}

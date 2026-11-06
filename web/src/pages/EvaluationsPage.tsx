@@ -40,7 +40,7 @@ import { count, milliseconds, percent } from "~/lib/format";
 import { checkSentence } from "~/lib/judging";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { metricName, metricOf } from "~/lib/metrics";
-import { modelCardHref } from "~/lib/modelLinks";
+import { modelCardHref, modelPageHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { DataVersus } from "./data/versionData";
 import { Updated } from "./models/MyModels";
@@ -395,9 +395,7 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
             <ErrorLine error={versions.error ?? promote.error} />
             <DialogFooter>
                 <Button variant="outline" asChild>
-                    <Link href={`/models/custom/${encodeURIComponent(model.key)}`}>
-                        Model details
-                    </Link>
+                    <Link href={modelPageHref(model.key)}>Model details</Link>
                 </Button>
                 <Button variant="outline" asChild>
                     <Link href={modelCardHref(model.key, version.number)}>Model card</Link>
