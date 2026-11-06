@@ -536,7 +536,6 @@ export function EvaluationsPage() {
                     can.build ? (
                         <DeployButton
                             version={line.version}
-                            size="xs"
                             pending={promote.isPending}
                             onDeploy={() =>
                                 promote.mutate({

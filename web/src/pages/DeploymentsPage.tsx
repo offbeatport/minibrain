@@ -337,7 +337,6 @@ function VersionHistory({ row }: { row: ModelRow }) {
                 can.build && item.original.status === "ready" && !item.original.live ? (
                     <Button
                         variant="outline"
-                        size="xs"
                         disabled={deploy.isPending || tearingDown}
                         onClick={() => deploy.mutate(item.original.number)}
                     >

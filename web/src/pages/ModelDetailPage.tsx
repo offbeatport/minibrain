@@ -666,7 +666,7 @@ function CustomModelView({ row }: { row: ModelRow }) {
                     }
                     rowLabel={(version) => `Model card for v${version.number}`}
                     rowActions={(version) => (
-                        <Button variant="outline" size="xs" asChild>
+                        <Button variant="outline" asChild>
                             <Link href={modelCardHref(row.key, version.number)}>Model card</Link>
                         </Button>
                     )}
