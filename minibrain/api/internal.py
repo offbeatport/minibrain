@@ -17,6 +17,7 @@ from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
 from minibrain.jobs.queue import EventIn, WorkerInfo
+from minibrain.lifecycle import STOPPING
 from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.registry import check_job
@@ -161,9 +162,9 @@ def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: Se
                     return ClaimResponse(**claimed.__dict__, env=env)
             queue.fail(claimed.job_id, claimed.token, refusal, False, None)
             continue
-        if time.monotonic() >= deadline:
+        if STOPPING.is_set() or time.monotonic() >= deadline:
             return Response(status_code=204)
-        time.sleep(CLAIM_POLL_SECONDS)
+        STOPPING.wait(CLAIM_POLL_SECONDS)
 
 
 @router.post("/jobs/{job_id}/heartbeat")

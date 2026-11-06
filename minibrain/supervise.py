@@ -24,7 +24,7 @@ class Supervisor:
         failures = 0
         while not self.stop.is_set():
             started = time.monotonic()
-            self.process = subprocess.Popen(self.command, env=self.env)
+            self.process = subprocess.Popen(self.command, env=self.env, start_new_session=True)
             code = self.process.wait()
             if self.stop.is_set():
                 return

@@ -22,9 +22,12 @@ COMMAND_LINE = "command line"
 DEFAULT_URL = "http://127.0.0.1:8000"
 MPS_FALLBACK_ENV = "PYTORCH_ENABLE_MPS_FALLBACK"
 STARTUP_FAILURE = 3
+REPEAT_SIGNAL_SECONDS = 2.0
 RULE = "-" * 78
 
 if TYPE_CHECKING:
+    from types import FrameType
+
     from minibrain.auth.first_run import FirstRun
     from minibrain.registry.audit_chain import ChainReport
     from minibrain.settings import Settings
@@ -109,8 +112,15 @@ def serve(host: str, port: int, with_worker: bool, browser: bool) -> None:
     worker = Supervisor("worker", command, env) if with_worker else None
     if worker is not None:
         worker.start()
-    config = uvicorn.Config("minibrain.app:create_app", factory=True, host=host, port=port, proxy_headers=False)
-    server = uvicorn.Server(config)
+    config = uvicorn.Config(
+        "minibrain.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        proxy_headers=False,
+        timeout_graceful_shutdown=10,
+    )
+    server = QuietServer(config, partial(begin_stop, worker))
     opens = browser and desktop_session()
     threading.Thread(target=announce, args=(server, found, settings.ui_url or api_url, opens), daemon=True).start()
     try:
@@ -122,6 +132,36 @@ def serve(host: str, port: int, with_worker: bool, browser: bool) -> None:
             worker.shutdown()
     if not server.started:
         raise SystemExit(STARTUP_FAILURE)
+    print("minibrain: stopped", file=sys.stderr, flush=True)
+
+
+class QuietServer(uvicorn.Server):
+    def __init__(self, config: uvicorn.Config, on_stop: Callable[[], None]) -> None:
+        super().__init__(config)
+        self.on_stop = on_stop
+        self.first_signal: float | None = None
+
+    def handle_exit(self, sig: int, frame: "FrameType | None") -> None:
+        now = time.monotonic()
+        if self.first_signal is None:
+            self.first_signal = now
+            print("minibrain: stopping…", file=sys.stderr, flush=True)
+            self.on_stop()
+        elif now - self.first_signal < REPEAT_SIGNAL_SECONDS:
+            return
+        super().handle_exit(sig, frame)
+
+
+def begin_stop(worker: Supervisor | None) -> None:
+    from minibrain.lifecycle import STOPPING
+
+    STOPPING.set()
+    if worker is not None:
+        threading.Thread(target=worker.shutdown, daemon=True).start()
+
+
+def exit_quietly(signum: int, frame: "FrameType | None") -> None:
+    raise SystemExit(0)
 
 
 def watch_parent(parent: int | None, stop: threading.Event, on_orphan: Callable[[], None] | None = None) -> None:
@@ -212,6 +252,8 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None,
     )
     stop = threading.Event()
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
+    signal.signal(signal.SIGTERM, exit_quietly)
+    signal.signal(signal.SIGINT, exit_quietly)
     Worker(config).run_forever(stop)
 
 
