@@ -57,9 +57,11 @@ import {
 import { modelsHref } from "~/lib/modelsSearch";
 import {
     RETRY_LABELS,
+    REVIEW_LABEL,
     beingDeleted,
     busyTearingDown,
     deleteModel,
+    needsReview,
     retryTeardown,
     rowId,
     setDeployed,
@@ -165,10 +167,12 @@ function TeardownNotice({
     row,
     canRetry,
     onRetried,
+    onReview,
 }: {
     row: ModelRow;
     canRetry: boolean;
     onRetried: () => Promise<unknown>;
+    onReview?: () => void;
 }) {
     const teardown = row.teardown;
     const [error, setError] = useState<unknown>(null);
@@ -199,7 +203,11 @@ function TeardownNotice({
                 </p>
                 <ErrorLine error={error} />
             </div>
-            {failed && canRetry && <Button onClick={retry}>{RETRY_LABELS[teardown.kind]}</Button>}
+            {failed && canRetry && onReview && needsReview(teardown) ? (
+                <Button onClick={onReview}>{REVIEW_LABEL}</Button>
+            ) : (
+                failed && canRetry && <Button onClick={retry}>{RETRY_LABELS[teardown.kind]}</Button>
+            )}
         </div>
     );
 }
@@ -332,6 +340,7 @@ function BaseModelView({ model }: { model: BaseModelDetail }) {
                 row={model}
                 canRetry={can.admin || (can.build && model.teardown?.kind === "undeploy")}
                 onRetried={reload}
+                onReview={() => setDeleting([{ key: rowId(model), model, version: null }])}
             />
             <HealthNotice
                 row={model}

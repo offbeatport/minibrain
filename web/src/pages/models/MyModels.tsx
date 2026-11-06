@@ -67,10 +67,12 @@ import {
 import type { ModelsSearch } from "~/lib/modelsSearch";
 import {
     RETRY_LABELS,
+    REVIEW_LABEL,
     beingDeleted,
     builtOn,
     busyTearingDown,
     deleteModel,
+    needsReview,
     retryTeardown,
     rowId,
     setDeployed,
@@ -275,6 +277,9 @@ function teardownStep(row: ModelRow, on: Handlers): { label: string; run: () => 
     if (teardown?.state !== "failed") {
         return null;
     }
+    if (needsReview(teardown)) {
+        return { label: REVIEW_LABEL, run: () => on.remove(row) };
+    }
     return { label: RETRY_LABELS[teardown.kind], run: () => retryTeardown(row).then(on.refresh) };
 }
 
@@ -477,10 +482,14 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
             {retryable && (manages || retryable.kind === "undeploy") && (
                 <DropdownMenuItem
                     className="md:hidden"
-                    onSelect={() => retryTeardown(row).then(on.refresh)}
+                    onSelect={() =>
+                        needsReview(retryable)
+                            ? on.remove(row)
+                            : retryTeardown(row).then(on.refresh)
+                    }
                 >
                     <RotateCcw />
-                    {RETRY_LABELS[retryable.kind]}
+                    {needsReview(retryable) ? REVIEW_LABEL : RETRY_LABELS[retryable.kind]}
                 </DropdownMenuItem>
             )}
             {fixes

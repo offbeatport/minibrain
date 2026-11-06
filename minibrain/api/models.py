@@ -62,6 +62,8 @@ from minibrain.registry.models import (
     CatalogModel,
     DatasetVersion,
     Model,
+    TeardownKind,
+    TeardownStatus,
     VersionKind,
     now,
 )
@@ -150,6 +152,11 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     chosen = preset(body.preset)
     if base_readiness(session, base) == "missing":
         raise ConflictError(f"{base} is not a base model on this install")
+    found = session.get(BaseModel, base)
+    teardown = found.teardown if found is not None else None
+    deleting = teardown is not None and teardown.kind == TeardownKind.DELETE
+    if found is not None and deleting and teardown is not None and teardown.status == TeardownStatus.RUNNING:
+        raise ConflictError(f"{found.name} is being deleted; pick another base")
     model = create_model(session, body.name, body.preset, base)
     model.description = body.description.strip()
     model.tags = user_tags(body.tags)

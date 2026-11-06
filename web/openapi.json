@@ -12863,7 +12863,7 @@
           },
           "response_format": {
             "title": "Response Format",
-            "description": "An OpenAI response_format: {\"type\": \"text\"}, {\"type\": \"json_object\"} or {\"type\": \"json_schema\", \"json_schema\": {\"name\": ..., \"schema\": {...}, \"strict\": true}}."
+            "description": "An OpenAI response_format: {\"type\": \"text\"}, {\"type\": \"json_object\"} or {\"type\": \"json_schema\", \"json_schema\": {\"name\": ..., \"schema\": {...}, \"strict\": true}}. A custom model's contract holds by default; a request's format can only narrow a model whose contract is free text, so a model answering with labels or its own schema refuses one."
           }
         },
         "additionalProperties": true,
@@ -23579,6 +23579,13 @@
             },
             "type": "array",
             "title": "Models"
+          },
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Added"
           },
           "part_of": {
             "anyOf": [

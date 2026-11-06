@@ -124,6 +124,7 @@ def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> Tear
         started_at=teardown.started_at,
         waiting=list(detail.get("waiting") or []),
         models=list(detail.get("models") or []),
+        added=list(detail.get("added") or []),
         part_of=part_of,
         cascade=bool(detail.get("cascade")),
         undeploy=bool(detail.get("live")),

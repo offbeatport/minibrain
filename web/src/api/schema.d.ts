@@ -3803,7 +3803,7 @@ export interface components {
             stream?: boolean;
             /**
              * Response Format
-             * @description An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or {"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}.
+             * @description An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or {"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}. A custom model's contract holds by default; a request's format can only narrow a model whose contract is free text, so a model answering with labels or its own schema refuses one.
              */
             response_format?: unknown;
         } & {
@@ -7281,6 +7281,8 @@ export interface components {
             waiting?: string[];
             /** Models */
             models?: string[];
+            /** Added */
+            added?: string[];
             /** Part Of */
             part_of?: string | null;
             /**

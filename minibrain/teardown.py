@@ -270,6 +270,12 @@ def dependents_of(session: Session, base: BaseModel) -> list[Model]:
     return list(session.scalars(select(Model).where(Model.base_model == base.id).order_by(Model.name)))
 
 
+class NewDependentsError(ConflictError):
+    def __init__(self, added: list[str], base: str) -> None:
+        super().__init__(f"{names(added)} {are(added)} built on {base} now; delete them first")
+        self.added = added
+
+
 def base_job_running(session: Session, base: BaseModel) -> bool:
     query = select(Job.id).where(Job.base_model_id == base.id, Job.status.in_(ACTIVE_JOB_STATUSES)).limit(1)
     return session.scalar(query) is not None
@@ -284,7 +290,9 @@ def delete_base(
             return existing
         if bool(existing.detail.get("cascade")) != cascade:
             raise ConflictError(f"deleting {base.name} with the models built on it failed; retry it with cascade=true")
-        return restart(session, existing, actor)
+        current = sorted(model.name for model in dependents_of(session, base))
+        if not cascade or current == sorted(existing.detail.get("models") or []):
+            return restart(session, existing, actor)
     running = existing is not None and existing.status == TeardownStatus.RUNNING
     if base_job_running(session, base):
         raise ConflictError(f"{base.name} has a download or import running; cancel it first")
@@ -444,6 +452,8 @@ class Teardowns:
             log.warning("removing %s failed: %s", teardown.name, error)
             found = session.get(Teardown, teardown.id)
             if found is not None:
+                if isinstance(error, NewDependentsError):
+                    found.detail = {**found.detail, "added": error.added}
                 self.fail(session, found, short(error))
 
     def note(self, session: Session, teardown: Teardown, waiting: list[str]) -> None:
@@ -523,7 +533,7 @@ class Teardowns:
             return
         added = [model.name for model in dependents_of(session, base)]
         if added:
-            raise ConflictError(f"{names(added)} {are(added)} built on {base.name} now; delete them first")
+            raise NewDependentsError(added, base.name)
         remove_folder(model_dir(self.settings, base.id))
         store = store_for(self.settings)
         objects = drop_weights(session, store, base)

@@ -574,6 +574,7 @@ class TeardownInfo(BaseModel):
     started_at: datetime
     waiting: list[str] = Field(default_factory=list)
     models: list[str] = Field(default_factory=list)
+    added: list[str] = Field(default_factory=list)
     part_of: str | None = None
     cascade: bool = False
     undeploy: bool = False

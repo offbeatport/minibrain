@@ -25,6 +25,7 @@ from minibrain.registry.models import (
     Version,
     now,
 )
+from minibrain.registry.service import create_model
 from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
 from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, give_data
@@ -416,3 +417,24 @@ def test_standalone_gateways_report_what_they_route(harness: Harness, tmp_path: 
     with harness.sessions() as session:
         found = session.scalars(select(Gateway).where(Gateway.kind == "standalone")).one()
     assert SLUG in found.routes and "qwen3-0.6b" in found.bases
+
+
+def test_a_base_being_deleted_takes_no_new_models_and_a_failed_delete_restarts_with_the_current_ones(
+    harness: Harness,
+) -> None:
+    folder = add_base(harness)
+    add_custom(harness, "Foo")
+    started = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    assert started.status_code == 202
+    refused = harness.client.post("/api/models", json={"name": "Late", "base_model": BASE})
+    assert refused.status_code == 409 and refused.json()["detail"] == "Tiny is being deleted; pick another base"
+    with harness.sessions() as session:
+        create_model(session, "Late", "general", BASE)
+        session.commit()
+    harness.settle()
+    failed = shown(harness, BASE, "base")["teardown"]
+    assert (failed["state"], failed["added"]) == ("failed", ["Late"])
+    again = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    assert again.status_code == 202 and again.json()["teardown"]["models"] == ["Late"]
+    harness.settle()
+    assert row(harness, BASE, "base") is None and row(harness, "late") is None and not folder.exists()

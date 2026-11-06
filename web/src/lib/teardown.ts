@@ -63,6 +63,12 @@ export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
           );
 }
 
+export function needsReview(teardown: Teardown | null | undefined): boolean {
+    return teardown?.state === "failed" && (teardown.added?.length ?? 0) > 0;
+}
+
+export const REVIEW_LABEL = "Delete again…";
+
 export function retryTeardown(row: ModelRow): Promise<unknown> {
     const teardown = row.teardown;
     if (!teardown) {
