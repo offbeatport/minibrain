@@ -21,13 +21,18 @@ EFFORTS = ("low", "medium", "high")
 TAGS = "tags"
 OPEN = "open"
 
+LLAMA_GUARD = "llama-guard"
+SHIELDGEMMA = "shieldgemma"
+QWEN3GUARD = "qwen3guard"
+SAFEGUARD = "gpt-oss-safeguard"
+
 AUTO = "auto"
 NONE = "none"
 REQUIRED = "required"
 
 THINK_OPEN = "<think>"
 THINK_CLOSE = "</think>"
-OPENED_THINKING = re.compile("(?:assistant|Assistant\\uff5c>)(?:\\\\n|\\n)*<think>")
+OPENED_THINKING = re.compile("(?:assistant|Assistant\\uff5c>)(?:\\\\n|\\n)*<think>(?!(?:\\\\n|\\n)*</think>)")
 
 HERMES_OPEN = "<tool_call>"
 HERMES_CLOSE = "</tool_call>"
@@ -55,6 +60,19 @@ def detect_tools(template: str | None) -> str | None:
         return MISTRAL
     if PYTHON_TAG in template or ('"parameters"' in template and "ipython" in template):
         return LLAMA3
+    return None
+
+
+def detect_guard(repo: str | None, name: str | None = None) -> str | None:
+    text = f"{repo or ''} {name or ''}".lower().replace("_", "-").replace(" ", "-")
+    if "llama-guard" in text:
+        return LLAMA_GUARD
+    if "shieldgemma" in text:
+        return SHIELDGEMMA
+    if "qwen3guard" in text:
+        return QWEN3GUARD
+    if "gpt-oss-safeguard" in text:
+        return SAFEGUARD
     return None
 
 

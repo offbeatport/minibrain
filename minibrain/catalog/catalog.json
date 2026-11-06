@@ -9808,6 +9808,1071 @@
    ],
    "superseded_by": null,
    "position": 55
+  },
+  {
+   "id": "llama-guard-3-1b",
+   "name": "Llama Guard 3 1B",
+   "description": "Safety model: checks requests and answers against 14 hazard categories (S1 to S14).",
+   "provider": "Meta",
+   "repo": "meta-llama/Llama-Guard-3-1B",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": true,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 15175,
+   "context_tokens": 131072,
+   "released": "2024-09-20",
+   "license": "llama3.2",
+   "license_name": "Llama 3.2 Community Licence",
+   "license_summary": "Commercial use allowed under Meta's acceptable-use policy; over 700M monthly users needs a separate licence; credit 'Built with Llama'.",
+   "license_url": "https://www.llama.com/llama3_2/license/",
+   "family": "llama-guard",
+   "generation": "3",
+   "architecture": "llama",
+   "tier": "S",
+   "params_b": 1.5,
+   "moe": false,
+   "shape": {
+    "hidden": 2048,
+    "layers": 16,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 8192,
+    "tied": true
+   },
+   "variants": [
+    {
+     "id": "llama-guard-3-1b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "meta-llama/Llama-Guard-3-1B",
+     "revision": "acf7aafa60f0410f8f42b1fa35e077d705892029",
+     "files": [
+      {
+       "path": "USE_POLICY.md",
+       "size": 6021,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 877,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 189,
+       "sha256": null
+      },
+      {
+       "path": "model.safetensors",
+       "size": 2996982344,
+       "sha256": "e010146ce3209c8e1485021cbea5462f3f04461be924a066b6c0d80085b17957"
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 296,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 9085657,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 53195,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 3006128579,
+     "weights_bytes": 2996982344,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 56
+  },
+  {
+   "id": "llama-guard-3-8b",
+   "name": "Llama Guard 3 8B",
+   "description": "Safety model: checks requests and answers against 14 hazard categories (S1 to S14).",
+   "provider": "Meta",
+   "repo": "meta-llama/Llama-Guard-3-8B",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": true,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 23102,
+   "context_tokens": 131072,
+   "released": "2024-07-22",
+   "license": "llama3.1",
+   "license_name": "Llama 3.1 Community Licence",
+   "license_summary": "Commercial use allowed under Meta's acceptable-use policy; over 700M monthly users needs a separate licence; credit 'Built with Llama'.",
+   "license_url": "https://www.llama.com/llama3_1/license/",
+   "family": "llama-guard",
+   "generation": "3",
+   "architecture": "llama",
+   "tier": "M",
+   "params_b": 8.03,
+   "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 32,
+    "vocab": 128256,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 14336,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "llama-guard-3-8b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "meta-llama/Llama-Guard-3-8B",
+     "revision": "7327bd9f6efbbe6101dc6cc4736302b3cbb6e425",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 7627,
+       "sha256": null
+      },
+      {
+       "path": "USE_POLICY.md",
+       "size": 4691,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 860,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 160,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00004.safetensors",
+       "size": 4976698672,
+       "sha256": "37aa666e38f27d6364c510bf68644cf146009f90ddfdd0e46264fd833fc735da"
+      },
+      {
+       "path": "model-00002-of-00004.safetensors",
+       "size": 4999802720,
+       "sha256": "4b169a796073335f6059927b2070edfcb506876b1afa862fcde0c8b538bf903f"
+      },
+      {
+       "path": "model-00003-of-00004.safetensors",
+       "size": 4915916176,
+       "sha256": "ac817adae76270f1a466cda70e1c360a780668534f7a22bce00ac4fe03135f4a"
+      },
+      {
+       "path": "model-00004-of-00004.safetensors",
+       "size": 1168138808,
+       "sha256": "ec748c5f2821d7eecb446922b7e75431108e43081c21fc0773212de09c19eaaa"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 23950,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 73,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 9084449,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 51967,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 16069730153,
+     "weights_bytes": 16060556376,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 57
+  },
+  {
+   "id": "shieldgemma-2b",
+   "name": "shieldgemma 2b",
+   "description": "Safety model: checks requests and answers against four policies, one at a time.",
+   "provider": "Google",
+   "repo": "google/shieldgemma-2b",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": true,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 3345,
+   "context_tokens": 8192,
+   "released": "2024-07-16",
+   "license": "gemma",
+   "license_name": "Gemma Terms of Use",
+   "license_summary": "Commercial use allowed under Google's prohibited-use policy; pass the terms on with the model.",
+   "license_url": "https://ai.google.dev/gemma/terms",
+   "family": "shieldgemma",
+   "generation": "1",
+   "architecture": "gemma2",
+   "tier": "S",
+   "params_b": 2.61,
+   "moe": false,
+   "shape": {
+    "hidden": 2304,
+    "layers": 26,
+    "vocab": 256000,
+    "heads": 8,
+    "kv_heads": 4,
+    "head_dim": 256,
+    "intermediate": 9216,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "shieldgemma-2b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "google/shieldgemma-2b",
+     "revision": "d1dffc9c8c9237a90aab09c61383791e718ef9e8",
+     "files": [
+      {
+       "path": "config.json",
+       "size": 842,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 168,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00002.safetensors",
+       "size": 4988025760,
+       "sha256": "343f39c3f075eda5077dab58476d3e3231432ea3cddeb81e6f5ad106b0b524f5"
+      },
+      {
+       "path": "model-00002-of-00002.safetensors",
+       "size": 240691728,
+       "sha256": "ce68ef43056ff896f0fa55bada30885eb192a1a439cc984d44d836329c752f21"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 24223,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 555,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 17525357,
+       "sha256": "3f289bc05132635a8bc7aca7aa21255efd5e18f3710f43e3cdb96bcd41be4922"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 47904,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 5246316537,
+     "weights_bytes": 5228717488,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 58
+  },
+  {
+   "id": "shieldgemma-9b",
+   "name": "shieldgemma 9b",
+   "description": "Safety model: checks requests and answers against four policies, one at a time.",
+   "provider": "Google",
+   "repo": "google/shieldgemma-9b",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": true,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 255858,
+   "context_tokens": 8192,
+   "released": "2024-07-16",
+   "license": "gemma",
+   "license_name": "Gemma Terms of Use",
+   "license_summary": "Commercial use allowed under Google's prohibited-use policy; pass the terms on with the model.",
+   "license_url": "https://ai.google.dev/gemma/terms",
+   "family": "shieldgemma",
+   "generation": "1",
+   "architecture": "gemma2",
+   "tier": "M",
+   "params_b": 9.24,
+   "moe": false,
+   "shape": {
+    "hidden": 3584,
+    "layers": 42,
+    "vocab": 256000,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 256,
+    "intermediate": 14336,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "shieldgemma-9b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "google/shieldgemma-9b",
+     "revision": "b8b636016df4540721a098c7aab91c97ec6ee508",
+     "files": [
+      {
+       "path": "config.json",
+       "size": 844,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 168,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00004.safetensors",
+       "size": 4903351912,
+       "sha256": "abcbc2d2d3682d16f156238744a14d9f34d23521a5fd60e319f34e70e4f542ae"
+      },
+      {
+       "path": "model-00002-of-00004.safetensors",
+       "size": 4947570872,
+       "sha256": "41201a66dfbd9743677a5f6060e2819624d569236a7795352c00e1e2ab133cdf"
+      },
+      {
+       "path": "model-00003-of-00004.safetensors",
+       "size": 4962221464,
+       "sha256": "865c917f2ba77ce31818538dd25f89c60af46335d4376571c3149ae63817432b"
+      },
+      {
+       "path": "model-00004-of-00004.safetensors",
+       "size": 3670322200,
+       "sha256": "24c747abbe456bc47382c6efb89fe505e605aca759d21a7f98753458f72b8c82"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 39072,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 555,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 17525357,
+       "sha256": "3f289bc05132635a8bc7aca7aa21255efd5e18f3710f43e3cdb96bcd41be4922"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 47904,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 18501080348,
+     "weights_bytes": 18483466448,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 59
+  },
+  {
+   "id": "qwen3guard-gen-0.6b",
+   "name": "Qwen3Guard Gen 0.6B",
+   "description": "Safety model: checks requests and answers against nine categories, with a controversial grade.",
+   "provider": "Qwen",
+   "repo": "Qwen/Qwen3Guard-Gen-0.6B",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": false,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 219256,
+   "context_tokens": 32768,
+   "released": "2025-09-23",
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "family": "qwen3guard",
+   "generation": "1",
+   "architecture": "qwen3",
+   "tier": "S",
+   "params_b": 0.75,
+   "moe": false,
+   "shape": {
+    "hidden": 1024,
+    "layers": 28,
+    "vocab": 151936,
+    "heads": 16,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 3072,
+    "tied": true
+   },
+   "variants": [
+    {
+     "id": "qwen3guard-gen-0.6b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "Qwen/Qwen3Guard-Gen-0.6B",
+     "revision": "fada3b2f655b89601929198343c94cd2f64d93cc",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 11343,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 727,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 161,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 1671853,
+       "sha256": null
+      },
+      {
+       "path": "model.safetensors",
+       "size": 1503300328,
+       "sha256": "4f3ce47ebd968cddb67de08d8764f8ede7c410a7d1fb9e08145a4c7a2f2e5c0f"
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 11422654,
+       "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 9601,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 2776833,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 1519193500,
+     "weights_bytes": 1503300328,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 60
+  },
+  {
+   "id": "qwen3guard-gen-4b",
+   "name": "Qwen3Guard Gen 4B",
+   "description": "Safety model: checks requests and answers against nine categories, with a controversial grade.",
+   "provider": "Qwen",
+   "repo": "Qwen/Qwen3Guard-Gen-4B",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": false,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 18903,
+   "context_tokens": 32768,
+   "released": "2025-09-23",
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "family": "qwen3guard",
+   "generation": "1",
+   "architecture": "qwen3",
+   "tier": "S",
+   "params_b": 4.41,
+   "moe": false,
+   "shape": {
+    "hidden": 2560,
+    "layers": 36,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 9728,
+    "tied": true
+   },
+   "variants": [
+    {
+     "id": "qwen3guard-gen-4b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "Qwen/Qwen3Guard-Gen-4B",
+     "revision": "6ec42827da0c1ff11e7a49dc269d2e810d27e108",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 11343,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 727,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 161,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 1671853,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00003.safetensors",
+       "size": 3957900840,
+       "sha256": "d73f9558059de0740f2cf77bd98705dab0073fc3b61f41460124252df60a717e"
+      },
+      {
+       "path": "model-00002-of-00003.safetensors",
+       "size": 3987450520,
+       "sha256": "13f603d405366e68d19698e90a934eae216f9e9182e5b71c236b0043cb4f8b59"
+      },
+      {
+       "path": "model-00003-of-00003.safetensors",
+       "size": 877543072,
+       "sha256": "e12365059f1dade58ce0df2d22f9d8618eaf60e15b01b2fcceee55b6ac5a8832"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 32877,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 11422654,
+       "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 9601,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 2776833,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 8838820481,
+     "weights_bytes": 8822894432,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 61
+  },
+  {
+   "id": "qwen3guard-gen-8b",
+   "name": "Qwen3Guard Gen 8B",
+   "description": "Safety model: checks requests and answers against nine categories, with a controversial grade.",
+   "provider": "Qwen",
+   "repo": "Qwen/Qwen3Guard-Gen-8B",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": false,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 110997,
+   "context_tokens": 32768,
+   "released": "2025-09-23",
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "family": "qwen3guard",
+   "generation": "1",
+   "architecture": "qwen3",
+   "tier": "M",
+   "params_b": 8.19,
+   "moe": false,
+   "shape": {
+    "hidden": 4096,
+    "layers": 36,
+    "vocab": 151936,
+    "heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "intermediate": 12288,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "qwen3guard-gen-8b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "Qwen/Qwen3Guard-Gen-8B",
+     "revision": "4505cb1a6f1864f21f8b27f7daf1b9a1aab6edbb",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 11343,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 729,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 161,
+       "sha256": null
+      },
+      {
+       "path": "merges.txt",
+       "size": 1671853,
+       "sha256": null
+      },
+      {
+       "path": "model-00001-of-00005.safetensors",
+       "size": 3996250744,
+       "sha256": "017fbd70389fd873bbd89f1b833fe867aa09fcd87438dd35d556a7a8b403b8ea"
+      },
+      {
+       "path": "model-00002-of-00005.safetensors",
+       "size": 3993160032,
+       "sha256": "497581027655f3188e40f221d4130a8659c1ebd2191f898500210d69594cc712"
+      },
+      {
+       "path": "model-00003-of-00005.safetensors",
+       "size": 3959604768,
+       "sha256": "c5b6112c09d0c89924d98be42a18887d516e1cce92ca537d20dc48ed9a0e29f2"
+      },
+      {
+       "path": "model-00004-of-00005.safetensors",
+       "size": 3187841392,
+       "sha256": "ea7cf87db6e61d88c0476dffac16a2c15b99015866ae0e5e733b28ccf756e5c3"
+      },
+      {
+       "path": "model-00005-of-00005.safetensors",
+       "size": 1244659840,
+       "sha256": "048a9615fa462914b5028b0e68256176feeee525235d194a6d9985c4973eb8c1"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 32878,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 11422654,
+       "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 9601,
+       "sha256": null
+      },
+      {
+       "path": "vocab.json",
+       "size": 2776833,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 16397442828,
+     "weights_bytes": 16381516776,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 62
+  },
+  {
+   "id": "gpt-oss-safeguard-20b",
+   "name": "gpt oss safeguard 20b",
+   "description": "Safety model: checks requests and answers against a written policy it reasons over.",
+   "provider": "OpenAI",
+   "repo": "openai/gpt-oss-safeguard-20b",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": false,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 20754,
+   "context_tokens": 131072,
+   "released": "2025-09-18",
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "family": "gpt-oss-safeguard",
+   "generation": "1",
+   "architecture": "gpt_oss",
+   "tier": "L",
+   "params_b": 21.51,
+   "moe": true,
+   "shape": {
+    "hidden": 2880,
+    "layers": 24,
+    "vocab": 201088,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 2880,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "gpt-oss-safeguard-20b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "openai/gpt-oss-safeguard-20b",
+     "revision": "8a11e17b25c973a24099d4016bf2e17dd7ec1574",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 11358,
+       "sha256": null
+      },
+      {
+       "path": "chat_template.jinja",
+       "size": 16663,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 1806,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 165,
+       "sha256": null
+      },
+      {
+       "path": "model-00000-of-00002.safetensors",
+       "size": 4792272488,
+       "sha256": "ef82af3aff019605840ebd545957b8493a65a179a8c11339e50753d311195d12"
+      },
+      {
+       "path": "model-00001-of-00002.safetensors",
+       "size": 4798702184,
+       "sha256": "19684279c3bf220c0bf6e63a86ee22a2724debb6972c7ad59b0d8aa42dff642d"
+      },
+      {
+       "path": "model-00002-of-00002.safetensors",
+       "size": 4170342232,
+       "sha256": "e18569972d3995dd7327e4423a6a3de5b1356223d4f710808bfcbac09f2b4d5d"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 36355,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 98,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 27868174,
+       "sha256": "0614fe83cadab421296e664e1f48f4261fa8fef6e03e63bb75c20f38e37d07d3"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 4200,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 13789255723,
+     "weights_bytes": 13761316904,
+     "runtimes": [
+      "transformers",
+      "sglang",
+      "vllm",
+      "mlx"
+     ],
+     "requires": {}
+    }
+   ],
+   "superseded_by": null,
+   "position": 63
+  },
+  {
+   "id": "gpt-oss-safeguard-120b",
+   "name": "gpt oss safeguard 120b",
+   "description": "Safety model: checks requests and answers against a written policy it reasons over.",
+   "provider": "OpenAI",
+   "repo": "openai/gpt-oss-safeguard-120b",
+   "capabilities": [
+    "Safety"
+   ],
+   "recommended": false,
+   "recommendation": null,
+   "gated": false,
+   "stop_tokens": [],
+   "template_kwargs": {},
+   "popularity": 14344,
+   "context_tokens": 131072,
+   "released": "2025-09-18",
+   "license": "apache-2.0",
+   "license_name": "Apache 2.0",
+   "license_summary": "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "family": "gpt-oss-safeguard",
+   "generation": "1",
+   "architecture": "gpt_oss",
+   "tier": "XL",
+   "params_b": 116.83,
+   "moe": true,
+   "shape": {
+    "hidden": 2880,
+    "layers": 36,
+    "vocab": 201088,
+    "heads": 64,
+    "kv_heads": 8,
+    "head_dim": 64,
+    "intermediate": 2880,
+    "tied": false
+   },
+   "variants": [
+    {
+     "id": "gpt-oss-safeguard-120b:bf16:safetensors",
+     "label": "BF16 safetensors",
+     "format": "safetensors",
+     "precision": "bf16",
+     "repo": "openai/gpt-oss-safeguard-120b",
+     "revision": "3c7391182603991a904031244e7822488c67796d",
+     "files": [
+      {
+       "path": "LICENSE",
+       "size": 11358,
+       "sha256": null
+      },
+      {
+       "path": "chat_template.jinja",
+       "size": 16663,
+       "sha256": null
+      },
+      {
+       "path": "config.json",
+       "size": 2089,
+       "sha256": null
+      },
+      {
+       "path": "generation_config.json",
+       "size": 165,
+       "sha256": null
+      },
+      {
+       "path": "model-00000-of-00014.safetensors",
+       "size": 4064660800,
+       "sha256": "390d1940d5157d84236e6ba5c79a0097d604a9cebaa6387a2fc8b50ce193272d"
+      },
+      {
+       "path": "model-00001-of-00014.safetensors",
+       "size": 4625017896,
+       "sha256": "78b5c58391bff0fe8b426ec60ac1932777184531aac0ba6011626d76261ba940"
+      },
+      {
+       "path": "model-00002-of-00014.safetensors",
+       "size": 4115586752,
+       "sha256": "f82e79ca8696a01f264c431edf7d0f0015d85f35956d293d8311d452f0f34eff"
+      },
+      {
+       "path": "model-00003-of-00014.safetensors",
+       "size": 4625017896,
+       "sha256": "005a7e66dccd17585d883c680a97e5fb5187d0a380a626f1723c54830d17112d"
+      },
+      {
+       "path": "model-00004-of-00014.safetensors",
+       "size": 4115586752,
+       "sha256": "d3927ad7c48743f98ff4780cc15d1979b8b2bcf3fce08fb0bf104a80916908d4"
+      },
+      {
+       "path": "model-00005-of-00014.safetensors",
+       "size": 4625017888,
+       "sha256": "326f07d7ce40a9920aed51ec6ac1237cd3ece080f28c86d6ed0796494c612c7d"
+      },
+      {
+       "path": "model-00006-of-00014.safetensors",
+       "size": 4115586752,
+       "sha256": "987b29395f80eb82204284d770fee8aef7f4f5072c893e3a6e0185cd9d5adf9d"
+      },
+      {
+       "path": "model-00007-of-00014.safetensors",
+       "size": 4625017888,
+       "sha256": "1cecde8fd7f86f2770f60433654aa1d674f1ebbef786200d129f55cac243e0bc"
+      },
+      {
+       "path": "model-00008-of-00014.safetensors",
+       "size": 4115586752,
+       "sha256": "bd85f4d6f369e76e159513428da05e08e1818f84f1c11ecfe24653f34c1771b8"
+      },
+      {
+       "path": "model-00009-of-00014.safetensors",
+       "size": 4625017896,
+       "sha256": "279813e394c118754a8f896c8ddfaf670d920d9c59553d6b38144790bd03736e"
+      },
+      {
+       "path": "model-00010-of-00014.safetensors",
+       "size": 4170906296,
+       "sha256": "7d23bbff2e2e0d0eda531f56b7d9ad995347a4403d36c1f41d592f75cec51fc5"
+      },
+      {
+       "path": "model-00011-of-00014.safetensors",
+       "size": 4625017896,
+       "sha256": "26d9774fcb15ce82e226c8747dfa19aaece0c323bb228789d3fced17b6d586ff"
+      },
+      {
+       "path": "model-00012-of-00014.safetensors",
+       "size": 4115586736,
+       "sha256": "1f4bcccbd6fa3fabc9f7d89c8c19b48ab078a48010ddc0cbc395a2ba28c1875f"
+      },
+      {
+       "path": "model-00013-of-00014.safetensors",
+       "size": 4625017856,
+       "sha256": "0adcb96bba558ca2878ae1db0eba944286e0534d5a8053a7eddab4864d9aca02"
+      },
+      {
+       "path": "model-00014-of-00014.safetensors",
+       "size": 4060267128,
+       "sha256": "590d1238be108961ccb99ab37837191758b354d1bdb9d71e7708b1cc8d7742d7"
+      },
+      {
+       "path": "model.safetensors.index.json",
+       "size": 54511,
+       "sha256": null
+      },
+      {
+       "path": "special_tokens_map.json",
+       "size": 98,
+       "sha256": null
+      },
+      {
+       "path": "tokenizer.json",
+       "size": 27868174,
+       "sha256": "0614fe83cadab421296e664e1f48f4261fa8fef6e03e63bb75c20f38e37d07d3"
+      },
+      {
+       "path": "tokenizer_config.json",
+       "size": 4200,
+       "sha256": null
+      }
+     ],
+     "size_bytes": 65276850442,
+     "weights_bytes": 65248893184,
+     "runtimes": [
+      "sglang",
+      "vllm"
+     ],
+     "requires": {
+      "gpus": "multi",
+      "note": "Needs several datacenter GPUs."
+     }
+    }
+   ],
+   "superseded_by": null,
+   "position": 64
   }
  ]
 }

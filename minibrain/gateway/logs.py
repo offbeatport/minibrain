@@ -3,11 +3,12 @@ import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.registry.models import ApiKey, Model, RequestLog
+from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog
 
 FLUSH_SECONDS = 2.0
 MAX_BUFFERED = 10_000
@@ -31,6 +32,7 @@ class LogEntry:
     input: str | None = None
     output: str | None = None
     finish_reason: str | None = None
+    safety: dict[str, Any] | None = None
 
     def as_json(self) -> dict:
         return asdict(self) | {"at": self.at.isoformat()}
@@ -87,11 +89,31 @@ def existing(session: Session, batch: list[LogEntry]) -> Callable[[LogEntry], Lo
     return keep
 
 
+def key_actor(key_id: int | None) -> str:
+    return f"api_key:{key_id}" if key_id is not None else "api_key:unknown"
+
+
+def blocked_event(entry: LogEntry) -> AuditEvent | None:
+    found = entry.safety or {}
+    if not found.get("blocked"):
+        return None
+    target = f"{entry.model}@{entry.version}" if entry.version is not None and "@" not in entry.model else entry.model
+    detail = {
+        "safety_model": found.get("model"),
+        "stage": found.get("stage"),
+        "categories": found.get("categories") or [],
+        "response_id": entry.response_id,
+        "key_id": entry.key_id,
+    }
+    return AuditEvent(at=entry.at, actor=key_actor(entry.key_id), action="safety.block", target=target, detail=detail)
+
+
 def database_sink(sessions: sessionmaker[Session]) -> Sink:
     def write(batch: list[LogEntry]) -> None:
         with sessions() as session:
             entries = list(map(existing(session, batch), batch))
             session.add_all(RequestLog(**asdict(entry)) for entry in entries)
+            session.add_all(event for event in map(blocked_event, entries) if event is not None)
             last_used: dict[int, datetime] = {}
             for entry in entries:
                 if entry.key_id is not None and entry.status < 400:

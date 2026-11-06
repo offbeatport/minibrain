@@ -19,6 +19,7 @@ import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { RequestBodies } from "~/components/RequestBodies";
+import { ModelSafety } from "~/components/SafetySettings";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { LastUsed, Requests, failingShare } from "~/components/models/ModelMetrics";
@@ -123,6 +124,7 @@ function Connect({ slug }: { slug: string }) {
                 keyValue={created?.secret ?? null}
             />
             <RequestBodies detail={detail} />
+            <ModelSafety detail={detail} />
             {can.build && <ApiKeys scope={{ kind: "custom", key: slug }} onCreated={setCreated} />}
         </>
     );

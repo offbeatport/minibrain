@@ -197,6 +197,30 @@ export const GENERAL = {
         },
         { role: "admin" },
     ),
+    safety: section(
+        "Safety model",
+        {
+            safetyModel: setting(
+                "Safety model",
+                "The guard model that checks every request to every model that does not pick its own.",
+                [
+                    "guard",
+                    "llama guard",
+                    "shieldgemma",
+                    "qwen3guard",
+                    "safeguard",
+                    "moderation",
+                    "content filter",
+                ],
+            ),
+            safetyAnswers: setting(
+                "Also check answers",
+                "Checks each model's answer too, not only the request, before it is returned.",
+                ["moderation", "output filter", "responses"],
+            ),
+        },
+        { role: "admin" },
+    ),
     recipe: section(
         "Default training recipe",
         {},

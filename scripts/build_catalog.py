@@ -165,6 +165,26 @@ CANDIDATES: list[dict[str, Any]] = [
         "tokens": GLM_HYBRID_TOKENS,
         "extra": ["Reasoning"],
     },
+    *[
+        {
+            "repo": repo,
+            "family": family,
+            "generation": generation,
+            "tasks": ["Safety"],
+            "description": f"Safety model: checks requests and answers against {policy}.",
+        }
+        for repo, family, generation, policy in (
+            ("meta-llama/Llama-Guard-3-1B", "llama-guard", "3", "14 hazard categories (S1 to S14)"),
+            ("meta-llama/Llama-Guard-3-8B", "llama-guard", "3", "14 hazard categories (S1 to S14)"),
+            ("google/shieldgemma-2b", "shieldgemma", "1", "four policies, one at a time"),
+            ("google/shieldgemma-9b", "shieldgemma", "1", "four policies, one at a time"),
+            ("Qwen/Qwen3Guard-Gen-0.6B", "qwen3guard", "1", "nine categories, with a controversial grade"),
+            ("Qwen/Qwen3Guard-Gen-4B", "qwen3guard", "1", "nine categories, with a controversial grade"),
+            ("Qwen/Qwen3Guard-Gen-8B", "qwen3guard", "1", "nine categories, with a controversial grade"),
+            ("openai/gpt-oss-safeguard-20b", "gpt-oss-safeguard", "1", "a written policy it reasons over"),
+            ("openai/gpt-oss-safeguard-120b", "gpt-oss-safeguard", "1", "a written policy it reasons over"),
+        )
+    ],
 ]
 
 
@@ -307,7 +327,8 @@ class Builder:
         base = {
             "id": entry_id,
             "name": repo.split("/", 1)[1].replace("-", " ").replace("_", " "),
-            "description": f"{PUBLISHERS[organisation]} instruct model, {params:.1f}B parameters"
+            "description": candidate.get("description")
+            or f"{PUBLISHERS[organisation]} instruct model, {params:.1f}B parameters"
             + (" (mixture of experts)" if moe else "")
             + ".",
             "provider": PUBLISHERS[organisation],

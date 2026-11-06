@@ -5,6 +5,7 @@ from typing import Any
 STOP = "stop"
 LENGTH = "length"
 TOOL_CALLS = "tool_calls"
+CONTENT_FILTER = "content_filter"
 
 
 def call_id() -> str:
@@ -41,9 +42,12 @@ class Completion:
     seconds: float
     tool_calls: tuple[ToolCall, ...] = ()
     reasoning: str | None = None
+    refusal: str | None = None
 
     @property
     def finish_reason(self) -> str:
+        if self.refusal:
+            return CONTENT_FILTER
         if self.tool_calls:
             return TOOL_CALLS
         return STOP if self.stopped else LENGTH
@@ -77,9 +81,10 @@ class Piece:
     content: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
     reasoning: str = ""
+    refusal: str = ""
 
     def __bool__(self) -> bool:
-        return bool(self.content or self.tool_calls or self.reasoning)
+        return bool(self.content or self.tool_calls or self.reasoning or self.refusal)
 
     def __add__(self, other: "Piece") -> "Piece":
         return Piece(self.content + other.content, self.tool_calls + other.tool_calls, self.reasoning + other.reasoning)

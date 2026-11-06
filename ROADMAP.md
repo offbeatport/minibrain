@@ -123,7 +123,8 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 
 Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, tool calling through each family's
 chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss), reasoning off or at an effort with
-`reasoning_content` apart from the answer, and token streaming from every engine. Not yet: `/v1/embeddings`,
+`reasoning_content` apart from the answer, token streaming from every engine, and a safety model (Llama Guard,
+ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request. Not yet: `/v1/embeddings`,
 `/v1/completions`, sizing guidance.
 
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
@@ -872,6 +873,11 @@ once it matches; only deleting a base removes its files.
 - Reasoning: `reasoning_effort` (`none`, `low`, `medium`, `high`) mapped per family (Qwen3 `enable_thinking`,
   gpt-oss `reasoning_effort`, DeepSeek-R1 always on), detected from the template; the reasoning returns as
   `reasoning_content` and never reaches answers, logs or graders. Built 2026-11-06; `docs/serving.md`, Reasoning.
+- Safety model: a guard base checks requests and optionally answers (install default under Settings, a per-model
+  override, a per-request `safety` field that can add but not remove); a block is an OpenAI refusal with
+  `finish_reason: content_filter` and the categories, kept in the request log and audited as `safety.block`. The
+  catalogue carries Llama Guard 3, ShieldGemma, Qwen3Guard and gpt-oss-safeguard. Built 2026-11-06;
+  `docs/serving.md`, Safety model.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the model by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and

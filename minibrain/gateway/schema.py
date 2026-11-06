@@ -34,6 +34,12 @@ REASONING_HELP = (
     "on; gpt-oss always reasons at an effort; DeepSeek-R1 always reasons. The reasoning comes back apart from the "
     "answer, as message.reasoning_content."
 )
+SAFETY_HELP = (
+    "A minibrain extension: check the request with a safety model on this install (Llama Guard, ShieldGemma, "
+    "Qwen3Guard, gpt-oss-safeguard), and the answer too with answers: true. A model with a safety model set in "
+    "Settings or on its page is always checked by it; a request can add the answer check but not change or turn "
+    "off that model. A blocked request answers with message.refusal and finish_reason content_filter."
+)
 TOOL_CHOICE_HELP = (
     "auto (the default with tools) lets the model choose, none answers in text, required makes it call one, and "
     '{"type": "function", "function": {"name": ...}} makes it call that one.'
@@ -75,6 +81,11 @@ class FunctionSpec(BaseModel):
 class ToolSpec(BaseModel):
     type: Literal["function"] = "function"
     function: FunctionSpec
+
+
+class SafetyRequest(BaseModel):
+    model: str | None = Field(default=None, description="A safety model's key, or none.")
+    answers: bool | None = Field(default=None, description="Check the answer as well as the request.")
 
 
 class ChatCompletionRequest(BaseModel):
@@ -142,6 +153,7 @@ class ChatCompletionRequest(BaseModel):
         default=None, description="false keeps only the first call the model makes; true (the default) keeps all."
     )
     reasoning_effort: Literal["none", "low", "medium", "high"] | None = Field(default=None, description=REASONING_HELP)
+    safety: SafetyRequest | None = Field(default=None, description=SAFETY_HELP)
 
     @property
     def token_budget(self) -> int | None:
@@ -169,14 +181,25 @@ class AnswerMessage(BaseModel):
     tool_calls: list[ToolCallBody] | None = Field(
         default=None, description="The functions the model calls; answer each with a tool message."
     )
+    refusal: str | None = Field(
+        default=None, description="Why the safety model blocked the request or the answer, with its categories."
+    )
 
 
 class CompletionChoice(BaseModel):
     index: int
     message: AnswerMessage
-    finish_reason: Literal["stop", "length", "tool_calls"] = Field(
-        description="stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools."
+    finish_reason: Literal["stop", "length", "tool_calls", "content_filter"] = Field(
+        description="stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools, "
+        "content_filter when the safety model blocked it."
     )
+
+
+class SafetyVerdict(BaseModel):
+    model: str = Field(description="The safety model that checked the call.")
+    stage: Literal["prompt", "answer"] = Field(description="What it checked last: the request or the answer.")
+    blocked: bool
+    categories: list[str] = Field(description="The categories it found, in the safety model's own words.")
 
 
 class TokenUsage(BaseModel):
@@ -192,6 +215,7 @@ class ChatCompletion(BaseModel):
     model: str
     choices: list[CompletionChoice]
     usage: TokenUsage
+    safety: SafetyVerdict | None = Field(default=None, description="Present when a safety model checked the call.")
 
 
 class ErrorInfo(BaseModel):

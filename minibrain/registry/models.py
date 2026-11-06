@@ -220,6 +220,7 @@ class Model(Base):
     judge_model: Mapped[str | None] = mapped_column(default=None)
     first_live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     labels_dismissed: Mapped[list[int] | None] = mapped_column(JSON, default=None)
+    safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
@@ -438,6 +439,7 @@ class RequestLog(Base):
     input: Mapped[str | None] = mapped_column(default=None)
     output: Mapped[str | None] = mapped_column(default=None)
     finish_reason: Mapped[str | None] = mapped_column(default=None)
+    safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
 
 
 class Feedback(Base):

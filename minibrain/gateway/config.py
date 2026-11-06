@@ -19,6 +19,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
 from minibrain.models.registry import missing_files, resolve_spec
+from minibrain.models.safety import guard_specs, install_safety, model_safety
 from minibrain.policy import load as load_policy
 from minibrain.registry.compute import GatewayReport, live_engines, record_gateway
 from minibrain.registry.files import ref
@@ -54,6 +55,7 @@ class Route:
     contract: int | None = None
     preset: str = ""
     request_bodies: bool = False
+    safety: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +88,7 @@ class GatewayConfig:
     engines: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
     problems: dict[str, str] = field(default_factory=dict)
+    guards: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -101,6 +104,7 @@ class GatewayConfig:
             engines={base: replicas_of(found) for base, found in data.get("engines", {}).items()},
             bases=dict(data.get("bases", {})),
             problems=dict(data.get("problems", {})),
+            guards=dict(data.get("guards", {})),
         )
 
 
@@ -115,6 +119,11 @@ EMPTY = GatewayConfig(version="empty")
 
 
 def routes_for(session: Session, model: Model, bodies: bool) -> list[Route]:
+    guarded = model_safety(session, model).as_route()
+    return [replace(route, safety=guarded) for route in model_routes(session, model, bodies)]
+
+
+def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
     ready = sorted((v for v in model.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
     for version in ready:
@@ -189,14 +198,16 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         routes |= {route.name: route for route in routes_for(session, model, bodies)}
     deployed = select(BaseModel).where(BaseModel.deployed.is_(True), BaseModel.status == BaseModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
+    guarded = install_safety(session).as_route()
     routes |= {
-        base.id: replace(base_route(base), request_bodies=default)
+        base.id: replace(base_route(base), request_bodies=default, safety=guarded)
         for base in session.scalars(deployed)
         if base.id not in dropped
     }
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
-    for key in sorted({route.base_model for route in routes.values()}):
+    guards = {str(route.safety["model"]) for route in routes.values() if route.safety}
+    for key in sorted({route.base_model for route in routes.values()} | guards):
         base = session.get(BaseModel, key)
         try:
             bases[key] = resolve_spec(session, settings, key).as_dict()
@@ -226,6 +237,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         engines=engines,
         bases=bases,
         problems=problems,
+        guards=guard_specs(session, settings),
     )
     return replace(config, version=hash_of(config.to_json()))
 

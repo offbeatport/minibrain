@@ -1728,6 +1728,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/safety": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Safety */
+        get: operations["read_safety_api_settings_safety_get"];
+        /** Update Safety */
+        put: operations["update_safety_api_settings_safety_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{slug}/safety": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Model Safety */
+        put: operations["update_model_safety_api_models__slug__safety_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{slug}/training-plan": {
         parameters: {
             query?: never;
@@ -2923,6 +2958,11 @@ export interface components {
              * @description The functions the model calls; answer each with a tool message.
              */
             tool_calls?: components["schemas"]["ToolCallBody"][] | null;
+            /**
+             * Refusal
+             * @description Why the safety model blocked the request or the answer, with its categories.
+             */
+            refusal?: string | null;
         };
         /** AnswerSide */
         AnswerSide: {
@@ -3724,6 +3764,8 @@ export interface components {
             /** Choices */
             choices: components["schemas"]["CompletionChoice"][];
             usage: components["schemas"]["TokenUsage"];
+            /** @description Present when a safety model checked the call. */
+            safety?: components["schemas"]["SafetyVerdict"] | null;
         };
         /**
          * ChatCompletionRequest
@@ -3841,6 +3883,8 @@ export interface components {
              * @description none turns reasoning off; low, medium or high turn it on at that effort; unset keeps the model's default (off for custom models and the catalogue's Qwen3 bases). Qwen3 and GLM think or not, so any effort turns thinking on; gpt-oss always reasons at an effort; DeepSeek-R1 always reasons. The reasoning comes back apart from the answer, as message.reasoning_content.
              */
             reasoning_effort?: ("none" | "low" | "medium" | "high") | null;
+            /** @description A minibrain extension: check the request with a safety model on this install (Llama Guard, ShieldGemma, Qwen3Guard, gpt-oss-safeguard), and the answer too with answers: true. A model with a safety model set in Settings or on its page is always checked by it; a request can add the answer check but not change or turn off that model. A blocked request answers with message.refusal and finish_reason content_filter. */
+            safety?: components["schemas"]["SafetyRequest"] | null;
         } & {
             [key: string]: unknown;
         };
@@ -3958,10 +4002,10 @@ export interface components {
             message: components["schemas"]["AnswerMessage"];
             /**
              * Finish Reason
-             * @description stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools.
+             * @description stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools, content_filter when the safety model blocked it.
              * @enum {string}
              */
-            finish_reason: "stop" | "length" | "tool_calls";
+            finish_reason: "stop" | "length" | "tool_calls" | "content_filter";
         };
         /** ConfusionInfo */
         ConfusionInfo: {
@@ -5222,6 +5266,15 @@ export interface components {
             /** Graders */
             graders: components["schemas"]["GraderConfig"][];
         };
+        /** GuardInfo */
+        GuardInfo: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -5864,6 +5917,10 @@ export interface components {
             output?: string | null;
             /** Finish Reason */
             finish_reason?: string | null;
+            /** Safety */
+            safety?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** LoggedRequest */
         LoggedRequest: {
@@ -6075,6 +6132,7 @@ export interface components {
             /** Graders Default */
             graders_default: boolean;
             judge: components["schemas"]["JudgeInfo"];
+            safety: components["schemas"]["ModelSafety"];
             promotion: components["schemas"]["PromotionInfo"];
             /**
              * Went Live
@@ -6201,6 +6259,51 @@ export interface components {
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
+        };
+        /** ModelSafety */
+        ModelSafety: {
+            /**
+             * Mode
+             * @description inherit follows Settings, none turns it off, model picks one.
+             * @enum {string}
+             */
+            mode: "inherit" | "none" | "model";
+            /**
+             * Model
+             * @description The safety model this model picks, when mode is model.
+             */
+            model: string | null;
+            /** Answers */
+            answers: boolean;
+            /**
+             * Effective
+             * @description The safety model that checks this model's calls, if any.
+             */
+            effective: string | null;
+            /** Effective Name */
+            effective_name: string | null;
+            /** Effective Answers */
+            effective_answers: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "install" | "model";
+        };
+        /** ModelSafetyUpdate */
+        ModelSafetyUpdate: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "inherit" | "none" | "model";
+            /** Model */
+            model?: string | null;
+            /**
+             * Answers
+             * @default false
+             */
+            answers?: boolean;
         };
         /** ModelSummary */
         ModelSummary: {
@@ -6683,6 +6786,13 @@ export interface components {
             completion_tokens: number;
             /** Finish Reason */
             finish_reason: string | null;
+            /** Blocked By */
+            blocked_by?: string | null;
+            /**
+             * Blocked For
+             * @default []
+             */
+            blocked_for?: string[];
             /** Response Id */
             response_id: string | null;
             /** Feedback Up */
@@ -6825,6 +6935,13 @@ export interface components {
             completion_tokens: number;
             /** Finish Reason */
             finish_reason: string | null;
+            /** Blocked By */
+            blocked_by?: string | null;
+            /**
+             * Blocked For
+             * @default []
+             */
+            blocked_for?: string[];
             /** Response Id */
             response_id: string | null;
             /** Feedback Up */
@@ -6911,6 +7028,70 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** SafetyRequest */
+        SafetyRequest: {
+            /**
+             * Model
+             * @description A safety model's key, or none.
+             */
+            model?: string | null;
+            /**
+             * Answers
+             * @description Check the answer as well as the request.
+             */
+            answers?: boolean | null;
+        };
+        /** SafetySetting */
+        SafetySetting: {
+            /**
+             * Model
+             * @description The install's safety model, or null for none.
+             */
+            model: string | null;
+            /** Name */
+            name: string | null;
+            /**
+             * Answers
+             * @description Whether it checks answers as well as requests.
+             */
+            answers: boolean;
+            /**
+             * Guards
+             * @description The safety models on this install.
+             */
+            guards: components["schemas"]["GuardInfo"][];
+        };
+        /** SafetyUpdate */
+        SafetyUpdate: {
+            /** Model */
+            model?: string | null;
+            /**
+             * Answers
+             * @default false
+             */
+            answers?: boolean;
+        };
+        /** SafetyVerdict */
+        SafetyVerdict: {
+            /**
+             * Model
+             * @description The safety model that checked the call.
+             */
+            model: string;
+            /**
+             * Stage
+             * @description What it checked last: the request or the answer.
+             * @enum {string}
+             */
+            stage: "prompt" | "answer";
+            /** Blocked */
+            blocked: boolean;
+            /**
+             * Categories
+             * @description The categories it found, in the safety model's own words.
+             */
+            categories: string[];
+        };
         /** SampleDetail */
         SampleDetail: {
             /** Slug */
@@ -6960,6 +7141,7 @@ export interface components {
             /** Graders Default */
             graders_default: boolean;
             judge: components["schemas"]["JudgeInfo"];
+            safety: components["schemas"]["ModelSafety"];
             promotion: components["schemas"]["PromotionInfo"];
             /**
              * Went Live
@@ -11717,6 +11899,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JudgeSetting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_safety_api_settings_safety_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafetySetting"];
+                };
+            };
+        };
+    };
+    update_safety_api_settings_safety_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SafetyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SafetySetting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_model_safety_api_models__slug__safety_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelSafetyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
                 };
             };
             /** @description Validation Error */

@@ -25,6 +25,7 @@ export const keys = {
     sourceStats: (id: number) => ["sources", id, "stats"] as const,
     presets: ["presets"] as const,
     judge: ["settings", "judge"] as const,
+    safety: ["settings", "safety"] as const,
     answers: (slug: string, number: number) => ["model", slug, "answers", number] as const,
 };
 
@@ -257,6 +258,13 @@ export function useJudgeSetting() {
     return useQuery({
         queryKey: keys.judge,
         queryFn: () => unwrap(api.GET("/api/settings/judge")),
+    });
+}
+
+export function useSafetySetting() {
+    return useQuery({
+        queryKey: keys.safety,
+        queryFn: () => unwrap(api.GET("/api/settings/safety")),
     });
 }
 

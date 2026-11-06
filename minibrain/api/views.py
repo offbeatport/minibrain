@@ -25,6 +25,7 @@ from minibrain.api.schemas import (
     MappingInfo,
     Mistake,
     ModelDetail,
+    ModelSafety,
     ModelSummary,
     PromotionInfo,
     RequestBodiesInfo,
@@ -40,6 +41,7 @@ from minibrain.data.dataset_versions import Changes, changes_since, version_numb
 from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import plain_columns
+from minibrain.models.safety import model_safety
 from minibrain.policy import bodies_choice
 from minibrain.presets import answer_preset
 from minibrain.registry.files import store_for
@@ -389,6 +391,21 @@ def judge_info(session: Session, model: Model, graders: list[dict[str, Any]]) ->
     )
 
 
+def safety_info(session: Session, model: Model) -> ModelSafety:
+    chosen = model_safety(session, model)
+    override = model.safety
+    mode = "inherit" if override is None else "model" if override.get("model") else "none"
+    return ModelSafety(
+        mode=mode,
+        model=str(override["model"]) if override and override.get("model") else None,
+        answers=bool(override.get("answers")) if override else False,
+        effective=chosen.model,
+        effective_name=base_name(session, chosen.model) if chosen.model else None,
+        effective_answers=chosen.answers if chosen.model else False,
+        source="model" if chosen.source == "model" else "install",
+    )
+
+
 def label_proposal(model: Model, current: DatasetVersion | None) -> LabelProposal | None:
     if current is None or not preset_of(model).free_text or len(current.labels) < 2:
         return None
@@ -430,6 +447,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         graders=grader_infos(graders),
         graders_default=not model.graders,
         judge=judge_info(session, model, graders),
+        safety=safety_info(session, model),
         promotion=PromotionInfo.model_validate(rule_of(model).as_dict()),
         went_live=went_live(model),
         label_proposal=label_proposal(model, current),

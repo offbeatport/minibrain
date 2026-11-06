@@ -91,6 +91,43 @@ class JudgeSetting(BaseModel):
     name: str | None
 
 
+class GuardInfo(BaseModel):
+    key: str
+    name: str
+    kind: str
+
+
+class SafetySetting(BaseModel):
+    model: str | None = Field(description="The install's safety model, or null for none.")
+    name: str | None
+    answers: bool = Field(description="Whether it checks answers as well as requests.")
+    guards: list[GuardInfo] = Field(description="The safety models on this install.")
+
+
+class SafetyUpdate(BaseModel):
+    model: str | None = Field(default=None, max_length=200)
+    answers: bool = False
+
+
+SafetyMode = Literal["inherit", "none", "model"]
+
+
+class ModelSafety(BaseModel):
+    mode: SafetyMode = Field(description="inherit follows Settings, none turns it off, model picks one.")
+    model: str | None = Field(description="The safety model this model picks, when mode is model.")
+    answers: bool
+    effective: str | None = Field(description="The safety model that checks this model's calls, if any.")
+    effective_name: str | None
+    effective_answers: bool
+    source: Literal["install", "model"]
+
+
+class ModelSafetyUpdate(BaseModel):
+    mode: SafetyMode
+    model: str | None = Field(default=None, max_length=200)
+    answers: bool = False
+
+
 class InstructionsUpdate(BaseModel):
     instructions: str = Field(max_length=8000)
 
@@ -630,6 +667,7 @@ class ModelDetail(ModelSummary):
     graders: list[GraderConfig]
     graders_default: bool
     judge: JudgeInfo
+    safety: ModelSafety
     promotion: PromotionInfo
     went_live: bool = False
     label_proposal: LabelProposal | None = None

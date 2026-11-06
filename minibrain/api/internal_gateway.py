@@ -47,6 +47,7 @@ class LogBody(BaseModel):
     input: str | None = None
     output: str | None = None
     finish_reason: str | None = None
+    safety: dict[str, Any] | None = None
 
 
 class LogsBody(BaseModel):

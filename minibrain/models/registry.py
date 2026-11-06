@@ -36,7 +36,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.service import ConflictError, NotFoundError
-from minibrain.serve.dialects import detect_reasoning, detect_tools
+from minibrain.serve.dialects import detect_guard, detect_reasoning, detect_tools
 from minibrain.settings import Settings
 from minibrain.storage import missing_room, staging_room
 
@@ -142,6 +142,7 @@ def spec_for(settings: Settings, model: BaseModel) -> BaseModelSpec:
         content_hash=content_hash(model.files),
         tools=detect_tools(template),
         reasoning=detect_reasoning(template),
+        guard=detect_guard(model.repo, model.name),
     )
 
 

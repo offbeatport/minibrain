@@ -291,6 +291,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Reasoning** · shipped · engineer
   Turn reasoning off or set its effort, returned apart.
   API: POST /v1/chat/completions
+- **Safety model** · shipped · engineer, admin
+  Block unsafe requests and answers with a guard model, audited.
+  UI: Settings › General › Safety model, Deployments › model, Monitor › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{slug}/safety, POST /v1/chat/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access

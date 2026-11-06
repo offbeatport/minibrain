@@ -50,6 +50,8 @@ class RequestRow(pydantic.BaseModel):
     prompt_tokens: int
     completion_tokens: int
     finish_reason: str | None
+    blocked_by: str | None = None
+    blocked_for: list[str] = []
     response_id: str | None
     feedback_up: int
     feedback_down: int
@@ -282,6 +284,8 @@ def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
                 prompt_tokens=log.prompt_tokens,
                 completion_tokens=log.completion_tokens,
                 finish_reason=log.finish_reason,
+                blocked_by=str((log.safety or {}).get("model") or "") or None,
+                blocked_for=[str(item) for item in (log.safety or {}).get("categories") or []],
                 response_id=log.response_id,
                 feedback_up=mark.get(UP, 0),
                 feedback_down=sum(total for rating, total in mark.items() if rating != UP),

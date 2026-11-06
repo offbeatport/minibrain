@@ -166,6 +166,32 @@ feedback and graders see only the answer.
   `deepseek-r1` or `gpt-oss` on SGLang; `qwen3`, `deepseek_r1` or `openai_gptoss` on vLLM).
 - Evaluation and judge jobs strip the reasoning too, so a reasoning base is scored on its answers.
 
+## Safety model
+
+A guard model installed like any base checks each request before the model answers it, and the answer too when
+set. A blocked call answers 200 with OpenAI's refusal shape: `message.content: null`, `message.refusal` naming the
+safety model and the categories it found, `finish_reason: content_filter`, and a `safety` object (`model`, `stage`
+`prompt` or `answer`, `blocked`, `categories`). Streams send the refusal as `delta.refusal`.
+
+| Guard | Detected from | Prompt | Categories |
+|---|---|---|---|
+| Llama Guard 3 (1B, 8B) | `llama-guard` in the repo or name | its chat template, roles merged to alternate | `S1` to `S14`, named |
+| ShieldGemma (2B, 9B) | `shieldgemma` | its template with each of four policies as `guideline` | the policy that answered Yes |
+| Qwen3Guard Gen (0.6B, 4B, 8B) | `qwen3guard` | its template (request or answer moderation) | its own; Controversial passes |
+| gpt-oss-safeguard (20B, 120B) | `gpt-oss-safeguard` | a written policy as the system message, low effort | the category in its JSON answer |
+
+- Which guard applies: a model's own choice on its Deployments page (a guard, or none), else the install's under
+  Settings, General (none by default); base models served through `/v1` follow the install's. Both can also check
+  answers. A request's `safety` field (`{"model": ..., "answers": true}`, an extension) can pick a guard for a model
+  that has none and add the answer check, but cannot change or turn off the one set (400 `safety.model`).
+- The guard runs greedily through the same engines as any base, and its engine starts with the configuration when
+  it is set. If it cannot answer, the call fails with a 503 rather than going unchecked. Checking answers means the
+  answer is generated in full before it streams.
+- Blocked `/v1` calls keep their request log, with `finish_reason: content_filter` and the safety verdict
+  (Monitor, Requests shows "Blocked by"), and add a `safety.block` audit event with the API key as actor, the stage,
+  categories and response ID, never the content. Playground calls are audited with the person as actor. Changes
+  to the settings are audited as `settings.safety` and `model.safety`.
+
 ## Engines
 
 One engine process serves one base model with many adapters. It picks its engine when it starts, from its own

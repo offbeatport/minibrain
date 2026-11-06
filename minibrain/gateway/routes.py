@@ -1,6 +1,7 @@
 import contextlib
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from minibrain.data.feedback import ORIGIN_API, Submission
 from minibrain.gateway.chat import (
+    ChatPlan,
     answer,
     chat_events,
     checked_base,
@@ -18,12 +20,14 @@ from minibrain.gateway.chat import (
     plan,
     response_body,
     response_id,
+    safety_of,
     served_model,
     sse,
 )
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.errors import OpenAIError
 from minibrain.gateway.logs import LogBuffer, LogEntry
+from minibrain.gateway.safety import Verdict
 from minibrain.gateway.schema import (
     CHAT_HELP,
     CHAT_RESPONSES,
@@ -144,9 +148,12 @@ def chat_completions(
     started = time.monotonic()
     identifier = response_id()
     route = config.routes.get(body.model)
+    planned: list[ChatPlan] = []
 
     def finished(completion: Completion | None, error: BaseException | None) -> None:
-        log_chat(request.app.state.request_logs, body, grant, route, identifier, started, completion, error)
+        verdict = planned[0].verdict if planned else None
+        outcome = Outcome(completion, error, verdict)
+        log_chat(request.app.state.request_logs, body, grant, route, identifier, started, outcome)
 
     try:
         if route is None:
@@ -154,7 +161,8 @@ def chat_completions(
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
         base, adapter = checked_base(config, route)
-        chat = plan(body, route, base, adapter)
+        chat = plan(body, route, base, adapter, safety_of(body, route, config))
+        planned.append(chat)
         backend = request.app.state.backend
         if body.stream:
             events = chat_events(backend, chat)
@@ -165,7 +173,7 @@ def chat_completions(
         finished(None, error)
         raise
     finished(completion, None)
-    return response_body(identifier, body.model, completion)
+    return response_body(identifier, body.model, completion, chat.verdict)
 
 
 def include_usage(body: ChatCompletionRequest) -> bool:
@@ -179,6 +187,17 @@ def status_of(error: BaseException | None) -> int:
     return error.status_code if isinstance(error, HTTPException | OpenAIError) else 500
 
 
+@dataclass(frozen=True)
+class Outcome:
+    completion: Completion | None
+    error: BaseException | None
+    verdict: Verdict | None = None
+
+    @property
+    def blocked(self) -> dict[str, Any] | None:
+        return self.verdict.as_dict() if self.verdict is not None and not self.verdict.safe else None
+
+
 def log_chat(
     logs: LogBuffer,
     body: ChatCompletionRequest,
@@ -186,9 +205,9 @@ def log_chat(
     route: Route | None,
     identifier: str,
     started: float,
-    completion: Completion | None,
-    error: BaseException | None,
+    outcome: Outcome,
 ) -> None:
+    completion, error = outcome.completion, outcome.error
     status = status_of(error) if completion is not None or error is not None else 500
     answered = completion is not None and status == 200
     kept = answered and route is not None and route.request_bodies
@@ -210,6 +229,7 @@ def log_chat(
             input=last_user_text(body.messages) if kept else None,
             output=kept_output(completion) if completion and kept else None,
             finish_reason=completion.finish_reason if completion and answered else None,
+            safety=outcome.blocked,
         )
     )
 

@@ -19,6 +19,7 @@ class BaseModelSpec:
     content_hash: str | None = None
     tools: str | None = None
     reasoning: str | None = None
+    guard: str | None = None
 
     def source(self) -> tuple[str, str | None]:
         if self.path and (Path(self.path) / "config.json").is_file():
@@ -43,6 +44,7 @@ class BaseModelSpec:
             content_hash=data.get("content_hash"),
             tools=data.get("tools"),
             reasoning=data.get("reasoning"),
+            guard=data.get("guard"),
         )
 
 

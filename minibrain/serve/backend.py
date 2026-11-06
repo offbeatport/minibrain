@@ -58,6 +58,7 @@ class CompletionRequest:
     sampling: Sampling = field(default_factory=Sampling)
     tools: ToolUse = field(default_factory=ToolUse)
     reasoning: str | None = None
+    template_extra: dict[str, Any] = field(default_factory=dict)
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
@@ -72,7 +73,8 @@ class CompletionRequest:
         return prefill(self.base.tools, self.tools)
 
     def template_kwargs(self) -> dict[str, Any]:
-        return self.base.template_kwargs | reasoning_kwargs(self.base.reasoning, self.reasoning)
+        found = self.base.template_kwargs | reasoning_kwargs(self.base.reasoning, self.reasoning)
+        return found | self.template_extra
 
     def reader(self) -> Reader:
         return reader_for(self.base.tools, self.tools, think_mode(self.base.reasoning, self.template_kwargs()))

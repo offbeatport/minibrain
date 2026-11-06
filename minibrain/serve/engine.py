@@ -68,6 +68,7 @@ class GenerateBody(BaseModel):
     tool_choice: str | dict[str, Any] | None = None
     parallel_tool_calls: bool = True
     reasoning: str | None = None
+    template_extra: dict[str, Any] = {}
     stream: bool = False
 
     def request(self, spec: BaseModelSpec, adapter: AdapterRef | None) -> CompletionRequest:
@@ -81,6 +82,7 @@ class GenerateBody(BaseModel):
             sampling=Sampling.from_dict(self.sampling),
             tools=ToolUse(tuple(self.tools), self.tool_choice, self.parallel_tool_calls),
             reasoning=self.reasoning,
+            template_extra=dict(self.template_extra),
         )
 
 

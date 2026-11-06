@@ -29,6 +29,8 @@ extensions vLLM and SGLang share.
 gpt-oss); answers carry `tool_calls`, and results go back as `tool` messages.
 - `reasoning_effort` turns reasoning off (`none`) or sets its effort where the model supports it; the reasoning \
 comes back as `reasoning_content`, apart from the answer.
+- A safety model set for the install or the model checks each call; a blocked one answers with `message.refusal` \
+and `finish_reason: content_filter`.
 - Send a completion's `id` to `POST /feedback` to rate or correct its answer."""
 
 MANAGEMENT_INTRO = f"""The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, \

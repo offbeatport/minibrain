@@ -238,6 +238,17 @@ function facts(row: RequestRow): [string, ReactNode][] {
             </span>,
         ],
         ["Finish reason", row.finish_reason ?? "–"],
+        ...(row.blocked_by
+            ? [
+                  [
+                      "Blocked by",
+                      <span key="blocked">
+                          <span className="font-mono">{row.blocked_by}</span>
+                          {row.blocked_for?.length ? ` · ${row.blocked_for.join(", ")}` : ""}
+                      </span>,
+                  ] as [string, ReactNode],
+              ]
+            : []),
         [
             "Response ID",
             row.response_id ? (

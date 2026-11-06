@@ -5,7 +5,7 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from fastapi import HTTPException
@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.errors import OpenAIError, invalid
+from minibrain.gateway.safety import SafetyPlan, SafetyUnavailableError, Verdict, judged
 from minibrain.gateway.schema import ChatCompletionRequest, Message
 from minibrain.ml.completion import Completion, Piece
 from minibrain.models.health import base_changed
@@ -299,16 +300,58 @@ class ChatPlan:
     route: Route
     request: CompletionRequest
     requested: Constraint | None
+    conversation: list[dict[str, Any]] = field(default_factory=list)
+    safety: SafetyPlan | None = None
+    verdicts: list[Verdict] = field(default_factory=list)
+
+    @property
+    def verdict(self) -> Verdict | None:
+        return self.verdicts[-1] if self.verdicts else None
 
 
-def plan(body: ChatCompletionRequest, route: Route, base: BaseModelSpec, adapter: AdapterRef | None = None) -> ChatPlan:
+def guard_spec(config: GatewayConfig, key: str) -> BaseModelSpec:
+    found = config.guards.get(key) or config.bases.get(key)
+    if found is None:
+        raise HTTPException(status_code=503, detail=f"the safety model {key} is not on this install")
+    return BaseModelSpec.from_dict(found)
+
+
+def safety_of(body: ChatCompletionRequest, route: Route, config: GatewayConfig) -> SafetyPlan | None:
+    asked = body.safety
+    configured = route.safety or {}
+    model = configured.get("model")
+    if model:
+        if asked is not None and asked.model and asked.model != model:
+            message = (
+                f"{served_model(route)} is checked by the safety model {model}, set for it; a request cannot change "
+                "or turn it off. Leave safety.model out."
+            )
+            raise invalid("safety.model", message, "unsupported_value")
+        answers = bool(configured.get("answers")) or bool(asked and asked.answers)
+        return SafetyPlan(guard_spec(config, str(model)), answers)
+    if asked is None or not asked.model or asked.model == NONE:
+        return None
+    if asked.model not in config.guards:
+        message = f"{asked.model} is not a safety model on this install."
+        raise invalid("safety.model", message, "unsupported_value")
+    return SafetyPlan(guard_spec(config, asked.model), bool(asked.answers))
+
+
+def plan(
+    body: ChatCompletionRequest,
+    route: Route,
+    base: BaseModelSpec,
+    adapter: AdapterRef | None = None,
+    safety: SafetyPlan | None = None,
+) -> ChatPlan:
     refuse_unsupported(body)
     requested = narrowed(route, requested_format(body.response_format))
     use = tool_use_of(body)
     refuse_tools(route, base, use)
+    conversation = plain(body.messages)
     request = CompletionRequest(
         base=base,
-        messages=route_messages(route, plain(body.messages)),
+        messages=route_messages(route, conversation),
         adapter=adapter,
         max_tokens=body.token_budget,
         constraint=requested or task_constraint(route),
@@ -317,7 +360,7 @@ def plan(body: ChatCompletionRequest, route: Route, base: BaseModelSpec, adapter
         tools=use,
         reasoning=reasoning_of(body, route, base),
     )
-    return ChatPlan(route, request, requested)
+    return ChatPlan(route, request, requested, conversation, safety)
 
 
 def complete(backend: ServingBackend, request: CompletionRequest, requested: bool) -> Completion:
@@ -359,9 +402,37 @@ def conformed(requested: Constraint | None, completion: Completion, route: Route
     return replace(completion, text=text)
 
 
+def checked(backend: ServingBackend, chat: ChatPlan, answer_text: str | None = None) -> Verdict | None:
+    if chat.safety is None:
+        return None
+    try:
+        verdict = judged(backend, chat.safety, chat.conversation, answer_text)
+    except SafetyUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    chat.verdicts.append(verdict)
+    return verdict
+
+
+def refused(verdict: Verdict, completion: Completion | None = None) -> Completion:
+    tokens = (completion.prompt_tokens, completion.completion_tokens) if completion else (0, 0)
+    seconds = completion.seconds if completion else 0.0
+    return Completion("", tokens[0], tokens[1], True, seconds, refusal=verdict.refusal())
+
+
+def prompt_refusal(backend: ServingBackend, chat: ChatPlan) -> Completion | None:
+    verdict = checked(backend, chat)
+    return refused(verdict) if verdict is not None and not verdict.safe else None
+
+
 def answer(backend: ServingBackend, chat: ChatPlan) -> Completion:
-    completion = completed(backend, chat.request, chat.requested is not None)
-    return conformed(chat.requested, completion, chat.route)
+    blocked = prompt_refusal(backend, chat)
+    if blocked is not None:
+        return blocked
+    completion = conformed(chat.requested, completed(backend, chat.request, chat.requested is not None), chat.route)
+    if chat.safety is None or not chat.safety.answers or not completion.text:
+        return completion
+    verdict = checked(backend, chat, completion.text)
+    return refused(verdict, completion) if verdict is not None and not verdict.safe else completion
 
 
 def run(
@@ -409,6 +480,8 @@ def kept_output(completion: Completion) -> str:
 
 
 def answer_message(completion: Completion) -> dict[str, Any]:
+    if completion.refusal:
+        return {"role": "assistant", "content": None, "refusal": completion.refusal}
     content = completion.text if completion.text or not completion.tool_calls else None
     found: dict[str, Any] = {"role": "assistant", "content": content}
     if completion.reasoning:
@@ -418,8 +491,10 @@ def answer_message(completion: Completion) -> dict[str, Any]:
     return found
 
 
-def response_body(identifier: str, model: str, completion: Completion) -> dict[str, Any]:
-    return {
+def response_body(
+    identifier: str, model: str, completion: Completion, verdict: Verdict | None = None
+) -> dict[str, Any]:
+    found = {
         "id": identifier,
         "object": "chat.completion",
         "created": int(time.time()),
@@ -427,6 +502,7 @@ def response_body(identifier: str, model: str, completion: Completion) -> dict[s
         "choices": [{"index": 0, "message": answer_message(completion), "finish_reason": completion.finish_reason}],
         "usage": usage(completion),
     }
+    return found | ({"safety": verdict.as_dict()} if verdict is not None else {})
 
 
 def piece_of(completion: Completion) -> Piece:
@@ -434,7 +510,8 @@ def piece_of(completion: Completion) -> Piece:
 
 
 def buffered(chat: ChatPlan) -> bool:
-    return chat.request.constraint is not None or contract_schema(chat.route) is not None
+    checked_answers = chat.safety is not None and chat.safety.answers
+    return checked_answers or chat.request.constraint is not None or contract_schema(chat.route) is not None
 
 
 def mapped(events: Iterator[Event]) -> Iterator[Event]:
@@ -450,6 +527,10 @@ def mapped(events: Iterator[Event]) -> Iterator[Event]:
 
 def chat_events(backend: ServingBackend, chat: ChatPlan) -> Iterator[Event]:
     stream = getattr(backend, "stream", None)
+    blocked = prompt_refusal(backend, chat) if stream is not None and not buffered(chat) else None
+    if blocked is not None:
+        yield blocked
+        return
     if stream is None or buffered(chat):
         completion = answer(backend, chat)
         if piece_of(completion):
@@ -465,6 +546,8 @@ def data(payload: dict[str, Any]) -> str:
 
 def delta_of(piece: Piece, first_call: int, opening: bool) -> dict[str, Any]:
     found: dict[str, Any] = {"role": "assistant"} if opening else {}
+    if piece.refusal:
+        found["refusal"] = piece.refusal
     if piece.reasoning:
         found["reasoning_content"] = piece.reasoning
     if piece.content or opening:
@@ -513,8 +596,8 @@ def sse(
             calls, opening = calls + len(event.tool_calls), False
         if final is None:
             raise EngineUnavailableError("the engine stopped before it finished the answer")
-        if opening:
-            yield data(chunk | {"choices": [moving(delta_of(Piece(), 0, True))]})
+        if opening or final.refusal:
+            yield data(chunk | {"choices": [moving(delta_of(Piece(refusal=final.refusal or ""), 0, opening))]})
         last = {"index": 0, "delta": {}, "finish_reason": final.finish_reason}
         yield data(chunk | {"choices": [last]} | ({} if include_usage else {"usage": usage(final)}))
         if include_usage:

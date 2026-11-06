@@ -217,6 +217,7 @@ class EngineBackend:
             "tool_choice": request.tools.choice,
             "parallel_tool_calls": request.tools.parallel,
             "reasoning": request.reasoning,
+            "template_extra": request.template_extra,
         }
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)
