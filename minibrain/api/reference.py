@@ -23,6 +23,10 @@ API key to a minibrain key.
 - A custom model's name follows its live version, `name@3` pins version 3, and a served base model goes by its key. \
 `GET /models` lists the names a key can call.
 - Keys are created on Deployments and cover one or more models; a call to a model the key does not cover gets 403.
+- Sampling fields left out keep the model's default; `top_k`, `min_p` and `repetition_penalty` are the engine \
+extensions vLLM and SGLang share.
+- `tools` work with models whose chat template has a tool-call format (Qwen, Hermes, Llama 3.1 and later, Mistral, \
+gpt-oss); answers carry `tool_calls`, and results go back as `tool` messages.
 - Send a completion's `id` to `POST /feedback` to rate or correct its answer."""
 
 MANAGEMENT_INTRO = f"""The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, \

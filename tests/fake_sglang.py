@@ -35,6 +35,17 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
             served = body.get("model") if body.get("model") != "qwen3-0.6b" else None
             text = f"{body.get('lora_path') or served or 'base'}:{body['messages'][-1]['content']}"
             choice = {"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}
+            if body.get("tools") and body.get("tool_choice") != "none":
+                name = body["tools"][0]["function"]["name"]
+                call = {
+                    "id": "call_fake",
+                    "type": "function",
+                    "function": {"name": name, "arguments": '{"city": "Paris"}'},
+                }
+                choice = {
+                    "message": {"role": "assistant", "content": None, "tool_calls": [call]},
+                    "finish_reason": "tool_calls",
+                }
             self.reply(200, {"choices": [choice], "usage": {"prompt_tokens": 7, "completion_tokens": 2}})
 
         def log_message(self, format: str, *args: object) -> None:

@@ -1,3 +1,4 @@
+import json
 import os
 import threading
 import time
@@ -8,7 +9,7 @@ from typing import Any
 import httpx
 
 from minibrain.base_models import BaseModelSpec
-from minibrain.ml.completion import Completion
+from minibrain.ml.completion import Completion, ToolCall
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
 from minibrain.serve.sampling import UnsupportedParameterError
 from minibrain.supervise import Supervisor
@@ -31,6 +32,25 @@ def error_message(response: httpx.Response) -> str:
     if isinstance(nested, dict) and nested.get("message"):
         return str(nested["message"])
     return str(found.get("message") or found.get("detail") or found)
+
+
+def tool_fields(request: CompletionRequest) -> dict[str, Any]:
+    use = request.tools
+    if not use.tools:
+        return {}
+    return {"tools": list(use.tools), "tool_choice": use.choice or use.mode, "parallel_tool_calls": use.parallel}
+
+
+def tool_call_of(call: dict[str, Any]) -> ToolCall:
+    function = call.get("function") or {}
+    arguments = function.get("arguments")
+    text = arguments if isinstance(arguments, str) else json.dumps(arguments or {})
+    name = str(function.get("name") or "")
+    return ToolCall(name, text, str(call["id"])) if call.get("id") else ToolCall(name, text)
+
+
+def tool_calls_of(message: dict[str, Any]) -> tuple[ToolCall, ...]:
+    return tuple(tool_call_of(call) for call in message.get("tool_calls") or ())
 
 
 def sampling_fields(request: CompletionRequest) -> dict[str, Any]:
@@ -123,7 +143,7 @@ class OpenAIServerBackend:
         }
         if request.max_tokens is not None:
             body["max_tokens"] = request.max_tokens
-        return body | sampling_fields(request) | self.constraint_fields(request)
+        return body | sampling_fields(request) | tool_fields(request) | self.constraint_fields(request)
 
     def refused(self, request: CompletionRequest, response: httpx.Response) -> None:
         if response.status_code != 400:
@@ -148,12 +168,14 @@ class OpenAIServerBackend:
         result = response.json()
         choice = result["choices"][0]
         usage = result.get("usage") or {}
+        message = choice.get("message") or {}
         return Completion(
-            text=str(choice["message"].get("content") or ""),
+            text=str(message.get("content") or ""),
             prompt_tokens=int(usage.get("prompt_tokens", 0)),
             completion_tokens=int(usage.get("completion_tokens", 0)),
             stopped=choice.get("finish_reason") != "length",
             seconds=time.perf_counter() - started,
+            tool_calls=tool_calls_of(message) if request.tools.active else (),
         )
 
     def status(self) -> list[dict[str, Any]]:

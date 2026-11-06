@@ -9,8 +9,8 @@ import torch
 from fastapi.testclient import TestClient
 
 from minibrain.base_models import QWEN3_0_6B, base_model
+from minibrain.gateway.chat import task_constraint
 from minibrain.gateway.config import base_route_for
-from minibrain.gateway.routes import task_constraint
 from minibrain.gateway.standalone import create_gateway_app
 from minibrain.ml.completion import Completion
 from minibrain.ml.runtime import choice_filter

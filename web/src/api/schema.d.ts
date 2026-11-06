@@ -2908,8 +2908,16 @@ export interface components {
              * @constant
              */
             role: "assistant";
-            /** Content */
-            content: string;
+            /**
+             * Content
+             * @description The answer; null when the model only calls tools.
+             */
+            content: string | null;
+            /**
+             * Tool Calls
+             * @description The functions the model calls; answer each with a tool message.
+             */
+            tool_calls?: components["schemas"]["ToolCallBody"][] | null;
         };
         /** AnswerSide */
         AnswerSide: {
@@ -3732,7 +3740,7 @@ export interface components {
             model: string;
             /**
              * Messages
-             * @description The conversation. A custom model answers the last user message; a base model reads them all.
+             * @description The conversation: system (or developer), user, assistant and tool messages. A custom model answers after its own instructions, without the app's system messages; a base model reads them all.
              */
             messages: components["schemas"]["Message"][];
             /**
@@ -3806,6 +3814,23 @@ export interface components {
              * @description An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or {"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}. A custom model's contract holds by default; a request's format can only narrow a model whose contract is free text, so a model answering with labels or its own schema refuses one.
              */
             response_format?: unknown;
+            /**
+             * Tools
+             * @description Up to 128 functions the model may call. Each model family's chat template renders them, and its answer is read back as tool_calls: Qwen and Hermes <tool_call> JSON, Llama 3.1 and later JSON, Mistral [TOOL_CALLS] and gpt-oss harmony. A model answering with labels or a JSON schema takes no tools.
+             */
+            tools?: components["schemas"]["ToolSpec"][] | null;
+            /**
+             * Tool Choice
+             * @description auto (the default with tools) lets the model choose, none answers in text, required makes it call one, and {"type": "function", "function": {"name": ...}} makes it call that one.
+             */
+            tool_choice?: string | {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Parallel Tool Calls
+             * @description false keeps only the first call the model makes; true (the default) keeps all.
+             */
+            parallel_tool_calls?: boolean | null;
         } & {
             [key: string]: unknown;
         };
@@ -3923,10 +3948,10 @@ export interface components {
             message: components["schemas"]["AnswerMessage"];
             /**
              * Finish Reason
-             * @description stop when the answer ended, length when max_tokens cut it.
+             * @description stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools.
              * @enum {string}
              */
-            finish_reason: "stop" | "length";
+            finish_reason: "stop" | "length" | "tool_calls";
         };
         /** ConfusionInfo */
         ConfusionInfo: {
@@ -5097,6 +5122,41 @@ export interface components {
             /** Locked */
             locked: boolean;
         };
+        /** FunctionCallBody */
+        FunctionCallBody: {
+            /** Name */
+            name: string;
+            /**
+             * Arguments
+             * @description The arguments as a JSON object in text.
+             */
+            arguments: string;
+        };
+        /** FunctionSpec */
+        FunctionSpec: {
+            /**
+             * Name
+             * @description 1 to 64 letters, digits, underscores or dashes.
+             */
+            name: string;
+            /**
+             * Description
+             * @description What the function does, for the model.
+             */
+            description?: string | null;
+            /**
+             * Parameters
+             * @description The arguments, as a JSON Schema object.
+             */
+            parameters?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Strict
+             * @description Accepted; the arguments are not constrained.
+             */
+            strict?: boolean | null;
+        };
         /** GatewayBody */
         GatewayBody: {
             /** Id */
@@ -5846,11 +5906,31 @@ export interface components {
         Message: {
             /**
              * Role
-             * @description system, user or assistant.
+             * @description system, developer, user, assistant or tool.
              */
             role: string;
-            /** Content */
-            content?: string | null;
+            /**
+             * Content
+             * @description Text, or a list of text parts; empty on an assistant message that calls tools.
+             */
+            content?: string | {
+                [key: string]: unknown;
+            }[] | null;
+            /**
+             * Name
+             * @description The function's name, on a tool message.
+             */
+            name?: string | null;
+            /**
+             * Tool Calls
+             * @description On an assistant message: the calls it made, sent back with their results.
+             */
+            tool_calls?: components["schemas"]["ToolCallBody"][] | null;
+            /**
+             * Tool Call Id
+             * @description On a tool message: the id of the call it answers.
+             */
+            tool_call_id?: string | null;
         } & {
             [key: string]: unknown;
         };
@@ -7344,6 +7424,28 @@ export interface components {
             completion_tokens: number;
             /** Total Tokens */
             total_tokens: number;
+        };
+        /** ToolCallBody */
+        ToolCallBody: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @default function
+             * @constant
+             */
+            type?: "function";
+            function: components["schemas"]["FunctionCallBody"];
+        };
+        /** ToolSpec */
+        ToolSpec: {
+            /**
+             * Type
+             * @default function
+             * @constant
+             */
+            type?: "function";
+            function: components["schemas"]["FunctionSpec"];
         };
         /** TrainFitInfo */
         TrainFitInfo: {
@@ -12862,7 +12964,7 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
-            /** @description response_format is not valid or cannot be applied. */
+            /** @description A field is out of range or cannot be applied to this model; param names it. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -12898,7 +13000,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description The version was trained on base weights that have changed since. */
+            /** @description The version was trained on base weights that changed since. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -12907,7 +13009,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description The answer does not match response_format, or the body is not valid. */
+            /** @description The answer does not match response_format or the contract. */
             422: {
                 headers: {
                     [name: string]: unknown;

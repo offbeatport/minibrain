@@ -1,12 +1,13 @@
 import threading
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
+from minibrain.serve.dialects import ToolUse, prefill, read_all, reader_for, template_messages
 from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from minibrain.ml.runtime import Runtime
 
 Message = dict[str, Any]
+TemplateTools = list[dict[Any, Any] | Callable[..., Any]] | None
 MAX_ADAPTERS = 32
 
 
@@ -45,9 +47,24 @@ class CompletionRequest:
     constraint: Constraint | None = None
     route: str | None = None
     sampling: Sampling = field(default_factory=Sampling)
+    tools: ToolUse = field(default_factory=ToolUse)
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
+
+    def template_messages(self) -> list[Message]:
+        return template_messages(self.messages)
+
+    def template_tools(self) -> TemplateTools:
+        return [*self.tools.tools] if self.tools.active else None
+
+    def prefill(self) -> str:
+        return prefill(self.base.tools, self.tools)
+
+
+def parsed(request: CompletionRequest, raw: Completion) -> Completion:
+    piece = read_all(reader_for(request.base.tools, request.tools), request.prefill() + raw.text)
+    return replace(raw, text=piece.content, tool_calls=piece.tool_calls)
 
 
 class ServingBackend(Protocol):
@@ -99,9 +116,10 @@ class TransformersBackend:
             if request.adapter is not None:
                 self.use_adapter(runtime, request.adapter)
             adapter = request.adapter.name if request.adapter else None
-            prompt = runtime.render(request.messages)
+            prompt = runtime.render(request.template_messages(), request.template_tools()) + request.prefill()
             choices = request.decoding_choices()
-            return runtime.generate([prompt], adapter, request.max_tokens, choices, request.sampling)[0]
+            raw = runtime.generate([prompt], adapter, request.max_tokens, choices, request.sampling)[0]
+            return parsed(request, raw)
 
     def status(self) -> list[dict[str, Any]]:
         return [

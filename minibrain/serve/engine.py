@@ -26,6 +26,7 @@ from minibrain.serve.backend import (
     ServingBackend,
     TransformersBackend,
 )
+from minibrain.serve.dialects import ToolUse
 from minibrain.serve.sampling import Sampling, UnsupportedParameterError
 from minibrain.serve.select import NoEngineError, choose_engine
 from minibrain.serve.structured import Constraint
@@ -59,6 +60,9 @@ class GenerateBody(BaseModel):
     constraint: Constraint | None = None
     route: str | None = None
     sampling: dict[str, Any] = {}
+    tools: list[dict[str, Any]] = []
+    tool_choice: str | dict[str, Any] | None = None
+    parallel_tool_calls: bool = True
 
     def request(self, spec: BaseModelSpec, adapter: AdapterRef | None) -> CompletionRequest:
         return CompletionRequest(
@@ -69,6 +73,7 @@ class GenerateBody(BaseModel):
             self.constraint,
             self.route,
             sampling=Sampling.from_dict(self.sampling),
+            tools=ToolUse(tuple(self.tools), self.tool_choice, self.parallel_tool_calls),
         )
 
 

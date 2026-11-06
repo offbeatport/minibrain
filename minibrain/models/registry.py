@@ -20,6 +20,7 @@ from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import MISSING, content_hash, listed, problem_of, size_problems
 from minibrain.models.inspect import source_type_of
 from minibrain.models.sources import HUB, S3, s3_endpoint
+from minibrain.models.templates import gguf_template, template_in_files
 from minibrain.object_store import load_config
 from minibrain.policy import load as load_policy
 from minibrain.registry.files import store_for
@@ -35,6 +36,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.serve.dialects import detect_tools
 from minibrain.settings import Settings
 from minibrain.storage import missing_room, staging_room
 
@@ -83,8 +85,50 @@ def gguf_file(model: BaseModel) -> str | None:
     return next((str(entry["path"]) for entry in model.files if str(entry["path"]).endswith(".gguf")), None)
 
 
+TEMPLATES: dict[tuple[str, str], str | None] = {}
+
+
+def stored_file(settings: Settings, model: BaseModel, name: str) -> bytes | None:
+    if model.store != BUCKET:
+        local = model_folder(settings, model) / name
+        return local.read_bytes() if local.is_file() else None
+    entry = next((entry for entry in model.files if entry.get("path") == name and entry.get("sha256")), None)
+    if entry is None:
+        return None
+    with store_for(settings).open(str(entry["sha256"])) as stream:
+        return stream.read()
+
+
+def read_chat_template(settings: Settings, model: BaseModel) -> str | None:
+    weights = gguf_file(model)
+    try:
+        if weights is None:
+            return template_in_files(lambda name: stored_file(settings, model, name))
+        if model.store != BUCKET:
+            with (model_folder(settings, model) / weights).open("rb") as stream:
+                return gguf_template(stream)
+        entry = next((item for item in model.files if item.get("path") == weights and item.get("sha256")), None)
+        if entry is None:
+            return None
+        with store_for(settings).open(str(entry["sha256"])) as stream:
+            return gguf_template(stream)
+    except (OSError, ValueError, ArtifactError, EnvelopeError):
+        return None
+
+
+def chat_template(settings: Settings, model: BaseModel) -> str | None:
+    found = content_hash(model.files)
+    if found is None:
+        return read_chat_template(settings, model)
+    key = (model.id, found)
+    if key not in TEMPLATES:
+        TEMPLATES[key] = read_chat_template(settings, model)
+    return TEMPLATES[key]
+
+
 def spec_for(settings: Settings, model: BaseModel) -> BaseModelSpec:
     weights_file = gguf_file(model)
+    template = chat_template(settings, model) if model.status == BaseModelStatus.AVAILABLE else None
     return BaseModelSpec(
         key=model.id,
         repo=model.repo or "",
@@ -96,6 +140,7 @@ def spec_for(settings: Settings, model: BaseModel) -> BaseModelSpec:
         format="gguf" if weights_file else "safetensors",
         weights_file=weights_file,
         content_hash=content_hash(model.files),
+        tools=detect_tools(template),
     )
 
 
@@ -110,14 +155,7 @@ def resolve_spec(session: Session, settings: Settings, key: str) -> BaseModelSpe
 
 
 def config_bytes(settings: Settings, model: BaseModel) -> bytes | None:
-    if model.store != BUCKET:
-        local = model_folder(settings, model) / CONFIG_FILE
-        return local.read_bytes() if local.is_file() else None
-    entry = next((entry for entry in model.files if entry.get("path") == CONFIG_FILE and entry.get("sha256")), None)
-    if entry is None:
-        return None
-    with store_for(settings).open(str(entry["sha256"])) as stream:
-        return stream.read()
+    return stored_file(settings, model, CONFIG_FILE)
 
 
 def base_config(settings: Settings, model: BaseModel) -> dict[str, Any] | None:

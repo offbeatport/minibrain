@@ -3,7 +3,7 @@ import time
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 from peft import PeftModel, PeftModelForCausalLM
@@ -23,6 +23,9 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.ml.devices import pick_device, weights_dtype
 from minibrain.serve.sampling import Sampling, stopped_at
+
+if TYPE_CHECKING:
+    from minibrain.serve.backend import TemplateTools
 from minibrain.serve.structured import TokenTrie
 
 Message = dict[str, Any]
@@ -65,9 +68,14 @@ def as_text(rendered: object) -> str:
     return rendered
 
 
-def render_prompt(tokenizer: PreTrainedTokenizerBase, spec: BaseModelSpec, messages: list[Message]) -> str:
+def render_prompt(
+    tokenizer: PreTrainedTokenizerBase,
+    spec: BaseModelSpec,
+    messages: list[Message],
+    tools: "TemplateTools" = None,
+) -> str:
     rendered = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True, **spec.template_kwargs
+        messages, tools=tools, tokenize=False, add_generation_prompt=True, **spec.template_kwargs
     )
     return as_text(rendered)
 
@@ -166,8 +174,8 @@ class Runtime:
             self.model.eval()
         self.adapters.discard(name)
 
-    def render(self, messages: list[Message]) -> str:
-        return render_prompt(self.tokenizer, self.spec, messages)
+    def render(self, messages: list[Message], tools: "TemplateTools" = None) -> str:
+        return render_prompt(self.tokenizer, self.spec, messages, tools)
 
     def adapter_scope(self, adapter: str | None) -> AbstractContextManager:
         if not isinstance(self.model, PeftModelForCausalLM):

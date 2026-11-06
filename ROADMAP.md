@@ -121,8 +121,9 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 4. Extract, for document processing.
 5. Specialist presets (Classify is done) and the ML-engineer tooling below.
 
-Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine. Not yet: `/v1/embeddings`,
-`/v1/completions`, sizing guidance.
+Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, tool calling through each family's
+chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss). Not yet: `/v1/embeddings`, `/v1/completions`, sizing
+guidance.
 
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
 when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
@@ -864,6 +865,9 @@ once it matches; only deleting a base removes its files.
   the same way). A request's format only narrows a model whose contract is free text; a label or schema contract
   refuses one with a 400 (built 2026-11-06). A custom model answers the user and assistant turns of the conversation after its instructions
   (prompt-only versions with their few-shot turns first); system messages from the app are dropped.
+- Tool calling: `tools`, `tool_choice` and `parallel_tool_calls`, rendered by the base's chat template and read back
+  as `tool_calls` (format detected from the template; SGLang and vLLM use their own parsers). Built 2026-11-06;
+  details in `docs/serving.md`, Tool calling.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the model by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and

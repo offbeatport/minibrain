@@ -285,6 +285,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Sampling settings** · shipped · engineer
   Set temperature, top_p, top_k, min_p, penalties, seed and stops.
   API: POST /v1/chat/completions
+- **Tool calling** · shipped · engineer
+  Call functions from Qwen, Llama, Mistral and gpt-oss models, streamed too.
+  API: POST /v1/chat/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access

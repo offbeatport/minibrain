@@ -1,67 +1,46 @@
 import contextlib
-import json
-import logging
-import re
 import time
-import uuid
-from collections.abc import Callable, Iterator
-from dataclasses import replace
+from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.exception_handlers import request_validation_exception_handler
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.data.feedback import ORIGIN_API, Submission
+from minibrain.gateway.chat import (
+    answer,
+    checked_base,
+    kept_output,
+    last_user_text,
+    plan,
+    response_body,
+    response_id,
+    served_model,
+    stream_events,
+)
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
+from minibrain.gateway.errors import OpenAIError
 from minibrain.gateway.logs import LogBuffer, LogEntry
+from minibrain.gateway.schema import (
+    CHAT_HELP,
+    CHAT_RESPONSES,
+    FEEDBACK_RESPONSES,
+    KEY_ERRORS,
+    ChatCompletionRequest,
+    ModelInfo,
+    ModelList,
+)
 from minibrain.ml.completion import Completion
-from minibrain.models.health import base_changed
 from minibrain.registry.models import now
 from minibrain.registry.service import KEY_PREFIX, key_digest
-from minibrain.serve.backend import (
-    AdapterRef,
-    CompletionRequest,
-    EngineUnavailableError,
-    OutputFormatError,
-    ServingBackend,
-)
-from minibrain.serve.sampling import MAX_STOPS, Sampling, UnsupportedParameterError
-from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
-from minibrain.tasks.contracts import JSON, TEXT, Contract
-from minibrain.tasks.prompting import PromptError, Prompting
 from minibrain.telemetry.call import current_call
 
 router = APIRouter(prefix="/v1")
-log = logging.getLogger("minibrain.gateway")
 
-CHAT_PATH = "/v1/chat/completions"
 TEXT_MAX = 50_000
 COMMENT_MAX = 2_000
-FORMAT = "response_format"
-SCHEMA_FORMAT = f"{FORMAT}.json_schema"
-FORMAT_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
-UNCONSTRAINED = "only SGLang and llama.cpp engines constrain decoding, the others check the answer afterwards."
-FORMAT_HELP = (
-    'An OpenAI response_format: {"type": "text"}, {"type": "json_object"} or '
-    '{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}, "strict": true}}. '
-    "A custom model's contract holds by default; a request's format can only narrow a model whose contract is "
-    "free text, so a model answering with labels or its own schema refuses one."
-)
-
-MODEL_HELP = (
-    "A name from GET /models: a custom model follows its live version, name@3 pins version 3, "
-    "and a served base model goes by its key."
-)
-CHAT_HELP = (
-    "Answer a conversation with a model. Every call is logged without its content, "
-    "unless the model keeps request inputs and answers."
-)
-MESSAGES_HELP = "The conversation. A custom model answers the last user message; a base model reads them all."
 API_KEY = HTTPBearer(
     auto_error=False,
     scheme_name="apiKey",
@@ -70,202 +49,6 @@ API_KEY = HTTPBearer(
 )
 
 FeedbackSink = Callable[[Submission], int]
-
-
-class OpenAIError(Exception):
-    def __init__(
-        self, status_code: int, message: str, param: str | None = None, code: str | None = None, kind: str = ""
-    ) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.message = message
-        self.param = param
-        self.code = code
-        self.kind = kind or "invalid_request_error"
-
-    def body(self) -> dict[str, Any]:
-        return {"error": {"message": self.message, "type": self.kind, "param": self.param, "code": self.code}}
-
-
-async def openai_error(_request: Request, error: Exception) -> JSONResponse:
-    found = error if isinstance(error, OpenAIError) else OpenAIError(500, str(error), kind="server_error")
-    return JSONResponse(status_code=found.status_code, content=found.body())
-
-
-def openai_validation(error: RequestValidationError) -> OpenAIError:
-    first = error.errors()[0] if error.errors() else {"loc": (), "msg": "The body is not valid."}
-    parts = [str(part) for part in first.get("loc", ()) if part != "body"]
-    param = ".".join(parts) or None
-    message = f"{param}: {first.get('msg')}" if param else str(first.get("msg"))
-    return OpenAIError(400, message, param, "invalid_value")
-
-
-async def invalid_body(request: Request, error: Exception) -> Response:
-    if not isinstance(error, RequestValidationError):
-        return await openai_error(request, error)
-    if request.url.path != CHAT_PATH:
-        return await request_validation_exception_handler(request, error)
-    return await openai_error(request, openai_validation(error))
-
-
-def invalid(param: str, message: str, code: str = "invalid_value") -> OpenAIError:
-    return OpenAIError(400, message, param, code)
-
-
-class Message(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    role: str = Field(description="system, user or assistant.")
-    content: str | None = None
-
-
-class ChatCompletionRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-        json_schema_extra={
-            "example": {"model": "support-triage", "messages": [{"role": "user", "content": "I was charged twice"}]}
-        },
-    )
-
-    model: str = Field(description=MODEL_HELP)
-    messages: list[Message] = Field(description=MESSAGES_HELP)
-    max_tokens: int | None = Field(
-        default=None, ge=1, description="The most tokens to answer with. Unset: up to the model's context limit."
-    )
-    max_completion_tokens: int | None = Field(
-        default=None, ge=1, description="The same as max_tokens, under its newer name; it wins when both are set."
-    )
-    temperature: float | None = Field(
-        default=None,
-        ge=0,
-        le=2,
-        description="0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's "
-        "default; custom models answer at 0, the way their scores were measured.",
-    )
-    top_p: float | None = Field(
-        default=None,
-        gt=0,
-        le=1,
-        description="Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p.",
-    )
-    top_k: int | None = Field(
-        default=None, ge=1, description="Sample only from the k likeliest tokens. An extension vLLM and SGLang share."
-    )
-    min_p: float | None = Field(
-        default=None,
-        ge=0,
-        le=1,
-        description="0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension.",
-    )
-    presence_penalty: float | None = Field(
-        default=None, ge=-2, le=2, description="-2 to 2: above 0 favours tokens that have not appeared yet."
-    )
-    frequency_penalty: float | None = Field(
-        default=None, ge=-2, le=2, description="-2 to 2: above 0 lowers a token's odds the more often it appeared."
-    )
-    repetition_penalty: float | None = Field(
-        default=None,
-        gt=0,
-        le=2,
-        description="Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension.",
-    )
-    seed: int | None = Field(
-        default=None, description="Sample the same way for the same seed and inputs, as far as the engine allows."
-    )
-    stop: str | list[str] | None = Field(
-        default=None, description=f"Up to {MAX_STOPS} texts that end the answer; the text itself is not returned."
-    )
-    n: int | None = Field(default=None, ge=1, le=1, description="How many answers; only 1 is supported.")
-    stream: bool = Field(default=False, description="Send the answer as server-sent events, ending with data: [DONE].")
-    response_format: Any = Field(default=None, description=FORMAT_HELP)
-
-    @property
-    def token_budget(self) -> int | None:
-        return self.max_completion_tokens or self.max_tokens
-
-
-class ModelInfo(BaseModel):
-    id: str = Field(description="The name to send as model.")
-    object: Literal["model"] = "model"
-    created: int
-    owned_by: str
-
-
-class ModelList(BaseModel):
-    object: Literal["list"] = "list"
-    data: list[ModelInfo]
-
-
-class AnswerMessage(BaseModel):
-    role: Literal["assistant"]
-    content: str
-
-
-class CompletionChoice(BaseModel):
-    index: int
-    message: AnswerMessage
-    finish_reason: Literal["stop", "length"] = Field(
-        description="stop when the answer ended, length when max_tokens cut it."
-    )
-
-
-class TokenUsage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-
-
-class ChatCompletion(BaseModel):
-    id: str = Field(description="The response id; send it as response_id to POST /feedback.")
-    object: Literal["chat.completion"]
-    created: int
-    model: str
-    choices: list[CompletionChoice]
-    usage: TokenUsage
-
-
-class ErrorInfo(BaseModel):
-    message: str
-    type: str
-    param: str | None
-    code: str | None
-
-
-class OpenAIErrorBody(BaseModel):
-    error: ErrorInfo
-
-
-class ErrorDetail(BaseModel):
-    detail: str
-
-
-KEY_ERRORS: dict[int | str, dict[str, Any]] = {
-    401: {"model": ErrorDetail, "description": "The API key is missing, unknown or expired."},
-}
-MODEL_ERRORS: dict[int | str, dict[str, Any]] = {
-    **KEY_ERRORS,
-    403: {"model": ErrorDetail, "description": "The API key does not cover this model."},
-    404: {"model": ErrorDetail, "description": "No model has this name."},
-}
-CHAT_RESPONSES: dict[int | str, dict[str, Any]] = {
-    200: {
-        "model": ChatCompletion,
-        "description": "The answer, or with stream set, server-sent chat.completion.chunk events.",
-        "content": {"text/event-stream": {"schema": {"type": "string"}}},
-    },
-    400: {"model": OpenAIErrorBody, "description": "response_format is not valid or cannot be applied."},
-    **MODEL_ERRORS,
-    409: {"model": ErrorDetail, "description": "The version was trained on base weights that have changed since."},
-    422: {
-        "model": OpenAIErrorBody,
-        "description": "The answer does not match response_format, or the body is not valid.",
-    },
-    503: {"model": ErrorDetail, "description": "No engine is serving this model right now."},
-}
-FEEDBACK_RESPONSES: dict[int | str, dict[str, Any]] = {
-    **MODEL_ERRORS,
-    422: {"model": ErrorDetail, "description": "The model is a base model, or the body is not valid."},
-}
 
 
 def gateway_config(request: Request) -> GatewayConfig:
@@ -292,231 +75,6 @@ def authorize(
 
 
 GrantDep = Annotated[Grant, Depends(authorize)]
-
-
-def spec_for(config: GatewayConfig, key: str) -> BaseModelSpec:
-    found = config.bases.get(key)
-    return BaseModelSpec.from_dict(found) if found else base_model(key)
-
-
-def prompting(route: Route) -> Prompting | None:
-    return Prompting.from_dict(route.prompting) if route.kind != "base" and route.prompting else None
-
-
-def route_messages(route: Route, messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    found = prompting(route)
-    if found is None:
-        return messages
-    try:
-        return found.messages(messages)
-    except PromptError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-def schema_format(spec: Any) -> dict[str, Any]:
-    if not isinstance(spec, dict):
-        message = "response_format.json_schema is required when response_format.type is json_schema."
-        raise invalid(SCHEMA_FORMAT, message, "missing_required_parameter")
-    name = spec.get("name")
-    if not isinstance(name, str) or not FORMAT_NAME.fullmatch(name):
-        message = "response_format.json_schema.name must be 1-64 letters, digits, underscores or dashes."
-        raise invalid(f"{SCHEMA_FORMAT}.name", message)
-    if spec.get("strict") is not None and not isinstance(spec["strict"], bool):
-        raise invalid(f"{SCHEMA_FORMAT}.strict", "response_format.json_schema.strict must be true or false.")
-    schema = spec.get("schema")
-    if not isinstance(schema, dict):
-        message = "response_format.json_schema.schema must be a JSON Schema object."
-        raise invalid(
-            f"{SCHEMA_FORMAT}.schema", message, "missing_required_parameter" if schema is None else "invalid_value"
-        )
-    problem = schema_problem(schema)
-    if problem is not None:
-        raise invalid(f"{SCHEMA_FORMAT}.schema", f"Invalid JSON Schema: {problem}.")
-    return schema
-
-
-def requested_format(raw: Any) -> Constraint | None:
-    if raw is None:
-        return None
-    if not isinstance(raw, dict):
-        raise invalid(FORMAT, 'response_format must be an object such as {"type": "json_object"}.')
-    kind = raw.get("type")
-    if kind == "text":
-        return None
-    if kind == "json_object":
-        return Constraint(json_schema=JSON_OBJECT)
-    if kind != "json_schema":
-        raise invalid(f"{FORMAT}.type", "response_format.type must be text, json_object or json_schema.")
-    return Constraint(json_schema=schema_format(raw.get("json_schema")))
-
-
-def stops_of(raw: str | list[str] | None) -> tuple[str, ...]:
-    found = [raw] if isinstance(raw, str) else list(raw or [])
-    if len(found) > MAX_STOPS:
-        raise invalid("stop", f"stop takes at most {MAX_STOPS} texts.")
-    if any(not text for text in found):
-        raise invalid("stop", "Each stop text needs at least one character.")
-    return tuple(found)
-
-
-def sampling_of(body: ChatCompletionRequest, route: Route) -> Sampling:
-    sampling = Sampling(
-        temperature=body.temperature,
-        top_p=body.top_p,
-        top_k=body.top_k,
-        min_p=body.min_p,
-        presence_penalty=body.presence_penalty,
-        frequency_penalty=body.frequency_penalty,
-        repetition_penalty=body.repetition_penalty,
-        seed=body.seed,
-        stop=stops_of(body.stop),
-    )
-    return sampling if route.kind == "base" else sampling.or_greedy()
-
-
-def refuse_unsupported(body: ChatCompletionRequest) -> None:
-    extra = body.model_extra or {}
-    if extra.get("logprobs"):
-        raise invalid("logprobs", "logprobs are not returned; leave logprobs unset.", "unsupported_parameter")
-    if extra.get("logit_bias"):
-        raise invalid("logit_bias", "logit_bias is not supported; leave it unset.", "unsupported_parameter")
-
-
-def route_contract(route: Route) -> Contract | None:
-    found = prompting(route)
-    return found.contract if found is not None else None
-
-
-def narrowed(route: Route, requested: Constraint | None) -> Constraint | None:
-    contract = route_contract(route)
-    if requested is None or contract is None or contract.kind == TEXT:
-        return requested
-    held = "one of its labels" if contract.labels is not None else "its JSON schema"
-    message = (
-        f"{served_model(route)} answers with {held}, its contract; response_format can only narrow a model whose "
-        "contract is free text. Leave response_format out to get the contract's answer."
-    )
-    raise invalid(FORMAT, message, "unsupported_value")
-
-
-def task_constraint(route: Route) -> Constraint | None:
-    found = prompting(route)
-    return found.constraint() if found is not None else None
-
-
-def contract_schema(route: Route) -> dict[str, Any] | None:
-    contract = route_contract(route)
-    if contract is None or contract.kind != JSON or contract.labels is not None:
-        return None
-    return contract.schema
-
-
-def conformed(requested: Constraint | None, completion: Completion, route: Route | None = None) -> Completion:
-    schema = requested.json_schema if requested else contract_schema(route) if route else None
-    if schema is None or not completion.stopped:
-        return completion
-    text = unfenced(completion.text)
-    try:
-        value = json.loads(text)
-    except json.JSONDecodeError as error:
-        message = f"The model's answer is not valid JSON ({error.msg}); {UNCONSTRAINED}"
-        raise OpenAIError(422, message, FORMAT, "invalid_json", "invalid_output_error") from error
-    problem = violation(schema, value)
-    if problem is not None:
-        against = "response_format" if requested else "the model's contract"
-        message = f"The model's answer does not match {against}: {problem}; {UNCONSTRAINED}"
-        raise OpenAIError(422, message, FORMAT, "schema_mismatch", "invalid_output_error")
-    return replace(completion, text=text)
-
-
-def completion_request(
-    config: GatewayConfig,
-    route: Route,
-    messages: list[dict[str, Any]],
-    max_tokens: int | None,
-    constraint: Constraint | None = None,
-    sampling: Sampling | None = None,
-) -> CompletionRequest:
-    problem = config.problems.get(route.base_model)
-    if problem is not None:
-        raise HTTPException(status_code=503, detail=problem)
-    base = spec_for(config, route.base_model)
-    adapter = None
-    if route.adapter:
-        trained = route.adapter.get("base_hash")
-        mismatch = base_changed(f"{route.slug}@{route.version}", route.base_model, trained, base.content_hash)
-        if mismatch is not None:
-            raise HTTPException(status_code=409, detail=mismatch)
-        adapter = AdapterRef(route.adapter["name"], route.adapter["artifact"], trained)
-    return CompletionRequest(
-        base=base,
-        messages=route_messages(route, messages),
-        adapter=adapter,
-        max_tokens=max_tokens,
-        constraint=constraint,
-        route=route.name,
-        sampling=sampling if sampling is not None else Sampling().or_greedy(),
-    )
-
-
-def complete(backend: ServingBackend, request: CompletionRequest, requested: bool) -> Completion:
-    try:
-        return backend.complete(request)
-    except OutputFormatError as error:
-        if requested or request.constraint is None:
-            raise
-        log.warning("answering %s without its label constraint: %s", request.base.key, error)
-        return backend.complete(replace(request, constraint=None))
-
-
-def run(
-    backend: ServingBackend,
-    config: GatewayConfig,
-    route: Route,
-    messages: list[dict[str, Any]],
-    max_tokens: int | None,
-    requested: Constraint | None = None,
-    sampling: Sampling | None = None,
-) -> Completion:
-    constraint = requested or task_constraint(route)
-    request = completion_request(config, route, messages, max_tokens, constraint, sampling)
-    try:
-        return complete(backend, request, bool(requested))
-    except EngineUnavailableError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
-    except OutputFormatError as error:
-        raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
-    except UnsupportedParameterError as error:
-        raise invalid(error.param, f"{error.message}.", "unsupported_parameter") from error
-
-
-def plain(messages: list[Message]) -> list[dict[str, str]]:
-    return [{"role": message.role, "content": message.content or ""} for message in messages]
-
-
-def last_user_text(messages: list[Message]) -> str | None:
-    texts = [message.content for message in messages if message.role == "user" and message.content]
-    return texts[-1] if texts else None
-
-
-def response_id() -> str:
-    return f"chatcmpl-{uuid.uuid4().hex}"
-
-
-def usage(completion: Completion) -> dict[str, int]:
-    return {
-        "prompt_tokens": completion.prompt_tokens,
-        "completion_tokens": completion.completion_tokens,
-        "total_tokens": completion.prompt_tokens + completion.completion_tokens,
-    }
-
-
-def finish_reason(completion: Completion) -> str:
-    return completion.finish_reason
-
-
-def served_model(route: Route) -> str:
-    return route.slug if route.version is None else f"{route.slug}@{route.version}"
 
 
 def sampling_labels(body: ChatCompletionRequest) -> dict[str, Any]:
@@ -556,34 +114,7 @@ def note_chat(
     if completion is not None:
         call.input_tokens = completion.prompt_tokens
         call.output_tokens = completion.completion_tokens
-        call.finish_reasons = (finish_reason(completion),)
-
-
-def response_body(identifier: str, model: str, completion: Completion) -> dict:
-    return {
-        "id": identifier,
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": completion.text},
-                "finish_reason": finish_reason(completion),
-            }
-        ],
-        "usage": usage(completion),
-    }
-
-
-def stream_events(identifier: str, model: str, completion: Completion) -> Iterator[str]:
-    created = int(time.time())
-    chunk = {"id": identifier, "object": "chat.completion.chunk", "created": created, "model": model}
-    first = {"index": 0, "delta": {"role": "assistant", "content": completion.text}, "finish_reason": None}
-    last = {"index": 0, "delta": {}, "finish_reason": finish_reason(completion)}
-    yield f"data: {json.dumps(chunk | {'choices': [first]})}\n\n"
-    yield f"data: {json.dumps(chunk | {'choices': [last], 'usage': usage(completion)})}\n\n"
-    yield "data: [DONE]\n\n"
+        call.finish_reasons = (completion.finish_reason,)
 
 
 @router.get(
@@ -621,12 +152,8 @@ def chat_completions(
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
-        refuse_unsupported(body)
-        requested = narrowed(route, requested_format(body.response_format))
-        sampling = sampling_of(body, route)
-        backend = request.app.state.backend
-        completion = run(backend, config, route, plain(body.messages), body.token_budget, requested, sampling)
-        completion = conformed(requested, completion, route)
+        base, adapter = checked_base(config, route)
+        completion = answer(request.app.state.backend, plan(body, route, base, adapter))
     except (HTTPException, OpenAIError) as error:
         status = error.status_code
         code = error.code if isinstance(error, OpenAIError) else None
@@ -649,8 +176,8 @@ def chat_completions(
                 completion_tokens=completion.completion_tokens if completion else 0,
                 response_id=identifier if answered else None,
                 input=last_user_text(body.messages) if kept else None,
-                output=completion.text if completion and kept else None,
-                finish_reason=finish_reason(completion) if completion and answered else None,
+                output=kept_output(completion) if completion and kept else None,
+                finish_reason=completion.finish_reason if completion and answered else None,
             )
         )
     if completion is None:

@@ -10,7 +10,7 @@ from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest
+from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest, TemplateTools, parsed
 from minibrain.serve.sampling import GREEDY_SAMPLING, Sampling, stopped_at
 from minibrain.serve.structured import TokenTrie
 from minibrain.serve.weights import local_dir
@@ -143,11 +143,11 @@ class MlxRuntime:
         self.active: str | None = None
         self.zeros: dict[str, Any] = {}
 
-    def render(self, messages: list[dict[str, str]]) -> list[int]:
+    def render(self, messages: list[dict[str, Any]], tools: TemplateTools = None, start: str = "") -> list[int]:
         text = self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True, **self.spec.template_kwargs
+            messages, tools=tools, tokenize=False, add_generation_prompt=True, **self.spec.template_kwargs
         )
-        return list(self.tokenizer.encode(text, add_special_tokens=False))
+        return list(self.tokenizer.encode(text + start, add_special_tokens=False))
 
     def attach(self, shape: LoraShape) -> None:
         import mlx.core as mx
@@ -227,7 +227,7 @@ class MlxRuntime:
 
     def generate(
         self,
-        messages: list[dict[str, Any]],
+        prompt: list[int],
         max_tokens: int | None,
         choices: Sequence[str] = (),
         sampling: Sampling = GREEDY_SAMPLING,
@@ -237,7 +237,6 @@ class MlxRuntime:
 
         sampling.refuse_beyond(self.supported, "MLX")
         chosen = sampling.over(self.defaults)
-        prompt = self.render(messages)
         room = max(self.context - len(prompt), 1)
         if chosen.seed is not None:
             mx.random.seed(chosen.seed)
@@ -292,7 +291,9 @@ class MlxBackend:
             if request.adapter is not None:
                 runtime.ensure_adapter(request.adapter.name, self.materialize(request.adapter.artifact))
             runtime.activate(request.adapter.name if request.adapter else None)
-            return runtime.generate(request.messages, request.max_tokens, request.decoding_choices(), request.sampling)
+            prompt = runtime.render(request.template_messages(), request.template_tools(), request.prefill())
+            raw = runtime.generate(prompt, request.max_tokens, request.decoding_choices(), request.sampling)
+            return parsed(request, raw)
 
     def status(self) -> list[dict[str, Any]]:
         return [

@@ -24,8 +24,9 @@ from minibrain.api.views import detail, version_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.data.dataset_versions import cleanup, require_splits, training_dataset_version
+from minibrain.gateway.chat import conformed, prompting, response_id, run
 from minibrain.gateway.config import GatewayConfig, Route
-from minibrain.gateway.routes import OpenAIError, conformed, prompting, response_id, run
+from minibrain.gateway.errors import OpenAIError
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.ml.completion import Completion

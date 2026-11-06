@@ -17,6 +17,7 @@ class BaseModelSpec:
     format: str = "safetensors"
     weights_file: str | None = None
     content_hash: str | None = None
+    tools: str | None = None
 
     def source(self) -> tuple[str, str | None]:
         if self.path and (Path(self.path) / "config.json").is_file():
@@ -39,6 +40,7 @@ class BaseModelSpec:
             format=str(data.get("format") or "safetensors"),
             weights_file=data.get("weights_file"),
             content_hash=data.get("content_hash"),
+            tools=data.get("tools"),
         )
 
 
@@ -48,6 +50,7 @@ QWEN3_0_6B = BaseModelSpec(
     revision="c1899de289a04d12100db370d81485cdf75e47ca",
     license="Apache-2.0",
     template_kwargs={"enable_thinking": False},
+    tools="hermes",
 )
 
 BASE_MODELS = {spec.key: spec for spec in (QWEN3_0_6B,)}

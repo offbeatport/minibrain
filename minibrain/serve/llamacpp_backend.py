@@ -5,7 +5,7 @@ from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import AdapterNotSupportedError, CompletionRequest, OutputFormatError
+from minibrain.serve.backend import AdapterNotSupportedError, CompletionRequest, OutputFormatError, parsed
 from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint, choice_grammar
 from minibrain.serve.weights import gguf_path
@@ -58,15 +58,24 @@ class LlamaCppBackend:
             )
         return self.models[spec.key]
 
-    def render(self, model: Any, spec: BaseModelSpec, messages: list[Any]) -> str:
-        from llama_cpp.llama_chat_format import Jinja2ChatFormatter
+    def render(self, model: Any, request: CompletionRequest) -> str:
+        from transformers.utils.chat_template_utils import render_jinja_template
 
         template = model.metadata.get("tokenizer.chat_template")
         if not template:
-            raise ValueError(f"{spec.key} has no chat template in its GGUF metadata")
+            raise ValueError(f"{request.base.key} has no chat template in its GGUF metadata")
         eos = model.detokenize([model.token_eos()]).decode(errors="ignore")
         bos = model.detokenize([model.token_bos()]).decode(errors="ignore")
-        return Jinja2ChatFormatter(template, eos, bos)(messages=messages, **spec.template_kwargs).prompt
+        rendered, _ = render_jinja_template(
+            conversations=[request.template_messages()],
+            tools=request.template_tools(),
+            chat_template=template,
+            add_generation_prompt=True,
+            bos_token=bos,
+            eos_token=eos,
+            **request.base.template_kwargs,
+        )
+        return rendered[0] + request.prefill()
 
     def complete(self, request: CompletionRequest) -> Completion:
         if request.adapter is not None:
@@ -76,20 +85,21 @@ class LlamaCppBackend:
             model = self.runtime(request.base)
             started = time.perf_counter()
             result = model.create_completion(
-                self.render(model, request.base, request.messages),
+                self.render(model, request),
                 max_tokens=request.max_tokens,
                 grammar=constrained,
                 **sampling_arguments(request.sampling, request.base.stop_tokens),
             )
         choice = result["choices"][0]
         usage = result.get("usage") or {}
-        return Completion(
+        raw = Completion(
             text=str(choice.get("text") or ""),
             prompt_tokens=int(usage.get("prompt_tokens", 0)),
             completion_tokens=int(usage.get("completion_tokens", 0)),
             stopped=choice.get("finish_reason") == "stop",
             seconds=time.perf_counter() - started,
         )
+        return parsed(request, raw)
 
     def status(self) -> list[dict[str, Any]]:
         return [{"base_model": key, "device": "llama.cpp", "adapters": []} for key in self.models]

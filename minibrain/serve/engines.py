@@ -205,6 +205,9 @@ class EngineBackend:
             "max_tokens": request.max_tokens,
             "route": request.route,
             "sampling": request.sampling.given(),
+            "tools": list(request.tools.tools),
+            "tool_choice": request.tools.choice,
+            "parallel_tool_calls": request.tools.parallel,
         }
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)

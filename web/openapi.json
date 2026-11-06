@@ -8086,7 +8086,7 @@
             }
           },
           "400": {
-            "description": "response_format is not valid or cannot be applied.",
+            "description": "A field is out of range or cannot be applied to this model; param names it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8126,7 +8126,7 @@
             }
           },
           "409": {
-            "description": "The version was trained on base weights that have changed since.",
+            "description": "The version was trained on base weights that changed since.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8136,7 +8136,7 @@
             }
           },
           "422": {
-            "description": "The answer does not match response_format, or the body is not valid.",
+            "description": "The answer does not match response_format or the contract.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9786,8 +9786,31 @@
             "title": "Role"
           },
           "content": {
-            "type": "string",
-            "title": "Content"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "The answer; null when the model only calls tools."
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCallBody"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "The functions the model calls; answer each with a tool message."
           }
         },
         "type": "object",
@@ -12685,8 +12708,9 @@
               "$ref": "#/components/schemas/Message"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Messages",
-            "description": "The conversation. A custom model answers the last user message; a base model reads them all."
+            "description": "The conversation: system (or developer), user, assistant and tool messages. A custom model answers after its own instructions, without the app's system messages; a base model reads them all."
           },
           "max_tokens": {
             "anyOf": [
@@ -12864,6 +12888,50 @@
           "response_format": {
             "title": "Response Format",
             "description": "An OpenAI response_format: {\"type\": \"text\"}, {\"type\": \"json_object\"} or {\"type\": \"json_schema\", \"json_schema\": {\"name\": ..., \"schema\": {...}, \"strict\": true}}. A custom model's contract holds by default; a request's format can only narrow a model whose contract is free text, so a model answering with labels or its own schema refuses one."
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolSpec"
+                },
+                "type": "array",
+                "maxItems": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "Up to 128 functions the model may call. Each model family's chat template renders them, and its answer is read back as tool_calls: Qwen and Hermes <tool_call> JSON, Llama 3.1 and later JSON, Mistral [TOOL_CALLS] and gpt-oss harmony. A model answering with labels or a JSON schema takes no tools."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Choice",
+            "description": "auto (the default with tools) lets the model choose, none answers in text, required makes it call one, and {\"type\": \"function\", \"function\": {\"name\": ...}} makes it call that one."
+          },
+          "parallel_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Tool Calls",
+            "description": "false keeps only the first call the model makes; true (the default) keeps all."
           }
         },
         "additionalProperties": true,
@@ -13218,10 +13286,11 @@
             "type": "string",
             "enum": [
               "stop",
-              "length"
+              "length",
+              "tool_calls"
             ],
             "title": "Finish Reason",
-            "description": "stop when the answer ended, length when max_tokens cut it."
+            "description": "stop when the answer ended, length when max_tokens cut it, tool_calls when it calls tools."
           }
         },
         "type": "object",
@@ -16707,6 +16776,76 @@
         ],
         "title": "FolderRoots"
       },
+      "FunctionCallBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments",
+            "description": "The arguments as a JSON object in text."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "title": "FunctionCallBody"
+      },
+      "FunctionSpec": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "1 to 64 letters, digits, underscores or dashes."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the function does, for the model."
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters",
+            "description": "The arguments, as a JSON Schema object."
+          },
+          "strict": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict",
+            "description": "Accepted; the arguments are not constrained."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FunctionSpec"
+      },
       "GatewayBody": {
         "properties": {
           "id": {
@@ -19127,9 +19266,28 @@
           "role": {
             "type": "string",
             "title": "Role",
-            "description": "system, user or assistant."
+            "description": "system, developer, user, assistant or tool."
           },
           "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Text, or a list of text parts; empty on an assistant message that calls tools."
+          },
+          "name": {
             "anyOf": [
               {
                 "type": "string"
@@ -19138,7 +19296,35 @@
                 "type": "null"
               }
             ],
-            "title": "Content"
+            "title": "Name",
+            "description": "The function's name, on a tool message."
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCallBody"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "On an assistant message: the calls it made, sent back with their results."
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id",
+            "description": "On a tool message: the id of the call it answers."
           }
         },
         "additionalProperties": true,
@@ -23741,6 +23927,47 @@
           "total_tokens"
         ],
         "title": "TokenUsage"
+      },
+      "ToolCallBody": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "const": "function",
+            "title": "Type",
+            "default": "function"
+          },
+          "function": {
+            "$ref": "#/components/schemas/FunctionCallBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "function"
+        ],
+        "title": "ToolCallBody"
+      },
+      "ToolSpec": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "function",
+            "title": "Type",
+            "default": "function"
+          },
+          "function": {
+            "$ref": "#/components/schemas/FunctionSpec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "function"
+        ],
+        "title": "ToolSpec"
       },
       "TrainFitInfo": {
         "properties": {

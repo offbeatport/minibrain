@@ -16,6 +16,7 @@ from fastapi.responses import PlainTextResponse, Response
 from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
 from minibrain.gateway.config import REPORT_SECONDS, GatewayConfig, RemoteConfig, gateway_id, served_bases
+from minibrain.gateway.errors import OpenAIError, invalid_body, openai_error
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.serve.backend import ServingBackend
 from minibrain.serve.engines import EngineBackend
@@ -100,8 +101,8 @@ def create_gateway_app(
     app.state.metrics_access = load_metrics_access()
     app.state.telemetry = gateway_telemetry(app.state.metrics_access)
     app.state.telemetry.refresh()
-    app.add_exception_handler(routes.OpenAIError, routes.openai_error)
-    app.add_exception_handler(RequestValidationError, routes.invalid_body)
+    app.add_exception_handler(OpenAIError, openai_error)
+    app.add_exception_handler(RequestValidationError, invalid_body)
     app.add_middleware(RequestContext)
     app.include_router(routes.router)
 

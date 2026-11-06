@@ -102,6 +102,34 @@ the request sets one, the way its scores were measured.
   check `format`, `multipleOf` and `patternProperties`.
 - `strict` is accepted and changes nothing: every answer is constrained, checked, or both.
 
+## Tool calling
+
+`/v1/chat/completions` takes OpenAI's `tools` (functions with JSON-schema `parameters`), `tool_choice` (`auto`,
+`none`, `required` or a named function) and `parallel_tool_calls`. Answers carry `tool_calls` with
+`finish_reason: tool_calls`, and follow-up turns send assistant messages with their `tool_calls` and `role: tool`
+messages with each `tool_call_id`. Streams carry the calls as `delta.tool_calls`.
+
+| Format | Read from | Families | SGLang parser | vLLM parser |
+|---|---|---|---|---|
+| `hermes` | `<tool_call>` JSON `</tool_call>` | Qwen 2.5 and 3, Hermes, SmolLM3 | `qwen25` | `hermes` |
+| `llama3` | `{"name", "parameters"}` JSON, after `<|python_tag|>` or alone; `;` between calls | Llama 3.1, 3.2, 3.3 | `llama3` | `llama3_json` |
+| `mistral` | `[TOOL_CALLS]` and a JSON list | Mistral 7B v0.3, Nemo, Small | `mistral` | `mistral` |
+| `harmony` | the `commentary to=functions.<name>` channel | gpt-oss | `gpt-oss` | `openai` |
+
+- The format comes from the base model's own chat template (`chat_template.jinja`, `tokenizer_config.json`, or the
+  GGUF metadata), read once per weights hash, so imported and Hugging Face models get it too. A model whose template
+  has none of these refuses `tools` with a 400.
+- The template renders the tools: `transformers`, MLX and llama.cpp pass `tools` to the tokenizer's chat template
+  (llama.cpp through the same Jinja renderer as `transformers`) and read the calls back from the raw answer; SGLang
+  and vLLM start with the matching `--tool-call-parser` and get `tools` as they are.
+- `required` and a named function prefill the answer with the format's call opening (`<tool_call>` plus the name
+  for Qwen), so the model can only complete a call. `none` renders no tools. `parallel_tool_calls: false` keeps the
+  first call.
+- A model answering with labels or its own JSON schema takes no tools; a free-text custom model does, with its
+  instructions first. Arguments the model writes as invalid JSON stay in `content`.
+- `functions` and `function_call`, OpenAI's old names, are refused with a pointer to `tools`; content parts other
+  than text are refused.
+
 ## Engines
 
 One engine process serves one base model with many adapters. It picks its engine when it starts, from its own

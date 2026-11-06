@@ -62,6 +62,7 @@ from minibrain.encryption.providers import KeyUnavailableError
 from minibrain.encryption.rekey import rekey_forever
 from minibrain.gateway import routes as gateway
 from minibrain.gateway.config import LocalConfig
+from minibrain.gateway.errors import OpenAIError, invalid_body, openai_error
 from minibrain.gateway.logs import LogBuffer, database_sink
 from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
@@ -268,8 +269,8 @@ def create_app(
     app.state.telemetry.refresh()
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
-    app.add_exception_handler(gateway.OpenAIError, gateway.openai_error)
-    app.add_exception_handler(RequestValidationError, gateway.invalid_body)
+    app.add_exception_handler(OpenAIError, openai_error)
+    app.add_exception_handler(RequestValidationError, invalid_body)
     app.add_middleware(PeerAddress)
     app.add_middleware(Identify)
     app.add_middleware(TrustedProxy)
