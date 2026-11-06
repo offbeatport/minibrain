@@ -78,7 +78,10 @@ function installState(option: BaseOption): InstallState | null {
     return INSTALL_STATES[option.added?.availability.state ?? ""] ?? null;
 }
 
-function Availability({ option }: { option: BaseOption }) {
+function Availability({ option, deleting }: { option: BaseOption; deleting?: boolean }) {
+    if (deleting) {
+        return <Badge variant="destructive">Deleting</Badge>;
+    }
     const state = installState(option);
     return state ? <Badge variant={state.variant}>{state.text}</Badge> : null;
 }
@@ -206,7 +209,15 @@ function Details({ entry }: { entry: CatalogEntry }) {
     );
 }
 
-function OptionRow({ option, recommended }: { option: BaseOption; recommended?: boolean }) {
+function OptionRow({
+    option,
+    recommended,
+    deleting,
+}: {
+    option: BaseOption;
+    recommended?: boolean;
+    deleting?: boolean;
+}) {
     const facts = factsOf(option);
     const description = descriptionOf(option);
     return (
@@ -226,7 +237,7 @@ function OptionRow({ option, recommended }: { option: BaseOption; recommended?: 
                 )}
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
-                <Availability option={option} />
+                <Availability option={option} deleting={deleting} />
                 <Resources option={option} />
             </span>
             {option.kind === "catalogue" && option.entry && <Details entry={option.entry} />}
@@ -361,6 +372,13 @@ export function BasePicker({
     const [runsHere, setRunsHere] = useState(false);
     const [trainsHere, setTrainsHere] = useState(false);
     const entries = catalog?.entries ?? [];
+    const deleting = new Set(
+        models
+            .filter((row) => row.kind === "base" && row.teardown?.kind === "delete")
+            .map((row) => row.key),
+    );
+    const beingDeleted = (option: BaseOption) =>
+        Boolean(option.baseKey && deleting.has(option.baseKey));
     const runsSomewhere = useRunsHere(catalog);
     const trainsSomewhere = useTrainsHere(catalog);
     const everything = entries.map((entry) => catalogueOption(entry));
@@ -497,10 +515,14 @@ export function BasePicker({
                     itemKey={(row) => row.option.key}
                     itemText={(row) => searchText(row.option)}
                     renderItem={(row) => (
-                        <OptionRow option={row.option} recommended={row.recommended} />
+                        <OptionRow
+                            option={row.option}
+                            recommended={row.recommended}
+                            deleting={beingDeleted(row.option)}
+                        />
                     )}
                     currentKey={value.option?.key}
-                    onPick={(row) => onPick(row.option)}
+                    onPick={(row) => !beingDeleted(row.option) && onPick(row.option)}
                     label="Search base models"
                     placeholder="Search"
                     className="min-h-0 flex-1"
