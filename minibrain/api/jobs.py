@@ -79,7 +79,12 @@ def text_match(text: str) -> ColumnElement[bool]:
     named = select(Model.id).where(
         or_(Model.name.icontains(term, autoescape=True), Model.slug.icontains(term, autoescape=True))
     )
-    matches = [Job.model_id.in_(named), Job.base_model_id.icontains(term, autoescape=True)]
+    matches = [
+        Job.model_id.in_(named),
+        Job.model_name.icontains(term, autoescape=True),
+        Job.model_slug.icontains(term, autoescape=True),
+        Job.base_model_key.icontains(term, autoescape=True),
+    ]
     if term.isdigit():
         matches.append(Job.id == int(term))
     return or_(*matches)
@@ -88,8 +93,7 @@ def text_match(text: str) -> ColumnElement[bool]:
 def conditions(filters: JobFilter, skip: Facet | None = None) -> list[ColumnElement[bool]]:
     where: list[ColumnElement[bool]] = []
     if filters.models and skip != "model":
-        chosen = select(Model.id).where(Model.slug.in_(filters.models))
-        where.append(Job.model_id.in_(chosen))
+        where.append(Job.model_slug.in_(filters.models))
     if filters.statuses and skip != "status":
         where.append(Job.status.in_(filters.statuses))
     if filters.kinds:
@@ -138,16 +142,17 @@ def list_jobs(
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
     by_model = (
-        select(Model.slug, func.count())
-        .select_from(Job)
-        .join(Model, Job.model_id == Model.id)
-        .where(*conditions(filters, "model"))
-        .group_by(Model.slug)
+        select(Job.model_slug, func.count(), func.max(Job.model_name))
+        .where(Job.model_slug.is_not(None), *conditions(filters, "model"))
+        .group_by(Job.model_slug)
     )
+    found = list(session.execute(by_model))
+    live = set(session.scalars(select(Model.slug).where(Model.slug.in_([row[0] for row in found]))))
     return JobFacets(
         total=count_jobs(session, conditions(filters)),
         statuses={status: count for status, count in session.execute(by_status)},
-        models={slug: count for slug, count in session.execute(by_model)},
+        models={str(slug): count for slug, count, _ in found},
+        deleted_models={str(slug): str(name or slug) for slug, _, name in found if slug not in live},
     )
 
 
@@ -216,7 +221,7 @@ async def stream_events(job_id: int, request: Request, session: SessionDep, afte
 
 
 def audit(session: Session, action: str, subject: Job, **detail: Any) -> None:
-    owner = subject.model.slug if subject.model is not None else subject.base_model_id
+    owner = subject.model_slug or subject.base_model_key
     facts = {"name": f"Job #{subject.id}", "kind": subject.kind} | ({"model": owner} if owner else {}) | detail
     session.add(AuditEvent(actor=current_actor(), action=action, target=f"job:{subject.id}", detail=facts))
 

@@ -17,6 +17,8 @@ from minibrain.registry.models import (
     JobAttempt,
     JobEvent,
     JobStatus,
+    Model,
+    Version,
     Worker,
     now,
 )
@@ -115,12 +117,18 @@ def enqueue(
         if existing is not None:
             return existing
     rules = policy(kind)
+    owner = session.get(Model, model_id) if model_id is not None else None
+    version = session.get(Version, version_id) if version_id is not None else None
     job = Job(
         kind=kind,
         params=params,
         model_id=model_id,
         version_id=version_id,
         base_model_id=base_model_id,
+        model_slug=owner.slug if owner else None,
+        model_name=owner.name if owner else None,
+        version_number=version.number if version else None,
+        base_model_key=base_model_id,
         needs_gpu=rules.needs_gpu,
         max_attempts=rules.max_attempts,
         idempotency_key=idempotency_key,
@@ -132,6 +140,14 @@ def enqueue(
     session.flush()
     add_state(session, job, "queued")
     return job
+
+
+def refuse_orphan(job: Job) -> None:
+    name = job.model_name or job.model_slug or job.base_model_key
+    if job.owner_deleted:
+        raise JobStateError(f"{name} was deleted, so job {job.id} can't be retried")
+    if job.version_deleted:
+        raise JobStateError(f"{name} v{job.version_number} was deleted, so job {job.id} can't be retried")
 
 
 def same_error_twice(job: Job, error: str) -> bool:
@@ -357,6 +373,7 @@ class SqlJobQueue:
     def retry(self, session: Session, job: Job) -> Job:
         if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
             raise JobStateError(f"job {job.id} is {job.status}; only failed or cancelled jobs can be retried")
+        refuse_orphan(job)
         again = enqueue(
             session,
             job.kind,

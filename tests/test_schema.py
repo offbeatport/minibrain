@@ -43,6 +43,7 @@ def shape(sql: str) -> Shape:
     head, _, rest = flat.partition("(")
     if not head.startswith("CREATE TABLE"):
         return flat, (), ()
+    head = head.replace('"', "")
     items = parts(rest.rsplit(")", 1)[0])
     columns = tuple(item for item in items if not item.startswith(CONSTRAINTS))
     constraints = tuple(sorted(item for item in items if item.startswith(CONSTRAINTS)))

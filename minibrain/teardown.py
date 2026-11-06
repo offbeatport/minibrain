@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.data.dataset_versions import cleanup
@@ -26,6 +26,7 @@ from minibrain.registry.models import (
     Job,
     KeyScope,
     Model,
+    RequestLog,
     Teardown,
     TeardownKind,
     TeardownStatus,
@@ -362,6 +363,24 @@ def drop_artifacts(session: Session, settings: Settings, candidates: set[str]) -
     return dropped
 
 
+def changed(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
+def keep_custom_history(session: Session, model: Model) -> dict[str, int]:
+    owner = {"model_slug": model.slug, "model_name": model.name}
+    jobs = session.execute(update(Job).where(Job.model_id == model.id).values(owner))
+    logs = session.execute(update(RequestLog).where(RequestLog.model_id == model.id).values(owner))
+    return {"jobs": changed(jobs), "request_logs": changed(logs)}
+
+
+def keep_base_history(session: Session, base: BaseModel) -> dict[str, int]:
+    jobs = session.execute(update(Job).where(Job.base_model_id == base.id).values(base_model_key=base.id))
+    served = (RequestLog.model_id.is_(None), RequestLog.model_slug.is_(None), RequestLog.model == base.id)
+    logs = session.execute(update(RequestLog).where(*served).values(model_name=base.name))
+    return {"jobs": changed(jobs), "request_logs": changed(logs)}
+
+
 def short(error: Exception) -> str:
     text = str(error).splitlines()[0] if str(error) else type(error).__name__
     return text[:ERROR_LENGTH]
@@ -516,13 +535,14 @@ class Teardowns:
             return
         adapters = {version.adapter_artifact_id for version in model.versions if version.adapter_artifact_id}
         removed = {"versions": len(model.versions), "key_scopes": len(model.key_scopes)}
+        kept = keep_custom_history(session, model)
         drop(session, teardown)
         session.delete(model)
         session.flush()
         drop_orphan_keys(session)
         removed["dataset_versions"] = cleanup(session, self.settings)
         removed["artifacts"] = drop_artifacts(session, self.settings, adapters)
-        self.finish(session, record, removed=removed)
+        self.finish(session, record, removed=removed, history=kept)
 
     def delete_base(self, session: Session, teardown: Teardown) -> None:
         record = record_of(teardown)
@@ -540,13 +560,14 @@ class Teardowns:
         scopes = session.query(KeyScope).filter(KeyScope.base_model_id == base.id).delete()
         removed = {"size_bytes": base.size_bytes, "key_scopes": scopes, "models": teardown.detail.get("models", [])}
         removed |= {"kept": base.path} if base.path else {}
+        kept = keep_base_history(session, base)
         drop(session, teardown)
         session.delete(base)
         session.flush()
         objects += sweep_weights(session, store)
         removed |= {"bucket_objects": objects} if objects else {}
         drop_orphan_keys(session)
-        self.finish(session, record, removed=removed)
+        self.finish(session, record, removed=removed, history=kept)
 
     def fail(self, session: Session, teardown: Teardown, error: str) -> None:
         teardown.status = TeardownStatus.FAILED

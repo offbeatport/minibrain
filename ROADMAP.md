@@ -762,8 +762,14 @@ once it matches; only deleting a base removes its files.
   unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
   Ten minutes without that is Stop failed, naming what did not confirm.
 - Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, dataset versions only it
-  uses and API key scopes. A base with models built on it answers 409 with their names unless
+  uses, feedback and API key scopes. A base with models built on it answers 409 with their names unless
   the call says `cascade=true`; the cascade deletes them first, then the base.
+- History stays: jobs (with their events, logs and metrics) and request logs outlive the model. Their links to the
+  model, version and base are `ON DELETE SET NULL`, and each row keeps a snapshot written when it is created: the
+  model's slug and name and the version number on jobs, the base key on jobs, the slug and name on request logs (the
+  base's name is written there when the base goes). Filters match the snapshot slug, so a deleted model still filters,
+  and lists show its name with "(deleted)" and no link. A job whose model or version is gone is not retried (409, and
+  refused per job in the bulk retry). A new model that reuses a deleted slug shares that slug's history in filters.
 - Audit: `model.delete` and `model.undeploy` when a person starts one (`retry` on a retry), and `model.delete_finished`
   and `model.undeploy_finished` with the outcome, what went and the reason a failure gives.
 

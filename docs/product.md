@@ -144,6 +144,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments
+- **History outlives models** · shipped · product, admin
+  Jobs and request logs of deleted models stay, marked deleted.
+  UI: Training, Monitor › Jobs, Monitor › Requests, Monitor › Overview, Jobs › job
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
   UI: Models › model › How it's judged › Answers, Evaluations › version · API: GET /api/presets

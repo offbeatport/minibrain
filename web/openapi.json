@@ -19221,6 +19221,16 @@
             ],
             "title": "Version"
           },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
+          "version_deleted": {
+            "type": "boolean",
+            "title": "Version Deleted",
+            "default": false
+          },
           "kind": {
             "type": "string",
             "title": "Kind"
@@ -19398,6 +19408,14 @@
             },
             "type": "object",
             "title": "Models"
+          },
+          "deleted_models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Deleted Models",
+            "default": {}
           }
         },
         "type": "object",
@@ -19475,6 +19493,16 @@
               }
             ],
             "title": "Version"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
+          "version_deleted": {
+            "type": "boolean",
+            "title": "Version Deleted",
+            "default": false
           },
           "kind": {
             "type": "string",
@@ -21877,6 +21905,11 @@
             "type": "boolean",
             "title": "Custom"
           },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
           "requests": {
             "type": "integer",
             "title": "Requests"
@@ -22034,6 +22067,11 @@
           "other": {
             "type": "boolean",
             "title": "Other",
+            "default": false
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
             "default": false
           }
         },
@@ -23133,6 +23171,11 @@
             "type": "boolean",
             "title": "Custom"
           },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
           "version": {
             "anyOf": [
               {
@@ -23347,6 +23390,11 @@
               }
             ],
             "title": "Publisher"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
           }
         },
         "type": "object",
@@ -23585,6 +23633,11 @@
           "custom": {
             "type": "boolean",
             "title": "Custom"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
           },
           "version": {
             "anyOf": [

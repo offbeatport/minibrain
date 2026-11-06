@@ -201,10 +201,12 @@ def model_changes(settings: Settings, model: Model) -> ChangeInfo | None:
 def job_fields(job: Job) -> dict:
     return {
         "id": job.id,
-        "model": job.model.slug if job.model else None,
-        "model_name": job.model.name if job.model else None,
-        "base_model": job.base_model_id,
-        "version": job.version.number if job.version else None,
+        "model": job.model.slug if job.model else job.model_slug,
+        "model_name": job.model.name if job.model else job.model_name,
+        "base_model": job.base_model_id or job.base_model_key,
+        "version": job.version.number if job.version else job.version_number,
+        "deleted": job.owner_deleted,
+        "version_deleted": job.version_deleted,
         "kind": job.kind,
         "status": job.status,
         "progress": job.progress,

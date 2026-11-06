@@ -77,16 +77,26 @@ class LogBuffer:
         self.flush()
 
 
-def existing(session: Session, batch: list[LogEntry]) -> Callable[[LogEntry], LogEntry]:
-    def keep(entry: LogEntry) -> LogEntry:
-        key_id = entry.key_id if entry.key_id in keys else None
-        model_id = entry.model_id if entry.model_id in models else None
+@dataclass(frozen=True)
+class Known:
+    keys: set[int]
+    models: dict[int, tuple[str, str]]
+
+    def keep(self, entry: LogEntry) -> LogEntry:
+        key_id = entry.key_id if entry.key_id in self.keys else None
+        model_id = entry.model_id if entry.model_id in self.models else None
         return replace(entry, key_id=key_id, model_id=model_id)
 
+    def row(self, entry: LogEntry) -> RequestLog:
+        slug, name = self.models[entry.model_id] if entry.model_id is not None else (None, None)
+        return RequestLog(**asdict(entry), model_slug=slug, model_name=name)
+
+
+def existing(session: Session, batch: list[LogEntry]) -> Known:
     keys = set(session.scalars(select(ApiKey.id).where(ApiKey.id.in_({e.key_id for e in batch if e.key_id}))))
     wanted = {entry.model_id for entry in batch if entry.model_id}
-    models = set(session.scalars(select(Model.id).where(Model.id.in_(wanted))))
-    return keep
+    found = session.execute(select(Model.id, Model.slug, Model.name).where(Model.id.in_(wanted)))
+    return Known(keys=keys, models={row.id: (row.slug, row.name) for row in found})
 
 
 def key_actor(key_id: int | None) -> str:
@@ -111,8 +121,9 @@ def blocked_event(entry: LogEntry) -> AuditEvent | None:
 def database_sink(sessions: sessionmaker[Session]) -> Sink:
     def write(batch: list[LogEntry]) -> None:
         with sessions() as session:
-            entries = list(map(existing(session, batch), batch))
-            session.add_all(RequestLog(**asdict(entry)) for entry in entries)
+            known = existing(session, batch)
+            entries = list(map(known.keep, batch))
+            session.add_all(map(known.row, entries))
             session.add_all(event for event in map(blocked_event, entries) if event is not None)
             last_used: dict[int, datetime] = {}
             for entry in entries:

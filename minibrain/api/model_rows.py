@@ -209,7 +209,7 @@ class UsageIndex:
 def usage_index(session: Session) -> UsageIndex:
     custom = usage_for(session, [RequestLog.model_id], RequestLog.model_id.is_not(None))
     added = select(BaseModel.created_at).where(BaseModel.id == RequestLog.model).scalar_subquery()
-    base = usage_for(session, [RequestLog.model], RequestLog.model_id.is_(None) & (RequestLog.at >= added))
+    base = usage_for(session, [RequestLog.model], RequestLog.model_slug.is_(None) & (RequestLog.at >= added))
     versions = usage_for(session, [RequestLog.model_id, RequestLog.version], RequestLog.model_id.is_not(None))
     return UsageIndex(
         custom={target[0]: usage for target, usage in custom.items()},

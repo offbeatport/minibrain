@@ -5894,6 +5894,16 @@ export interface components {
             base_model?: string | null;
             /** Version */
             version: number | null;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
+            /**
+             * Version Deleted
+             * @default false
+             */
+            version_deleted?: boolean;
             /** Kind */
             kind: string;
             /** Status */
@@ -5956,6 +5966,13 @@ export interface components {
             models: {
                 [key: string]: number;
             };
+            /**
+             * Deleted Models
+             * @default {}
+             */
+            deleted_models?: {
+                [key: string]: string;
+            };
         };
         /** JobIds */
         JobIds: {
@@ -5974,6 +5991,16 @@ export interface components {
             base_model?: string | null;
             /** Version */
             version: number | null;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
+            /**
+             * Version Deleted
+             * @default false
+             */
+            version_deleted?: boolean;
             /** Kind */
             kind: string;
             /** Status */
@@ -6735,6 +6762,11 @@ export interface components {
             label: string;
             /** Custom */
             custom: boolean;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
             /** Requests */
             requests: number;
             /** Errors */
@@ -6784,6 +6816,11 @@ export interface components {
              * @default false
              */
             other?: boolean;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
         };
         /** PasswordLink */
         PasswordLink: {
@@ -7169,6 +7206,11 @@ export interface components {
             model_name: string;
             /** Custom */
             custom: boolean;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
             /** Version */
             version: number | null;
             /** Contract */
@@ -7229,6 +7271,11 @@ export interface components {
             count: number;
             /** Publisher */
             publisher?: string | null;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
         };
         /** RequestFacets */
         RequestFacets: {
@@ -7320,6 +7367,11 @@ export interface components {
             model_name: string;
             /** Custom */
             custom: boolean;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
             /** Version */
             version: number | null;
             /** Contract */

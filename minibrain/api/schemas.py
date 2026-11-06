@@ -457,6 +457,8 @@ class JobInfo(BaseModel):
     model_name: str | None
     base_model: str | None = None
     version: int | None
+    deleted: bool = False
+    version_deleted: bool = False
     kind: str
     status: str
     progress: float
@@ -481,6 +483,7 @@ class JobFacets(BaseModel):
     total: int
     statuses: dict[str, int]
     models: dict[str, int]
+    deleted_models: dict[str, str] = {}
 
 
 class JobIds(BaseModel):

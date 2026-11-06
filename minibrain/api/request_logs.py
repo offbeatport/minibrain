@@ -41,6 +41,7 @@ class RequestRow(pydantic.BaseModel):
     model_key: str
     model_name: str
     custom: bool
+    deleted: bool = False
     version: int | None
     contract: int | None = None
     key_id: int | None
@@ -69,6 +70,7 @@ class RequestFacet(pydantic.BaseModel):
     label: str
     count: int
     publisher: str | None = None
+    deleted: bool = False
 
 
 class RequestFacets(pydantic.BaseModel):
@@ -124,17 +126,13 @@ def status_match(chosen: str) -> ColumnElement[bool]:
 
 
 def model_match(keys: list[str]) -> ColumnElement[bool]:
-    custom = select(Model.id).where(Model.slug.in_(keys))
-    return or_(RequestLog.model_id.in_(custom), and_(RequestLog.model_id.is_(None), RequestLog.model.in_(keys)))
+    return or_(RequestLog.model_slug.in_(keys), and_(RequestLog.model_slug.is_(None), RequestLog.model.in_(keys)))
 
 
 def version_match(values: list[str]) -> ColumnElement[bool]:
     pairs = [value.rpartition("@") for value in values]
     chosen = [
-        and_(
-            RequestLog.model_id.in_(select(Model.id).where(Model.slug == slug)),
-            RequestLog.version == int(number),
-        )
+        and_(RequestLog.model_slug == slug, RequestLog.version == int(number))
         for slug, _, number in pairs
         if slug and number.isdigit()
     ]
@@ -255,29 +253,41 @@ def rows_for(session: Session, where: Sequence[ColumnElement[bool]], size: int) 
     return list(session.execute(query.order_by(RequestLog.id.desc()).limit(size)))
 
 
-def identity(log: RequestLog, slug: str | None, name: str | None, names: dict[str, str]) -> tuple[str, str]:
+@dataclass(frozen=True)
+class Owner:
+    key: str
+    name: str
+    custom: bool
+    deleted: bool
+
+
+def owner_of(log: RequestLog, slug: str | None, name: str | None, names: dict[str, str]) -> Owner:
     if slug is not None and name is not None:
-        return slug, name
-    return log.model, names.get(log.model, log.model)
+        return Owner(slug, name, custom=True, deleted=False)
+    if log.model_slug is not None:
+        return Owner(log.model_slug, log.model_name or log.model_slug, custom=True, deleted=True)
+    if log.model in names:
+        return Owner(log.model, names[log.model], custom=False, deleted=False)
+    return Owner(log.model, log.model_name or log.model, custom=False, deleted=log.model_name is not None)
 
 
 def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
     logs = [row[0] for row in found]
     marks = feedback_marks(session, logs)
-    names = base_names(session, {log.model for log in logs if log.model_id is None})
+    names = base_names(session, {log.model for log in logs if log.model_slug is None})
     items: list[RequestRow] = []
     for log, slug, name, key_name in found:
-        model_key, model_name = identity(log, slug, name, names)
-        custom = slug is not None
-        mark = marks.get((log.model_id, log.response_id), {}) if custom and log.response_id else {}
+        owner = owner_of(log, slug, name, names)
+        mark = marks.get((log.model_id, log.response_id), {}) if slug is not None and log.response_id else {}
         items.append(
             RequestRow(
                 id=log.id,
                 at=aware(log.at),
                 model=log.model,
-                model_key=model_key,
-                model_name=model_name,
-                custom=custom,
+                model_key=owner.key,
+                model_name=owner.name,
+                custom=owner.custom,
+                deleted=owner.deleted,
                 version=log.version,
                 contract=log.contract,
                 key_id=log.key_id,
@@ -322,42 +332,51 @@ def list_requests(
     )
 
 
-def base_facet(base: BaseModel | None, model: str, total: int) -> RequestFacet:
+def base_facet(base: BaseModel | None, model: str, kept: str | None, total: int) -> RequestFacet:
     if base is None:
-        return RequestFacet(value=model, label=model, count=total)
+        return RequestFacet(value=model, label=kept or model, count=total, deleted=kept is not None)
     return RequestFacet(value=model, label=base.name, count=total, publisher=base_publisher(base))
 
 
+def live_names(session: Session, slugs: set[str]) -> dict[str, str]:
+    query = select(Model.slug, Model.name).where(Model.slug.in_(slugs))
+    return {slug: name for slug, name in session.execute(query)}
+
+
+def custom_names(session: Session, where: list[ColumnElement[bool]], *by: Any) -> list[Any]:
+    query = (
+        select(RequestLog.model_slug, *by, func.count(), func.max(RequestLog.model_name))
+        .where(RequestLog.model_slug.is_not(None), *where)
+        .group_by(RequestLog.model_slug, *by)
+    )
+    found: list[Any] = list(session.execute(query))
+    slugs = {str(row[0]) for row in found}
+    live = live_names(session, slugs) if slugs else {}
+    return [(*row[:-1], live.get(row[0]) or row[-1] or row[0], row[0] not in live) for row in found]
+
+
 def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
-    custom = (
-        select(Model.slug, Model.name, func.count())
-        .select_from(RequestLog)
-        .join(Model, RequestLog.model_id == Model.id)
-        .where(*where)
-        .group_by(Model.slug, Model.name)
-    )
     base = (
-        select(RequestLog.model, func.count()).where(RequestLog.model_id.is_(None), *where).group_by(RequestLog.model)
+        select(RequestLog.model, func.max(RequestLog.model_name), func.count())
+        .where(RequestLog.model_slug.is_(None), *where)
+        .group_by(RequestLog.model)
     )
-    facets = [RequestFacet(value=slug, label=name, count=total) for slug, name, total in session.execute(custom)]
+    facets = [
+        RequestFacet(value=slug, label=name, count=total, deleted=deleted)
+        for slug, total, name, deleted in custom_names(session, where)
+    ]
     found = list(session.execute(base))
-    bases = bases_of(session, {model for model, _ in found})
-    facets += [base_facet(bases.get(model), model, total) for model, total in found]
+    bases = bases_of(session, {model for model, _, _ in found})
+    facets += [base_facet(bases.get(model), model, kept, total) for model, kept, total in found]
     return sorted(facets, key=lambda facet: (-facet.count, facet.label.lower()))
 
 
 def version_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
-    query = (
-        select(Model.slug, Model.name, RequestLog.version, func.count())
-        .select_from(RequestLog)
-        .join(Model, RequestLog.model_id == Model.id)
-        .where(RequestLog.version.is_not(None), *where)
-        .group_by(Model.slug, Model.name, RequestLog.version)
-    )
-    found = sorted(session.execute(query), key=lambda row: (row[1].lower(), -(row[2] or 0)))
+    found = custom_names(session, [RequestLog.version.is_not(None), *where], RequestLog.version)
+    ordered = sorted(found, key=lambda row: (row[3].lower(), -(row[1] or 0)))
     return [
-        RequestFacet(value=f"{slug}@{version}", label=f"{name} v{version}", count=total)
-        for slug, name, version, total in found
+        RequestFacet(value=f"{slug}@{version}", label=f"{name} v{version}", count=total, deleted=deleted)
+        for slug, version, total, name, deleted in ordered
     ]
 
 

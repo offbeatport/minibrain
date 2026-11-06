@@ -230,7 +230,7 @@ def test_events_stream_until_the_job_ends(harness: Harness) -> None:
     assert "step 1" in stream and stream.rstrip().endswith(f'data: {{"job": {claim["job_id"]}}}')
 
 
-def test_job_rows_cascade_with_the_model(harness: Harness) -> None:
+def test_job_rows_outlive_the_model(harness: Harness) -> None:
     lora_job(harness)
     claim = harness.claim(["train"])
     assert claim is not None
@@ -238,7 +238,8 @@ def test_job_rows_cascade_with_the_model(harness: Harness) -> None:
     assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
     harness.settle()
     with harness.sessions() as session:
-        assert session.get(Job, claim["job_id"]) is None
+        kept = session.get(Job, claim["job_id"])
+        assert kept is not None and kept.model_id is None and kept.model_slug == SLUG
 
 
 def test_jobs_filter_by_several_kinds(harness: Harness) -> None:

@@ -224,7 +224,7 @@ class Model(Base):
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
-    jobs: Mapped[list["Job"]] = relationship(back_populates="model", cascade="all, delete-orphan")
+    jobs: Mapped[list["Job"]] = relationship(back_populates="model", passive_deletes=True)
     key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="model", cascade="all, delete-orphan")
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
@@ -320,8 +320,8 @@ class Job(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str]
-    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
-    version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), default=None)
+    version_id: Mapped[int | None] = mapped_column(ForeignKey("versions.id", ondelete="SET NULL"), default=None)
     base_model_id: Mapped[str | None] = mapped_column(ForeignKey("base_models.id", ondelete="SET NULL"), default=None)
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     needs_gpu: Mapped[bool] = mapped_column(default=False)
@@ -344,12 +344,26 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    model_slug: Mapped[str | None] = mapped_column(default=None)
+    model_name: Mapped[str | None] = mapped_column(default=None)
+    version_number: Mapped[int | None] = mapped_column(default=None)
+    base_model_key: Mapped[str | None] = mapped_column(default=None)
 
     model: Mapped[Model | None] = relationship(back_populates="jobs")
     version: Mapped[Version | None] = relationship()
     attempts: Mapped[list["JobAttempt"]] = relationship(
         back_populates="job", cascade="all, delete-orphan", order_by="JobAttempt.number"
     )
+
+    @property
+    def owner_deleted(self) -> bool:
+        if self.model_slug is not None:
+            return self.model_id is None
+        return self.base_model_key is not None and self.base_model_id is None
+
+    @property
+    def version_deleted(self) -> bool:
+        return self.version_number is not None and self.version_id is None
 
 
 class JobAttempt(Base):
@@ -427,13 +441,14 @@ class RequestLog(Base):
         Index("ix_request_logs_response", "response_id"),
         Index("ix_request_logs_at", "at"),
         Index("ix_request_logs_key", "key_id", "id"),
+        Index("ix_request_logs_slug", "model_slug", "id"),
         {"sqlite_autoincrement": True},
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     at: Mapped[datetime] = mapped_column(UtcDateTime)
     key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"), default=None)
-    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), default=None)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), default=None)
     model: Mapped[str]
     version: Mapped[int | None] = mapped_column(default=None)
     contract: Mapped[int | None] = mapped_column(default=None)
@@ -446,6 +461,8 @@ class RequestLog(Base):
     output: Mapped[str | None] = mapped_column(default=None)
     finish_reason: Mapped[str | None] = mapped_column(default=None)
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    model_slug: Mapped[str | None] = mapped_column(default=None)
+    model_name: Mapped[str | None] = mapped_column(default=None)
 
 
 class Feedback(Base):

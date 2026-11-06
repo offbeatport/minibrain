@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
-from minibrain.api.request_logs import CLIENT_ERROR, aware, base_names, model_match
-from minibrain.registry.models import Model, RequestLog, now
+from minibrain.api.request_logs import CLIENT_ERROR, aware, base_names, live_names, model_match
+from minibrain.registry.models import RequestLog, now
 
 router = APIRouter(prefix="/api", tags=["requests"])
 
@@ -35,6 +35,7 @@ class OverviewSeries(BaseModel):
     label: str
     custom: bool
     other: bool = False
+    deleted: bool = False
 
 
 class OverviewPoint(BaseModel):
@@ -52,6 +53,7 @@ class OverviewModel(BaseModel):
     key: str
     label: str
     custom: bool
+    deleted: bool = False
     requests: int
     errors: int
     error_rate: float | None
@@ -74,7 +76,7 @@ class RequestOverview(BaseModel):
 
 @dataclass(frozen=True)
 class Identity:
-    model_id: int | None
+    slug: str | None
     base: str | None
 
 
@@ -114,13 +116,13 @@ def bucket_of(column: Any, edges: Sequence[datetime], low: int, high: int) -> Co
 
 
 def base_of() -> ColumnElement[Any]:
-    return case((RequestLog.model_id.is_(None), RequestLog.model), else_=None)
+    return case((RequestLog.model_slug.is_(None), RequestLog.model), else_=None)
 
 
 def same_model(item: Identity) -> ColumnElement[bool]:
-    if item.model_id is not None:
-        return RequestLog.model_id == item.model_id
-    return and_(RequestLog.model_id.is_(None), RequestLog.model == item.base)
+    if item.slug is not None:
+        return RequestLog.model_slug == item.slug
+    return and_(RequestLog.model_slug.is_(None), RequestLog.model == item.base)
 
 
 def series_of(top: Sequence[Identity]) -> ColumnElement[int]:
@@ -173,11 +175,11 @@ def shared_columns() -> list[Any]:
 
 
 def model_rows(session: Session, where: Sequence[ColumnElement[bool]]) -> list[tuple[Identity, Partition]]:
-    identity = [RequestLog.model_id.label("model_id"), base_of().label("base"), RequestLog.at.label("at")]
+    identity = [RequestLog.model_slug.label("slug"), base_of().label("base"), RequestLog.at.label("at")]
     sub = select(*identity, *shared_columns()).where(*where).subquery()
-    query = ranked(sub, [sub.c.model_id, sub.c.base], {"last_at": func.max(sub.c.at)})
-    found = partitions(list(session.execute(query)), lambda row: Identity(row.model_id, row.base))
-    return sorted(found.items(), key=lambda item: (-item[1].total, str(item[0].base or item[0].model_id)))
+    query = ranked(sub, [sub.c.slug, sub.c.base], {"last_at": func.max(sub.c.at)})
+    found = partitions(list(session.execute(query)), lambda row: Identity(row.slug, row.base))
+    return sorted(found.items(), key=lambda item: (-item[1].total, str(item[0].base or item[0].slug)))
 
 
 def series_points(
@@ -202,21 +204,29 @@ def series_points(
     ]
 
 
+def kept_names(session: Session, column: Any, keys: set[str]) -> dict[str, str]:
+    if not keys:
+        return {}
+    query = select(column, func.max(RequestLog.model_name)).where(column.in_(keys)).group_by(column)
+    return {key: name for key, name in session.execute(query) if name}
+
+
 def names_for(session: Session, identities: Sequence[Identity]) -> dict[Identity, OverviewSeries]:
-    wanted = {item.model_id for item in identities if item.model_id is not None}
-    custom = dict.fromkeys(wanted, ("", ""))
-    if wanted:
-        query = select(Model.id, Model.slug, Model.name).where(Model.id.in_(wanted))
-        custom |= {row.id: (row.slug, row.name) for row in session.execute(query)}
-    bases = base_names(session, {item.base for item in identities if item.base is not None})
+    slugs = {item.slug for item in identities if item.slug is not None}
+    live = live_names(session, slugs) if slugs else {}
+    kept = kept_names(session, RequestLog.model_slug, slugs - set(live))
+    wanted = {item.base for item in identities if item.base is not None}
+    bases = base_names(session, wanted)
+    kept_bases = kept_names(session, RequestLog.model, wanted - set(bases))
     found: dict[Identity, OverviewSeries] = {}
     for item in identities:
-        if item.model_id is not None:
-            slug, name = custom[item.model_id]
-            found[item] = OverviewSeries(key=slug, label=name or slug, custom=True)
+        if item.slug is not None:
+            label = live.get(item.slug) or kept.get(item.slug) or item.slug
+            found[item] = OverviewSeries(key=item.slug, label=label, custom=True, deleted=item.slug not in live)
         else:
             base = item.base or ""
-            found[item] = OverviewSeries(key=base, label=bases.get(base, base), custom=False)
+            label = bases.get(base) or kept_bases.get(base) or base
+            found[item] = OverviewSeries(key=base, label=label, custom=False, deleted=base in kept_bases)
     return found
 
 
@@ -238,6 +248,7 @@ def table_row(series: OverviewSeries, part: Partition) -> OverviewModel:
         key=series.key,
         label=series.label,
         custom=series.custom,
+        deleted=series.deleted,
         requests=part.total,
         errors=part.errors,
         error_rate=part.errors / part.total if part.total else None,
