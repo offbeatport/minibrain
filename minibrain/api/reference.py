@@ -27,6 +27,8 @@ API key to a minibrain key.
 extensions vLLM and SGLang share.
 - `tools` work with models whose chat template has a tool-call format (Qwen, Hermes, Llama 3.1 and later, Mistral, \
 gpt-oss); answers carry `tool_calls`, and results go back as `tool` messages.
+- `reasoning_effort` turns reasoning off (`none`) or sets its effort where the model supports it; the reasoning \
+comes back as `reasoning_content`, apart from the answer.
 - Send a completion's `id` to `POST /feedback` to rate or correct its answer."""
 
 MANAGEMENT_INTRO = f"""The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, \

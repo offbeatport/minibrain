@@ -5,7 +5,8 @@ import socket
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from dataclasses import asdict
 from typing import Any
 
@@ -13,8 +14,8 @@ import httpx
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
-from minibrain.ml.completion import Completion
-from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
+from minibrain.ml.completion import Completion, Piece
+from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, Event, OutputFormatError
 from minibrain.serve.sampling import UnsupportedParameterError
 from minibrain.settings import Settings
 from minibrain.supervise import Supervisor
@@ -172,6 +173,14 @@ def engine_detail(response: Any) -> str:
         return response.text
 
 
+def failed(response: Any) -> None:
+    if response.status_code in (FAILED_STATUS, 409):
+        raise EngineUnavailableError(engine_detail(response))
+    if response.status_code == 400:
+        raise refusal(response)
+    response.raise_for_status()
+
+
 def refusal(response: Any) -> Exception:
     try:
         detail = response.json().get("detail")
@@ -192,8 +201,7 @@ class EngineBackend:
     def replicas(self, base: str) -> list[dict[str, str]]:
         return self.engines().get(base, [])
 
-    def complete(self, request: CompletionRequest) -> Completion:
-        base = request.base.key
+    def body_of(self, request: CompletionRequest) -> dict[str, Any]:
         adapter = (
             {"name": request.adapter.name, "artifact": request.adapter.artifact, "base_hash": request.adapter.base_hash}
             if request.adapter
@@ -208,9 +216,28 @@ class EngineBackend:
             "tools": list(request.tools.tools),
             "tool_choice": request.tools.choice,
             "parallel_tool_calls": request.tools.parallel,
+            "reasoning": request.reasoning,
         }
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)
+        return body
+
+    def send(self, url: str, body: dict[str, Any], stream: bool) -> tuple[Any, ExitStack]:
+        stack = ExitStack()
+        if not stream:
+            return self.http.request("POST", f"{url}/generate", json=body), stack
+        try:
+            response = stack.enter_context(self.http.stream("POST", f"{url}/generate", json=body | {"stream": True}))
+            if response.status_code != 200:
+                response.read()
+        except BaseException:
+            stack.close()
+            raise
+        return response, stack
+
+    def opened(self, request: CompletionRequest, stream: bool) -> tuple[Any, ExitStack]:
+        base = request.base.key
+        body = self.body_of(request)
         key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)
         started = time.monotonic()
         deadline = started + STARTUP_SECONDS
@@ -231,29 +258,47 @@ class EngineBackend:
                 waiting = None
                 continue
             try:
-                response = self.http.request("POST", f"{url}/generate", json=body)
+                response, stack = self.send(url, body, stream)
             except (httpx.TransportError, OSError):
+                self.balancer.release(url)
                 self.balancer.mark(url, "down")
                 tried.add(url)
                 continue
-            finally:
-                self.balancer.release(url)
+            stack.callback(self.balancer.release, url)
             if response.status_code == 503:
+                stack.close()
                 self.balancer.mark(url, "loading")
                 tried.add(url)
                 waiting = fetching(response)
                 if waiting is not None:
                     deadline = time.monotonic() + STARTUP_SECONDS
                 continue
-            if response.status_code in (FAILED_STATUS, 409):
-                raise EngineUnavailableError(engine_detail(response))
-            if response.status_code == 400:
-                raise refusal(response)
-            response.raise_for_status()
+            if response.status_code != 200:
+                stack.close()
+                failed(response)
             self.balancer.mark(url, "ready")
             if tried:
                 self.balancer.rebind(key, url)
+            return response, stack
+
+    def complete(self, request: CompletionRequest) -> Completion:
+        response, stack = self.opened(request, False)
+        with stack:
             return Completion.from_dict(response.json())
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        response, stack = self.opened(request, True)
+        with stack:
+            for line in response.iter_lines():
+                if not line.strip():
+                    continue
+                found = json.loads(line)
+                if "error" in found:
+                    raise EngineUnavailableError(str(found["error"].get("detail") or "the engine failed"))
+                if "completion" in found:
+                    yield Completion.from_dict(found["completion"])
+                else:
+                    yield Piece.from_dict(found["piece"])
 
     def check(self, url: str) -> str:
         try:
@@ -291,10 +336,17 @@ class ManagedEngineBackend(EngineBackend):
         return found
 
     def complete(self, request: CompletionRequest) -> Completion:
+        self.started(request)
+        return super().complete(request)
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        self.started(request)
+        return super().stream(request)
+
+    def started(self, request: CompletionRequest) -> None:
         if not self.engines().get(request.base.key):
             self.manager.ensure_one(request.base)
         self.manager.touch(request.base.key)
-        return super().complete(request)
 
     def health(self, key: str) -> str | None:
         if any(self.balancer.state(entry) == "ready" for entry in self.engines().get(key, [])):

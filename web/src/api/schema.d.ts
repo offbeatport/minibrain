@@ -2914,6 +2914,11 @@ export interface components {
              */
             content: string | null;
             /**
+             * Reasoning Content
+             * @description The model's reasoning before the answer, when it reasons; never part of content.
+             */
+            reasoning_content?: string | null;
+            /**
              * Tool Calls
              * @description The functions the model calls; answer each with a tool message.
              */
@@ -3831,6 +3836,11 @@ export interface components {
              * @description false keeps only the first call the model makes; true (the default) keeps all.
              */
             parallel_tool_calls?: boolean | null;
+            /**
+             * Reasoning Effort
+             * @description none turns reasoning off; low, medium or high turn it on at that effort; unset keeps the model's default (off for custom models and the catalogue's Qwen3 bases). Qwen3 and GLM think or not, so any effort turns thinking on; gpt-oss always reasons at an effort; DeepSeek-R1 always reasons. The reasoning comes back apart from the answer, as message.reasoning_content.
+             */
+            reasoning_effort?: ("none" | "low" | "medium" | "high") | null;
         } & {
             [key: string]: unknown;
         };

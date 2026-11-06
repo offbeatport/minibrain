@@ -6,23 +6,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Piece, ToolCall, call_id
 
 HERMES = "hermes"
 LLAMA3 = "llama3"
 MISTRAL = "mistral"
 HARMONY = "harmony"
-TOOL_FORMATS = (HERMES, LLAMA3, MISTRAL, HARMONY)
-TOOL_FORMAT_NAMES = {
-    HERMES: "<tool_call> JSON (Qwen, Hermes)",
-    LLAMA3: "JSON with parameters (Llama 3.1 and later)",
-    MISTRAL: "[TOOL_CALLS] JSON list (Mistral)",
-    HARMONY: "harmony commentary channel (gpt-oss)",
-}
+
+TOGGLE = "toggle"
+EFFORT = "effort"
+ALWAYS = "always"
+EFFORTS = ("low", "medium", "high")
+TAGS = "tags"
+OPEN = "open"
 
 AUTO = "auto"
 NONE = "none"
 REQUIRED = "required"
+
+THINK_OPEN = "<think>"
+THINK_CLOSE = "</think>"
+OPENED_THINKING = re.compile("(?:assistant|Assistant\\uff5c>)(?:\\\\n|\\n)*<think>")
 
 HERMES_OPEN = "<tool_call>"
 HERMES_CLOSE = "</tool_call>"
@@ -50,6 +55,44 @@ def detect_tools(template: str | None) -> str | None:
         return MISTRAL
     if PYTHON_TAG in template or ('"parameters"' in template and "ipython" in template):
         return LLAMA3
+    return None
+
+
+def detect_reasoning(template: str | None) -> str | None:
+    if not template:
+        return None
+    if "reasoning_effort" in template:
+        return EFFORT
+    if "enable_thinking" in template:
+        return TOGGLE
+    if OPENED_THINKING.search(template):
+        return ALWAYS
+    return None
+
+
+def reasoning_choices(style: str | None) -> tuple[str, ...]:
+    if style == TOGGLE:
+        return (NONE, *EFFORTS)
+    if style == EFFORT:
+        return EFFORTS
+    return ()
+
+
+def reasoning_kwargs(style: str | None, effort: str | None) -> dict[str, Any]:
+    if effort is None:
+        return {}
+    if style == TOGGLE:
+        return {"enable_thinking": effort != NONE}
+    if style == EFFORT:
+        return {"reasoning_effort": effort}
+    return {}
+
+
+def think_mode(style: str | None, kwargs: dict[str, Any]) -> str | None:
+    if style == ALWAYS:
+        return OPEN
+    if style == TOGGLE and kwargs.get("enable_thinking", True):
+        return TAGS
     return None
 
 
@@ -107,6 +150,58 @@ class PlainReader:
 
     def finish(self) -> Piece:
         return Piece()
+
+
+@dataclass
+class ThinkReader:
+    opened: bool = False
+    buffer: str = ""
+    state: str = "start"
+
+    def __post_init__(self) -> None:
+        self.state = "opening" if self.opened else "start"
+
+    def feed(self, text: str) -> Piece:
+        self.buffer += text
+        found = Piece()
+        while True:
+            step = self.step()
+            if step is None:
+                return found
+            found += step
+
+    def step(self) -> Piece | None:
+        if self.state in ("start", "opening"):
+            stripped = self.buffer.lstrip()
+            if not stripped or (THINK_OPEN.startswith(stripped) and stripped != THINK_OPEN):
+                return None
+            if stripped.startswith(THINK_OPEN):
+                self.buffer, self.state = stripped[len(THINK_OPEN) :].lstrip(), "thinking"
+            else:
+                self.buffer, self.state = stripped, "thinking" if self.state == "opening" else "content"
+            return Piece()
+        if self.state == "thinking":
+            end = self.buffer.find(THINK_CLOSE)
+            if end >= 0:
+                thought, self.buffer, self.state = self.buffer[:end], self.buffer[end + len(THINK_CLOSE) :], "after"
+                return Piece(reasoning=thought)
+            keep = held(self.buffer, (THINK_CLOSE,))
+            thought, self.buffer = self.buffer[: len(self.buffer) - keep], self.buffer[len(self.buffer) - keep :]
+            return Piece(reasoning=thought) if thought else None
+        if self.state == "after":
+            self.buffer = self.buffer.lstrip()
+            if not self.buffer:
+                return None
+            self.state = "content"
+            return Piece()
+        text, self.buffer = self.buffer, ""
+        return Piece(content=text) if text else None
+
+    def finish(self) -> Piece:
+        rest, self.buffer = self.buffer, ""
+        if self.state == "thinking" or (self.state == "opening" and rest.strip()):
+            return Piece(reasoning=rest.removeprefix(THINK_OPEN) if self.state == "opening" else rest)
+        return Piece(content=rest.lstrip() if self.state in ("start", "after") else rest)
 
 
 @dataclass
@@ -263,7 +358,7 @@ class HarmonyReader:
             self.body += text
             return Piece()
         if self.channel() == "analysis":
-            return Piece()
+            return Piece(reasoning=text)
         return Piece(content=text)
 
     def closed(self) -> Piece:
@@ -283,6 +378,23 @@ class HarmonyReader:
 
 
 @dataclass
+class Chain:
+    first: Reader
+    second: Reader
+
+    def passed(self, piece: Piece) -> Piece:
+        if not piece.content:
+            return piece
+        return Piece(tool_calls=piece.tool_calls, reasoning=piece.reasoning) + self.second.feed(piece.content)
+
+    def feed(self, text: str) -> Piece:
+        return self.passed(self.first.feed(text))
+
+    def finish(self) -> Piece:
+        return self.passed(self.first.finish()) + self.second.finish()
+
+
+@dataclass
 class OneCall:
     inner: Reader
     calls: int = 0
@@ -294,7 +406,7 @@ class OneCall:
         room = max(self.limit - self.calls, 0)
         kept = piece.tool_calls[:room]
         self.calls += len(kept)
-        return Piece(content=piece.content, tool_calls=kept)
+        return Piece(content=piece.content, tool_calls=kept, reasoning=piece.reasoning)
 
     def feed(self, text: str) -> Piece:
         return self.kept(self.inner.feed(text))
@@ -337,12 +449,19 @@ class ToolUse:
         return None
 
 
-def reader_for(fmt: str | None, use: ToolUse) -> Reader:
+def reader_for(fmt: str | None, use: ToolUse, think: str | None = None) -> Reader:
     if fmt == HARMONY:
         inner: Reader = HarmonyReader()
     else:
         inner = tool_reader(fmt) if use.active else PlainReader()
+        if think is not None:
+            inner = Chain(ThinkReader(opened=think == OPEN), inner)
     return OneCall(inner, limit=None if use.parallel else 1)
+
+
+def answer_text(spec: BaseModelSpec, text: str) -> str:
+    think = think_mode(spec.reasoning, spec.template_kwargs)
+    return read_all(reader_for(spec.tools, ToolUse(), think), text).content
 
 
 def prefill(fmt: str | None, use: ToolUse) -> str:

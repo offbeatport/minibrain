@@ -2,15 +2,17 @@ import json
 import os
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from minibrain.base_models import BaseModelSpec
-from minibrain.ml.completion import Completion, ToolCall
-from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, OutputFormatError
+from minibrain.ml.completion import Completion, Piece, ToolCall
+from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, Event, OutputFormatError
+from minibrain.serve.dialects import EFFORT, EFFORTS
 from minibrain.serve.sampling import UnsupportedParameterError
 from minibrain.supervise import Supervisor
 
@@ -39,6 +41,25 @@ def tool_fields(request: CompletionRequest) -> dict[str, Any]:
     if not use.tools:
         return {}
     return {"tools": list(use.tools), "tool_choice": use.choice or use.mode, "parallel_tool_calls": use.parallel}
+
+
+@dataclass
+class PartialCalls:
+    parts: dict[int, dict[str, str]] = field(default_factory=dict)
+
+    def add(self, deltas: Any) -> None:
+        for delta in deltas:
+            found = self.parts.setdefault(int(delta.get("index", 0)), {"id": "", "name": "", "arguments": ""})
+            function = delta.get("function") or {}
+            found["id"] = delta.get("id") or found["id"]
+            found["name"] = function.get("name") or found["name"]
+            found["arguments"] += function.get("arguments") or ""
+
+    def done(self) -> tuple[ToolCall, ...]:
+        return tuple(
+            tool_call_of({"id": part["id"], "function": {"name": part["name"], "arguments": part["arguments"]}})
+            for _, part in sorted(self.parts.items())
+        )
 
 
 def tool_call_of(call: dict[str, Any]) -> ToolCall:
@@ -139,8 +160,10 @@ class OpenAIServerBackend:
         body: dict[str, Any] = {
             "model": spec.key,
             "messages": request.messages,
-            "chat_template_kwargs": spec.template_kwargs,
+            "chat_template_kwargs": request.template_kwargs(),
         }
+        if spec.reasoning == EFFORT and request.reasoning in EFFORTS:
+            body["reasoning_effort"] = request.reasoning
         if request.max_tokens is not None:
             body["max_tokens"] = request.max_tokens
         return body | sampling_fields(request) | tool_fields(request) | self.constraint_fields(request)
@@ -155,12 +178,59 @@ class OpenAIServerBackend:
             if name in message:
                 raise UnsupportedParameterError(name, f"the {self.engine} engine refused {name} ({message})")
 
-    def complete(self, request: CompletionRequest) -> Completion:
+    def prepared(self, request: CompletionRequest) -> tuple[str, dict[str, Any]]:
         url = self.load(request.base)
         body = self.body(request)
         if request.adapter is not None:
             self.ensure_adapter(request.base, url, request.adapter.name, request.adapter.artifact)
             body |= self.adapter_fields(request)
+        return url, body
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        url, body = self.prepared(request)
+        body |= {"stream": True, "stream_options": {"include_usage": True}}
+        started = time.perf_counter()
+        with self.http.stream("POST", f"{url}/v1/chat/completions", json=body) as response:
+            if response.status_code != 200:
+                response.read()
+                self.refused(request, response)
+                response.raise_for_status()
+            yield from self.events(request, response.iter_lines(), started)
+
+    def events(self, request: CompletionRequest, lines: Iterator[str], started: float) -> Iterator[Event]:
+        total, calls = Piece(), PartialCalls()
+        usage: dict[str, Any] = {}
+        finish: str | None = None
+        for line in lines:
+            data = line.removeprefix("data:").strip()
+            if not line.startswith("data:") or not data or data == "[DONE]":
+                continue
+            chunk = json.loads(data)
+            usage = chunk.get("usage") or usage
+            for choice in chunk.get("choices") or ():
+                finish = choice.get("finish_reason") or finish
+                delta = choice.get("delta") or {}
+                calls.add(delta.get("tool_calls") or ())
+                thought = delta.get("reasoning_content") or delta.get("reasoning") or ""
+                piece = Piece(content=delta.get("content") or "", reasoning=thought)
+                total += piece
+                if piece:
+                    yield piece
+        found = calls.done() if request.tools.active else ()
+        if found:
+            yield Piece(tool_calls=found)
+        yield Completion(
+            text=total.content,
+            prompt_tokens=int(usage.get("prompt_tokens", 0)),
+            completion_tokens=int(usage.get("completion_tokens", 0)),
+            stopped=finish != "length",
+            seconds=time.perf_counter() - started,
+            tool_calls=found,
+            reasoning=total.reasoning or None,
+        )
+
+    def complete(self, request: CompletionRequest) -> Completion:
+        url, body = self.prepared(request)
         started = time.perf_counter()
         response = self.http.post(f"{url}/v1/chat/completions", json=body)
         self.refused(request, response)
@@ -176,6 +246,7 @@ class OpenAIServerBackend:
             stopped=choice.get("finish_reason") != "length",
             seconds=time.perf_counter() - started,
             tool_calls=tool_calls_of(message) if request.tools.active else (),
+            reasoning=message.get("reasoning_content") or message.get("reasoning") or None,
         )
 
     def status(self) -> list[dict[str, Any]]:

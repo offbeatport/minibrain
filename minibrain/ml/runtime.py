@@ -1,9 +1,11 @@
 import copy
+import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import torch
 from peft import PeftModel, PeftModelForCausalLM
@@ -22,7 +24,7 @@ from transformers import (
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
 from minibrain.ml.devices import pick_device, weights_dtype
-from minibrain.serve.sampling import Sampling, stopped_at
+from minibrain.serve.sampling import Sampling, StopCutter, stopped_at
 
 if TYPE_CHECKING:
     from minibrain.serve.backend import TemplateTools
@@ -73,9 +75,11 @@ def render_prompt(
     spec: BaseModelSpec,
     messages: list[Message],
     tools: "TemplateTools" = None,
+    kwargs: dict[str, Any] | None = None,
 ) -> str:
+    chosen = spec.template_kwargs if kwargs is None else kwargs
     rendered = tokenizer.apply_chat_template(
-        messages, tools=tools, tokenize=False, add_generation_prompt=True, **spec.template_kwargs
+        messages, tools=tools, tokenize=False, add_generation_prompt=True, **chosen
     )
     return as_text(rendered)
 
@@ -141,6 +145,15 @@ def generate_tokens(
     return output
 
 
+@dataclass(frozen=True)
+class Prepared:
+    batch: BatchEncoding
+    prompt_length: int
+    config: GenerationConfig
+    allowed: AllowedTokens | None
+    extra: dict[str, Any]
+
+
 class Runtime:
     def __init__(self, spec: BaseModelSpec, device: str | None = None) -> None:
         self.spec = spec
@@ -174,8 +187,10 @@ class Runtime:
             self.model.eval()
         self.adapters.discard(name)
 
-    def render(self, messages: list[Message], tools: "TemplateTools" = None) -> str:
-        return render_prompt(self.tokenizer, self.spec, messages, tools)
+    def render(
+        self, messages: list[Message], tools: "TemplateTools" = None, kwargs: dict[str, Any] | None = None
+    ) -> str:
+        return render_prompt(self.tokenizer, self.spec, messages, tools, kwargs)
 
     def adapter_scope(self, adapter: str | None) -> AbstractContextManager:
         if not isinstance(self.model, PeftModelForCausalLM):
@@ -206,14 +221,9 @@ class Runtime:
         stop = self.stop_ids[0]
         return TokenTrie([[*self.tokenizer.encode(choice, add_special_tokens=False), stop] for choice in choices])
 
-    def generate(
-        self,
-        prompts: list[str],
-        adapter: str | None,
-        max_new_tokens: int | None,
-        choices: Sequence[str] = (),
-        sampling: Sampling | None = None,
-    ) -> list[Completion]:
+    def prepared(
+        self, prompts: list[str], max_new_tokens: int | None, choices: Sequence[str], sampling: Sampling | None
+    ) -> Prepared:
         batch = self.tokenizer(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
         prompt_length = batch["input_ids"].shape[1]
         allowed = choice_filter(self.choice_trie(choices), prompt_length, self.stop_ids[0]) if choices else None
@@ -228,9 +238,66 @@ class Runtime:
             extra["logits_processor"] = processors
         if sampling is not None and sampling.seed is not None:
             torch.manual_seed(sampling.seed)
+        return Prepared(batch, prompt_length, config, allowed, extra)
+
+    def stream(
+        self,
+        prompt: str,
+        adapter: str | None,
+        max_new_tokens: int | None,
+        choices: Sequence[str] = (),
+        sampling: Sampling | None = None,
+    ) -> Iterator[str | Completion]:
+        from transformers import TextIteratorStreamer
+
+        ready = self.prepared([prompt], max_new_tokens, choices, sampling)
+        streamer = TextIteratorStreamer(cast(Any, self.tokenizer), skip_prompt=True, skip_special_tokens=False)
+        found: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                with self.adapter_scope(adapter), torch.inference_mode():
+                    found["output"] = generate_tokens(
+                        self.model, ready.batch, ready.config, ready.allowed, streamer=streamer, **ready.extra
+                    )
+            except Exception as error:
+                found["error"] = error
+                streamer.end()
+
+        stops = sampling.stop if sampling is not None else ()
+        cutter = StopCutter((*self.stop_texts(), *stops))
+        started = time.perf_counter()
+        worker = threading.Thread(target=run, daemon=True)
+        worker.start()
+        for text in streamer:
+            piece = cutter.feed(text)
+            if piece:
+                yield piece
+        worker.join()
+        if "error" in found:
+            raise found["error"]
+        rest = cutter.finish()
+        if rest:
+            yield rest
+        tokens = found["output"][0][ready.prompt_length :].tolist()
+        yield self.completion(tokens, ready.prompt_length, time.perf_counter() - started, stops)
+
+    def stop_texts(self) -> tuple[str, ...]:
+        return tuple(text for text in self.tokenizer.convert_ids_to_tokens(self.stop_ids) if isinstance(text, str))
+
+    def generate(
+        self,
+        prompts: list[str],
+        adapter: str | None,
+        max_new_tokens: int | None,
+        choices: Sequence[str] = (),
+        sampling: Sampling | None = None,
+    ) -> list[Completion]:
+        ready = self.prepared(prompts, max_new_tokens, choices, sampling)
+        batch, prompt_length = ready.batch, ready.prompt_length
         started = time.perf_counter()
         with self.adapter_scope(adapter), torch.inference_mode():
-            output = generate_tokens(self.model, batch, config, allowed, **extra)
+            output = generate_tokens(self.model, batch, ready.config, ready.allowed, **ready.extra)
         seconds = time.perf_counter() - started
         counts = batch["attention_mask"].sum(dim=1).tolist()
         stops = sampling.stop if sampling is not None else ()

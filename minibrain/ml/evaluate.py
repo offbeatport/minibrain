@@ -1,6 +1,6 @@
 import statistics
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from minibrain.data.splits import read_split
@@ -11,6 +11,7 @@ from minibrain.ml.runtime import Runtime
 from minibrain.registry.models import VersionKind
 from minibrain.registry.prices import DEVICE_TIME
 from minibrain.registry.service import adapter_name
+from minibrain.serve.dialects import answer_text
 from minibrain.tasks.examples import Example
 from minibrain.tasks.prompting import Prompting
 
@@ -80,7 +81,8 @@ class Evaluation:
             report(self.done / self.total, evaluated=self.done, of=self.total)
 
     def generate(self, prompts: list[str]) -> list[Completion]:
-        return self.runtime.generate(prompts, self.adapter, self.max_tokens, self.choices)
+        found = self.runtime.generate(prompts, self.adapter, self.max_tokens, self.choices)
+        return [replace(completion, text=answer_text(self.runtime.spec, completion.text)) for completion in found]
 
     def run(self, examples: list[Example], batch_size: int) -> Pass:
         prompts = self.prompts(examples)

@@ -1,9 +1,10 @@
+import itertools
 import json
 import logging
 import re
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -13,16 +14,17 @@ from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.errors import OpenAIError, invalid
 from minibrain.gateway.schema import ChatCompletionRequest, Message
-from minibrain.ml.completion import Completion
+from minibrain.ml.completion import Completion, Piece
 from minibrain.models.health import base_changed
 from minibrain.serve.backend import (
     AdapterRef,
     CompletionRequest,
     EngineUnavailableError,
+    Event,
     OutputFormatError,
     ServingBackend,
 )
-from minibrain.serve.dialects import AUTO, NONE, REQUIRED, ToolUse
+from minibrain.serve.dialects import ALWAYS, AUTO, EFFORT, NONE, REQUIRED, ToolUse, reasoning_choices
 from minibrain.serve.sampling import MAX_STOPS, Sampling, UnsupportedParameterError
 from minibrain.serve.structured import JSON_OBJECT, Constraint, schema_problem, unfenced, violation
 from minibrain.tasks.contracts import JSON, TEXT, Contract
@@ -258,6 +260,26 @@ def refuse_tools(route: Route, spec: BaseModelSpec, use: ToolUse) -> None:
         raise invalid("tools", message, "unsupported_value")
 
 
+def reasoning_of(body: ChatCompletionRequest, route: Route, spec: BaseModelSpec) -> str | None:
+    effort = body.reasoning_effort
+    if effort is None or (effort == NONE and spec.reasoning is None):
+        return None
+    held = held_by(route)
+    if held is not None and effort != NONE:
+        raise invalid(
+            "reasoning_effort", f"{served_model(route)} answers with {held}, its contract, so it does not reason."
+        )
+    if effort in reasoning_choices(spec.reasoning):
+        return effort
+    if spec.reasoning == ALWAYS:
+        message = f"{spec.key} always reasons and takes no effort; leave reasoning_effort unset."
+    elif spec.reasoning == EFFORT:
+        message = f"{spec.key} always reasons; set reasoning_effort to low, medium or high, or leave it unset."
+    else:
+        message = f"{spec.key} does not reason; leave reasoning_effort unset or none."
+    raise invalid("reasoning_effort", message, "unsupported_value")
+
+
 def checked_base(config: GatewayConfig, route: Route) -> tuple[BaseModelSpec, AdapterRef | None]:
     problem = config.problems.get(route.base_model)
     if problem is not None:
@@ -293,6 +315,7 @@ def plan(body: ChatCompletionRequest, route: Route, base: BaseModelSpec, adapter
         route=route.name,
         sampling=sampling_of(body, route),
         tools=use,
+        reasoning=reasoning_of(body, route, base),
     )
     return ChatPlan(route, request, requested)
 
@@ -388,6 +411,8 @@ def kept_output(completion: Completion) -> str:
 def answer_message(completion: Completion) -> dict[str, Any]:
     content = completion.text if completion.text or not completion.tool_calls else None
     found: dict[str, Any] = {"role": "assistant", "content": content}
+    if completion.reasoning:
+        found["reasoning_content"] = completion.reasoning
     if completion.tool_calls:
         found["tool_calls"] = [call.as_openai() for call in completion.tool_calls]
     return found
@@ -404,18 +429,101 @@ def response_body(identifier: str, model: str, completion: Completion) -> dict[s
     }
 
 
-def tool_deltas(completion: Completion) -> list[dict[str, Any]]:
-    return [{"index": index} | call.as_openai() for index, call in enumerate(completion.tool_calls)]
+def piece_of(completion: Completion) -> Piece:
+    return Piece(content=completion.text, tool_calls=completion.tool_calls, reasoning=completion.reasoning or "")
 
 
-def stream_events(identifier: str, model: str, completion: Completion) -> Iterator[str]:
-    created = int(time.time())
-    chunk = {"id": identifier, "object": "chat.completion.chunk", "created": created, "model": model}
-    delta: dict[str, Any] = {"role": "assistant", "content": completion.text}
-    if completion.tool_calls:
-        delta["tool_calls"] = tool_deltas(completion)
-    first = {"index": 0, "delta": delta, "finish_reason": None}
-    last = {"index": 0, "delta": {}, "finish_reason": completion.finish_reason}
-    yield f"data: {json.dumps(chunk | {'choices': [first]})}\n\n"
-    yield f"data: {json.dumps(chunk | {'choices': [last], 'usage': usage(completion)})}\n\n"
+def buffered(chat: ChatPlan) -> bool:
+    return chat.request.constraint is not None or contract_schema(chat.route) is not None
+
+
+def mapped(events: Iterator[Event]) -> Iterator[Event]:
+    try:
+        yield from events
+    except EngineUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except OutputFormatError as error:
+        raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
+    except UnsupportedParameterError as error:
+        raise invalid(error.param, f"{error.message}.", "unsupported_parameter") from error
+
+
+def chat_events(backend: ServingBackend, chat: ChatPlan) -> Iterator[Event]:
+    stream = getattr(backend, "stream", None)
+    if stream is None or buffered(chat):
+        completion = answer(backend, chat)
+        if piece_of(completion):
+            yield piece_of(completion)
+        yield completion
+        return
+    yield from mapped(stream(chat.request))
+
+
+def data(payload: dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def delta_of(piece: Piece, first_call: int, opening: bool) -> dict[str, Any]:
+    found: dict[str, Any] = {"role": "assistant"} if opening else {}
+    if piece.reasoning:
+        found["reasoning_content"] = piece.reasoning
+    if piece.content or opening:
+        found["content"] = piece.content
+    if piece.tool_calls:
+        calls = enumerate(piece.tool_calls, start=first_call)
+        found["tool_calls"] = [{"index": index} | call.as_openai() for index, call in calls]
+    return found
+
+
+def moving(delta: dict[str, Any]) -> dict[str, Any]:
+    return {"index": 0, "delta": delta, "finish_reason": None}
+
+
+def failure_body(error: BaseException) -> dict[str, Any]:
+    if isinstance(error, OpenAIError):
+        return error.body()
+    if isinstance(error, HTTPException):
+        return OpenAIError(error.status_code, str(error.detail), kind="server_error").body()
+    return OpenAIError(500, str(error) or type(error).__name__, kind="server_error").body()
+
+
+Finished = Callable[[Completion | None, BaseException | None], None]
+
+
+def sse(
+    identifier: str,
+    model: str,
+    first: Event,
+    events: Iterator[Event],
+    include_usage: bool = False,
+    finished: Finished | None = None,
+) -> Iterator[str]:
+    chunk = {"id": identifier, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
+    calls, opening = 0, True
+    final: Completion | None = None
+    failure: BaseException | None = None
+    try:
+        for event in itertools.chain([first], events):
+            if isinstance(event, Completion):
+                final = event
+                continue
+            yield data(
+                chunk | {"choices": [{"index": 0, "delta": delta_of(event, calls, opening), "finish_reason": None}]}
+            )
+            calls, opening = calls + len(event.tool_calls), False
+        if final is None:
+            raise EngineUnavailableError("the engine stopped before it finished the answer")
+        if opening:
+            yield data(chunk | {"choices": [moving(delta_of(Piece(), 0, True))]})
+        last = {"index": 0, "delta": {}, "finish_reason": final.finish_reason}
+        yield data(chunk | {"choices": [last]} | ({} if include_usage else {"usage": usage(final)}))
+        if include_usage:
+            yield data(chunk | {"choices": [], "usage": usage(final)})
+    except Exception as error:
+        failure = error
+        log.warning("a streamed answer failed: %s", error)
+        yield data(failure_body(error))
+    finally:
+        if finished is not None:
+            finished(final, failure)
     yield "data: [DONE]\n\n"

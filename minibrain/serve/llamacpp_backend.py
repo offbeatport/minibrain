@@ -1,11 +1,19 @@
 import json
 import threading
 import time
+from collections.abc import Iterator
 from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import AdapterNotSupportedError, CompletionRequest, OutputFormatError, parsed
+from minibrain.serve.backend import (
+    AdapterNotSupportedError,
+    CompletionRequest,
+    Event,
+    OutputFormatError,
+    parsed,
+    streamed,
+)
 from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint, choice_grammar
 from minibrain.serve.weights import gguf_path
@@ -73,7 +81,7 @@ class LlamaCppBackend:
             add_generation_prompt=True,
             bos_token=bos,
             eos_token=eos,
-            **request.base.template_kwargs,
+            **request.template_kwargs(),
         )
         return rendered[0] + request.prefill()
 
@@ -100,6 +108,40 @@ class LlamaCppBackend:
             seconds=time.perf_counter() - started,
         )
         return parsed(request, raw)
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        if request.adapter is not None:
+            raise AdapterNotSupportedError("the llama.cpp engine serves GGUF base models without adapters")
+        constrained = grammar(request.constraint)
+        with self.lock:
+            model = self.runtime(request.base)
+            yield from streamed(request, self.raw_stream(model, request, constrained))
+
+    def raw_stream(self, model: Any, request: CompletionRequest, constrained: Any) -> Iterator[str | Completion]:
+        prompt = self.render(model, request)
+        started = time.perf_counter()
+        text, finish, generated = "", None, 0
+        for chunk in model.create_completion(
+            prompt,
+            max_tokens=request.max_tokens,
+            grammar=constrained,
+            stream=True,
+            **sampling_arguments(request.sampling, request.base.stop_tokens),
+        ):
+            choice = chunk["choices"][0]
+            piece = str(choice.get("text") or "")
+            finish = choice.get("finish_reason") or finish
+            generated += 1 if piece else 0
+            text += piece
+            if piece:
+                yield piece
+        yield Completion(
+            text=text,
+            prompt_tokens=len(model.tokenize(prompt.encode(), special=True)),
+            completion_tokens=generated,
+            stopped=finish == "stop",
+            seconds=time.perf_counter() - started,
+        )
 
     def status(self) -> list[dict[str, Any]]:
         return [{"base_model": key, "device": "llama.cpp", "adapters": []} for key in self.models]

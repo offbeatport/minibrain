@@ -1,13 +1,22 @@
 import threading
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from minibrain.base_models import BaseModelSpec
-from minibrain.ml.completion import Completion
-from minibrain.serve.dialects import ToolUse, prefill, read_all, reader_for, template_messages
+from minibrain.ml.completion import Completion, Piece
+from minibrain.serve.dialects import (
+    Reader,
+    ToolUse,
+    prefill,
+    read_all,
+    reader_for,
+    reasoning_kwargs,
+    template_messages,
+    think_mode,
+)
 from minibrain.serve.sampling import Sampling
 from minibrain.serve.structured import Constraint
 
@@ -48,6 +57,7 @@ class CompletionRequest:
     route: str | None = None
     sampling: Sampling = field(default_factory=Sampling)
     tools: ToolUse = field(default_factory=ToolUse)
+    reasoning: str | None = None
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
@@ -61,16 +71,60 @@ class CompletionRequest:
     def prefill(self) -> str:
         return prefill(self.base.tools, self.tools)
 
+    def template_kwargs(self) -> dict[str, Any]:
+        return self.base.template_kwargs | reasoning_kwargs(self.base.reasoning, self.reasoning)
+
+    def reader(self) -> Reader:
+        return reader_for(self.base.tools, self.tools, think_mode(self.base.reasoning, self.template_kwargs()))
+
+
+Event = Piece | Completion
+Raw = Iterator[str | Completion]
+
+
+def answered(raw: Completion, piece: Piece) -> Completion:
+    thought = piece.reasoning.strip() or None
+    return replace(raw, text=piece.content, tool_calls=piece.tool_calls, reasoning=thought)
+
 
 def parsed(request: CompletionRequest, raw: Completion) -> Completion:
-    piece = read_all(reader_for(request.base.tools, request.tools), request.prefill() + raw.text)
-    return replace(raw, text=piece.content, tool_calls=piece.tool_calls)
+    return answered(raw, read_all(request.reader(), request.prefill() + raw.text))
+
+
+def streamed(request: CompletionRequest, raw: Raw) -> Iterator[Event]:
+    reader = request.reader()
+    total = reader.feed(request.prefill())
+    final: Completion | None = None
+    for item in raw:
+        if isinstance(item, Completion):
+            final = item
+            continue
+        piece = reader.feed(item)
+        total += piece
+        if piece:
+            yield piece
+    rest = reader.finish()
+    total += rest
+    if rest:
+        yield rest
+    if final is None:
+        raise EngineUnavailableError("the engine stopped before it finished the answer")
+    yield answered(final, total)
+
+
+def drained(events: Iterator[Event]) -> Completion:
+    found = [event for event in events if isinstance(event, Completion)]
+    return found[-1]
 
 
 class ServingBackend(Protocol):
     def complete(self, request: CompletionRequest) -> Completion: ...
 
     def status(self) -> list[dict[str, Any]]: ...
+
+
+class StreamingBackend(ServingBackend, Protocol):
+    def stream(self, request: CompletionRequest) -> Iterator[Event]: ...
 
 
 class EngineRuntime(ServingBackend, Protocol):
@@ -110,16 +164,29 @@ class TransformersBackend:
                 runtime.drop_adapter(name)
                 self.recent.pop((key, name), None)
 
+    def prompt(self, runtime: "Runtime", request: CompletionRequest) -> str:
+        if request.adapter is not None:
+            self.use_adapter(runtime, request.adapter)
+        messages, tools, kwargs = request.template_messages(), request.template_tools(), request.template_kwargs()
+        return runtime.render(messages, tools, kwargs) + request.prefill()
+
     def complete(self, request: CompletionRequest) -> Completion:
         with self.lock:
             runtime = self.runtime(request.base)
-            if request.adapter is not None:
-                self.use_adapter(runtime, request.adapter)
+            prompt = self.prompt(runtime, request)
             adapter = request.adapter.name if request.adapter else None
-            prompt = runtime.render(request.template_messages(), request.template_tools()) + request.prefill()
             choices = request.decoding_choices()
             raw = runtime.generate([prompt], adapter, request.max_tokens, choices, request.sampling)[0]
             return parsed(request, raw)
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        with self.lock:
+            runtime = self.runtime(request.base)
+            prompt = self.prompt(runtime, request)
+            adapter = request.adapter.name if request.adapter else None
+            choices = request.decoding_choices()
+            raw = runtime.stream(prompt, adapter, request.max_tokens, choices, request.sampling)
+            yield from streamed(request, raw)
 
     def status(self) -> list[dict[str, Any]]:
         return [

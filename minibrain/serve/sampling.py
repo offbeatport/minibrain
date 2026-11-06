@@ -77,3 +77,39 @@ GREEDY_SAMPLING = Sampling(temperature=GREEDY)
 def stopped_at(text: str, stops: tuple[str, ...]) -> int | None:
     found = [index for index in (text.find(stop) for stop in stops if stop) if index >= 0]
     return min(found) if found else None
+
+
+def held_back(text: str, stops: tuple[str, ...]) -> int:
+    longest = 0
+    for stop in stops:
+        for size in range(min(len(stop) - 1, len(text)), 0, -1):
+            if stop.startswith(text[-size:]):
+                longest = max(longest, size)
+                break
+    return longest
+
+
+@dataclass
+class StopCutter:
+    stops: tuple[str, ...]
+    text: str = ""
+    sent: int = 0
+    stopped: bool = False
+
+    def feed(self, piece: str) -> str:
+        if self.stopped:
+            return ""
+        self.text += piece
+        cut = stopped_at(self.text, self.stops)
+        if cut is not None:
+            self.stopped = True
+            return self.release(cut)
+        return self.release(len(self.text) - held_back(self.text, self.stops))
+
+    def release(self, end: int) -> str:
+        found = self.text[self.sent : max(end, self.sent)]
+        self.sent = max(end, self.sent)
+        return found
+
+    def finish(self) -> str:
+        return "" if self.stopped else self.release(len(self.text))

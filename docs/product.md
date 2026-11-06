@@ -280,13 +280,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Serve a downloaded base model by name through the gateway.
   UI: Models › base model › Deploy · API: POST /api/base-models/{key}/deploy
 - **OpenAI-compatible API** · shipped · engineer
-  Call any model by name or pinned version, with streaming.
+  Call any model by name or pinned version, streamed token by token.
   UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
 - **Sampling settings** · shipped · engineer
   Set temperature, top_p, top_k, min_p, penalties, seed and stops.
   API: POST /v1/chat/completions
 - **Tool calling** · shipped · engineer
   Call functions from Qwen, Llama, Mistral and gpt-oss models, streamed too.
+  API: POST /v1/chat/completions
+- **Reasoning** · shipped · engineer
+  Turn reasoning off or set its effort, returned apart.
   API: POST /v1/chat/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.

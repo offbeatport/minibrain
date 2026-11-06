@@ -35,6 +35,8 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
             served = body.get("model") if body.get("model") != "qwen3-0.6b" else None
             text = f"{body.get('lora_path') or served or 'base'}:{body['messages'][-1]['content']}"
             choice = {"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}
+            if (body.get("chat_template_kwargs") or {}).get("enable_thinking") or body.get("reasoning_effort"):
+                choice["message"]["reasoning_content"] = f"thought:{body.get('reasoning_effort') or 'on'}"
             if body.get("tools") and body.get("tool_choice") != "none":
                 name = body["tools"][0]["function"]["name"]
                 call = {
@@ -46,7 +48,31 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
                     "message": {"role": "assistant", "content": None, "tool_calls": [call]},
                     "finish_reason": "tool_calls",
                 }
-            self.reply(200, {"choices": [choice], "usage": {"prompt_tokens": 7, "completion_tokens": 2}})
+            usage = {"prompt_tokens": 7, "completion_tokens": 2}
+            if body.get("stream"):
+                self.stream(choice, usage)
+                return
+            self.reply(200, {"choices": [choice], "usage": usage})
+
+        def stream(self, choice: dict, usage: dict) -> None:
+            message = choice["message"]
+            deltas = [{"reasoning_content": message["reasoning_content"]}] if message.get("reasoning_content") else []
+            deltas += [{"content": char} for char in message.get("content") or ""]
+            for call in message.get("tool_calls") or []:
+                function = call["function"]
+                deltas.append({"tool_calls": [{"index": 0, "id": call["id"], "function": {"name": function["name"]}}]})
+                arguments = function["arguments"]
+                for part in (arguments[:5], arguments[5:]):
+                    deltas.append({"tool_calls": [{"index": 0, "function": {"arguments": part}}]})
+            chunks = [{"choices": [{"index": 0, "delta": delta, "finish_reason": None}]} for delta in deltas]
+            chunks += [{"choices": [{"index": 0, "delta": {}, "finish_reason": choice["finish_reason"]}]}]
+            chunks += [{"choices": [], "usage": usage}]
+            data = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(data.encode())))
+            self.end_headers()
+            self.wfile.write(data.encode())
 
         def log_message(self, format: str, *args: object) -> None:
             return

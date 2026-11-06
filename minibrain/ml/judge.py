@@ -1,5 +1,6 @@
 from minibrain.ml.context import JobSpec, report, run_child, write_result
 from minibrain.ml.runtime import Runtime
+from minibrain.serve.dialects import answer_text
 from minibrain.tasks.judge import Item, grade_value, messages_for, reason_of
 
 BATCH_SIZE = 8
@@ -17,11 +18,12 @@ def main(spec: JobSpec) -> None:
         batch = items[start : start + BATCH_SIZE]
         prompts = [runtime.render(messages_for(rubric, item, instructions)) for item in batch]
         for item, completion in zip(batch, runtime.generate(prompts, None, VERDICT_TOKENS), strict=True):
-            value = grade_value(completion.text)
+            text = answer_text(runtime.spec, completion.text)
+            value = grade_value(text)
             if value is None:
                 continue
             scores[item.key] = value
-            reason = reason_of(completion.text)
+            reason = reason_of(text)
             if reason:
                 reasons[item.key] = reason
         report((start + len(batch)) / max(len(items), 1), judged=start + len(batch), of=len(items))

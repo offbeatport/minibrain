@@ -40,6 +40,7 @@ class Completion:
     stopped: bool
     seconds: float
     tool_calls: tuple[ToolCall, ...] = ()
+    reasoning: str | None = None
 
     @property
     def finish_reason(self) -> str:
@@ -55,6 +56,7 @@ class Completion:
             "stopped": self.stopped,
             "seconds": self.seconds,
             "tool_calls": [call.as_dict() for call in self.tool_calls],
+            "reasoning": self.reasoning,
         }
 
     @staticmethod
@@ -66,6 +68,7 @@ class Completion:
             stopped=bool(data.get("stopped")),
             seconds=float(data.get("seconds") or 0.0),
             tool_calls=calls_of(data.get("tool_calls")),
+            reasoning=data.get("reasoning") or None,
         )
 
 
@@ -73,16 +76,22 @@ class Completion:
 class Piece:
     content: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
+    reasoning: str = ""
 
     def __bool__(self) -> bool:
-        return bool(self.content or self.tool_calls)
+        return bool(self.content or self.tool_calls or self.reasoning)
 
     def __add__(self, other: "Piece") -> "Piece":
-        return Piece(self.content + other.content, self.tool_calls + other.tool_calls)
+        return Piece(self.content + other.content, self.tool_calls + other.tool_calls, self.reasoning + other.reasoning)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"content": self.content, "tool_calls": [call.as_dict() for call in self.tool_calls]}
+        calls = [call.as_dict() for call in self.tool_calls]
+        return {"content": self.content, "tool_calls": calls, "reasoning": self.reasoning}
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> "Piece":
-        return Piece(content=str(data.get("content") or ""), tool_calls=calls_of(data.get("tool_calls")))
+        return Piece(
+            content=str(data.get("content") or ""),
+            tool_calls=calls_of(data.get("tool_calls")),
+            reasoning=str(data.get("reasoning") or ""),
+        )

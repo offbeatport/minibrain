@@ -169,6 +169,13 @@ CANDIDATES: list[dict[str, Any]] = [
 
 
 GGUF_PREFERENCE = ("Q8_0", "q8_0", "Q4_K_M")
+TOOL_FAMILIES = {"qwen", "qwen-coder", "mistral", "mistral-nemo", "mistral-small", "gpt-oss"}
+TOOL_GENERATIONS = {("llama", "3.1"), ("llama", "3.2"), ("llama", "3.3"), ("smollm", "3")}
+
+
+def tool_calling(candidate: dict[str, Any]) -> list[str]:
+    family, generation = candidate["family"], candidate["generation"]
+    return ["Tools"] if family in TOOL_FAMILIES or (family, generation) in TOOL_GENERATIONS else []
 
 
 def slug(repo: str) -> str:
@@ -305,7 +312,11 @@ class Builder:
             + ".",
             "provider": PUBLISHERS[organisation],
             "repo": repo,
-            "capabilities": ["Chat", "Classification", "Extraction", *candidate.get("extra", [])],
+            "capabilities": [
+                *candidate.get("tasks", ["Chat", "Classification", "Extraction"]),
+                *candidate.get("extra", []),
+                *tool_calling(candidate),
+            ],
             "recommended": False,
             "recommendation": None,
             "gated": bool(info.get("gated")),

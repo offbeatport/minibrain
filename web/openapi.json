@@ -9797,6 +9797,18 @@
             "title": "Content",
             "description": "The answer; null when the model only calls tools."
           },
+          "reasoning_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Content",
+            "description": "The model's reasoning before the answer, when it reasons; never part of content."
+          },
           "tool_calls": {
             "anyOf": [
               {
@@ -12932,6 +12944,24 @@
             ],
             "title": "Parallel Tool Calls",
             "description": "false keeps only the first call the model makes; true (the default) keeps all."
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort",
+            "description": "none turns reasoning off; low, medium or high turn it on at that effort; unset keeps the model's default (off for custom models and the catalogue's Qwen3 bases). Qwen3 and GLM think or not, so any effort turns thinking on; gpt-oss always reasons at an effort; DeepSeek-R1 always reasons. The reasoning comes back apart from the answer, as message.reasoning_content."
           }
         },
         "additionalProperties": true,

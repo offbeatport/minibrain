@@ -5,7 +5,7 @@ from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.serve.backend import CompletionRequest
-from minibrain.serve.dialects import HARMONY, HERMES, LLAMA3, MISTRAL
+from minibrain.serve.dialects import ALWAYS, EFFORT, HARMONY, HERMES, LLAMA3, MISTRAL, TOGGLE
 from minibrain.serve.openai_server import (
     MAX_LORA_RANK,
     MAX_LORAS_PER_BATCH,
@@ -18,11 +18,14 @@ from minibrain.serve.structured import choice_grammar
 from minibrain.serve.weights import local_dir
 
 TOOL_PARSERS = {HERMES: "qwen25", LLAMA3: "llama3", MISTRAL: "mistral", HARMONY: "gpt-oss"}
+REASONING_PARSERS = {TOGGLE: "qwen3", ALWAYS: "deepseek-r1", EFFORT: "gpt-oss"}
 
 
 def parser_flags(spec: BaseModelSpec) -> list[str]:
     tools = TOOL_PARSERS.get(spec.tools or "")
-    return ["--tool-call-parser", tools] if tools else []
+    reasoning = REASONING_PARSERS.get(spec.reasoning or "")
+    found = ["--tool-call-parser", tools] if tools else []
+    return found + (["--reasoning-parser", reasoning] if reasoning else [])
 
 
 def launch_command(spec: BaseModelSpec, port: int) -> list[str]:
@@ -70,3 +73,7 @@ class SglangBackend(OpenAIServerBackend):
 
     def adapter_fields(self, request: CompletionRequest) -> dict[str, Any]:
         return {"lora_path": request.adapter.name} if request.adapter else {}
+
+    def body(self, request: CompletionRequest) -> dict[str, Any]:
+        found = super().body(request)
+        return found | ({"separate_reasoning": True} if request.base.reasoning else {})

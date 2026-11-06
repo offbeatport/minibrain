@@ -6,7 +6,7 @@ from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.serve.backend import CompletionRequest
-from minibrain.serve.dialects import HARMONY, HERMES, LLAMA3, MISTRAL
+from minibrain.serve.dialects import ALWAYS, EFFORT, HARMONY, HERMES, LLAMA3, MISTRAL, TOGGLE
 from minibrain.serve.openai_server import (
     MAX_LORA_RANK,
     MAX_LORAS_PER_BATCH,
@@ -18,11 +18,14 @@ from minibrain.serve.select import vllm_python
 from minibrain.serve.weights import local_dir
 
 TOOL_PARSERS = {HERMES: "hermes", LLAMA3: "llama3_json", MISTRAL: "mistral", HARMONY: "openai"}
+REASONING_PARSERS = {TOGGLE: "qwen3", ALWAYS: "deepseek_r1", EFFORT: "openai_gptoss"}
 
 
 def parser_flags(spec: BaseModelSpec) -> list[str]:
     tools = TOOL_PARSERS.get(spec.tools or "")
-    return ["--enable-auto-tool-choice", "--tool-call-parser", tools] if tools else []
+    reasoning = REASONING_PARSERS.get(spec.reasoning or "")
+    found = ["--enable-auto-tool-choice", "--tool-call-parser", tools] if tools else []
+    return found + (["--reasoning-parser", reasoning] if reasoning else [])
 
 
 def launch_command(spec: BaseModelSpec, port: int) -> list[str]:

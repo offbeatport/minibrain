@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from minibrain.data.feedback import ORIGIN_API, Submission
 from minibrain.gateway.chat import (
     answer,
+    chat_events,
     checked_base,
     kept_output,
     last_user_text,
@@ -18,7 +19,7 @@ from minibrain.gateway.chat import (
     response_body,
     response_id,
     served_model,
-    stream_events,
+    sse,
 )
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.errors import OpenAIError
@@ -141,50 +142,76 @@ def chat_completions(
     body: ChatCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
 ) -> dict | StreamingResponse:
     started = time.monotonic()
-    logs: LogBuffer = request.app.state.request_logs
     identifier = response_id()
     route = config.routes.get(body.model)
-    status = 200
-    code: str | None = None
-    completion: Completion | None = None
+
+    def finished(completion: Completion | None, error: BaseException | None) -> None:
+        log_chat(request.app.state.request_logs, body, grant, route, identifier, started, completion, error)
+
     try:
         if route is None:
             raise HTTPException(status_code=404, detail=f"model {body.model} not found")
         if not grant.covers(route):
             raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
         base, adapter = checked_base(config, route)
-        completion = answer(request.app.state.backend, plan(body, route, base, adapter))
-    except (HTTPException, OpenAIError) as error:
-        status = error.status_code
-        code = error.code if isinstance(error, OpenAIError) else None
+        chat = plan(body, route, base, adapter)
+        backend = request.app.state.backend
+        if body.stream:
+            events = chat_events(backend, chat)
+            stream = sse(identifier, body.model, next(events), events, include_usage(body), finished)
+            return StreamingResponse(stream, media_type="text/event-stream")
+        completion = answer(backend, chat)
+    except Exception as error:
+        finished(None, error)
         raise
-    finally:
-        answered = completion is not None and status == 200
-        kept = answered and route is not None and route.request_bodies
-        note_chat(body, route, completion, identifier if answered else None, code)
-        logs.add(
-            LogEntry(
-                at=now(),
-                key_id=grant.key_id,
-                model_id=route.model_id if route else None,
-                model=body.model,
-                version=route.version if route else None,
-                contract=route.contract if route else None,
-                status=status,
-                latency_ms=(time.monotonic() - started) * 1000,
-                prompt_tokens=completion.prompt_tokens if completion else 0,
-                completion_tokens=completion.completion_tokens if completion else 0,
-                response_id=identifier if answered else None,
-                input=last_user_text(body.messages) if kept else None,
-                output=kept_output(completion) if completion and kept else None,
-                finish_reason=completion.finish_reason if completion and answered else None,
-            )
-        )
-    if completion is None:
-        raise HTTPException(status_code=500, detail="no completion")
-    if body.stream:
-        return StreamingResponse(stream_events(identifier, body.model, completion), media_type="text/event-stream")
+    finished(completion, None)
     return response_body(identifier, body.model, completion)
+
+
+def include_usage(body: ChatCompletionRequest) -> bool:
+    options = (body.model_extra or {}).get("stream_options")
+    return isinstance(options, dict) and bool(options.get("include_usage"))
+
+
+def status_of(error: BaseException | None) -> int:
+    if error is None:
+        return 200
+    return error.status_code if isinstance(error, HTTPException | OpenAIError) else 500
+
+
+def log_chat(
+    logs: LogBuffer,
+    body: ChatCompletionRequest,
+    grant: Grant,
+    route: Route | None,
+    identifier: str,
+    started: float,
+    completion: Completion | None,
+    error: BaseException | None,
+) -> None:
+    status = status_of(error) if completion is not None or error is not None else 500
+    answered = completion is not None and status == 200
+    kept = answered and route is not None and route.request_bodies
+    code = error.code if isinstance(error, OpenAIError) else None
+    note_chat(body, route, completion if answered else None, identifier if answered else None, code)
+    logs.add(
+        LogEntry(
+            at=now(),
+            key_id=grant.key_id,
+            model_id=route.model_id if route else None,
+            model=body.model,
+            version=route.version if route else None,
+            contract=route.contract if route else None,
+            status=status,
+            latency_ms=(time.monotonic() - started) * 1000,
+            prompt_tokens=completion.prompt_tokens if completion else 0,
+            completion_tokens=completion.completion_tokens if completion else 0,
+            response_id=identifier if answered else None,
+            input=last_user_text(body.messages) if kept else None,
+            output=kept_output(completion) if completion and kept else None,
+            finish_reason=completion.finish_reason if completion and answered else None,
+        )
+    )
 
 
 class FeedbackRequest(BaseModel):

@@ -1,3 +1,4 @@
+import json
 import logging
 import threading
 import uuid
@@ -10,10 +11,12 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from minibrain.artifacts import ArtifactStore, StreamReader
 from minibrain.base_models import BaseModelSpec
+from minibrain.ml.completion import Completion, Piece
 from minibrain.models.copies import BUCKET, Progress, bucket_client, ensure, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
 from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
@@ -22,6 +25,7 @@ from minibrain.serve.backend import (
     AdapterRef,
     CompletionRequest,
     EngineRuntime,
+    Event,
     OutputFormatError,
     ServingBackend,
     TransformersBackend,
@@ -63,6 +67,8 @@ class GenerateBody(BaseModel):
     tools: list[dict[str, Any]] = []
     tool_choice: str | dict[str, Any] | None = None
     parallel_tool_calls: bool = True
+    reasoning: str | None = None
+    stream: bool = False
 
     def request(self, spec: BaseModelSpec, adapter: AdapterRef | None) -> CompletionRequest:
         return CompletionRequest(
@@ -74,6 +80,7 @@ class GenerateBody(BaseModel):
             self.route,
             sampling=Sampling.from_dict(self.sampling),
             tools=ToolUse(tuple(self.tools), self.tool_choice, self.parallel_tool_calls),
+            reasoning=self.reasoning,
         )
 
 
@@ -143,6 +150,31 @@ def artifact_fetcher(store: ArtifactStore, http: HttpClient, token: str):
 
 
 UNSUPPORTED = "unsupported_parameter"
+
+
+def events_of(serving: ServingBackend, request: CompletionRequest) -> Iterator[Event]:
+    stream = getattr(serving, "stream", None)
+    if stream is not None:
+        yield from stream(request)
+        return
+    completion = serving.complete(request)
+    yield Piece(content=completion.text, tool_calls=completion.tool_calls, reasoning=completion.reasoning or "")
+    yield completion
+
+
+def event_line(event: Event) -> str:
+    key = "completion" if isinstance(event, Completion) else "piece"
+    return json.dumps({key: event.as_dict()}) + "\n"
+
+
+def ndjson(first: Event, events: Iterator[Event]) -> Iterator[str]:
+    yield event_line(first)
+    try:
+        for event in events:
+            yield event_line(event)
+    except Exception as error:
+        log.exception("the engine failed in the middle of an answer")
+        yield json.dumps({"error": {"status": 500, "detail": str(error) or type(error).__name__}}) + "\n"
 
 
 def unsupported_detail(error: UnsupportedParameterError) -> dict[str, str]:
@@ -413,8 +445,12 @@ def create_engine_app(
             "device": (loaded or {}).get("device"),
         }
 
-    @app.post("/generate")
-    def generate(body: GenerateBody) -> dict[str, Any]:
+    def flown(body: GenerateBody, serving: ServingBackend, adapter: AdapterRef | None) -> Iterator[Event]:
+        with flights.flying(body.route, adapter.name if adapter else None):
+            yield from events_of(serving, body.request(spec, adapter))
+
+    @app.post("/generate", response_model=None)
+    def generate(body: GenerateBody) -> dict[str, Any] | StreamingResponse:
         if current["failure"] is not None:
             raise HTTPException(status_code=500, detail=current["failure"]["error"])
         serving: ServingBackend | None = current["backend"]
@@ -428,6 +464,10 @@ def create_engine_app(
                 raise HTTPException(status_code=409, detail=mismatch)
         adapter = AdapterRef(body.adapter.name, body.adapter.artifact) if body.adapter else None
         try:
+            if body.stream:
+                events = flown(body, serving, adapter)
+                first = next(events)
+                return StreamingResponse(ndjson(first, events), media_type="application/x-ndjson")
             with flights.flying(body.route, adapter.name if adapter else None):
                 completion = serving.complete(body.request(spec, adapter))
         except AdapterNotSupportedError as error:

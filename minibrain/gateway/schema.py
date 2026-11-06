@@ -28,6 +28,12 @@ TOOLS_HELP = (
     "answer is read back as tool_calls: Qwen and Hermes <tool_call> JSON, Llama 3.1 and later JSON, Mistral "
     "[TOOL_CALLS] and gpt-oss harmony. A model answering with labels or a JSON schema takes no tools."
 )
+REASONING_HELP = (
+    "none turns reasoning off; low, medium or high turn it on at that effort; unset keeps the model's default (off "
+    "for custom models and the catalogue's Qwen3 bases). Qwen3 and GLM think or not, so any effort turns thinking "
+    "on; gpt-oss always reasons at an effort; DeepSeek-R1 always reasons. The reasoning comes back apart from the "
+    "answer, as message.reasoning_content."
+)
 TOOL_CHOICE_HELP = (
     "auto (the default with tools) lets the model choose, none answers in text, required makes it call one, and "
     '{"type": "function", "function": {"name": ...}} makes it call that one.'
@@ -135,6 +141,7 @@ class ChatCompletionRequest(BaseModel):
     parallel_tool_calls: bool | None = Field(
         default=None, description="false keeps only the first call the model makes; true (the default) keeps all."
     )
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None = Field(default=None, description=REASONING_HELP)
 
     @property
     def token_budget(self) -> int | None:
@@ -156,6 +163,9 @@ class ModelList(BaseModel):
 class AnswerMessage(BaseModel):
     role: Literal["assistant"]
     content: str | None = Field(description="The answer; null when the model only calls tools.")
+    reasoning_content: str | None = Field(
+        default=None, description="The model's reasoning before the answer, when it reasons; never part of content."
+    )
     tool_calls: list[ToolCallBody] | None = Field(
         default=None, description="The functions the model calls; answer each with a tool message."
     )

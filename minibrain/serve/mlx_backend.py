@@ -3,15 +3,15 @@ import json
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion
-from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest, TemplateTools, parsed
-from minibrain.serve.sampling import GREEDY_SAMPLING, Sampling, stopped_at
+from minibrain.serve.backend import MAX_ADAPTERS, CompletionRequest, Event, parsed, streamed
+from minibrain.serve.sampling import GREEDY_SAMPLING, Sampling, StopCutter
 from minibrain.serve.structured import TokenTrie
 from minibrain.serve.weights import local_dir
 
@@ -143,11 +143,15 @@ class MlxRuntime:
         self.active: str | None = None
         self.zeros: dict[str, Any] = {}
 
-    def render(self, messages: list[dict[str, Any]], tools: TemplateTools = None, start: str = "") -> list[int]:
+    def render(self, request: CompletionRequest) -> list[int]:
         text = self.tokenizer.apply_chat_template(
-            messages, tools=tools, tokenize=False, add_generation_prompt=True, **self.spec.template_kwargs
+            request.template_messages(),
+            tools=request.template_tools(),
+            tokenize=False,
+            add_generation_prompt=True,
+            **request.template_kwargs(),
         )
-        return list(self.tokenizer.encode(text + start, add_special_tokens=False))
+        return list(self.tokenizer.encode(text + request.prefill(), add_special_tokens=False))
 
     def attach(self, shape: LoraShape) -> None:
         import mlx.core as mx
@@ -225,13 +229,13 @@ class MlxRuntime:
         }
         return make_sampler(**arguments)
 
-    def generate(
+    def stream(
         self,
         prompt: list[int],
         max_tokens: int | None,
         choices: Sequence[str] = (),
         sampling: Sampling = GREEDY_SAMPLING,
-    ) -> Completion:
+    ) -> Iterator[str | Completion]:
         import mlx.core as mx
         from mlx_lm import stream_generate
 
@@ -241,6 +245,7 @@ class MlxRuntime:
         if chosen.seed is not None:
             mx.random.seed(chosen.seed)
         started = time.perf_counter()
+        cutter = StopCutter(chosen.stop)
         text, stopped, generated = "", False, 0
         for response in stream_generate(
             self.model,
@@ -250,20 +255,35 @@ class MlxRuntime:
             sampler=self.sampler(chosen),
             logits_processors=self.processors(choices, len(prompt), chosen),
         ):
-            text += response.text
+            piece = cutter.feed(response.text)
+            text += piece
             generated = response.generation_tokens
-            stopped = response.finish_reason == "stop"
-            cut = stopped_at(text, chosen.stop)
-            if cut is not None:
-                text, stopped = text[:cut], True
+            stopped = response.finish_reason == "stop" or cutter.stopped
+            if piece:
+                yield piece
+            if cutter.stopped:
                 break
-        return Completion(
+        rest = cutter.finish()
+        if rest:
+            text += rest
+            yield rest
+        yield Completion(
             text=text,
             prompt_tokens=len(prompt),
             completion_tokens=generated,
             stopped=stopped,
             seconds=time.perf_counter() - started,
         )
+
+    def generate(
+        self,
+        prompt: list[int],
+        max_tokens: int | None,
+        choices: Sequence[str] = (),
+        sampling: Sampling = GREEDY_SAMPLING,
+    ) -> Completion:
+        found = [item for item in self.stream(prompt, max_tokens, choices, sampling) if isinstance(item, Completion)]
+        return found[-1]
 
 
 class MlxBackend:
@@ -291,9 +311,19 @@ class MlxBackend:
             if request.adapter is not None:
                 runtime.ensure_adapter(request.adapter.name, self.materialize(request.adapter.artifact))
             runtime.activate(request.adapter.name if request.adapter else None)
-            prompt = runtime.render(request.template_messages(), request.template_tools(), request.prefill())
+            prompt = runtime.render(request)
             raw = runtime.generate(prompt, request.max_tokens, request.decoding_choices(), request.sampling)
             return parsed(request, raw)
+
+    def stream(self, request: CompletionRequest) -> Iterator[Event]:
+        with self.lock:
+            runtime = self.runtime(request.base)
+            if request.adapter is not None:
+                runtime.ensure_adapter(request.adapter.name, self.materialize(request.adapter.artifact))
+            runtime.activate(request.adapter.name if request.adapter else None)
+            prompt = runtime.render(request)
+            raw = runtime.stream(prompt, request.max_tokens, request.decoding_choices(), request.sampling)
+            yield from streamed(request, raw)
 
     def status(self) -> list[dict[str, Any]]:
         return [

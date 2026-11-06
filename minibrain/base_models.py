@@ -18,6 +18,7 @@ class BaseModelSpec:
     weights_file: str | None = None
     content_hash: str | None = None
     tools: str | None = None
+    reasoning: str | None = None
 
     def source(self) -> tuple[str, str | None]:
         if self.path and (Path(self.path) / "config.json").is_file():
@@ -41,6 +42,7 @@ class BaseModelSpec:
             weights_file=data.get("weights_file"),
             content_hash=data.get("content_hash"),
             tools=data.get("tools"),
+            reasoning=data.get("reasoning"),
         )
 
 
@@ -51,6 +53,7 @@ QWEN3_0_6B = BaseModelSpec(
     license="Apache-2.0",
     template_kwargs={"enable_thinking": False},
     tools="hermes",
+    reasoning="toggle",
 )
 
 BASE_MODELS = {spec.key: spec for spec in (QWEN3_0_6B,)}

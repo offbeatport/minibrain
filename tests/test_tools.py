@@ -192,8 +192,8 @@ class FakeRuntime:
     tokenizer: Recorder = field(default_factory=Recorder)
     prompts: list[str] = field(default_factory=list)
 
-    def render(self, messages: list[dict[str, Any]], tools: Any = None) -> str:
-        return render_prompt(cast(Any, self.tokenizer), QWEN3_0_6B, messages, tools)
+    def render(self, messages: list[dict[str, Any]], tools: Any = None, kwargs: Any = None) -> str:
+        return render_prompt(cast(Any, self.tokenizer), QWEN3_0_6B, messages, tools, kwargs)
 
     def generate(self, prompts: list[str], *_args: Any) -> list[Completion]:
         self.prompts += prompts
@@ -371,8 +371,8 @@ def test_engines_carry_tools_and_return_calls(harness: Harness, tmp_path: Path) 
 def test_sglang_and_vllm_parse_tool_calls_natively(tmp_path: Path) -> None:
     spec = replace(QWEN3_0_6B, path=str(tmp_path))
     (tmp_path / "config.json").write_text("{}")
-    assert launch_command(spec, 1)[-2:] == ["--tool-call-parser", "qwen25"]
-    flags = vllm_command(replace(spec, tools=LLAMA3), 1)[-3:]
+    assert launch_command(spec, 1)[-4:-2] == ["--tool-call-parser", "qwen25"]
+    flags = vllm_command(replace(spec, tools=LLAMA3, reasoning=None), 1)[-3:]
     assert flags == ["--enable-auto-tool-choice", "--tool-call-parser", "llama3_json"]
     assert "--tool-call-parser" not in launch_command(replace(spec, tools=None), 1)
     log = tmp_path / "requests.jsonl"

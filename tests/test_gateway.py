@@ -32,7 +32,7 @@ class Down:
     def request(self, method: str, url: str, *, content: Any = None, json: Any = None, headers: Any = None) -> Any:
         raise ConnectionError(f"main is down: {method} {url}")
 
-    def stream(self, method: str, url: str, *, headers: Any = None) -> AbstractContextManager[Any]:
+    def stream(self, method: str, url: str, *, headers: Any = None, json: Any = None) -> AbstractContextManager[Any]:
         raise ConnectionError(f"main is down: {method} {url}")
 
 

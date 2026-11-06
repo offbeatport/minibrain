@@ -11,7 +11,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": true,
    "recommendation": "Tested default base; trains on a laptop.",
@@ -145,7 +146,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -289,7 +291,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -438,7 +441,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -668,7 +672,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -816,7 +821,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -1009,7 +1015,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -1197,7 +1204,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -1896,7 +1904,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2017,7 +2026,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2204,7 +2214,8 @@
     "Chat",
     "Classification",
     "Extraction",
-    "Code"
+    "Code",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2395,7 +2406,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2501,7 +2513,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2607,7 +2620,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2733,7 +2747,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -2879,7 +2894,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -3070,7 +3086,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -3363,7 +3380,8 @@
     "Chat",
     "Classification",
     "Extraction",
-    "Code"
+    "Code",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -3956,7 +3974,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4057,7 +4076,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4165,7 +4185,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4291,7 +4312,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4545,7 +4567,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4653,7 +4676,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -4781,7 +4805,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -7614,7 +7639,8 @@
     "Chat",
     "Classification",
     "Extraction",
-    "Reasoning"
+    "Reasoning",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -7733,7 +7759,8 @@
     "Chat",
     "Classification",
     "Extraction",
-    "Reasoning"
+    "Reasoning",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,
@@ -8476,7 +8503,8 @@
    "capabilities": [
     "Chat",
     "Classification",
-    "Extraction"
+    "Extraction",
+    "Tools"
    ],
    "recommended": false,
    "recommendation": null,

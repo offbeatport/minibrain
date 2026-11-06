@@ -47,6 +47,21 @@ An inference request never touches the database.
   bottleneck long before gateways or the database.
 - Very high log volume moves to ClickHouse or Parquet in object storage, or to sampling.
 
+## Streaming
+
+`stream: true` sends `chat.completion.chunk` events as the engine generates them: `transformers` through a token
+streamer, MLX through `stream_generate`, llama.cpp through its own stream, SGLang and vLLM by relaying their events,
+and remote engines as newline-delimited JSON from `/generate`. The gateway splits each piece into `content`,
+`reasoning_content` and `tool_calls` deltas as it goes (a tool call is sent whole once its closing tag arrives).
+
+- An answer held to `response_format` or to a custom model's contract is generated in full, checked, then sent as
+  events, so a 422 still arrives as a status code.
+- `stream_options: {"include_usage": true}` adds OpenAI's final chunk with empty `choices` and `usage`; otherwise the
+  usage rides on the chunk with `finish_reason`.
+- A failure before the first token is an ordinary error response; one after it ends the stream with an `error` event
+  and `data: [DONE]`. The request log is written when the stream ends, with its tokens and status.
+- A gateway fails over to another replica only before the first byte of a stream.
+
 ## Sampling
 
 `/v1/chat/completions` takes OpenAI's sampling fields and the engine extensions vLLM and SGLang share. A field left
@@ -129,6 +144,27 @@ messages with each `tool_call_id`. Streams carry the calls as `delta.tool_calls`
   instructions first. Arguments the model writes as invalid JSON stay in `content`.
 - `functions` and `function_call`, OpenAI's old names, are refused with a pointer to `tools`; content parts other
   than text are refused.
+
+## Reasoning
+
+`reasoning_effort` takes `none`, `low`, `medium` or `high`; unset keeps the model's default. The reasoning comes back
+as `message.reasoning_content` (`delta.reasoning_content` when streaming), never in `content`, so request logs,
+feedback and graders see only the answer.
+
+| Style | Detected from the template | Families | `none` | `low`, `medium`, `high` | Read from |
+|---|---|---|---|---|---|
+| Toggle | `enable_thinking` | Qwen3 (not the 2507 Instruct models), GLM-4.5, SmolLM3 | Thinking off | Thinking on | `<think>` … `</think>` |
+| Effort | `reasoning_effort` | gpt-oss | 400 | The effort | the harmony `analysis` channel |
+| Always | `<think>` opened by the generation prompt | DeepSeek-R1 and its distills, Qwen3 Thinking 2507 | 400 | 400 | up to `</think>` |
+| None | none of these | everything else | Accepted, changes nothing | 400 | |
+
+- The default stays off for custom models and the catalogue's Qwen3 bases (`enable_thinking: false` in their
+  template settings); a base imported without that setting follows its own template's default.
+- A model answering with labels or its own schema does not reason: `none` is accepted, an effort is a 400.
+- `transformers`, MLX and llama.cpp pass the setting to the chat template and split the answer; SGLang and vLLM get
+  `chat_template_kwargs` (and `reasoning_effort` for gpt-oss) and start with `--reasoning-parser` (`qwen3`,
+  `deepseek-r1` or `gpt-oss` on SGLang; `qwen3`, `deepseek_r1` or `openai_gptoss` on vLLM).
+- Evaluation and judge jobs strip the reasoning too, so a reasoning base is scored on its answers.
 
 ## Engines
 
