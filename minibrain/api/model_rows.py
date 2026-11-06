@@ -25,8 +25,7 @@ from minibrain.api.views import cost_info, teardown_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
-from minibrain.models.registry import files_present
-from minibrain.models.rules import publisher_of
+from minibrain.models.registry import base_publisher, files_present
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     BaseModel,
@@ -402,7 +401,7 @@ def base_row(
         current_version=None,
         ready_version=None,
         needed_bytes=needed_bytes(weights) if weights else None,
-        publisher=variant.model.provider if variant is not None else publisher_of(model.repo),
+        publisher=base_publisher(model),
         error=model.error or (job.error if job is not None and job.status == JobStatus.FAILED else None),
         size_bytes=model.size_bytes or None,
         usage=usage,

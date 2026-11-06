@@ -11,6 +11,7 @@ import {
     useRequestOverview,
     useRequestSummary,
 } from "~/api/requestQueries";
+import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Section } from "~/components/Section";
 import type { ChartSeries } from "~/components/charts/TimeChart";
 import { count, milliseconds, percent } from "~/lib/format";
@@ -196,7 +197,7 @@ export function OverviewTab({ paused }: { paused: boolean }) {
                     label="Model"
                     allLabel="All models"
                     noun="models"
-                    options={models}
+                    options={models.map(modelOption)}
                     value={filter.model}
                     onValueChange={(next) => update({ model: next.join(",") })}
                 />

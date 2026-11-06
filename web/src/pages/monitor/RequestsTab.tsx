@@ -27,6 +27,7 @@ import {
     useRequestList,
     useRequestSummary,
 } from "~/api/requestQueries";
+import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count, milliseconds, percent } from "~/lib/format";
@@ -48,7 +49,7 @@ import { RequestDialog } from "./RequestDetail";
 
 const SEARCH_DELAY_MS = 300;
 
-type FacetOption = { value: string; label: string; count: number };
+type FacetOption = { value: string; label: string; count: number; publisher?: string | null };
 
 function Muted({ children }: { children: ReactNode }) {
     return <span className="text-muted-foreground">{children}</span>;
@@ -323,7 +324,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                     label="Model"
                     allLabel="All models"
                     noun="models"
-                    options={withChosen(facets.data?.models ?? [], filter.model)}
+                    options={withChosen(facets.data?.models ?? [], filter.model).map(modelOption)}
                     value={filter.model}
                     onValueChange={(next) => update({ model: next.join(",") })}
                 />

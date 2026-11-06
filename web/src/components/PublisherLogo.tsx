@@ -1,4 +1,5 @@
 import { type ProviderId, ProviderLogo } from "obp-ui";
+import type { ReactNode } from "react";
 
 const PROVIDERS: Record<string, ProviderId> = {
     Qwen: "qwen",
@@ -46,4 +47,34 @@ export function PublisherLogo({
             )}
         </span>
     );
+}
+
+export function ModelLabel({
+    publisher,
+    name,
+    label,
+    detail,
+}: {
+    publisher?: string | null;
+    name: string;
+    label?: ReactNode;
+    detail?: ReactNode;
+}) {
+    return (
+        <span className="flex min-w-0 items-center gap-2">
+            <PublisherLogo publisher={publisher} name={name} size="sm" />
+            <span className="flex min-w-0 flex-col">
+                <span className="truncate">{label ?? name}</span>
+                {detail && <span className="truncate text-sm opacity-70">{detail}</span>}
+            </span>
+        </span>
+    );
+}
+
+export function modelOption<T extends { label: string; publisher?: string | null }>(option: T) {
+    return {
+        ...option,
+        label: <ModelLabel publisher={option.publisher} name={option.label} />,
+        text: option.label,
+    };
 }

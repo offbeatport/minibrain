@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from minibrain.auth.roles import Role
-from minibrain.registry.models import AuditEvent, RequestLog
+from minibrain.registry.models import AuditEvent, BaseModel, RequestLog
 from tests.conftest import Harness
 from tests.test_flow import SLUG, create_on_data, deploy, finish
 from tests.test_safety import ASK, GUARD, guarded, import_base
@@ -20,6 +20,11 @@ def test_targets_list_versions_live_names_and_installed_bases(harness: Harness, 
     tool_base(harness, tmp_path, QWEN_TEMPLATE)
     import_base(harness, tmp_path, "Spare Base", "spare-base")
     import_base(harness, tmp_path, "Llama Guard 3 1B", GUARD)
+    with harness.sessions() as session:
+        base = session.get(BaseModel, "spare-base")
+        assert base is not None
+        base.repo = "Qwen/Spare-Base"
+        session.commit()
     found = harness.client.get("/api/playground/models").json()
     targets = {item["name"]: item for item in found["targets"]}
     assert {SLUG, f"{SLUG}@0", "tool-base", "spare-base"} <= set(targets) and GUARD not in targets
@@ -27,6 +32,7 @@ def test_targets_list_versions_live_names_and_installed_bases(harness: Harness, 
     assert targets[f"{SLUG}@0"]["version"] == 0 and not targets[f"{SLUG}@0"]["live"]
     assert targets["tool-base"]["tools"] == "hermes" and targets["tool-base"]["deployed"]
     assert targets["spare-base"]["deployed"] is False and targets["spare-base"]["tools"] is None
+    assert targets["spare-base"]["publisher"] == "Qwen" and targets[SLUG]["publisher"] is None
     assert [guard["key"] for guard in found["guards"]] == [GUARD]
 
 

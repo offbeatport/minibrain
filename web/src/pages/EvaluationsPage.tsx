@@ -20,6 +20,7 @@ import { useMemo } from "react";
 import { type ModelRow, type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useAllModels, useVersions } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
+import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page, Stat } from "~/components/Section";
 import {
     VERSION_STATES,
@@ -475,11 +476,14 @@ export function EvaluationsPage() {
     );
     const modelOptions = (models.data ?? [])
         .filter((row) => row.kind === "custom")
-        .map((row) => ({
-            value: row.key,
-            label: row.name,
-            count: row.versions?.length ?? 0,
-        }));
+        .map((row) =>
+            modelOption({
+                value: row.key,
+                label: row.name,
+                publisher: row.publisher,
+                count: row.versions?.length ?? 0,
+            }),
+        );
     const statusOptions = VERSION_STATES.map((state) => ({
         value: state,
         label: versionStateLabel(state),

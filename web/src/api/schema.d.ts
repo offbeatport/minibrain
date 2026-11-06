@@ -6575,6 +6575,11 @@ export interface components {
             key: string;
             /** Model Name */
             model_name: string;
+            /**
+             * Publisher
+             * @description Who published the base, for its logo; none for custom models.
+             */
+            publisher: string | null;
             /** Version */
             version: number | null;
             /**
@@ -6911,6 +6916,8 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+            /** Publisher */
+            publisher?: string | null;
         };
         /** RequestFacets */
         RequestFacets: {

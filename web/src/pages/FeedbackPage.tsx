@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { type FeedbackInfo, useFeedbackFacets, useFeedbackList } from "~/api/feedbackQueries";
 import { useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
+import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import {
@@ -158,11 +159,13 @@ export function FeedbackPage() {
     const clear = () => update({ model: "", status: "", assignee: "", q: "" });
     const show = (id: number | null) =>
         id === null ? update({ item: "" }) : open({ item: String(id) });
-    const modelOptions = (owned.data ?? []).map((item) => ({
-        value: item.slug,
-        label: item.name,
-        count: facets.data?.models[item.slug] ?? 0,
-    }));
+    const modelOptions = (owned.data ?? []).map((item) =>
+        modelOption({
+            value: item.slug,
+            label: item.name,
+            count: facets.data?.models[item.slug] ?? 0,
+        }),
+    );
     const statusOptions = FEEDBACK_STATUSES.map((status) => ({
         value: status,
         label: feedbackStatusLabel(status),

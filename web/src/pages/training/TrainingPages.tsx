@@ -29,6 +29,7 @@ import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jo
 import { isActiveJob, useJob, useModels } from "~/api/queries";
 import { JobPanel } from "~/components/JobPanel";
 import { PageHeader } from "~/components/PageHeader";
+import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, JobStatus, jobStatusLabel } from "~/components/StatusBadge";
 import { ProgressBar } from "~/components/models/StatusText";
@@ -219,6 +220,7 @@ function JobDialog({ id, onClose }: { id: number | null; onClose: () => void }) 
 function ModelChoice({ item }: { item: ModelSummary }) {
     return (
         <>
+            <PublisherLogo name={item.name} />
             <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-semibold">{item.name}</span>
                 <span className="truncate text-muted-foreground">{item.base_model}</span>
@@ -303,11 +305,13 @@ export function TrainingListPage() {
         () => jobColumns((job) => listHref(PATH, { ...search, job: String(job.id) })),
         [search],
     );
-    const modelOptions = (owned.data ?? []).map((item) => ({
-        value: item.slug,
-        label: item.name,
-        count: facets.data?.models[item.slug] ?? 0,
-    }));
+    const modelOptions = (owned.data ?? []).map((item) =>
+        modelOption({
+            value: item.slug,
+            label: item.name,
+            count: facets.data?.models[item.slug] ?? 0,
+        }),
+    );
     const statusOptions = JOB_STATUSES.map((status) => ({
         value: status,
         label: jobStatusLabel(status),

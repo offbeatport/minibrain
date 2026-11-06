@@ -19,6 +19,7 @@ from minibrain.models.bucket import missing_objects, writes_bucket
 from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import MISSING, content_hash, listed, problem_of, size_problems
 from minibrain.models.inspect import source_type_of
+from minibrain.models.rules import publisher_of
 from minibrain.models.sources import HUB, S3, s3_endpoint
 from minibrain.models.templates import gguf_template, template_in_files
 from minibrain.object_store import load_config
@@ -124,6 +125,10 @@ def chat_template(settings: Settings, model: BaseModel) -> str | None:
     if key not in TEMPLATES:
         TEMPLATES[key] = read_chat_template(settings, model)
     return TEMPLATES[key]
+
+
+def base_publisher(model: BaseModel) -> str | None:
+    return model.variant.model.provider if model.variant is not None else publisher_of(model.repo)
 
 
 def spec_for(settings: Settings, model: BaseModel) -> BaseModelSpec:

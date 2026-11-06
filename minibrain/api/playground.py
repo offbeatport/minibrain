@@ -29,7 +29,7 @@ from minibrain.gateway.config import GatewayConfig, Route, base_route_for
 from minibrain.gateway.safety import Verdict
 from minibrain.gateway.schema import CHAT_RESPONSES, ChatCompletionRequest
 from minibrain.ml.completion import Completion
-from minibrain.models.registry import base_config, require_usable, spec_for
+from minibrain.models.registry import base_config, base_publisher, require_usable, spec_for
 from minibrain.models.safety import install_safety
 from minibrain.models.usage import touch
 from minibrain.registry.models import AuditEvent, BaseModelStatus, CatalogModel, Model, PlaygroundPreset, now
@@ -55,6 +55,7 @@ class PlaygroundTarget(BaseModel):
     kind: Literal["custom", "base"]
     key: str = Field(description="The custom model's slug or the base model's key.")
     model_name: str
+    publisher: str | None = Field(description="Who published the base, for its logo; none for custom models.")
     version: int | None
     live: bool = Field(description="The name follows the live version.")
     deployed: bool
@@ -97,6 +98,7 @@ class BaseFacts(BaseModel):
     name: str
     spec: dict[str, Any]
     context: int | None
+    publisher: str | None = None
 
 
 def contract_kind(contract: Contract | None) -> tuple[ContractKind, list[str]]:
@@ -125,6 +127,7 @@ def target(
         kind=kind,
         key=key,
         model_name=model_name,
+        publisher=facts.publisher if kind == "base" else None,
         version=route.version,
         live=kind == "custom" and "@" not in name,
         deployed="@" not in name,
@@ -146,7 +149,8 @@ def playground_models(session: Session, settings: Settings, config: GatewayConfi
     facts: dict[str, BaseFacts] = {}
     for base in session.scalars(available):
         context = context_of(session, settings, base)
-        facts[base.id] = BaseFacts(name=base.name, spec=spec_for(settings, base).as_dict(), context=context)
+        spec = spec_for(settings, base).as_dict()
+        facts[base.id] = BaseFacts(name=base.name, spec=spec, context=context, publisher=base_publisher(base))
     served = {key: BaseFacts(name=key, spec=spec, context=None) for key, spec in config.bases.items()}
     known = served | facts
     custom = [

@@ -21332,6 +21332,18 @@
             "type": "string",
             "title": "Model Name"
           },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher",
+            "description": "Who published the base, for its logo; none for custom models."
+          },
           "version": {
             "anyOf": [
               {
@@ -21437,6 +21449,7 @@
           "kind",
           "key",
           "model_name",
+          "publisher",
           "version",
           "live",
           "deployed",
@@ -22322,6 +22335,17 @@
           "count": {
             "type": "integer",
             "title": "Count"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
           }
         },
         "type": "object",

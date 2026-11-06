@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import sees_rows, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.data.feedback import UP
+from minibrain.models.registry import base_publisher
 from minibrain.policy import bodies_choice
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import ApiKey, BaseModel, Feedback, FeedbackStatus, Model, RequestLog
@@ -67,6 +68,7 @@ class RequestFacet(pydantic.BaseModel):
     value: str
     label: str
     count: int
+    publisher: str | None = None
 
 
 class RequestFacets(pydantic.BaseModel):
@@ -212,11 +214,13 @@ def count_requests(session: Session, where: Sequence[ColumnElement[bool]]) -> in
 
 
 def base_names(session: Session, keys: set[str]) -> dict[str, str]:
+    return {key: base.name for key, base in bases_of(session, keys).items()}
+
+
+def bases_of(session: Session, keys: set[str]) -> dict[str, BaseModel]:
     if not keys:
         return {}
-    return {
-        key: name for key, name in session.execute(select(BaseModel.id, BaseModel.name).where(BaseModel.id.in_(keys)))
-    }
+    return {base.id: base for base in session.scalars(select(BaseModel).where(BaseModel.id.in_(keys)))}
 
 
 Marks = dict[tuple[int | None, str | None], dict[str, int]]
@@ -318,6 +322,12 @@ def list_requests(
     )
 
 
+def base_facet(base: BaseModel | None, model: str, total: int) -> RequestFacet:
+    if base is None:
+        return RequestFacet(value=model, label=model, count=total)
+    return RequestFacet(value=model, label=base.name, count=total, publisher=base_publisher(base))
+
+
 def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
     custom = (
         select(Model.slug, Model.name, func.count())
@@ -331,8 +341,8 @@ def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[Req
     )
     facets = [RequestFacet(value=slug, label=name, count=total) for slug, name, total in session.execute(custom)]
     found = list(session.execute(base))
-    names = base_names(session, {model for model, _ in found})
-    facets += [RequestFacet(value=model, label=names.get(model, model), count=total) for model, total in found]
+    bases = bases_of(session, {model for model, _ in found})
+    facets += [base_facet(bases.get(model), model, total) for model, total in found]
     return sorted(facets, key=lambda facet: (-facet.count, facet.label.lower()))
 
 

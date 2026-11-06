@@ -22,6 +22,7 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
+import { ModelLabel } from "~/components/PublisherLogo";
 import {
     DEFAULT_PARAMETERS,
     type FunctionSpec,
@@ -112,7 +113,20 @@ function ModelPicker({
         >
             <Select value={model} onValueChange={(next) => onModel(String(next ?? model))}>
                 <SelectTrigger id="playground-model" className="w-full">
-                    <SelectValue placeholder="Pick a model" />
+                    <SelectValue>
+                        {(value: string | null) => {
+                            const found = targets.find((item) => item.name === value);
+                            return found ? (
+                                <ModelLabel
+                                    publisher={found.publisher}
+                                    name={found.model_name}
+                                    label={targetLabel(found)}
+                                />
+                            ) : (
+                                "Pick a model"
+                            );
+                        }}
+                    </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                     {custom.length > 0 && (
@@ -122,9 +136,14 @@ function ModelPicker({
                                 <SelectItem
                                     key={item.name}
                                     value={item.name}
-                                    description={item.name}
+                                    label={targetLabel(item)}
                                 >
-                                    {targetLabel(item)}
+                                    <ModelLabel
+                                        publisher={item.publisher}
+                                        name={item.model_name}
+                                        label={targetLabel(item)}
+                                        detail={<span className="font-mono">{item.name}</span>}
+                                    />
                                 </SelectItem>
                             ))}
                         </SelectGroup>
@@ -136,11 +155,16 @@ function ModelPicker({
                                 <SelectItem
                                     key={item.name}
                                     value={item.name}
-                                    description={
-                                        item.deployed ? "Deployed" : "Installed, not deployed"
-                                    }
+                                    label={targetLabel(item)}
                                 >
-                                    {targetLabel(item)}
+                                    <ModelLabel
+                                        publisher={item.publisher}
+                                        name={item.model_name}
+                                        label={targetLabel(item)}
+                                        detail={
+                                            item.deployed ? "Deployed" : "Installed, not deployed"
+                                        }
+                                    />
                                 </SelectItem>
                             ))}
                         </SelectGroup>
