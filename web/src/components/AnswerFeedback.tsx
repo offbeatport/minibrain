@@ -13,11 +13,12 @@ import {
     useToast,
 } from "obp-ui";
 import { type FormEvent, useState } from "react";
-import type { CompleteResponse } from "~/api/client";
 import { useSendFeedback } from "~/api/feedbackQueries";
 import { ErrorLine } from "~/components/Section";
 
 type Rating = "up" | "down";
+
+export type Answered = { id: string; model: string; output: string };
 
 function versionOf(model: string): number | null {
     const number = Number(model.split("@")[1]);
@@ -117,7 +118,7 @@ export function AnswerFeedback({
 }: {
     slug: string;
     input: string;
-    reply: CompleteResponse;
+    reply: Answered;
     labels: string[];
 }) {
     const toast = useToast();

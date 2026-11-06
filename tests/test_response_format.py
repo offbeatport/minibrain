@@ -30,7 +30,7 @@ from minibrain.serve.structured import (
     violation,
 )
 from tests.conftest import LABELS, FakeBackend, Harness
-from tests.test_flow import SLUG, bearer
+from tests.test_flow import bearer
 from tests.test_gateway import CHAT, servable
 from tests.test_general import create_assistant
 
@@ -155,8 +155,8 @@ def test_classify_answers_are_held_to_the_labels_by_default(harness: Harness) ->
     assert chat(harness, headers, response_format={"type": "text"}).status_code == 200
     constraints = [request.constraint for request in harness.backend.requests]
     assert constraints == [Constraint(choices=("account", "billing", "bug", "feature"))] * 2
-    played = harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "charged twice"}).json()
-    assert (played["answer"], played["valid"]) == ("billing", True)
+    played = harness.client.post("/api/playground/chat/completions", json=CHAT).json()
+    assert played["choices"][0]["message"]["content"] == "billing"
     assert harness.backend.requests[-1].constraint == constraints[0]
     assert task_constraint(base_route_for("qwen3-0.6b")) is None
 

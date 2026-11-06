@@ -7,8 +7,6 @@ from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
     AnswerSide,
-    CompleteRequest,
-    CompleteResponse,
     ExampleAnswer,
     ModelDetail,
     ScoreInfo,
@@ -24,7 +22,7 @@ from minibrain.api.views import detail, version_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.data.dataset_versions import cleanup, require_splits, training_dataset_version
-from minibrain.gateway.chat import conformed, prompting, response_id, run
+from minibrain.gateway.chat import conformed, prompting, run
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.errors import OpenAIError
 from minibrain.jobs.queue import enqueue
@@ -259,38 +257,6 @@ def answered(
         return conformed(None, completion, route)
     except OpenAIError:
         return completion
-
-
-def conversation_of(body: CompleteRequest) -> list[dict[str, str]]:
-    if body.messages:
-        return [message.model_dump() for message in body.messages]
-    if body.text:
-        return [{"role": "user", "content": body.text}]
-    raise ConflictError("send text, or the conversation as messages")
-
-
-@router.post("/models/{slug}/complete", dependencies=[Depends(viewer)])
-def complete(
-    slug: str, body: CompleteRequest, session: SessionDep, backend: BackendDep, request: Request
-) -> CompleteResponse:
-    model = get_model(session, slug)
-    config = request.app.state.gateway_config.current()
-    route = routed(config, model, body.version)
-    completion = answered(backend, config, route, conversation_of(body), body.max_tokens)
-    touch(session, model.base_model)
-    session.commit()
-    answer, valid = answer_text(route, completion.text)
-    return CompleteResponse(
-        id=response_id(),
-        model=f"{route.slug}@{route.version}",
-        output=completion.text,
-        answer=answer,
-        valid=valid,
-        contract=route.contract,
-        latency_ms=completion.seconds * 1000,
-        prompt_tokens=completion.prompt_tokens,
-        completion_tokens=completion.completion_tokens,
-    )
 
 
 def test_scores(version: Version, output: str, expected: str | None, messages: list[dict[str, str]]) -> list[ScoreInfo]:

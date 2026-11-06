@@ -130,20 +130,17 @@ def test_v0_answers_a_whole_conversation_in_the_playground_at_once(harness: Harn
         {"role": "assistant", "content": "Which order number?"},
         {"role": "user", "content": "Order 7"},
     ]
-    reply = harness.client.post(f"/api/models/{SLUG}/complete", json={"version": 1, "messages": turns})
+    played = "/api/playground/chat/completions"
+    reply = harness.client.post(played, json={"model": f"{SLUG}@1", "messages": turns})
     assert reply.status_code == 200, reply.text
-    assert (reply.json()["answer"], reply.json()["valid"], reply.json()["model"]) == (
-        "It arrives on Friday.",
-        True,
-        f"{SLUG}@1",
-    )
+    assert reply.json()["choices"][0]["message"]["content"] == "It arrives on Friday."
     sent = harness.backend.requests[-1]
     assert sent.constraint is None
     assert [message["role"] for message in sent.messages] == ["system", "user", "assistant", "user"]
     assert sent.messages[0]["content"] == "Answer as Acme support."
-    single = harness.client.post(f"/api/models/{SLUG}/complete", json={"version": 0, "text": "Hello"})
+    single = harness.client.post(played, json={"model": f"{SLUG}@0", "messages": [{"role": "user", "content": "Hi"}]})
     assert single.status_code == 200
-    assert harness.client.post(f"/api/models/{SLUG}/complete", json={"version": 0}).status_code == 409
+    assert harness.client.post(played, json={"model": f"{SLUG}@0", "messages": []}).status_code == 400
 
 
 def test_chat_jsonl_is_a_first_class_upload(harness: Harness) -> None:

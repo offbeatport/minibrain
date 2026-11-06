@@ -124,8 +124,8 @@ ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not th
 Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, tool calling through each family's
 chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss), reasoning off or at an effort with
 `reasoning_content` apart from the answer, token streaming from every engine, and a safety model (Llama Guard,
-ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request. Not yet: `/v1/embeddings`,
-`/v1/completions`, sizing guidance.
+ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request, and a Playground with every setting as
+the chat UI for staff. Not yet: `/v1/embeddings`, `/v1/completions`, sizing guidance.
 
 Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
 when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
@@ -1004,8 +1004,19 @@ keys, and `/v1` stays key-only.
   (`/developers/management`), each a Scalar reference themed from the obp-ui tokens (Cobalt, light and dark, the
   kit's sans and mono). Create a key (Builders) links to Deployments; the user menu, Connect on Deployments and a base
   model's API link to it, and the copy-paste harness configs stay where they are.
-- Playground chats with one model at a time: a picker in the page, `?model=<slug>` for links, the last pick remembered
-  in the browser.
+- Playground (built 2026-11-06): the chat on the left, a settings panel on the right (a drawer below 1024px, hidden on
+  request) with Model (any version of your models, the live name, or any installed base, deployed or not;
+  `?model=<name or slug>` for links, the last pick remembered in the browser), Presets (saved, named sets of every
+  setting below, per person in `playground_presets`, one loading by default; sharing later), Settings (max tokens,
+  temperature, safety model, reasoning), Format options (response format with a JSON schema editor, functions with
+  JSON-schema parameters and a tool choice) and Sampling (top P, top K, min P, presence, frequency and repetition
+  penalties, stop sequences, seed). Every control has the kit's `InfoTip`; numbers are `OptionalNumberField`s whose
+  Unset sends nothing. Answers stream in, reasoning in a collapsible block, tool calls as cards with a box for the
+  result that continues the chat, JSON pretty-printed, a refusal marked Blocked, and each answer's latency, tokens and
+  finish reason; custom models keep thumbs and corrections. View code shows the next request as curl, Python
+  (`openai`, extensions in `extra_body`) and JavaScript. It calls `POST /api/playground/chat/completions`, the `/v1`
+  pipeline under the person's session: not request logs, safety blocks audited with the person. Comparing two versions
+  side by side moved to Evaluations' answer review.
 - Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
   and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"
@@ -1097,10 +1108,10 @@ keys, and `/v1` stays key-only.
 | Preview, playground, side-by-side eval | `chat`: `ChatBubble`, `AssistantTurn`, `ChatComposer` |
 | Forms, tabs, tables | Primitives |
 
-- Missing, added to obp-ui as an opt-in entry: SQL editor (CodeMirror 6).
+- Missing, added to obp-ui as an opt-in entry: SQL editor (CodeMirror 6). Added to obp-ui for the Playground
+  (2026-11-06): `Slider`, `OptionalNumberField`, `JsonEditor`, `Sheet` and `Collapsible`.
 - App-level: preview grid (TanStack Table over `Table`), loss and eval charts (Recharts).
-- The chat is a playground, not open chat: the model's system prompt, held-out examples as starter inputs, base vs
-  adapter side by side.
+- The chat is a playground for any model with the API's settings (see UI, Playground), not open chat for end users.
 - The review queue is built for domain experts (doctors, analysts, lawyers), not ML engineers: plain-language labels,
   rows assigned to people, agreement between reviewers tracked, no model terms on screen.
 - Every output in the playground and review screens has thumbs-down and correct.

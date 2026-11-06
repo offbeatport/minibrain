@@ -240,7 +240,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Evaluations · API: GET /api/models/{slug}/golden
 - **Mistakes and side by side** · shipped · product, ml
   Read held-out mistakes and compare answers with the base.
-  UI: Evaluations › version, Playground › Compare with
+  UI: Evaluations › version
 - **Answer review** · shipped · product, ml
   Read free-text answers beside the expected and live ones, worse first.
   UI: Evaluations › version › Answers · API: GET /api/models/{slug}/versions/{number}/answers
@@ -303,9 +303,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
   UI: Deployments › model › Connect
-- **Playground** · shipped · product
-  Chat with one model or version over turns, and compare with another.
-  UI: Playground · API: POST /api/models/{slug}/complete
+- **Playground** · shipped · product, engineer
+  Chat with any model, streamed, with every API setting and its code.
+  UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
+- **Playground presets** · shipped · product, engineer
+  Save, rename and delete named settings, one loading by default.
+  UI: Playground › Presets · API: GET /api/playground/presets, POST /api/playground/presets, PUT /api/playground/presets/{preset_id}, DELETE /api/playground/presets/{preset_id}
 - **Engines per machine** · shipped · admin
   Serve on SGLang, vLLM, MLX, transformers or llama.cpp, on any machine.
   CLI: minibrain engine · Config: MINIBRAIN_SGLANG_PYTHON, MINIBRAIN_VLLM_PYTHON

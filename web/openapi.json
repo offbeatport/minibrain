@@ -5293,58 +5293,6 @@
         }
       }
     },
-    "/api/models/{slug}/complete": {
-      "post": {
-        "tags": [
-          "versions"
-        ],
-        "summary": "Complete",
-        "operationId": "complete_api_models__slug__complete_post",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CompleteResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/models/{slug}/versions/{number}/test": {
       "post": {
         "tags": [
@@ -5585,6 +5533,283 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playground/models": {
+      "get": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "List Targets",
+        "operationId": "list_targets_api_playground_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaygroundModels"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playground/chat/completions": {
+      "post": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Chat in the Playground",
+        "description": "The Playground's chat: the same body, answer and stream as POST /v1/chat/completions, with the signed-in person instead of an API key. It also reaches installed bases that are not deployed. Calls are not request logs; a safety block is audited with the person as actor.",
+        "operationId": "playground_chat_api_playground_chat_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The answer, or with stream set, server-sent chat.completion.chunk events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletion"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field is out of range or cannot be applied to this model; param names it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not cover this model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No model has this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The version was trained on base weights that changed since.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The answer does not match response_format or the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No engine is serving this model right now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playground/presets": {
+      "get": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "List Presets",
+        "operationId": "list_presets_api_playground_presets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedPresetInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Presets Api Playground Presets Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Create Preset",
+        "operationId": "create_preset_api_playground_presets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPresetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPresetInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/playground/presets/{preset_id}": {
+      "put": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Update Preset",
+        "operationId": "update_preset_api_playground_presets__preset_id__put",
+        "parameters": [
+          {
+            "name": "preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Preset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedPresetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPresetInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "playground"
+        ],
+        "summary": "Delete Preset",
+        "operationId": "delete_preset_api_playground_presets__preset_id__delete",
+        "parameters": [
+          {
+            "name": "preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Preset Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -13326,129 +13551,6 @@
         ],
         "title": "CompleteBody"
       },
-      "CompleteRequest": {
-        "properties": {
-          "text": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text"
-          },
-          "messages": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ChatMessage"
-                },
-                "type": "array",
-                "minItems": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Messages"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version"
-          },
-          "max_tokens": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 4096.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Tokens"
-          }
-        },
-        "type": "object",
-        "title": "CompleteRequest"
-      },
-      "CompleteResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "model": {
-            "type": "string",
-            "title": "Model"
-          },
-          "output": {
-            "type": "string",
-            "title": "Output"
-          },
-          "answer": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Answer"
-          },
-          "valid": {
-            "type": "boolean",
-            "title": "Valid"
-          },
-          "contract": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contract"
-          },
-          "latency_ms": {
-            "type": "number",
-            "title": "Latency Ms"
-          },
-          "prompt_tokens": {
-            "type": "integer",
-            "title": "Prompt Tokens"
-          },
-          "completion_tokens": {
-            "type": "integer",
-            "title": "Completion Tokens"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "model",
-          "output",
-          "answer",
-          "valid",
-          "latency_ms",
-          "prompt_tokens",
-          "completion_tokens"
-        ],
-        "title": "CompleteResponse"
-      },
       "CompletionChoice": {
         "properties": {
           "index": {
@@ -21182,6 +21284,174 @@
         ],
         "title": "PlaygroundFeedback"
       },
+      "PlaygroundModels": {
+        "properties": {
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "guards": {
+            "items": {
+              "$ref": "#/components/schemas/GuardInfo"
+            },
+            "type": "array",
+            "title": "Guards"
+          }
+        },
+        "type": "object",
+        "required": [
+          "targets",
+          "guards"
+        ],
+        "title": "PlaygroundModels"
+      },
+      "PlaygroundTarget": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "What to send as model."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "base"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The custom model's slug or the base model's key."
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live",
+            "description": "The name follows the live version."
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "contract": {
+            "type": "string",
+            "enum": [
+              "text",
+              "labels",
+              "json"
+            ],
+            "title": "Contract"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "The tool-call format, when the base has one."
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning",
+            "description": "toggle, effort or always, when the base reasons."
+          },
+          "reasoning_choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning Choices"
+          },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety",
+            "description": "The safety model that always checks this target."
+          },
+          "safety_answers": {
+            "type": "boolean",
+            "title": "Safety Answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "key",
+          "model_name",
+          "version",
+          "live",
+          "deployed",
+          "base",
+          "contract",
+          "labels",
+          "tools",
+          "reasoning",
+          "reasoning_choices",
+          "context_tokens",
+          "safety",
+          "safety_answers"
+        ],
+        "title": "PlaygroundTarget"
+      },
       "PolicyChoice": {
         "properties": {
           "value": {
@@ -23140,6 +23410,102 @@
           "credit"
         ],
         "title": "SampleInfo"
+      },
+      "SavedPresetBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SavedPresetBody"
+      },
+      "SavedPresetInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "settings",
+          "is_default"
+        ],
+        "title": "SavedPresetInfo"
+      },
+      "SavedPresetUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          }
+        },
+        "type": "object",
+        "title": "SavedPresetUpdate"
       },
       "ScoreInfo": {
         "properties": {

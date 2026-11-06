@@ -27,7 +27,7 @@ importers:
         version: 1.64.0(@types/react@19.3.0)(react@19.3.1)
       obp-ui:
         specifier: github:offbeatport/obp-ui#main
-        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/e0fd1046a682a2dad683519a32a92f4d51865b4c(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
+        version: https://codeload.github.com/offbeatport/obp-ui/tar.gz/4f8915cf9a64993d17f05f2ccdf668b87564132a(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3)
       openapi-fetch:
         specifier: ^0.13.0
         version: 0.13.8
@@ -1900,8 +1900,8 @@ packages:
     resolution: {integrity: sha512-5NUN6QCxNFrS9oEA9RPS+d0AP+ooGBzzovY2JhIpDRHacPvOhHjXjUsUMX9qp4nLHZ+5jVgXB2jj/P4arGOE/g==}
     engines: {node: '>=18'}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/e0fd1046a682a2dad683519a32a92f4d51865b4c:
-    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/e0fd1046a682a2dad683519a32a92f4d51865b4c}
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/4f8915cf9a64993d17f05f2ccdf668b87564132a:
+    resolution: {tarball: https://codeload.github.com/offbeatport/obp-ui/tar.gz/4f8915cf9a64993d17f05f2ccdf668b87564132a}
     version: 0.1.0
     peerDependencies:
       '@xyflow/react': ^12
@@ -4542,11 +4542,12 @@ snapshots:
 
   node-releases@2.0.61: {}
 
-  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/e0fd1046a682a2dad683519a32a92f4d51865b4c(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
+  obp-ui@https://codeload.github.com/offbeatport/obp-ui/tar.gz/4f8915cf9a64993d17f05f2ccdf668b87564132a(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.3):
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@codemirror/autocomplete': 6.20.4
       '@codemirror/commands': 6.11.1
+      '@codemirror/lang-json': 6.0.2
       '@codemirror/lang-sql': 6.10.0
       '@codemirror/language': 6.13.1
       '@codemirror/lint': 6.9.7

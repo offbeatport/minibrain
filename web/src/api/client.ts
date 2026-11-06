@@ -27,7 +27,6 @@ export type Uploaded = SourceAdded | { outcome: "name_taken"; taken: NameTakenIn
 export type MappingInfo = Schemas["MappingInfo"];
 export type LabelCount = Schemas["LabelCount"];
 export type ColumnStats = Schemas["ColumnStats"];
-export type CompleteResponse = Schemas["CompleteResponse"];
 export type SplitScore = Schemas["SplitScore"];
 export type PresetInfo = Schemas["PresetInfo"];
 export type PresetsResponse = Schemas["PresetsResponse"];
@@ -135,7 +134,7 @@ api.use({
     },
 });
 
-type Failure = { detail?: unknown };
+type Failure = { detail?: unknown; error?: { message?: unknown } };
 type Outcome<T> = { data?: T; error?: unknown; response: Response };
 
 const UNREACHABLE = "minibrain isn't responding. It may be restarting; try again in a moment.";
@@ -143,6 +142,10 @@ const GATEWAY_ERRORS = new Set([502, 503, 504]);
 
 function describeError(error: unknown, response: Response): string {
     const detail = (error as Failure | undefined)?.detail;
+    const message = (error as Failure | undefined)?.error?.message;
+    if (typeof message === "string") {
+        return message;
+    }
     if (typeof detail === "string") {
         return detail;
     }

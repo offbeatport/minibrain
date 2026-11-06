@@ -661,6 +661,22 @@ class User(Base):
     sessions: Mapped[list["LoginSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
+class PlaygroundPreset(Base):
+    __tablename__ = "playground_presets"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_playground_presets_user_name"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str]
+    settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
 class LoginSession(Base):
     __tablename__ = "sessions"
     __table_args__ = (Index("ix_sessions_user", "user_id"), {"sqlite_autoincrement": True})

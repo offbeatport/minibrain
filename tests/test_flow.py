@@ -218,15 +218,16 @@ def test_gateway_streams(harness: Harness) -> None:
     assert response.text.rstrip().endswith("data: [DONE]")
 
 
-def test_playground_parses_label(harness: Harness) -> None:
+def test_playground_answers_with_the_label(harness: Harness) -> None:
     create_with_dataset(harness)
     add_version(harness, "prompt")
-    assert harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "x"}).status_code == 409
+    ask = {"model": SLUG, "messages": [{"role": "user", "content": "charged twice"}]}
+    assert harness.client.post("/api/playground/chat/completions", json=ask).status_code == 404
     finish(harness, "eval", accuracy=0.4)
     deploy(harness, 1)
-    reply = harness.client.post(f"/api/models/{SLUG}/complete", json={"text": "charged twice"}).json()
-    assert (reply["answer"], reply["valid"], reply["contract"]) == ("billing", True, 1)
-    assert reply["model"] == f"{SLUG}@1"
+    reply = harness.client.post("/api/playground/chat/completions", json=ask).json()
+    assert (reply["choices"][0]["message"]["content"], reply["model"]) == ("billing", SLUG)
+    assert harness.backend.requests[-1].route == SLUG
 
 
 def test_cancel_queued_job_and_delete_guard(harness: Harness) -> None:

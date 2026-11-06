@@ -790,25 +790,6 @@ class TrainingPlanInfo(BaseModel):
     defaults: TrainingDefaults
 
 
-class CompleteRequest(BaseModel):
-    text: str | None = Field(default=None, min_length=1)
-    messages: list[ChatMessage] | None = Field(default=None, min_length=1)
-    version: int | None = None
-    max_tokens: int | None = Field(default=None, ge=1, le=4096)
-
-
-class CompleteResponse(BaseModel):
-    id: str
-    model: str
-    output: str
-    answer: str | None
-    valid: bool
-    contract: int | None = None
-    latency_ms: float
-    prompt_tokens: int
-    completion_tokens: int
-
-
 class VersionTest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1)
     expected: str | None = None

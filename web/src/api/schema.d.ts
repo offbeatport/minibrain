@@ -1659,23 +1659,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete */
-        post: operations["complete_api_models__slug__complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/models/{slug}/versions/{number}/test": {
         parameters: {
             query?: never;
@@ -1758,6 +1741,79 @@ export interface paths {
         put: operations["update_model_safety_api_models__slug__safety_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playground/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Targets */
+        get: operations["list_targets_api_playground_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playground/chat/completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat in the Playground
+         * @description The Playground's chat: the same body, answer and stream as POST /v1/chat/completions, with the signed-in person instead of an API key. It also reaches installed bases that are not deployed. Calls are not request logs; a safety block is audited with the person as actor.
+         */
+        post: operations["playground_chat_api_playground_chat_completions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playground/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Presets */
+        get: operations["list_presets_api_playground_presets_get"];
+        put?: never;
+        /** Create Preset */
+        post: operations["create_preset_api_playground_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playground/presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Preset */
+        put: operations["update_preset_api_playground_presets__preset_id__put"];
+        post?: never;
+        /** Delete Preset */
+        delete: operations["delete_preset_api_playground_presets__preset_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3962,38 +4018,6 @@ export interface components {
             };
             /** Log */
             log?: string | null;
-        };
-        /** CompleteRequest */
-        CompleteRequest: {
-            /** Text */
-            text?: string | null;
-            /** Messages */
-            messages?: components["schemas"]["ChatMessage"][] | null;
-            /** Version */
-            version?: number | null;
-            /** Max Tokens */
-            max_tokens?: number | null;
-        };
-        /** CompleteResponse */
-        CompleteResponse: {
-            /** Id */
-            id: string;
-            /** Model */
-            model: string;
-            /** Output */
-            output: string;
-            /** Answer */
-            answer: string | null;
-            /** Valid */
-            valid: boolean;
-            /** Contract */
-            contract?: number | null;
-            /** Latency Ms */
-            latency_ms: number;
-            /** Prompt Tokens */
-            prompt_tokens: number;
-            /** Completion Tokens */
-            completion_tokens: number;
         };
         /** CompletionChoice */
         CompletionChoice: {
@@ -6525,6 +6549,72 @@ export interface components {
             /** Response Id */
             response_id?: string | null;
         };
+        /** PlaygroundModels */
+        PlaygroundModels: {
+            /** Targets */
+            targets: components["schemas"]["PlaygroundTarget"][];
+            /** Guards */
+            guards: components["schemas"]["GuardInfo"][];
+        };
+        /** PlaygroundTarget */
+        PlaygroundTarget: {
+            /**
+             * Name
+             * @description What to send as model.
+             */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "custom" | "base";
+            /**
+             * Key
+             * @description The custom model's slug or the base model's key.
+             */
+            key: string;
+            /** Model Name */
+            model_name: string;
+            /** Version */
+            version: number | null;
+            /**
+             * Live
+             * @description The name follows the live version.
+             */
+            live: boolean;
+            /** Deployed */
+            deployed: boolean;
+            /** Base */
+            base: string;
+            /**
+             * Contract
+             * @enum {string}
+             */
+            contract: "text" | "labels" | "json";
+            /** Labels */
+            labels: string[];
+            /**
+             * Tools
+             * @description The tool-call format, when the base has one.
+             */
+            tools: string | null;
+            /**
+             * Reasoning
+             * @description toggle, effort or always, when the base reasons.
+             */
+            reasoning: string | null;
+            /** Reasoning Choices */
+            reasoning_choices: string[];
+            /** Context Tokens */
+            context_tokens: number | null;
+            /**
+             * Safety
+             * @description The safety model that always checks this target.
+             */
+            safety: string | null;
+            /** Safety Answers */
+            safety_answers: boolean;
+        };
         /** PolicyChoice */
         PolicyChoice: {
             /** Value */
@@ -7170,6 +7260,44 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+        };
+        /** SavedPresetBody */
+        SavedPresetBody: {
+            /** Name */
+            name: string;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default?: boolean;
+        };
+        /** SavedPresetInfo */
+        SavedPresetInfo: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Settings */
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Is Default */
+            is_default: boolean;
+        };
+        /** SavedPresetUpdate */
+        SavedPresetUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            } | null;
+            /** Is Default */
+            is_default?: boolean | null;
         };
         /** ScoreInfo */
         ScoreInfo: {
@@ -11768,41 +11896,6 @@ export interface operations {
             };
         };
     };
-    complete_api_models__slug__complete_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CompleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     test_version_api_models__slug__versions__number__test_post: {
         parameters: {
             query?: never;
@@ -11988,6 +12081,231 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_targets_api_playground_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaygroundModels"];
+                };
+            };
+        };
+    };
+    playground_chat_api_playground_chat_completions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatCompletionRequest"];
+            };
+        };
+        responses: {
+            /** @description The answer, or with stream set, server-sent chat.completion.chunk events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatCompletion"];
+                    "text/event-stream": string;
+                };
+            };
+            /** @description A field is out of range or cannot be applied to this model; param names it. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description The API key is missing, unknown or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The API key does not cover this model. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No model has this name. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The version was trained on base weights that changed since. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The answer does not match response_format or the contract. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description No engine is serving this model right now. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+        };
+    };
+    list_presets_api_playground_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedPresetInfo"][];
+                };
+            };
+        };
+    };
+    create_preset_api_playground_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedPresetBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedPresetInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_preset_api_playground_presets__preset_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedPresetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedPresetInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_preset_api_playground_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -1,304 +1,50 @@
-import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import {
     Button,
     Card,
-    CardContent,
     EmptyState,
-    Field,
+    Kbd,
     Link,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
     Textarea,
 } from "obp-ui";
-import { ChatBubble } from "obp-ui/chat";
-import { type FormEvent, useState } from "react";
-import { type CompleteResponse, type ModelSummary, api, unwrap } from "~/api/client";
-import { useGolden, useModel, useModels, useVersions } from "~/api/queries";
-import { AnswerFeedback } from "~/components/AnswerFeedback";
+import {
+    type FormEvent,
+    type KeyboardEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { usePlaygroundModels } from "~/api/playgroundQueries";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, Section } from "~/components/Section";
-import { useCan } from "~/lib/access";
-import { asCode, milliseconds } from "~/lib/format";
+import { ErrorLine, Page } from "~/components/Section";
 import { useSearchParam } from "~/lib/listSearch";
-import { playgroundHref, trainingHref } from "~/lib/modelLinks";
+import {
+    type AssistantTurn,
+    DEFAULT_SETTINGS,
+    type Settings,
+    type Target,
+    type ToolCall,
+    type Turn,
+    messagesOf,
+    newId,
+    requestBody,
+    streamChat,
+} from "~/lib/playground";
+import { Conversation } from "./playground/Conversation";
+import { SettingsPanel } from "./playground/SettingsPanel";
+import { ViewCode } from "./playground/ViewCode";
 
-const NONE = "none";
 const STORAGE_KEY = "minibrain.playground.model";
+const WIDE = "(min-width: 1024px)";
 
-type Exchange = { id: number; text: string; replies: CompleteResponse[] };
-type Turn = { role: "user" | "assistant"; content: string };
-
-function conversationOf(history: Exchange[], text: string): Turn[] {
-    const earlier = [...history].reverse().flatMap((exchange): Turn[] => [
-        { role: "user", content: exchange.text },
-        {
-            role: "assistant",
-            content: exchange.replies[0]?.answer ?? exchange.replies[0]?.output ?? "",
-        },
-    ]);
-    return [...earlier, { role: "user", content: text }];
-}
-
-function VersionPicker({
-    id,
-    label,
-    value,
-    options,
-    onChange,
-    allowNone,
-}: {
-    id: string;
-    label: string;
-    value: string;
-    options: number[];
-    onChange: (value: string) => void;
-    allowNone?: boolean;
-}) {
-    return (
-        <Field id={id} label={label}>
-            <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
-                <SelectTrigger id={id} className="w-40">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {allowNone && <SelectItem value={NONE}>None</SelectItem>}
-                    {options.map((number) => (
-                        <SelectItem key={number} value={String(number)}>
-                            v{number}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </Field>
-    );
-}
-
-function Reply({
-    slug,
-    input,
-    reply,
-    labels,
-    prose,
-}: {
-    slug: string;
-    input: string;
-    reply: CompleteResponse;
-    labels: string[];
-    prose: boolean;
-}) {
-    return (
-        <div className="flex flex-col gap-1">
-            <ChatBubble
-                role="assistant"
-                text={(prose ? reply.output : asCode(reply.output)) || "(empty)"}
-            />
-            <p className="text-sm text-muted-foreground">
-                <span className="font-mono">{reply.model}</span> · {milliseconds(reply.latency_ms)}
-                {prose ? "" : ` · ${reply.valid ? "meets the contract" : "breaks the contract"}`}
-            </p>
-            <AnswerFeedback slug={slug} input={input} reply={reply} labels={labels} />
-        </div>
-    );
-}
-
-function Exchanged({
-    slug,
-    exchange,
-    labels,
-    prose,
-}: {
-    slug: string;
-    exchange: Exchange;
-    labels: string[];
-    prose: boolean;
-}) {
-    return (
-        <div className="flex flex-col gap-2">
-            <ChatBubble role="user" text={exchange.text} />
-            <div className="grid gap-3 md:grid-cols-2">
-                {exchange.replies.map((reply) => (
-                    <Reply
-                        key={reply.model}
-                        slug={slug}
-                        input={exchange.text}
-                        reply={reply}
-                        labels={labels}
-                        prose={prose}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function Playground({ slug }: { slug: string }) {
-    const { data: detail } = useModel(slug);
-    const { data: versions } = useVersions(slug);
-    const can = useCan();
-    const golden = useGolden(slug, can.build && Boolean(detail?.dataset_version));
-    const ready = (versions ?? [])
-        .filter((version) => version.status === "ready")
-        .map((v) => v.number);
-    const [primary, setPrimary] = useState<string>("");
-    const [compare, setCompare] = useState<string>(NONE);
-    const [text, setText] = useState("");
-    const [history, setHistory] = useState<Exchange[]>([]);
-    const chosen = primary || String(detail?.current_version ?? ready[0] ?? "");
-    const labels = detail?.contract.labels ?? [];
-    const conversational = detail?.contract.kind === "text";
-    const run = useMutation({
-        mutationFn: async (input: string) => {
-            const targets = [chosen, compare].filter((value) => value && value !== NONE);
-            const messages = conversational ? conversationOf(history, input) : null;
-            const replies = await Promise.all(
-                targets.map((version) =>
-                    unwrap(
-                        api.POST("/api/models/{slug}/complete", {
-                            params: { path: { slug } },
-                            body: messages
-                                ? { messages, version: Number(version) }
-                                : { text: input, version: Number(version) },
-                        }),
-                    ),
-                ),
-            );
-            return { id: Date.now(), text: input, replies };
-        },
-        onSuccess: (exchange) => {
-            setHistory((previous) => [exchange, ...previous]);
-            setText("");
-        },
-    });
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        if (text.trim()) {
-            run.mutate(text.trim());
-        }
-    };
-    if (ready.length === 0) {
-        return (
-            <>
-                <p className="text-sm text-muted-foreground">
-                    No version is ready yet. Score or train one on{" "}
-                    <Link href={trainingHref(slug)} className="text-primary hover:underline">
-                        Training
-                    </Link>
-                    .
-                </p>
-            </>
-        );
-    }
-    const samples = (golden.data ?? []).slice(0, 4);
-    const shown = conversational ? [...history].reverse() : history;
-    const restart = (next: string) => (value: string) => {
-        if (conversational && value !== next) {
-            setHistory([]);
-        }
-    };
-    return (
-        <>
-            <Section
-                title="Try it"
-                caption={
-                    conversational
-                        ? "A conversation: each answer sees the turns before it, held to the version's contract. A second version answers the same conversation, side by side."
-                        : "Each message is answered on its own, held to the version's contract. Pick a second version to compare answers side by side."
-                }
-            >
-                <form onSubmit={submit} className="flex flex-col gap-3">
-                    <div className="flex flex-wrap gap-3">
-                        <VersionPicker
-                            id="primary"
-                            label="Version"
-                            value={chosen}
-                            options={ready}
-                            onChange={(next) => {
-                                restart(chosen)(next);
-                                setPrimary(next);
-                            }}
-                        />
-                        <VersionPicker
-                            id="compare"
-                            label="Compare with"
-                            value={compare}
-                            options={ready}
-                            onChange={setCompare}
-                            allowNone
-                        />
-                    </div>
-                    <Textarea
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
-                        rows={3}
-                        placeholder={
-                            labels.length > 0 ? "Type an input to classify" : "Type a message"
-                        }
-                        aria-label="Input"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button type="submit" disabled={!text.trim() || run.isPending}>
-                            {run.isPending ? "Running…" : conversational ? "Send" : "Run"}
-                        </Button>
-                        {conversational && history.length > 0 && (
-                            <Button type="button" variant="outline" onClick={() => setHistory([])}>
-                                New conversation
-                            </Button>
-                        )}
-                        {samples.map((sample) => (
-                            <Button
-                                key={sample.input}
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="max-w-64 truncate"
-                                onClick={() => setText(sample.input)}
-                            >
-                                <span className="truncate">
-                                    {sample.input.replace(/\s+/g, " ")}
-                                </span>
-                            </Button>
-                        ))}
-                    </div>
-                    <ErrorLine error={run.error} />
-                </form>
-            </Section>
-            {conversational && shown.length > 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col gap-4">
-                        {shown.map((exchange) => (
-                            <Exchanged
-                                key={exchange.id}
-                                slug={slug}
-                                exchange={exchange}
-                                labels={labels}
-                                prose
-                            />
-                        ))}
-                    </CardContent>
-                </Card>
-            ) : (
-                shown.map((exchange) => (
-                    <Card key={exchange.id}>
-                        <CardContent>
-                            <Exchanged
-                                slug={slug}
-                                exchange={exchange}
-                                labels={labels}
-                                prose={false}
-                            />
-                        </CardContent>
-                    </Card>
-                ))
-            )}
-        </>
-    );
-}
-
-function rememberedModel(): string | null {
+function remembered(): string | null {
     try {
         return window.localStorage.getItem(STORAGE_KEY);
     } catch {
@@ -306,76 +52,338 @@ function rememberedModel(): string | null {
     }
 }
 
-function rememberModel(slug: string): void {
+function remember(name: string): void {
     try {
-        window.localStorage.setItem(STORAGE_KEY, slug);
+        window.localStorage.setItem(STORAGE_KEY, name);
     } catch {
         return;
     }
 }
 
-function chooseModel(requested: string | null, models: ModelSummary[]): string | null {
-    const known = new Set(models.map((item) => item.slug));
-    const candidates = [requested, rememberedModel(), models[0]?.slug];
-    return candidates.find((slug): slug is string => Boolean(slug && known.has(slug))) ?? null;
+function useWide(): boolean {
+    const [wide, setWide] = useState(() => window.matchMedia(WIDE).matches);
+    useEffect(() => {
+        const query = window.matchMedia(WIDE);
+        const update = () => setWide(query.matches);
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+    return wide;
 }
 
-function ModelPicker({
-    slug,
-    models,
-    onSelect,
+function chosenTarget(targets: Target[], wanted: (string | null)[]): Target | undefined {
+    for (const name of wanted) {
+        if (!name) {
+            continue;
+        }
+        const exact = targets.find((item) => item.name === name);
+        if (exact) {
+            return exact;
+        }
+        const versions = targets.filter((item) => item.kind === "custom" && item.key === name);
+        const latest = versions.sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+        if (latest) {
+            return latest;
+        }
+    }
+    return targets[0];
+}
+
+function assistantTurn(json: boolean): AssistantTurn {
+    return {
+        kind: "assistant",
+        id: newId(),
+        content: "",
+        reasoning: "",
+        calls: [],
+        refusal: "",
+        blocked: [],
+        meta: null,
+        error: null,
+        streaming: true,
+        json,
+    };
+}
+
+function answered(turns: Turn[], call: ToolCall): boolean {
+    const owner = [...turns]
+        .reverse()
+        .find(
+            (turn) => turn.kind === "assistant" && turn.calls.some((item) => item.id === call.id),
+        );
+    if (!owner || owner.kind !== "assistant") {
+        return false;
+    }
+    const results = new Set(turns.flatMap((turn) => (turn.kind === "tool" ? [turn.callId] : [])));
+    return owner.calls.every((item) => results.has(item.id));
+}
+
+function Composer({
+    busy,
+    disabled,
+    onSend,
+    onStop,
 }: {
-    slug: string;
-    models: ModelSummary[];
-    onSelect: (slug: string) => void;
+    busy: boolean;
+    disabled: boolean;
+    onSend: (text: string) => void;
+    onStop: () => void;
 }) {
+    const [text, setText] = useState("");
+    const submit = (event?: FormEvent) => {
+        event?.preventDefault();
+        if (text.trim() && !busy) {
+            onSend(text.trim());
+            setText("");
+        }
+    };
+    const keys = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            submit();
+        }
+    };
     return (
-        <Select value={slug} onValueChange={(next) => onSelect(String(next ?? slug))}>
-            <SelectTrigger className="w-56" aria-label="Model">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                {models.map((item) => (
-                    <SelectItem key={item.slug} value={item.slug}>
-                        {item.name}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
+        <form onSubmit={submit} className="flex flex-col gap-2 border-t p-4">
+            <Textarea
+                value={text}
+                rows={3}
+                disabled={disabled}
+                placeholder="Type a message"
+                aria-label="Message"
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={keys}
+            />
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-muted-foreground">
+                    <Kbd>Ctrl</Kbd> <Kbd>Enter</Kbd> sends
+                </span>
+                {busy ? (
+                    <Button type="button" variant="outline" onClick={onStop}>
+                        Stop
+                    </Button>
+                ) : (
+                    <Button type="submit" disabled={disabled || !text.trim()}>
+                        Send
+                    </Button>
+                )}
+            </div>
+        </form>
     );
 }
 
 export function PlaygroundPage() {
     const router = useRouter();
     const requested = useSearchParam("model");
-    const { data, isLoading } = useModels();
-    const models = data ?? [];
-    const slug = data ? chooseModel(requested, models) : null;
-    const select = (next: string) => {
-        rememberModel(next);
-        router.history.replace(playgroundHref(next));
+    const models = usePlaygroundModels();
+    const targets = models.data?.targets ?? [];
+    const guards = models.data?.guards ?? [];
+    const [picked, setPicked] = useState<string | null>(null);
+    const target = chosenTarget(targets, [picked, requested, remembered()]);
+    const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+    const [turns, setTurns] = useState<Turn[]>([]);
+    const [busy, setBusy] = useState(false);
+    const [panel, setPanel] = useState(true);
+    const [drawer, setDrawer] = useState(false);
+    const wide = useWide();
+    const aborter = useRef<AbortController | null>(null);
+    const end = useRef<HTMLDivElement | null>(null);
+    const pick = (name: string) => {
+        setPicked(name);
+        remember(name);
+        router.history.replace(`/playground?model=${encodeURIComponent(name)}`);
     };
+    const loadSettings = useCallback((next: Settings) => setSettings(next), []);
+    const update = (id: string, change: Partial<AssistantTurn>) =>
+        setTurns((all) =>
+            all.map((turn) =>
+                turn.id === id && turn.kind === "assistant" ? { ...turn, ...change } : turn,
+            ),
+        );
+    const ask = async (conversation: Turn[]) => {
+        if (!target) {
+            return;
+        }
+        const json = settings.response_format !== "text" || target.contract === "json";
+        const reply = assistantTurn(json);
+        setTurns([...conversation, reply]);
+        setBusy(true);
+        const controller = new AbortController();
+        aborter.current = controller;
+        const started = performance.now();
+        const body = { ...requestBody(target.name, settings, messagesOf(conversation), target) };
+        try {
+            const done = await streamChat(body, controller.signal, (progress) =>
+                update(reply.id, {
+                    content: progress.content,
+                    reasoning: progress.reasoning,
+                    calls: progress.calls,
+                    refusal: progress.refusal,
+                }),
+            );
+            update(reply.id, {
+                content: done.content,
+                reasoning: done.reasoning,
+                calls: done.calls,
+                refusal: done.refusal,
+                streaming: false,
+                meta: {
+                    model: target.name,
+                    latencyMs: performance.now() - started,
+                    promptTokens: done.promptTokens,
+                    completionTokens: done.completionTokens,
+                    finishReason: done.finishReason,
+                    responseId: done.id,
+                },
+            });
+        } catch (error) {
+            const stopped = controller.signal.aborted;
+            update(reply.id, {
+                streaming: false,
+                error: stopped
+                    ? "Stopped."
+                    : error instanceof Error
+                      ? error.message
+                      : String(error),
+            });
+        } finally {
+            aborter.current = null;
+            setBusy(false);
+        }
+    };
+    const send = (text: string) => ask([...turns, { kind: "user", id: newId(), content: text }]);
+    const toolResult = (call: ToolCall, text: string) => {
+        const next: Turn[] = [
+            ...turns,
+            { kind: "tool", id: newId(), callId: call.id, name: call.name, content: text },
+        ];
+        if (answered(next, call)) {
+            ask(next);
+        } else {
+            setTurns(next);
+        }
+    };
+    useEffect(() => {
+        if (turns.length > 0) {
+            end.current?.scrollIntoView({ block: "end" });
+        }
+    }, [turns]);
+    const preview = useMemo(
+        () =>
+            requestBody(
+                target?.name ?? "",
+                settings,
+                messagesOf(turns).concat({ role: "user", content: "Your message" }),
+                target,
+            ),
+        [target, settings, turns],
+    );
+    const panelBody = target && (
+        <SettingsPanel
+            targets={targets}
+            guards={guards}
+            target={target}
+            model={target.name}
+            onModel={pick}
+            settings={settings}
+            onSettings={loadSettings}
+        />
+    );
+    const showSettings = () => (wide ? setPanel((open) => !open) : setDrawer(true));
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Playground"
-                caption="Try a version on your own inputs, or compare two side by side."
-                actions={slug && <ModelPicker slug={slug} models={models} onSelect={select} />}
+                caption="Chat with any of your models or installed bases, with the settings the API takes."
+                actions={
+                    target && (
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                disabled={busy || turns.length === 0}
+                                onClick={() => setTurns([])}
+                            >
+                                New chat
+                            </Button>
+                            <ViewCode body={preview} disabled={!target} />
+                            <Button
+                                variant="outline"
+                                aria-expanded={wide ? panel : drawer}
+                                onClick={showSettings}
+                            >
+                                {wide && panel ? "Hide settings" : "Settings"}
+                            </Button>
+                        </div>
+                    )
+                }
             />
-            {!isLoading && !slug && (
+            <ErrorLine error={models.error} />
+            {models.data && targets.length === 0 && (
                 <EmptyState
                     variant="panel"
-                    title="No custom models yet"
+                    title="Nothing to chat with yet"
                     action={
                         <Button asChild>
-                            <Link href="/models/new">Create one</Link>
+                            <Link href="/models/new">Add a model</Link>
                         </Button>
                     }
                 >
-                    Create a custom model first, then try it here.
+                    Add a model, or download a base from Discover, then try it here.
                 </EmptyState>
             )}
-            {slug && <Playground key={slug} slug={slug} />}
+            {target && (
+                <div
+                    className={
+                        wide && panel
+                            ? "grid grid-cols-[minmax(0,1fr)_22rem] items-start gap-4"
+                            : "flex flex-col"
+                    }
+                >
+                    <Card className="flex min-h-[32rem] flex-col p-0">
+                        <div className="flex-1 overflow-y-auto p-panel">
+                            {turns.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    Send a message to {target.model_name}. Answers stream in as the
+                                    model writes them, with any reasoning and tool calls shown
+                                    apart.
+                                </p>
+                            ) : (
+                                <Conversation
+                                    turns={turns}
+                                    target={target}
+                                    busy={busy}
+                                    onToolResult={toolResult}
+                                />
+                            )}
+                            <div ref={end} />
+                        </div>
+                        <Composer
+                            busy={busy}
+                            disabled={!target}
+                            onSend={send}
+                            onStop={() => aborter.current?.abort()}
+                        />
+                    </Card>
+                    {wide && panel && (
+                        <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto p-0">
+                            {panelBody}
+                        </Card>
+                    )}
+                </div>
+            )}
+            {!wide && (
+                <Sheet open={drawer} onOpenChange={setDrawer}>
+                    <SheetContent side="right" className="p-0">
+                        <SheetHeader className="px-4 pt-4">
+                            <SheetTitle>Settings</SheetTitle>
+                            <SheetDescription>
+                                Model, presets and what the next request sends.
+                            </SheetDescription>
+                        </SheetHeader>
+                        {panelBody}
+                    </SheetContent>
+                </Sheet>
+            )}
         </Page>
     );
 }
