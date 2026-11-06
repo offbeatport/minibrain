@@ -96,7 +96,16 @@ function link(row: ModelRow, action: HealthAction): string | null {
         return "/infrastructure/storage";
     }
     if (action.kind === "pick_variant") {
-        return row.catalog_id ? `/discover/${encodeURIComponent(row.catalog_id)}` : "/discover";
+        if (!row.catalog_id) {
+            return "/discover";
+        }
+        if (action.variant) {
+            return `/models/new?${new URLSearchParams({ model: row.catalog_id, variant: action.variant })}`;
+        }
+        return `/discover/${encodeURIComponent(row.catalog_id)}`;
+    }
+    if (action.kind === "find_smaller") {
+        return "/discover";
     }
     if (action.kind === "open_base") {
         return `/models/base/${encodeURIComponent(row.base_model ?? "")}`;

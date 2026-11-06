@@ -5524,9 +5524,14 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "try_again" | "verify" | "open_base" | "retrain";
+            kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "find_smaller" | "try_again" | "verify" | "open_base" | "retrain";
             /** Label */
             label: string;
+            /**
+             * Variant
+             * @description The catalogue variant to add instead, for pick_variant.
+             */
+            variant?: string | null;
         };
         /** HeartbeatResponse */
         HeartbeatResponse: {

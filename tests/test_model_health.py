@@ -9,13 +9,15 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from minibrain.api.model_health import HealthContext, capability
 from minibrain.base_models import BaseModelSpec
 from minibrain.models.files import Progress
 from minibrain.models.health import content_hash
 from minibrain.models.transfer import fetch
-from minibrain.registry.models import AuditEvent, BaseModel
+from minibrain.registry.models import AuditEvent, BaseModel, CatalogModel, CatalogVariant
 from minibrain.serve.engine import create_engine_app, load_failure
 from minibrain.serve.select import NoEngineError
+from minibrain.settings import Settings
 from tests.conftest import FakeBackend, Harness, give_data, tickets_csv
 from tests.test_flow import SLUG, add_version, bearer, build_dataset, deploy, finish
 from tests.test_models import FILES, REPO, REVISION, Quiet, add_tiny, download_tiny, hub, manifest
@@ -259,7 +261,7 @@ def test_engine_load_failures_become_a_state_with_a_way_out(harness: Harness, hu
     assert response.status_code == 204
     found = row(harness)
     assert (found["health"]["state"], found["health"]["label"]) == ("no_memory", "Failed to start")
-    assert actions(found) == ["pick_variant", "try_again"] and "smaller" in found["health"]["detail"]
+    assert actions(found) == ["find_smaller", "try_again"] and "smaller" in found["health"]["detail"]
     assert harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True}).status_code == 409
     assert harness.client.post("/api/base-models/tiny/recheck").status_code == 200
     assert row(harness)["health"] is None
@@ -287,3 +289,19 @@ def test_interrupted_download_resumes_from_the_partial_file(tmp_path: Path) -> N
     digest = fetch(source, entry, tmp_path, Progress(len(data), "downloading"))
     assert source.offsets == [3000] and digest == entry["sha256"]
     assert (tmp_path / f"{WEIGHTS}.part").read_bytes() == data
+
+
+def test_gguf_without_llama_cpp_offers_to_add_the_safetensors_variant(settings: Settings) -> None:
+    gguf = CatalogVariant(id="tiny-q8", label="GGUF Q8_0", format="gguf", precision="q8_0", repo=REPO, revision="r")
+    plain = CatalogVariant(
+        id="tiny-bf16", label="BF16 safetensors", format="safetensors", precision="bf16", repo=REPO, revision="r"
+    )
+    CatalogModel(id="tiny", variants=[gguf, plain])
+    model = BaseModel(id="tiny-q8", name="Tiny", files=[{"path": "tiny.gguf", "size": 1}], variant=gguf)
+    found = capability(model, HealthContext(settings=settings, hub_ok=True, engines=frozenset({"transformers"})))
+    assert found is not None and found.state == "cant_run" and "add BF16 safetensors instead" in found.detail
+    assert [(item.kind, item.label, item.variant) for item in found.actions] == [
+        ("pick_variant", "Add BF16 safetensors instead", "tiny-bf16")
+    ]
+    ready = HealthContext(settings=settings, hub_ok=True, engines=frozenset({"llamacpp"}))
+    assert capability(model, ready) is None

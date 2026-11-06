@@ -18043,6 +18043,7 @@
               "storage",
               "get_access",
               "pick_variant",
+              "find_smaller",
               "try_again",
               "verify",
               "open_base",
@@ -18053,6 +18054,18 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant",
+            "description": "The catalogue variant to add instead, for pick_variant."
           }
         },
         "type": "object",

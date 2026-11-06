@@ -45,7 +45,8 @@ LABELS: dict[str, str] = {
     "resume": "Resume",
     "storage": "Free up space",
     "get_access": "Get access",
-    "pick_variant": "Pick another variant",
+    "pick_variant": "See other variants",
+    "find_smaller": "Find a smaller model",
     "try_again": "Try again",
     "verify": "Verify files",
     "open_base": "Open base model",
@@ -73,6 +74,10 @@ def health_context(session: Session, settings: Settings, node: NodeReport | None
 
 def act(kind: HealthActionKind, label: str | None = None) -> HealthAction:
     return HealthAction(kind=kind, label=label or LABELS[kind])
+
+
+def add_variant(variant: CatalogVariant) -> HealthAction:
+    return HealthAction(kind="pick_variant", label=f"Add {variant.label} instead", variant=variant.id)
 
 
 def repairable(model: BaseModel, context: HealthContext) -> bool:
@@ -188,7 +193,7 @@ def load_failure(model: BaseModel, context: HealthContext) -> Health:
             detail += f" Pick a smaller or quantized variant: {names}."
         else:
             detail += " No smaller variant of it is in the catalogue; pick a smaller model on Discover."
-        actions = [act("pick_variant", "Pick a smaller variant"), act("try_again")]
+        actions = [add_variant(smaller[0]) if smaller else act("find_smaller"), act("try_again")]
         return Health(state="no_memory", label="Failed to start", detail=detail, actions=actions)
     actions = [act("pick_variant"), act("try_again")] if other_variants(model) else [act("try_again")]
     return Health(state="cant_run", label="Can't run here", detail=detail, actions=actions)
@@ -197,13 +202,13 @@ def load_failure(model: BaseModel, context: HealthContext) -> Health:
 def capability(model: BaseModel, context: HealthContext) -> Health | None:
     if context.engines is None or gguf_file(model) is None or "llamacpp" in context.engines:
         return None
-    alternative = any(item.format != "gguf" for item in other_variants(model))
+    alternative = next((item for item in other_variants(model) if item.format != "gguf"), None)
     detail = (
         "GGUF weights need llama.cpp, and no machine in the compute pools has it. Install minibrain[llamacpp] on "
         "the machine that serves it"
     )
-    detail += ", or pick the safetensors variant." if alternative else "."
-    actions = [act("pick_variant", "Pick the safetensors variant")] if alternative else []
+    detail += f", or add {alternative.label} instead." if alternative else "."
+    actions = [add_variant(alternative)] if alternative else []
     return Health(state="cant_run", label="Can't run here", detail=detail, actions=actions)
 
 
