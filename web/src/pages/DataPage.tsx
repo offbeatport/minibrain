@@ -13,7 +13,7 @@ import {
     SqlEditor,
 } from "obp-ui";
 import { ChatBubble } from "obp-ui/chat";
-import { type ChangeEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import {
     type ExampleInfo,
     type MappingInfo,
@@ -22,7 +22,6 @@ import {
     type QueryResponse,
     api,
     unwrap,
-    uploadSource,
 } from "~/api/client";
 import { keys, useDatasets, useGolden, useModel, useModels, usePreview } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
@@ -63,18 +62,6 @@ function useRefresh(slug: string) {
 }
 
 function SourceSection({ detail }: { detail: ModelDetail }) {
-    const refresh = useRefresh(detail.slug);
-    const upload = useMutation({
-        mutationFn: (file: File) => uploadSource(detail.slug, file),
-        onSuccess: refresh,
-    });
-    const choose = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            upload.mutate(file);
-        }
-        event.target.value = "";
-    };
     const source = detail.source;
     return (
         <Section
@@ -82,16 +69,7 @@ function SourceSection({ detail }: { detail: ModelDetail }) {
             caption="A CSV, TSV, JSON Lines or Parquet file. It is copied into this install."
             actions={
                 <Button asChild variant={source ? "outline" : "default"} size="sm">
-                    <label className="cursor-pointer">
-                        {upload.isPending ? "Uploading…" : source ? "Replace file" : "Upload file"}
-                        <input
-                            type="file"
-                            className="sr-only"
-                            accept=".csv,.tsv,.json,.jsonl,.ndjson,.parquet"
-                            onChange={choose}
-                            disabled={upload.isPending}
-                        />
-                    </label>
+                    <Link href="/data">{source ? "Change data" : "Add data"}</Link>
                 </Button>
             }
         >
@@ -117,7 +95,6 @@ function SourceSection({ detail }: { detail: ModelDetail }) {
             ) : (
                 <p className="text-sm text-muted-foreground">No data yet.</p>
             )}
-            <ErrorLine error={upload.error} />
         </Section>
     );
 }

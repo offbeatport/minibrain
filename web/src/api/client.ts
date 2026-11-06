@@ -120,7 +120,7 @@ function noticeSignedOut(response: Response): Response {
 export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
     const method = init.method ?? "GET";
     const headers = guarded(method, new Headers(init.headers));
-    return noticeSignedOut(await fetch(url, { ...init, headers }));
+    return noticeSignedOut(await settled(fetch(url, { ...init, headers })));
 }
 
 export const api = createClient<paths>();
@@ -138,7 +138,10 @@ api.use({
 type Failure = { detail?: unknown };
 type Outcome<T> = { data?: T; error?: unknown; response: Response };
 
-function describeError(error: unknown, status: number): string {
+const UNREACHABLE = "minibrain isn't responding. It may be restarting; try again in a moment.";
+const GATEWAY_ERRORS = new Set([502, 503, 504]);
+
+function describeError(error: unknown, response: Response): string {
     const detail = (error as Failure | undefined)?.detail;
     if (typeof detail === "string") {
         return detail;
@@ -146,43 +149,44 @@ function describeError(error: unknown, status: number): string {
     if (Array.isArray(detail)) {
         return detail.map((item) => (item as { msg?: string })?.msg ?? String(item)).join("; ");
     }
-    return `Request failed (${status})`;
+    const reference = response.headers.get("x-request-id");
+    if (GATEWAY_ERRORS.has(response.status) || (response.status === 500 && !reference)) {
+        return UNREACHABLE;
+    }
+    if (response.status >= 500) {
+        return `Something went wrong on the server. Reference: ${reference}`;
+    }
+    return `Request failed (${response.status})`;
+}
+
+async function settled<T>(request: Promise<T>): Promise<T> {
+    try {
+        return await request;
+    } catch (error) {
+        throw error instanceof TypeError ? new Error(UNREACHABLE) : error;
+    }
 }
 
 export async function unwrap<T>(request: Promise<Outcome<T>>): Promise<T> {
-    const { data, error, response } = await request;
+    const { data, error, response } = await settled(request);
     if (!response.ok || data === undefined) {
-        throw new Error(describeError(error, response.status));
+        throw new Error(describeError(error, response));
     }
     return data;
 }
 
 export async function succeed(request: Promise<Outcome<unknown>>): Promise<void> {
-    const { error, response } = await request;
+    const { error, response } = await settled(request);
     if (!response.ok) {
-        throw new Error(describeError(error, response.status));
+        throw new Error(describeError(error, response));
     }
 }
 
 export async function removed(request: Promise<Outcome<unknown>>): Promise<void> {
-    const { error, response } = await request;
+    const { error, response } = await settled(request);
     if (!response.ok && response.status !== 404) {
-        throw new Error(describeError(error, response.status));
+        throw new Error(describeError(error, response));
     }
-}
-
-export async function uploadSource(slug: string, file: File): Promise<ModelDetail> {
-    const form = new FormData();
-    form.append("file", file);
-    const response = await apiFetch(`/api/models/${encodeURIComponent(slug)}/source`, {
-        method: "POST",
-        body: form,
-    });
-    const body: unknown = await response.json();
-    if (!response.ok) {
-        throw new Error(describeError(body, response.status));
-    }
-    return body as ModelDetail;
 }
 
 function isNameTaken(body: unknown): body is NameTakenInfo {
@@ -204,7 +208,7 @@ export async function uploadFile(
         return { outcome: "name_taken", taken: body };
     }
     if (!response.ok) {
-        throw new Error(describeError(body, response.status));
+        throw new Error(describeError(body, response));
     }
     return body as SourceAdded;
 }
