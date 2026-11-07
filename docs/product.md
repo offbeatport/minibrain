@@ -156,6 +156,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Duplicate models** · shipped · product, ml
   Copy a custom model's settings, data and live version, sharing its files.
   UI: Models › Duplicate, Models › model › Duplicate · API: POST /api/models/{slug}/duplicate
+- **Serve-only bases** · shipped · product, ml
+  Build on GGUF, AWQ or FP8 bases; Train explains why not.
+  UI: Models › Add model, Models › model, Models · API: GET /api/all-models, GET /api/model-pages/{name}
+- **Switch base** · shipped · product, ml
+  Move a model to another base without touching live traffic.
+  UI: Models › model › Switch base, Models › Switch base · API: GET /api/models/{slug}/base-options, POST /api/models/{slug}/base
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments

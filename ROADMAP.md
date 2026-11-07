@@ -825,6 +825,32 @@ once it matches; only deleting a base removes its files.
 3. The report compares each rebased version with `current` on score, latency and cost.
 4. Deploying stays per model and explicit. Nothing that is live changes until someone deploys.
 
+Switch base (per model, shipped) is the one-model form, and the way off a serve-only base:
+
+- A custom model on a GGUF, AWQ or FP8 base serves, takes instructions, a contract and graders, is scored and
+  collects feedback, but cannot train. Train stays visible and disabled with the reason ("<base> is GGUF, which serves
+  only. Switch to <full-precision variant> to train."); `POST /api/models/{slug}/versions` with `lora` and the
+  training plan answer 409 with the same sentence. The model page's next step offers "Move to <variant> to train"
+  instead of "Train vN" when the catalogue has a trainable variant of the base, and nothing when it has none.
+- `POST /api/models/{slug}/base` with `{base_model}` (builder, audited as `model.base_change` with the old and new
+  base) sets the base for new versions and creates a prompt-only version on it, scored at once like v0 (or once the
+  base finishes downloading). Name, slug, API keys, instructions, contract, graders, promotion rule, dataset,
+  feedback and test examples stay. `GET /api/models/{slug}/base-options` lists the installed bases, each with what
+  the model loses there (tool calls, reasoning, from the chat templates) and why it is refused, plus the catalogue's
+  full-precision variant, which the dialog downloads first through the Add model path and licence check.
+- Live traffic never breaks: every version records the base it was made on (`versions.base_model`, migration 0010,
+  backfilled from the model), and the gateway routes each version on its own base. The live version keeps serving on
+  its old base, with its adapter, until a version on the new base is deployed. A model deployed with no version live
+  keeps serving the base it was deployed on (`models.deployed_base`) until a version goes live or it is deployed
+  again. Chosen over refusing the switch while a LoRA version is live, which would have blocked the common case: a
+  serve-only model already in production moving to its trainable variant.
+- Versions made on another base stay as history, grouped under their base on the Versions tab, and cannot be
+  deployed: promote answers 409 ("v2 was made on X, and the model is on Y now…") and Deploy buttons are disabled with
+  that reason. Their `slug@N` routes still answer while their base is installed.
+- Refused: the same base, a base not on this install, a base being deleted, a base with a health problem, a model
+  being deleted, and a version still training. Deleting the old base counts a model whose live traffic runs on it as
+  built on it.
+
 ### Feedback loop
 
 1. `POST /v1/feedback` with an API key: `model`, `response_id` (the chat completion's `id`), `rating` (`up` or
@@ -1553,6 +1579,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] Signed offline update bundles (app and base models) with rollback (release files are signed with cosign
       now; bundles will reuse that signing)
 - [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
+- [x] Switch base: per model, live traffic stays on its own base until a version on the new one is deployed
 - [ ] Rebase: rebuild every model on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
       in the playground → review queue; accepted rows join the next version's training data; "Train with feedback";

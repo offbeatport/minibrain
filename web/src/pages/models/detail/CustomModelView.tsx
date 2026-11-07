@@ -12,6 +12,7 @@ import {
     usePresets,
     useVersions,
 } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { Facts } from "~/components/Facts";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
@@ -37,6 +38,7 @@ import { DuplicateModelDialog } from "../DuplicateModelDialog";
 import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
 import { LabelProposalNotice } from "../LabelProposal";
+import { SwitchBaseDialog } from "../SwitchBaseDialog";
 import { ConfirmAction, type Confirmation, EditModelDialog, useModelsRefresh } from "../dialogs";
 import { CustomFiles, FilesSheet, adapterText, liveVersion } from "./files";
 import { NextRow, QualityRow, SummaryCard, TrafficRow, TryIt, WeightsRow } from "./overview";
@@ -120,6 +122,7 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
     const base = useBaseModel(row.base_model ?? "");
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
+    const [switching, setSwitching] = useState<{ preferred: string | null } | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const recipe = useRouterState({
         select: (state) => {
@@ -130,6 +133,8 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
         },
     });
     const deleting = beingDeleted(row);
+    const serveOnly = detail.data?.serve_only ?? row.serve_only ?? null;
+    const moveTo = serveOnly?.switch_to ?? null;
     const deployed = detail.data?.deployed ?? row.deployment.state !== "not_deployed";
     const baseKey = row.base_model ?? "";
     const baseName = base.data?.name ?? baseKey;
@@ -154,6 +159,8 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
             deploy();
         } else if (next.kind === "promote" && next.version !== null && next.version !== undefined) {
             setConfirmation(promoteConfirmation(row, next.version, reload));
+        } else if (next.kind === "switch_base") {
+            setSwitching({ preferred: next.base ?? null });
         }
     };
     const openBase = (_row: ModelRow, action: HealthAction) => {
@@ -240,11 +247,16 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
                 onDeploy={can.build && !deleting && !busyTearingDown(row) ? deploy : undefined}
                 actions={
                     <>
-                        {can.build && (
-                            <Button variant="outline" disabled={deleting} asChild>
-                                <Link href={`${trainingHref(row.key)}${recipe}`}>Train</Link>
-                            </Button>
-                        )}
+                        {can.build &&
+                            (serveOnly ? (
+                                <BlockedButton variant="outline" reason={serveOnly.reason}>
+                                    Train
+                                </BlockedButton>
+                            ) : (
+                                <Button variant="outline" disabled={deleting} asChild>
+                                    <Link href={`${trainingHref(row.key)}${recipe}`}>Train</Link>
+                                </Button>
+                            ))}
                         <Button variant="outline" asChild>
                             <Link href={evaluationsHref(row.key)}>Review results</Link>
                         </Button>
@@ -264,6 +276,15 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
                                 onClick={() => setDuplicating(row)}
                             >
                                 Duplicate
+                            </Button>
+                        )}
+                        {can.build && (
+                            <Button
+                                variant={moveTo ? "outline" : "ghost"}
+                                disabled={deleting}
+                                onClick={() => setSwitching({ preferred: moveTo?.key ?? null })}
+                            >
+                                {moveTo ? `Move to ${moveTo.name}` : "Switch base"}
                             </Button>
                         )}
                     </>
@@ -331,6 +352,11 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
             <DuplicateModelDialog
                 row={duplicating}
                 onOpenChange={(open) => !open && setDuplicating(null)}
+            />
+            <SwitchBaseDialog
+                row={switching ? row : null}
+                preferred={switching?.preferred}
+                onOpenChange={(open) => !open && setSwitching(null)}
             />
             <ConfirmAction
                 confirmation={confirmation}

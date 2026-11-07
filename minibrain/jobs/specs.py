@@ -25,19 +25,19 @@ def dataset_version_ref(session: Session, version: Version) -> dict[str, Any]:
 
 
 def base_spec(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
-    touch(session, version.model.base_model)
-    return resolve_spec(session, settings, version.model.base_model).as_dict()
+    touch(session, version.base_model)
+    return resolve_spec(session, settings, version.base_model).as_dict()
 
 
 def train_params(session: Session, settings: Settings, version: Version) -> dict[str, Any]:
     return {
         "slug": version.model.slug,
         "number": version.number,
-        "base_model": version.model.base_model,
+        "base_model": version.base_model,
         "base_spec": base_spec(session, settings, version),
         "dataset_version": dataset_version_ref(session, version),
         "recipe": DEFAULT_RECIPE | dict(version.recipe),
-        "plan_base": base_facts(session, settings, version.model.base_model).as_dict(),
+        "plan_base": base_facts(session, settings, version.base_model).as_dict(),
         "prompting": prompting_of(version).as_dict(),
     }
 
@@ -46,7 +46,7 @@ def eval_params(session: Session, settings: Settings, version: Version) -> dict[
     return {
         "slug": version.model.slug,
         "number": version.number,
-        "base_model": version.model.base_model,
+        "base_model": version.base_model,
         "base_spec": base_spec(session, settings, version),
         "version_kind": version.kind,
         "dataset_version": dataset_version_ref(session, version),

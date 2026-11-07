@@ -69,6 +69,13 @@ def live_version(model: Model) -> Version | None:
     return next((item for item in model.versions if item.number == model.current_version), None)
 
 
+def serving_base(model: Model) -> str:
+    live = live_version(model)
+    if live is not None:
+        return live.base_model
+    return model.deployed_base or model.base_model
+
+
 def decision(model: Model, version: Version) -> Decision:
     live = live_version(model)
     against = None if live is None or live.id == version.id else Live(live.number, held_out(live))
@@ -210,6 +217,7 @@ def new_version(
         instructions=instructions,
         shots=[] if kind == VersionKind.LORA else shots_of(session, store, dataset_version),
         graders=graders,
+        base_model=model.base_model,
     )
     if kind == VersionKind.PROMPT and not scored:
         version.status = VersionStatus.READY

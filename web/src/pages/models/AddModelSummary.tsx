@@ -168,24 +168,23 @@ function ServeOnlyNotice({
     ) : (
         "The catalogue has no full-precision format of this model."
     );
+    const still = full
+        ? `You can still give it instructions, score it and serve it under its own name; train it later by switching to ${entry?.name ?? "the model"} ${scheme(full)}.`
+        : "You can still give it instructions, score it and serve it under its own name.";
     return (
         <div className="flex flex-col gap-2.5">
             <StatusText tone="warning">{`${scheme(variant)} can't be fine-tuned`}</StatusText>
             <p className="text-sm text-muted-foreground">
                 Quantized formats serve only; training needs full precision. {next}
             </p>
+            <p className="text-sm text-muted-foreground">{still}</p>
             <div>
                 {full ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onVariant(full.id)}
-                    >
+                    <Button type="button" variant="outline" onClick={() => onVariant(full.id)}>
                         {`Use ${formatName(full)}`}
                     </Button>
                 ) : (
-                    <Button type="button" variant="outline" size="sm" onClick={onPickAnother}>
+                    <Button type="button" variant="outline" onClick={onPickAnother}>
                         Pick another
                     </Button>
                 )}

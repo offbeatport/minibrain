@@ -694,6 +694,10 @@ class VersionInfo(BaseModel):
     live_at: datetime | None = None
     view: str | None = None
     duplicated_from: VersionOrigin | None = None
+    base_model: str = Field(default="", description="The base the version was made on and runs on.")
+    base_refusal: str | None = Field(
+        default=None, description="Why the version can't be deployed: it was made on a base the model has left."
+    )
 
 
 TeardownKindName = Literal["delete", "undeploy"]
@@ -749,6 +753,21 @@ class LabelDismissal(BaseModel):
     dataset_version_id: int
 
 
+class BaseTargetInfo(BaseModel):
+    key: str = Field(description="The base's key, or the key it gets once downloaded.")
+    name: str
+    catalog_id: str
+    variant_id: str
+    size_bytes: int
+    installed: bool = Field(description="On this install, or downloading or importing.")
+
+
+class ServeOnlyInfo(BaseModel):
+    format: str = Field(description="The quantized format, such as GGUF, AWQ or FP8.")
+    reason: str = Field(description="Why Train is off and what to switch to.")
+    switch_to: BaseTargetInfo | None = Field(description="The catalogue's full-precision variant of the base.")
+
+
 class ModelDetail(ModelSummary):
     source: SourceInfo | None
     mapping: MappingInfo
@@ -756,6 +775,7 @@ class ModelDetail(ModelSummary):
     dataset_name: str | None = None
     dataset_version: DatasetVersionInfo | None
     changed: ChangeInfo | None = None
+    serve_only: ServeOnlyInfo | None = None
     models: list[str]
     request_bodies: RequestBodiesInfo
     teardown: TeardownInfo | None = None
@@ -1174,6 +1194,8 @@ class VersionRow(BaseModel):
     latency_p50_ms: float | None = None
     latency_p95_ms: float | None = None
     cost: EvalCost | None = None
+    base_model: str = ""
+    base_refusal: str | None = None
 
 
 class ModelRow(BaseModel):
@@ -1205,6 +1227,27 @@ class ModelRow(BaseModel):
     catalog_id: str | None = None
     last_used_at: datetime | None = None
     teardown: TeardownInfo | None = None
+    serve_only: ServeOnlyInfo | None = None
+
+
+class BaseChoice(BaseModel):
+    key: str
+    name: str
+    state: Literal["ready", "pending"]
+    current: bool
+    serve_only: str | None = Field(description="The quantized format when the base can't be fine-tuned.")
+    warnings: list[str] = Field(description="What the model loses on this base, such as tool calls or reasoning.")
+    refusal: str | None = Field(description="Why the model can't switch to this base.")
+
+
+class BaseOptions(BaseModel):
+    current: str
+    choices: list[BaseChoice]
+    switch_to: BaseTargetInfo | None = Field(description="The catalogue's full-precision variant of the current base.")
+
+
+class BaseSwitch(BaseModel):
+    base_model: str = Field(min_length=1)
 
 
 FileState = Literal["ok", "corrupt", "missing", "wrong_size", "unchecked"]

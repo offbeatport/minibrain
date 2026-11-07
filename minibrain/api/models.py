@@ -269,6 +269,7 @@ def deploy(
     if not model.deployed:
         facts = {"name": model.name, "version": model.current_version}
         session.add(AuditEvent(actor=current_actor(), action="model.deploy", target=model.slug, detail=facts))
+        model.deployed_base = model.base_model
     model.deployed = True
     model.updated_at = now()
     session.commit()

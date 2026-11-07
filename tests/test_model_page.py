@@ -54,9 +54,9 @@ def test_a_name_finds_either_kind_of_model(harness: Harness) -> None:
 
 def test_the_next_step_follows_the_model(harness: Harness) -> None:
     create_with_dataset(harness)
-    assert page(harness)["next"] == {"kind": "promote", "label": "Deploy v0", "version": 0, "count": None}
+    assert page(harness)["next"] == {"kind": "promote", "label": "Deploy v0", "version": 0, "count": None, "base": None}
     deploy(harness)
-    assert page(harness)["next"] == {"kind": "train", "label": "Train v1", "version": 1, "count": None}
+    assert page(harness)["next"] == {"kind": "train", "label": "Train v1", "version": 1, "count": None, "base": None}
     add_version(harness, "prompt")
     assert page(harness)["next"] is None
     finish(harness, "eval", accuracy=1.0)
@@ -69,6 +69,7 @@ def test_the_next_step_follows_the_model(harness: Harness) -> None:
         "label": "1 feedback row to review",
         "version": None,
         "count": 1,
+        "base": None,
     }
 
 
@@ -81,6 +82,7 @@ def test_a_base_is_deployed_then_built_on(harness: Harness) -> None:
         "label": "Create a custom model from it",
         "version": None,
         "count": None,
+        "base": None,
     }
 
 

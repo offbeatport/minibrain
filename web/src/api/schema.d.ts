@@ -518,6 +518,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{slug}/base-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the bases a custom model can move to
+         * @description Installed bases with what the model would lose on each, and the full-precision variant to download.
+         */
+        get: operations["base_options_api_models__slug__base_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{slug}/base": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a custom model to another base
+         * @description New versions are made on the new base, starting with a prompt-only version scored at once. What is live keeps serving on its own base until a version on the new base is deployed.
+         */
+        post: operations["switch_base_api_models__slug__base_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/model-pages/{name}": {
         parameters: {
             query?: never;
@@ -3313,6 +3353,35 @@ export interface components {
             /** Job Id */
             job_id?: number | null;
         };
+        /** BaseChoice */
+        BaseChoice: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "pending";
+            /** Current */
+            current: boolean;
+            /**
+             * Serve Only
+             * @description The quantized format when the base can't be fine-tuned.
+             */
+            serve_only: string | null;
+            /**
+             * Warnings
+             * @description What the model loses on this base, such as tool calls or reasoning.
+             */
+            warnings: string[];
+            /**
+             * Refusal
+             * @description Why the model can't switch to this base.
+             */
+            refusal: string | null;
+        };
         /** BaseFile */
         BaseFile: {
             /** Path */
@@ -3390,6 +3459,7 @@ export interface components {
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
+            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
             /** Source */
             source: string;
             /** Repo */
@@ -3445,6 +3515,41 @@ export interface components {
             parameters?: number | null;
             /** Context Tokens */
             context_tokens?: number | null;
+        };
+        /** BaseOptions */
+        BaseOptions: {
+            /** Current */
+            current: string;
+            /** Choices */
+            choices: components["schemas"]["BaseChoice"][];
+            /** @description The catalogue's full-precision variant of the current base. */
+            switch_to: components["schemas"]["BaseTargetInfo"] | null;
+        };
+        /** BaseSwitch */
+        BaseSwitch: {
+            /** Base Model */
+            base_model: string;
+        };
+        /** BaseTargetInfo */
+        BaseTargetInfo: {
+            /**
+             * Key
+             * @description The base's key, or the key it gets once downloaded.
+             */
+            key: string;
+            /** Name */
+            name: string;
+            /** Catalog Id */
+            catalog_id: string;
+            /** Variant Id */
+            variant_id: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Installed
+             * @description On this install, or downloading or importing.
+             */
+            installed: boolean;
         };
         /** BaseWeights */
         BaseWeights: {
@@ -6528,6 +6633,7 @@ export interface components {
             dataset_name?: string | null;
             dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
+            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
             /** Models */
             models: string[];
             request_bodies: components["schemas"]["RequestBodiesInfo"];
@@ -6692,6 +6798,7 @@ export interface components {
             /** Last Used At */
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
+            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
         };
         /** ModelSafety */
         ModelSafety: {
@@ -6823,13 +6930,18 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "promote" | "deploy" | "review_feedback" | "add_data" | "train" | "create_custom";
+            kind: "promote" | "deploy" | "review_feedback" | "add_data" | "train" | "switch_base" | "create_custom";
             /** Label */
             label: string;
             /** Version */
             version?: number | null;
             /** Count */
             count?: number | null;
+            /**
+             * Base
+             * @description The base to switch to, for switch_base.
+             */
+            base?: string | null;
         };
         /** NodeInfo */
         NodeInfo: {
@@ -7723,6 +7835,7 @@ export interface components {
             dataset_name?: string | null;
             dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
+            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
             /** Models */
             models: string[];
             request_bodies: components["schemas"]["RequestBodiesInfo"];
@@ -7830,6 +7943,21 @@ export interface components {
             metric: string;
             /** Value */
             value: number;
+        };
+        /** ServeOnlyInfo */
+        ServeOnlyInfo: {
+            /**
+             * Format
+             * @description The quantized format, such as GGUF, AWQ or FP8.
+             */
+            format: string;
+            /**
+             * Reason
+             * @description Why Train is off and what to switch to.
+             */
+            reason: string;
+            /** @description The catalogue's full-precision variant of the base. */
+            switch_to: components["schemas"]["BaseTargetInfo"] | null;
         };
         /** SessionInfo */
         SessionInfo: {
@@ -8609,6 +8737,17 @@ export interface components {
             /** View */
             view?: string | null;
             duplicated_from?: components["schemas"]["VersionOrigin"] | null;
+            /**
+             * Base Model
+             * @description The base the version was made on and runs on.
+             * @default
+             */
+            base_model?: string;
+            /**
+             * Base Refusal
+             * @description Why the version can't be deployed: it was made on a base the model has left.
+             */
+            base_refusal?: string | null;
         };
         /** VersionOrigin */
         VersionOrigin: {
@@ -8659,6 +8798,13 @@ export interface components {
             /** Latency P95 Ms */
             latency_p95_ms?: number | null;
             cost?: components["schemas"]["EvalCost"] | null;
+            /**
+             * Base Model
+             * @default
+             */
+            base_model?: string;
+            /** Base Refusal */
+            base_refusal?: string | null;
         };
         /** VersionTest */
         VersionTest: {
@@ -9763,6 +9909,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JudgeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    base_options_api_models__slug__base_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseOptions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    switch_base_api_models__slug__base_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BaseSwitch"];
             };
         };
         responses: {

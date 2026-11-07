@@ -17,7 +17,6 @@ from minibrain.registry.models import (
     JobKind,
     JobStatus,
     JudgeScore,
-    Model,
     Version,
     VersionKind,
     VersionStatus,
@@ -100,10 +99,8 @@ class DomainEffects:
 
     def score_waiting(self, session: Session, base: str) -> None:
         waiting = session.scalars(
-            select(Version)
-            .join(Model)
-            .where(
-                Model.base_model == base,
+            select(Version).where(
+                Version.base_model == base,
                 Version.kind == VersionKind.PROMPT,
                 Version.status == VersionStatus.READY,
                 Version.metrics.is_(None),

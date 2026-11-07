@@ -142,7 +142,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
             slug=model.slug,
             version=version.number,
             kind=version.kind,
-            base_model=model.base_model,
+            base_model=version.base_model,
             adapter=adapter,
             prompting=prompting_of(version).as_dict(),
             contract=version.contract_number,
@@ -155,7 +155,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
     if model.deployed and not any(route.name == model.slug for route in routes):
         routes.append(
             replace(
-                base_route_for(model.base_model),
+                base_route_for(model.deployed_base or model.base_model),
                 name=model.slug,
                 owner=owner_of(model.id, None),
                 model_id=model.id,
@@ -278,9 +278,15 @@ REPORT_SECONDS = 10.0
 EngineStarter = Callable[[dict[str, BaseModelSpec], Replicas, frozenset[str]], dict[str, str]]
 
 
+def released(detail: dict[str, Any]) -> list[str]:
+    found = detail.get("release")
+    if isinstance(found, list):
+        return [str(key) for key in found]
+    return [str(detail["base"])] if found and detail.get("base") else []
+
+
 def releasing_bases(session: Session) -> frozenset[str]:
-    found = (item.detail.get("base") for item in session.scalars(select(Teardown)) if item.detail.get("release"))
-    return frozenset(str(key) for key in found if key)
+    return frozenset(key for item in session.scalars(select(Teardown)) for key in released(item.detail))
 
 
 class ConfigSource(Protocol):

@@ -17,9 +17,11 @@ import { useEffect, useRef, useState } from "react";
 import { type ModelDetail, type VersionCreate, api, unwrap } from "~/api/client";
 import { type DatasetVersionInfo, useDatasetVersions } from "~/api/dataQueries";
 import { isActiveJob, useDatasets, useJobs, useModel } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { FeedbackSince } from "~/components/FeedbackSince";
 import { JobPanel } from "~/components/JobPanel";
 import { ErrorLine, PanelSection, Section, errorMessage } from "~/components/Section";
+import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useInvalidate } from "~/lib/jobs";
 import { relativeTime } from "~/lib/time";
@@ -118,7 +120,8 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
     const chosen = options.find((item) => String(item.id) === picked);
     const shown = chosen ?? detail.dataset_version;
     const settings = { ...choices, max_rows: maxRows, epochs };
-    const plan = useTrainingPlan(slug, chosen?.id ?? null, settings);
+    const serveOnly = detail.serve_only ?? null;
+    const plan = useTrainingPlan(slug, chosen?.id ?? null, settings, !serveOnly);
     const [breaking, setBreaking] = useState<{ body: VersionCreate; reason: string } | null>(null);
     const create = useMutation({
         mutationFn: (body: VersionCreate) =>
@@ -159,51 +162,63 @@ function CreateVersion({ detail, focusTrain }: { detail: ModelDetail; focusTrain
                 <ModelDataNotice slug={slug} />
             </div>
             <ModelChecks datasetVersion={shown} />
-            <TrainingPlanPanel
-                plan={plan.data}
-                error={plan.error}
-                choices={choices}
-                onChange={setChoices}
-            />
-            <ErrorLine error={plan.error} />
+            {serveOnly ? (
+                <StatusText tone="warning" className="whitespace-normal">
+                    {serveOnly.reason}
+                </StatusText>
+            ) : (
+                <>
+                    <TrainingPlanPanel
+                        plan={plan.data}
+                        error={plan.error}
+                        choices={choices}
+                        onChange={setChoices}
+                    />
+                    <ErrorLine error={plan.error} />
+                </>
+            )}
             <div className="flex flex-wrap items-end gap-6 pt-4">
                 <Button variant="outline" onClick={() => create.mutate({ kind: "prompt" })}>
                     Score prompt-only version
                 </Button>
-                <div className="flex flex-wrap items-end gap-2">
-                    <Field id="max-rows" label="Training rows">
-                        <NumberField
-                            id="max-rows"
-                            value={maxRows}
-                            onValueChange={setMaxRows}
-                            min={10}
-                            step={100}
-                            largeStep={1000}
-                            format={{ maximumFractionDigits: 0 }}
-                        />
-                    </Field>
-                    <Field id="epochs" label="Epochs">
-                        <NumberField
-                            id="epochs"
-                            value={epochs}
-                            onValueChange={setEpochs}
-                            min={0.1}
-                            max={10}
-                            step={1}
-                            smallStep={0.1}
-                            format={{ maximumFractionDigits: 2 }}
-                        />
-                    </Field>
-                    <Button
-                        ref={trainButton}
-                        onClick={train}
-                        disabled={
-                            create.isPending || maxRows === null || epochs === null || refused
-                        }
-                    >
-                        Train new version
-                    </Button>
-                </div>
+                {serveOnly ? (
+                    <BlockedButton reason={serveOnly.reason}>Train new version</BlockedButton>
+                ) : (
+                    <div className="flex flex-wrap items-end gap-2">
+                        <Field id="max-rows" label="Training rows">
+                            <NumberField
+                                id="max-rows"
+                                value={maxRows}
+                                onValueChange={setMaxRows}
+                                min={10}
+                                step={100}
+                                largeStep={1000}
+                                format={{ maximumFractionDigits: 0 }}
+                            />
+                        </Field>
+                        <Field id="epochs" label="Epochs">
+                            <NumberField
+                                id="epochs"
+                                value={epochs}
+                                onValueChange={setEpochs}
+                                min={0.1}
+                                max={10}
+                                step={1}
+                                smallStep={0.1}
+                                format={{ maximumFractionDigits: 2 }}
+                            />
+                        </Field>
+                        <Button
+                            ref={trainButton}
+                            onClick={train}
+                            disabled={
+                                create.isPending || maxRows === null || epochs === null || refused
+                            }
+                        >
+                            Train new version
+                        </Button>
+                    </div>
+                )}
             </div>
             <ErrorLine error={breaking ? null : create.error} />
             <ConfirmDialog

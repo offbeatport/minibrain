@@ -1495,6 +1495,102 @@
         }
       }
     },
+    "/api/models/{slug}/base-options": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List the bases a custom model can move to",
+        "description": "Installed bases with what the model would lose on each, and the full-precision variant to download.",
+        "operationId": "base_options_api_models__slug__base_options_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseOptions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{slug}/base": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Move a custom model to another base",
+        "description": "New versions are made on the new base, starting with a prompt-only version scored at once. What is live keeps serving on its own base until a version on the new base is deployed.",
+        "operationId": "switch_base_api_models__slug__base_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BaseSwitch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/model-pages/{name}": {
       "get": {
         "tags": [
@@ -11159,6 +11255,73 @@
         ],
         "title": "Availability"
       },
+      "BaseChoice": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "pending"
+            ],
+            "title": "State"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "serve_only": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serve Only",
+            "description": "The quantized format when the base can't be fine-tuned."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "What the model loses on this base, such as tool calls or reasoning."
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal",
+            "description": "Why the model can't switch to this base."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "state",
+          "current",
+          "serve_only",
+          "warnings",
+          "refusal"
+        ],
+        "title": "BaseChoice"
+      },
       "BaseFile": {
         "properties": {
           "path": {
@@ -11437,6 +11600,16 @@
               }
             ]
           },
+          "serve_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServeOnlyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -11659,6 +11832,93 @@
           "verified"
         ],
         "title": "BaseModelDetail"
+      },
+      "BaseOptions": {
+        "properties": {
+          "current": {
+            "type": "string",
+            "title": "Current"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/BaseChoice"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "switch_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaseTargetInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The catalogue's full-precision variant of the current base."
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "choices",
+          "switch_to"
+        ],
+        "title": "BaseOptions"
+      },
+      "BaseSwitch": {
+        "properties": {
+          "base_model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Base Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_model"
+        ],
+        "title": "BaseSwitch"
+      },
+      "BaseTargetInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The base's key, or the key it gets once downloaded."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "catalog_id": {
+            "type": "string",
+            "title": "Catalog Id"
+          },
+          "variant_id": {
+            "type": "string",
+            "title": "Variant Id"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "installed": {
+            "type": "boolean",
+            "title": "Installed",
+            "description": "On this install, or downloading or importing."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "catalog_id",
+          "variant_id",
+          "size_bytes",
+          "installed"
+        ],
+        "title": "BaseTargetInfo"
       },
       "BaseWeights": {
         "properties": {
@@ -21192,6 +21452,16 @@
               }
             ]
           },
+          "serve_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServeOnlyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -21691,6 +21961,16 @@
                 "type": "null"
               }
             ]
+          },
+          "serve_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServeOnlyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -22076,6 +22356,7 @@
               "review_feedback",
               "add_data",
               "train",
+              "switch_base",
               "create_custom"
             ],
             "title": "Kind"
@@ -22105,6 +22386,18 @@
               }
             ],
             "title": "Count"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base",
+            "description": "The base to switch to, for switch_base."
           }
         },
         "type": "object",
@@ -24725,6 +25018,16 @@
               }
             ]
           },
+          "serve_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServeOnlyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "items": {
               "type": "string"
@@ -25066,6 +25369,38 @@
           "value"
         ],
         "title": "ScoreInfo"
+      },
+      "ServeOnlyInfo": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "The quantized format, such as GGUF, AWQ or FP8."
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Why Train is off and what to switch to."
+          },
+          "switch_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaseTargetInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The catalogue's full-precision variant of the base."
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "reason",
+          "switch_to"
+        ],
+        "title": "ServeOnlyInfo"
       },
       "SessionInfo": {
         "properties": {
@@ -27555,6 +27890,24 @@
                 "type": "null"
               }
             ]
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model",
+            "description": "The base the version was made on and runs on.",
+            "default": ""
+          },
+          "base_refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Refusal",
+            "description": "Why the version can't be deployed: it was made on a base the model has left."
           }
         },
         "type": "object",
@@ -27761,6 +28114,22 @@
                 "type": "null"
               }
             ]
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model",
+            "default": ""
+          },
+          "base_refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Refusal"
           }
         },
         "type": "object",

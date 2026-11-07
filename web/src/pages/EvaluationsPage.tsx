@@ -234,6 +234,7 @@ function RuleCell({ version }: { version: ModelVersionRow }) {
 function deployable(version: ModelVersionRow): boolean {
     return (
         version.status === "ready" &&
+        !version.base_refusal &&
         !version.live &&
         (version.was_live || Boolean(version.promotion?.passed))
     );
@@ -242,6 +243,9 @@ function deployable(version: ModelVersionRow): boolean {
 function blockedReason(version: ModelVersionRow): string | null {
     if (version.status !== "ready" || version.live || deployable(version)) {
         return null;
+    }
+    if (version.base_refusal) {
+        return version.base_refusal;
     }
     const failed = (version.promotion?.checks ?? []).filter((check) => !check.passed);
     return failed.map(checkSentence).join(" ") || "It does not pass the promotion rule.";
@@ -280,7 +284,9 @@ export function DeployButton({
                     </Button>
                 </span>
             </TooltipTrigger>
-            <TooltipContent>{`It can't go live yet. ${reason}`}</TooltipContent>
+            <TooltipContent>
+                {version.base_refusal ?? `It can't go live yet. ${reason}`}
+            </TooltipContent>
         </Tooltip>
     );
 }

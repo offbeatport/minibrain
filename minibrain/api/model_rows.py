@@ -17,11 +17,12 @@ from minibrain.api.schemas import (
     DeploymentState,
     Health,
     ModelRow,
+    ServeOnlyInfo,
     TeardownInfo,
     Usage,
     VersionRow,
 )
-from minibrain.api.views import cost_info, teardown_info
+from minibrain.api.views import cost_info, refusal_of, serve_only_info, teardown_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
@@ -49,7 +50,8 @@ from minibrain.registry.models import (
 from minibrain.registry.prices import DevicePrices, load_prices
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
-from minibrain.tasks.service import decision, held_out_score, version_metric
+from minibrain.tasks.rebase import serve_only
+from minibrain.tasks.service import decision, held_out_score, serving_base, version_metric
 
 FAILED_LABELS: dict[str, str] = {
     JobKind.TRAIN: "Training failed",
@@ -109,7 +111,11 @@ def active_activity(job: Job) -> Activity:
 
 def candidate(model: Model) -> Version | None:
     current = model.current_version if model.current_version is not None else -1
-    ready = [v for v in model.versions if v.status == VersionStatus.READY and v.number > current]
+    ready = [
+        v
+        for v in model.versions
+        if v.status == VersionStatus.READY and v.number > current and v.base_model == model.base_model
+    ]
     return max(ready, key=lambda v: v.number, default=None)
 
 
@@ -222,7 +228,7 @@ def version_rows(
     model: Model,
     jobs: list[Job],
     version_usage: dict[tuple[int, int], Usage],
-    base_hash: str | None = None,
+    hashes: dict[str, str | None] | None = None,
     prices: DevicePrices | None = None,
 ) -> list[VersionRow]:
     rows: list[VersionRow] = []
@@ -245,7 +251,9 @@ def version_rows(
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
                 usage=version_usage.get((model.id, version.number)),
                 created_at=version.created_at,
-                health=version_health(model, version, base_hash),
+                health=version_health(model, version, (hashes or {}).get(version.base_model)),
+                base_model=version.base_model,
+                base_refusal=refusal_of(model, version),
                 latency_p50_ms=latency.get("p50_ms"),
                 latency_p95_ms=latency.get("p95_ms"),
                 cost=cost_info(version.metrics, prices or DevicePrices()),
@@ -302,8 +310,11 @@ def custom_row(
     base: tuple[str, Health | None, str | None, Availability | None] | None = None,
     prices: DevicePrices | None = None,
     teardown: tuple[Teardown | None, TeardownInfo | None] = (None, None),
+    hashes: dict[str, str | None] | None = None,
+    serve_only: ServeOnlyInfo | None = None,
 ) -> ModelRow:
     base_name, broken, base_hash, base_state = base or (model.base_model, None, None, None)
+    known = {model.base_model: base_hash} | (hashes or {})
     found, info = teardown
     availability = custom_availability(model, store)
     if base_state is not None and base_state.state in ("downloading", "importing"):
@@ -331,7 +342,7 @@ def custom_row(
         deployment=deployment(
             f"v{current}" if current is not None else "Base model",
             model.deployed,
-            health(model.base_model) if model.deployed else None,
+            health(serving_base(model)) if model.deployed else None,
             [current] if model.deployed and current is not None else [],
             found,
         ),
@@ -340,7 +351,7 @@ def custom_row(
         update_available=False,
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
-        versions=version_rows(model, jobs, version_usage or {}, base_hash, prices),
+        versions=version_rows(model, jobs, version_usage or {}, known, prices),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         score=held_out_score(shown) if shown is not None else None,
@@ -348,6 +359,7 @@ def custom_row(
         usage=usage,
         health=custom_health(broken, base_name),
         teardown=info,
+        serve_only=serve_only,
     )
 
 
@@ -472,6 +484,9 @@ def all_rows(
         )
         for base, row in zip(bases_found, base_rows, strict=True)
     }
+    hashes = {key: found[2] for key, found in bases.items()}
+    models = list(session.scalars(select(Model)))
+    limits = {key: serve_only_info(serve_only(session, settings, key)) for key in {m.base_model for m in models}}
     rows = [
         custom_row(
             model,
@@ -484,8 +499,10 @@ def all_rows(
             bases.get(model.base_model),
             prices,
             custom_teardown(model),
+            hashes,
+            limits.get(model.base_model),
         )
-        for model in session.scalars(select(Model))
+        for model in models
     ]
     rows += base_rows
     custom_keys = dict(

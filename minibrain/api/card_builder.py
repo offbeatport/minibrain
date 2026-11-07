@@ -137,7 +137,7 @@ def licence_key(licence: str | None) -> str | None:
 
 
 def base_card(session: Session, model: Model, version: Version) -> CardBaseModel:
-    key = model.base_model
+    key = version.base_model
     base = session.get(BaseModel, key)
     builtin = BASE_MODELS.get(key)
     repo = base.repo if base is not None else builtin.repo if builtin is not None else None

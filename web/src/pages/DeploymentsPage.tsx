@@ -14,6 +14,7 @@ import {
 } from "~/api/client";
 import { useAllModels, useModel } from "~/api/queries";
 import { ApiKeys } from "~/components/ApiKeys";
+import { BlockedButton } from "~/components/BlockedButton";
 import { FeedbackApi } from "~/components/FeedbackApi";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PageHeader } from "~/components/PageHeader";
@@ -336,13 +337,19 @@ function VersionHistory({ row }: { row: ModelRow }) {
             id: "actions",
             cell: ({ row: item }) =>
                 can.build && item.original.status === "ready" && !item.original.live ? (
-                    <Button
-                        variant="outline"
-                        disabled={deploy.isPending || tearingDown}
-                        onClick={() => deploy.mutate(item.original.number)}
-                    >
-                        {`Deploy v${item.original.number}`}
-                    </Button>
+                    item.original.base_refusal ? (
+                        <BlockedButton variant="outline" reason={item.original.base_refusal}>
+                            {`Deploy v${item.original.number}`}
+                        </BlockedButton>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            disabled={deploy.isPending || tearingDown}
+                            onClick={() => deploy.mutate(item.original.number)}
+                        >
+                            {`Deploy v${item.original.number}`}
+                        </Button>
+                    )
                 ) : null,
         },
     ];

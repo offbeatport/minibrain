@@ -56,6 +56,7 @@ from minibrain.tasks.answers import Side, compared
 from minibrain.tasks.contracts import answer_of
 from minibrain.tasks.examples import Example, turns_of
 from minibrain.tasks.graders import GraderError
+from minibrain.tasks.rebase import other_base
 from minibrain.tasks.service import decision, graders_of, new_version, version_contract
 from minibrain.teardown import cancel_stop, require_idle
 
@@ -92,11 +93,11 @@ def start_version(
         contract=version.contract_number,
     )
     if kind == VersionKind.LORA:
-        version.base_hash = base_hash(session, model.base_model)
+        version.base_hash = base_hash(session, version.base_model)
         params = train_params(session, settings, version)
         enqueue(session, JobKind.TRAIN, params, model.id, version.id, f"train:{version.id}")
     elif version.status == VersionStatus.EVALUATING:
-        if base_readiness(session, model.base_model) != "ready":
+        if base_readiness(session, version.base_model) != "ready":
             version.status = VersionStatus.READY
             return version
         params = eval_params(session, settings, version)
@@ -220,8 +221,12 @@ def delete_version(slug: str, number: int, session: SessionDep, settings: Settin
 def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
     version = get_version(model, number)
+    already = model.deployed and model.current_version == number
+    refusal = other_base(session, model, version)
+    if refusal is not None and not already:
+        raise ConflictError(refusal)
     mismatch = base_changed(
-        f"{slug}@{number}", model.base_model, version.base_hash, base_hash(session, model.base_model)
+        f"{slug}@{number}", version.base_model, version.base_hash, base_hash(session, version.base_model)
     )
     if mismatch is not None:
         raise ConflictError(mismatch)
@@ -234,6 +239,7 @@ def promote_version(slug: str, number: int, session: SessionDep, settings: Setti
     previous, was_deployed = model.current_version, model.deployed
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number
+    model.deployed_base = model.deployed_base if was_deployed else model.base_model
     model.deployed = True
     version.live_at = version.live_at or now()
     model.first_live_at = model.first_live_at or version.live_at
@@ -300,7 +306,7 @@ def test_version(
     route = routed(config, model, number)
     messages = [message.model_dump() for message in body.messages]
     completion = answered(backend, config, route, messages, body.max_tokens)
-    touch(session, model.base_model)
+    touch(session, version.base_model)
     session.commit()
     answer = answer_of(version_contract(version), completion.text)
     shown, _ = answer_text(route, completion.text)

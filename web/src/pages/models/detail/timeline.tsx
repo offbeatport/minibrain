@@ -1,6 +1,7 @@
 import { History } from "lucide-react";
 import { Badge, Link } from "obp-ui";
 import type { ModelRow, VersionInfo } from "~/api/client";
+import { useAllModels } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { PanelSection } from "~/components/Section";
 import { count, percent } from "~/lib/format";
@@ -112,6 +113,74 @@ function Attempt({
     );
 }
 
+type BaseGroup = { key: string; name: string; publisher: string | null; versions: VersionInfo[] };
+
+function groups(
+    row: ModelRow,
+    versions: VersionInfo[],
+    rows: ModelRow[],
+    baseName: string,
+): BaseGroup[] {
+    const current = row.base_model ?? "";
+    const newest = [...versions].sort((a, b) => b.number - a.number);
+    const keys = [current, ...newest.map((version) => version.base_model || current)];
+    return [...new Set(keys)].map((key) => {
+        const base = rows.find((item) => item.kind === "base" && item.key === key);
+        return {
+            key,
+            name: key === current ? baseName : (base?.name ?? key),
+            publisher: base?.publisher ?? (key === current ? (row.publisher ?? null) : null),
+            versions: newest.filter((version) => (version.base_model || current) === key),
+        };
+    });
+}
+
+function Group({
+    row,
+    group,
+    current,
+    deployed,
+}: {
+    row: ModelRow;
+    group: BaseGroup;
+    current: boolean;
+    deployed: boolean;
+}) {
+    return (
+        <div className="flex flex-col">
+            <Link
+                href={modelPageHref(group.key)}
+                className="flex w-fit items-center gap-2 font-semibold hover:underline"
+            >
+                <PublisherLogo publisher={group.publisher} name={group.name} />
+                {group.name}
+                <Badge variant="outline">{current ? "Base" : "Previous base"}</Badge>
+            </Link>
+            {!current && (
+                <p className="ml-3 border-l pt-1 pl-6 text-sm text-muted-foreground">
+                    {`Made before the switch. They stay as history and can't be deployed while ${row.name} is on another base.`}
+                </p>
+            )}
+            {group.versions.length === 0 ? (
+                <p className="ml-3 border-l pt-2 pl-6 text-muted-foreground">
+                    No versions yet: add training data, then train or score a prompt.
+                </p>
+            ) : (
+                <ul className="ml-3 border-l pl-6" aria-label={`Versions built from ${group.name}`}>
+                    {group.versions.map((version) => (
+                        <Attempt
+                            key={version.number}
+                            slug={row.key}
+                            version={version}
+                            deployed={deployed}
+                        />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 export function VersionTimeline({
     row,
     versions,
@@ -123,42 +192,24 @@ export function VersionTimeline({
     deployed: boolean;
     baseName: string;
 }) {
-    const base = row.base_model ?? "";
-    const newest = [...versions].sort((a, b) => b.number - a.number);
+    const models = useAllModels();
+    const found = groups(row, versions, models.data ?? [], baseName);
+    const description =
+        found.length > 1
+            ? `Every version is a fresh attempt from its base: none builds on another. New versions are made on ${baseName}. Open one for its model card.`
+            : `Every version is a fresh attempt from ${baseName}: none builds on another. Open one for its model card.`;
     return (
-        <PanelSection
-            icon={History}
-            title="Versions"
-            description={`Every version is a fresh attempt from ${baseName}: none builds on another. Open one for its model card.`}
-        >
-            <div className="flex flex-col">
-                <Link
-                    href={modelPageHref(base)}
-                    className="flex w-fit items-center gap-2 font-semibold hover:underline"
-                >
-                    <PublisherLogo publisher={row.publisher} name={baseName} />
-                    {baseName}
-                    <Badge variant="outline">Base</Badge>
-                </Link>
-                {newest.length === 0 ? (
-                    <p className="ml-3 border-l pt-2 pl-6 text-muted-foreground">
-                        No versions yet: add training data, then train or score a prompt.
-                    </p>
-                ) : (
-                    <ul
-                        className="ml-3 border-l pl-6"
-                        aria-label={`Versions built from ${baseName}`}
-                    >
-                        {newest.map((version) => (
-                            <Attempt
-                                key={version.number}
-                                slug={row.key}
-                                version={version}
-                                deployed={deployed}
-                            />
-                        ))}
-                    </ul>
-                )}
+        <PanelSection icon={History} title="Versions" description={description}>
+            <div className="flex flex-col gap-4">
+                {found.map((group, index) => (
+                    <Group
+                        key={group.key}
+                        row={row}
+                        group={group}
+                        current={index === 0}
+                        deployed={deployed}
+                    />
+                ))}
             </div>
         </PanelSection>
     );

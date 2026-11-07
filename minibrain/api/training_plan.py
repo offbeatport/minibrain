@@ -34,6 +34,7 @@ from minibrain.registry.files import dataset_version_location, store_for
 from minibrain.registry.models import CatalogModel, CatalogVariant, DatasetVersion, Model
 from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
+from minibrain.tasks.rebase import serve_only
 
 router = APIRouter(prefix="/api", tags=["training"])
 PlanLevel = Literal["fits", "insufficient", "unknown"]
@@ -58,6 +59,9 @@ def model_base(session: Session, settings: InstallSettings, model: Model) -> Bas
 
 
 def require_trainable(session: Session, settings: InstallSettings, model: Model) -> None:
+    limit = serve_only(session, settings, model.base_model)
+    if limit is not None:
+        raise ConflictError(limit.reason)
     try:
         validate(model_base(session, settings, model), Settings())
     except PlanError as error:
@@ -73,6 +77,7 @@ def training_plan(
     body: TrainingSettings,
 ) -> tuple[Plan, int]:
     require_splits(dataset_version)
+    require_trainable(session, settings, model)
     chosen = planner_settings(body)
     location = dataset_version_location(session, store_for(settings), dataset_version)
     rows, longest = longest_example(location, chosen.max_rows)

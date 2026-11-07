@@ -211,4 +211,4 @@ def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness
     assert harness.client.post("/api/models", json=body).status_code == 201
     trained = harness.client.post("/api/models/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
-    assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]
+    assert trained.json()["detail"] == "Corp FP8 is FP8, which serves only. Switch to a full-precision base to train."

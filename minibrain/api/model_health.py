@@ -244,7 +244,7 @@ def custom_health(base: Health | None, base_name: str) -> Health | None:
 def version_health(model: Model, version: Version, current: str | None) -> Health | None:
     if version.kind != VersionKind.LORA:
         return None
-    message = base_changed(f"v{version.number}", model.base_model, version.base_hash, current)
+    message = base_changed(f"v{version.number}", version.base_model, version.base_hash, current)
     if message is None:
         return None
     return Health(state="base_changed", label="Base changed", detail=message, actions=[act("retrain")])

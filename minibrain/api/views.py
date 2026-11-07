@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, object_session
 
 from minibrain.api.schemas import (
     AttemptInfo,
+    BaseTargetInfo,
     ChangeInfo,
     CheckInfo,
     ColumnInfo,
@@ -30,6 +31,7 @@ from minibrain.api.schemas import (
     PromotionInfo,
     RequestBodiesInfo,
     ScoreInfo,
+    ServeOnlyInfo,
     SourceInfo,
     SplitScore,
     TeardownInfo,
@@ -68,6 +70,7 @@ from minibrain.serve.resolve import model_names
 from minibrain.settings import Settings
 from minibrain.tasks.contracts import Contract
 from minibrain.tasks.judges import JUDGE, judge_choice
+from minibrain.tasks.rebase import ServeOnly, Target, other_base, serve_only
 from minibrain.tasks.service import (
     contract_of,
     decision,
@@ -333,7 +336,26 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         live_at=version.live_at,
         view=view_of(version),
         duplicated_from=VersionOrigin.model_validate(version.duplicated_from) if version.duplicated_from else None,
+        base_model=version.base_model,
+        base_refusal=refusal_of(model, version),
     )
+
+
+def target_info(target: Target | None) -> BaseTargetInfo | None:
+    return BaseTargetInfo(**asdict(target)) if target is not None else None
+
+
+def serve_only_info(found: ServeOnly | None) -> ServeOnlyInfo | None:
+    if found is None:
+        return None
+    return ServeOnlyInfo(format=found.format, reason=found.reason, switch_to=target_info(found.target))
+
+
+def refusal_of(model: Model, version: Version) -> str | None:
+    session = object_session(model)
+    if session is None or version.base_model == model.base_model:
+        return None
+    return other_base(session, model, version)
 
 
 def current_score(model: Model) -> float | None:
@@ -455,6 +477,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         promotion=PromotionInfo.model_validate(rule_of(model).as_dict()),
         went_live=went_live(model),
         label_proposal=label_proposal(model, current),
+        serve_only=serve_only_info(serve_only(session, settings, model.base_model)),
     )
 
 

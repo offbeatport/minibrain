@@ -38,6 +38,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import ConflictError, adapter_name, drop_orphan_keys
 from minibrain.serve.engines import DRAIN_TIMEOUT, drain_engine
 from minibrain.settings import Settings
+from minibrain.tasks.service import serving_base
 from minibrain.worker import HttpClient
 
 STOP_TIMEOUT = timedelta(minutes=10)
@@ -108,18 +109,22 @@ def lora_adapters(model: Model, numbers: set[int] | None = None) -> list[str]:
 
 def custom_targets(model: Model, everything: bool) -> dict[str, Any]:
     current = model.current_version
+    serving = serving_base(model)
     if everything:
         routes = [model.slug, *(f"{model.slug}@{version.number}" for version in model.versions)]
         adapters = lora_adapters(model)
+        bases = sorted({serving, *(version.base_model for version in model.versions)})
     else:
         routes = [model.slug]
         adapters = lora_adapters(model, {current}) if current is not None else []
+        bases = [serving]
     return {
         "custom": True,
         "slug": model.slug,
         "routes": routes,
         "adapters": adapters,
-        "base": model.base_model,
+        "base": serving,
+        "bases": bases,
         "version": current,
     }
 
@@ -268,7 +273,8 @@ def delete_custom(
 
 
 def dependents_of(session: Session, base: BaseModel) -> list[Model]:
-    return list(session.scalars(select(Model).where(Model.base_model == base.id).order_by(Model.name)))
+    models = session.scalars(select(Model).order_by(Model.name))
+    return [model for model in models if base.id in (model.base_model, serving_base(model) if model.deployed else "")]
 
 
 class NewDependentsError(ConflictError):
@@ -490,17 +496,17 @@ class Teardowns:
         detail = teardown.detail
         routes = sorted(set(detail.get("routes") or []))
         adapters = list(detail.get("adapters") or [])
-        base = str(detail.get("base") or "")
+        bases = set(detail.get("bases") or [str(detail.get("base") or "")])
         waiting: list[str] = []
         for gateway in live_gateways(session):
             still = [route for route in routes if route in gateway.routes]
             if still:
                 waiting.append(f"the gateway on {gateway.host} to stop routing {names(still)}")
-        needed = self.needed(base)
-        release = False
+        released: set[str] = set()
         for replica in live_engines(session):
-            if replica.base_model != base:
+            if replica.base_model not in bases:
                 continue
+            needed = self.needed(replica.base_model)
             host = host_of(replica.node_id)
             try:
                 report = drain_engine(self.http, replica.url, routes, adapters)
@@ -514,10 +520,10 @@ class Teardowns:
             elif replica.managed and not needed and report.get("total"):
                 waiting.append(f"the engine on {host} to finish {report['total']} requests in flight")
             elif replica.managed and not needed:
-                release = True
+                released.add(replica.base_model)
                 waiting.append(f"the engine on {host} to stop")
-        if release and not detail.get("release"):
-            teardown.detail = {**teardown.detail, "release": True}
+        if released and not detail.get("release"):
+            teardown.detail = {**teardown.detail, "release": sorted(released)}
         return waiting
 
     def remove(self, session: Session, teardown: Teardown) -> None:

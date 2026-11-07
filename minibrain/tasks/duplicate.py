@@ -63,6 +63,7 @@ def copied_version(session: Session, model: Model, source: Model, version: Versi
         graders=deepcopy(version.graders or []),
         adapter_artifact_id=version.adapter_artifact_id,
         base_hash=version.base_hash,
+        base_model=version.base_model,
         recipe=deepcopy(version.recipe or {}),
         metrics=deepcopy(version.metrics),
         intended_use=version.intended_use,

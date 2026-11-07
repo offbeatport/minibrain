@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import {
+    ArrowRightLeft,
     ArrowUpDown,
     CircleX,
     Copy,
@@ -88,6 +89,7 @@ import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeleteModelsDialog } from "./DeleteModelsDialog";
 import { DuplicateModelDialog } from "./DuplicateModelDialog";
 import { ModelsEmpty } from "./ModelsEmpty";
+import { SwitchBaseDialog } from "./SwitchBaseDialog";
 import {
     ConfirmAction,
     type Confirmation,
@@ -263,6 +265,7 @@ type Handlers = {
     test: (row: ModelRow) => void;
     edit: (row: ModelRow) => void;
     duplicate: (row: ModelRow) => void;
+    switchBase: (row: ModelRow, preferred: string | null) => void;
     confirm: (confirmation: Confirmation) => void;
     remove: (row: ModelRow) => void;
     createFrom: (base: string) => void;
@@ -451,7 +454,7 @@ function TrainItem({
     onSelect,
 }: {
     label: string;
-    blocked: { label: string } | null;
+    blocked: string | null;
     onSelect: () => void;
 }) {
     if (!blocked) {
@@ -467,7 +470,9 @@ function TrainItem({
             <GraduationCap className="mt-0.5" />
             <span className="flex flex-col">
                 <span>{label}</span>
-                <span className="text-sm text-muted-foreground">{`Fix the base model first: ${blocked.label}`}</span>
+                <span className="max-w-64 text-sm whitespace-normal text-muted-foreground">
+                    {blocked}
+                </span>
             </span>
         </DropdownMenuItem>
     );
@@ -512,10 +517,21 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
                 ))}
             {version?.status === "ready" && !version.live && (
                 <DropdownMenuItem
+                    disabled={Boolean(version.base_refusal)}
+                    className={version.base_refusal ? "items-start" : undefined}
                     onSelect={() => promoteVersion(row, version.number).then(on.refresh)}
                 >
-                    <Rocket />
-                    {`Deploy v${version.number}`}
+                    <Rocket className={version.base_refusal ? "mt-0.5" : undefined} />
+                    {version.base_refusal ? (
+                        <span className="flex flex-col">
+                            <span>{`Deploy v${version.number}`}</span>
+                            <span className="max-w-64 text-sm whitespace-normal text-muted-foreground">
+                                {version.base_refusal}
+                            </span>
+                        </span>
+                    ) : (
+                        `Deploy v${version.number}`
+                    )}
                 </DropdownMenuItem>
             )}
             {version?.status === "ready" && (
@@ -543,14 +559,28 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
             {row.kind === "custom" && (
                 <TrainItem
                     label="Train"
-                    blocked={row.health?.state === "base_unusable" ? row.health : null}
+                    blocked={
+                        row.health?.state === "base_unusable"
+                            ? `Fix the base model first: ${row.health.label}`
+                            : (row.serve_only?.reason ?? null)
+                    }
                     onSelect={() => on.open(scoped("/training", row))}
                 />
+            )}
+            {row.kind === "custom" && (
+                <DropdownMenuItem
+                    onSelect={() => on.switchBase(row, row.serve_only?.switch_to?.key ?? null)}
+                >
+                    <ArrowRightLeft />
+                    {row.serve_only?.switch_to
+                        ? `Move to ${row.serve_only.switch_to.name}`
+                        : "Switch base"}
+                </DropdownMenuItem>
             )}
             {row.kind === "base" && row.availability.state === "available" && (
                 <TrainItem
                     label="Train a model on it"
-                    blocked={row.health ?? null}
+                    blocked={row.health ? `Fix the base model first: ${row.health.label}` : null}
                     onSelect={() => on.createFrom(row.key)}
                 />
             )}
@@ -1440,6 +1470,9 @@ export function MyModels({
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
+    const [switching, setSwitching] = useState<{ row: ModelRow; preferred: string | null } | null>(
+        null,
+    );
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
@@ -1474,6 +1507,7 @@ export function MyModels({
             },
             edit: setEditing,
             duplicate: setDuplicating,
+            switchBase: (row, preferred) => setSwitching({ row, preferred }),
             confirm: setConfirmation,
             remove: (row) => setDeleting([{ key: rowId(row), model: row, version: null }]),
             createFrom: (base) =>
@@ -1579,6 +1613,11 @@ export function MyModels({
             <DuplicateModelDialog
                 row={duplicating}
                 onOpenChange={(open) => !open && setDuplicating(null)}
+            />
+            <SwitchBaseDialog
+                row={switching?.row ?? null}
+                preferred={switching?.preferred}
+                onOpenChange={(open) => !open && setSwitching(null)}
             />
             <ConfirmAction
                 confirmation={confirmation}

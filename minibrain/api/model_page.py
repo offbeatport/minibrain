@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
-from minibrain.api.deps import SessionDep
+from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.api.overview import Identity, model_rows, series_points
 from minibrain.api.request_logs import model_match
 from minibrain.data import feedback as feedback_store
@@ -24,6 +24,8 @@ from minibrain.registry.models import (
 )
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import NotFoundError, latest_dataset_version
+from minibrain.settings import Settings
+from minibrain.tasks.rebase import ServeOnly, serve_only
 from minibrain.tasks.service import decision, live_version
 
 router = APIRouter(prefix="/api", tags=["models"])
@@ -31,7 +33,7 @@ router = APIRouter(prefix="/api", tags=["models"])
 DAYS = 7
 DAY = timedelta(days=1)
 
-NextKind = Literal["promote", "deploy", "review_feedback", "add_data", "train", "create_custom"]
+NextKind = Literal["promote", "deploy", "review_feedback", "add_data", "train", "switch_base", "create_custom"]
 
 
 class TrafficDay(BaseModel):
@@ -55,6 +57,7 @@ class NextAction(BaseModel):
     label: str
     version: int | None = None
     count: int | None = None
+    base: str | None = Field(default=None, description="The base to switch to, for switch_base.")
 
 
 class ModelPage(BaseModel):
@@ -104,7 +107,11 @@ def busy(session: Session, model: Model) -> bool:
 
 def passing_candidate(model: Model) -> int | None:
     current = model.current_version if model.deployed and model.current_version is not None else -1
-    ready = [v for v in model.versions if v.status == VersionStatus.READY and v.number > current]
+    ready = [
+        v
+        for v in model.versions
+        if v.status == VersionStatus.READY and v.number > current and v.base_model == model.base_model
+    ]
     passing = [v for v in ready if v.live_at is not None or decision(model, v).passed]
     best = max(passing, key=lambda v: v.number, default=None)
     return best.number if best is not None else None
@@ -114,7 +121,16 @@ def rows_text(count: int) -> str:
     return f"{count} feedback {'row' if count == 1 else 'rows'} to review"
 
 
-def custom_next(model: Model, pending: int, working: bool) -> NextAction | None:
+def train_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
+    if limit is None:
+        upcoming = max((v.number for v in model.versions), default=0) + 1
+        return NextAction(kind="train", label=f"Train v{upcoming}", version=upcoming)
+    if limit.target is None:
+        return None
+    return NextAction(kind="switch_base", label=f"Move to {limit.target.name} to train", base=limit.target.key)
+
+
+def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | None = None) -> NextAction | None:
     if model.teardown is not None or working:
         return None
     candidate = passing_candidate(model)
@@ -127,8 +143,7 @@ def custom_next(model: Model, pending: int, working: bool) -> NextAction | None:
         return NextAction(kind="review_feedback", label=rows_text(pending), count=pending)
     if latest_dataset_version(model) is None:
         return NextAction(kind="add_data", label="Add training data")
-    upcoming = max((v.number for v in model.versions), default=0) + 1
-    return NextAction(kind="train", label=f"Train v{upcoming}", version=upcoming)
+    return train_next(model, limit)
 
 
 def base_next(model: BaseRow) -> NextAction | None:
@@ -139,7 +154,7 @@ def base_next(model: BaseRow) -> NextAction | None:
     return NextAction(kind="create_custom", label="Create a custom model from it")
 
 
-def model_page_of(session: Session, name: str) -> ModelPage:
+def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
     custom = session.scalar(select(Model).where(Model.slug == name))
     if custom is not None:
         pending = feedback_store.count(
@@ -150,7 +165,7 @@ def model_page_of(session: Session, name: str) -> ModelPage:
             key=custom.slug,
             name=custom.name,
             traffic=traffic(session, name, Identity(custom.slug, None)),
-            next=custom_next(custom, pending, busy(session, custom)),
+            next=custom_next(custom, pending, busy(session, custom), serve_only(session, settings, custom.base_model)),
         )
     base = session.get(BaseRow, name)
     if base is None:
@@ -170,5 +185,5 @@ def model_page_of(session: Session, name: str) -> ModelPage:
     summary="Summarise a model for its page",
     description="Base keys and custom slugs share one namespace, so a name finds either kind of model.",
 )
-def read_model_page(name: str, session: SessionDep) -> ModelPage:
-    return model_page_of(session, name)
+def read_model_page(name: str, session: SessionDep, settings: SettingsDep) -> ModelPage:
+    return model_page_of(session, settings, name)

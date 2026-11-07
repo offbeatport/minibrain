@@ -534,7 +534,7 @@ def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: 
     )
     trained = harness.client.post("/api/models/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
-    assert "has FP8 weights, which can be served but not fine-tuned" in trained.json()["detail"]
+    assert trained.json()["detail"] == "Corp FP8 is FP8, which serves only. Switch to a full-precision base to train."
 
 
 def test_hub_entries_name_their_quantization() -> None:

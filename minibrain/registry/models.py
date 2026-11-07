@@ -221,6 +221,7 @@ class Model(Base):
     first_live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     labels_dismissed: Mapped[list[int] | None] = mapped_column(JSON, default=None)
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    deployed_base: Mapped[str | None] = mapped_column(default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
@@ -287,6 +288,7 @@ class Version(Base):
     known_limits: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     duplicated_from: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    base_model: Mapped[str]
 
     model: Mapped[Model] = relationship(back_populates="versions")
     dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")

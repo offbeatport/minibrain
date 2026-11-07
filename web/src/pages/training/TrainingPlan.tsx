@@ -70,6 +70,7 @@ export function useTrainingPlan(
     slug: string,
     datasetVersion: number | null,
     choices: TrainingChoices,
+    enabled = true,
 ) {
     const query = {
         ...chosenSettings(choices),
@@ -85,6 +86,7 @@ export function useTrainingPlan(
             ),
         placeholderData: keepPreviousData,
         retry: false,
+        enabled,
     });
 }
 
