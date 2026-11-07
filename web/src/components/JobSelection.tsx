@@ -155,7 +155,7 @@ function JobSelectionBar({
     });
     return (
         <div className={cn("flex min-h-8 flex-wrap items-center gap-2", className)}>
-            <span className="text-sm font-medium tabular-nums">{`${jobs.length.toLocaleString()} selected`}</span>
+            <span className="font-medium tabular-nums">{`${jobs.length.toLocaleString()} selected`}</span>
             <Button variant="outline" onClick={onClear}>
                 <X />
                 Clear selection

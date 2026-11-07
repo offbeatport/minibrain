@@ -23,7 +23,7 @@ import { bytes } from "~/lib/time";
 
 export function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div className="grid gap-x-6 gap-y-1 px-panel py-3 text-sm sm:grid-cols-[8rem_1fr] sm:items-center">
+        <div className="grid gap-x-6 gap-y-1 px-panel py-3 sm:grid-cols-[8rem_1fr] sm:items-center">
             <div className="text-muted-foreground">{label}</div>
             <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">{children}</div>
         </div>
@@ -338,7 +338,7 @@ export function TryIt({ row }: { row: ModelRow }) {
                     </p>
                 )}
                 {answer && (
-                    <div className="flex flex-col gap-2 rounded-md border p-3 text-sm">
+                    <div className="flex flex-col gap-2 rounded-md border p-3">
                         {(answer.refusal || answer.content || !error) && (
                             <p className="whitespace-pre-wrap">
                                 {answer.refusal || answer.content || (busy ? "…" : "No answer.")}

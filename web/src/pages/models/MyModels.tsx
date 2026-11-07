@@ -1143,7 +1143,7 @@ function ModelList({
             <div
                 className={cn(
                     ROW_GRID,
-                    "h-9 border-b bg-secondary text-sm font-medium text-muted-foreground",
+                    "h-9 border-b bg-secondary font-medium text-muted-foreground",
                 )}
             >
                 <label className="-ml-4 flex cursor-pointer items-center self-stretch pr-2 pl-4">
@@ -1358,7 +1358,7 @@ function BulkBar({
     const canUndeploy = chosen.some(liveOf);
     return (
         <div className="flex min-h-8 flex-wrap items-center gap-2">
-            <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
+            <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
             <Button variant="outline" size="sm" onClick={onClear}>
                 <X />
                 Clear selection
@@ -1544,7 +1544,7 @@ export function MyModels({
                 </div>
             )}
             {models.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading models…</p>
+                <p className="text-muted-foreground">Loading models…</p>
             ) : models.error ? (
                 <div className="flex items-center gap-2">
                     <ErrorLine error={models.error} />

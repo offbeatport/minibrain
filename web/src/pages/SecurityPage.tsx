@@ -386,7 +386,7 @@ function LockedRow({ policy }: { policy: PolicyInfo }) {
             disabled
             control={
                 <>
-                    <span className="text-sm">{display(policy, policy.value)}</span>
+                    <span>{display(policy, policy.value)}</span>
                     <LockedBadge policy={policy} />
                 </>
             }
@@ -443,7 +443,7 @@ function LicenceList({ policy }: { policy: PolicyInfo }) {
                 ))}
             </div>
             {chosen.size === 0 && (
-                <p className="text-sm text-warning">
+                <p className="text-warning">
                     No licence is allowed until you tick one, so every download is refused.
                 </p>
             )}

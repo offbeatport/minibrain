@@ -31,7 +31,7 @@ function Reasoning({ text, streaming }: { text: string; streaming: boolean }) {
                     : `Reasoning · ${count(text.trim().split(/\s+/).length)} words`}
             </CollapsibleTrigger>
             <CollapsibleContent>
-                <p className="mt-2 border-l pl-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                <p className="mt-2 border-l pl-3 whitespace-pre-wrap text-muted-foreground">
                     {text.trim()}
                 </p>
             </CollapsibleContent>
@@ -57,7 +57,7 @@ function ToolCard({
     return (
         <div className="flex flex-col gap-2 rounded-md border bg-card p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm">
+                <span>
                     Calls <span className="font-mono">{call.name}</span>
                 </span>
                 <span className="font-mono text-sm text-muted-foreground">{call.id}</span>
@@ -146,7 +146,7 @@ function Answer({
                     <Badge variant="warning" className="w-fit">
                         Blocked
                     </Badge>
-                    <p className="text-sm">{turn.refusal}</p>
+                    <p>{turn.refusal}</p>
                 </div>
             )}
             {json ? (
@@ -155,7 +155,7 @@ function Answer({
                 turn.content && <Markdown content={turn.content} className="text-base" />
             )}
             {turn.streaming && !turn.content && !turn.reasoning && (
-                <p className="text-sm text-muted-foreground">Generating…</p>
+                <p className="text-muted-foreground">Generating…</p>
             )}
             {turn.calls.map((call) => (
                 <ToolCard
@@ -166,7 +166,7 @@ function Answer({
                     busy={busy}
                 />
             ))}
-            {turn.error && <p className="text-sm text-destructive">{turn.error}</p>}
+            {turn.error && <p className="text-destructive">{turn.error}</p>}
             <Meta turn={turn} />
             {answered && target?.kind === "custom" && turn.meta && (
                 <AnswerFeedback

@@ -111,7 +111,7 @@ function FieldRow({
                 disabled
                 control={
                     <>
-                        <span className="text-sm">{display(field)}</span>
+                        <span>{display(field)}</span>
                         <Badge variant="neutral" className="w-fit">
                             {LOCK_LABEL[field.source] ?? field.source}
                         </Badge>
@@ -252,7 +252,7 @@ function ProviderForm({ status }: { status: EncryptionStatus }) {
                 </div>
             )}
             {test.data && (
-                <p className="text-sm">
+                <p>
                     <StatusText tone={test.data.ok ? "success" : "destructive"}>
                         {test.data.ok ? "Key works" : "Key failed"}
                     </StatusText>
@@ -279,7 +279,7 @@ function countsText(counts: EncryptionCounts): string {
 function CurrentKey({ status }: { status: EncryptionStatus }) {
     if (status.provider === "off") {
         return (
-            <p className="text-sm">
+            <p>
                 <StatusText tone="warning">Off</StatusText>
                 <span className="ml-2 text-muted-foreground">
                     New files are written unencrypted.
@@ -289,14 +289,14 @@ function CurrentKey({ status }: { status: EncryptionStatus }) {
     }
     if (status.problem) {
         return (
-            <p className="text-sm">
+            <p>
                 <StatusText tone="destructive">{status.provider_label} unavailable</StatusText>
                 <span className="ml-2 text-muted-foreground">{status.problem}</span>
             </p>
         );
     }
     return (
-        <p className="flex flex-wrap items-center gap-x-2 text-sm">
+        <p className="flex flex-wrap items-center gap-x-2">
             <StatusText tone="success">{status.provider_label}</StatusText>
             <span className="font-mono break-all">{status.key}</span>
             <span className="text-muted-foreground break-all">{status.where}</span>
@@ -321,7 +321,7 @@ function Files({ status }: { status: EncryptionStatus }) {
     return (
         <div className="flex flex-col gap-2">
             {running && task ? (
-                <p className="text-sm">
+                <p>
                     <StatusText tone="info">{TASKS[task.kind] ?? task.kind}</StatusText>
                     {task.progress && (
                         <span className="ml-2 text-muted-foreground tabular-nums">
@@ -331,7 +331,7 @@ function Files({ status }: { status: EncryptionStatus }) {
                     )}
                 </p>
             ) : last ? (
-                <p className="text-sm tabular-nums">
+                <p className="tabular-nums">
                     {countsText(last.counts)}
                     {last.finished_at && (
                         <span
@@ -343,16 +343,16 @@ function Files({ status }: { status: EncryptionStatus }) {
                     )}
                 </p>
             ) : (
-                <p className="text-sm text-muted-foreground">No files have been checked yet.</p>
+                <p className="text-muted-foreground">No files have been checked yet.</p>
             )}
             {task?.state === "failed" && !running && (
-                <p className="text-sm text-destructive">
+                <p className="text-destructive">
                     {task.error ??
                         `${last?.counts.damaged ?? 0} files could not be read or changed.`}
                 </p>
             )}
             {(last?.counts.problems?.length ?? 0) > 0 && (
-                <ul className="list-inside list-disc text-sm text-muted-foreground">
+                <ul className="list-inside list-disc text-muted-foreground">
                     {(last?.counts.problems ?? []).map((problem) => (
                         <li key={problem} className="font-mono break-all">
                             {problem}
@@ -401,7 +401,7 @@ function Keys({ status }: { status: EncryptionStatus }) {
         return null;
     }
     return (
-        <ul className="divide-y border-y text-sm">
+        <ul className="divide-y border-y">
             {status.keys.map((key) => (
                 <li
                     key={`${key.provider}:${key.key}`}

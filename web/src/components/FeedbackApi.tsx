@@ -40,7 +40,7 @@ export function FeedbackApi({
             title="Feedback"
             description="Tell the model when an answer was right or wrong; it lands in the review queue."
         >
-            <div className="flex flex-col gap-3 text-sm">
+            <div className="flex flex-col gap-3">
                 <p>
                     <span className="font-mono">POST {baseUrl}/feedback</span> with the{" "}
                     <span className="font-mono">id</span> of the chat completion as{" "}

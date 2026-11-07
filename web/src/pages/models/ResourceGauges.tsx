@@ -66,7 +66,7 @@ function Bar({ label, total, segments }: { label: string; total: number; segment
 
 function Legend({ rows }: { rows: Row[] }) {
     return (
-        <dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1 text-sm">
+        <dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1">
             {rows.map((row) => (
                 <div key={row.id} className="contents">
                     <span
@@ -97,7 +97,7 @@ function Gauge({
     return (
         <div className="flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm font-medium">{title}</span>
+                <span className="font-medium">{title}</span>
                 <span className={cn("text-lg font-semibold tabular-nums", TONE_TEXT[tone])}>
                     {headline}
                 </span>
@@ -171,7 +171,7 @@ export function DiskGauge({
     if (free === null || free === undefined || !total) {
         return (
             <Gauge title={store.label} headline="–" tone="normal">
-                <p className="text-sm text-muted-foreground">Free space unknown</p>
+                <p className="text-muted-foreground">Free space unknown</p>
             </Gauge>
         );
     }

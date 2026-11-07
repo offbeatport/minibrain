@@ -133,7 +133,7 @@ function TableList({
                 Tables: click one to insert its name
             </div>
             {sources.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-muted-foreground">No sources yet.</p>
+                <p className="px-3 py-2 text-muted-foreground">No sources yet.</p>
             ) : (
                 <ul className="max-h-64 divide-y overflow-y-auto">
                     {[...sources]
@@ -145,7 +145,7 @@ function TableList({
                                     onClick={() => onInsert(source.table)}
                                     className="flex w-full flex-col items-start gap-0.5 px-3 py-1.5 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
                                 >
-                                    <span className="font-mono text-sm">{source.table}</span>
+                                    <span className="font-mono">{source.table}</span>
                                     <span className="w-full truncate text-sm text-muted-foreground">
                                         {source.columns.map((column) => column.name).join(", ")}
                                     </span>
@@ -396,7 +396,7 @@ export function PreviewSection({
             />
             {data && data.example.length > 0 && (
                 <div className="flex max-w-2xl flex-col gap-2 border-t px-panel py-4">
-                    <h3 className="text-sm font-semibold">One training example</h3>
+                    <h3 className="font-semibold">One training example</h3>
                     {data.example.map((message) => (
                         <ChatBubble
                             key={message.role}

@@ -866,12 +866,12 @@ export function DiscoverComparePage() {
             )}
             {catalog.isLoading && <CompareSkeleton ids={ids} />}
             {missing.length > 0 && (
-                <StatusText tone="warning" className="text-sm whitespace-normal">
+                <StatusText tone="warning" className="whitespace-normal">
                     {`Not in the catalogue, so left out: ${missing.join(", ")}.`}
                 </StatusText>
             )}
             {extra.length > 0 && (
-                <StatusText tone="warning" className="text-sm whitespace-normal">
+                <StatusText tone="warning" className="whitespace-normal">
                     {`Compare shows up to ${COMPARE_MAX} models; left out: ${extra
                         .map((id) => byId.get(id)?.name ?? id)
                         .join(", ")}.`}
@@ -899,9 +899,7 @@ export function DiscoverComparePage() {
             )}
             {data && entries.length === 1 && (
                 <div className="flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2">
-                    <p className="text-sm">
-                        {`Add at least one more model to compare with ${entries[0].name}.`}
-                    </p>
+                    <p>{`Add at least one more model to compare with ${entries[0].name}.`}</p>
                     <AddToCompare count={1} onAdd={() => setPicking(true)} />
                 </div>
             )}
@@ -925,7 +923,7 @@ export function DiscoverComparePage() {
                         }
                     />
                     {filtering && differing === 0 && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground">
                             These models match on every attribute. Turn off Only differences to see
                             them.
                         </p>

@@ -534,16 +534,13 @@ function Overview({
             </PanelSection>
             <PanelSection icon={TriangleAlert} title="Needs a look">
                 {warnings.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground">
                         Nothing: every machine is online and up to date.
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {warnings.map((warning) => (
-                            <li
-                                key={warning.text}
-                                className="flex flex-wrap items-center gap-2 text-sm"
-                            >
+                            <li key={warning.text} className="flex flex-wrap items-center gap-2">
                                 <StatusText tone="warning">{warning.text}</StatusText>
                                 <Link href={warning.href} className="text-primary hover:underline">
                                     Open

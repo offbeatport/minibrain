@@ -392,7 +392,7 @@ export function FeedbackReview(props: Props) {
         return <ErrorLine error={item.error} />;
     }
     if (!item.data) {
-        return <p className="text-sm text-muted-foreground">Loading…</p>;
+        return <p className="text-muted-foreground">Loading…</p>;
     }
     return <Review {...props} item={item.data} />;
 }

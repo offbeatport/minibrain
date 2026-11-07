@@ -469,7 +469,7 @@ export function AddModelPage() {
                     </Field>
                     {option?.entry && (
                         <div className="flex flex-col gap-label">
-                            <span className="text-sm font-medium">Licence</span>
+                            <span className="font-medium">Licence</span>
                             <Licence
                                 id="create-licence"
                                 option={option}

@@ -226,7 +226,7 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
         >
             <div className="flex flex-col gap-3">
                 {dataset.models.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No model trains on it yet.</p>
+                    <p className="text-muted-foreground">No model trains on it yet.</p>
                 ) : (
                     <ul className="flex flex-col divide-y rounded-lg border">
                         {dataset.models.map((slug) => (
@@ -360,7 +360,7 @@ export function DatasetDetail({
             />
             <ErrorLine error={remove.error} />
             {dataset.error && (
-                <p className="text-sm text-destructive">{`The query fails: ${dataset.error}`}</p>
+                <p className="text-destructive">{`The query fails: ${dataset.error}`}</p>
             )}
             <RowLimitNotice rows={dataset.rows} limit={dataset.row_limit ?? 0} />
             <FirstVersionNotice dataset={dataset} />

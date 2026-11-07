@@ -31,10 +31,10 @@ export function ModelPage() {
     return (
         <Page>
             <BackLink />
-            {models.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {models.isLoading && <p className="text-muted-foreground">Loading…</p>}
             <ErrorLine error={models.error} />
             {models.data && !row && (
-                <p className="text-sm text-muted-foreground">{`No model called ${name}.`}</p>
+                <p className="text-muted-foreground">{`No model called ${name}.`}</p>
             )}
             {row?.kind === "base" && <BaseModelLoader key={row.key} row={row} />}
             {row?.kind === "custom" && <CustomModelLoader key={row.key} row={row} />}

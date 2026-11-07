@@ -78,7 +78,7 @@ export function SourcesOverview({
         <div className="flex flex-col gap-6">
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Sources</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     Files, folders, buckets and tables minibrain reads. Each one is a table that
                     dataset SQL reads by name.
                 </p>

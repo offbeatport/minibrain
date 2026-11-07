@@ -32,7 +32,7 @@ function Transcript({ turns }: { turns: { role: string; content: string }[] }) {
                 </p>
             )}
             {turns.slice(-SHOWN_TURNS).map((turn, index) => (
-                <p key={`${index}-${turn.role}`} className="text-sm whitespace-pre-wrap">
+                <p key={`${index}-${turn.role}`} className="whitespace-pre-wrap">
                     <span className="text-muted-foreground">
                         {turn.role === "user" ? "User: " : "Assistant: "}
                     </span>
@@ -102,7 +102,7 @@ export function SaveExample({
                     {messages ? (
                         <Transcript turns={messages} />
                     ) : (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground">
                             Only conversations of plain messages can be test examples, without tool
                             calls.
                         </p>

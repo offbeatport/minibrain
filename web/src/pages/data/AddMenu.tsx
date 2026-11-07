@@ -255,7 +255,7 @@ export function AddMenu({
                                 </DropdownMenuItem>
                             ))}
                             {samples.error ? (
-                                <p className="px-2.5 py-1.5 text-sm text-destructive">
+                                <p className="px-2.5 py-1.5 text-destructive">
                                     Sample data could not be listed.
                                 </p>
                             ) : null}

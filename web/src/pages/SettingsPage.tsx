@@ -158,7 +158,7 @@ function CurrencyRow({ value, locked }: { value: string | undefined; locked?: st
             control={
                 locked ? (
                     <>
-                        <span className="text-sm">{value}</span>
+                        <span>{value}</span>
                         <SourceBadge source={locked} />
                     </>
                 ) : (

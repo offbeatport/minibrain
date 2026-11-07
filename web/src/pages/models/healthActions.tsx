@@ -257,7 +257,7 @@ function AccessDialog({
             onClose();
         },
     });
-    let steps: ReactNode = <p className="text-sm text-muted-foreground">Loading…</p>;
+    let steps: ReactNode = <p className="text-muted-foreground">Loading…</p>;
     if (catalog.data) {
         steps = <AccessSteps entry={entry} catalog={catalog.data} />;
     }

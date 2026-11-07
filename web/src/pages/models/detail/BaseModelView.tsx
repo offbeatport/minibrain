@@ -199,7 +199,7 @@ export function BaseModelView({ model, tab }: { model: BaseModelDetail; tab: Mod
                         <PanelSection icon={Info} title="Details">
                             <Facts items={facts} />
                             {model.error && !model.health && (
-                                <p className="mt-2 text-sm text-destructive">{model.error}</p>
+                                <p className="mt-2 text-destructive">{model.error}</p>
                             )}
                         </PanelSection>
                     </PanelSections>

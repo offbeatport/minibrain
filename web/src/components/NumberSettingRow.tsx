@@ -52,7 +52,7 @@ export function NumberSettingRow({
                 disabled
                 control={
                     <>
-                        <span className="text-sm tabular-nums">
+                        <span className="tabular-nums">
                             {text}
                             {options.unit && (
                                 <span className="text-muted-foreground"> {options.unit}</span>

@@ -79,7 +79,7 @@ export function LabelProposalNotice({ detail }: { detail: ModelDetail }) {
     return (
         <section
             aria-label="Label proposal"
-            className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft p-3 text-sm"
+            className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft p-3"
         >
             <div className="flex min-w-0 max-w-3xl flex-col gap-1">
                 <p className="font-semibold">

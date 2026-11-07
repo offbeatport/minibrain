@@ -36,7 +36,7 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
 function GetStarted() {
     return (
         <Section title="Get started" caption="Five minutes with the sample data in this repo.">
-            <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
+            <ol className="flex list-decimal flex-col gap-1 pl-5">
                 <li>
                     Create a model on{" "}
                     <Link className="text-primary" href="/models">

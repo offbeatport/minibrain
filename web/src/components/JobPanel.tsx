@@ -25,7 +25,7 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
     return (
         <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Link href={jobPageHref(job.id)} className="font-semibold hover:underline">
                         {jobTitle(job)}
                     </Link>
@@ -59,7 +59,7 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
                     />
                 </div>
             )}
-            {job.error && <p className="text-sm text-destructive">{job.error}</p>}
+            {job.error && <p className="text-destructive">{job.error}</p>}
             <ErrorLine error={cancel.error ?? retry.error} />
         </div>
     );

@@ -278,7 +278,7 @@ function KindCards({
                     type="button"
                     aria-pressed={item.kind === active}
                     onClick={() => onChoose(item)}
-                    className="flex min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-primary aria-pressed:bg-accent"
+                    className="flex min-w-0 items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-primary aria-pressed:bg-accent"
                 >
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
                         <KindIcon kind={item.kind} className="size-4" />
@@ -314,7 +314,7 @@ function HubResult({ repo }: { repo: string }) {
         );
     }
     return (
-        <div className="flex flex-col gap-2 rounded-md border px-3 py-3 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border px-3 py-3">
             <span>{`${repo} is not in the catalogue. minibrain can read its details from Hugging Face and add it.`}</span>
             <div>
                 <Button
@@ -334,7 +334,7 @@ function HubResult({ repo }: { repo: string }) {
 
 function Checklist({ checks }: { checks: NonNullable<Inspection["checks"]> }) {
     return (
-        <ul className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
+        <ul className="flex flex-col gap-1.5 px-3 py-2.5">
             {checks.map((check) => (
                 <li key={check.label} className="flex items-start gap-2">
                     {check.ok ? (
@@ -368,7 +368,7 @@ export function PathResult({ plan }: { plan: SourcePlan }) {
         return null;
     }
     if (plan.checking || !plan.found) {
-        return <span className="text-sm text-muted-foreground">Checking…</span>;
+        return <span className="text-muted-foreground">Checking…</span>;
     }
     const { found } = plan;
     if (!found.checks?.length) {
@@ -383,7 +383,7 @@ export function PathResult({ plan }: { plan: SourcePlan }) {
         Boolean,
     );
     return (
-        <div className="flex flex-col divide-y rounded-md border text-sm">
+        <div className="flex flex-col divide-y rounded-md border">
             <div className="flex flex-col gap-0.5 px-3 py-2.5">
                 <span className="font-semibold">{found.name || where}</span>
                 <span className="text-muted-foreground tabular-nums">
@@ -419,7 +419,7 @@ function ConnectionChoice({
     const options = (connections.data ?? []).filter((item) => item.kind === "s3");
     if (connections.data && options.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 {
                     "No S3 connections yet, so the server's environment credentials are used. Add one under "
                 }
@@ -432,7 +432,7 @@ function ConnectionChoice({
     }
     return (
         <div className="flex flex-col gap-1.5">
-            <label htmlFor="base-connection" className="text-sm font-medium">
+            <label htmlFor="base-connection" className="font-medium">
                 Connection
             </label>
             <Select
@@ -498,7 +498,7 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                 />
                 <div className="flex flex-col gap-label">
                     <span className="flex items-center gap-1.5">
-                        <label htmlFor="base-source" className="text-sm font-medium">
+                        <label htmlFor="base-source" className="font-medium">
                             Model id, link, S3 path or folder
                         </label>
                         <InfoTip label="Where models can come from">
@@ -527,7 +527,7 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                     </div>
                 </div>
                 {plan.target.kind === "empty" && (
-                    <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                    <div className="flex min-h-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center text-muted-foreground">
                         <span className="font-medium text-foreground">
                             Paste where the model is
                         </span>
@@ -537,7 +537,7 @@ export function ImportPanel({ seed, onUse }: { seed: string; onUse: (pick: Impor
                     </div>
                 )}
                 {plan.target.kind === "catalogue" && (
-                    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm">
+                    <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
                         <PublisherLogo
                             publisher={plan.target.entry.provider}
                             name={plan.target.entry.name}

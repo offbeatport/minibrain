@@ -25,7 +25,7 @@ function Block({
     return (
         <div className="flex flex-col gap-3 px-panel py-4">
             {title && (
-                <span className="flex items-center gap-1.5 text-sm font-medium">
+                <span className="flex items-center gap-1.5 font-medium">
                     {title}
                     {info}
                 </span>
@@ -61,7 +61,7 @@ function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control
     );
 }
 
-const CARD = "flex rounded-lg border px-3 py-2.5 text-sm leading-snug";
+const CARD = "flex rounded-lg border px-3 py-2.5 leading-snug";
 
 const TRAIN_TONES = { fits: "success", insufficient: "destructive" } as const;
 
@@ -72,7 +72,7 @@ function TrainLine({ variant }: { variant: CatalogVariantInfo | null }) {
     }
     const level = fit.level === "fits" || fit.level === "insufficient" ? fit.level : null;
     return (
-        <div className="flex flex-col gap-1 text-sm">
+        <div className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-3">
                 <span className="inline-flex items-center gap-1.5 font-medium">
                     Memory to train (QLoRA)
@@ -135,7 +135,7 @@ function Formats({
             </div>
         );
     }
-    return <span className="text-sm text-muted-foreground">As installed</span>;
+    return <span className="text-muted-foreground">As installed</span>;
 }
 
 function installed(entry: CatalogEntry, variant: CatalogVariantInfo): boolean {
@@ -232,7 +232,7 @@ export function Licence({
             );
         }
         return (
-            <Label className="flex items-start gap-2 text-sm leading-snug font-normal">
+            <Label className="flex items-start gap-2 leading-snug font-normal">
                 <Checkbox
                     id={id}
                     checked={accepted}
@@ -258,7 +258,7 @@ export function Licence({
         );
     }
     return (
-        <p className="text-sm leading-snug">
+        <p className="leading-snug">
             {`${entry.license_name}, already accepted on this install. `}
             <ReadLink href={entry.license_url} />
             <span className="mt-0.5 block text-muted-foreground">{use}</span>

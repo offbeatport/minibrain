@@ -213,7 +213,7 @@ export function FoldersGroup({
         <div className="flex flex-col gap-6">
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Folders</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     Directories on this server, read in place. Every CSV, TSV, JSON, JSON Lines or
                     Parquet file of one format in a folder and its subfolders is one table.
                 </p>
@@ -246,7 +246,7 @@ export function FoldersGroup({
                     Security, Folder sources.
                 </EmptyState>
             ) : (
-                <div className="flex flex-col gap-1 text-sm">
+                <div className="flex flex-col gap-1">
                     <span className="text-muted-foreground">
                         {roots.data?.locked
                             ? "Allowed folders, set by configuration:"

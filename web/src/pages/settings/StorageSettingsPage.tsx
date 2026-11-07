@@ -226,7 +226,7 @@ function StorageForm({ settings }: { settings: StorageSettings }) {
                 </Button>
             </div>
             {test.data && (
-                <p className="text-sm">
+                <p>
                     <StatusText tone={test.data.ok ? "success" : "destructive"}>
                         {test.data.ok ? "Connected" : "Could not connect"}
                     </StatusText>
@@ -265,7 +265,7 @@ export function StorageSettingsPage() {
                 >
                     {settings.data && (
                         <div className="flex flex-col gap-field">
-                            <p className="text-sm">
+                            <p>
                                 <span className="text-muted-foreground">Now: </span>
                                 <span className="font-mono break-all">
                                     {settings.data.location}

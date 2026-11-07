@@ -21,7 +21,7 @@ function Progress({ job, label }: { job: JobDetail; label: string }) {
                 label={label}
                 className="w-full max-w-md"
             />
-            <span className="text-sm tabular-nums">{percent(job.progress)}</span>
+            <span className="tabular-nums">{percent(job.progress)}</span>
         </div>
     );
 }
@@ -180,7 +180,7 @@ export function TransferPanel({
                 )}
                 <Progress job={job} label="Transfer progress" />
                 {!transfer && !isActiveJob(job) && (
-                    <p className="text-sm text-muted-foreground">No files moved in this run.</p>
+                    <p className="text-muted-foreground">No files moved in this run.</p>
                 )}
             </div>
         </Section>

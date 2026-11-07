@@ -411,7 +411,7 @@ export function ModelTrainingPage() {
             </Link>
             <ErrorLine error={models.error} />
             {models.data && !model && (
-                <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
+                <p className="text-muted-foreground">No custom model called {slug}.</p>
             )}
             {model && (
                 <>

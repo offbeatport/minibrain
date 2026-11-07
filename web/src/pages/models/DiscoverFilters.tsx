@@ -197,7 +197,7 @@ function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: num
                 <button
                     type="button"
                     onClick={() => setExpanded(!expanded)}
-                    className="mt-1 w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="mt-1 w-fit rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                     {expanded ? "Show less" : `Show ${hidden} more`}
                 </button>
@@ -209,7 +209,7 @@ function OptionList({ items, limit = SHOWN }: { items: OptionItem[]; limit?: num
 function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
     return (
         <fieldset className="flex flex-col px-4 py-4">
-            <legend className="float-left mb-2 text-sm font-semibold">{title}</legend>
+            <legend className="float-left mb-2 font-semibold">{title}</legend>
             {children}
         </fieldset>
     );
@@ -306,7 +306,7 @@ export function FilterPanel({
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
             <div className="flex h-12 items-center gap-2 px-4">
-                <span className="text-sm font-semibold">Filters</span>
+                <span className="font-semibold">Filters</span>
                 {active > 0 && (
                     <>
                         <span className="text-sm text-muted-foreground tabular-nums">

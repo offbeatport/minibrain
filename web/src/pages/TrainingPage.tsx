@@ -308,7 +308,7 @@ export function Training({ slug }: { slug: string }) {
             </Section>
             <Section title="Jobs" caption="One job runs at a time; the rest wait in the queue.">
                 {active.length + finished.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No jobs yet.</p>
+                    <p className="text-muted-foreground">No jobs yet.</p>
                 ) : (
                     <div className="flex flex-col gap-3">
                         {[...active, ...finished].map((job) => (

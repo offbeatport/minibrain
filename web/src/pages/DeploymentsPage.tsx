@@ -89,7 +89,7 @@ function Connect({ slug }: { slug: string }) {
     return (
         <>
             <PanelSection icon={Plug} title="Connect">
-                <div className="flex flex-col gap-4 text-sm">
+                <div className="flex flex-col gap-4">
                     <div>
                         <div className="text-muted-foreground">Base URL</div>
                         <div className="font-mono">{baseUrl}</div>
@@ -249,7 +249,7 @@ export function DeploymentsPage() {
             <PanelSections>
                 <PanelSection icon={Radio} title="Live models" bare>
                     {models.isLoading ? (
-                        <p className="text-sm text-muted-foreground">Loading…</p>
+                        <p className="text-muted-foreground">Loading…</p>
                     ) : (
                         <DataGrid
                             columns={LIVE_COLUMNS}
@@ -388,7 +388,7 @@ export function DeploymentPage() {
             </Link>
             <ErrorLine error={models.error} />
             {models.data && !row && (
-                <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
+                <p className="text-muted-foreground">No custom model called {slug}.</p>
             )}
             {row && (
                 <>

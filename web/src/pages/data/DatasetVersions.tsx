@@ -109,7 +109,7 @@ export function ChangeNotice({
     }
     return (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="text-sm">
+            <p>
                 <StatusText tone="warning">{text}</StatusText>
                 <span className="text-muted-foreground">
                     {` · ${shortName(datasetVersion)} saved ${relativeTime(takenAt(datasetVersion))}. ${after ?? "Update to save the next version."}`}
@@ -126,7 +126,7 @@ export function FirstVersionNotice({ dataset }: { dataset: DatasetSummary }) {
     }
     return (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="text-sm">
+            <p>
                 <StatusText tone="warning">No version yet</StatusText>
                 <span className="text-muted-foreground">
                     {" · Models train and score on a saved version of the rows."}
@@ -142,7 +142,7 @@ export function RowLimitNotice({ rows, limit }: { rows: number | null; limit: nu
         return null;
     }
     return (
-        <p className="text-sm text-destructive">
+        <p className="text-destructive">
             {`${count(rows)} rows: more than the ${count(limit)} one version holds, so no new version can be saved. Filter or sample in the query, for example `}
             <span className="font-mono">{`USING SAMPLE reservoir(${limit} ROWS) REPEATABLE (7)`}</span>
             {", or raise the limit under "}

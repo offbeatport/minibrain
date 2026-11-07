@@ -243,7 +243,7 @@ function ChangeTable({ event, policies }: { event: AuditEvent; policies: Policie
     }
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Change</h3>
+            <h3 className="font-medium">Change</h3>
             <div className="overflow-x-auto rounded-md border">
                 <Table>
                     <TableHeader>
@@ -339,7 +339,7 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
             <ChangeTable event={event} policies={policies} />
             {fields.length > 0 && (
                 <section className="flex flex-col gap-2">
-                    <h3 className="text-sm font-medium">Details</h3>
+                    <h3 className="font-medium">Details</h3>
                     <Facts
                         items={fields.map(([name, value]) => [
                             keyLabel(name),
@@ -588,7 +588,7 @@ function Retention({ policy }: { policy: PolicyInfo }) {
     const older = prunable.data?.total ?? 0;
     const control = policy.locked ? (
         <>
-            <span className="text-sm">{retentionText(days)}</span>
+            <span>{retentionText(days)}</span>
             <Badge variant="neutral">
                 {policy.source === "environment" ? "Set by environment" : "Set by config file"}
             </Badge>
@@ -628,7 +628,7 @@ function Retention({ policy }: { policy: PolicyInfo }) {
                     control={control}
                 >
                     {days > 0 && (
-                        <p className="pb-2.5 text-sm text-warning">
+                        <p className="pb-2.5 text-warning">
                             {older > 0
                                 ? `${count(older)} ${older === 1 ? "event is" : "events are"} older than that and will be deleted within the hour. Export them first if you need a copy.`
                                 : "Deleted events cannot be restored. Export the log first if you need a copy."}

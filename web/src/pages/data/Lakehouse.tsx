@@ -74,7 +74,7 @@ function FormatPicker({
 
 function Missing({ children, href, action }: { children: string; href: string; action: string }) {
     return (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground">
             {`${children} `}
             <Link href={href} className="text-primary hover:underline">
                 {action}
@@ -227,7 +227,7 @@ export function LakehouseGroup({
         <div className="flex flex-col gap-6">
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Lakehouse</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     Iceberg and Delta Lake tables, read in place at their current snapshot or
                     version. Iceberg tables come from S3 through a connection, Delta tables from
                     folders on this server.
@@ -245,7 +245,7 @@ export function LakehouseGroup({
                 <Stat label="Datasets" value={count(built.length)} />
             </div>
             <ExtensionWarning needed={used.flatMap((format) => EXTENSIONS_FOR[format] ?? [])} />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 {members.length === 0
                     ? "No tables yet. Pick Lakehouse table under Add; each one becomes a table in dataset SQL."
                     : "Pick a table to see its columns, rows and the version or snapshot it is read at."}
@@ -260,7 +260,7 @@ export function LakehouseFacts({ source }: { source: SourceSummary }) {
         return null;
     }
     return (
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
             <dt className="text-muted-foreground">Format</dt>
             <dd className="flex items-center gap-2">
                 <FileTypeIcon type={format} className="size-4" />

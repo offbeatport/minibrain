@@ -72,7 +72,7 @@ function Labelled({
                 {id ? (
                     <Label htmlFor={id}>{label}</Label>
                 ) : (
-                    <span className="text-sm leading-snug font-medium">{label}</span>
+                    <span className="leading-snug font-medium">{label}</span>
                 )}
                 <InfoTip label={`About ${label}`}>{help}</InfoTip>
             </div>

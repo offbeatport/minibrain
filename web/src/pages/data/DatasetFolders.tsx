@@ -618,7 +618,7 @@ export function FolderContents({
         <div className="flex flex-col gap-3">
             {chosen.length > 0 && (
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
+                    <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
                     <Button variant="outline" size="sm" onClick={clear}>
                         <X />
                         Clear selection
@@ -811,7 +811,7 @@ export function DatasetsRoot({
         <div className="flex flex-col gap-6">
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Datasets</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     Saved queries that turn one or more sources into input and label rows. Models
                     train on a saved version of one.
                 </p>

@@ -146,7 +146,7 @@ function ChatRow({
                 aria-current={current ? "true" : undefined}
                 className="flex min-w-0 flex-1 flex-col rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-                <span className="truncate text-sm">{chat.title}</span>
+                <span className="truncate">{chat.title}</span>
                 <span className="truncate text-sm text-muted-foreground">
                     {`${relativeTime(chat.updated_at)} · `}
                     <span className="font-mono">{chat.model}</span>
@@ -210,14 +210,12 @@ export function Recent({
                     </div>
                 )}
                 {chats.data && items.length === 0 && (
-                    <p className="p-2 text-sm text-muted-foreground">
+                    <p className="p-2 text-muted-foreground">
                         Your chats appear here as you send them, for you alone.
                     </p>
                 )}
                 {items.length > 0 && shown.length === 0 && (
-                    <p className="p-2 text-sm text-muted-foreground">
-                        No chat matches {filter.trim()}.
-                    </p>
+                    <p className="p-2 text-muted-foreground">No chat matches {filter.trim()}.</p>
                 )}
                 {shown.length > 0 && (
                     <ul className="flex flex-col gap-0.5" aria-label="Recent chats">

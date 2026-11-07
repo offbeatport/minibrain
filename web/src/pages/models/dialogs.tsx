@@ -242,7 +242,7 @@ export function TestBaseDialog({
                 />
                 {test.data && (
                     <div className="flex flex-col gap-1 rounded-md border bg-secondary p-3">
-                        <p className="whitespace-pre-wrap text-sm">{test.data.output}</p>
+                        <p className="whitespace-pre-wrap">{test.data.output}</p>
                         <p className="text-sm tabular-nums text-muted-foreground">
                             {Math.round(test.data.latency_ms)} ms · {test.data.completion_tokens}{" "}
                             tokens

@@ -175,7 +175,7 @@ export function ItemHeader({
                         )}
                         <span className="truncate">{title}</span>
                     </h2>
-                    {detail && <p className="text-sm text-muted-foreground">{detail}</p>}
+                    {detail && <p className="text-muted-foreground">{detail}</p>}
                 </div>
                 {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
             </div>
@@ -341,11 +341,11 @@ export function LabelBalance({ counts }: { counts: LabelCount[] }) {
     const rest = counts.slice(SHOWN_LABELS);
     const restRows = rest.reduce((sum, item) => sum + item.rows, 0);
     if (total === 0) {
-        return <p className="text-sm text-muted-foreground">No labelled rows yet.</p>;
+        return <p className="text-muted-foreground">No labelled rows yet.</p>;
     }
     return (
         <div className="flex flex-col gap-2">
-            <table className="w-full table-fixed border-collapse text-sm">
+            <table className="w-full table-fixed border-collapse">
                 <caption className="sr-only">Rows per label</caption>
                 <thead className="sr-only">
                     <tr>

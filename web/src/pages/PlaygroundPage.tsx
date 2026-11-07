@@ -497,11 +497,9 @@ export function PlaygroundPage() {
                     )}
                     <Card className="flex min-h-[32rem] flex-col p-0">
                         <div className="flex-1 overflow-y-auto p-panel">
-                            {missing && (
-                                <p className="mb-4 text-sm text-muted-foreground">{missing}</p>
-                            )}
+                            {missing && <p className="mb-4 text-muted-foreground">{missing}</p>}
                             {turns.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-muted-foreground">
                                     Send a message to {target.model_name}. Answers stream in as the
                                     model writes them, with any reasoning and tool calls shown
                                     apart.

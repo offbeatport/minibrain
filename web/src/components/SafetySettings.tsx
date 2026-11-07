@@ -36,7 +36,7 @@ function GuardItems({ guards }: { guards: Guard[] }) {
 
 function NoGuards() {
     return (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground">
             No safety model is installed. Download Llama Guard, ShieldGemma, Qwen3Guard or
             gpt-oss-safeguard from{" "}
             <Link href={DISCOVER} className="text-primary hover:underline">

@@ -165,7 +165,7 @@ function variantColumns(
 function Licence({ entry }: { entry: CatalogEntry }) {
     return (
         <PanelSection icon={Scale} title="Licence">
-            <div className="flex flex-col gap-2 text-sm">
+            <div className="flex flex-col gap-2">
                 <span className="font-semibold">{entry.license_name}</span>
                 <p className="text-muted-foreground">{entry.license_summary}</p>
                 {entry.license_url && external(entry.license_url, "Read the licence")}
@@ -230,7 +230,7 @@ export function DiscoverModelPage() {
                 </div>
             )}
             {data && !entry && (
-                <p className="text-sm text-muted-foreground">No model {id} in the catalogue.</p>
+                <p className="text-muted-foreground">No model {id} in the catalogue.</p>
             )}
             {data && entry && (
                 <>

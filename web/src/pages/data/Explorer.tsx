@@ -304,7 +304,7 @@ function GroupDetail({
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="text-2xl font-semibold">Uploads</h2>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground">
                         Files copied into this install, stored once and shared by every model.
                     </p>
                 </div>
@@ -828,7 +828,7 @@ export function DataExplorer() {
                     </div>
                     <div ref={treeBox} className="min-h-0 flex-1 overflow-y-auto">
                         {loading ? (
-                            <p className="p-3 text-sm text-muted-foreground">Loading…</p>
+                            <p className="p-3 text-muted-foreground">Loading…</p>
                         ) : (
                             <>
                                 <Tree
@@ -846,14 +846,14 @@ export function DataExplorer() {
                                     canDrop={canDrop}
                                     rowActions={menuFor}
                                     empty={
-                                        <p className="p-3 text-sm text-muted-foreground">
+                                        <p className="p-3 text-muted-foreground">
                                             Nothing matches. Search looks in names, column names,
                                             descriptions and tags.
                                         </p>
                                     }
                                 />
                                 {!text && sourceList.length === 0 && (
-                                    <p className="pr-3 pb-3 pl-11 text-sm text-muted-foreground">
+                                    <p className="pr-3 pb-3 pl-11 text-muted-foreground">
                                         No sources yet. Use Add to upload a file, read a folder,
                                         bucket or database, or try sample data.
                                     </p>

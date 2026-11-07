@@ -498,7 +498,7 @@ export function ConnectedGroup({
         <div className="flex flex-col gap-6">
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">{group.title}</h2>
-                <p className="text-sm text-muted-foreground">{group.body}</p>
+                <p className="text-muted-foreground">{group.body}</p>
             </header>
             <ErrorLine error={connections.error} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
@@ -533,7 +533,7 @@ export function ConnectedGroup({
                         : "Add an S3-compatible connection under Settings, Connections: endpoint, keys and, if you like, a bucket."}
                 </EmptyState>
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     {members.length === 0
                         ? `No ${group.noun}s yet. Pick ${group.choice} under Add; each one becomes a table in dataset SQL.`
                         : "Pick a source to see its columns, rows and how its changes are tracked."}
@@ -548,7 +548,7 @@ export function ConnectedFacts({ source }: { source: SourceSummary }) {
         return null;
     }
     return (
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
             <dt className="text-muted-foreground">Connection</dt>
             <dd>
                 <Link href="/settings/connections" className="text-primary hover:underline">

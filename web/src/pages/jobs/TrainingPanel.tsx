@@ -88,7 +88,7 @@ function stepText(training: TrainingMetrics): string {
 
 function OverfitHint({ step }: { step: number }) {
     return (
-        <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm">
+        <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
             {`Held-out loss has risen since step ${count(step)} while training loss kept falling: the model is starting to memorise its training rows. Fewer epochs or more varied data usually help.`}
         </div>
     );
@@ -133,7 +133,7 @@ export function TrainingPanel({
     if (!training || training.points.length === 0) {
         return (
             <Section title="Training">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     {job.status === "queued" || job.status === "running"
                         ? "Waiting for the first training step."
                         : "This run recorded no training steps."}

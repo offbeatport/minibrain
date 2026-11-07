@@ -49,11 +49,11 @@ const LOCK_SOURCES: Record<string, string> = {
 };
 
 function Muted({ children }: { children: ReactNode }) {
-    return <span className="text-sm text-muted-foreground">{children}</span>;
+    return <span className="text-muted-foreground">{children}</span>;
 }
 
 function Text({ children, mono = false }: { children: ReactNode; mono?: boolean }) {
-    return <span className={cn("text-sm tabular-nums", mono && "font-mono")}>{children}</span>;
+    return <span className={cn("tabular-nums", mono && "font-mono")}>{children}</span>;
 }
 
 function shortPath(value: string): string {
@@ -65,7 +65,7 @@ function Path({ value, label }: { value: string; label: string }) {
         <div className="flex min-w-0 items-center gap-1">
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <span className="max-w-[min(28rem,60vw)] truncate font-mono text-sm">
+                    <span className="max-w-[min(28rem,60vw)] truncate font-mono">
                         {shortPath(value)}
                     </span>
                 </TooltipTrigger>
@@ -315,7 +315,7 @@ function TimeText({ value }: { value: string }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <button type="button" className="rounded-sm text-sm tabular-nums">
+                <button type="button" className="rounded-sm tabular-nums">
                     {relativeTime(value)}
                 </button>
             </TooltipTrigger>

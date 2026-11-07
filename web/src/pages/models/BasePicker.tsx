@@ -279,7 +279,7 @@ function Trigger({ value }: { value: PickerValue }) {
             <button
                 type="button"
                 id="base-model"
-                className="flex w-full min-w-0 items-center gap-4 rounded-lg border border-input bg-input-background p-4 text-left text-sm outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex w-full min-w-0 items-center gap-4 rounded-lg border border-input bg-input-background p-4 text-left outline-none hover:bg-secondary focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
             >
                 {option ? (
                     <PublisherLogo publisher={logoPublisher(option)} name={option.name} size="lg" />
@@ -502,7 +502,7 @@ export function BasePicker({
                         href={discoverListHref()}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        className="inline-flex items-center gap-1 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                         Explore in Discover
                         <ExternalLink aria-hidden="true" className="size-3.5" />

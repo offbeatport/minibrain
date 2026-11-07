@@ -117,7 +117,7 @@ function Panel({ children }: { children: ReactNode }) {
 }
 
 function Muted({ children }: { children: ReactNode }) {
-    return <p className="text-sm text-muted-foreground">{children}</p>;
+    return <p className="text-muted-foreground">{children}</p>;
 }
 
 function Numeric({ value }: { value: string | number }) {
@@ -297,7 +297,7 @@ function CheckList({ checks }: { checks: Check[] }) {
         return <Muted>No checks were recorded with this data.</Muted>;
     }
     return (
-        <ul className="flex flex-col divide-y text-sm">
+        <ul className="flex flex-col divide-y">
             {checks.map((check) => {
                 const badge = CHECK_BADGES[check.status] ?? CHECK_BADGES.skipped;
                 return (
@@ -433,7 +433,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
     if (training.method !== "lora" || !recipe) {
         return (
             <PanelSection icon={Cpu} title="Training" description="How the version was built.">
-                <p className="text-sm">
+                <p>
                     {`Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and ${training.few_shot_examples ?? 0} few-shot examples from the training split.`}
                 </p>
             </PanelSection>
@@ -720,7 +720,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
             bare
         >
             <Panel>
-                {!evaluation.scored && <p className="pb-3 text-sm text-warning">Not scored yet.</p>}
+                {!evaluation.scored && <p className="pb-3 text-warning">Not scored yet.</p>}
                 {summary && <p className="pb-3 text-base font-semibold tabular-nums">{summary}</p>}
                 <div className="flex flex-wrap gap-x-8 gap-y-4">
                     <Stat label="Held-out rows" value={count(held?.examples)} />
@@ -796,7 +796,7 @@ export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () =
                 )
             }
         >
-            <div className="flex flex-col gap-4 text-sm">
+            <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                     <h3 className="font-semibold">From the data and scores</h3>
                     {derived.length === 0 ? (
@@ -891,7 +891,7 @@ export function IntegritySection({ sha256, form }: { sha256: string; form: strin
             title="Integrity"
             description="The Markdown and JSON downloads carry this digest, so a reviewer can check the card was not changed."
         >
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
                 <span className="text-muted-foreground">SHA-256 of the canonical JSON</span>
                 {form && <InfoTip label="How the digest is computed">{form}</InfoTip>}
                 <Hash value={sha256} label="card digest" />

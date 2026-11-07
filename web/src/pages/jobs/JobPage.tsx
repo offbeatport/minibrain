@@ -157,8 +157,8 @@ function Failure({ job }: { job: JobDetail }) {
         <div
             className={
                 retrying
-                    ? "rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm"
-                    : "rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2 text-sm"
+                    ? "rounded-md border border-warning/40 bg-warning-soft px-3 py-2"
+                    : "rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2"
             }
         >
             <span className="font-semibold">{retrying ? "Retrying after: " : "Failed: "}</span>
@@ -172,7 +172,7 @@ function Serving({ job }: { job: JobDetail }) {
         return null;
     }
     return (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
             <StatusText tone="success">Serving</StatusText>
             <span>{`v${job.version} is the live version of ${job.model_name ?? job.model}.`}</span>
             <Link href={deploymentPageHref(job.model)} className="text-primary hover:underline">
@@ -258,7 +258,7 @@ export function JobPage(): ReactNode {
     return (
         <Page>
             <BackLink job={job.data} />
-            {jobId === null && <p className="text-sm text-muted-foreground">No job called {id}.</p>}
+            {jobId === null && <p className="text-muted-foreground">No job called {id}.</p>}
             <ErrorLine error={job.error} />
             {job.data && <JobView job={job.data} />}
         </Page>

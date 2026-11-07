@@ -67,7 +67,7 @@ function ModelChecklist({
     onToggle: (id: string, on: boolean) => void;
 }) {
     if (choices.length === 0) {
-        return <p className="text-sm text-muted-foreground">Add or download a model first.</p>;
+        return <p className="text-muted-foreground">Add or download a model first.</p>;
     }
     return (
         <div className="flex max-h-72 flex-col divide-y overflow-y-auto rounded-md border">
@@ -180,7 +180,7 @@ function KeyDialog({
                         </Field>
                     )}
                     <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">Models</span>
+                        <span className="font-medium">Models</span>
                         <ModelChecklist choices={choices} picked={picked} onToggle={toggle} />
                     </div>
                     <ErrorLine error={save.error} />
@@ -200,7 +200,7 @@ function KeyDialog({
 
 function NewSecret({ created, onDismiss }: { created: KeyCreated; onDismiss: () => void }) {
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3">
             <div className="font-semibold">{`New key ${created.name}: copy it now, it is not shown again`}</div>
             <div className="flex items-center gap-2">
                 <CodeBlock code={created.secret} copyLabel="Copy the key" wrap className="flex-1" />

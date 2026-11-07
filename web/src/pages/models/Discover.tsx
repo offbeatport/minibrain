@@ -75,7 +75,7 @@ export function AccessSteps({
 }: { entry?: CatalogEntry; catalog: CatalogResponse }) {
     const page = entry ? `${catalog.endpoint}/${entry.repo}` : catalog.endpoint;
     return (
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
+        <ol className="list-decimal space-y-1 pl-5">
             <li>Create or sign in to an account on {catalog.endpoint.replace("https://", "")}.</li>
             <li>
                 Open{" "}
@@ -379,8 +379,11 @@ function MemoryCell({ entry }: { entry: CatalogEntry }) {
         <span className="flex flex-col tabular-nums">
             <span>{`${memoryNeeded(entry)} to run`}</span>
             <DataGridDetail className="text-sm text-muted-foreground">
-                {`${train === null ? "Serve only" : `${bytes(train)} to train`}${hint ? ` · ${hint}` : ""}`}
+                {train === null ? "Serve only" : `${bytes(train)} to train`}
             </DataGridDetail>
+            {hint && (
+                <DataGridDetail className="text-sm text-muted-foreground">{hint}</DataGridDetail>
+            )}
         </span>
     );
 }
@@ -516,7 +519,7 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
             cell: ({ row }) => (
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <span className="flex max-w-48 flex-col">
+                        <span className="flex max-w-36 flex-col">
                             <span className="truncate">{row.original.license_name}</span>
                             <DataGridDetail className="truncate text-sm text-muted-foreground">
                                 {`Commercial use: ${licenceUseLabel(row.original.license_use).toLowerCase()}`}
@@ -584,7 +587,7 @@ function SelectionBar({
     const hint = compareHint(count);
     return (
         <div className={cn("flex flex-wrap items-center gap-2", className)}>
-            <span className="text-sm font-medium tabular-nums">{`${count} selected`}</span>
+            <span className="font-medium tabular-nums">{`${count} selected`}</span>
             <Button variant="outline" onClick={onClear}>
                 <X />
                 Clear selection
@@ -624,13 +627,11 @@ function FilterSkeleton() {
     return (
         <div className="flex flex-col divide-y rounded-md border bg-card">
             <div className="flex h-12 items-center px-4">
-                <span className="text-sm font-semibold">Filters</span>
+                <span className="font-semibold">Filters</span>
             </div>
             {SKELETON_GROUPS.map((group) => (
                 <div key={group.id} className="flex flex-col px-4 py-4">
-                    {group.title && (
-                        <span className="mb-2 text-sm font-semibold">{group.title}</span>
-                    )}
+                    {group.title && <span className="mb-2 font-semibold">{group.title}</span>}
                     {skeletonRows(group.id, group.rows).map((row) => (
                         <div key={row} className="flex h-[26px] items-center gap-2">
                             <Skeleton className="size-4 rounded-sm" />
@@ -793,7 +794,7 @@ export function Discover({
     return (
         <div className="flex flex-col gap-3">
             {data.online === false && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 px-3 py-2">
                     <StatusText tone="warning">
                         {data.offline_forced ? "Offline mode" : `No connection to ${data.endpoint}`}
                     </StatusText>
@@ -870,7 +871,7 @@ export function Discover({
                     />
                     {needsAccess && (
                         <div className="flex flex-col gap-2 rounded-md border px-3 py-2">
-                            <p className="text-sm font-semibold">
+                            <p className="font-semibold">
                                 Models that need access from their publisher first
                             </p>
                             <AccessSteps catalog={data} />

@@ -78,7 +78,7 @@ function Finding({
             </div>
             <p className="text-sm text-muted-foreground">{check.detail}</p>
             {check.examples.length > 0 && (
-                <ul className="flex flex-col gap-0.5 text-sm">
+                <ul className="flex flex-col gap-0.5">
                     {check.examples.map((example) => (
                         <li key={example} className="truncate">
                             {example}
@@ -106,7 +106,7 @@ export function ChecksReport({
     const passed = checks.filter((check) => check.status === "ok");
     if (checks.length === 0) {
         return (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 This version was saved before checks ran. The next one carries a report.
             </p>
         );
@@ -126,7 +126,7 @@ export function ChecksReport({
                 </ul>
             )}
             {passed.length > 0 && (
-                <p className="text-sm">
+                <p>
                     <StatusText tone="success">Passed</StatusText>
                     <span className="ml-2 text-muted-foreground">
                         {passed.map((check) => check.title).join(" · ")}
@@ -134,7 +134,7 @@ export function ChecksReport({
                 </p>
             )}
             {dismissed.length > 0 && (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-muted-foreground">Dismissed for this dataset:</span>
                     {dismissed.map((check) => (
                         <span key={check.check} className="inline-flex items-center gap-1">
@@ -188,7 +188,7 @@ export function ModelChecks({
     );
     return (
         <div className="mb-4 flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 {open.length === 0
                     ? `Checks on version ${datasetVersion.number ?? "–"} passed.`
                     : `Checks on version ${datasetVersion.number ?? "–"} found ${open.length === 1 ? "one thing" : `${open.length} things`} to look at. Training still runs.`}

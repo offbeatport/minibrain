@@ -131,7 +131,7 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
             cell: ({ row }) => (
                 <Link
                     href={href(row.original)}
-                    className="block truncate font-semibold text-foreground"
+                    className="block max-w-48 truncate font-semibold text-foreground"
                 >
                     {row.original.model.name}
                 </Link>

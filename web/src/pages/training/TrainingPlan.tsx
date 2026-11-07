@@ -112,7 +112,7 @@ function Basis({ plan }: { plan: TrainingPlanInfo }) {
     const context = plan.context ? `, capped by the ${count(plan.context)}-token context` : "";
     return (
         <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
                 {plan.level === "insufficient" ? (
                     <StatusText tone="destructive">Cannot train here</StatusText>
                 ) : (
@@ -127,9 +127,7 @@ function Basis({ plan }: { plan: TrainingPlanInfo }) {
                     {`The fastest strategy whose estimated peak memory stays under 85% of the machine's. Rows are ${count(plan.seq_len)} tokens: the longest example, about ${count(plan.longest_tokens)} tokens${context}.`}
                 </InfoTip>
             </div>
-            {plan.level === "insufficient" && (
-                <p className="text-sm text-destructive">{plan.basis}</p>
-            )}
+            {plan.level === "insufficient" && <p className="text-destructive">{plan.basis}</p>}
             {plan.note && <p className="text-sm text-muted-foreground">{plan.note}</p>}
         </div>
     );
@@ -338,11 +336,11 @@ export function TrainingPlanPanel({
         <div className="flex flex-col gap-3 border-t pt-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-1">
-                    <h3 className="text-sm font-medium">Training plan</h3>
+                    <h3 className="font-medium">Training plan</h3>
                     {plan ? (
                         <Basis plan={plan} />
                     ) : (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground">
                             {error ? "No plan for these settings." : "Planning…"}
                         </p>
                     )}

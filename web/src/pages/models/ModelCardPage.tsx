@@ -296,7 +296,7 @@ export function ModelCardPage() {
     const card = useModelCard(target);
     return (
         <Page>
-            {card.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {card.isLoading && <p className="text-muted-foreground">Loading…</p>}
             <ErrorLine error={card.error} />
             {card.data && (
                 <CardView

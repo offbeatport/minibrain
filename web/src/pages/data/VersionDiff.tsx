@@ -262,7 +262,7 @@ export function VersionDiffDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <ErrorLine error={diff.error} />
-                {diff.isLoading && <p className="text-sm text-muted-foreground">Comparing…</p>}
+                {diff.isLoading && <p className="text-muted-foreground">Comparing…</p>}
                 {diff.data && <DiffBody diff={diff.data} />}
             </DialogContent>
         </Dialog>

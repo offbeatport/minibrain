@@ -160,7 +160,7 @@ function RunElsewhere({
                         trains or serves once a machine that fits joins a pool.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex min-w-0 flex-col gap-5 text-sm">
+                <div className="flex min-w-0 flex-col gap-5">
                     <section className="flex min-w-0 flex-col gap-1.5">
                         <h3 className="font-medium">A compute pool that fits</h3>
                         {others.length > 0 ? (
@@ -214,7 +214,7 @@ export function ComputeHelp({
     const [open, setOpen] = useState(false);
     return (
         <div className="flex flex-col gap-2.5">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 {`Too big for ${catalog.hardware.machine}. Add it now and run it on a machine that fits, or pick a smaller one.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -237,7 +237,7 @@ function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) 
         : "default training settings, as it has no trained version yet";
     const kept = ["the same base model", copy.answers, data].filter(Boolean);
     return (
-        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft px-3 py-2">
             <span className="min-w-0 flex-1">
                 {`Starts from ${copy.name}: ${kept.join(", ")}, and ${recipe}.`}
             </span>
@@ -263,7 +263,7 @@ export function BaseSummary({
         return null;
     }
     return (
-        <div className="flex flex-col gap-3 text-sm" aria-live="polite">
+        <div className="flex flex-col gap-3" aria-live="polite">
             {copy && <CopyNote copy={copy} onClear={onClearCopy} />}
             {!option && <PathResult plan={plan} />}
         </div>

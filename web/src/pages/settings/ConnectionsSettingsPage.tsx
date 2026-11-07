@@ -425,7 +425,7 @@ function ConnectionForm({
 
 function CheckLine({ ok, message }: { ok: boolean; message: string }) {
     return (
-        <p className="text-sm">
+        <p>
             <StatusText tone={ok ? "success" : "destructive"}>
                 {ok ? "Connected" : "Could not connect"}
             </StatusText>
@@ -547,11 +547,11 @@ function Extensions() {
                                 key={item.name}
                                 className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5"
                             >
-                                <span className="font-mono text-sm">{item.name}</span>
+                                <span className="font-mono">{item.name}</span>
                                 <span className="text-sm text-muted-foreground">
                                     {item.purpose}
                                 </span>
-                                <span className="ml-auto shrink-0 text-sm">
+                                <span className="ml-auto shrink-0">
                                     <StatusText tone={item.installed ? "success" : "warning"}>
                                         {item.installed ? "Installed" : "Missing"}
                                     </StatusText>
@@ -564,7 +564,7 @@ function Extensions() {
                         <span className="font-mono break-all">{data.directory}</span>
                     </p>
                     {missing.length > 0 && (
-                        <div className="flex flex-col gap-2 text-sm">
+                        <div className="flex flex-col gap-2">
                             <span>On a connected machine, save them with:</span>
                             <CodeBlock
                                 code={`minibrain extensions download --to ./duckdb-extensions --platform ${data.platform}`}
@@ -596,7 +596,7 @@ export function ConnectionsSettingsPage() {
     const formOpen = editing !== null;
     return (
         <SettingsLayout title="Connections">
-            <p className="-mt-2 text-sm text-muted-foreground">
+            <p className="-mt-2 text-muted-foreground">
                 {
                     "Buckets and databases that data sources and model imports read from. Where minibrain keeps its own files is under "
                 }

@@ -181,7 +181,7 @@ export function PromotionEditor({
                     <Button type="button" variant="outline" size="sm" onClick={add}>
                         Add threshold
                     </Button>
-                    <label htmlFor={`${id}-beats`} className="flex items-center gap-2 text-sm">
+                    <label htmlFor={`${id}-beats`} className="flex items-center gap-2">
                         <Switch
                             id={`${id}-beats`}
                             checked={value.beats_live ?? true}

@@ -36,7 +36,7 @@ import { exactTime, relativeTime } from "~/lib/time";
 function Block({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{label}</h3>
+            <h3 className="font-medium">{label}</h3>
             {children}
         </section>
     );
@@ -51,7 +51,7 @@ function Text({ children }: { children: string }) {
 }
 
 function Note({ children }: { children: ReactNode }) {
-    return <p className="text-sm text-muted-foreground">{children}</p>;
+    return <p className="text-muted-foreground">{children}</p>;
 }
 
 function SecurityLink() {
@@ -166,14 +166,14 @@ function FeedbackItem({ item, linked }: { item: RequestFeedback; linked: boolean
                 {linked && (
                     <Link
                         href={feedbackHref(item.id)}
-                        className="ml-auto text-sm text-primary hover:underline"
+                        className="ml-auto text-primary hover:underline"
                     >
                         Open review
                     </Link>
                 )}
             </div>
             {extra.length > 0 && (
-                <p className="text-sm whitespace-pre-wrap break-words">{extra.join("\n")}</p>
+                <p className="whitespace-pre-wrap break-words">{extra.join("\n")}</p>
             )}
         </li>
     );

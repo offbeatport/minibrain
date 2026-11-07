@@ -180,7 +180,7 @@ function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
             caption="Datasets whose query reads this source. A source in use cannot be deleted."
         >
             {datasets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No dataset reads it yet.</p>
+                <p className="text-muted-foreground">No dataset reads it yet.</p>
             ) : (
                 <ul className="flex flex-col divide-y rounded-lg border">
                     {datasets.map((dataset) => (
@@ -317,7 +317,7 @@ export function FileDetail({
                 about={<About item={source} onEdit={() => setEditing(true)} />}
             />
             <ErrorLine error={remove.error} />
-            {source.error && <p className="text-sm text-destructive">{source.error}</p>}
+            {source.error && <p className="text-destructive">{source.error}</p>}
             <ConnectedFacts source={source} />
             <LakehouseFacts source={source} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">

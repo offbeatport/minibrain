@@ -111,7 +111,7 @@ export function ErrorLine({ error }: { error: unknown }) {
     if (!message) {
         return null;
     }
-    return <p className="text-sm text-destructive">{message}</p>;
+    return <p className="text-destructive">{message}</p>;
 }
 
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {

@@ -69,16 +69,13 @@ export function PromotionDecision({ decision }: { decision: Decision }) {
                 </Badge>
             </div>
             {decision.checks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     The promotion rule asks for nothing, so any ready version can go live.
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1">
                     {decision.checks.map((check) => (
-                        <li
-                            key={check.name}
-                            className="flex flex-wrap items-baseline gap-2 text-sm"
-                        >
+                        <li key={check.name} className="flex flex-wrap items-baseline gap-2">
                             <Badge variant={check.passed ? "success" : "destructive"}>
                                 {check.passed ? "Met" : "Not met"}
                             </Badge>
@@ -145,11 +142,7 @@ function ConfusionMatrix({ split }: { split: Split }) {
 function ConfusionList({ split }: { split: Split }) {
     const items = (split.confusion ?? []).slice(0, 20);
     if (items.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">
-                No held-out row went to the wrong label.
-            </p>
-        );
+        return <p className="text-muted-foreground">No held-out row went to the wrong label.</p>;
     }
     return (
         <div className="overflow-x-auto rounded-md border">
@@ -269,7 +262,7 @@ function AnswerColumn({
 }) {
     return (
         <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm font-medium">{title}</span>
+            <span className="font-medium">{title}</span>
             {side && <SideScores side={side} main={main} />}
             <p className="whitespace-pre-wrap break-words text-base">
                 {side ? side.answer || "(empty)" : (text ?? "–")}
@@ -342,11 +335,7 @@ function FreeTextResults({ slug, version }: { slug: string; version: VersionInfo
         return null;
     }
     if (!can.build) {
-        return (
-            <p className="text-sm text-muted-foreground">
-                Reading the answers needs the Builder role.
-            </p>
-        );
+        return <p className="text-muted-foreground">Reading the answers needs the Builder role.</p>;
     }
     const found = answers.data;
     const worse = (found?.examples ?? []).filter((example) => example.worse);
@@ -362,7 +351,7 @@ function FreeTextResults({ slug, version }: { slug: string; version: VersionInfo
                             : `Each held-out conversation with the expected answer, this version's and the live v${found.live}'s, with their scores and the judge's reasons.`}
                     </p>
                 </div>
-                <label htmlFor="worse-only" className="flex items-center gap-2 text-sm">
+                <label htmlFor="worse-only" className="flex items-center gap-2">
                     <Switch
                         id="worse-only"
                         checked={worseOnly}
@@ -376,9 +365,9 @@ function FreeTextResults({ slug, version }: { slug: string; version: VersionInfo
                 </label>
             </div>
             <ErrorLine error={answers.error} />
-            {answers.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+            {answers.isLoading && <p className="text-muted-foreground">Loading…</p>}
             {found && rows.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     {worseOnly
                         ? "No answer scores below the live version's."
                         : "No answers were kept for this version."}

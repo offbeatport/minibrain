@@ -121,7 +121,7 @@ const COLUMNS: ColumnDef<RequestRow, unknown>[] = [
             <ModelName
                 name={modelLabel(row.original)}
                 deleted={row.original.deleted}
-                className="block max-w-56 truncate"
+                className="block max-w-48 truncate"
             />
         ),
     },

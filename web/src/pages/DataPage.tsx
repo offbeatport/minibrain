@@ -83,7 +83,7 @@ function SourceSection({ detail }: { detail: ModelDetail }) {
                         <Stat label="Rows" value={count(source.rows)} />
                         <Stat label="Columns" value={count(source.columns.length)} />
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground">
                         {source.columns.map((column) => (
                             <span key={column.name} className="mr-3 inline-block">
                                 <span className="font-mono text-foreground">{column.name}</span>{" "}
@@ -93,7 +93,7 @@ function SourceSection({ detail }: { detail: ModelDetail }) {
                     </p>
                 </div>
             ) : (
-                <p className="text-sm text-muted-foreground">No data yet.</p>
+                <p className="text-muted-foreground">No data yet.</p>
             )}
         </Section>
     );
@@ -291,7 +291,7 @@ export function PreviewSection({
                 <div className="flex flex-col gap-4">
                     <DataGrid columns={ROW_COLUMNS} rows={data.rows} />
                     <div className="flex max-w-2xl flex-col gap-2">
-                        <h3 className="text-sm font-semibold">One training example</h3>
+                        <h3 className="font-semibold">One training example</h3>
                         {data.example.map((message) => (
                             <ChatBubble
                                 key={message.role}
@@ -385,7 +385,7 @@ function DatasetSection({ detail }: { detail: ModelDetail }) {
                     {showGolden && <DataGrid columns={GOLDEN_COLUMNS} rows={golden.data ?? []} />}
                 </div>
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground">
                     Save a version of the dataset before scoring or training.
                 </p>
             )}
@@ -412,7 +412,7 @@ function DatasetPicker({ detail }: { detail: ModelDetail }) {
             title="Dataset"
             caption="Datasets are shared: several models can train on the same one. Upload a new file below, or pick one."
             actions={
-                <Link href="/data" className="text-sm text-primary hover:underline">
+                <Link href="/data" className="text-primary hover:underline">
                     All datasets
                 </Link>
             }
@@ -439,7 +439,7 @@ function DatasetPicker({ detail }: { detail: ModelDetail }) {
                 {detail.dataset && (
                     <Link
                         href={itemHref({ kind: "dataset", id: detail.dataset })}
-                        className="text-sm text-primary hover:underline"
+                        className="text-primary hover:underline"
                     >
                         Open dataset
                     </Link>
@@ -494,7 +494,7 @@ function ModelData({ slug }: { slug: string }) {
             />
             <ErrorLine error={models.error} />
             {models.data && !model && (
-                <p className="text-sm text-muted-foreground">No custom model called {slug}.</p>
+                <p className="text-muted-foreground">No custom model called {slug}.</p>
             )}
             {model && <DataSections key={slug} slug={slug} />}
         </Page>

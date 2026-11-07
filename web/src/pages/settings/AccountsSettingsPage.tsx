@@ -293,7 +293,7 @@ function LinkNotice({ link, onDismiss }: { link: PasswordLink; onDismiss: () => 
     const url = `${window.location.origin}${link.path}`;
     const who = link.account.email ?? link.account.name;
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3">
             <div className="font-semibold">
                 {`Send this link to ${who}. It sets their password, works once and expires ${relativeTime(link.expires_at)}. It is not shown again.`}
             </div>
@@ -567,7 +567,7 @@ function SignInSources() {
                             ? "Set by auth.default_role in minibrain.yaml."
                             : "Change it under Security."
                     }
-                    control={<span className="text-sm">{defaultRole}</span>}
+                    control={<span>{defaultRole}</span>}
                 />
             </SettingsGroup>
             {info && info.mapping.length > 0 ? (
@@ -590,7 +590,7 @@ function SignInSources() {
                     </Table>
                 </div>
             ) : (
-                <p className="mt-4 text-sm text-muted-foreground">
+                <p className="mt-4 text-muted-foreground">
                     No groups are mapped. auth.roles in minibrain.yaml maps identity provider groups
                     to roles.
                 </p>

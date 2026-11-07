@@ -404,7 +404,7 @@ function DeleteSourcesDialog({
                                 </span>
                             </span>
                         </Label>
-                        <ul className="flex flex-col divide-y rounded-md border text-sm">
+                        <ul className="flex flex-col divide-y rounded-md border">
                             {readers.map((slug) => (
                                 <li key={slug} className="truncate px-3 py-2">
                                     {nameOf(slug)}
@@ -455,7 +455,7 @@ export function SourceTable({
         <div className="flex flex-col gap-3">
             {chosen.length > 0 && (
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium tabular-nums">{`${chosen.length} selected`}</span>
+                    <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
                     <Button variant="outline" size="sm" onClick={clear}>
                         <X />
                         Clear selection

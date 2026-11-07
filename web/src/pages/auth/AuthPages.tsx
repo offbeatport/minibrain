@@ -59,7 +59,7 @@ function InsecureNotice() {
         return null;
     }
     return (
-        <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm">
+        <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
             This page is not served over HTTPS, so your browser will not keep you signed in. Put
             minibrain behind TLS, or open it on this machine at localhost.
         </p>
@@ -127,7 +127,7 @@ function SingleSignOn({ label, divider }: { label: string; divider: string }) {
     const error = ssoError();
     return (
         <div className="flex flex-col gap-4">
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-destructive">{error}</p>}
             <Button asChild>
                 <a href={ssoHref()}>{`Sign in with ${label}`}</a>
             </Button>
@@ -159,7 +159,7 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
                 <FieldGroup>
                     <InsecureNotice />
                     {reason && (
-                        <p className="rounded-md border bg-secondary px-3 py-2 text-sm">
+                        <p className="rounded-md border bg-secondary px-3 py-2">
                             {`${reason} Sign in again to carry on where you were.`}
                         </p>
                     )}

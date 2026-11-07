@@ -61,7 +61,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             cell: ({ row }) => (
                 <Link
                     href={href(row.original)}
-                    className="block max-w-80 truncate font-semibold text-foreground"
+                    className="block max-w-72 truncate font-semibold text-foreground"
                 >
                     {row.original.input}
                 </Link>
@@ -72,7 +72,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             header: "Model's answer",
             cell: ({ row }) =>
                 row.original.output ? (
-                    <span className="block max-w-48 truncate">{row.original.output}</span>
+                    <span className="block max-w-40 truncate">{row.original.output}</span>
                 ) : (
                     <Muted>Not sent</Muted>
                 ),
@@ -82,7 +82,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             header: "Suggested answer",
             cell: ({ row }) =>
                 row.original.suggestion ? (
-                    <span className="block max-w-48 truncate">{row.original.suggestion}</span>
+                    <span className="block max-w-40 truncate">{row.original.suggestion}</span>
                 ) : (
                     <Muted>None given</Muted>
                 ),
