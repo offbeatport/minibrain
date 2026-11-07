@@ -1422,6 +1422,28 @@ Two modes, same code, same adapter format (PEFT safetensors).
 
 Everything in the v1 scope below, after M1.
 
+### Large datasets
+
+Small, curated fine-tunes stay the default path. This milestone makes training scale to datasets that do not fit in
+memory or on one GPU: continued pretraining on a domain corpus (billions of tokens), instruction tuning or distillation
+on 100k to millions of examples, classification or extraction over millions of rows. The data side (DuckDB over
+Parquet, S3 and Postgres, dedupe, dataset versions) already scans millions of rows; training does not yet: it loads
+every row into memory (`Dataset.from_list`), defaults to 3,000 rows and runs on one GPU.
+
+1. Streaming training data: the dataset version is written as sharded Parquet in the object store and streamed into
+   training, with packing (short examples joined into full-length sequences), so memory does not grow with the data.
+2. Multi-GPU on one machine with FSDP or DeepSpeed ZeRO, planned by the training memory planner like LoRA and QLoRA
+   are today.
+3. Multi-node through Ray (v2).
+4. Full fine-tuning and continued pretraining as methods, with a data mix (the corpus plus general text) to limit
+   forgetting; a full fine-tune produces new base weights, stored and hashed like Make base model.
+5. Checkpoints every N steps to the object store and resume from the last one, so a days-long run survives a crash or
+   a lost node.
+6. An estimate before starting: tokens, GPU hours and finish time on the chosen machines, shown before the run is
+   queued.
+
+Order: 1 and 2 together, then 5 and 6, then 3 and 4.
+
 ## v1 scope
 
 - [x] models: create, list, select, delete
