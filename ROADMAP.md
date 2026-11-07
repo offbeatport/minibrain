@@ -1580,6 +1580,15 @@ Everything in the v1 scope below, after M1.
   - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
   - [ ] Recipes: worked use cases, designed properly later.
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
+  - [ ] Continue from a version: train the next version on top of a chosen version's adapter (warm start) instead of
+    fresh from the base, picked per run ("Continue from v4"); the version records what it started from, and the
+    promotion rule still guards the result. Comes first: it is how most people improve one model
+  - [ ] Make base model: merge a custom model's live version into new full weights (SHA-256 hashed, stored like any
+    base) and list it as a base, e.g. "guy1 v4 (base)", built from guy1 v4 on Qwen3 0.6B, for a house model that
+    several specialist models build on. Always an explicit action, never automatic: a version that wins its own task
+    can be worse at chat. It keeps the original base's licence and naming rules (Llama requires "Llama" in the name),
+    costs full disk and its own GPU memory where adapters share one loaded base, and its lineage shows on its model
+    card
   - [ ] MLX training on Macs behind a flag, only if MPS training is too slow for local use: a second trainer plus an
     MLX-to-PEFT adapter converter, so Mac-trained adapters still serve on SGLang and vLLM
 
