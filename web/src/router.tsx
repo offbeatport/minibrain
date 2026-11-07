@@ -52,7 +52,11 @@ function prototypePages(): AnyRoute[] {
         return [];
     }
     const logos = lazyRouteComponent(() => import("./pages/proto/LogosPage"), "LogosPage");
-    return [globalPage("/proto/logos", logos)];
+    const modelIcons = lazyRouteComponent(
+        () => import("./pages/proto/ModelIconsPage"),
+        "ModelIconsPage",
+    );
+    return [globalPage("/proto/logos", logos), globalPage("/proto/model-icons", modelIcons)];
 }
 
 function guarded(role: Role, Component: RouteComponent): RouteComponent {
