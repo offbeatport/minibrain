@@ -113,6 +113,12 @@ class CardRecipe(BaseModel):
     learning_rate: float | None
 
 
+class CardOrigin(BaseModel):
+    slug: str
+    name: str
+    number: int
+
+
 class CardTraining(BaseModel):
     method: str
     recipe: CardRecipe | None
@@ -120,6 +126,7 @@ class CardTraining(BaseModel):
     few_shot_examples: int | None
     train_loss: float | None
     run: CardRun | None
+    duplicated_from: CardOrigin | None = None
 
 
 class CardScore(BaseModel):

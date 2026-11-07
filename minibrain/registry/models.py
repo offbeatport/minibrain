@@ -286,6 +286,7 @@ class Version(Base):
     intended_use: Mapped[str | None] = mapped_column(default=None)
     known_limits: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    duplicated_from: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
 
     model: Mapped[Model] = relationship(back_populates="versions")
     dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")

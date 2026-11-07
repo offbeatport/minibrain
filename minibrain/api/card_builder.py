@@ -19,6 +19,7 @@ from minibrain.api.card_schemas import (
     CardLabelScore,
     CardLimit,
     CardLimits,
+    CardOrigin,
     CardPurpose,
     CardRecipe,
     CardRun,
@@ -291,13 +292,35 @@ def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
     )
 
 
+def origin_card(version: Version) -> CardOrigin | None:
+    found = version.duplicated_from
+    if not found:
+        return None
+    return CardOrigin(slug=str(found["slug"]), name=str(found["name"]), number=int(found["number"]))
+
+
+def training_job(session: Session, model: Model, version: Version) -> Job | None:
+    job = version_job(model, version, JobKind.TRAIN)
+    copied = (version.duplicated_from or {}).get("job")
+    if job is None and copied is not None:
+        return session.get(Job, int(copied))
+    return job
+
+
 def training_card(session: Session, model: Model, version: Version) -> CardTraining:
+    origin = origin_card(version)
     if version.kind != VersionKind.LORA:
         shots = len(version.shots or [])
         return CardTraining(
-            method="prompt", recipe=None, examples=None, few_shot_examples=shots, train_loss=None, run=None
+            method="prompt",
+            recipe=None,
+            examples=None,
+            few_shot_examples=shots,
+            train_loss=None,
+            run=None,
+            duplicated_from=origin,
         )
-    job = version_job(model, version, JobKind.TRAIN)
+    job = training_job(session, model, version)
     recipe = dict((job.params.get("recipe") if job is not None else None) or {}) | dict(version.recipe or {})
     return CardTraining(
         method="lora",
@@ -306,6 +329,7 @@ def training_card(session: Session, model: Model, version: Version) -> CardTrain
         few_shot_examples=None,
         train_loss=rounded(recipe.get("train_loss")),
         run=run_card(session, job, recipe.get("device")),
+        duplicated_from=origin,
     )
 
 

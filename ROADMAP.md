@@ -1089,8 +1089,8 @@ keys, and `/v1` stays key-only.
   and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"
   and the next free number ("Assistant 1"), never a name a base or custom model already has, with an inline error
   when a typed one is taken. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat
-  assistant, 7B+ works best." Starting from one of your models copies its answers, graders, rule and instructions
-  too. The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
+  assistant, 7B+ works best." The picker lists base models only; to start from one of your models, Duplicate it
+  (below). The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
   part as a plain default with an Edit action, collapsed until opened: the answers (free text, one of these labels or
   a JSON schema) with the contract number (after going live, a breaking change asks to confirm), the graders with the
   judge's rubric and model, and the rule. Its Instructions section edits the system prompt; saving makes a
@@ -1098,9 +1098,8 @@ keys, and `/v1` stays key-only.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for a chat assistant (capability, size tier favouring 7B and up, the catalogue's tested default; superseded
     models left out), then popularity. Being downloaded is not a ranking factor.
-  - Catalogue: every entry, with size, fit and licence-use filters. My models: start from a custom model (same base,
-    its training data, and its trained version's rows and epochs, carried to the Training page as `?rows=&epochs=`),
-    or an imported base. Import: a Hugging Face id or link, an `s3://` path or a folder.
+  - Catalogue: every entry, with size, fit and licence-use filters. Imported: bases imported on this install. Import:
+    a Hugging Face id or link, an `s3://` path or a folder.
   - Each option shows publisher, parameters, licence use, "On this install" or the download size, and a fit hint.
   - Logos: a base model shows its publisher's logo (a letter tile when the publisher is unknown); a custom model
     always shows a letter tile from its own name, with its base named in text, on every page.
@@ -1109,6 +1108,15 @@ keys, and `/v1` stays key-only.
     pool. It can always be downloaded now and run later.
   - `?model=<catalogue id>&variant=` and `?base=<key>` preselect the base, `?dataset=` the training data, and
     `?source=import` opens Import.
+- Duplicate (built 2026-11-07), in a custom model's row menu on Models and its page header, asks for a name
+  ("<name> copy", the next free one in the shared namespace) and calls `POST /api/models/{slug}/duplicate` (Builder,
+  audited as `model.duplicate` with the source slug and version; 409 on a taken name or a source being deleted). The
+  copy gets the same base, preset, answers, instructions, graders, rule, judge, safety, training data, description and
+  tags, and a fresh v0. The source's live version (else its latest ready one) becomes the copy's v1, ready and not
+  deployed, with its scores, recipe and data version; it points at the same adapter artifact by SHA-256, so no bytes
+  are copied (the store is content-addressed and write-once), and `versions.duplicated_from` records the source name,
+  version and training job ("Duplicated from guy1 v4" on the Versions tab and the model card, whose run facts come
+  from that job). Deleting either model drops an adapter only when no version still references it.
 - Settings replaces the sidebar with its own: Back (the last page outside Settings, else Home), then its sections.
   General: You (appearance; profile once accounts exist), the model catalogue, recipe and splits. Security: the
   policies, locked when set by config, with a link to their changes in the audit log. Accounts (admin) once accounts

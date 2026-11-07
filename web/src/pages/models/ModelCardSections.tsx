@@ -430,12 +430,28 @@ function runFacts(run: Run | null | undefined): [string, ReactNode][] {
 export function TrainingSection({ card }: { card: ModelCard }) {
     const training = card.training;
     const recipe = training.recipe;
+    const origin = training.duplicated_from;
+    const copied: [string, ReactNode][] = origin
+        ? [
+              [
+                  "Duplicated from",
+                  <Link
+                      key="origin"
+                      href={modelPageHref(origin.slug, "versions")}
+                      className="text-primary hover:underline"
+                  >
+                      {`${origin.name} v${origin.number}`}
+                  </Link>,
+              ],
+          ]
+        : [];
     if (training.method !== "lora" || !recipe) {
         return (
             <PanelSection icon={Cpu} title="Training" description="How the version was built.">
                 <p>
                     {`Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and ${training.few_shot_examples ?? 0} few-shot examples from the training split.`}
                 </p>
+                {origin && <Facts items={copied} />}
             </PanelSection>
         );
     }
@@ -444,6 +460,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
         <PanelSection icon={Cpu} title="Training" description="How the version was built.">
             <Facts
                 items={[
+                    ...copied,
                     ["Method", "LoRA adapter"],
                     ["Strategy", recipe.strategy ?? NONE],
                     ["Rows trained on", value(training.examples)],

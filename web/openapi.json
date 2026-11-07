@@ -483,6 +483,58 @@
         }
       }
     },
+    "/api/models/{slug}/duplicate": {
+      "post": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Duplicate",
+        "operationId": "duplicate_api_models__slug__duplicate_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelDuplicate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/name": {
       "get": {
         "tags": [
@@ -12532,6 +12584,29 @@
         ],
         "title": "CardLimits"
       },
+      "CardOrigin": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "number"
+        ],
+        "title": "CardOrigin"
+      },
       "CardPurpose": {
         "properties": {
           "description": {
@@ -12896,6 +12971,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CardRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duplicated_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardOrigin"
               },
               {
                 "type": "null"
@@ -21205,6 +21290,21 @@
         ],
         "title": "ModelDetail"
       },
+      "ModelDuplicate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ModelDuplicate"
+      },
       "ModelFile": {
         "properties": {
           "path": {
@@ -27445,6 +27545,16 @@
               }
             ],
             "title": "View"
+          },
+          "duplicated_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -27472,6 +27582,40 @@
           "score"
         ],
         "title": "VersionInfo"
+      },
+      "VersionOrigin": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "number"
+        ],
+        "title": "VersionOrigin"
       },
       "VersionRow": {
         "properties": {

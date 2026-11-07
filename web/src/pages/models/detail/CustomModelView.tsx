@@ -33,6 +33,7 @@ import {
 import { beingDeleted, busyTearingDown } from "~/lib/teardown";
 import { relativeTime } from "~/lib/time";
 import { ModelDataNotice } from "../../data/versionData";
+import { DuplicateModelDialog } from "../DuplicateModelDialog";
 import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
 import { LabelProposalNotice } from "../LabelProposal";
@@ -118,6 +119,7 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
     const presets = usePresets();
     const base = useBaseModel(row.base_model ?? "");
     const [editing, setEditing] = useState<ModelRow | null>(null);
+    const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const recipe = useRouterState({
         select: (state) => {
@@ -255,6 +257,15 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
                                 Edit
                             </Button>
                         )}
+                        {can.build && (
+                            <Button
+                                variant="ghost"
+                                disabled={deleting}
+                                onClick={() => setDuplicating(row)}
+                            >
+                                Duplicate
+                            </Button>
+                        )}
                     </>
                 }
             />
@@ -317,6 +328,10 @@ export function CustomModelView({ row, tab }: { row: ModelRow; tab: ModelTab }) 
                 <CustomFiles slug={row.key} live={live} base={baseKey} baseName={baseName} />
             </FilesSheet>
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
+            <DuplicateModelDialog
+                row={duplicating}
+                onOpenChange={(open) => !open && setDuplicating(null)}
+            />
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}

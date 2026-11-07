@@ -24,6 +24,7 @@ from minibrain.api.schemas import (
     MappingUpdate,
     ModelCreate,
     ModelDetail,
+    ModelDuplicate,
     ModelRow,
     ModelSummary,
     ModelUpdate,
@@ -35,7 +36,7 @@ from minibrain.api.schemas import (
     RequestBodiesUpdate,
     SampleDetail,
 )
-from minibrain.api.versions import start_version
+from minibrain.api.versions import audit_version, start_version
 from minibrain.api.views import detail, summary
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor, current_role
@@ -79,6 +80,7 @@ from minibrain.registry.service import (
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
 from minibrain.tasks.contracts import FREE_TEXT, Contract, ContractError, changes, json_contract, label_set
+from minibrain.tasks.duplicate import copied_version, duplicate_model, source_version
 from minibrain.tasks.judges import installed
 from minibrain.tasks.promotion import Rule, RuleError
 from minibrain.tasks.service import (
@@ -89,7 +91,7 @@ from minibrain.tasks.service import (
     version_contract,
     went_live,
 )
-from minibrain.teardown import cancel_stop, delete_custom, undeploy_custom
+from minibrain.teardown import cancel_stop, delete_custom, require_idle, undeploy_custom
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -149,8 +151,7 @@ def first_version(session: Session, settings: Settings, store: ArtifactStore, mo
     start_version(session, settings, store, model, VersionKind.PROMPT, dataset_version)
 
 
-def configured(session: Session, settings: Settings, store: ArtifactStore, body: ModelCreate, base: str) -> Model:
-    chosen = preset(body.preset)
+def require_base(session: Session, base: str) -> None:
     if base_readiness(session, base) == "missing":
         raise ConflictError(f"{base} is not a base model on this install")
     found = session.get(BaseModel, base)
@@ -158,6 +159,11 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     deleting = teardown is not None and teardown.kind == TeardownKind.DELETE
     if found is not None and deleting and teardown is not None and teardown.status == TeardownStatus.RUNNING:
         raise ConflictError(f"{found.name} is being deleted; pick another base")
+
+
+def configured(session: Session, settings: Settings, store: ArtifactStore, body: ModelCreate, base: str) -> Model:
+    chosen = preset(body.preset)
+    require_base(session, base)
     model = create_model(session, body.name, body.preset, base)
     model.description = body.description.strip()
     model.tags = user_tags(body.tags)
@@ -182,6 +188,27 @@ def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store:
 
 def created(model: Model) -> dict[str, Any]:
     return {"name": model.name, "preset": model.preset, "base": model.base_model}
+
+
+@router.post("/{slug}/duplicate", status_code=201, dependencies=[Depends(builder)])
+def duplicate(
+    slug: str, body: ModelDuplicate, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> ModelDetail:
+    source = get_model(session, slug)
+    require_idle(source.teardown, source.name)
+    require_base(session, source.base_model)
+    model = duplicate_model(session, source, body.name)
+    first_version(session, settings, store, model)
+    version = source_version(source)
+    if version is not None:
+        copy = copied_version(session, model, source, version)
+        audit_version(
+            session, model, copy.number, "version.create", kind=str(copy.kind), duplicated_from=copy.duplicated_from
+        )
+    facts = created(model) | {"source": source.slug, "version": version.number if version is not None else None}
+    session.add(AuditEvent(actor=current_actor(), action="model.duplicate", target=model.slug, detail=facts))
+    session.commit()
+    return detail(settings, model)
 
 
 @router.get("/name", dependencies=[Depends(viewer)])

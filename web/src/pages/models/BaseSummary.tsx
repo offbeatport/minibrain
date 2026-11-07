@@ -12,7 +12,6 @@ import { useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { StatusText } from "~/components/models/StatusText";
-import { count } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { PathResult, type SourcePlan } from "./BaseSource";
@@ -20,14 +19,6 @@ import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
 import { runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
-
-export type CopySource = {
-    slug: string;
-    name: string;
-    answers: string | null;
-    datasetName: string | null;
-    recipe: { rows: number; epochs: number; version: number } | null;
-};
 
 export type DiskNeed = { size: number; free: number | null; verb: string } | null;
 
@@ -230,42 +221,13 @@ export function ComputeHelp({
     );
 }
 
-function CopyNote({ copy, onClear }: { copy: CopySource; onClear: () => void }) {
-    const data = copy.datasetName ? `its training data (${copy.datasetName})` : null;
-    const recipe = copy.recipe
-        ? `its training settings from version ${copy.recipe.version} (${count(copy.recipe.rows)} rows, ${copy.recipe.epochs} ${copy.recipe.epochs === 1 ? "epoch" : "epochs"}), used when you train it`
-        : "default training settings, as it has no trained version yet";
-    const kept = ["the same base model", copy.answers, data].filter(Boolean);
-    return (
-        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-info-soft px-3 py-2">
-            <span className="min-w-0 flex-1">
-                {`Starts from ${copy.name}: ${kept.join(", ")}, and ${recipe}.`}
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={onClear}>
-                Start fresh
-            </Button>
-        </div>
-    );
-}
-
-export function BaseSummary({
-    option,
-    plan,
-    copy,
-    onClearCopy,
-}: {
-    option: BaseOption | null;
-    plan: SourcePlan;
-    copy: CopySource | null;
-    onClearCopy: () => void;
-}) {
-    if (!copy && option) {
+export function BaseSummary({ option, plan }: { option: BaseOption | null; plan: SourcePlan }) {
+    if (option) {
         return null;
     }
     return (
         <div className="flex flex-col gap-3" aria-live="polite">
-            {copy && <CopyNote copy={copy} onClear={onClearCopy} />}
-            {!option && <PathResult plan={plan} />}
+            <PathResult plan={plan} />
         </div>
     );
 }

@@ -193,6 +193,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{slug}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate */
+        post: operations["duplicate_api_models__slug__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/name": {
         parameters: {
             query?: never;
@@ -3666,6 +3683,15 @@ export interface components {
             /** Known Limits */
             known_limits: string;
         };
+        /** CardOrigin */
+        CardOrigin: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number;
+        };
         /** CardPurpose */
         CardPurpose: {
             /** Description */
@@ -3756,6 +3782,7 @@ export interface components {
             /** Train Loss */
             train_loss: number | null;
             run: components["schemas"]["CardRun"] | null;
+            duplicated_from?: components["schemas"]["CardOrigin"] | null;
         };
         /** CardUse */
         CardUse: {
@@ -6526,6 +6553,11 @@ export interface components {
             went_live?: boolean;
             label_proposal?: components["schemas"]["LabelProposal"] | null;
         };
+        /** ModelDuplicate */
+        ModelDuplicate: {
+            /** Name */
+            name: string;
+        };
         /** ModelFile */
         ModelFile: {
             /** Path */
@@ -8576,6 +8608,18 @@ export interface components {
             live_at?: string | null;
             /** View */
             view?: string | null;
+            duplicated_from?: components["schemas"]["VersionOrigin"] | null;
+        };
+        /** VersionOrigin */
+        VersionOrigin: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number;
+            /** Job */
+            job?: number | null;
         };
         /** VersionRow */
         VersionRow: {
@@ -9021,6 +9065,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ModelCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_api_models__slug__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelDuplicate"];
             };
         };
         responses: {

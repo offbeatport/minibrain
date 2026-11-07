@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import {
     ArrowUpDown,
     CircleX,
+    Copy,
     Eye,
     FlaskConical,
     Gauge,
@@ -85,6 +86,7 @@ import {
 } from "~/lib/teardown";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeleteModelsDialog } from "./DeleteModelsDialog";
+import { DuplicateModelDialog } from "./DuplicateModelDialog";
 import { ModelsEmpty } from "./ModelsEmpty";
 import {
     ConfirmAction,
@@ -260,6 +262,7 @@ type Handlers = {
     open: (path: string) => void;
     test: (row: ModelRow) => void;
     edit: (row: ModelRow) => void;
+    duplicate: (row: ModelRow) => void;
     confirm: (confirmation: Confirmation) => void;
     remove: (row: ModelRow) => void;
     createFrom: (base: string) => void;
@@ -529,6 +532,12 @@ function ActionItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: 
                 <DropdownMenuItem onSelect={() => on.edit(row)}>
                     <Pencil />
                     Edit
+                </DropdownMenuItem>
+            )}
+            {row.kind === "custom" && (
+                <DropdownMenuItem onSelect={() => on.duplicate(row)}>
+                    <Copy />
+                    Duplicate
                 </DropdownMenuItem>
             )}
             {row.kind === "custom" && (
@@ -1430,6 +1439,7 @@ export function MyModels({
     const models = useAllModels();
     const [testing, setTesting] = useState<ModelRow | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
+    const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
@@ -1463,6 +1473,7 @@ export function MyModels({
                 });
             },
             edit: setEditing,
+            duplicate: setDuplicating,
             confirm: setConfirmation,
             remove: (row) => setDeleting([{ key: rowId(row), model: row, version: null }]),
             createFrom: (base) =>
@@ -1565,6 +1576,10 @@ export function MyModels({
             )}
             <TestBaseDialog row={testing} onOpenChange={(open) => !open && setTesting(null)} />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
+            <DuplicateModelDialog
+                row={duplicating}
+                onOpenChange={(open) => !open && setDuplicating(null)}
+            />
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}

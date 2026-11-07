@@ -153,6 +153,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Custom models** · shipped · product, ml
   Pick a base and a name; it starts as a chat assistant.
   UI: Models › Add model · API: GET /api/models, POST /api/models, GET /api/models/name, GET /api/models/{slug}, PATCH /api/models/{slug}, DELETE /api/models/{slug}
+- **Duplicate models** · shipped · product, ml
+  Copy a custom model's settings, data and live version, sharing its files.
+  UI: Models › Duplicate, Models › model › Duplicate · API: POST /api/models/{slug}/duplicate
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments

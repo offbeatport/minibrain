@@ -1,18 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
 import { type FormEvent, type KeyboardEvent, useState } from "react";
-import {
-    type CatalogEntry,
-    type ContractInfo,
-    type ModelCreate,
-    type ModelDetail,
-    type ModelRow,
-    api,
-    unwrap,
-} from "~/api/client";
-import { keys, useAllModels, useCatalog, usePresets } from "~/api/queries";
+import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
+import { useAllModels, useCatalog, usePresets } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
@@ -21,7 +13,7 @@ import { bytes } from "~/lib/time";
 import { AddModelSummary, Licence } from "./AddModelSummary";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
-import { BaseSummary, type CopySource, diskBlocks, diskNeed } from "./BaseSummary";
+import { BaseSummary, diskBlocks, diskNeed } from "./BaseSummary";
 import {
     type BaseOption,
     baseOptionFor,
@@ -31,6 +23,7 @@ import {
     servesOnly,
 } from "./baseOptions";
 import { splitTags, useModelsRefresh } from "./dialogs";
+import { isTaken, nextFree, takenNames } from "./names";
 
 type Problems = {
     model?: string;
@@ -48,70 +41,6 @@ const PROBLEM_TARGETS: Record<keyof Problems, string> = {
 
 const STARTING_PRESET = "general";
 const STARTING_NOUN = "Assistant";
-
-type CopiedSettings = Pick<
-    ModelCreate,
-    "preset" | "labels" | "contract" | "graders" | "promotion" | "instructions"
->;
-
-function contractOf(contract: ContractInfo): ContractInfo | null {
-    if (contract.labels) {
-        return { kind: "json", labels: contract.labels };
-    }
-    return contract.kind === "json" ? { kind: "json", json_schema: contract.json_schema } : null;
-}
-
-function settingsOf(detail: ModelDetail): CopiedSettings {
-    const preset = detail.preset as ModelCreate["preset"];
-    return {
-        preset,
-        labels: preset === "classify" ? (detail.contract.labels ?? []) : [],
-        contract: preset === "custom" ? contractOf(detail.contract) : null,
-        graders: detail.graders_default ? null : detail.graders,
-        promotion: detail.promotion,
-        instructions: detail.instructions || null,
-    };
-}
-
-function answersOf(contract: ContractInfo): string | null {
-    if (contract.labels) {
-        return `its ${contract.labels.length} labels`;
-    }
-    return contract.kind === "json" ? "its JSON schema" : null;
-}
-
-function takenNames(rows: ModelRow[]): Set<string> {
-    return new Set(
-        rows.flatMap((row) => [
-            row.name.trim().toLowerCase(),
-            row.key.toLowerCase(),
-            slugOf(row.key),
-        ]),
-    );
-}
-
-function isTaken(name: string, taken: Set<string>): boolean {
-    return taken.has(name.trim().toLowerCase()) || taken.has(slugOf(name));
-}
-
-function nextFree(noun: string, taken: Set<string>, numbered = true): string {
-    for (let number = 1; number < 10_000; number++) {
-        const candidate = number === 1 && !numbered ? noun : `${noun} ${number}`;
-        if (!isTaken(candidate, taken)) {
-            return candidate;
-        }
-    }
-    return noun;
-}
-
-function slugOf(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 48)
-        .replace(/-+$/, "");
-}
 
 function Optional({ label }: { label: string }) {
     return (
@@ -162,27 +91,22 @@ function chosenOption(
 
 export function AddModelPage() {
     const router = useRouter();
-    const client = useQueryClient();
     const refresh = useModelsRefresh();
     const toast = useToast();
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useAllModels();
     const catalog = useCatalog();
     const starting = usePresets().data?.presets.find((item) => item.key === STARTING_PRESET);
-    const [copied, setCopied] = useState<CopiedSettings | null>(null);
     const [nameEdited, setNameEdited] = useState(false);
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
     const [checked, setChecked] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
     const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "import" : "catalogue");
-    const [copy, setCopy] = useState<CopySource | null>(null);
     const [typedName, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
-    const [dataset, setDataset] = useState(
-        params.dataset === undefined ? "" : String(params.dataset),
-    );
+    const [dataset] = useState(params.dataset === undefined ? "" : String(params.dataset));
     const entries = catalog.data?.entries ?? [];
     const rows = models.data ?? [];
     const picks = recommend(entries, rows, "general");
@@ -199,75 +123,18 @@ export function AddModelPage() {
         connection: current?.kind === "import" ? current.connection : null,
     });
     const need = diskNeed(option, plan, catalog.data?.store_free_bytes);
-    const startFrom = useMutation({
-        mutationFn: async (row: ModelRow) => {
-            const path = { params: { path: { slug: row.key } } };
-            const [detail, versions] = await Promise.all([
-                client.fetchQuery({
-                    queryKey: keys.model(row.key),
-                    queryFn: () => unwrap(api.GET("/api/models/{slug}", path)),
-                }),
-                client.fetchQuery({
-                    queryKey: keys.versions(row.key),
-                    queryFn: () => unwrap(api.GET("/api/models/{slug}/versions", path)),
-                }),
-            ]);
-            return { detail, versions };
-        },
-        onSuccess: ({ detail, versions }) => {
-            const trainedVersions = versions
-                .filter((version) => version.kind === "lora" && version.status === "ready")
-                .sort((a, b) => b.number - a.number);
-            const trained =
-                trainedVersions.find((version) => version.current) ?? trainedVersions[0];
-            setCopied(settingsOf(detail));
-            choose({ kind: "base", key: detail.base_model });
-            setDataset(detail.dataset ?? "");
-            setCopy({
-                slug: detail.slug,
-                name: detail.name,
-                answers: answersOf(detail.contract),
-                datasetName: detail.dataset ? (detail.dataset_name ?? detail.dataset) : null,
-                recipe: trained
-                    ? {
-                          rows: Number(trained.recipe.max_rows ?? 3000),
-                          epochs: Number(trained.recipe.epochs ?? 1),
-                          version: trained.number,
-                      }
-                    : null,
-            });
-        },
-    });
     const choose = (next: Picked) => {
         setPicked(next);
         setAccepted(false);
         setOpen(false);
     };
-    const pick = (chosen: BaseOption) => {
-        if (chosen.kind === "custom" && chosen.custom) {
-            setDescription(chosen.custom.description ?? "");
-            setTags((chosen.custom.tags ?? []).join(", "));
-            startFrom.mutate(chosen.custom);
-            return;
-        }
-        if (copy) {
-            clearCopy();
-        }
+    const pick = (chosen: BaseOption) =>
         choose(
             chosen.entry
                 ? { kind: "catalogue", id: chosen.entry.id, variant: chosen.variant?.id ?? "" }
                 : { kind: "base", key: chosen.baseKey ?? "" },
         );
-    };
-    const clearCopy = () => {
-        setCopy(null);
-        setCopied(null);
-        setDataset(params.dataset === undefined ? "" : String(params.dataset));
-    };
     const importPick = (found: ImportPick) => {
-        if (copy) {
-            clearCopy();
-        }
         if (found.kind === "catalogue") {
             const fresh = catalogueOption(found.entry);
             choose({ kind: "catalogue", id: found.entry.id, variant: fresh.variant?.id ?? "" });
@@ -276,9 +143,7 @@ export function AddModelPage() {
         choose({ kind: "import", text: found.text, connection: found.connection });
     };
     const taken = takenNames(rows);
-    const suggestedName = copy
-        ? nextFree(`${copy.name} copy`, taken, false)
-        : nextFree(starting?.noun ?? STARTING_NOUN, taken);
+    const suggestedName = nextFree(starting?.noun ?? STARTING_NOUN, taken);
     const name = nameEdited ? typedName : suggestedName;
     const add = useMutation({
         mutationFn: async () => {
@@ -291,7 +156,7 @@ export function AddModelPage() {
                         description: description.trim(),
                         tags: splitTags(tags),
                         base_model: baseModel || null,
-                        ...(copied ?? { preset: STARTING_PRESET }),
+                        preset: STARTING_PRESET,
                         dataset: dataset || null,
                     },
                 }),
@@ -394,7 +259,7 @@ export function AddModelPage() {
                             id="base-model"
                             label="Model"
                             error={shown.model}
-                            hint={copy ? undefined : chatHint(option)}
+                            hint={chatHint(option)}
                         >
                             <BasePicker
                                 value={{
@@ -417,13 +282,8 @@ export function AddModelPage() {
                                 Loading the catalogue…
                             </span>
                         )}
-                        <ErrorLine error={catalog.error ?? startFrom.error} />
-                        <BaseSummary
-                            option={option}
-                            plan={plan}
-                            copy={copy}
-                            onClearCopy={clearCopy}
-                        />
+                        <ErrorLine error={catalog.error} />
+                        <BaseSummary option={option} plan={plan} />
                     </div>
                     <Field
                         id="create-name"

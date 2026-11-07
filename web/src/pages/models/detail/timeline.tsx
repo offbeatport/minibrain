@@ -66,6 +66,8 @@ function Attempt({
     deployed,
 }: { slug: string; version: VersionInfo; deployed: boolean }) {
     const state = outcome(version, deployed);
+    const origin = version.duplicated_from;
+    const job = version.job?.id ?? origin?.job;
     return (
         <li className="relative grid grid-cols-[3rem_6.5rem_minmax(10rem,1fr)_minmax(9rem,1fr)_6rem_7rem_5.5rem_2rem] items-center gap-x-4 py-2 before:absolute before:top-1/2 before:-left-6 before:w-5 before:border-t max-lg:grid-cols-[3rem_6.5rem_1fr_6rem_5.5rem_2rem]">
             <span className="font-semibold tabular-nums">{`v${version.number}`}</span>
@@ -88,12 +90,23 @@ function Attempt({
             >
                 Model card
             </Link>
-            {version.job ? (
-                <Link href={jobPageHref(version.job.id)} className="text-primary hover:underline">
+            {job ? (
+                <Link href={jobPageHref(job)} className="text-primary hover:underline">
                     Job
                 </Link>
             ) : (
                 <span />
+            )}
+            {origin && (
+                <span className="col-span-full col-start-2 text-sm text-muted-foreground">
+                    {"Duplicated from "}
+                    <Link
+                        href={modelPageHref(origin.slug, "versions")}
+                        className="text-primary hover:underline"
+                    >
+                        {`${origin.name} v${origin.number}`}
+                    </Link>
+                </span>
             )}
         </li>
     );

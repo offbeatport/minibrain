@@ -10,6 +10,7 @@ from minibrain.api.card_schemas import (
     CardCost,
     CardData,
     CardEvent,
+    CardOrigin,
     CardRun,
     CardScore,
     ModelCard,
@@ -262,16 +263,22 @@ def run_rows(run: CardRun | None) -> Facts:
     ]
 
 
+def origin_text(origin: CardOrigin | None) -> str | None:
+    return f"{origin.name} v{origin.number}" if origin is not None else None
+
+
 def training_section(card: ModelCard) -> list[str]:
     training = card.training
     recipe = training.recipe
+    origin = origin_text(training.duplicated_from)
     if training.method != "lora" or recipe is None:
         text = (
             "Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and "
             f"{training.few_shot_examples or 0} few-shot examples from the training split."
         )
-        return section("## Training", [text])
+        return section("## Training", [text] + ([f"Duplicated from {origin}."] if origin else []))
     rows: Facts = [
+        *([("Duplicated from", origin)] if origin else []),
         ("Method", "LoRA adapter"),
         ("Strategy", recipe.strategy),
         ("Rows trained on", training.examples),

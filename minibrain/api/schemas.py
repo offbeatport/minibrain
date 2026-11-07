@@ -656,6 +656,13 @@ class VersionFiles(BaseModel):
     files: list[PackedFileInfo]
 
 
+class VersionOrigin(BaseModel):
+    slug: str
+    name: str
+    number: int
+    job: int | None = None
+
+
 class VersionInfo(BaseModel):
     number: int
     kind: str
@@ -686,6 +693,7 @@ class VersionInfo(BaseModel):
     promotion: DecisionInfo | None = None
     live_at: datetime | None = None
     view: str | None = None
+    duplicated_from: VersionOrigin | None = None
 
 
 TeardownKindName = Literal["delete", "undeploy"]
@@ -1231,6 +1239,10 @@ class BaseModelDetail(ModelRow):
     relocated: bool = False
     parameters: int | None = Field(default=None, description="Parameter count, from the catalogue or the weights.")
     context_tokens: int | None = None
+
+
+class ModelDuplicate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
 
 
 class ModelUpdate(BaseModel):

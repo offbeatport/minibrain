@@ -29,6 +29,7 @@ ROUTE_ROLES = {
     ("PATCH", "/api/models/{slug}"): "builder",
     ("GET", "/api/models/{slug}"): "viewer",
     ("DELETE", "/api/models/{slug}"): "builder",
+    ("POST", "/api/models/{slug}/duplicate"): "builder",
     ("POST", "/api/models/{slug}/deploy"): "builder",
     ("POST", "/api/models/sample"): "builder",
     ("GET", "/api/models/name"): "viewer",

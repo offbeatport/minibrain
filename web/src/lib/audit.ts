@@ -48,6 +48,7 @@ const ACTIONS: Record<string, string> = {
     "model.delete": "Model delete started",
     "model.delete_finished": "Model delete finished",
     "model.deploy": "Model deployed",
+    "model.duplicate": "Model duplicated",
     "model.reimport": "Model re-imported",
     "model.request_bodies": "Request inputs and answers changed",
     "model.safety": "Safety model changed",
@@ -280,6 +281,10 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         typeof detail.job === "number" ? `Queued again as job #${detail.job}` : "Queued again",
     "model.delete": (detail) =>
         typeof detail.size_bytes === "number" ? `Freed ${bytes(detail.size_bytes)}` : "Deleted",
+    "model.duplicate": (detail) =>
+        typeof detail.version === "number"
+            ? `From ${plainValue(detail.source)} v${detail.version}`
+            : `From ${plainValue(detail.source)}`,
     "model.reimport": (detail) => `From ${plainValue(detail.source)}`,
     "model.relocate": (detail) => `${plainValue(detail.from)} → ${plainValue(detail.to)}`,
     "model.repair": (detail) => `From ${plainValue(detail.source)}`,

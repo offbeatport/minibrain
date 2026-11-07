@@ -35,7 +35,6 @@ import {
     type FitLevel,
     type Recommendations,
     catalogueOption,
-    customOptions,
     gigabytes,
     localBases,
     logoPublisher,
@@ -52,7 +51,7 @@ import {
     useTrainsHere,
 } from "./runsHere";
 
-export type PickerTab = "catalogue" | "mine" | "import";
+export type PickerTab = "catalogue" | "imported" | "import";
 
 const USE_FILTERS = [
     { value: "commercial", label: "Commercial use" },
@@ -175,7 +174,7 @@ function Resources({ option }: { option: BaseOption }) {
 function factsOf(option: BaseOption): string[] {
     const variant = option.variant;
     return [
-        option.kind === "custom" ? null : option.publisher,
+        option.publisher,
         option.params ? `${option.params} parameters` : null,
         option.entry?.license_name ?? null,
         variant && (quantized(variant) || servesOnly(option)) ? formatName(variant) : null,
@@ -246,7 +245,7 @@ function OptionRow({
 }
 
 function descriptionOf(option: BaseOption): string | null {
-    return option.entry?.description || option.custom?.description || option.note || null;
+    return option.entry?.description || option.note || null;
 }
 
 const FIT_RANK: Record<FitLevel, number> = { fits: 0, limited: 1, unknown: 2, insufficient: 3 };
@@ -328,7 +327,7 @@ function Trigger({ value }: { value: PickerValue }) {
                         <>
                             <span className="text-base font-semibold">Choose a base model</span>
                             <span className="text-muted-foreground">
-                                Recommended, from the catalogue, one of yours, or an import.
+                                Recommended, from the catalogue, or an import.
                             </span>
                         </>
                     )}
@@ -390,7 +389,6 @@ export function BasePicker({
     const catalogue = everything.filter(shown);
     const copies = entries.flatMap(servingCopies).filter(shown);
     const count = (match: (option: BaseOption) => boolean) => everything.filter(match).length;
-    const custom = customOptions(entries, models);
     const imported = localBases(entries, models);
     const suggested = [...picks.here, ...picks.unchecked].slice(0, 3).map((pick) => pick.key);
     const ordered = [...catalogue, ...copies].sort((left, right) => {
@@ -477,13 +475,12 @@ export function BasePicker({
             empty: "No catalogue model matches these filters.",
         },
         {
-            value: "mine",
-            label: "My models",
-            groups: [
-                groupOf("custom", "Your models: adds a copy with its data and settings", custom),
-                groupOf("imported", "Imported base models", imported),
-            ].filter((group) => group.items.length > 0),
-            empty: "No custom or imported models yet.",
+            value: "imported",
+            label: "Imported",
+            groups: [groupOf("imported", undefined, imported)].filter(
+                (group) => group.items.length > 0,
+            ),
+            empty: "No imported base models yet. Import one from a Hugging Face id, an S3 path or a folder.",
         },
         {
             value: "import",

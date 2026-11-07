@@ -36,6 +36,7 @@ from minibrain.api.schemas import (
     TeardownKindName,
     TeardownState,
     VersionInfo,
+    VersionOrigin,
 )
 from minibrain.data.dataset_versions import Changes, changes_since, version_number
 from minibrain.data.shared import table_of
@@ -331,6 +332,7 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         promotion=DecisionInfo.model_validate(decision(model, version).as_dict()) if ready else None,
         live_at=version.live_at,
         view=view_of(version),
+        duplicated_from=VersionOrigin.model_validate(version.duplicated_from) if version.duplicated_from else None,
     )
 
 

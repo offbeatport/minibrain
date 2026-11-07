@@ -12,7 +12,7 @@ type AddedInfo = CatalogEntry["added"][number];
 
 export type BaseOption = {
     key: string;
-    kind: "catalogue" | "local" | "custom";
+    kind: "catalogue" | "local";
     name: string;
     publisher: string | null;
     params: string | null;
@@ -23,7 +23,6 @@ export type BaseOption = {
     size: number | null;
     fit: FitLevel;
     licence: LicenceUse | null;
-    custom: ModelRow | null;
     note: string | null;
 };
 
@@ -134,7 +133,6 @@ export function catalogueOption(entry: CatalogEntry, variantId?: string): BaseOp
         size: variant.size_bytes,
         fit: variant.fit.level,
         licence: entry.license_use,
-        custom: null,
         note: entry.superseded_by ? "A newer version is in the catalogue" : null,
     };
 }
@@ -158,7 +156,6 @@ function localOption(row: ModelRow): BaseOption {
         size: row.size_bytes ?? null,
         fit: "unknown",
         licence: null,
-        custom: null,
         note: "Imported on this install",
     };
 }
@@ -200,36 +197,6 @@ export function localBases(entries: CatalogEntry[], rows: ModelRow[]): BaseOptio
                 row.availability.state !== "not_downloaded",
         )
         .map(localOption);
-}
-
-export function customOptions(entries: CatalogEntry[], rows: ModelRow[]): BaseOption[] {
-    return rows
-        .filter((row) => row.kind === "custom" && row.base_model)
-        .map((row) => {
-            const base = baseOptionFor(row.base_model ?? "", entries, rows);
-            const version = row.current_version ?? row.ready_version;
-            return {
-                key: `custom:${row.key}`,
-                kind: "custom",
-                name: row.name,
-                publisher: base?.publisher ?? null,
-                params: base?.params ?? null,
-                entry: base?.entry ?? null,
-                variant: base?.variant ?? null,
-                added: base?.added ?? null,
-                baseKey: base?.baseKey ?? row.base_model,
-                size: base?.size ?? null,
-                fit: base?.fit ?? "unknown",
-                licence: base?.licence ?? null,
-                custom: row,
-                note: [
-                    `Based on ${base?.name ?? row.base_model}`,
-                    version !== null && version !== undefined ? `version ${version}` : null,
-                ]
-                    .filter(Boolean)
-                    .join(", "),
-            };
-        });
 }
 
 function ranked(entries: CatalogEntry[], task: TaskKey): CatalogEntry[] {
@@ -281,7 +248,7 @@ export function chatHint(option: BaseOption | null): string | undefined {
 }
 
 export function logoPublisher(option: BaseOption | null): string | null {
-    return option && option.kind !== "custom" ? option.publisher : null;
+    return option ? option.publisher : null;
 }
 
 export function searchText(option: BaseOption): string {
@@ -292,7 +259,6 @@ export function searchText(option: BaseOption): string {
         option.entry?.id,
         option.entry?.family,
         option.baseKey,
-        option.custom?.key,
         option.note,
     ]
         .filter(Boolean)
