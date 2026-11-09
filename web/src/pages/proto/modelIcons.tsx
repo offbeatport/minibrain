@@ -1,6 +1,6 @@
-import { createAvatar } from "@dicebear/core";
-import * as dicebearIdenticon from "@dicebear/identicon";
-import * as dicebearShapes from "@dicebear/shapes";
+import { Avatar as DicebearAvatar, Style } from "@dicebear/core";
+import identiconDefinition from "@dicebear/styles/identicon.json";
+import shapesDefinition from "@dicebear/styles/shapes.json";
 import Avatar from "boring-avatars";
 import { toSvg } from "jdenticon";
 import {
@@ -192,7 +192,7 @@ function Glyph({ size, children }: { size: Size; children: ReactNode }) {
     );
 }
 
-function SvgMarkup({ markup }: { markup: string }) {
+export function SvgMarkup({ markup }: { markup: string }) {
     const host = useRef<HTMLSpanElement>(null);
     useLayoutEffect(() => {
         const svg = new DOMParser().parseFromString(markup, "image/svg+xml").documentElement;
@@ -215,12 +215,12 @@ function placeholders(colors: string[]): { hexes: string[]; paint: (svg: string)
     };
 }
 
-function cleanDicebear(svg: string): string {
-    return svg
-        .replace(/<metadata[\s\S]*?<\/metadata>/, "")
-        .replace(/<mask[\s\S]*?<\/mask>/, "")
-        .replace(' mask="url(#viewboxMask)"', "");
+export function cleanDicebear(svg: string): string {
+    return svg.replace(/<!--[\s\S]*?-->/g, "").replace(/<metadata[\s\S]*?<\/metadata>/, "");
 }
+
+let shapesStyle: Style<typeof shapesDefinition> | undefined;
+let identiconStyle: Style<typeof identiconDefinition> | undefined;
 
 function MonoMonogram({ model, size }: { model: SampleModel; size: Size }) {
     const two = size !== "sm";
@@ -629,8 +629,10 @@ function dicebearShapesSvg(name: string): string {
     const tone = toneOf(name);
     const { hexes, paint } = placeholders([mix(tone, 14), tone, toneOf(name, 3), toneOf(name, 7)]);
     const [background, ...shapes] = hexes;
-    const svg = createAvatar(dicebearShapes, {
+    shapesStyle ??= new Style(shapesDefinition);
+    const svg = new DicebearAvatar(shapesStyle, {
         seed: slugOf(name),
+        idRandomization: true,
         backgroundColor: [background],
         shape1Color: shapes,
         shape2Color: shapes,
@@ -651,10 +653,12 @@ function DicebearShapes({ model, size }: { model: SampleModel; size: Size }) {
 function dicebearIdenticonSvg(name: string): string {
     const tone = toneOf(name);
     const { hexes, paint } = placeholders([tone]);
-    const svg = createAvatar(dicebearIdenticon, {
+    identiconStyle ??= new Style(identiconDefinition);
+    const svg = new DicebearAvatar(identiconStyle, {
         seed: slugOf(name),
+        idRandomization: true,
         rowColor: hexes,
-        scale: 70,
+        scale: 0.7,
     }).toString();
     return paint(cleanDicebear(svg));
 }
@@ -838,7 +842,7 @@ export const VARIANTS: Variant[] = [
     {
         name: "Shapes (DiceBear)",
         idea: "DiceBear's shapes style: three overlapping, rotated shapes on a tint, recoloured to three kit tones.",
-        source: "@dicebear/core and @dicebear/shapes 9.4.3",
+        source: "@dicebear/core 10.7.0 and @dicebear/styles 10.6.0",
         licence: "MIT code, CC0 1.0 design",
         bends: "Shapes are cropped by the tile edge by design.",
         Icon: DicebearShapes,
@@ -846,7 +850,7 @@ export const VARIANTS: Variant[] = [
     {
         name: "Identicon (DiceBear)",
         idea: "DiceBear's identicon style: a mirrored 5 by 5 grid in the model's tone on its tint.",
-        source: "@dicebear/core and @dicebear/identicon 9.4.3",
+        source: "@dicebear/core 10.7.0 and @dicebear/styles 10.6.0",
         licence: "MIT code, CC0 1.0 design",
         Icon: DicebearIdenticon,
     },

@@ -11,6 +11,7 @@ import {
 } from "obp-ui";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
+import { AvatarStyles } from "./AvatarStylesSection";
 import {
     CurrentLogo,
     MODELS,
@@ -44,13 +45,13 @@ const LIBRARIES: Library[] = [
     },
     {
         name: "DiceBear",
-        version: "@dicebear/core 9.4.3 (v9 LTS)",
+        version: "@dicebear/core 10.7.0 with @dicebear/styles 10.6.0",
         licence:
             "MIT code; identicon and shapes designs CC0 1.0. Other styles vary and several are CC BY 4.0, which needs attribution",
-        size: "2.9 KB core; 4.2 KB with identicon; 4.6 KB with shapes",
-        released: "9.4.3 on 2026-07-05; 10.7.0 on 2026-08-26 moves styles to JSON definitions",
-        offline: "Yes: createAvatar().toString() returns an SVG string",
-        theme: "Emits hex, so placeholder hexes are swapped for tokens. Strip its metadata and fixed viewboxMask id, which collides between inline SVGs",
+        size: "24.9 KB core; 0.8 KB identicon; 1.6 KB shapes",
+        released: "Both on 2026-08-26; 11.0 is a release candidate",
+        offline: "Yes: new Avatar(new Style(definition)).toString() returns an SVG string",
+        theme: "Takes hex only, so placeholder hexes are swapped for tokens. Strip its metadata; idRandomization keeps ids unique between inline SVGs",
         verdict: "Usable: shapes and identicon (17, 18); identicon is easy to write in-house",
     },
     {
@@ -356,8 +357,9 @@ export function ModelIconsPage() {
         <Page wide>
             <PageHeader
                 title="Model icons"
-                caption="Twenty designs for a custom model's logo, each for six names at 20, 32 and 48 px and in the list, picker and page header. Prototype; not in the sidebar."
+                caption="Avatar styles and a picker mock first, then twenty designs for a custom model's logo, each for six names at 20, 32 and 48 px and in the list, picker and page header. Prototype; not in the sidebar."
             />
+            <AvatarStyles />
             <Notes />
             <Overview />
             {VARIANTS.map((variant, index) => (
