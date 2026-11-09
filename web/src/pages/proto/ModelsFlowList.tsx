@@ -1,36 +1,15 @@
 import { useRouter } from "@tanstack/react-router";
-import {
-    ArrowUpDown,
-    ChevronRight,
-    Eye,
-    FileText,
-    GitCompare,
-    GraduationCap,
-    MoreHorizontal,
-    Play,
-    Plug,
-    PowerOff,
-    Trash2,
-    X,
-} from "lucide-react";
+import { ArrowUpDown, Columns3, GitCompare, Layers, PowerOff, Trash2, X } from "lucide-react";
 import {
     Button,
-    Checkbox,
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
     DropdownMenu,
+    DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
+    DropdownMenuLabel,
     DropdownMenuTrigger,
     FilterMenu,
+    InfoTip,
     KbdHint,
-    Link,
     SearchInput,
     Select,
     SelectContent,
@@ -44,63 +23,109 @@ import {
     cn,
     useToast,
 } from "obp-ui";
-import { type KeyboardEvent, type MouseEvent, type ReactNode, useMemo, useState } from "react";
-import type { ModelUsage } from "~/api/client";
-import { Requests } from "~/components/models/ModelMetrics";
-import { StatusText } from "~/components/models/StatusText";
+import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
 import {
-    FLOW,
+    type BaseVariant,
     type FlowModel,
     type FlowVersion,
     KIND_LABELS,
     attention,
+    baseModelSlug,
     compareHref,
     deleteModels,
+    deleteVariantFiles,
     deleteVersions,
+    deployVariants,
     flowHref,
     liveVersion,
     modelHref,
     newestFirst,
-    pct,
-    scoreDelta,
-    shortAgo,
     shownVersions,
+    togglePin,
     undeployModels,
+    undeployVariants,
     useFlowModels,
+    variantKey,
     versionKey,
     versionState,
 } from "./modelsFlowData";
 import {
-    Delta,
-    DeployDialog,
-    type DeployIntent,
-    ModelAvatar,
-    VersionStatus,
-    deployBlocked,
-    deployLabel,
-} from "./modelsFlowParts";
+    AutopilotDialog,
+    type Confirm,
+    ConfirmDialog,
+    DeleteModelsDialog,
+} from "./modelsFlowDialogs";
+import { DeployDialog, type DeployIntent } from "./modelsFlowParts";
+import { QuickLook } from "./modelsFlowPeek";
+import {
+    COLUMNS,
+    type Column,
+    GroupHeading,
+    type Handlers,
+    type Hint,
+    ModelRow,
+    MoreRow,
+    ROW_GRID,
+    type RowProps,
+    VariantRow,
+    VersionRow,
+    gridTemplate,
+    plural,
+} from "./modelsFlowRows";
 
-type Kind = "model" | "version";
-type Selection = { kind: Kind; keys: string[] };
 type Line =
     | { key: string; type: "model"; model: FlowModel; expanded: boolean }
     | { key: string; type: "version"; model: FlowModel; version: FlowVersion }
-    | { key: string; type: "more"; model: FlowModel; shown: number; searching: boolean };
-type Confirm = {
-    title: string;
-    description: ReactNode;
-    label: string;
-    run: () => void;
-};
+    | { key: string; type: "variant"; model: FlowModel; variant: BaseVariant }
+    | { key: string; type: "more"; model: FlowModel; shown: number; searching: boolean }
+    | { key: string; type: "group"; label: string; facts: string };
+type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
 
 type Filters = { deployed: boolean; attention: boolean };
 type SortKey = "attention" | "score" | "name";
+type GroupKey = "none" | "base" | "task" | "status";
 
 const SORTS: { value: SortKey; label: string }[] = [
     { value: "attention", label: "Needs attention first" },
     { value: "score", label: "Score, high to low" },
     { value: "name", label: "Name, A to Z" },
 ];
+
+const GROUPS: { value: GroupKey; label: string }[] = [
+    { value: "none", label: "No grouping" },
+    { value: "base", label: "Group by base" },
+    { value: "task", label: "Group by task" },
+    { value: "status", label: "Group by status" },
+];
+
+const HINTS: Record<string, Hint> = {
+    "support-triage": {
+        text: "Qwen3 0.6B scores 85.9% vs 86.7% at 1/12 the cost.",
+        action: "Try smaller base",
+        href: modelHref("support-triage", "versions"),
+    },
+};
+
+const EXPANDED_KEY = "minibrain.proto.flow.expanded";
+const COLUMNS_KEY = "minibrain.proto.flow.columns";
+const DEFAULT_COLUMNS: Column[] = ["quality", "requests", "cost"];
+
+function readStored<T>(key: string, fallback: T): T {
+    try {
+        const raw = window.localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as T) : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function writeStored(key: string, value: unknown) {
+    try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        return;
+    }
+}
 
 function passes(model: FlowModel, filters: Filters): boolean {
     return (
@@ -116,43 +141,13 @@ function scoreOf(model: FlowModel): number {
 function sortModels(models: FlowModel[], sort: SortKey): FlowModel[] {
     const sorted = [...models];
     if (sort === "score") {
-        return sorted.sort((a, b) => scoreOf(b) - scoreOf(a));
+        sorted.sort((a, b) => scoreOf(b) - scoreOf(a));
+    } else if (sort === "name") {
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+        sorted.sort((a, b) => Number(attention(b) !== null) - Number(attention(a) !== null));
     }
-    if (sort === "name") {
-        return sorted.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return sorted.sort((a, b) => Number(attention(b) !== null) - Number(attention(a) !== null));
-}
-
-const EXPANDED_KEY = "minibrain.proto.flow.expanded";
-const LIST_GRID =
-    "grid grid-cols-[auto_minmax(14rem,1fr)_minmax(7rem,auto)_minmax(9rem,auto)_minmax(9rem,auto)_auto] gap-x-4";
-const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
-const EMPTY_SELECTION: Selection = { kind: "model", keys: [] };
-
-function readExpanded(): Record<string, boolean> {
-    try {
-        const raw = window.localStorage.getItem(EXPANDED_KEY);
-        return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-    } catch {
-        return {};
-    }
-}
-
-function writeExpanded(value: Record<string, boolean>) {
-    try {
-        window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(value));
-    } catch {
-        return;
-    }
-}
-
-export function forgetExpanded() {
-    try {
-        window.localStorage.removeItem(EXPANDED_KEY);
-    } catch {
-        return;
-    }
+    return sorted.sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 function lineId(key: string): string {
@@ -174,593 +169,151 @@ function versionMatches(model: FlowModel, version: FlowVersion, text: string): b
         .includes(text);
 }
 
-function usageOf(model: FlowModel): ModelUsage | null {
-    const total = model.traffic.reduce((sum, value) => sum + value, 0);
-    if (total === 0 && !model.deployed) {
-        return null;
+function variantMatches(item: BaseVariant, text: string): boolean {
+    return `${item.format} ${item.apiName} ${item.live ? "live" : "not deployed"}`
+        .toLowerCase()
+        .includes(text);
+}
+
+function childHits(model: FlowModel, text: string): number {
+    if (!text) {
+        return 0;
     }
-    return {
-        days: [],
-        daily: model.traffic,
-        total,
-        previous: model.previous,
-        failed: 0,
-        last_at: new Date().toISOString(),
-        p50_ms: null,
-    };
+    return model.kind === "base"
+        ? model.variants.filter((item) => variantMatches(item, text)).length
+        : model.versions.filter((version) => versionMatches(model, version, text)).length;
 }
 
-function plural(count: number, word: string): string {
-    return `${count} ${word}${count === 1 ? "" : "s"}`;
+function groupOf(model: FlowModel, group: GroupKey, names: Map<string, string>): string {
+    if (group === "base") {
+        const slug = model.kind === "base" ? model.slug : baseModelSlug(model.base ?? "");
+        return names.get(slug) ?? model.base ?? "Other";
+    }
+    if (group === "task") {
+        return model.kind === "base" ? "Base models" : model.task;
+    }
+    if (group === "status") {
+        if (attention(model) !== null || model.autopilot?.run) {
+            return "Needs attention";
+        }
+        return model.deployed ? "Live" : "Not deployed";
+    }
+    return model.kind === "base" ? "Base models" : "Your models";
 }
 
-function fromControl(event: MouseEvent | KeyboardEvent): boolean {
-    return (event.target as HTMLElement).closest("a,button,label,input,[role=menuitem]") !== null;
+const GROUP_ORDER: Record<GroupKey, string[]> = {
+    none: ["Your models", "Base models"],
+    base: [],
+    task: ["Classify", "Extract", "SQL", "Base models"],
+    status: ["Needs attention", "Live", "Not deployed"],
+};
+
+function grouped(models: FlowModel[], group: GroupKey): [string, FlowModel[]][] {
+    const names = new Map(
+        models.filter((model) => model.kind === "base").map((model) => [model.slug, model.name]),
+    );
+    const buckets = new Map<string, FlowModel[]>();
+    for (const model of models) {
+        const label = groupOf(model, group, names);
+        buckets.set(label, [...(buckets.get(label) ?? []), model]);
+    }
+    const order = GROUP_ORDER[group];
+    const rank = (label: string) => (order.includes(label) ? order.indexOf(label) : order.length);
+    const entries = [...buckets.entries()].sort(
+        (a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]),
+    );
+    if (group === "base") {
+        return entries.map(([label, items]) => [
+            label,
+            [...items].sort((a, b) => Number(b.kind === "base") - Number(a.kind === "base")),
+        ]);
+    }
+    return entries;
 }
 
-function useExpanded() {
-    const [stored, setStored] = useState<Record<string, boolean>>(readExpanded);
-    const toggle = (slug: string, next: boolean) => {
-        const value = { ...stored, [slug]: next };
-        setStored(value);
-        writeExpanded(value);
-    };
-    return { stored, toggle };
+function groupFacts(items: FlowModel[]): string {
+    const custom = items.filter((model) => model.kind === "custom").length;
+    const bases = items.length - custom;
+    return [custom > 0 && plural(custom, "model"), bases > 0 && plural(bases, "base")]
+        .filter(Boolean)
+        .join(" · ");
+}
+
+function childLines(model: FlowModel, text: string): Line[] {
+    if (model.kind === "base") {
+        const shown = text ? model.variants.filter((item) => variantMatches(item, text)) : [];
+        return (shown.length > 0 ? shown : model.variants).map((item) => ({
+            key: variantKey(model.slug, item.id),
+            type: "variant" as const,
+            model,
+            variant: item,
+        }));
+    }
+    const hits = text ? newestFirst(model).filter((v) => versionMatches(model, v, text)) : [];
+    const searching = hits.length > 0;
+    const shown = searching ? hits : shownVersions(model);
+    const lines: Line[] = shown.map((version) => ({
+        key: versionKey(model.slug, version.number),
+        type: "version",
+        model,
+        version,
+    }));
+    if (shown.length < model.versions.length) {
+        lines.push({
+            key: `${model.slug}:more`,
+            type: "more",
+            model,
+            shown: shown.length,
+            searching,
+        });
+    }
+    return lines;
+}
+
+function defaultExpanded(model: FlowModel): boolean {
+    if (model.kind === "base") {
+        return model.variants.some((item) => item.update !== null);
+    }
+    return attention(model) !== null || model.autopilot?.run !== undefined;
 }
 
 function buildLines(
     models: FlowModel[],
+    group: GroupKey,
     text: string,
     stored: Record<string, boolean>,
     searchToggles: Record<string, boolean>,
 ): Line[] {
     const lines: Line[] = [];
-    for (const model of models) {
-        const nameHit = !text || modelText(model).includes(text);
-        const hits = text ? newestFirst(model).filter((v) => versionMatches(model, v, text)) : [];
-        if (!nameHit && hits.length === 0) {
+    for (const [label, items] of grouped(models, group)) {
+        const visible = items.filter(
+            (model) => !text || modelText(model).includes(text) || childHits(model, text) > 0,
+        );
+        if (visible.length === 0) {
             continue;
         }
-        const searching = hits.length > 0;
-        const expanded =
-            model.versions.length > 0 &&
-            (searching
-                ? (searchToggles[model.slug] ?? true)
-                : (stored[model.slug] ?? attention(model) !== null));
-        lines.push({ key: model.slug, type: "model", model, expanded });
-        if (!expanded) {
-            continue;
-        }
-        const shown = searching ? hits : shownVersions(model);
-        for (const version of shown) {
-            lines.push({
-                key: versionKey(model.slug, version.number),
-                type: "version",
-                model,
-                version,
-            });
-        }
-        if (shown.length < model.versions.length) {
-            lines.push({
-                key: `${model.slug}:more`,
-                type: "more",
-                model,
-                shown: shown.length,
-                searching,
-            });
+        lines.push({ key: `group:${label}`, type: "group", label, facts: groupFacts(visible) });
+        for (const model of visible) {
+            const children = model.kind === "base" ? model.variants : model.versions;
+            const searching = childHits(model, text) > 0;
+            const expanded =
+                children.length > 0 &&
+                (searching
+                    ? (searchToggles[model.slug] ?? true)
+                    : (stored[model.slug] ?? defaultExpanded(model)));
+            lines.push({ key: model.slug, type: "model", model, expanded });
+            if (expanded) {
+                lines.push(...childLines(model, searching ? text : ""));
+            }
         }
     }
     return lines;
 }
 
-function ModelActions({ model, on }: { model: FlowModel; on: Handlers }) {
-    return (
-        <div className="relative z-10 flex items-center justify-end gap-1">
-            {model.deployed ? (
-                <Button variant="secondary" onClick={() => on.open(modelHref(model.slug, "api"))}>
-                    <Plug aria-hidden="true" />
-                    Use API
-                </Button>
-            ) : (
-                <Button
-                    variant="secondary"
-                    onClick={() => on.open(`${FLOW}/playground?model=${model.slug}`)}
-                >
-                    <Play aria-hidden="true" />
-                    Test
-                </Button>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`More actions for ${model.name}`}
-                    >
-                        <MoreHorizontal />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
-                    <DropdownMenuItem onSelect={() => on.open(flowHref(model.slug))}>
-                        <Eye />
-                        View details
-                    </DropdownMenuItem>
-                    {model.kind === "custom" && (
-                        <DropdownMenuItem
-                            disabled={model.serveOnly}
-                            className={model.serveOnly ? "items-start" : undefined}
-                            onSelect={() => on.open(modelHref(model.slug))}
-                        >
-                            <GraduationCap className={model.serveOnly ? "mt-0.5" : undefined} />
-                            <span className="flex flex-col">
-                                <span>Train</span>
-                                {model.serveOnly && (
-                                    <span className="max-w-60 text-sm whitespace-normal text-muted-foreground">
-                                        {`${model.base} is serve-only: GGUF weights cannot be trained.`}
-                                    </span>
-                                )}
-                            </span>
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    {model.deployed && (
-                        <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => on.undeploy([model])}
-                        >
-                            <PowerOff />
-                            Undeploy
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => on.removeModels([model])}
-                    >
-                        <Trash2 />
-                        {model.kind === "custom" ? "Delete model and all versions" : "Delete model"}
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-    );
-}
+type PickedVersion = { model: FlowModel; version: FlowVersion };
+type PickedVariant = { model: FlowModel; variant: BaseVariant; key: string };
 
-function DisabledWithTip({ tip, children }: { tip: string; children: ReactNode }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="inline-flex">{children}</span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs whitespace-normal">{tip}</TooltipContent>
-        </Tooltip>
-    );
-}
-
-function compareTarget(model: FlowModel, version: FlowVersion): FlowVersion | undefined {
-    const live = liveVersion(model);
-    if (live && live.number !== version.number && live.scores) {
-        return live;
-    }
-    return newestFirst(model).find(
-        (other) => other.number < version.number && other.scores !== null,
-    );
-}
-
-function VersionActions({
-    model,
-    version,
-    on,
-}: {
-    model: FlowModel;
-    version: FlowVersion;
-    on: Handlers;
-}) {
-    const label = deployLabel(model, version);
-    const blocked = deployBlocked(version);
-    const target = version.scores ? compareTarget(model, version) : undefined;
-    const live = liveVersion(model)?.number === version.number;
-    const deploy = label && !blocked && (
-        <Button variant="secondary" size="sm" onClick={() => on.deploy({ model, version })}>
-            {label.startsWith("Deploy") ? "Deploy" : label}
-        </Button>
-    );
-    return (
-        <div className="relative z-10 flex items-center justify-end gap-1">
-            {deploy}
-            {target ? (
-                <Button variant="outline" size="sm" asChild>
-                    <Link
-                        href={compareHref(model.slug, target.number, version.number)}
-                        aria-label={`Compare v${version.number} with v${target.number}`}
-                    >
-                        Compare
-                    </Link>
-                </Button>
-            ) : (
-                <DisabledWithTip
-                    tip={
-                        version.scores
-                            ? "No earlier scored version to compare with."
-                            : "Nothing to compare until it is scored."
-                    }
-                >
-                    <Button variant="outline" size="sm" disabled>
-                        Compare
-                    </Button>
-                </DisabledWithTip>
-            )}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`More actions for ${model.name} v${version.number}`}
-                    >
-                        <MoreHorizontal />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
-                    <DropdownMenuItem
-                        onSelect={() => on.open(flowHref(model.slug, version.number))}
-                    >
-                        <Eye />
-                        {`Open v${version.number}`}
-                    </DropdownMenuItem>
-                    {version.status === "ready" && (
-                        <DropdownMenuItem
-                            onSelect={() => on.open(`${FLOW}/playground?model=${model.slug}`)}
-                        >
-                            <Play />
-                            {`Test v${version.number}`}
-                        </DropdownMenuItem>
-                    )}
-                    {version.status === "ready" && (
-                        <DropdownMenuItem
-                            onSelect={() => on.open(flowHref(model.slug, version.number, "card"))}
-                        >
-                            <FileText />
-                            Model card
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        variant="destructive"
-                        disabled={live}
-                        onSelect={() => on.removeVersions([{ model, version }])}
-                    >
-                        <Trash2 />
-                        {live ? `v${version.number} is live` : `Delete v${version.number}`}
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-    );
-}
-
-function Chevron({
-    model,
-    expanded,
-    onToggle,
-}: {
-    model: FlowModel;
-    expanded: boolean;
-    onToggle: () => void;
-}) {
-    if (model.versions.length === 0) {
-        return <span aria-hidden="true" className="size-6 shrink-0" />;
-    }
-    return (
-        <Button
-            variant="ghost"
-            size="icon-xs"
-            tabIndex={-1}
-            aria-expanded={expanded}
-            aria-label={`${expanded ? "Hide" : "Show"} versions of ${model.name}`}
-            className="relative z-10 shrink-0"
-            onClick={onToggle}
-        >
-            <ChevronRight
-                className={cn(
-                    "transition-transform duration-100 motion-reduce:transition-none",
-                    expanded && "rotate-90",
-                )}
-            />
-        </Button>
-    );
-}
-
-function ModelStatus({ model }: { model: FlowModel }) {
-    const reason = attention(model);
-    return (
-        <span className="flex min-w-0 flex-col">
-            {model.deployed ? (
-                <StatusText tone="success">Live</StatusText>
-            ) : (
-                <span className="text-muted-foreground">Not deployed</span>
-            )}
-            {reason && <span className="truncate text-sm text-muted-foreground">{reason}</span>}
-        </span>
-    );
-}
-
-function LiveCell({ model }: { model: FlowModel }) {
-    const live = liveVersion(model);
-    if (!live) {
-        return <span className="text-muted-foreground">—</span>;
-    }
-    return (
-        <span className="tabular-nums">
-            {`v${live.number}`}
-            <span className="text-muted-foreground">{` · ${pct(live.scores?.[0])}`}</span>
-        </span>
-    );
-}
-
-type Handlers = {
-    open: (href: string) => void;
-    deploy: (intent: DeployIntent) => void;
-    undeploy: (models: FlowModel[]) => void;
-    removeModels: (models: FlowModel[]) => void;
-    removeVersions: (items: { model: FlowModel; version: FlowVersion }[]) => void;
-};
-
-type RowProps = {
-    focused: boolean;
-    selected: boolean;
-    selecting: boolean;
-    onFocus: () => void;
-    onKey: (event: KeyboardEvent<HTMLLIElement>) => void;
-    onSelect: (on: boolean) => void;
-    open: () => void;
-};
-
-function rowEvents(props: RowProps) {
-    return {
-        tabIndex: props.focused ? 0 : -1,
-        onFocus: props.onFocus,
-        onKeyDown: props.onKey,
-        onClick: (event: MouseEvent<HTMLLIElement>) => {
-            if (fromControl(event)) {
-                return;
-            }
-            if (props.selecting) {
-                props.onSelect(!props.selected);
-                return;
-            }
-            props.open();
-        },
-    };
-}
-
-const ROW_STATE =
-    "relative cursor-pointer outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-[state=selected]:bg-accent";
-
-function ModelRow({
-    model,
-    expanded,
-    onToggle,
-    on,
-    ...props
-}: RowProps & {
-    model: FlowModel;
-    expanded: boolean;
-    onToggle: () => void;
-    on: Handlers;
-}) {
-    return (
-        <li
-            {...rowEvents(props)}
-            id={lineId(model.slug)}
-            aria-expanded={model.versions.length > 0 ? expanded : undefined}
-            aria-label={model.name}
-            data-state={props.selected ? "selected" : undefined}
-            className={cn(ROW_GRID, ROW_STATE, "py-3")}
-        >
-            <label className="relative z-10 -my-3 -ml-4 flex cursor-pointer items-center self-stretch py-3 pr-2 pl-4">
-                <Checkbox
-                    tabIndex={-1}
-                    aria-label={`Select ${model.name}`}
-                    checked={props.selected}
-                    onCheckedChange={(value) => props.onSelect(value === true)}
-                />
-            </label>
-            <div className="flex min-w-0 items-center gap-2">
-                <Chevron model={model} expanded={expanded} onToggle={onToggle} />
-                <ModelAvatar model={model} />
-                <div className="ml-1 flex min-w-0 flex-col">
-                    <Link
-                        href={flowHref(model.slug)}
-                        tabIndex={-1}
-                        className="truncate font-semibold text-foreground hover:underline"
-                    >
-                        {model.name}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                        {model.kind === "custom"
-                            ? `On ${model.base}`
-                            : `${model.serveOnly ? "Serve-only base" : "Base"} · ${model.size}`}
-                    </span>
-                </div>
-            </div>
-            <div className="min-w-0">
-                <LiveCell model={model} />
-            </div>
-            <div className="relative z-10 min-w-0">
-                <Requests usage={usageOf(model)} live={model.deployed} />
-            </div>
-            <div className="min-w-0">
-                <ModelStatus model={model} />
-            </div>
-            <ModelActions model={model} on={on} />
-        </li>
-    );
-}
-
-function ScoreCell({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    if (!version.scores) {
-        return <span className="text-muted-foreground">—</span>;
-    }
-    const live = liveVersion(model)?.number === version.number;
-    return (
-        <span className="flex items-baseline gap-2 tabular-nums">
-            <span>{pct(version.scores[0])}</span>
-            {live ? (
-                <span className="text-sm text-muted-foreground">live</span>
-            ) : (
-                <span className="text-sm">
-                    <Delta value={scoreDelta(model, version)} suffix="vs live" />
-                </span>
-            )}
-        </span>
-    );
-}
-
-function FailedStatus({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="relative z-10 rounded-sm text-left">
-                    <VersionStatus model={model} version={version} />
-                </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm whitespace-normal">{version.error}</TooltipContent>
-        </Tooltip>
-    );
-}
-
-function VersionRow({
-    model,
-    version,
-    on,
-    ...props
-}: RowProps & { model: FlowModel; version: FlowVersion; on: Handlers }) {
-    const live = liveVersion(model)?.number === version.number;
-    return (
-        <li
-            {...rowEvents(props)}
-            id={lineId(versionKey(model.slug, version.number))}
-            aria-label={`${model.name} v${version.number}`}
-            data-state={props.selected ? "selected" : undefined}
-            className={cn(ROW_GRID, ROW_STATE, "py-1.5")}
-        >
-            <label className="relative z-10 -my-1.5 -ml-4 flex cursor-pointer items-center self-stretch py-1.5 pr-2 pl-4">
-                <Checkbox
-                    tabIndex={-1}
-                    aria-label={`Select ${model.name} v${version.number}`}
-                    checked={props.selected}
-                    onCheckedChange={(value) => props.onSelect(value === true)}
-                />
-            </label>
-            <div className="flex min-w-0 items-center gap-2 self-stretch">
-                <span aria-hidden="true" className="size-6 shrink-0" />
-                <span
-                    aria-hidden="true"
-                    className="-my-1.5 flex w-8 shrink-0 justify-center self-stretch"
-                >
-                    <span className="w-px bg-border" />
-                </span>
-                <span className="ml-1 flex min-w-0 items-center gap-2">
-                    <span
-                        aria-hidden="true"
-                        className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            live ? "bg-success" : "bg-transparent",
-                        )}
-                    />
-                    <Link
-                        href={flowHref(model.slug, version.number)}
-                        tabIndex={-1}
-                        className="font-medium text-foreground tabular-nums hover:underline"
-                    >
-                        {`v${version.number}`}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground">
-                        {`${KIND_LABELS[version.kind]} · ${shortAgo(version)}`}
-                    </span>
-                </span>
-            </div>
-            <div className="min-w-0">
-                <ScoreCell model={model} version={version} />
-            </div>
-            <div />
-            <div className="min-w-0 text-muted-foreground">
-                {version.status === "failed" ? (
-                    <FailedStatus model={model} version={version} />
-                ) : (
-                    <span className="text-foreground">
-                        <VersionStatus model={model} version={version} />
-                    </span>
-                )}
-            </div>
-            <VersionActions model={model} version={version} on={on} />
-        </li>
-    );
-}
-
-function MoreRow({
-    model,
-    shown,
-    searching,
-}: {
-    model: FlowModel;
-    shown: number;
-    searching: boolean;
-}) {
-    return (
-        <li className="col-span-full flex items-center gap-3 py-1.5 pr-4 pl-[5.75rem] text-sm">
-            <span className="text-muted-foreground tabular-nums">
-                {searching
-                    ? `${shown} of ${plural(model.versions.length, "version")} match`
-                    : `Showing ${shown} of ${model.versions.length}`}
-            </span>
-            <Link href={flowHref(model.slug)} className="text-primary hover:underline">
-                {`All ${model.versions.length} versions →`}
-            </Link>
-        </li>
-    );
-}
-
-function ConfirmDialog({
-    confirm,
-    onClose,
-}: {
-    confirm: Confirm | null;
-    onClose: () => void;
-}) {
-    if (!confirm) {
-        return null;
-    }
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{confirm.title}</DialogTitle>
-                    <DialogDescription asChild>
-                        <div>{confirm.description}</div>
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button
-                        variant="destructive"
-                        onClick={() => {
-                            confirm.run();
-                            onClose();
-                        }}
-                    >
-                        {confirm.label}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-type Picked = { model: FlowModel; version: FlowVersion };
-
-function pickedVersions(models: FlowModel[], keys: string[]): Picked[] {
+function pickedVersions(models: FlowModel[], keys: string[]): PickedVersion[] {
     return models.flatMap((model) =>
         model.versions
             .filter((version) => keys.includes(versionKey(model.slug, version.number)))
@@ -768,9 +321,21 @@ function pickedVersions(models: FlowModel[], keys: string[]): Picked[] {
     );
 }
 
-function compareBlock(picked: Picked[]): string | null {
+function pickedVariants(models: FlowModel[], keys: string[]): PickedVariant[] {
+    return models.flatMap((model) =>
+        model.variants
+            .map((item) => ({ model, variant: item, key: variantKey(model.slug, item.id) }))
+            .filter((item) => keys.includes(item.key)),
+    );
+}
+
+function isLiveVersion(item: PickedVersion): boolean {
+    return liveVersion(item.model)?.number === item.version.number;
+}
+
+function compareBlock(picked: PickedVersion[]): string | null {
     if (picked.length !== 2) {
-        return "Pick exactly two versions of one model to compare.";
+        return `Compare takes exactly two versions of one model; ${plural(picked.length, "version")} ${picked.length === 1 ? "is" : "are"} ticked.`;
     }
     if (picked[0].model.slug !== picked[1].model.slug) {
         return "The two versions belong to different models; pick two of one model.";
@@ -781,106 +346,332 @@ function compareBlock(picked: Picked[]): string | null {
     return null;
 }
 
+function WithTip({ tip, children }: { tip: string | null; children: ReactNode }) {
+    if (!tip) {
+        return children;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="inline-flex">{children}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{tip}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+function selectionCount(versions: PickedVersion[], variants: PickedVariant[]): string {
+    const parts = [
+        versions.length > 0 && plural(versions.length, "version"),
+        variants.length > 0 && plural(variants.length, "variant"),
+    ].filter(Boolean);
+    const owners = [...new Set([...versions, ...variants].map((item) => item.model.name))];
+    return `${parts.join(" and ")} selected${owners.length === 1 ? ` of ${owners[0]}` : ""}`;
+}
+
 function SelectionBar({
-    selection,
-    models,
+    versions,
+    variants,
     onClear,
     on,
+    onDelete,
 }: {
-    selection: Selection;
-    models: FlowModel[];
+    versions: PickedVersion[];
+    variants: PickedVariant[];
     onClear: () => void;
     on: Handlers;
+    onDelete: () => void;
 }) {
-    const chosenModels = models.filter((model) => selection.keys.includes(model.slug));
-    const picked = pickedVersions(models, selection.keys);
-    const liveOnes = picked.filter(
-        (item) => liveVersion(item.model)?.number === item.version.number,
-    );
-    const blocked = compareBlock(picked);
-    const sorted = [...picked].sort((a, b) => a.version.number - b.version.number);
-    const owners = [...new Set(picked.map((item) => item.model.name))];
-    const count =
-        selection.kind === "model"
-            ? plural(chosenModels.length, "model")
-            : plural(picked.length, "version");
-    const compare = (
-        <Button
-            variant="outline"
-            disabled={Boolean(blocked)}
-            onClick={() =>
-                on.open(
-                    compareHref(
-                        sorted[0].model.slug,
-                        sorted[0].version.number,
-                        sorted[1].version.number,
-                    ),
-                )
-            }
-        >
-            <GitCompare aria-hidden="true" />
-            Compare
-        </Button>
-    );
+    const mixed = versions.length > 0 && variants.length > 0;
+    const liveVersions = versions.filter(isLiveVersion);
+    const liveVariants = variants.filter((item) => item.variant.live);
+    const skipped = [
+        ...liveVersions.map((item) => `v${item.version.number} of ${item.model.name}`),
+        ...liveVariants.map((item) => `${item.model.name} ${item.variant.format}`),
+    ];
+    const deletable = versions.length + variants.length - skipped.length;
+    const blocked = compareBlock(versions);
+    const sorted = [...versions].sort((a, b) => a.version.number - b.version.number);
     return (
         <div className="flex min-h-8 flex-wrap items-center gap-2">
-            <span className="font-medium tabular-nums">{`${count} selected`}</span>
-            {selection.kind === "version" && owners.length === 1 && (
-                <span className="text-muted-foreground">{`of ${owners[0]}`}</span>
-            )}
+            <span className="font-medium tabular-nums">{selectionCount(versions, variants)}</span>
             <Button variant="outline" onClick={onClear}>
                 <X aria-hidden="true" />
                 Clear selection
             </Button>
-            {selection.kind === "version" && liveOnes.length > 0 && (
+            {skipped.length > 0 && (
                 <span className="text-sm text-muted-foreground">
-                    {`${liveOnes.map((item) => `v${item.version.number} of ${item.model.name}`).join(", ")} ${liveOnes.length === 1 ? "is" : "are"} live and will not be deleted.`}
+                    {`${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} live and will not be deleted.`}
                 </span>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-2">
-                {selection.kind === "version" ? (
-                    blocked ? (
-                        <DisabledWithTip tip={blocked}>{compare}</DisabledWithTip>
-                    ) : (
-                        compare
-                    )
-                ) : (
-                    <Button
-                        variant="outline"
-                        disabled={!chosenModels.some((model) => model.deployed)}
-                        onClick={() => on.undeploy(chosenModels.filter((model) => model.deployed))}
-                    >
-                        <PowerOff aria-hidden="true" />
-                        Undeploy
-                    </Button>
+                {mixed && (
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        Only Delete fits both
+                        <InfoTip label="Why only Delete">
+                            Compare works on two versions of one custom model; Deploy and Undeploy
+                            work on base variants, since a custom model deploys one version at a
+                            time from its row. Tick only versions or only variants to see those.
+                        </InfoTip>
+                    </span>
+                )}
+                {!mixed && versions.length > 0 && (
+                    <WithTip tip={blocked}>
+                        <Button
+                            variant="outline"
+                            disabled={Boolean(blocked)}
+                            onClick={() =>
+                                on.open(
+                                    compareHref(
+                                        sorted[0].model.slug,
+                                        sorted[0].version.number,
+                                        sorted[1].version.number,
+                                    ),
+                                )
+                            }
+                        >
+                            <GitCompare aria-hidden="true" />
+                            Compare
+                        </Button>
+                    </WithTip>
+                )}
+                {!mixed && variants.length > 0 && (
+                    <>
+                        <WithTip
+                            tip={
+                                liveVariants.length === variants.length
+                                    ? "Every ticked variant is already live."
+                                    : null
+                            }
+                        >
+                            <Button
+                                variant="outline"
+                                disabled={liveVariants.length === variants.length}
+                                onClick={() =>
+                                    on.deployVariants(
+                                        variants
+                                            .filter((item) => !item.variant.live)
+                                            .map((item) => item.key),
+                                    )
+                                }
+                            >
+                                Deploy
+                            </Button>
+                        </WithTip>
+                        <WithTip tip={liveVariants.length === 0 ? "None of them is live." : null}>
+                            <Button
+                                variant="outline"
+                                disabled={liveVariants.length === 0}
+                                onClick={() =>
+                                    on.undeployVariants(liveVariants.map((item) => item.key))
+                                }
+                            >
+                                <PowerOff aria-hidden="true" />
+                                Undeploy
+                            </Button>
+                        </WithTip>
+                    </>
                 )}
                 <Separator
                     orientation="vertical"
                     className="mx-1 data-[orientation=vertical]:h-5"
                 />
-                <Button
-                    variant="destructive"
-                    disabled={selection.kind === "version" && liveOnes.length === picked.length}
-                    onClick={() =>
-                        selection.kind === "model"
-                            ? on.removeModels(chosenModels)
-                            : on.removeVersions(picked)
-                    }
-                >
-                    <Trash2 aria-hidden="true" />
-                    Delete
-                </Button>
+                <WithTip tip={deletable === 0 ? "Everything ticked is live." : null}>
+                    <Button variant="destructive" disabled={deletable === 0} onClick={onDelete}>
+                        <Trash2 aria-hidden="true" />
+                        {variants.length > 0 && versions.length === 0 ? "Delete files" : "Delete"}
+                    </Button>
+                </WithTip>
             </div>
         </div>
     );
 }
 
-function GroupHeading({ label, facts }: { label: string; facts: string }) {
+function ColumnPicker({
+    shown,
+    onChange,
+}: {
+    shown: Column[];
+    onChange: (columns: Column[]) => void;
+}) {
     return (
-        <li className="col-span-full flex items-baseline gap-2 px-4 pt-4 pb-1.5 text-sm text-muted-foreground">
-            <span className="font-medium">{label}</span>
-            <span className="tabular-nums">{facts}</span>
-        </li>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    <Columns3 aria-hidden="true" />
+                    Columns
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                {COLUMNS.map((column) => (
+                    <DropdownMenuCheckboxItem
+                        key={column.id}
+                        checked={shown.includes(column.id)}
+                        closeOnClick={false}
+                        onCheckedChange={(on) =>
+                            onChange(
+                                on
+                                    ? COLUMNS.map((c) => c.id).filter(
+                                          (id) => id === column.id || shown.includes(id),
+                                      )
+                                    : shown.filter((id) => id !== column.id),
+                            )
+                        }
+                    >
+                        {column.label}
+                    </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function useExpanded() {
+    const [stored, setStored] = useState<Record<string, boolean>>(() =>
+        readStored(EXPANDED_KEY, {}),
+    );
+    const toggle = (slug: string, next: boolean) => {
+        const value = { ...stored, [slug]: next };
+        setStored(value);
+        writeStored(EXPANDED_KEY, value);
+    };
+    return { stored, toggle };
+}
+
+function confirmDeletion(
+    versions: PickedVersion[],
+    variants: PickedVariant[],
+    done: (count: number) => void,
+): Confirm {
+    const goingVersions = versions.filter((item) => !isLiveVersion(item));
+    const goingVariants = variants.filter((item) => !item.variant.live);
+    const skipped = versions.length + variants.length - goingVersions.length - goingVariants.length;
+    const names = [
+        ...goingVersions.map((item) => `${item.model.name} v${item.version.number}`),
+        ...goingVariants.map(
+            (item) => `${item.model.name} ${item.variant.format} (${item.variant.size})`,
+        ),
+    ];
+    const total = names.length;
+    return {
+        title:
+            goingVariants.length > 0 && goingVersions.length === 0
+                ? `Delete the files of ${plural(total, "variant")}?`
+                : `Delete ${total === 1 ? names[0] : `${total} items`}?`,
+        description: (
+            <div className="flex flex-col gap-2">
+                {total > 1 && <p>{names.join(", ")}</p>}
+                {goingVariants.length > 0 && (
+                    <p>Variant files can be downloaded again from Discover.</p>
+                )}
+                {skipped > 0 && <p>{`${plural(skipped, "live item")} skipped: undeploy first.`}</p>}
+            </div>
+        ),
+        label: "Delete",
+        run: () => {
+            deleteVersions(
+                goingVersions.map((item) => versionKey(item.model.slug, item.version.number)),
+            );
+            deleteVariantFiles(goingVariants.map((item) => item.key));
+            done(total);
+        },
+    };
+}
+
+function Toolbar({
+    models,
+    query,
+    onQuery,
+    filters,
+    onFilters,
+    group,
+    onGroup,
+    sort,
+    onSort,
+    columns,
+    onColumns,
+    onDeleteModels,
+}: {
+    models: FlowModel[];
+    query: string;
+    onQuery: (value: string) => void;
+    filters: Filters;
+    onFilters: (value: Filters) => void;
+    group: GroupKey;
+    onGroup: (value: GroupKey) => void;
+    sort: SortKey;
+    onSort: (value: SortKey) => void;
+    columns: Column[];
+    onColumns: (value: Column[]) => void;
+    onDeleteModels: () => void;
+}) {
+    return (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <SearchInput
+                aria-label="Search models, versions and variants"
+                placeholder="Search models and versions"
+                value={query}
+                onValueChange={onQuery}
+                className="w-full max-w-64 flex-1"
+            />
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+                <FilterMenu
+                    sections={[
+                        {
+                            kind: "toggle",
+                            key: "deployed",
+                            title: "Deployment",
+                            label: "Deployed",
+                            count: models.filter((model) => model.deployed).length,
+                            checked: filters.deployed,
+                            onCheckedChange: (deployed) => onFilters({ ...filters, deployed }),
+                        },
+                        {
+                            kind: "toggle",
+                            key: "attention",
+                            title: "Attention",
+                            label: "Needs attention",
+                            count: models.filter((model) => attention(model) !== null).length,
+                            checked: filters.attention,
+                            onCheckedChange: (value) => onFilters({ ...filters, attention: value }),
+                        },
+                    ]}
+                    onClear={() => onFilters({ deployed: false, attention: false })}
+                />
+                <Select value={group} onValueChange={(value) => onGroup(value as GroupKey)}>
+                    <SelectTrigger aria-label="Group models" className="w-auto">
+                        <Layers aria-hidden="true" className="size-4 text-muted-foreground" />
+                        <SelectValue className="flex-1 text-left" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {GROUPS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={sort} onValueChange={(value) => onSort(value as SortKey)}>
+                    <SelectTrigger aria-label="Sort models" className="w-auto">
+                        <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
+                        <SelectValue className="flex-1 text-left" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {SORTS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <ColumnPicker shown={columns} onChange={onColumns} />
+                <Button variant="outline" onClick={onDeleteModels}>
+                    <Trash2 aria-hidden="true" />
+                    Delete models…
+                </Button>
+            </div>
+        </div>
     );
 }
 
@@ -891,12 +682,19 @@ export function ModelsFlowList() {
     const expanded = useExpanded();
     const [query, setQuery] = useState("");
     const [searchToggles, setSearchToggles] = useState<Record<string, boolean>>({});
-    const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
+    const [selection, setSelection] = useState<string[]>([]);
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const [deploy, setDeploy] = useState<DeployIntent>(null);
     const [confirm, setConfirm] = useState<Confirm | null>(null);
     const [filters, setFilters] = useState<Filters>({ deployed: false, attention: false });
     const [sort, setSort] = useState<SortKey>("attention");
+    const [group, setGroup] = useState<GroupKey>("none");
+    const [columns, setColumns] = useState<Column[]>(() =>
+        readStored(COLUMNS_KEY, DEFAULT_COLUMNS),
+    );
+    const [peek, setPeek] = useState<string | null>(null);
+    const [deletingModels, setDeletingModels] = useState(false);
+    const [autopilotFor, setAutopilotFor] = useState<string | null>(null);
     const text = query.trim().toLowerCase();
     const lines = useMemo(
         () =>
@@ -905,18 +703,35 @@ export function ModelsFlowList() {
                     models.filter((model) => passes(model, filters)),
                     sort,
                 ),
+                group,
                 text,
                 expanded.stored,
                 searchToggles,
             ),
-        [models, filters, sort, text, expanded.stored, searchToggles],
+        [models, filters, sort, group, text, expanded.stored, searchToggles],
     );
-    const rows = lines.filter((line) => line.type !== "more");
+    const rows = lines.filter((line): line is RowLine =>
+        ["model", "version", "variant"].includes(line.type),
+    );
     const activeKey = rows.some((line) => line.key === focusKey) ? focusKey : rows[0]?.key;
-    const clear = () => setSelection(EMPTY_SELECTION);
+    const visibleKeys = new Set(rows.map((line) => line.key));
+    const picked = selection.filter((key) => visibleKeys.has(key));
+    const versions = pickedVersions(models, picked);
+    const variants = pickedVariants(models, picked);
+    const clear = () => setSelection([]);
+    const peekModel = models.find((model) => model.slug === peek) ?? null;
     const on: Handlers = {
         open: (href) => router.history.push(href),
         deploy: setDeploy,
+        peek: (model) => {
+            setPeek(model.slug);
+            focusLine(model.slug);
+        },
+        pin: (model) => {
+            togglePin(model.slug);
+            toast({ title: model.pinned ? `Unpinned ${model.name}` : `Pinned ${model.name}` });
+        },
+        autopilot: (model) => setAutopilotFor(model.slug),
         undeploy: (chosen) =>
             setConfirm({
                 title:
@@ -927,7 +742,6 @@ export function ModelsFlowList() {
                 label: "Undeploy",
                 run: () => {
                     undeployModels(chosen.map((model) => model.slug));
-                    clear();
                     toast({
                         title: `Undeployed ${chosen.map((model) => model.name).join(", ")}`,
                         tone: "success",
@@ -936,92 +750,80 @@ export function ModelsFlowList() {
             }),
         removeModels: (chosen) =>
             setConfirm({
-                title:
-                    chosen.length === 1
-                        ? `Delete ${chosen[0].name}?`
-                        : `Delete ${plural(chosen.length, "model")}?`,
+                title: `Delete ${chosen[0].name}?`,
                 description: (
-                    <p>
-                        {`${chosen.map((model) => model.name).join(", ")} ${chosen.length === 1 ? "goes" : "go"} with every version, key and file.`}
-                    </p>
+                    <p>{`${chosen[0].name} goes with every version, variant file, key and score.`}</p>
                 ),
                 label: "Delete",
                 run: () => {
                     deleteModels(chosen.map((model) => model.slug));
-                    clear();
-                    toast({ title: `Deleted ${plural(chosen.length, "model")}`, tone: "success" });
+                    toast({ title: `Deleted ${chosen[0].name}`, tone: "success" });
                 },
             }),
-        removeVersions: (items) => {
-            const deletable = items.filter(
-                (item) => liveVersion(item.model)?.number !== item.version.number,
-            );
-            const skipped = items.length - deletable.length;
-            setConfirm({
-                title: `Delete ${plural(deletable.length, "version")}?`,
-                description: (
-                    <div className="flex flex-col gap-2">
-                        <p>
-                            {deletable
-                                .map((item) => `${item.model.name} v${item.version.number}`)
-                                .join(", ")}
-                        </p>
-                        {skipped > 0 && (
-                            <p>{`${plural(skipped, "live version")} skipped: undeploy or deploy another version first.`}</p>
-                        )}
-                    </div>
+        removeVersions: (items) =>
+            setConfirm(
+                confirmDeletion(items, [], (count) =>
+                    toast({ title: `Deleted ${plural(count, "version")}`, tone: "success" }),
                 ),
-                label: "Delete",
+            ),
+        deployVariants: (keys) => {
+            deployVariants(keys);
+            clear();
+            toast({ title: `Deployed ${plural(keys.length, "variant")}`, tone: "success" });
+        },
+        undeployVariants: (keys) => {
+            const chosen = pickedVariants(models, keys);
+            setConfirm({
+                title: `Undeploy ${chosen.map((item) => `${item.model.name} ${item.variant.format}`).join(", ")}?`,
+                description: (
+                    <p>{`Requests to ${chosen.map((item) => item.variant.apiName).join(", ")} stop being answered; the files stay.`}</p>
+                ),
+                label: "Undeploy",
                 run: () => {
-                    deleteVersions(
-                        deletable.map((item) => versionKey(item.model.slug, item.version.number)),
-                    );
+                    undeployVariants(keys);
                     clear();
-                    toast({
-                        title: `Deleted ${plural(deletable.length, "version")}`,
-                        tone: "success",
-                    });
+                    toast({ title: `Undeployed ${plural(keys.length, "variant")}` });
                 },
             });
         },
+        removeVariants: (keys) =>
+            setConfirm(
+                confirmDeletion([], pickedVariants(models, keys), (count) =>
+                    toast({ title: `Deleted ${plural(count, "variant file")}`, tone: "success" }),
+                ),
+            ),
     };
-    const select = (kind: Kind, key: string, on: boolean) => {
-        if (on && selection.keys.length > 0 && selection.kind !== kind) {
-            setSelection({ kind, keys: [key] });
-            toast({
-                title:
-                    kind === "version"
-                        ? "Selection switched to versions"
-                        : "Selection switched to models",
-                description: `A selection is all models or all versions, so the ${plural(selection.keys.length, selection.kind)} you had ticked ${selection.keys.length === 1 ? "was" : "were"} cleared.`,
-            });
-            return;
-        }
-        const keys = on
-            ? [...new Set([...selection.keys, key])]
-            : selection.keys.filter((item) => item !== key);
-        setSelection({ kind, keys });
-    };
+    const select = (key: string, value: boolean) =>
+        setSelection(value ? [...new Set([...picked, key])] : picked.filter((k) => k !== key));
     const toggle = (line: Extract<Line, { type: "model" }>) => {
         const next = !line.expanded;
-        if (text && line.model.versions.some((v) => versionMatches(line.model, v, text))) {
+        if (!next) {
+            setSelection(
+                picked.filter(
+                    (key) =>
+                        !key.startsWith(`${line.model.slug}@`) &&
+                        !key.startsWith(`${line.model.slug}#`),
+                ),
+            );
+        }
+        if (childHits(line.model, text) > 0) {
             setSearchToggles({ ...searchToggles, [line.model.slug]: next });
         } else {
             expanded.toggle(line.model.slug, next);
         }
     };
-    const focusLine = (key: string | undefined) => {
+    function focusLine(key: string | undefined) {
         if (!key) {
             return;
         }
         setFocusKey(key);
         requestAnimationFrame(() => document.getElementById(lineId(key))?.focus());
-    };
-    const hrefOf = (line: Line) =>
+    }
+    const hrefOf = (line: RowLine) =>
         line.type === "version"
             ? flowHref(line.model.slug, line.version.number)
             : flowHref(line.model.slug);
-    const onKey = (line: Line) => (event: KeyboardEvent<HTMLLIElement>) => {
+    const onKey = (line: RowLine) => (event: KeyboardEvent<HTMLLIElement>) => {
         if (event.target !== event.currentTarget) {
             return;
         }
@@ -1032,23 +834,28 @@ export function ModelsFlowList() {
             Home: () => focusLine(rows[0]?.key),
             End: () => focusLine(rows.at(-1)?.key),
             Enter: () => on.open(hrefOf(line)),
-            " ": () =>
-                line.type !== "more" &&
-                select(line.type, line.key, !selection.keys.includes(line.key)),
+            Escape: () => setPeek(null),
+            " ": () => {
+                if (line.type === "model") {
+                    setPeek(peek === line.model.slug ? null : line.model.slug);
+                } else {
+                    select(line.key, !picked.includes(line.key));
+                }
+            },
             ArrowRight: () => {
-                if (line.type !== "model" || line.model.versions.length === 0) {
+                if (line.type !== "model") {
                     return;
                 }
                 if (line.expanded) {
                     focusLine(rows[index + 1]?.key);
-                } else {
+                } else if (line.model.versions.length + line.model.variants.length > 0) {
                     toggle(line);
                 }
             },
             ArrowLeft: () => {
                 if (line.type === "model" && line.expanded) {
                     toggle(line);
-                } else if (line.type === "version") {
+                } else if (line.type !== "model") {
                     focusLine(line.model.slug);
                 }
             },
@@ -1059,25 +866,27 @@ export function ModelsFlowList() {
             action();
         }
     };
-    const rowProps = (line: Line): RowProps => ({
+    const rowProps = (line: RowLine): RowProps => ({
+        id: lineId(line.key),
         focused: line.key === activeKey,
-        selected: selection.keys.includes(line.key),
-        selecting: selection.keys.length > 0,
-        onFocus: () => setFocusKey(line.key),
+        selected: picked.includes(line.key),
+        selecting: picked.length > 0,
+        peeked: peek !== null && line.type === "model" && line.model.slug === peek,
+        columns,
+        onFocus: () => {
+            setFocusKey(line.key);
+            if (peek !== null) {
+                setPeek(line.model.slug);
+            }
+        },
         onKey: onKey(line),
-        onSelect: (value) => line.type !== "more" && select(line.type, line.key, value),
+        onSelect: (value) => select(line.key, value),
         open: () => on.open(hrefOf(line)),
     });
-    const custom = lines.filter((line) => line.model.kind === "custom");
-    const bases = lines.filter((line) => line.model.kind === "base");
-    const modelKeys = models.map((model) => model.slug);
-    const allModels =
-        selection.kind === "model" && selection.keys.length > 0
-            ? selection.keys.length === modelKeys.length
-                ? true
-                : "indeterminate"
-            : false;
     const render = (line: Line) => {
+        if (line.type === "group") {
+            return <GroupHeading key={line.key} label={line.label} facts={line.facts} />;
+        }
         if (line.type === "model") {
             return (
                 <ModelRow
@@ -1086,6 +895,7 @@ export function ModelsFlowList() {
                     expanded={line.expanded}
                     onToggle={() => toggle(line)}
                     on={on}
+                    hint={HINTS[line.model.slug]}
                     {...rowProps(line)}
                 />
             );
@@ -1101,6 +911,17 @@ export function ModelsFlowList() {
                 />
             );
         }
+        if (line.type === "variant") {
+            return (
+                <VariantRow
+                    key={line.key}
+                    model={line.model}
+                    variant={line.variant}
+                    on={on}
+                    {...rowProps(line)}
+                />
+            );
+        }
         return (
             <MoreRow
                 key={line.key}
@@ -1110,136 +931,105 @@ export function ModelsFlowList() {
             />
         );
     };
-    const customCount = custom.filter((line) => line.type === "model").length;
-    const baseCount = bases.filter((line) => line.type === "model").length;
     return (
         <div className="flex flex-col gap-3">
-            {selection.keys.length > 0 ? (
-                <SelectionBar selection={selection} models={models} onClear={clear} on={on} />
+            {picked.length > 0 ? (
+                <SelectionBar
+                    versions={versions}
+                    variants={variants}
+                    onClear={clear}
+                    on={on}
+                    onDelete={() =>
+                        setConfirm(
+                            confirmDeletion(versions, variants, (count) => {
+                                clear();
+                                toast({
+                                    title: `Deleted ${plural(count, "item")}`,
+                                    tone: "success",
+                                });
+                            }),
+                        )
+                    }
+                />
             ) : (
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                    <SearchInput
-                        aria-label="Search models and versions"
-                        placeholder="Search models and versions"
-                        value={query}
-                        onValueChange={(value) => {
-                            setQuery(value);
-                            setSearchToggles({});
-                        }}
-                        className="w-full max-w-xs flex-1"
-                    />
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
-                        <FilterMenu
-                            sections={[
-                                {
-                                    kind: "toggle",
-                                    key: "deployed",
-                                    title: "Deployment",
-                                    label: "Deployed",
-                                    count: models.filter((model) => model.deployed).length,
-                                    checked: filters.deployed,
-                                    onCheckedChange: (deployed) =>
-                                        setFilters({ ...filters, deployed }),
-                                },
-                                {
-                                    kind: "toggle",
-                                    key: "attention",
-                                    title: "Attention",
-                                    label: "Needs attention",
-                                    count: models.filter((model) => attention(model) !== null)
-                                        .length,
-                                    checked: filters.attention,
-                                    onCheckedChange: (value) =>
-                                        setFilters({ ...filters, attention: value }),
-                                },
-                            ]}
-                            onClear={() => setFilters({ deployed: false, attention: false })}
-                        />
-                        <Select value={sort} onValueChange={(value) => setSort(value as SortKey)}>
-                            <SelectTrigger aria-label="Sort models" className="w-auto min-w-48">
-                                <ArrowUpDown
-                                    aria-hidden="true"
-                                    className="size-4 text-muted-foreground"
-                                />
-                                <SelectValue className="flex-1 text-left" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SORTS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
+                <Toolbar
+                    models={models}
+                    query={query}
+                    onQuery={(value) => {
+                        setQuery(value);
+                        setSearchToggles({});
+                    }}
+                    filters={filters}
+                    onFilters={setFilters}
+                    group={group}
+                    onGroup={setGroup}
+                    sort={sort}
+                    onSort={setSort}
+                    columns={columns}
+                    onColumns={(value) => {
+                        setColumns(value);
+                        writeStored(COLUMNS_KEY, value);
+                    }}
+                    onDeleteModels={() => setDeletingModels(true)}
+                />
             )}
-            <div className={cn(LIST_GRID, "overflow-x-auto rounded-lg border bg-card")}>
+            <div
+                className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card"
+                style={{ gridTemplateColumns: gridTemplate(columns) }}
+            >
                 <div
                     className={cn(
                         ROW_GRID,
                         "h-9 border-b bg-secondary font-medium text-muted-foreground",
                     )}
                 >
-                    <label className="-ml-4 flex cursor-pointer items-center self-stretch pr-2 pl-4">
-                        <Checkbox
-                            aria-label="Select all models"
-                            checked={allModels === true}
-                            indeterminate={allModels === "indeterminate"}
-                            onCheckedChange={(value) => {
-                                if (value !== true) {
-                                    clear();
-                                    return;
-                                }
-                                if (selection.kind === "version" && selection.keys.length > 0) {
-                                    toast({
-                                        title: "Selection switched to models",
-                                        description:
-                                            "A selection is all models or all versions, so the ticked versions were cleared.",
-                                    });
-                                }
-                                setSelection({ kind: "model", keys: modelKeys });
-                            }}
-                        />
-                    </label>
                     <span>Model</span>
-                    <span>Live version</span>
-                    <span>Requests, 7 days</span>
+                    {COLUMNS.filter((column) => columns.includes(column.id)).map((column) => (
+                        <span key={column.id} className="whitespace-nowrap">
+                            {column.label}
+                        </span>
+                    ))}
                     <span>Status</span>
                     <span className="sr-only">Actions</span>
                 </div>
                 {lines.length === 0 ? (
                     <div className="col-span-full flex min-h-40 items-center justify-center gap-2 text-muted-foreground">
-                        No models or versions match.
+                        No models, versions or variants match.
                     </div>
                 ) : (
                     <ul
                         aria-label="Models"
                         className="col-span-full grid grid-cols-subgrid divide-y"
                     >
-                        {customCount > 0 && (
-                            <GroupHeading
-                                label="Your models"
-                                facts={plural(customCount, "model")}
-                            />
-                        )}
-                        {custom.map(render)}
-                        {baseCount > 0 && (
-                            <GroupHeading label="Base models" facts={plural(baseCount, "model")} />
-                        )}
-                        {bases.map(render)}
+                        {lines.map(render)}
                     </ul>
                 )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <KbdHint keys={["↑", "↓"]}>move</KbdHint>
-                <KbdHint keys={["→"]}>expand</KbdHint>
-                <KbdHint keys={["←"]}>collapse</KbdHint>
+                <KbdHint keys={["→", "←"]}>expand, collapse</KbdHint>
                 <KbdHint keys={["Enter"]}>open</KbdHint>
-                <KbdHint keys={["Space"]}>select</KbdHint>
+                <KbdHint keys={["Space"]}>
+                    quick look on a model, select a version or variant
+                </KbdHint>
             </div>
             <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
+            <DeleteModelsDialog
+                open={deletingModels}
+                models={models}
+                onOpenChange={setDeletingModels}
+            />
+            <AutopilotDialog
+                model={models.find((model) => model.slug === autopilotFor) ?? null}
+                onClose={() => setAutopilotFor(null)}
+            />
+            <QuickLook
+                model={peekModel}
+                on={on}
+                onClose={() => setPeek(null)}
+                returnFocus={() => (activeKey ? document.getElementById(lineId(activeKey)) : null)}
+            />
         </div>
     );
 }

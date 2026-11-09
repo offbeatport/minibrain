@@ -37,6 +37,32 @@ export type FlowVersion = {
     p50: number | null;
 };
 
+export type BaseVariant = {
+    id: string;
+    format: string;
+    size: string;
+    apiName: string;
+    live: boolean;
+    trainable: boolean;
+    replicas: string[];
+    traffic: number[];
+    previous: number;
+    gpuSeconds: number;
+    p95: number | null;
+    update: string | null;
+};
+
+export type Autopilot = {
+    threshold: number;
+    canary: number;
+    minutes: number;
+    rollbackErrors: boolean;
+    rollbackScore: boolean;
+    run: { version: number; minutesLeft: number } | null;
+};
+
+export type RecentAnswer = { question: string; answer: string; minutesAgo: number };
+
 export type FlowModel = {
     slug: string;
     name: string;
@@ -60,6 +86,13 @@ export type FlowModel = {
     p95: number;
     errors: number;
     licence: string;
+    task: string;
+    gpuSeconds: number;
+    replicas: string[];
+    variants: BaseVariant[];
+    autopilot: Autopilot | null;
+    pinned: boolean;
+    recent: RecentAnswer[];
 };
 
 const CLASSIFY: [string, string] = ["Label accuracy", "Macro F1"];
@@ -185,15 +218,17 @@ const SUPPORT_TRIAGE: FlowVersion[] = [
 const INVOICE_EXTRACTOR: FlowVersion[] = [
     promptOnly([0.62, 0.41], false, 12 * DAY, 640),
     trained(1, [0.815, 0.702], true, 9 * DAY, {
+        wasLive: true,
         data: data(2, 880, 240, 0),
         settings: settings(16, 3, 2e-4, 792),
     }),
-    trained(2, null, null, 0.7, {
-        status: "training",
-        progress: 0.45,
-        jobId: 1187,
+    trained(2, [0.838, 0.731], true, 4 * DAY, {
         data: data(3, 1140, 290, 30),
         settings: settings(16, 3, 2e-4, 1026),
+    }),
+    trained(3, [0.851, 0.748], true, 1.2, {
+        data: data(4, 1190, 50, 0),
+        settings: settings(16, 3, 2e-4, 1071),
     }),
 ];
 
@@ -215,6 +250,13 @@ const CONTRACT_REVIEWER: FlowVersion[] = [
         data: data(4, 1020, 260, 20),
         settings: settings(32, 4, 2e-4, 918),
     }),
+    trained(4, null, null, 0.7, {
+        status: "training",
+        progress: 0.45,
+        jobId: 1187,
+        data: data(4, 1020, 0, 0),
+        settings: settings(16, 3, 2e-4, 918),
+    }),
 ];
 
 const GUY1: FlowVersion[] = [promptOnly([0.66, 0.6], true, 3 * DAY, 80)];
@@ -225,7 +267,173 @@ function week(values: number[], previous: number) {
     return { traffic: values, previous };
 }
 
-type RawModel = Omit<FlowModel, "avatar" | "dataset" | "accepted" | "p95" | "errors" | "licence">;
+type RawModel = Omit<
+    FlowModel,
+    | "avatar"
+    | "dataset"
+    | "accepted"
+    | "p95"
+    | "errors"
+    | "licence"
+    | "task"
+    | "gpuSeconds"
+    | "replicas"
+    | "variants"
+    | "autopilot"
+    | "pinned"
+    | "recent"
+>;
+
+function variant(
+    id: string,
+    format: string,
+    size: string,
+    apiName: string,
+    gpuSeconds: number,
+    extra: Partial<BaseVariant> = {},
+): BaseVariant {
+    return {
+        id,
+        format,
+        size,
+        apiName,
+        live: false,
+        trainable: true,
+        replicas: [],
+        traffic: [0, 0, 0, 0, 0, 0, 0],
+        previous: 0,
+        gpuSeconds,
+        p95: null,
+        update: null,
+        ...extra,
+    };
+}
+
+const VARIANTS: Record<string, BaseVariant[]> = {
+    "qwen3-8b": [
+        variant("bf16", "BF16", "16 GB", "qwen3-8b", 9.6, {
+            live: true,
+            replicas: ["gpu-a10-1", "gpu-a10-3"],
+            traffic: [120, 140, 132, 168, 150, 60, 41],
+            previous: 760,
+            p95: 410,
+        }),
+        variant("fp8", "FP8", "8 GB", "qwen3-8b-fp8", 5.1, {
+            live: true,
+            trainable: false,
+            replicas: ["gpu-a10-2"],
+            traffic: [90, 120, 108, 132, 138, 30, 34],
+            previous: 560,
+            p95: 290,
+        }),
+        variant("gguf-q4", "GGUF Q4", "5 GB", "qwen3-8b-gguf", 3.8, {
+            trainable: false,
+            update: "Upstream rebuilt the Q4_K_M weights on 2 Nov with a tokenizer fix; 5 GB to download.",
+        }),
+    ],
+    "qwen3-0.6b": [variant("bf16", "BF16", "1.4 GB", "qwen3-0.6b", 0.8)],
+    "llama-3.2-1b": [
+        variant("bf16", "BF16", "2.5 GB", "llama-3.2-1b", 1.3, {
+            live: true,
+            replicas: ["gpu-a10-1"],
+            traffic: [40, 35, 52, 61, 48, 12, 8],
+            previous: 230,
+            p95: 150,
+        }),
+        variant("fp8", "FP8", "1.3 GB", "llama-3.2-1b-fp8", 0.9, { trainable: false }),
+    ],
+};
+
+type Extra = Pick<FlowModel, "task" | "gpuSeconds" | "replicas" | "p95" | "recent"> & {
+    autopilot?: Autopilot;
+};
+
+function answer(question: string, text: string, minutesAgo: number): RecentAnswer {
+    return { question, answer: text, minutesAgo };
+}
+
+const EXTRA: Record<string, Extra> = {
+    "support-triage": {
+        task: "Classify",
+        gpuSeconds: 9.6,
+        replicas: ["gpu-a10-1", "gpu-a10-2"],
+        p95: 240,
+        recent: [
+            answer("Need my money back for the duplicate seat.", "refund_request", 2),
+            answer("The app logs me out every 5 minutes.", "account_access", 6),
+            answer("Where is my order? Tracking hasn't moved in 5 days.", "shipping", 9),
+        ],
+    },
+    "invoice-extractor": {
+        task: "Extract",
+        gpuSeconds: 1.4,
+        replicas: ["gpu-a10-2"],
+        p95: 310,
+        autopilot: {
+            threshold: 50,
+            canary: 10,
+            minutes: 60,
+            rollbackErrors: true,
+            rollbackScore: true,
+            run: { version: 3, minutesLeft: 42 },
+        },
+        recent: [
+            answer("Invoice INV-2291 from Nordlicht GmbH", "total 1,420.00 · due 30 Nov", 4),
+            answer("Rechnung 88-104, Bäckerei Lind", "total 312.40 · due 21 Nov", 11),
+            answer("Invoice 2026-0457 from Harbor Freight Co.", "total 9,870.00 · due 5 Dec", 18),
+        ],
+    },
+    "contract-reviewer": {
+        task: "Classify",
+        gpuSeconds: 2.1,
+        replicas: ["gpu-a10-1"],
+        p95: 280,
+        recent: [
+            answer("Clause 14.2: supplier may raise prices at any time.", "risky", 35),
+            answer("Clause 3.1: payment within 30 days of invoice.", "standard", 52),
+            answer("Clause 9: unlimited liability for the buyer.", "risky", 80),
+        ],
+    },
+    guy1: {
+        task: "Classify",
+        gpuSeconds: 0.7,
+        replicas: ["gpu-a10-1"],
+        p95: 95,
+        recent: [answer("test", "billing", 300)],
+    },
+    "sql-helper": { task: "SQL", gpuSeconds: 3.8, replicas: [], p95: 0, recent: [] },
+};
+
+const BASE_RECENT: RecentAnswer[] = [
+    answer("Summarise this ticket in one line.", "A refund request for a duplicate charge.", 3),
+    answer("Translate to German: the parcel is late.", "Das Paket ist verspätet.", 7),
+    answer("Is 2027 a leap year?", "No. The next one is 2028.", 15),
+];
+
+function sumDays(series: number[][]): number[] {
+    return Array.from({ length: 7 }, (_, day) =>
+        series.reduce((total, values) => total + (values[day] ?? 0), 0),
+    );
+}
+
+function summarise(model: FlowModel): FlowModel {
+    if (model.kind !== "base") {
+        return model;
+    }
+    const live = model.variants.filter((item) => item.live);
+    const p95s = live.map((item) => item.p95 ?? 0);
+    return {
+        ...model,
+        deployed: live.length > 0,
+        traffic: sumDays(model.variants.map((item) => item.traffic)),
+        previous: model.variants.reduce((total, item) => total + item.previous, 0),
+        serveOnly: model.variants.length > 0 && model.variants.every((item) => !item.trainable),
+        size: model.variants[0]?.size ?? model.size,
+        gpuSeconds: Math.min(...model.variants.map((item) => item.gpuSeconds), 99),
+        replicas: [...new Set(live.flatMap((item) => item.replicas))],
+        p95: p95s.length > 0 ? Math.max(...p95s) : 0,
+    };
+}
 
 const RAW: RawModel[] = [
     {
@@ -233,7 +441,7 @@ const RAW: RawModel[] = [
         name: "Support triage",
         kind: "custom",
         publisher: "Qwen",
-        base: "Qwen3 0.6B",
+        base: "Qwen3 8B",
         description: "Routes support tickets to one of six queues.",
         metrics: CLASSIFY,
         rule: [0.85, 0.01],
@@ -255,7 +463,7 @@ const RAW: RawModel[] = [
         metrics: EXTRACT,
         rule: [0.8, 0.02],
         heldOut: 96,
-        live: 1,
+        live: 2,
         deployed: true,
         ...week([88, 102, 95, 120, 131, 40, 22], 512),
         serveOnly: false,
@@ -314,6 +522,23 @@ const RAW: RawModel[] = [
         versions: SQL_HELPER,
     },
     {
+        slug: "qwen3-8b",
+        name: "Qwen3 8B",
+        kind: "base",
+        publisher: "Qwen",
+        base: null,
+        description: "",
+        metrics: CLASSIFY,
+        rule: [0, 0],
+        heldOut: 0,
+        live: null,
+        deployed: false,
+        ...week([0, 0, 0, 0, 0, 0, 0], 0),
+        serveOnly: false,
+        size: null,
+        versions: [],
+    },
+    {
         slug: "qwen3-0.6b",
         name: "Qwen3 0.6B",
         kind: "base",
@@ -327,7 +552,7 @@ const RAW: RawModel[] = [
         deployed: false,
         ...week([0, 0, 0, 0, 0, 0, 0], 0),
         serveOnly: false,
-        size: "1.4 GB",
+        size: null,
         versions: [],
     },
     {
@@ -341,27 +566,10 @@ const RAW: RawModel[] = [
         rule: [0, 0],
         heldOut: 0,
         live: null,
-        deployed: true,
-        ...week([40, 35, 52, 61, 48, 12, 8], 230),
+        deployed: false,
+        ...week([0, 0, 0, 0, 0, 0, 0], 0),
         serveOnly: false,
-        size: "2.5 GB",
-        versions: [],
-    },
-    {
-        slug: "qwen3-8b-gguf",
-        name: "Qwen3 8B GGUF",
-        kind: "base",
-        publisher: "Qwen",
-        base: null,
-        description: "Serve-only: GGUF weights cannot be trained.",
-        metrics: CLASSIFY,
-        rule: [0, 0],
-        heldOut: 0,
-        live: null,
-        deployed: true,
-        ...week([210, 260, 240, 300, 288, 90, 75], 1320),
-        serveOnly: true,
-        size: "5.0 GB",
+        size: null,
         versions: [],
     },
 ];
@@ -381,19 +589,36 @@ const LICENCES: Record<string, string> = {
 
 const FIXED_JOBS = new Set([1176, 1187]);
 
-const INITIAL: FlowModel[] = RAW.map((model, index) => ({
-    ...model,
-    versions: model.versions.map((version) => ({
-        ...version,
-        jobId: FIXED_JOBS.has(version.jobId) ? version.jobId : 1000 + index * 40 + version.number,
-    })),
-    avatar: null,
-    dataset: DATASET_OF[model.slug] ?? null,
-    accepted: 0,
-    p95: 180 + index * 37,
-    errors: model.slug === "contract-reviewer" ? 0.021 : model.deployed ? 0.002 : 0,
-    licence: LICENCES[model.publisher] ?? "Apache 2.0",
-}));
+const INITIAL: FlowModel[] = RAW.map((model, index) => {
+    const extra = EXTRA[model.slug];
+    return summarise({
+        ...model,
+        versions: model.versions.map((version) => ({
+            ...version,
+            jobId: FIXED_JOBS.has(version.jobId)
+                ? version.jobId
+                : 1000 + index * 40 + version.number,
+        })),
+        avatar: null,
+        dataset: DATASET_OF[model.slug] ?? null,
+        accepted: 0,
+        p95: extra?.p95 ?? 0,
+        errors:
+            model.slug === "contract-reviewer"
+                ? 0.021
+                : model.deployed || model.kind === "base"
+                  ? 0.002
+                  : 0,
+        licence: LICENCES[model.publisher] ?? "Apache 2.0",
+        task: extra?.task ?? "Base",
+        gpuSeconds: extra?.gpuSeconds ?? 0,
+        replicas: extra?.replicas ?? [],
+        variants: VARIANTS[model.slug] ?? [],
+        autopilot: extra?.autopilot ?? null,
+        pinned: false,
+        recent: extra?.recent ?? BASE_RECENT,
+    });
+});
 
 export type Check = { name: string; state: "ok" | "warning"; detail: string };
 
@@ -525,7 +750,7 @@ function jobsOf(models: FlowModel[]): Job[] {
         model.versions.map((version) => versionJob(model, version)),
     );
     const others: Job[] = [
-        transfer(1201, "download", "qwen3-8b-gguf", 6 * DAY, 9),
+        transfer(1201, "download", "qwen3-8b", 6 * DAY, 9),
         transfer(1202, "download", "llama-3.2-1b", 15 * DAY, 4),
         transfer(1203, "import", "qwen3-0.6b", 35 * DAY, 1),
         {
@@ -801,6 +1026,7 @@ export function deployVersion(slug: string, number: number) {
         ...model,
         live: number,
         deployed: true,
+        replicas: model.replicas.length > 0 ? model.replicas : ["gpu-a10-1"],
         versions: model.versions.map((version) =>
             version.number === model.live ? { ...version, wasLive: true } : version,
         ),
@@ -817,9 +1043,76 @@ export function undeployModels(slugs: string[]) {
     set((current) => ({
         ...current,
         models: current.models.map((model) =>
-            slugs.includes(model.slug) ? { ...model, deployed: false, live: null } : model,
+            slugs.includes(model.slug)
+                ? summarise({
+                      ...model,
+                      deployed: false,
+                      live: null,
+                      replicas: [],
+                      variants: model.variants.map((item) => ({
+                          ...item,
+                          live: false,
+                          replicas: [],
+                      })),
+                  })
+                : model,
         ),
     }));
+}
+
+export function variantKey(slug: string, id: string): string {
+    return `${slug}#${id}`;
+}
+
+function changeVariants(keys: string[], change: (item: BaseVariant) => BaseVariant | null) {
+    set((current) => ({
+        ...current,
+        models: current.models.map((model) => {
+            if (!model.variants.some((item) => keys.includes(variantKey(model.slug, item.id)))) {
+                return model;
+            }
+            const variants = model.variants.flatMap((item) => {
+                if (!keys.includes(variantKey(model.slug, item.id))) {
+                    return [item];
+                }
+                const next = change(item);
+                return next ? [next] : [];
+            });
+            return summarise({ ...model, variants });
+        }),
+    }));
+}
+
+export function deployVariants(keys: string[]) {
+    changeVariants(keys, (item) =>
+        item.live ? item : { ...item, live: true, replicas: ["gpu-a10-2"], p95: item.p95 ?? 180 },
+    );
+}
+
+export function undeployVariants(keys: string[]) {
+    changeVariants(keys, (item) => ({ ...item, live: false, replicas: [] }));
+}
+
+export function deleteVariantFiles(keys: string[]) {
+    changeVariants(keys, (item) => (item.live ? item : null));
+}
+
+export function togglePin(slug: string) {
+    update(slug, (model) => ({ ...model, pinned: !model.pinned }));
+}
+
+export function setAutopilot(slug: string, autopilot: Autopilot | null) {
+    update(slug, (model) => ({ ...model, autopilot }));
+}
+
+export function baseModelSlug(name: string): string {
+    const found = state.models.find(
+        (model) =>
+            model.kind === "base" &&
+            (model.name === name ||
+                (model.variants.length > 1 && name.startsWith(`${model.name} `))),
+    );
+    return found?.slug ?? slugify(name);
 }
 
 export function deleteModels(slugs: string[]) {
@@ -883,6 +1176,13 @@ export function createModel(name: string, baseId: string, avatar: AvatarChoice):
         p95: 0,
         errors: 0,
         licence: base.licence,
+        task: "Classify",
+        gpuSeconds: 0,
+        replicas: [],
+        variants: [],
+        autopilot: null,
+        pinned: false,
+        recent: [],
     };
     set((current) => ({ ...current, models: [model, ...current.models], focus: slug }));
     return slug;

@@ -50,6 +50,7 @@ import {
     type ModelTab,
     type TrainingSettings,
     attachDataset,
+    baseModelSlug,
     catalogEntry,
     compareHref,
     createKey,
@@ -515,7 +516,7 @@ function Details({ model }: { model: FlowModel }) {
 }
 
 function baseSlug(model: FlowModel): string {
-    return model.base ? model.base.toLowerCase().replace(/[^a-z0-9.]+/g, "-") : model.slug;
+    return model.base ? baseModelSlug(model.base) : model.slug;
 }
 
 function Overview({ model }: { model: FlowModel }) {

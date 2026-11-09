@@ -33,6 +33,7 @@ import {
     FLOW,
     type FlowModel,
     attention,
+    baseModelSlug,
     catalogEntry,
     catalogHref,
     createModel,
@@ -316,7 +317,10 @@ export function FlowCatalogPage() {
             {entry.downloaded && (
                 <p className="rounded-md border bg-card px-3 py-2">
                     Downloaded: it is also a base model on this install.{" "}
-                    <Link href={modelHref(entry.id)} className="text-primary hover:underline">
+                    <Link
+                        href={modelHref(baseModelSlug(entry.name))}
+                        className="text-primary hover:underline"
+                    >
                         Open its model page →
                     </Link>
                 </p>
