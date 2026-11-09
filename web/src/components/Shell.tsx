@@ -157,6 +157,10 @@ function Gate({ pathname, children }: { pathname: string; children: ReactNode })
     return children;
 }
 
+function ownShell(pathname: string): boolean {
+    return import.meta.env.DEV && pathname.startsWith("/proto/flow");
+}
+
 export function Shell() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -192,9 +196,13 @@ export function Shell() {
         >
             <ToastProvider>
                 <Gate pathname={pathname}>
-                    <AppShell rail={rail}>
+                    {ownShell(pathname) ? (
                         <Outlet />
-                    </AppShell>
+                    ) : (
+                        <AppShell rail={rail}>
+                            <Outlet />
+                        </AppShell>
+                    )}
                     <TeardownToasts />
                 </Gate>
             </ToastProvider>

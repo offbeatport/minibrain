@@ -315,7 +315,7 @@ function ToneSwatches({ tone, onPick }: { tone: ToneName; onPick: (tone: ToneNam
     );
 }
 
-function PickerDialog({
+export function PickerDialog({
     open,
     onOpenChange,
     name,

@@ -56,7 +56,50 @@ function prototypePages(): AnyRoute[] {
         () => import("./pages/proto/ModelIconsPage"),
         "ModelIconsPage",
     );
-    return [globalPage("/proto/logos", logos), globalPage("/proto/model-icons", modelIcons)];
+    return [
+        globalPage("/proto/logos", logos),
+        globalPage("/proto/model-icons", modelIcons),
+        globalPage("/proto/models-flow", flow("FlowRedirect")),
+        globalPage("/proto/models-flow/$", flow("FlowRedirect")),
+        flowRoutes(),
+    ];
+}
+
+type FlowPages = typeof import("./pages/proto/flowRoutes");
+
+function flow(name: keyof FlowPages): RouteComponent {
+    return lazyRouteComponent(() => import("./pages/proto/flowRoutes"), name);
+}
+
+function flowRoutes(): AnyRoute {
+    const layout = createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/proto/flow",
+        component: flow("FlowShell"),
+    });
+    const page = (path: string, name: keyof FlowPages) =>
+        createRoute({ getParentRoute: () => layout, path, component: flow(name) });
+    return layout.addChildren([
+        page("/", "FlowHomePage"),
+        page("models", "ModelsFlowPage"),
+        page("models/new", "FlowAddModelPage"),
+        page("models/$model", "FlowModelPage"),
+        page("models/$model/compare", "ModelsFlowComparePage"),
+        page("models/$model/versions/$version", "ModelsFlowVersionPage"),
+        page("models/$model/versions/$version/$tab", "ModelsFlowVersionPage"),
+        page("models/$model/$tab", "FlowModelPage"),
+        page("data", "FlowDataPage"),
+        page("data/$dataset", "FlowDatasetPage"),
+        page("discover", "FlowDiscoverPage"),
+        page("discover/$id", "FlowCatalogPage"),
+        page("playground", "FlowPlaygroundPage"),
+        page("monitor", "FlowMonitorPage"),
+        page("monitor/jobs", "FlowJobsPage"),
+        page("jobs/$id", "FlowJobPage"),
+        page("feedback", "FlowFeedbackPage"),
+        page("infrastructure", "FlowInfrastructurePage"),
+        page("settings", "FlowSettingsPage"),
+    ]);
 }
 
 function guarded(role: Role, Component: RouteComponent): RouteComponent {
