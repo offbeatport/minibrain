@@ -25,6 +25,9 @@ function outcome(version: VersionInfo, deployed: boolean): { variant: Variant; l
     if (version.status === "failed") {
         return { variant: "destructive", label: "Failed" };
     }
+    if (version.status === "deleting") {
+        return { variant: "neutral", label: "Deleting" };
+    }
     if (version.live_at) {
         return { variant: "neutral", label: "Was live" };
     }

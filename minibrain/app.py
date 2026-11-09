@@ -93,7 +93,7 @@ from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineB
 from minibrain.settings import Settings, load_settings
 from minibrain.siem import Forwarder
 from minibrain.tags import TagError
-from minibrain.teardown import Teardowns
+from minibrain.teardown import JobsRunningError, Teardowns
 from minibrain.telemetry.context import RequestContext
 from minibrain.telemetry.logs import configure_logging
 from minibrain.telemetry.prometheus import load_metrics_access
@@ -108,6 +108,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
     ConflictError: 409,
     NameTakenError: 409,
+    JobsRunningError: 409,
     LeaseError: 409,
     JobStateError: 409,
     MissingArtifactError: 409,
@@ -136,6 +137,8 @@ log = logging.getLogger("minibrain")
 def error_body(error: Exception) -> dict[str, Any]:
     if isinstance(error, NameTakenError):
         return {"detail": str(error), "name": error.name, "suggestion": error.suggestion, "taken": error.taken}
+    if isinstance(error, JobsRunningError):
+        return {"detail": str(error), "jobs": error.jobs}
     return {"detail": str(error)}
 
 

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type JobInfo, type ModelRow, type VersionInfo, api, unwrap } from "./client";
 
 const ACTIVE_JOB = new Set(["queued", "running"]);
-const ACTIVE_VERSION = new Set(["training", "evaluating"]);
+const ACTIVE_VERSION = new Set(["training", "evaluating", "deleting"]);
 const POLL_MS = 2000;
 export const MODELS_POLL_MS = POLL_MS;
 
@@ -157,6 +157,22 @@ export function useJobs(slug: string) {
                 (page) => page.items,
             ),
         refetchInterval: (query) => (query.state.data?.some(isActiveJob) ? POLL_MS : false),
+    });
+}
+
+const ACTIVE_JOBS_LIMIT = 200;
+
+export function useActiveJobs(enabled: boolean) {
+    return useQuery({
+        queryKey: ["jobs", "active"] as const,
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/jobs", {
+                    params: { query: { status: ["queued", "running"], limit: ACTIVE_JOBS_LIMIT } },
+                }),
+            ).then((page) => page.items),
+        enabled,
+        refetchInterval: enabled ? POLL_MS : false,
     });
 }
 

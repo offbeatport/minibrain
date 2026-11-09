@@ -1,10 +1,12 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
-from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import BackendDep, LocalNodeDep, QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.jobs import canceller
 from minibrain.api.schemas import (
     AnswerSide,
     ExampleAnswer,
@@ -23,7 +25,7 @@ from minibrain.api.training_plan import refuse, require_trainable, training_plan
 from minibrain.api.views import detail, version_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
-from minibrain.data.dataset_versions import cleanup, require_splits, training_dataset_version
+from minibrain.data.dataset_versions import require_splits, training_dataset_version
 from minibrain.gateway.chat import conformed, prompting, run
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.errors import OpenAIError
@@ -36,7 +38,6 @@ from minibrain.models.usage import touch
 from minibrain.presets import presets
 from minibrain.registry.files import packed_files
 from minibrain.registry.models import (
-    ACTIVE_JOB_STATUSES,
     Artifact,
     AuditEvent,
     BaseModel,
@@ -58,7 +59,15 @@ from minibrain.tasks.examples import Example, turns_of
 from minibrain.tasks.graders import GraderError
 from minibrain.tasks.rebase import other_base
 from minibrain.tasks.service import decision, graders_of, new_version, version_contract
-from minibrain.teardown import cancel_stop, require_idle
+from minibrain.teardown import (
+    a_job_running,
+    cancel_stop,
+    remove_version,
+    require_idle,
+    stop_jobs,
+    uncancelled,
+    version_jobs,
+)
 
 router = APIRouter(prefix="/api", tags=["versions"])
 
@@ -193,28 +202,53 @@ def add_version(
     return version_info(model, version)
 
 
-@router.delete("/models/{slug}/versions/{number}", status_code=204, dependencies=[Depends(builder)])
-def delete_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> None:
+@router.delete(
+    "/models/{slug}/versions/{number}",
+    status_code=204,
+    response_model=None,
+    responses={202: {"model": VersionInfo, "description": "Its cancelled jobs are stopping; it goes once they end"}},
+    dependencies=[Depends(builder)],
+)
+def delete_version(
+    slug: str,
+    number: int,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    queue: QueueDep,
+    cancel_jobs: bool = False,
+) -> Response:
     model = get_model(session, slug)
     version = get_version(model, number)
+    jobs = version_jobs(session, version)
+    refusal = a_job_running(f"{slug}@{number}", uncancelled(jobs))
+    cancel = canceller(session, queue, cancel_jobs)
+    if version.status == VersionStatus.DELETING:
+        if cancel is not None:
+            stop_jobs(jobs, cancel, refusal)
+            session.commit()
+        return deleting(model, version)
     if model.deployed and model.current_version == number:
         raise ConflictError(f"{slug}@{number} is deployed; undeploy it first")
-    if any(job.version_id == version.id and job.status in ACTIVE_JOB_STATUSES for job in model.jobs):
-        raise ConflictError(f"{slug}@{number} has a job running; cancel it first")
+    stop_jobs(jobs, cancel, refusal)
     if model.current_version == number:
         model.current_version = None
-    session.add(
-        AuditEvent(
-            actor=current_actor(),
-            action="version.delete",
-            target=f"{slug}@{number}",
-            detail={"name": model.name, "kind": version.kind, "status": version.status},
-        )
-    )
-    session.delete(version)
-    session.flush()
-    cleanup(session, settings)
+    facts: dict[str, Any] = {"name": model.name, "kind": version.kind, "status": version.status}
+    if jobs:
+        facts["jobs"] = [job.id for job in jobs]
+    session.add(AuditEvent(actor=current_actor(), action="version.delete", target=f"{slug}@{number}", detail=facts))
+    if version_jobs(session, version):
+        version.status = VersionStatus.DELETING
+        session.commit()
+        request.app.state.teardowns.wake()
+        return deleting(model, version)
+    remove_version(session, settings, version)
     session.commit()
+    return Response(status_code=204)
+
+
+def deleting(model: Model, version: Version) -> JSONResponse:
+    return JSONResponse(status_code=202, content=version_info(model, version).model_dump(mode="json"))
 
 
 @router.post("/models/{slug}/versions/{number}/promote", dependencies=[Depends(builder)])

@@ -19,6 +19,7 @@ from minibrain.registry.models import (
     JobStatus,
     Model,
     Version,
+    VersionStatus,
     Worker,
     now,
 )
@@ -142,12 +143,31 @@ def enqueue(
     return job
 
 
+def version_going(job: Job) -> bool:
+    return job.version is not None and job.version.status == VersionStatus.DELETING
+
+
+def orphaned(job: Job) -> bool:
+    return job.owner_deleted or job.version_deleted or version_going(job)
+
+
+def stopping(job: Job) -> bool:
+    return job.cancel_requested or orphaned(job)
+
+
+def note_orphan(session: Session, job: Job) -> None:
+    if orphaned(job) and not job.cancel_requested:
+        add_state(session, job, "its model or version was deleted", "warning")
+
+
 def refuse_orphan(job: Job) -> None:
     name = job.model_name or job.model_slug or job.base_model_key
     if job.owner_deleted:
         raise JobStateError(f"{name} was deleted, so job {job.id} can't be retried")
     if job.version_deleted:
         raise JobStateError(f"{name} v{job.version_number} was deleted, so job {job.id} can't be retried")
+    if version_going(job):
+        raise JobStateError(f"{name} v{job.version_number} is being deleted, so job {job.id} can't be retried")
 
 
 def same_error_twice(job: Job, error: str) -> bool:
@@ -246,7 +266,7 @@ class SqlJobQueue:
             if worker is not None:
                 worker.seen_at = self.clock()
             session.commit()
-            return Beat(cancel=job.cancel_requested, lease_expires_at=expires)
+            return Beat(cancel=stopping(job), lease_expires_at=expires)
 
     def record(self, job_id: int, token: str, events: Sequence[EventIn]) -> None:
         with self.lock, self.sessions() as session:
@@ -298,7 +318,8 @@ class SqlJobQueue:
     ) -> None:
         with self.lock, self.sessions() as session:
             job = self.leased(session, job_id, token)
-            if job.cancel_requested:
+            if stopping(job):
+                note_orphan(session, job)
                 self.close_attempt(job, AttemptOutcome.CANCELLED, None, None, log)
                 self.finish(session, job, JobStatus.CANCELLED)
             else:
@@ -310,7 +331,8 @@ class SqlJobQueue:
             session.commit()
 
     def settle_failure(self, session: Session, job: Job, error: str, retryable: bool) -> None:
-        if job.cancel_requested:
+        if stopping(job):
+            note_orphan(session, job)
             self.finish(session, job, JobStatus.CANCELLED)
             return
         if retryable and job.attempt < job.max_attempts and not same_error_twice(job, error):
@@ -328,7 +350,7 @@ class SqlJobQueue:
     ) -> None:
         with self.lock, self.sessions() as session:
             job = self.leased(session, job_id, token)
-            outcome = AttemptOutcome.CANCELLED if job.cancel_requested else AttemptOutcome.FAILED
+            outcome = AttemptOutcome.CANCELLED if stopping(job) else AttemptOutcome.FAILED
             self.close_attempt(job, outcome, error, retryable, log)
             job.error_code = code
             self.settle_failure(session, job, error, retryable)

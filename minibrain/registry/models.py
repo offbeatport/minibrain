@@ -31,6 +31,7 @@ class VersionStatus(StrEnum):
     EVALUATING = "evaluating"
     READY = "ready"
     FAILED = "failed"
+    DELETING = "deleting"
 
 
 class FeedbackStatus(StrEnum):

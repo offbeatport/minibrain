@@ -43,28 +43,32 @@ export function setDeployed(row: ModelRow, deployed: boolean) {
           );
 }
 
-export type DeleteOptions = { cascade?: boolean; undeploy?: boolean };
+export type DeleteOptions = { cascade?: boolean; undeploy?: boolean; cancelJobs?: boolean };
 
 export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
     const undeploy = options.undeploy ?? false;
+    const cancel_jobs = options.cancelJobs ?? false;
     return row.kind === "base"
         ? unwrap(
               api.DELETE("/api/base-models/{key}", {
                   params: {
                       path: { key: row.key },
-                      query: { cascade: options.cascade ?? false, undeploy },
+                      query: { cascade: options.cascade ?? false, undeploy, cancel_jobs },
                   },
               }),
           )
         : unwrap(
               api.DELETE("/api/models/{slug}", {
-                  params: { path: { slug: row.key }, query: { undeploy } },
+                  params: { path: { slug: row.key }, query: { undeploy, cancel_jobs } },
               }),
           );
 }
 
 export function needsReview(teardown: Teardown | null | undefined): boolean {
-    return teardown?.state === "failed" && (teardown.added?.length ?? 0) > 0;
+    return (
+        teardown?.state === "failed" &&
+        ((teardown.added?.length ?? 0) > 0 || (teardown.jobs?.length ?? 0) > 0)
+    );
 }
 
 export const REVIEW_LABEL = "Delete again…";

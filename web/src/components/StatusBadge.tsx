@@ -8,6 +8,7 @@ const VERSION_BADGE: Record<string, { variant: Variant; label: string }> = {
     evaluating: { variant: "info", label: "Scoring" },
     ready: { variant: "approval", label: "Awaiting promote" },
     failed: { variant: "destructive", label: "Failed" },
+    deleting: { variant: "neutral", label: "Deleting" },
 };
 
 const JOB_BADGE: Record<string, { variant: Variant; label: string }> = {

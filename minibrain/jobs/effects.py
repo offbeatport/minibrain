@@ -50,10 +50,11 @@ class DomainEffects:
             self.repaired(session, job)
 
     def on_failure(self, session: Session, job: Job) -> None:
-        if job.version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
-            job.version.status = VersionStatus.FAILED
-        if job.version is not None and job.kind == JobKind.JUDGE:
-            job.version.status = VersionStatus.READY
+        version = job.version if job.version is not None and job.version.status != VersionStatus.DELETING else None
+        if version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
+            version.status = VersionStatus.FAILED
+        if version is not None and job.kind == JobKind.JUDGE:
+            version.status = VersionStatus.READY
         model = session.get(BaseModel, job.base_model_id) if job.base_model_id else None
         if model is not None and job.kind in TRANSFERS:
             model.status = BaseModelStatus.CANCELLED if job.status == JobStatus.CANCELLED else BaseModelStatus.FAILED

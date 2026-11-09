@@ -9,12 +9,16 @@ import {
     DialogHeader,
     DialogTitle,
     Label,
+    Link,
 } from "obp-ui";
 import { useEffect, useState } from "react";
-import type { ModelRow } from "~/api/client";
+import type { JobInfo, ModelRow } from "~/api/client";
+import { useActiveJobs } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
+import { JobStatus } from "~/components/StatusBadge";
 import { StatusText } from "~/components/models/StatusText";
+import { jobPageHref, kindName } from "~/lib/jobs";
 import { builtOn, isLiveRow, rowId } from "~/lib/teardown";
 import { bytes } from "~/lib/time";
 import type { Entry } from "./entries";
@@ -68,6 +72,59 @@ function entryItem(entry: Entry, rows: ModelRow[]): DeleteItem {
     };
 }
 
+function rowOwns(row: ModelRow, job: JobInfo): boolean {
+    return row.kind === "base" ? job.base_model === row.key : job.model === row.key;
+}
+
+function entryOwns(entry: Entry, job: JobInfo): boolean {
+    const { model, version } = entry;
+    return version
+        ? job.model === model.key && job.version === version.number
+        : rowOwns(model, job);
+}
+
+function targetJobs(jobs: JobInfo[], picked: Entry[], dependents: ModelRow[]): JobInfo[] {
+    return jobs.filter(
+        (job) =>
+            !job.cancel_requested &&
+            (picked.some((entry) => entryOwns(entry, job)) ||
+                dependents.some((row) => rowOwns(row, job))),
+    );
+}
+
+function jobName(job: JobInfo): string {
+    const owner = job.model_name ?? job.model ?? job.base_model ?? `Job #${job.id}`;
+    const version = job.version === null || job.version === undefined ? "" : ` v${job.version}`;
+    return `${owner}${version}`;
+}
+
+function JobList({ jobs }: { jobs: JobInfo[] }) {
+    return (
+        <ul className="flex max-h-48 flex-col divide-y overflow-y-auto rounded-lg border">
+            {jobs.map((job) => (
+                <li key={job.id} className="flex items-center gap-3 px-3 py-2">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                        <Link
+                            href={jobPageHref(job.id)}
+                            className="truncate font-medium text-primary hover:underline"
+                        >
+                            {jobName(job)}
+                        </Link>
+                        <span className="truncate text-sm text-muted-foreground tabular-nums">
+                            {`${kindName(job.kind)} · Job #${job.id}`}
+                        </span>
+                    </span>
+                    <JobStatus job={job} />
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function cancelLabel(count: number): string {
+    return count === 1 ? "Cancel this job first" : `Cancel these ${count} jobs first`;
+}
+
 export function DeleteList({ items }: { items: DeleteItem[] }) {
     return (
         <ul className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border">
@@ -96,14 +153,17 @@ export function DeleteModelsDialog({
     chosen: Entry[] | null;
     rows: ModelRow[];
     onOpenChange: (open: boolean) => void;
-    onDelete: (cascade: boolean) => Promise<unknown>;
+    onDelete: (cascade: boolean, cancelJobs: boolean) => Promise<unknown>;
 }) {
     const [cascade, setCascade] = useState(false);
     const [undeploy, setUndeploy] = useState(false);
+    const [cancelJobs, setCancelJobs] = useState(true);
+    const active = useActiveJobs(chosen !== null);
     useEffect(() => {
         if (chosen) {
             setCascade(false);
             setUndeploy(false);
+            setCancelJobs(true);
         }
     }, [chosen]);
     const picked = chosen ?? [];
@@ -135,10 +195,13 @@ export function DeleteModelsDialog({
     ]
         .filter(Boolean)
         .join(" and ");
+    const jobs = targetJobs(active.data ?? [], picked, cascade ? orphans : []);
     const needsCascade = orphans.length > 0 && !cascade;
     const needsUndeploy = live > 0 && !undeploy;
+    const needsCancel = jobs.length > 0 && !cancelJobs;
+    const cancelling = jobs.length > 0 && cancelJobs;
     const start = useMutation({
-        mutationFn: () => onDelete(cascade),
+        mutationFn: () => onDelete(cascade, cancelling),
         onSuccess: () => onOpenChange(false),
     });
     return (
@@ -200,6 +263,26 @@ export function DeleteModelsDialog({
                         </span>
                     </Label>
                 )}
+                {jobs.length > 0 && (
+                    <div className="flex flex-col gap-3 rounded-lg border p-3">
+                        <Label className="flex items-start gap-2 font-normal">
+                            <Checkbox
+                                checked={cancelJobs}
+                                onCheckedChange={(value) => setCancelJobs(value === true)}
+                                className="mt-0.5"
+                            />
+                            <span className="flex flex-col gap-0.5">
+                                <span className="font-medium">{cancelLabel(jobs.length)}</span>
+                                <span className="text-sm text-muted-foreground">
+                                    {cancelJobs
+                                        ? "Their work so far is lost. Deleting starts once they have stopped."
+                                        : "Cancel the running jobs to delete."}
+                                </span>
+                            </span>
+                        </Label>
+                        <JobList jobs={jobs} />
+                    </div>
+                )}
                 <ErrorLine error={start.error} />
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -207,11 +290,19 @@ export function DeleteModelsDialog({
                     </Button>
                     <Button
                         variant="destructive"
-                        disabled={needsCascade || needsUndeploy || start.isPending}
+                        disabled={
+                            needsCascade ||
+                            needsUndeploy ||
+                            needsCancel ||
+                            active.isPending ||
+                            start.isPending
+                        }
                         onClick={() => start.mutate()}
                     >
                         {start.isPending
-                            ? "Deleting…"
+                            ? cancelling
+                                ? `Cancelling ${plural(jobs.length, "job")}…`
+                                : "Deleting…"
                             : `${live > 0 ? "Undeploy and delete" : "Delete"} ${parts}`}
                     </Button>
                 </DialogFooter>

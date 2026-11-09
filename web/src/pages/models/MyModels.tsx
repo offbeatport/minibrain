@@ -268,6 +268,7 @@ type Handlers = {
     switchBase: (row: ModelRow, preferred: string | null) => void;
     confirm: (confirmation: Confirmation) => void;
     remove: (row: ModelRow) => void;
+    removeVersion: (entry: Entry) => void;
     createFrom: (base: string) => void;
     refresh: () => Promise<unknown>;
     health: (row: ModelRow, action: HealthAction) => void;
@@ -327,15 +328,6 @@ function primaryAction(row: ModelRow, on: Handlers): { label: string; run: () =>
     return null;
 }
 
-function DeployedWarning({ row }: { row: ModelRow }) {
-    return (
-        <p>
-            It has to be undeployed before it can be deleted. Apps calling{" "}
-            <span className="font-mono">{row.key}</span> get errors from then on.
-        </p>
-    );
-}
-
 function promoteVersion(row: ModelRow, number: number) {
     return unwrap(
         api.POST("/api/models/{slug}/versions/{number}/promote", {
@@ -344,48 +336,12 @@ function promoteVersion(row: ModelRow, number: number) {
     );
 }
 
-function deleteVersion(row: ModelRow, number: number) {
+function deleteVersion(row: ModelRow, number: number, cancelJobs: boolean) {
     return removed(
         api.DELETE("/api/models/{slug}/versions/{number}", {
-            params: { path: { slug: row.key, number } },
+            params: { path: { slug: row.key, number }, query: { cancel_jobs: cancelJobs } },
         }),
     );
-}
-
-function deleteVersionConfirmation(entry: Entry, on: Handlers): Confirmation {
-    const row = entry.model;
-    const number = entry.version?.number ?? 0;
-    const removed = (
-        <p>
-            Its adapter, scores and results are removed; its jobs and request logs stay as history.
-            This cannot be undone; the number v{number} is not reused.
-        </p>
-    );
-    if (entry.version?.live) {
-        return {
-            title: `v${number} of ${row.name} is deployed. Delete it?`,
-            description: (
-                <>
-                    <DeployedWarning row={row} />
-                    {removed}
-                </>
-            ),
-            acknowledge: `Undeploy ${row.name} and delete v${number}`,
-            confirmLabel: "Undeploy and delete",
-            destructive: true,
-            run: () =>
-                setDeployed(row, false)
-                    .then(() => deleteVersion(row, number))
-                    .then(on.refresh),
-        };
-    }
-    return {
-        title: `Delete v${number} of ${row.name}?`,
-        description: removed,
-        confirmLabel: "Delete version",
-        destructive: true,
-        run: () => deleteVersion(row, number).then(on.refresh),
-    };
 }
 
 function versionAction(entry: Entry, on: Handlers): { label: string; run: () => void } | null {
@@ -630,10 +586,7 @@ function StopItems({ entry, on, admin }: { entry: Entry; on: Handlers; admin: bo
                 </DropdownMenuItem>
             )}
             {version && (
-                <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => on.confirm(deleteVersionConfirmation(entry, on))}
-                >
+                <DropdownMenuItem variant="destructive" onSelect={() => on.removeVersion(entry)}>
                     <Trash2 />
                     {`Delete v${version.number} only`}
                 </DropdownMenuItem>
@@ -719,9 +672,13 @@ function StepIcon({ label }: { label: string }) {
 function RowActions({ entry, on }: { entry: Entry; on: Handlers }) {
     const row = entry.model;
     const can = useCan();
-    const step = entry.version ? versionAction(entry, on) : primaryAction(row, on);
+    const step = versionDeleting(entry)
+        ? null
+        : entry.version
+          ? versionAction(entry, on)
+          : primaryAction(row, on);
     const primary = allowedStep(step, row, can);
-    const busy = busyTearingDown(row);
+    const busy = busyTearingDown(row) || versionDeleting(entry);
     return (
         <div className="flex items-center justify-end gap-1">
             {primary && (
@@ -806,6 +763,31 @@ function ErrorStatus({ label, detail }: { label: string; detail: string }) {
     );
 }
 
+function versionDeleting(entry: Entry): boolean {
+    return entry.version?.status === "deleting";
+}
+
+function VersionDeleting({ name }: { name: string }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="flex items-center gap-2 rounded-sm text-left">
+                    <StatusText tone="destructive">Deleting</StatusText>
+                    <ProgressBar
+                        value={null}
+                        label={`${name} deleting`}
+                        className="w-16"
+                        tone="destructive"
+                    />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">
+                Its cancelled jobs are stopping; it goes once they have.
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
 function StatusCell({ entry }: { entry: Entry }) {
     const { model, version } = entry;
     const state = stateOfEntry(entry);
@@ -824,6 +806,9 @@ function StatusCell({ entry }: { entry: Entry }) {
     }
     if (state === "live") {
         return <Deployment row={model} short />;
+    }
+    if (version?.status === "deleting") {
+        return <VersionDeleting name={`${model.name} v${version.number}`} />;
     }
     if (version && state === "progress") {
         const verb = version.status === "training" ? "Training" : "Scoring";
@@ -1041,7 +1026,7 @@ function ModelListRow({
     widths: ColumnWidths;
 }) {
     const { model } = entry;
-    const deleting = beingDeleted(model);
+    const deleting = beingDeleted(model) || versionDeleting(entry);
     const greyed = deleting ? "opacity-60" : undefined;
     return (
         <li
@@ -1333,7 +1318,12 @@ async function undeploySelected(chosen: Entry[]): Promise<void> {
     }
 }
 
-async function deleteSelected(chosen: Entry[], rows: ModelRow[], cascade: boolean): Promise<void> {
+async function deleteSelected(
+    chosen: Entry[],
+    rows: ModelRow[],
+    cascade: boolean,
+    cancelJobs: boolean,
+): Promise<void> {
     const whole = unique(chosen.filter((entry) => !entry.version).map((entry) => entry.model));
     const wholeKeys = new Set(whole.map(rowId));
     const cascading = new Set(
@@ -1362,13 +1352,13 @@ async function deleteSelected(chosen: Entry[], rows: ModelRow[], cascade: boolea
     ];
     await undeploySelected(versions);
     for (const entry of versions) {
-        await deleteVersion(entry.model, entry.version?.number ?? 0);
+        await deleteVersion(entry.model, entry.version?.number ?? 0, cancelJobs);
     }
     for (const row of whole) {
         if (row.kind === "custom" && cascading.has(row.base_model ?? "")) {
             continue;
         }
-        await deleteModel(row, { undeploy: true, cascade: cascading.has(row.key) });
+        await deleteModel(row, { undeploy: true, cascade: cascading.has(row.key), cancelJobs });
     }
 }
 
@@ -1510,6 +1500,7 @@ export function MyModels({
             switchBase: (row, preferred) => setSwitching({ row, preferred }),
             confirm: setConfirmation,
             remove: (row) => setDeleting([{ key: rowId(row), model: row, version: null }]),
+            removeVersion: (entry) => setDeleting([entry]),
             createFrom: (base) =>
                 router.history.push(`/models/new?base=${encodeURIComponent(base)}`),
             refresh,
@@ -1627,8 +1618,8 @@ export function MyModels({
                 chosen={deleting}
                 rows={rows}
                 onOpenChange={(open) => !open && setDeleting(null)}
-                onDelete={async (cascade) => {
-                    await deleteSelected(deleting ?? [], rows, cascade);
+                onDelete={async (cascade, cancelJobs) => {
+                    await deleteSelected(deleting ?? [], rows, cascade, cancelJobs);
                     setSelected([]);
                     await refresh();
                 }}

@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import admin, builder, viewer
-from minibrain.api.deps import BackendDep, SessionDep, SettingsDep, StoreDep, get_local_node
+from minibrain.api.deps import BackendDep, QueueDep, SessionDep, SettingsDep, StoreDep, get_local_node
+from minibrain.api.jobs import canceller
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
 from minibrain.api.schemas import (
@@ -210,10 +211,14 @@ def delete_base_model(
     session: SessionDep,
     settings: SettingsDep,
     store: StoreDep,
+    queue: QueueDep,
     cascade: bool = False,
     undeploy: bool = False,
+    cancel_jobs: bool = False,
 ) -> ModelRow:
-    delete_base(session, get_base_model(session, key), current_actor(), cascade=cascade, undeploy=undeploy)
+    cancel = canceller(session, queue, cancel_jobs)
+    base = get_base_model(session, key)
+    delete_base(session, base, current_actor(), cascade=cascade, undeploy=undeploy, cancel=cancel)
     session.commit()
     wake_teardowns(request)
     return model_row(request, session, settings, store, "base", key)

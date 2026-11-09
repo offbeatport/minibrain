@@ -7,7 +7,8 @@ from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.base_models import model_row, wake_teardowns
 from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
-from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.jobs import canceller
 from minibrain.api.schemas import (
     ContractChange,
     ContractCheck,
@@ -242,9 +243,17 @@ def read(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
 
 @router.delete("/{slug}", status_code=202, dependencies=[Depends(builder)])
 def delete(
-    slug: str, request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep, undeploy: bool = False
+    slug: str,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    queue: QueueDep,
+    undeploy: bool = False,
+    cancel_jobs: bool = False,
 ) -> ModelRow:
-    delete_custom(session, get_model(session, slug), current_actor(), undeploy=undeploy)
+    model = get_model(session, slug)
+    delete_custom(session, model, current_actor(), undeploy=undeploy, cancel=canceller(session, queue, cancel_jobs))
     session.commit()
     wake_teardowns(request)
     return model_row(request, session, settings, store, "custom", slug)

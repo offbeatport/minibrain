@@ -65,6 +65,7 @@ const ACTIONS: Record<string, string> = {
     "version.card": "Model card edited",
     "version.create": "Version created",
     "version.delete": "Version deleted",
+    "version.delete_finished": "Version delete finished",
     "version.promote": "Version deployed",
 };
 

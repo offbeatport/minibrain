@@ -226,10 +226,16 @@ def audit(session: Session, action: str, subject: Job, **detail: Any) -> None:
     session.add(AuditEvent(actor=current_actor(), action=action, target=f"job:{subject.id}", detail=facts))
 
 
-def cancel(session: Session, queue: SqlJobQueue, job: Job) -> None:
+def cancel(session: Session, queue: SqlJobQueue, job: Job, **detail: Any) -> None:
     before = job.status
     queue.cancel(session, job)
-    audit(session, "job.cancel", job, status=before)
+    audit(session, "job.cancel", job, status=before, **detail)
+
+
+def canceller(session: Session, queue: SqlJobQueue, cancel_jobs: bool) -> Callable[[Job], None] | None:
+    if not cancel_jobs:
+        return None
+    return lambda job: cancel(session, queue, job, reason="delete")
 
 
 def retry(session: Session, queue: SqlJobQueue, job: Job) -> Job:

@@ -165,6 +165,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Deployments
+- **Cancel jobs on delete** · shipped · product, ml, admin
+  Delete dialogs list running jobs and cancel them before deleting.
+  UI: Models › Delete, Models › model › Delete · API: DELETE /api/models/{slug}, DELETE /api/base-models/{key}, DELETE /api/models/{slug}/versions/{number}
 - **History outlives models** · shipped · product, admin
   Jobs and request logs of deleted models stay, marked deleted.
   UI: Training, Monitor › Jobs, Monitor › Requests, Monitor › Overview, Jobs › job

@@ -116,6 +116,13 @@ def teardown_text(teardown: Teardown) -> str:
     return STOPPING_TEXT[teardown.kind]
 
 
+def teardown_label(teardown: Teardown) -> str:
+    jobs = len(teardown.detail.get("jobs") or [])
+    if teardown.kind == TeardownKind.DELETE and teardown.status == TeardownStatus.RUNNING and jobs:
+        return f"Cancelling {jobs} job{'' if jobs == 1 else 's'}"
+    return TEARDOWN_LABELS[(teardown.kind, teardown.status)]
+
+
 def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> TeardownInfo | None:
     if teardown is None:
         return None
@@ -123,7 +130,7 @@ def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> Tear
     return TeardownInfo(
         kind=TEARDOWN_KINDS[teardown.kind],
         state=TEARDOWN_STATES[teardown.status],
-        label=TEARDOWN_LABELS[(teardown.kind, teardown.status)],
+        label=teardown_label(teardown),
         detail=teardown_text(teardown),
         error=teardown.error,
         started_by=teardown.actor,
@@ -131,6 +138,7 @@ def teardown_info(teardown: Teardown | None, part_of: str | None = None) -> Tear
         waiting=list(detail.get("waiting") or []),
         models=list(detail.get("models") or []),
         added=list(detail.get("added") or []),
+        jobs=list(detail.get("jobs") or []),
         part_of=part_of,
         cascade=bool(detail.get("cascade")),
         undeploy=bool(detail.get("live")),

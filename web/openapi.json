@@ -694,6 +694,16 @@
               "default": false,
               "title": "Undeploy"
             }
+          },
+          {
+            "name": "cancel_jobs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Jobs"
+            }
           }
         ],
         "responses": {
@@ -3908,6 +3918,16 @@
               "default": false,
               "title": "Undeploy"
             }
+          },
+          {
+            "name": "cancel_jobs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Jobs"
+            }
           }
         ],
         "responses": {
@@ -5465,11 +5485,31 @@
               "type": "integer",
               "title": "Number"
             }
+          },
+          {
+            "name": "cancel_jobs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Jobs"
+            }
           }
         ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "202": {
+            "description": "Its cancelled jobs are stopping; it goes once they end",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -26513,6 +26553,13 @@
             },
             "type": "array",
             "title": "Added"
+          },
+          "jobs": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Jobs"
           },
           "part_of": {
             "anyOf": [

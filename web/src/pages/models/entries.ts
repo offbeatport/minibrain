@@ -93,7 +93,9 @@ export function stateOfEntry(entry: Entry): EntryState {
         if (version.live) {
             return "live";
         }
-        return ["training", "evaluating"].includes(version.status) ? "progress" : "idle";
+        return ["training", "evaluating", "deleting"].includes(version.status)
+            ? "progress"
+            : "idle";
     }
     if (modelError(model)) {
         return "error";

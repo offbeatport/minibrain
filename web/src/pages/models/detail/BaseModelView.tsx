@@ -232,8 +232,8 @@ export function BaseModelView({ model, tab }: { model: BaseModelDetail; tab: Mod
                 chosen={deleting}
                 rows={models.data ?? []}
                 onOpenChange={(open) => !open && setDeleting(null)}
-                onDelete={async (cascade) => {
-                    await deleteModel(model, { cascade, undeploy: true });
+                onDelete={async (cascade, cancelJobs) => {
+                    await deleteModel(model, { cascade, undeploy: true, cancelJobs });
                     await refresh();
                     router.history.push(modelsHref());
                 }}

@@ -1,13 +1,14 @@
 import logging
 import shutil
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import ColumnElement, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.data.dataset_versions import cleanup
@@ -33,6 +34,7 @@ from minibrain.registry.models import (
     TeardownStep,
     Version,
     VersionKind,
+    VersionStatus,
     now,
 )
 from minibrain.registry.service import ConflictError, adapter_name, drop_orphan_keys
@@ -49,6 +51,18 @@ STARTED = {
     TeardownKind.UNDEPLOY: "model.undeploy",
 }
 FINISHED = {kind: f"{action}_finished" for kind, action in STARTED.items()}
+KIND_NAMES = {
+    "train": "Train",
+    "eval": "Score",
+    "judge": "Judge",
+    "download": "Download",
+    "import": "Import",
+    "verify": "Verify",
+    "repair": "Repair",
+    "catalog_sync": "Catalogue sync",
+}
+
+Cancel = Callable[[Job], None]
 
 log = logging.getLogger("minibrain.teardown")
 
@@ -133,8 +147,84 @@ def base_targets(base: BaseModel) -> dict[str, Any]:
     return {"custom": False, "slug": base.id, "routes": [base.id], "adapters": [], "base": base.id}
 
 
-def running_jobs(model: Model) -> bool:
-    return any(job.status in ACTIVE_JOB_STATUSES for job in model.jobs)
+def kind_name(kind: str) -> str:
+    return KIND_NAMES.get(kind, kind)
+
+
+def job_label(job: Job) -> str:
+    owner = job.model_name or job.model_slug or job.base_model_key or f"Job #{job.id}"
+    version = f" v{job.version_number}" if job.version_number is not None else ""
+    return f"{owner}{version}: {kind_name(job.kind)}, {job.status}"
+
+
+def job_fact(job: Job) -> dict[str, Any]:
+    return {
+        "id": job.id,
+        "label": job_label(job),
+        "kind": job.kind,
+        "status": job.status,
+        "model": job.model_slug,
+        "version": job.version_number,
+        "base_model": job.base_model_key,
+    }
+
+
+class JobsRunningError(ConflictError):
+    def __init__(self, message: str, jobs: list[Job]) -> None:
+        super().__init__(f"{message} ({'; '.join(job_label(job) for job in jobs)})")
+        self.jobs = [job_fact(job) for job in jobs]
+
+
+def active_jobs(session: Session, owner: ColumnElement[bool]) -> list[Job]:
+    query = select(Job).where(owner, Job.status.in_(ACTIVE_JOB_STATUSES)).order_by(Job.id)
+    return list(session.scalars(query))
+
+
+def still_active(jobs: list[Job]) -> list[int]:
+    return [job.id for job in jobs if job.status in ACTIVE_JOB_STATUSES]
+
+
+def uncancelled(jobs: list[Job]) -> list[Job]:
+    return [job for job in jobs if not job.cancel_requested]
+
+
+def a_job_running(name: str, jobs: list[Job]) -> str:
+    if len(jobs) == 1:
+        return f"{name} has a job running; cancel it first"
+    return f"{name} has {len(jobs)} jobs running; cancel them first"
+
+
+def stop_jobs(jobs: list[Job], cancel: Cancel | None, refusal: str) -> None:
+    pending = uncancelled(jobs)
+    if not pending:
+        return
+    if cancel is None:
+        raise JobsRunningError(refusal, pending)
+    for job in pending:
+        cancel(job)
+
+
+def model_jobs(session: Session, model: Model) -> list[Job]:
+    return active_jobs(session, Job.model_id == model.id)
+
+
+def version_jobs(session: Session, version: Version) -> list[Job]:
+    return active_jobs(session, Job.version_id == version.id)
+
+
+def base_jobs(session: Session, base: BaseModel) -> list[Job]:
+    return active_jobs(session, Job.base_model_id == base.id)
+
+
+def version_ids_with_jobs(session: Session) -> list[int]:
+    query = select(Job.version_id).where(Job.version_id.is_not(None), Job.status.in_(ACTIVE_JOB_STATUSES))
+    return [version_id for version_id in session.scalars(query) if version_id is not None]
+
+
+def remove_version(session: Session, settings: Settings, version: Version) -> int:
+    session.delete(version)
+    session.flush()
+    return cleanup(session, settings)
 
 
 def begin(
@@ -173,7 +263,9 @@ def restart(session: Session, teardown: Teardown, actor: str) -> Teardown:
     teardown.actor = actor
     teardown.started_at = now()
     teardown.updated_at = now()
-    teardown.detail = {key: value for key, value in teardown.detail.items() if key not in ("waiting", "release")}
+    teardown.detail = {
+        key: value for key, value in teardown.detail.items() if key not in ("waiting", "release", "jobs")
+    }
     for child in session.scalars(select(Teardown).where(Teardown.parent_id == teardown.id)):
         if child.status == TeardownStatus.FAILED:
             restart(session, child, actor)
@@ -245,27 +337,38 @@ def cancel_stop(session: Session, teardown: Teardown | None, name: str) -> None:
 
 
 def delete_custom(
-    session: Session, model: Model, actor: str, undeploy: bool = False, parent: Teardown | None = None
+    session: Session,
+    model: Model,
+    actor: str,
+    undeploy: bool = False,
+    parent: Teardown | None = None,
+    cancel: Cancel | None = None,
 ) -> Teardown:
     existing = model.teardown
+    jobs = model_jobs(session, model)
+    refusal = a_job_running(model.name, uncancelled(jobs))
     if existing is not None and existing.kind == TeardownKind.DELETE:
         if parent is not None:
             existing.parent_id = parent.id
         if existing.status == TeardownStatus.FAILED:
+            stop_jobs(jobs, cancel, refusal)
             return restart(session, existing, actor)
+        if cancel is not None:
+            stop_jobs(jobs, cancel, refusal)
         return existing
     stopping = existing is not None and existing.status == TeardownStatus.RUNNING
     if model.deployed and not undeploy:
         raise ConflictError(f"{model.name} is deployed; undeploy it first")
-    if running_jobs(model):
-        raise ConflictError("cancel the running jobs first")
+    stop_jobs(jobs, cancel, refusal)
     live = model.deployed or stopping
     if existing is not None:
         drop(session, existing)
-    detail = custom_targets(model, everything=True) | {"live": live}
+    detail = custom_targets(model, everything=True) | {"live": live, "jobs": still_active(jobs)}
     model.deployed = False
     model.updated_at = now()
-    facts = {"name": model.name, "kind": "custom", "versions": len(model.versions), "undeploy": live}
+    facts: dict[str, Any] = {"name": model.name, "kind": "custom", "versions": len(model.versions), "undeploy": live}
+    if jobs:
+        facts["jobs"] = [job.id for job in jobs]
     if parent is not None:
         facts["with_base"] = parent.name
     session.add(AuditEvent(actor=actor, action="model.delete", target=model.slug, detail=facts))
@@ -283,36 +386,52 @@ class NewDependentsError(ConflictError):
         self.added = added
 
 
-def base_job_running(session: Session, base: BaseModel) -> bool:
-    query = select(Job.id).where(Job.base_model_id == base.id, Job.status.in_(ACTIVE_JOB_STATUSES)).limit(1)
-    return session.scalar(query) is not None
+def dependent_jobs(session: Session, dependents: list[Model]) -> list[Job]:
+    return active_jobs(session, Job.model_id.in_([model.id for model in dependents])) if dependents else []
+
+
+def stop_base_jobs(
+    session: Session, base: BaseModel, dependents: list[Model], cascade: bool, cancel: Cancel | None
+) -> list[Job]:
+    own = base_jobs(session, base)
+    theirs = dependent_jobs(session, dependents) if cascade else []
+    stop_jobs(own, cancel, a_job_running(base.name, uncancelled(own)))
+    busy_ids = {job.model_id for job in uncancelled(theirs)}
+    busy = [model.name for model in dependents if model.id in busy_ids]
+    stop_jobs(theirs, cancel, f"{names(busy)} {'has' if len(busy) == 1 else 'have'} a job running; cancel it first")
+    return own + theirs
 
 
 def delete_base(
-    session: Session, base: BaseModel, actor: str, cascade: bool = False, undeploy: bool = False
+    session: Session,
+    base: BaseModel,
+    actor: str,
+    cascade: bool = False,
+    undeploy: bool = False,
+    cancel: Cancel | None = None,
 ) -> Teardown:
     existing = base.teardown
+    dependents = dependents_of(session, base)
     if existing is not None and existing.kind == TeardownKind.DELETE:
         if existing.status != TeardownStatus.FAILED:
+            if cancel is not None:
+                stop_base_jobs(session, base, dependents, cascade, cancel)
             return existing
         if bool(existing.detail.get("cascade")) != cascade:
             raise ConflictError(f"deleting {base.name} with the models built on it failed; retry it with cascade=true")
-        current = sorted(model.name for model in dependents_of(session, base))
+        current = sorted(model.name for model in dependents)
         if not cascade or current == sorted(existing.detail.get("models") or []):
+            stop_base_jobs(session, base, dependents, cascade, cancel)
             return restart(session, existing, actor)
     running = existing is not None and existing.status == TeardownStatus.RUNNING
-    if base_job_running(session, base):
-        raise ConflictError(f"{base.name} has a download or import running; cancel it first")
-    dependents = dependents_of(session, base)
     built = [model.name for model in dependents]
     if built and not cascade:
         raise ConflictError(
             f"{names(built)} {are(built)} trained on {base.name}; delete them first, or delete them with it "
             "(cascade=true)"
         )
-    busy = [model.name for model in dependents if running_jobs(model)]
-    if busy:
-        raise ConflictError(f"{names(busy)} {'has' if len(busy) == 1 else 'have'} a job running; cancel it first")
+    if cancel is None:
+        stop_base_jobs(session, base, dependents, cascade, None)
     live = [model.name for model in dependents if model.deployed]
     if base.deployed and not undeploy:
         raise ConflictError(f"{base.name} is deployed; undeploy it first")
@@ -320,6 +439,7 @@ def delete_base(
         them = "it" if len(live) == 1 else "them"
         raise ConflictError(f"{names(live)} {are(live)} live; pass undeploy=true to stop {them}")
     stopping = existing is not None and running and existing.kind == TeardownKind.UNDEPLOY
+    stopped = stop_base_jobs(session, base, dependents, cascade, cancel)
     if existing is not None:
         drop(session, existing)
     detail = base_targets(base) | {
@@ -327,16 +447,18 @@ def delete_base(
         "models": built,
         "live": len(live) + int(base.deployed or stopping),
         "undeploy": undeploy,
+        "jobs": still_active([job for job in stopped if job.base_model_id == base.id]),
     }
     facts: dict[str, Any] = {"name": base.name, "kind": "base", "size_bytes": base.size_bytes}
     facts |= {"kept": base.path} if base.path else {}
     facts |= {"cascade": [model.slug for model in dependents]} if cascade else {}
+    facts |= {"jobs": [job.id for job in stopped]} if stopped else {}
     base.deployed = False
     base.updated_at = now()
     session.add(AuditEvent(actor=actor, action="model.delete", target=base.id, detail=facts))
     teardown = begin(session, TeardownKind.DELETE, actor, base.name, detail, base_model=base)
     for model in dependents:
-        delete_custom(session, model, actor, undeploy=True, parent=teardown)
+        delete_custom(session, model, actor, undeploy=True, parent=teardown, cancel=cancel)
     return teardown
 
 
@@ -415,8 +537,9 @@ class Teardowns:
             return session.scalar(found) is not None
 
     def run_once(self) -> int:
+        versions = self.finish_versions()
         if not self.active():
-            return 0
+            return versions
         if self.config is not None:
             self.config.rebuild()
         with self.sessions() as session:
@@ -431,7 +554,34 @@ class Teardowns:
                 teardown = session.get(Teardown, teardown_id)
                 if teardown is not None and teardown.status == TeardownStatus.RUNNING:
                     self.advance(session, teardown)
-        return len(ids)
+        return len(ids) + versions
+
+    def finish_versions(self) -> int:
+        with self.sessions() as session:
+            busy = set(version_ids_with_jobs(session))
+            deleting = list(session.scalars(select(Version).where(Version.status == VersionStatus.DELETING)))
+            for version in deleting:
+                if version.id not in busy:
+                    self.finish_version(session, version)
+            return len(deleting)
+
+    def finish_version(self, session: Session, version: Version) -> None:
+        target = f"{version.model.slug}@{version.number}"
+        started = session.scalar(
+            select(AuditEvent)
+            .where(AuditEvent.action == "version.delete", AuditEvent.target == target)
+            .order_by(AuditEvent.id.desc())
+            .limit(1)
+        )
+        name = version.model.name
+        removed = remove_version(session, self.settings, version)
+        facts = {"name": name, "outcome": "done", "dataset_versions": removed}
+        if started is not None:
+            facts["seconds"] = round((now() - started.at).total_seconds(), 1)
+        actor = started.actor if started is not None else "minibrain"
+        session.add(AuditEvent(actor=actor, action="version.delete_finished", target=target, detail=facts))
+        session.commit()
+        log.info("deleting %s finished", target)
 
     def forever(self, stop: threading.Event, leader: Leader) -> None:
         while not stop.wait(TICK_SECONDS):
@@ -492,12 +642,31 @@ class Teardowns:
             return True
         return base in served_bases(self.config.current())
 
+    def job_waits(self, session: Session, teardown: Teardown) -> list[str]:
+        if teardown.kind != TeardownKind.DELETE:
+            return []
+        owner = (
+            Job.model_id == teardown.model_id
+            if teardown.model_id is not None
+            else Job.base_model_id == teardown.base_model_id
+        )
+        jobs = active_jobs(session, owner)
+        ids = [job.id for job in jobs]
+        if teardown.detail.get("jobs", []) != ids:
+            teardown.detail = {**teardown.detail, "jobs": ids}
+        if not jobs:
+            return []
+        listed = names([f"#{job.id} ({kind_name(job.kind)})" for job in jobs])
+        return [f"{'job' if len(jobs) == 1 else 'jobs'} {listed} to stop"]
+
     def pending(self, session: Session, teardown: Teardown) -> list[str]:
+        waiting = self.job_waits(session, teardown)
+        if waiting:
+            return waiting
         detail = teardown.detail
         routes = sorted(set(detail.get("routes") or []))
         adapters = list(detail.get("adapters") or [])
         bases = set(detail.get("bases") or [str(detail.get("base") or "")])
-        waiting: list[str] = []
         for gateway in live_gateways(session):
             still = [route for route in routes if route in gateway.routes]
             if still:

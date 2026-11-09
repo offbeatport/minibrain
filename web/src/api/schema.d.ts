@@ -8332,6 +8332,8 @@ export interface components {
             models?: string[];
             /** Added */
             added?: string[];
+            /** Jobs */
+            jobs?: number[];
             /** Part Of */
             part_of?: string | null;
             /**
@@ -9335,6 +9337,7 @@ export interface operations {
         parameters: {
             query?: {
                 undeploy?: boolean;
+                cancel_jobs?: boolean;
             };
             header?: never;
             path: {
@@ -11701,6 +11704,7 @@ export interface operations {
             query?: {
                 cascade?: boolean;
                 undeploy?: boolean;
+                cancel_jobs?: boolean;
             };
             header?: never;
             path: {
@@ -12754,7 +12758,9 @@ export interface operations {
     };
     delete_version_api_models__slug__versions__number__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                cancel_jobs?: boolean;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -12764,6 +12770,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Its cancelled jobs are stopping; it goes once they end */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionInfo"];
+                };
+            };
             /** @description Successful Response */
             204: {
                 headers: {

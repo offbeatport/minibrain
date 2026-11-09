@@ -764,6 +764,21 @@ once it matches; only deleting a base removes its files.
 - Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, dataset versions only it
   uses, feedback and API key scopes. A base with models built on it answers 409 with their names unless
   the call says `cascade=true`; the cascade deletes them first, then the base.
+- Active jobs (queued or running) of what is being deleted block the delete: 409 naming each one ("guy1 v13: Train,
+  running") with the list in a `jobs` field. `cancel_jobs=true` on the version, model and base deletes (cascades
+  included) cancels them first through the job cancel path, each audited as `job.cancel` with `reason: delete`. A job
+  already asked to cancel no longer blocks. Cancelling a running job is asynchronous, so nothing is removed while one
+  could still write artifacts or events: a model or base teardown waits for them (shown as "Cancelling N jobs", then
+  "Deleting"), and the ten-minute limit fails it naming the jobs, which the delete dialog reopens on ("Delete again…").
+  A version delete with running jobs answers 202 with the version as `deleting` (not routed, not retryable, its
+  failure effects skipped); the leader removes it once its jobs end and audits `version.delete_finished`. It needs no
+  timeout: a cancelled job always ends, by the worker killing its process or by its lease expiring. With only queued
+  jobs (cancelled at once) or none, it goes at once (204).
+- A worker reporting for a job whose model or version is gone, or whose version is being deleted, is told to cancel on
+  its heartbeat, and its completion or failure ends the job `cancelled` with its snapshot kept; a report after the job
+  ended gets 409 (lease lost), which the worker treats as the end of the job.
+- The delete dialogs list the active jobs of everything selected (a cascade adds its models' jobs), each linking to its
+  job page, with "Cancel these N jobs first" ticked; unticked, Delete stays off with "Cancel the running jobs to delete".
 - History stays: jobs (with their events, logs and metrics) and request logs outlive the model. Their links to the
   model, version and base are `ON DELETE SET NULL`, and each row keeps a snapshot written when it is created: the
   model's slug and name and the version number on jobs, the base key on jobs, the slug and name on request logs (the
