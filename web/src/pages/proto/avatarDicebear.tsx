@@ -9,7 +9,16 @@ import voxelBotDefinition from "@dicebear/styles/voxel-bot.json";
 import wavesDefinition from "@dicebear/styles/waves.json";
 import { cn } from "obp-ui";
 import { useMemo, useSyncExternalStore } from "react";
-import { SvgMarkup, TONE_TOKENS, cleanDicebear, cyrb53, slugOf } from "./modelIcons";
+import { appPresetStyle } from "~/lib/theme";
+import {
+    SvgMarkup,
+    TONE_KEYS,
+    type ToneName,
+    cleanDicebear,
+    cyrb53,
+    slugOf,
+    toneToken,
+} from "./modelIcons";
 
 export type AvatarStyleId =
     | "initials"
@@ -21,17 +30,32 @@ export type AvatarStyleId =
     | "bottts"
     | "bottts-neutral";
 
-export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: number };
+export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: ToneName };
 
 export type Palette = {
-    tones: string[];
+    tones: Record<ToneName, string>;
+    background: string;
+    foreground: string;
     surface: string;
     paper: string;
     ink: string;
     font: string;
 };
 
-type Options = Record<string, unknown>;
+export type Options = Record<string, unknown>;
+
+export type ContrastPair = { label: string; fg: string; bg: string; floor: number };
+
+export type FramedVariant = {
+    id: string;
+    style: AvatarStyleId;
+    label: string;
+    how: string;
+    picked?: boolean;
+    options: (palette: Palette, tone: string) => Options;
+    paint?: (svg: string, palette: Palette, tone: string) => string;
+    pairs: (palette: Palette, tone: string) => ContrastPair[];
+};
 
 export type AvatarStyle = {
     id: AvatarStyleId;
@@ -46,18 +70,18 @@ export type AvatarStyle = {
     options: (palette: Palette, tone: string) => Options;
 };
 
-export const TONE_NAMES = [
-    "Green",
-    "Teal",
-    "Amber",
-    "Orange",
-    "Indigo",
-    "Purple",
-    "Sky",
-    "Lime",
-    "Pink",
-    "Slate",
-];
+export const TONE_LABELS: Record<ToneName, string> = {
+    csv: "Green",
+    tsv: "Teal",
+    json: "Amber",
+    jsonl: "Orange",
+    parquet: "Indigo",
+    avro: "Purple",
+    iceberg: "Sky",
+    delta: "Lime",
+    sql: "Pink",
+    text: "Slate",
+};
 
 const DEFINITIONS: Record<AvatarStyleId, unknown> = {
     initials: initialsDefinition,
@@ -97,12 +121,17 @@ export function mixHex(color: string, other: string, weight: number): string {
     );
 }
 
-function luminance(hex: string): number {
+export function luminance(hex: string): number {
     const [red, green, blue] = channels(hex).map((value) => {
         const unit = value / 255;
         return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
     });
     return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+export function contrast(one: string, two: string): number {
+    const [dark, light] = [luminance(one), luminance(two)].sort((a, b) => a - b);
+    return (light + 0.05) / (dark + 0.05);
 }
 
 const LICENCE_CC0 = "CC0 1.0";
@@ -243,16 +272,24 @@ export const AVATAR_STYLES: AvatarStyle[] = [
 
 const STYLE_BY_ID = new Map(AVATAR_STYLES.map((style) => [style.id, style]));
 
-function defaultTone(name: string): number {
-    return cyrb53(slugOf(name)) % TONE_TOKENS.length;
+function toneAt(hash: number): ToneName {
+    return TONE_KEYS[hash % TONE_KEYS.length];
+}
+
+function defaultTone(name: string): ToneName {
+    return toneAt(cyrb53(slugOf(name)));
 }
 
 export function baseSeed(name: string): string {
     return slugOf(name) || "model";
 }
 
-export function seedTone(name: string, seed: string): number {
-    return seed === baseSeed(name) ? defaultTone(name) : cyrb53(seed) % TONE_TOKENS.length;
+export function seedTone(name: string, seed: string): ToneName {
+    return seed === baseSeed(name) ? defaultTone(name) : toneAt(cyrb53(seed));
+}
+
+export function choiceFor(style: AvatarStyleId, name: string, seed = baseSeed(name)): AvatarChoice {
+    return { style, seed, tone: seedTone(name, seed) };
 }
 
 export function randomSeed(name: string): string {
@@ -260,16 +297,28 @@ export function randomSeed(name: string): string {
     return `${baseSeed(name)}-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function avatarSvg(choice: AvatarChoice, name: string, palette: Palette): string {
-    const style = STYLE_BY_ID.get(choice.style) ?? AVATAR_STYLES[0];
-    const tone = palette.tones[choice.tone] ?? palette.tones[0];
+export function styleById(id: AvatarStyleId): AvatarStyle {
+    return STYLE_BY_ID.get(id) ?? AVATAR_STYLES[0];
+}
+
+export function avatarSvg(
+    choice: AvatarChoice,
+    name: string,
+    palette: Palette,
+    framed?: FramedVariant,
+): string {
+    const style = styleById(choice.style);
+    const tone = palette.tones[choice.tone] ?? palette.tones.csv;
     const seed = style.id === "initials" ? name.trim() || "?" : choice.seed;
-    const svg = new DicebearAvatar(styleOf(style.id), {
-        seed,
-        idRandomization: true,
-        ...style.options(palette, tone),
-    }).toString();
-    return cleanDicebear(svg);
+    const options = framed ? framed.options(palette, tone) : style.options(palette, tone);
+    const svg = cleanDicebear(
+        new DicebearAvatar(styleOf(style.id), {
+            seed,
+            idRandomization: true,
+            ...options,
+        }).toString(),
+    );
+    return framed?.paint ? framed.paint(svg, palette, tone) : svg;
 }
 
 const FEATURES: { label: string; pattern: RegExp }[] = [
@@ -315,18 +364,78 @@ function fontFamilies(value: string): string {
     return families.length > 0 ? families.join(", ") : "sans-serif";
 }
 
-function readPalette(): Palette {
-    const computed = getComputedStyle(document.documentElement);
-    const token = (name: string) => resolveColor(computed.getPropertyValue(name).trim());
+function paletteFrom(read: (token: string) => string): Palette {
+    const token = (name: string) => resolveColor(read(name));
     const card = token("--card");
     const foreground = token("--foreground");
     const cardIsLight = luminance(card) > luminance(foreground);
     return {
-        tones: TONE_TOKENS.map(token),
+        tones: Object.fromEntries(TONE_KEYS.map((key) => [key, token(toneToken(key))])) as Record<
+            ToneName,
+            string
+        >,
+        background: token("--background"),
+        foreground,
         surface: card,
         paper: cardIsLight ? card : foreground,
         ink: cardIsLight ? foreground : card,
-        font: fontFamilies(computed.getPropertyValue("--font-sans")),
+        font: fontFamilies(read("--font-sans")),
+    };
+}
+
+function readPalette(): Palette {
+    const computed = getComputedStyle(document.documentElement);
+    return paletteFrom((name) => computed.getPropertyValue(name).trim());
+}
+
+function declaredTokens(selector: string): Map<string, string> {
+    const found = new Map<string, string>();
+    const visit = (rules: CSSRuleList) => {
+        for (const rule of Array.from(rules)) {
+            if (
+                rule instanceof CSSStyleRule &&
+                rule.selectorText.split(",").some((part) => part.trim() === selector)
+            ) {
+                for (const property of Array.from(rule.style)) {
+                    if (property.startsWith("--")) {
+                        found.set(property, rule.style.getPropertyValue(property).trim());
+                    }
+                }
+            }
+            if ("cssRules" in rule) {
+                visit((rule as CSSGroupingRule).cssRules);
+            }
+        }
+    };
+    for (const sheet of Array.from(document.styleSheets)) {
+        const rules = readableRules(sheet);
+        if (rules) {
+            visit(rules);
+        }
+    }
+    return found;
+}
+
+function readableRules(sheet: CSSStyleSheet): CSSRuleList | undefined {
+    try {
+        return sheet.cssRules;
+    } catch {
+        return undefined;
+    }
+}
+
+export type ThemeMode = "light" | "dark";
+
+export function modePalette(mode: ThemeMode, fallback: Palette): Palette {
+    const preset = appPresetStyle(mode);
+    const light = declaredTokens(":root");
+    const declared = mode === "dark" ? new Map([...light, ...declaredTokens(".dark")]) : light;
+    const computed = getComputedStyle(document.documentElement);
+    return {
+        ...paletteFrom(
+            (name) => preset[name] ?? declared.get(name) ?? computed.getPropertyValue(name).trim(),
+        ),
+        font: fallback.font,
     };
 }
 
@@ -377,12 +486,12 @@ export function usePalette(): Palette {
     return useSyncExternalStore(subscribe, currentPalette);
 }
 
-function useAvatarSvg(choice: AvatarChoice, name: string): string {
+function useAvatarSvg(choice: AvatarChoice, name: string, framed?: FramedVariant): string {
     const current = usePalette();
     const { style, seed, tone } = choice;
     return useMemo(
-        () => avatarSvg({ style, seed, tone }, name, current),
-        [style, seed, tone, name, current],
+        () => avatarSvg({ style, seed, tone }, name, current, framed),
+        [style, seed, tone, name, current, framed],
     );
 }
 
@@ -399,18 +508,25 @@ export function AvatarTile({
     choice,
     name,
     size,
+    framed,
     className,
 }: {
     choice: AvatarChoice;
     name: string;
     size: AvatarSize;
+    framed?: FramedVariant;
     className?: string;
 }) {
-    const markup = useAvatarSvg(choice, name);
+    const markup = useAvatarSvg(choice, name, framed);
     return (
         <span
             aria-hidden="true"
-            className={cn("flex shrink-0 overflow-hidden rounded-md", AVATAR_TILE[size], className)}
+            className={cn(
+                "flex shrink-0 overflow-hidden rounded-md",
+                framed && "border bg-background",
+                AVATAR_TILE[size],
+                className,
+            )}
         >
             <SvgMarkup markup={markup} />
         </span>

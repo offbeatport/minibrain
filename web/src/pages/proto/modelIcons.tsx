@@ -63,7 +63,7 @@ const PROVIDERS: Record<string, ProviderId> = {
     Microsoft: "microsoft",
 };
 
-export const TONE_TOKENS = [
+export const TONE_KEYS = [
     "csv",
     "tsv",
     "json",
@@ -74,7 +74,15 @@ export const TONE_TOKENS = [
     "delta",
     "sql",
     "text",
-].map((key) => `--file-${key}`);
+] as const;
+
+export type ToneName = (typeof TONE_KEYS)[number];
+
+export function toneToken(name: ToneName): string {
+    return `--file-${name}`;
+}
+
+export const TONE_TOKENS = TONE_KEYS.map(toneToken);
 
 const TONES = TONE_TOKENS.map((token) => `var(${token})`);
 

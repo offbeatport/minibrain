@@ -10,6 +10,7 @@ import {
     DialogTitle,
     Input,
     Label,
+    Switch,
     Table,
     TableBody,
     TableCell,
@@ -23,21 +24,25 @@ import {
 } from "obp-ui";
 import { useMemo, useState } from "react";
 import { Section } from "~/components/Section";
+import { ContrastTable, MixedRow } from "./AvatarFramedRows";
 import {
     AVATAR_STYLES,
     type AvatarChoice,
     type AvatarStyle,
     type AvatarStyleId,
     AvatarTile,
-    TONE_NAMES,
+    type FramedVariant,
+    TONE_LABELS,
     avatarSvg,
     baseSeed,
+    choiceFor,
     featuresOf,
     randomSeed,
     seedTone,
     usePalette,
 } from "./avatarDicebear";
-import { MODELS, type SampleModel, TONE_TOKENS } from "./modelIcons";
+import { framedFor, framedVariantsOf } from "./avatarFramed";
+import { MODELS, type SampleModel, TONE_KEYS, type ToneName, toneToken } from "./modelIcons";
 
 const GZIPPED: Record<AvatarStyleId, string> = {
     initials: "0.7 KB",
@@ -50,16 +55,12 @@ const GZIPPED: Record<AvatarStyleId, string> = {
     "bottts-neutral": "22.9 KB",
 };
 
-function choiceFor(style: AvatarStyleId, name: string, seed = baseSeed(name)): AvatarChoice {
-    return { style, seed, tone: seedTone(name, seed) };
-}
-
 function shuffleSeeds(name: string): string[] {
     const base = baseSeed(name);
     return [base, `${base}-1`, `${base}-2`];
 }
 
-function Strip({ style }: { style: AvatarStyle }) {
+function Strip({ style, framed }: { style: AvatarStyle; framed?: FramedVariant }) {
     return (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             {MODELS.map((model) => {
@@ -70,9 +71,24 @@ function Strip({ style }: { style: AvatarStyle }) {
                         className="flex min-w-0 flex-col gap-2 rounded-md border bg-background p-3"
                     >
                         <div className="flex items-end gap-3">
-                            <AvatarTile choice={choice} name={model.name} size="lg" />
-                            <AvatarTile choice={choice} name={model.name} size="md" />
-                            <AvatarTile choice={choice} name={model.name} size="sm" />
+                            <AvatarTile
+                                choice={choice}
+                                name={model.name}
+                                size="lg"
+                                framed={framed}
+                            />
+                            <AvatarTile
+                                choice={choice}
+                                name={model.name}
+                                size="md"
+                                framed={framed}
+                            />
+                            <AvatarTile
+                                choice={choice}
+                                name={model.name}
+                                size="sm"
+                                framed={framed}
+                            />
                         </div>
                         <span className="truncate text-sm text-muted-foreground">{model.name}</span>
                     </div>
@@ -107,7 +123,7 @@ function Shuffles({ style }: { style: AvatarStyle }) {
     );
 }
 
-function ListMock({ style }: { style: AvatarStyle }) {
+function ListMock({ style, framed }: { style: AvatarStyle; framed?: FramedVariant }) {
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <span className="text-sm text-muted-foreground">Models list</span>
@@ -118,6 +134,7 @@ function ListMock({ style }: { style: AvatarStyle }) {
                             choice={choiceFor(style.id, model.name)}
                             name={model.name}
                             size="md"
+                            framed={framed}
                         />
                         <div className="flex min-w-0 flex-col">
                             <span className="truncate font-semibold">{model.name}</span>
@@ -132,12 +149,25 @@ function ListMock({ style }: { style: AvatarStyle }) {
     );
 }
 
-function HeaderMock({ style, model }: { style: AvatarStyle; model: SampleModel }) {
+function HeaderMock({
+    style,
+    model,
+    framed,
+}: {
+    style: AvatarStyle;
+    model: SampleModel;
+    framed?: FramedVariant;
+}) {
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <span className="text-sm text-muted-foreground">Page header</span>
             <div className="flex min-w-0 items-center gap-4 rounded-lg border bg-background p-4">
-                <AvatarTile choice={choiceFor(style.id, model.name)} name={model.name} size="lg" />
+                <AvatarTile
+                    choice={choiceFor(style.id, model.name)}
+                    name={model.name}
+                    size="lg"
+                    framed={framed}
+                />
                 <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="text-3xl font-normal">{model.name}</span>
@@ -189,6 +219,39 @@ function Facts({ style }: { style: AvatarStyle }) {
     );
 }
 
+function FramedBlock({ style, framed }: { style: AvatarStyle; framed: FramedVariant }) {
+    return (
+        <div id={`framed-${framed.id}`} className="flex flex-col gap-4 border-t pt-4">
+            <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-semibold">{framed.label}</h3>
+                    {framedFor(style.id) === framed && (
+                        <Badge variant="outline">Used in the picker</Badge>
+                    )}
+                </div>
+                <p className="text-sm text-muted-foreground">{framed.how}</p>
+            </div>
+            <Strip style={style} framed={framed} />
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <MixedRow style={style} framed={framed} />
+                <ListMock style={style} framed={framed} />
+                <HeaderMock style={style} model={MODELS[4]} framed={framed} />
+            </div>
+            <ContrastTable framed={framed} />
+        </div>
+    );
+}
+
+function FramedRows({ style }: { style: AvatarStyle }) {
+    return (
+        <>
+            {framedVariantsOf(style.id).map((framed) => (
+                <FramedBlock key={framed.id} style={style} framed={framed} />
+            ))}
+        </>
+    );
+}
+
 function StyleSection({ style }: { style: AvatarStyle }) {
     return (
         <Section
@@ -211,6 +274,7 @@ function StyleSection({ style }: { style: AvatarStyle }) {
                     <ListMock style={style} />
                     <HeaderMock style={style} model={MODELS[4]} />
                 </div>
+                <FramedRows style={style} />
             </div>
         </Section>
     );
@@ -323,13 +387,15 @@ function StyleOption({
     name,
     seed,
     tone,
+    framed,
     checked,
     onSelect,
 }: {
     style: AvatarStyle;
     name: string;
     seed: string;
-    tone: number;
+    tone: ToneName;
+    framed: boolean;
     checked: boolean;
     onSelect: () => void;
 }) {
@@ -348,38 +414,43 @@ function StyleOption({
                 onChange={onSelect}
                 className="sr-only"
             />
-            <AvatarTile choice={{ style: style.id, seed, tone }} name={name} size="lg" />
+            <AvatarTile
+                choice={{ style: style.id, seed, tone }}
+                name={name}
+                size="lg"
+                framed={framed ? framedFor(style.id) : undefined}
+            />
             <span className="truncate text-sm">{style.name}</span>
         </label>
     );
 }
 
-function ToneSwatches({ tone, onPick }: { tone: number; onPick: (tone: number) => void }) {
+function ToneSwatches({ tone, onPick }: { tone: ToneName; onPick: (tone: ToneName) => void }) {
     return (
         <fieldset className="flex flex-col gap-label">
             <legend className="mb-2 text-base font-medium">Colour</legend>
             <div className="flex flex-wrap gap-2">
-                {TONE_TOKENS.map((token, index) => (
+                {TONE_KEYS.map((key) => (
                     <label
-                        key={token}
+                        key={key}
                         className={cn(
                             "flex size-8 cursor-pointer items-center justify-center rounded-md border has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                            index === tone && "border-foreground",
+                            key === tone && "border-foreground",
                         )}
                     >
                         <input
                             type="radio"
                             name="avatar-tone"
-                            value={index}
-                            checked={index === tone}
-                            onChange={() => onPick(index)}
-                            aria-label={TONE_NAMES[index]}
+                            value={key}
+                            checked={key === tone}
+                            onChange={() => onPick(key)}
+                            aria-label={TONE_LABELS[key]}
                             className="sr-only"
                         />
                         <span
                             aria-hidden="true"
                             className="size-5 rounded-sm"
-                            style={{ backgroundColor: `var(${token})` }}
+                            style={{ backgroundColor: `var(${toneToken(key)})` }}
                         />
                     </label>
                 ))}
@@ -394,12 +465,16 @@ function PickerDialog({
     name,
     value,
     onUse,
+    framed,
+    onFramedChange,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     name: string;
     value: AvatarChoice;
     onUse: (choice: AvatarChoice) => void;
+    framed: boolean;
+    onFramedChange: (framed: boolean) => void;
 }) {
     const [draft, setDraft] = useState(value);
     const displayName = name.trim() || "Untitled model";
@@ -427,7 +502,12 @@ function PickerDialog({
                 </DialogHeader>
                 <div className="grid gap-6 sm:grid-cols-[8rem_minmax(0,1fr)]">
                     <div className="flex flex-col items-center gap-3">
-                        <AvatarTile choice={draft} name={displayName} size="xl" />
+                        <AvatarTile
+                            choice={draft}
+                            name={displayName}
+                            size="xl"
+                            framed={framed ? framedFor(draft.style) : undefined}
+                        />
                         <span className="max-w-full truncate font-semibold">{displayName}</span>
                         <span className="text-sm text-muted-foreground">{current.name}</span>
                         <Button type="button" variant="outline" onClick={shuffle}>
@@ -435,6 +515,19 @@ function PickerDialog({
                         </Button>
                     </div>
                     <div className="flex min-w-0 flex-col gap-field">
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                id="avatar-framed"
+                                checked={framed}
+                                onCheckedChange={onFramedChange}
+                            />
+                            <Label htmlFor="avatar-framed">Framed</Label>
+                            <span className="text-sm text-muted-foreground">
+                                {framed
+                                    ? "Publisher-logo tile, no background"
+                                    : "Old look: full-bleed background"}
+                            </span>
+                        </div>
                         <fieldset className="flex flex-col">
                             <legend className="mb-2 text-base font-medium">Style</legend>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -445,6 +538,7 @@ function PickerDialog({
                                         name={displayName}
                                         seed={draft.seed}
                                         tone={draft.tone}
+                                        framed={framed}
                                         checked={draft.style === style.id}
                                         onSelect={() =>
                                             setDraft((previous) => ({
@@ -489,6 +583,7 @@ export function AvatarPickerMock({ defaultOpen = false }: { defaultOpen?: boolea
     const [name, setName] = useState("Support triage");
     const [choice, setChoice] = useState(() => choiceFor("initials", "Support triage"));
     const [open, setOpen] = useState(defaultOpen);
+    const [framed, setFramed] = useState(true);
     const displayName = name.trim() || "Untitled model";
     return (
         <Section
@@ -507,7 +602,12 @@ export function AvatarPickerMock({ defaultOpen = false }: { defaultOpen?: boolea
                                 onClick={() => setOpen(true)}
                                 className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
                             >
-                                <AvatarTile choice={choice} name={displayName} size="md" />
+                                <AvatarTile
+                                    choice={choice}
+                                    name={displayName}
+                                    size="md"
+                                    framed={framed ? framedFor(choice.style) : undefined}
+                                />
                             </button>
                         </TooltipTrigger>
                         <TooltipContent>Change avatar</TooltipContent>
@@ -518,6 +618,13 @@ export function AvatarPickerMock({ defaultOpen = false }: { defaultOpen?: boolea
                         onChange={(event) => setName(event.target.value)}
                     />
                 </div>
+                <span className="text-sm text-muted-foreground">
+                    Stored:{" "}
+                    <code className="font-mono">
+                        {`{ style: "${choice.style}", seed: "${choice.seed}", tone: "${choice.tone}" }`}
+                    </code>
+                    . The tone is a name, resolved to the theme's colour at render time.
+                </span>
             </div>
             <PickerDialog
                 open={open}
@@ -525,6 +632,8 @@ export function AvatarPickerMock({ defaultOpen = false }: { defaultOpen?: boolea
                 name={name}
                 value={choice}
                 onUse={setChoice}
+                framed={framed}
+                onFramedChange={setFramed}
             />
         </Section>
     );
