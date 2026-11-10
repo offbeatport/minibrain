@@ -13,18 +13,16 @@ import { Requests } from "~/components/models/ModelMetrics";
 import { Sparkline } from "./flowSparkline";
 import {
     type FlowModel,
-    beatsLive,
+    bestCandidate,
     liveVersion,
     modelHref,
-    newestFirst,
     nextStep,
     pct,
     useFlowState,
 } from "./modelsFlowData";
-import { ModelAvatar } from "./modelsFlowParts";
+import { MakeLiveButton, ModelAvatar, openConnect } from "./modelsFlowParts";
 import {
     AutopilotBadge,
-    DeployButton,
     type Handlers,
     LiveStatus,
     autopilotText,
@@ -102,7 +100,7 @@ function Variants({ model }: { model: FlowModel }) {
                     {item.live ? (
                         <LiveStatus machines={item.replicas} />
                     ) : (
-                        <span className="text-muted-foreground">Not deployed</span>
+                        <span className="text-muted-foreground">Off the API</span>
                     )}
                 </li>
             ))}
@@ -114,7 +112,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
     const state = useFlowState();
     const live = liveVersion(model);
     const step = nextStep(state, model);
-    const candidate = newestFirst(model).find((version) => beatsLive(model, version));
+    const candidate = model.live !== null ? bestCandidate(model) : undefined;
     const status = autopilotText(model);
     return (
         <>
@@ -125,7 +123,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                         <SheetTitle className="truncate">{model.name}</SheetTitle>
                         <SheetDescription>
                             {model.kind === "custom"
-                                ? `On ${model.base} · ${live ? `v${live.number} live` : "not deployed"}`
+                                ? `On ${model.base} · ${live ? `v${live.number} live` : "nothing live"}${model.deployed ? "" : " · off the API"}`
                                 : `Base · ${plural(model.variants.length, "variant")}`}
                         </SheetDescription>
                     </div>
@@ -196,13 +194,16 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
             <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={() => on.open(modelHref(model.slug))}>Open model</Button>
                 {candidate && (
-                    <DeployButton model={model} version={candidate} on={on} size="default" full />
+                    <MakeLiveButton
+                        model={model}
+                        version={candidate}
+                        variant="secondary"
+                        label={`Make live v${candidate.number}`}
+                    />
                 )}
-                {model.deployed && (
-                    <Button variant="outline" onClick={() => on.open(modelHref(model.slug, "api"))}>
-                        Use API
-                    </Button>
-                )}
+                <Button variant="outline" onClick={() => openConnect(model.slug)}>
+                    Connect
+                </Button>
             </div>
             <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1">
                 <KbdHint keys={["↑", "↓"]}>move</KbdHint>

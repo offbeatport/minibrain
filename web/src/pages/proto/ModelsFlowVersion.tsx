@@ -1,5 +1,5 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import { ChevronDown, Download, MoreHorizontal, Play, Rocket, Trash2 } from "lucide-react";
+import { ChevronDown, Download, MoreHorizontal, Play, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -27,19 +27,20 @@ import {
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
+import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
-import { StepChart, type StepSeries } from "~/components/charts/StepChart";
-import { ChartLegend } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
 import { exactTime, relativeTime } from "~/lib/time";
+import { LossChart, RunPanel } from "./flowModelTabs";
+import { VersionMonitoring } from "./flowMonitoring";
 import {
     type Answer,
+    BASELINE_HINT,
     type FlowModel,
     type FlowVersion,
     KIND_LABELS,
-    LOSS_STEPS,
     answerOf,
     answersFor,
     compareHref,
@@ -48,37 +49,25 @@ import {
     flowHref,
     jobHref,
     liveVersion,
-    lossCurve,
     newestFirst,
     pct,
+    playgroundHref,
     points,
     previousVersion,
+    ruleChecks,
     useFlowModel,
+    versionName,
 } from "./modelsFlowData";
-import {
-    Crumbs,
-    Delta,
-    DeployDialog,
-    type DeployIntent,
-    StateBadge,
-    deployBlocked,
-    deployLabel,
-} from "./modelsFlowParts";
+import { Crumbs, Delta, MakeLiveButton, ScoreBadge, StateBadge, Tip } from "./modelsFlowParts";
 
-type Tab = "summary" | "answers" | "training" | "card";
+type Tab = "summary" | "answers" | "training" | "monitoring" | "card";
 
 const TABS: { id: Tab; label: string }[] = [
     { id: "summary", label: "Summary" },
     { id: "answers", label: "Answers" },
     { id: "training", label: "Training" },
+    { id: "monitoring", label: "Monitoring" },
     { id: "card", label: "Model card" },
-];
-
-const TRAIN = "var(--primary)";
-const HELD_OUT = "var(--file-sql)";
-const LOSS_SERIES: StepSeries[] = [
-    { key: "loss", label: "Training loss", color: TRAIN },
-    { key: "heldOut", label: "Held-out loss", color: HELD_OUT, dots: true },
 ];
 
 function rate(value: number): string {
@@ -102,7 +91,7 @@ function ScoresTable({ model, version }: { model: FlowModel; version: FlowVersio
             ? [{ version: live, label: `v${live.number} · live` }]
             : []),
         ...(zero && zero.number !== version.number && zero.number !== live?.number
-            ? [{ version: zero, label: "v0 · prompt only" }]
+            ? [{ version: zero, label: "v0 · Baseline" }]
             : []),
     ];
     return (
@@ -159,33 +148,7 @@ function ScoresTable({ model, version }: { model: FlowModel; version: FlowVersio
     );
 }
 
-type Check = { label: string; value: string; met: boolean };
-
-function ruleChecks(model: FlowModel, version: FlowVersion): Check[] {
-    if (!version.scores) {
-        return [];
-    }
-    const live = liveVersion(model);
-    const [floor, slack] = model.rule;
-    const checks: Check[] = [
-        {
-            label: `${model.metrics[0]} is at least ${pct(floor)}`,
-            value: pct(version.scores[0]),
-            met: version.scores[0] >= floor,
-        },
-    ];
-    if (live?.scores && live.number !== version.number) {
-        const drop = version.scores[1] - live.scores[1];
-        checks.push({
-            label: `${model.metrics[1]} is no more than ${(slack * 100).toFixed(1)} points below live (v${live.number})`,
-            value: `${points(drop)} points`,
-            met: drop >= -slack,
-        });
-    }
-    return checks;
-}
-
-function verdict(model: FlowModel, version: FlowVersion, checks: Check[]): string {
+function verdict(model: FlowModel, version: FlowVersion): string {
     const live = liveVersion(model);
     if (version.status === "training") {
         return "Still training; the rule is checked once it is scored.";
@@ -196,31 +159,24 @@ function verdict(model: FlowModel, version: FlowVersion, checks: Check[]): strin
     if (live?.number === version.number) {
         return "This is the live version.";
     }
-    const missed = checks.filter((check) => !check.met);
+    const missed = ruleChecks(model, version).filter((check) => !check.met);
     if (missed.length > 0) {
-        return `Rejected: ${missed.map((check) => check.label.charAt(0).toLowerCase() + check.label.slice(1)).join(" and ")} is not met. It cannot be deployed.`;
+        return "Below rule. You can still make it live; it asks you to confirm first.";
     }
     const delta = live?.scores && version.scores ? version.scores[0] - live.scores[0] : null;
     if (delta !== null && delta > 0) {
-        return `Passed, and it beats live by ${points(delta)} points on ${model.metrics[0].toLowerCase()}. Ready to deploy.`;
+        return `Met, and it beats live by ${points(delta)} points on ${model.metrics[0].toLowerCase()}.`;
     }
-    return "Passed the rule but scores below live, so deploying it would lower quality.";
+    return "Met the rule but scores below live, so making it live would lower quality.";
 }
 
 function PromotionPanel({ model, version }: { model: FlowModel; version: FlowVersion }) {
     const checks = ruleChecks(model, version);
-    const passed = version.passed;
     return (
         <Section
             title="Promotion rule"
-            caption={verdict(model, version, checks)}
-            actions={
-                passed !== null && (
-                    <Badge variant={passed ? "success" : "warning"}>
-                        {passed ? "Can go live" : "Cannot go live"}
-                    </Badge>
-                )
-            }
+            caption={verdict(model, version)}
+            actions={<ScoreBadge model={model} version={version} />}
         >
             {checks.length === 0 ? (
                 <p className="text-muted-foreground">No scores yet.</p>
@@ -228,7 +184,7 @@ function PromotionPanel({ model, version }: { model: FlowModel; version: FlowVer
                 <ul className="flex flex-col gap-1.5">
                     {checks.map((check) => (
                         <li key={check.label} className="flex flex-wrap items-baseline gap-2">
-                            <Badge variant={check.met ? "success" : "destructive"}>
+                            <Badge variant={check.met ? "success" : "neutral"}>
                                 {check.met ? "Met" : "Not met"}
                             </Badge>
                             <span>{check.label}</span>
@@ -288,7 +244,11 @@ function DiffTable({ rows, before, after }: { rows: DiffRow[]; before: string; a
 
 export function dataRows(a: FlowVersion, b: FlowVersion): DiffRow[] {
     return [
-        { label: "Data version", before: `v${a.data.number}`, after: `v${b.data.number}` },
+        {
+            label: "Data version",
+            before: `v${a.data.number}`,
+            after: `v${b.data.number}`,
+        },
         { label: "Rows", before: count(a.data.rows), after: count(b.data.rows) },
     ];
 }
@@ -578,10 +538,19 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
         return (
             <Section title="Training">
                 <p className="text-muted-foreground">
-                    Prompt-only versions are not trained: v0 scores the instructions on the base as
-                    it is.
+                    {`v0 · Baseline is ${BASELINE_HINT.toLowerCase()}: ${model.base} with the instructions, scored on the same held-out rows as every version.`}
                 </p>
             </Section>
+        );
+    }
+    if (version.status === "training") {
+        return (
+            <RunPanel
+                model={model}
+                version={version}
+                title={`Training v${version.number}`}
+                links={false}
+            />
         );
     }
     const settings = version.settings;
@@ -595,13 +564,6 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
             </span>
         );
     const before = previous?.settings;
-    const stop =
-        version.status === "training"
-            ? LOSS_STEPS * (version.progress ?? 0)
-            : version.status === "failed"
-              ? LOSS_STEPS * 0.3
-              : LOSS_STEPS;
-    const rows = lossCurve(version.number).filter((row) => row.step <= stop);
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-4 lg:grid-cols-2">
@@ -611,13 +573,12 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
                 >
                     <Facts
                         items={[
-                            ["Dataset", "Support tickets"],
                             [
                                 "Version",
                                 <span
                                     key="v"
                                     className="tabular-nums"
-                                >{`v${version.data.number} · ${count(version.data.rows)} rows`}</span>,
+                                >{`Data v${version.data.number} · ${count(version.data.rows)} rows`}</span>,
                             ],
                             ["Since previous", dataChange(version)],
                             [
@@ -638,7 +599,7 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
                 >
                     <Facts
                         items={[
-                            ["Method", "LoRA"],
+                            ["Method", was(settings.method, before ? before.method : undefined)],
                             [
                                 "Rank",
                                 was(
@@ -670,11 +631,7 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
             </div>
             <Section
                 title="Loss"
-                caption={
-                    version.status === "training"
-                        ? `Step ${count(stop)} of ${count(LOSS_STEPS)}; the chart grows while it trains.`
-                        : "Training loss every 24 steps, held-out loss every 120."
-                }
+                caption="Training loss every 24 steps, held-out loss every 120."
                 actions={
                     <Button variant="outline" asChild>
                         <Link href={jobHref(version.jobId)}>{`Job #${version.jobId}`}</Link>
@@ -687,16 +644,7 @@ function TrainingTab({ model, version }: { model: FlowModel; version: FlowVersio
                             {version.error}
                         </div>
                     )}
-                    <ChartLegend series={LOSS_SERIES} />
-                    <StepChart
-                        rows={rows}
-                        series={LOSS_SERIES}
-                        format={(value) => value.toFixed(3)}
-                        axisFormat={(value) => value.toFixed(2)}
-                        label={`Training and held-out loss for ${model.name} v${version.number}`}
-                        domain={[0, LOSS_STEPS]}
-                        height={240}
-                    />
+                    <LossChart model={model} version={version} />
                 </div>
             </Section>
         </div>
@@ -827,11 +775,11 @@ function CardTab({ model, version }: { model: FlowModel; version: FlowVersion })
                             version.passed === null
                                 ? "Not checked"
                                 : version.passed
-                                  ? "Passed"
-                                  : "Rejected",
+                                  ? "Met"
+                                  : "Below rule",
                         ],
                         [
-                            "Deployed",
+                            "Live",
                             live?.number === version.number
                                 ? `Live since ${relativeTime(createdAt(version))}`
                                 : version.wasLive
@@ -897,7 +845,9 @@ function CompareWith({ model, version }: { model: FlowModel; version: FlowVersio
                             {other.number === live?.number
                                 ? "Live"
                                 : other.scores
-                                  ? KIND_LABELS[other.kind]
+                                  ? other.kind === "prompt"
+                                      ? "Baseline"
+                                      : "Ready"
                                   : other.status === "training"
                                     ? "Training"
                                     : "Failed"}
@@ -910,41 +860,9 @@ function CompareWith({ model, version }: { model: FlowModel; version: FlowVersio
     );
 }
 
-export function DeployButton({
-    model,
-    version,
-    onDeploy,
-}: {
-    model: FlowModel;
-    version: FlowVersion;
-    onDeploy: (intent: DeployIntent) => void;
-}) {
-    const label = deployLabel(model, version);
-    const blocked = deployBlocked(version);
-    if (!label) {
-        return null;
-    }
-    const button = (
-        <Button disabled={Boolean(blocked)} onClick={() => onDeploy({ model, version })}>
-            <Rocket aria-hidden="true" />
-            {label}
-        </Button>
-    );
-    if (!blocked) {
-        return button;
-    }
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="inline-flex">{button}</span>
-            </TooltipTrigger>
-            <TooltipContent>{blocked}</TooltipContent>
-        </Tooltip>
-    );
-}
-
 function VersionMenu({ model, version }: { model: FlowModel; version: FlowVersion }) {
     const toast = useToast();
+    const router = useRouter();
     const live = liveVersion(model)?.number === version.number;
     const note = (what: string) =>
         toast({ title: "Not in the prototype", description: `Would ${what}.` });
@@ -962,10 +880,10 @@ function VersionMenu({ model, version }: { model: FlowModel; version: FlowVersio
             <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem
                     disabled={version.status !== "ready"}
-                    onSelect={() => note("open the playground")}
+                    onSelect={() => router.history.push(playgroundHref(model.slug, version.number))}
                 >
                     <Play />
-                    {`Test v${version.number}`}
+                    {`Try ${model.slug}@${version.number}`}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => note("download the model card")}>
                     <Download />
@@ -998,7 +916,6 @@ export function ModelsFlowVersionPage() {
     const model = useFlowModel(params.model);
     const number = Number((params.version ?? "").replace(/^v/, ""));
     const version = model ? findVersion(model, number) : undefined;
-    const [deploy, setDeploy] = useState<DeployIntent>(null);
     const tab = tabOf(params.tab);
     if (!model || !version) {
         return (
@@ -1015,6 +932,7 @@ export function ModelsFlowVersionPage() {
     }
     const base = flowHref(model.slug, version.number);
     const created = createdAt(version);
+    const callable = `${model.slug}@${version.number}`;
     return (
         <Page>
             <Crumbs
@@ -1025,26 +943,51 @@ export function ModelsFlowVersionPage() {
                 ]}
             />
             <PageHeader
-                title={`v${version.number}`}
+                title={versionName(version)}
                 badge={
                     <span className="flex items-center gap-2">
-                        <Badge variant="outline">{KIND_LABELS[version.kind]}</Badge>
                         <StateBadge model={model} version={version} />
+                        <ScoreBadge model={model} version={version} />
                     </span>
                 }
                 caption={
-                    <span>
-                        {`${model.name} on ${model.base} · created `}
-                        <time dateTime={created} title={exactTime(created)}>
-                            {relativeTime(created)}
-                        </time>
-                        {` · data v${version.data.number}`}
+                    <span className="flex flex-wrap items-center gap-x-1">
+                        <span className="font-mono text-sm text-foreground">{callable}</span>
+                        <CopyButton value={callable} label={`Copy ${callable}`} />
+                        <span>
+                            {version.kind === "prompt"
+                                ? `${BASELINE_HINT} · created `
+                                : `${model.name} on ${model.base} · created `}
+                            <time dateTime={created} title={exactTime(created)}>
+                                {relativeTime(created)}
+                            </time>
+                            {` · data v${version.data.number}`}
+                        </span>
                     </span>
                 }
                 actions={
                     <>
+                        <Tip tip={version.status === "ready" ? null : "Callable once it is ready."}>
+                            <Button
+                                variant="outline"
+                                disabled={version.status !== "ready"}
+                                asChild={version.status === "ready"}
+                            >
+                                {version.status === "ready" ? (
+                                    <Link href={playgroundHref(model.slug, version.number)}>
+                                        <Play aria-hidden="true" />
+                                        Try in Playground
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <Play aria-hidden="true" />
+                                        Try in Playground
+                                    </>
+                                )}
+                            </Button>
+                        </Tip>
                         <CompareWith model={model} version={version} />
-                        <DeployButton model={model} version={version} onDeploy={setDeploy} />
+                        <MakeLiveButton model={model} version={version} />
                         <VersionMenu model={model} version={version} />
                     </>
                 }
@@ -1060,9 +1003,9 @@ export function ModelsFlowVersionPage() {
                 {tab === "summary" && <SummaryTab model={model} version={version} />}
                 {tab === "answers" && <AnswersTab model={model} version={version} />}
                 {tab === "training" && <TrainingTab model={model} version={version} />}
+                {tab === "monitoring" && <VersionMonitoring model={model} version={version} />}
                 {tab === "card" && <CardTab model={model} version={version} />}
             </div>
-            <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
         </Page>
     );
 }

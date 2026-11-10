@@ -36,28 +36,29 @@ import { StatusText } from "~/components/models/StatusText";
 import { Sparkline } from "./flowSparkline";
 import {
     type BaseVariant,
-    FLOW,
     type FlowModel,
     type FlowVersion,
-    attention,
     compareHref,
     flowHref,
+    liveShare,
     liveVersion,
     modelHref,
     newestFirst,
+    openIntent,
     pct,
-    points,
-    scoreDelta,
+    playgroundHref,
+    retryWithQLoRA,
     shortAgo,
+    statusLine,
     variantKey,
 } from "./modelsFlowData";
 import {
-    Delta,
-    type DeployIntent,
+    MakeLiveButton,
     ModelAvatar,
+    ScoreBadge,
+    VersionName,
     VersionStatus,
-    deployBlocked,
-    deployLabel,
+    openConnect,
 } from "./modelsFlowParts";
 
 export type Column = "quality" | "requests" | "cost" | "p95";
@@ -76,7 +77,6 @@ export function gridTemplate(shown: Column[]): string {
 
 export type Handlers = {
     open: (href: string) => void;
-    deploy: (intent: DeployIntent) => void;
     undeploy: (models: FlowModel[]) => void;
     removeModels: (models: FlowModel[]) => void;
     removeVersions: (items: { model: FlowModel; version: FlowVersion }[]) => void;
@@ -90,6 +90,7 @@ export type Handlers = {
 
 export type RowProps = {
     id: string;
+    nested: boolean;
     focused: boolean;
     selected: boolean;
     selecting: boolean;
@@ -141,15 +142,6 @@ export function autopilotText(model: FlowModel): string | null {
         return null;
     }
     return `v${run.version} on ${model.autopilot?.canary}% canary · ${run.minutesLeft} min left`;
-}
-
-export function deployTip(model: FlowModel, version: FlowVersion): string {
-    const live = liveVersion(model);
-    const delta = scoreDelta(model, version);
-    if (!live || delta === null || !version.scores) {
-        return `v${version.number} scores ${pct(version.scores?.[0])}; nothing is live yet.`;
-    }
-    return `v${version.number} scores ${pct(version.scores[0])} vs ${pct(live.scores?.[0])} for live v${live.number}: ${points(delta)} points.`;
 }
 
 function fromControl(event: MouseEvent | KeyboardEvent): boolean {
@@ -239,10 +231,16 @@ function Chevron({
     );
 }
 
-export function LiveStatus({ machines }: { machines: string[] }) {
+export function LiveStatus({
+    machines,
+    text = "On the API",
+}: {
+    machines: string[];
+    text?: string;
+}) {
     const label = (
         <StatusText tone="success">
-            Live
+            {text}
             {machines.length > 1 && (
                 <span className="tabular-nums">{` · ${machines.length} replicas`}</span>
             )}
@@ -311,7 +309,7 @@ function ModelMenu({ model, on }: { model: FlowModel; on: Handlers }) {
                     <DropdownMenuItem
                         disabled={model.serveOnly}
                         className={model.serveOnly ? "items-start" : undefined}
-                        onSelect={() => on.open(modelHref(model.slug))}
+                        onSelect={() => on.open(modelHref(model.slug, "training"))}
                     >
                         <GraduationCap className={model.serveOnly ? "mt-0.5" : undefined} />
                         <span className="flex flex-col">
@@ -338,7 +336,9 @@ function ModelMenu({ model, on }: { model: FlowModel; on: Handlers }) {
                 {model.deployed && (
                     <DropdownMenuItem variant="destructive" onSelect={() => on.undeploy([model])}>
                         <PowerOff />
-                        {model.kind === "base" ? "Undeploy every variant" : "Undeploy"}
+                        {model.kind === "base"
+                            ? "Take every format off the API"
+                            : "Take off the API"}
                     </DropdownMenuItem>
                 )}
                 <DropdownMenuItem variant="destructive" onSelect={() => on.removeModels([model])}>
@@ -354,17 +354,14 @@ function ModelActions({ model, on }: { model: FlowModel; on: Handlers }) {
     return (
         <div className="relative z-10 flex items-center justify-end gap-1">
             {model.deployed ? (
-                <Button variant="secondary" onClick={() => on.open(modelHref(model.slug, "api"))}>
+                <Button variant="secondary" onClick={() => openConnect(model.slug)}>
                     <Plug aria-hidden="true" />
-                    Use API
+                    Connect
                 </Button>
             ) : (
-                <Button
-                    variant="secondary"
-                    onClick={() => on.open(`${FLOW}/playground?model=${model.slug}`)}
-                >
+                <Button variant="secondary" onClick={() => on.open(playgroundHref(model.slug))}>
                     <Play aria-hidden="true" />
-                    Test
+                    Try
                 </Button>
             )}
             <ModelMenu model={model} on={on} />
@@ -408,26 +405,93 @@ function QualityCell({ model, on }: { model: FlowModel; on: Handlers }) {
     );
 }
 
+const STATUS_TONES = {
+    canary: "info",
+    candidate: "success",
+    failed: "destructive",
+    training: "info",
+    update: "info",
+} as const;
+
 function ModelStatus({ model }: { model: FlowModel }) {
-    const note = autopilotText(model) ?? attention(model);
+    const line = statusLine(model);
+    const failed =
+        line.kind === "failed" ? model.versions.find((v) => v.number === line.version) : undefined;
+    const body = (() => {
+        if (line.kind === "on") {
+            return <LiveStatus machines={model.replicas} />;
+        }
+        if (line.kind === "off" || line.kind === "setup" || line.kind === "idle") {
+            return <Muted>{line.text}</Muted>;
+        }
+        if (failed?.error) {
+            return (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button type="button" className="relative z-10 rounded-sm text-left">
+                            <StatusText tone="destructive">{line.text}</StatusText>
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm whitespace-normal">
+                        {failed.error}
+                    </TooltipContent>
+                </Tooltip>
+            );
+        }
+        return (
+            <StatusText tone={STATUS_TONES[line.kind]}>
+                <span className="tabular-nums">{line.text}</span>
+            </StatusText>
+        );
+    })();
+    const version = line.version;
     return (
-        <span className="flex min-w-0 flex-col items-start gap-0.5">
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                {model.deployed ? (
-                    <LiveStatus machines={model.replicas} />
-                ) : (
-                    <Muted>Not deployed</Muted>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            {body}
+            {line.kind === "failed" &&
+                version !== undefined &&
+                /memory/i.test(failed?.error ?? "") && (
+                    <>
+                        <span aria-hidden="true" className="text-faint">
+                            ·
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => retryWithQLoRA(model.slug, version)}
+                            className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            Retry with QLoRA
+                        </button>
+                    </>
                 )}
-                {model.autopilot && <AutopilotBadge />}
-            </span>
-            {note && <span className="text-sm text-muted-foreground">{note}</span>}
+            {line.kind === "candidate" && version !== undefined && (
+                <>
+                    <span aria-hidden="true" className="text-faint">
+                        ·
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() =>
+                            openIntent({
+                                kind: "make-live",
+                                slug: model.slug,
+                                number: version,
+                            })
+                        }
+                        className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        Make live
+                    </button>
+                </>
+            )}
+            {model.autopilot && <AutopilotBadge />}
         </span>
     );
 }
 
 function baseFacts(model: FlowModel): string {
     const live = model.variants.filter((item) => item.live).length;
-    return `${plural(model.variants.length, "variant")} · ${live} deployed`;
+    return `${plural(model.variants.length, "variant")} · ${live} on the API`;
 }
 
 export type Hint = { text: string; action: string; href: string };
@@ -446,7 +510,11 @@ export function ModelRow({
     on: Handlers;
     hint?: Hint;
 }) {
-    const children = model.kind === "base" ? model.variants.length : model.versions.length;
+    const children = props.nested
+        ? model.kind === "base"
+            ? model.variants.length
+            : model.versions.length
+        : 0;
     const liveVariants = model.variants.filter((item) => item.live);
     return (
         <li
@@ -456,13 +524,15 @@ export function ModelRow({
             className={cn(ROW_GRID, ROW_STATE, "gap-y-1 py-3")}
         >
             <div className="flex min-w-0 items-center gap-2">
-                <Chevron
-                    name={model.name}
-                    expandable={children > 0}
-                    expanded={expanded}
-                    noun={model.kind === "base" ? "variants" : "versions"}
-                    onToggle={onToggle}
-                />
+                {props.nested && (
+                    <Chevron
+                        name={model.name}
+                        expandable={children > 0}
+                        expanded={expanded}
+                        noun={model.kind === "base" ? "variants" : "versions"}
+                        onToggle={onToggle}
+                    />
+                )}
                 <ModelAvatar model={model} />
                 <div className="ml-1 flex min-w-0 flex-col">
                     <span className="flex min-w-0 items-center gap-2">
@@ -534,7 +604,12 @@ export function ModelRow({
             </div>
             <ModelActions model={model} on={on} />
             {hint && (
-                <p className="col-span-full pl-[4.75rem] text-sm text-muted-foreground">
+                <p
+                    className={cn(
+                        "col-span-full text-sm text-muted-foreground",
+                        props.nested ? "pl-[4.75rem]" : "pl-[2.75rem]",
+                    )}
+                >
                     {hint.text}{" "}
                     <Link
                         href={hint.href}
@@ -577,31 +652,22 @@ function ScoreCell({ model, version }: { model: FlowModel; version: FlowVersion 
     if (!version.scores) {
         return <Muted />;
     }
-    const live = liveVersion(model)?.number === version.number;
     return (
-        <span className="flex items-baseline gap-2 tabular-nums">
+        <span className="flex items-center gap-2 tabular-nums">
             <span>{pct(version.scores[0])}</span>
-            {live ? (
-                <span className="text-sm text-muted-foreground">live</span>
-            ) : (
-                <span className="text-sm">
-                    <Delta value={scoreDelta(model, version)} suffix="vs live" />
-                </span>
-            )}
+            <ScoreBadge model={model} version={version} />
         </span>
     );
 }
 
 function VersionStatusCell({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    const live = liveVersion(model)?.number === version.number;
-    if (live) {
-        return <LiveStatus machines={model.replicas} />;
-    }
-    if (model.autopilot?.run?.version === version.number) {
+    const share = liveShare(model, version.number);
+    if (share !== null && version.status === "ready") {
         return (
-            <StatusText tone="info">
-                <span className="tabular-nums">{`Canary · ${model.autopilot.canary}%`}</span>
-            </StatusText>
+            <LiveStatus
+                machines={model.replicas}
+                text={share === 100 ? "Live" : `Live · ${share}%`}
+            />
         );
     }
     if (version.status === "failed") {
@@ -619,42 +685,6 @@ function VersionStatusCell({ model, version }: { model: FlowModel; version: Flow
         );
     }
     return <VersionStatus model={model} version={version} />;
-}
-
-export function DeployButton({
-    model,
-    version,
-    on,
-    size = "sm",
-    full = false,
-}: {
-    model: FlowModel;
-    version: FlowVersion;
-    on: Handlers;
-    size?: "sm" | "default";
-    full?: boolean;
-}) {
-    const label = deployLabel(model, version);
-    if (!label || deployBlocked(version)) {
-        return null;
-    }
-    const text = full ? label : label.startsWith("Deploy") ? "Deploy" : "Roll back";
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    variant="secondary"
-                    size={size}
-                    onClick={() => on.deploy({ model, version })}
-                >
-                    {text}
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs whitespace-normal">
-                {deployTip(model, version)}
-            </TooltipContent>
-        </Tooltip>
-    );
 }
 
 function VersionMenu({
@@ -703,10 +733,10 @@ function VersionMenu({
                 )}
                 {version.status === "ready" && (
                     <DropdownMenuItem
-                        onSelect={() => on.open(`${FLOW}/playground?model=${model.slug}`)}
+                        onSelect={() => on.open(playgroundHref(model.slug, version.number))}
                     >
                         <Play />
-                        {`Test v${version.number}`}
+                        {`Try ${model.slug}@${version.number}`}
                     </DropdownMenuItem>
                 )}
                 {version.status === "ready" && (
@@ -763,12 +793,10 @@ export function VersionRow({
                         tabIndex={-1}
                         className="font-medium text-foreground tabular-nums hover:underline"
                     >
-                        {`v${version.number}`}
+                        <VersionName version={version} />
                     </Link>
                     <span className="truncate text-sm text-muted-foreground">
-                        {version.kind === "prompt"
-                            ? `Prompt · ${shortAgo(version)}`
-                            : shortAgo(version)}
+                        {shortAgo(version)}
                     </span>
                 </span>
             </div>
@@ -780,7 +808,7 @@ export function VersionRow({
                 <VersionStatusCell model={model} version={version} />
             </div>
             <div className="relative z-10 flex items-center justify-end gap-1">
-                <DeployButton model={model} version={version} on={on} />
+                <MakeLiveButton model={model} version={version} variant="secondary" />
                 <VersionMenu model={model} version={version} on={on} />
             </div>
         </li>
@@ -790,11 +818,7 @@ export function VersionRow({
 function VariantStatus({ variant }: { variant: BaseVariant }) {
     return (
         <span className="flex min-w-0 flex-col items-start">
-            {variant.live ? (
-                <LiveStatus machines={variant.replicas} />
-            ) : (
-                <Muted>Not deployed</Muted>
-            )}
+            {variant.live ? <LiveStatus machines={variant.replicas} /> : <Muted>Off the API</Muted>}
             {variant.update && (
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -882,12 +906,12 @@ export function VariantRow({
             </div>
             <div className="relative z-10 flex items-center justify-end gap-1">
                 {variant.live ? (
-                    <Button variant="outline" size="sm" onClick={() => on.undeployVariants([key])}>
-                        Undeploy
+                    <Button variant="outline" onClick={() => on.undeployVariants([key])}>
+                        Take off
                     </Button>
                 ) : (
-                    <Button variant="secondary" size="sm" onClick={() => on.deployVariants([key])}>
-                        Deploy
+                    <Button variant="secondary" onClick={() => on.deployVariants([key])}>
+                        Put on API
                     </Button>
                 )}
                 <DropdownMenu>
@@ -901,11 +925,9 @@ export function VariantRow({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-60">
-                        <DropdownMenuItem
-                            onSelect={() => on.open(`${FLOW}/playground?model=${model.slug}`)}
-                        >
+                        <DropdownMenuItem onSelect={() => on.open(playgroundHref(model.slug))}>
                             <Play />
-                            {`Test ${variant.format}`}
+                            {`Try ${variant.format}`}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

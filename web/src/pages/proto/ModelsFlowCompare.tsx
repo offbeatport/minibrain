@@ -1,7 +1,9 @@
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
+    Button,
     type CompareRow,
     CompareTable,
+    Link,
     Select,
     SelectContent,
     SelectItem,
@@ -14,12 +16,12 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { useState } from "react";
+
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
-import { AnswersTable, DeployButton, dataRows, settingsRows, verdictOf } from "./ModelsFlowVersion";
+import { AnswersTable, dataRows, settingsRows, verdictOf } from "./ModelsFlowVersion";
 import {
     type FlowModel,
     type FlowVersion,
@@ -33,15 +35,18 @@ import {
     liveVersion,
     newestFirst,
     pct,
+    playgroundHref,
     points,
     useFlowModel,
+    versionName,
 } from "./modelsFlowData";
-import { Crumbs, DeployDialog, type DeployIntent } from "./modelsFlowParts";
+import { Crumbs, MakeLiveButton } from "./modelsFlowParts";
 
 function columnName(model: FlowModel, version: FlowVersion): string {
-    return liveVersion(model)?.number === version.number
-        ? `v${version.number} · live`
-        : `v${version.number}`;
+    if (liveVersion(model)?.number === version.number) {
+        return `v${version.number} · live`;
+    }
+    return versionName(version);
 }
 
 function scoreRows(model: FlowModel, a: FlowVersion, b: FlowVersion): CompareRow[] {
@@ -177,12 +182,8 @@ export function ModelsFlowComparePage() {
     const model = useFlowModel(slug);
     const aParam = Number(useSearchParam("a"));
     const bParam = Number(useSearchParam("b"));
-    const wantsDeploy = useSearchParam("deploy") === "1";
     const a = model ? findVersion(model, aParam) : undefined;
     const b = model ? findVersion(model, bParam) : undefined;
-    const [deploy, setDeploy] = useState<DeployIntent>(
-        wantsDeploy && model && a && b ? { model, version: deployTarget(model, a, b) } : null,
-    );
     if (!model || !a || !b) {
         return (
             <Page>
@@ -221,20 +222,35 @@ export function ModelsFlowComparePage() {
                 actions={
                     <>
                         <VersionPick
-                            label="Baseline"
+                            label="From"
                             model={model}
                             value={a.number}
                             other={b.number}
                             onPick={(n) => pick({ a: n })}
                         />
                         <VersionPick
-                            label="Against"
+                            label="To"
                             model={model}
                             value={b.number}
                             other={a.number}
                             onPick={(n) => pick({ b: n })}
                         />
-                        <DeployButton model={model} version={target} onDeploy={setDeploy} />
+                        {target.status === "ready" && (
+                            <Button variant="outline" asChild>
+                                <Link href={playgroundHref(model.slug, target.number)}>
+                                    {`Try ${model.slug}@${target.number}`}
+                                </Link>
+                            </Button>
+                        )}
+                        <MakeLiveButton
+                            model={model}
+                            version={target}
+                            label={
+                                model.live !== null && target.number < model.live
+                                    ? `Roll back to v${target.number}`
+                                    : `Make live v${target.number}`
+                            }
+                        />
                     </>
                 }
             />
@@ -304,7 +320,6 @@ export function ModelsFlowComparePage() {
                     </div>
                 )}
             </Section>
-            <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
         </Page>
     );
 }

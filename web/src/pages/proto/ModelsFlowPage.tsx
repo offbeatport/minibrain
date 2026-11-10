@@ -9,7 +9,7 @@ export function ModelsFlowPage() {
         <Page wide>
             <PageHeader
                 title="Models"
-                caption="Custom and base models, each with its newest versions. A model or version opens its one page."
+                caption="One row per model. Show versions lists versions and formats under each."
                 actions={
                     <Button asChild>
                         <Link href={`${FLOW}/models/new`}>

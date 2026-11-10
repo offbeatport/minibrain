@@ -10,6 +10,7 @@ import {
     FilterMenu,
     InfoTip,
     KbdHint,
+    Label,
     SearchInput,
     Select,
     SelectContent,
@@ -17,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
     Separator,
+    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -55,7 +57,6 @@ import {
     ConfirmDialog,
     DeleteModelsDialog,
 } from "./modelsFlowDialogs";
-import { DeployDialog, type DeployIntent } from "./modelsFlowParts";
 import { QuickLook } from "./modelsFlowPeek";
 import {
     COLUMNS,
@@ -77,7 +78,13 @@ type Line =
     | { key: string; type: "model"; model: FlowModel; expanded: boolean }
     | { key: string; type: "version"; model: FlowModel; version: FlowVersion }
     | { key: string; type: "variant"; model: FlowModel; variant: BaseVariant }
-    | { key: string; type: "more"; model: FlowModel; shown: number; searching: boolean }
+    | {
+          key: string;
+          type: "more";
+          model: FlowModel;
+          shown: number;
+          searching: boolean;
+      }
     | { key: string; type: "group"; label: string; facts: string };
 type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
 
@@ -108,6 +115,7 @@ const HINTS: Record<string, Hint> = {
 
 const EXPANDED_KEY = "minibrain.proto.flow.expanded";
 const COLUMNS_KEY = "minibrain.proto.flow.columns";
+const NESTED_KEY = "minibrain.proto.flow.showVersions";
 const DEFAULT_COLUMNS: Column[] = ["quality", "requests", "cost"];
 
 function readStored<T>(key: string, fallback: T): T {
@@ -170,7 +178,7 @@ function versionMatches(model: FlowModel, version: FlowVersion, text: string): b
 }
 
 function variantMatches(item: BaseVariant, text: string): boolean {
-    return `${item.format} ${item.apiName} ${item.live ? "live" : "not deployed"}`
+    return `${item.format} ${item.apiName} ${item.live ? "on the api" : "off"}`
         .toLowerCase()
         .includes(text);
 }
@@ -196,7 +204,7 @@ function groupOf(model: FlowModel, group: GroupKey, names: Map<string, string>):
         if (attention(model) !== null || model.autopilot?.run) {
             return "Needs attention";
         }
-        return model.deployed ? "Live" : "Not deployed";
+        return model.deployed ? "On the API" : "Off the API";
     }
     return model.kind === "base" ? "Base models" : "Your models";
 }
@@ -205,7 +213,7 @@ const GROUP_ORDER: Record<GroupKey, string[]> = {
     none: ["Your models", "Base models"],
     base: [],
     task: ["Classify", "Extract", "SQL", "Base models"],
-    status: ["Needs attention", "Live", "Not deployed"],
+    status: ["Needs attention", "On the API", "Off the API"],
 };
 
 function grouped(models: FlowModel[], group: GroupKey): [string, FlowModel[]][] {
@@ -283,6 +291,7 @@ function buildLines(
     text: string,
     stored: Record<string, boolean>,
     searchToggles: Record<string, boolean>,
+    nested: boolean,
 ): Line[] {
     const lines: Line[] = [];
     for (const [label, items] of grouped(models, group)) {
@@ -292,11 +301,17 @@ function buildLines(
         if (visible.length === 0) {
             continue;
         }
-        lines.push({ key: `group:${label}`, type: "group", label, facts: groupFacts(visible) });
+        lines.push({
+            key: `group:${label}`,
+            type: "group",
+            label,
+            facts: groupFacts(visible),
+        });
         for (const model of visible) {
             const children = model.kind === "base" ? model.variants : model.versions;
             const searching = childHits(model, text) > 0;
             const expanded =
+                nested &&
                 children.length > 0 &&
                 (searching
                     ? (searchToggles[model.slug] ?? true)
@@ -324,7 +339,11 @@ function pickedVersions(models: FlowModel[], keys: string[]): PickedVersion[] {
 function pickedVariants(models: FlowModel[], keys: string[]): PickedVariant[] {
     return models.flatMap((model) =>
         model.variants
-            .map((item) => ({ model, variant: item, key: variantKey(model.slug, item.id) }))
+            .map((item) => ({
+                model,
+                variant: item,
+                key: variantKey(model.slug, item.id),
+            }))
             .filter((item) => keys.includes(item.key)),
     );
 }
@@ -409,9 +428,9 @@ function SelectionBar({
                     <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         Only Delete fits both
                         <InfoTip label="Why only Delete">
-                            Compare works on two versions of one custom model; Deploy and Undeploy
-                            work on base variants, since a custom model deploys one version at a
-                            time from its row. Tick only versions or only variants to see those.
+                            Compare works on two versions of one custom model; Put on API and Take
+                            off work on base formats, since a custom model makes one version live
+                            from its row. Tick only versions or only variants to see those.
                         </InfoTip>
                     </span>
                 )}
@@ -455,7 +474,7 @@ function SelectionBar({
                                     )
                                 }
                             >
-                                Deploy
+                                Put on API
                             </Button>
                         </WithTip>
                         <WithTip tip={liveVariants.length === 0 ? "None of them is live." : null}>
@@ -467,7 +486,7 @@ function SelectionBar({
                                 }
                             >
                                 <PowerOff aria-hidden="true" />
-                                Undeploy
+                                Take off
                             </Button>
                         </WithTip>
                     </>
@@ -565,7 +584,9 @@ function confirmDeletion(
                 {goingVariants.length > 0 && (
                     <p>Variant files can be downloaded again from Discover.</p>
                 )}
-                {skipped > 0 && <p>{`${plural(skipped, "live item")} skipped: undeploy first.`}</p>}
+                {skipped > 0 && (
+                    <p>{`${plural(skipped, "live item")} skipped: take it off the API or move the live pointer first.`}</p>
+                )}
             </div>
         ),
         label: "Delete",
@@ -591,6 +612,8 @@ function Toolbar({
     onSort,
     columns,
     onColumns,
+    nested,
+    onNested,
     onDeleteModels,
 }: {
     models: FlowModel[];
@@ -604,25 +627,33 @@ function Toolbar({
     onSort: (value: SortKey) => void;
     columns: Column[];
     onColumns: (value: Column[]) => void;
+    nested: boolean;
+    onNested: (value: boolean) => void;
     onDeleteModels: () => void;
 }) {
     return (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <SearchInput
                 aria-label="Search models, versions and variants"
-                placeholder="Search models and versions"
+                placeholder="Search"
                 value={query}
                 onValueChange={onQuery}
                 className="w-full max-w-64 flex-1"
             />
+            <div className="flex h-8 items-center gap-2">
+                <Switch id="flow-show-versions" checked={nested} onCheckedChange={onNested} />
+                <Label htmlFor="flow-show-versions" className="cursor-pointer font-normal">
+                    Show versions
+                </Label>
+            </div>
             <div className="ml-auto flex flex-wrap items-center gap-2">
                 <FilterMenu
                     sections={[
                         {
                             kind: "toggle",
                             key: "deployed",
-                            title: "Deployment",
-                            label: "Deployed",
+                            title: "API",
+                            label: "On the API",
                             count: models.filter((model) => model.deployed).length,
                             checked: filters.deployed,
                             onCheckedChange: (deployed) => onFilters({ ...filters, deployed }),
@@ -684,9 +715,12 @@ export function ModelsFlowList() {
     const [searchToggles, setSearchToggles] = useState<Record<string, boolean>>({});
     const [selection, setSelection] = useState<string[]>([]);
     const [focusKey, setFocusKey] = useState<string | null>(null);
-    const [deploy, setDeploy] = useState<DeployIntent>(null);
+    const [nested, setNested] = useState<boolean>(() => readStored(NESTED_KEY, false));
     const [confirm, setConfirm] = useState<Confirm | null>(null);
-    const [filters, setFilters] = useState<Filters>({ deployed: false, attention: false });
+    const [filters, setFilters] = useState<Filters>({
+        deployed: false,
+        attention: false,
+    });
     const [sort, setSort] = useState<SortKey>("attention");
     const [group, setGroup] = useState<GroupKey>("none");
     const [columns, setColumns] = useState<Column[]>(() =>
@@ -707,8 +741,9 @@ export function ModelsFlowList() {
                 text,
                 expanded.stored,
                 searchToggles,
+                nested,
             ),
-        [models, filters, sort, group, text, expanded.stored, searchToggles],
+        [models, filters, sort, group, text, expanded.stored, searchToggles, nested],
     );
     const rows = lines.filter((line): line is RowLine =>
         ["model", "version", "variant"].includes(line.type),
@@ -722,28 +757,33 @@ export function ModelsFlowList() {
     const peekModel = models.find((model) => model.slug === peek) ?? null;
     const on: Handlers = {
         open: (href) => router.history.push(href),
-        deploy: setDeploy,
         peek: (model) => {
             setPeek(model.slug);
             focusLine(model.slug);
         },
         pin: (model) => {
             togglePin(model.slug);
-            toast({ title: model.pinned ? `Unpinned ${model.name}` : `Pinned ${model.name}` });
+            toast({
+                title: model.pinned ? `Unpinned ${model.name}` : `Pinned ${model.name}`,
+            });
         },
         autopilot: (model) => setAutopilotFor(model.slug),
         undeploy: (chosen) =>
             setConfirm({
                 title:
                     chosen.length === 1
-                        ? `Undeploy ${chosen[0].name}?`
-                        : `Undeploy ${plural(chosen.length, "model")}?`,
-                description: <p>Their APIs stop answering; versions, keys and files stay.</p>,
-                label: "Undeploy",
+                        ? `Take ${chosen[0].name} off the API?`
+                        : `Take ${plural(chosen.length, "model")} off the API?`,
+                description: (
+                    <p>
+                        Their names stop answering; the live pointer, versions, keys and files stay.
+                    </p>
+                ),
+                label: "Take off the API",
                 run: () => {
                     undeployModels(chosen.map((model) => model.slug));
                     toast({
-                        title: `Undeployed ${chosen.map((model) => model.name).join(", ")}`,
+                        title: `${chosen.map((model) => model.name).join(", ")} off the API`,
                         tone: "success",
                     });
                 },
@@ -763,33 +803,42 @@ export function ModelsFlowList() {
         removeVersions: (items) =>
             setConfirm(
                 confirmDeletion(items, [], (count) =>
-                    toast({ title: `Deleted ${plural(count, "version")}`, tone: "success" }),
+                    toast({
+                        title: `Deleted ${plural(count, "version")}`,
+                        tone: "success",
+                    }),
                 ),
             ),
         deployVariants: (keys) => {
             deployVariants(keys);
             clear();
-            toast({ title: `Deployed ${plural(keys.length, "variant")}`, tone: "success" });
+            toast({
+                title: `${plural(keys.length, "variant")} on the API`,
+                tone: "success",
+            });
         },
         undeployVariants: (keys) => {
             const chosen = pickedVariants(models, keys);
             setConfirm({
-                title: `Undeploy ${chosen.map((item) => `${item.model.name} ${item.variant.format}`).join(", ")}?`,
+                title: `Take ${chosen.map((item) => `${item.model.name} ${item.variant.format}`).join(", ")} off the API?`,
                 description: (
                     <p>{`Requests to ${chosen.map((item) => item.variant.apiName).join(", ")} stop being answered; the files stay.`}</p>
                 ),
-                label: "Undeploy",
+                label: "Take off the API",
                 run: () => {
                     undeployVariants(keys);
                     clear();
-                    toast({ title: `Undeployed ${plural(keys.length, "variant")}` });
+                    toast({ title: `${plural(keys.length, "variant")} off the API` });
                 },
             });
         },
         removeVariants: (keys) =>
             setConfirm(
                 confirmDeletion([], pickedVariants(models, keys), (count) =>
-                    toast({ title: `Deleted ${plural(count, "variant file")}`, tone: "success" }),
+                    toast({
+                        title: `Deleted ${plural(count, "variant file")}`,
+                        tone: "success",
+                    }),
                 ),
             ),
     };
@@ -848,7 +897,7 @@ export function ModelsFlowList() {
                 }
                 if (line.expanded) {
                     focusLine(rows[index + 1]?.key);
-                } else if (line.model.versions.length + line.model.variants.length > 0) {
+                } else if (nested && line.model.versions.length + line.model.variants.length > 0) {
                     toggle(line);
                 }
             },
@@ -868,6 +917,7 @@ export function ModelsFlowList() {
     };
     const rowProps = (line: RowLine): RowProps => ({
         id: lineId(line.key),
+        nested,
         focused: line.key === activeKey,
         selected: picked.includes(line.key),
         selecting: picked.length > 0,
@@ -970,6 +1020,14 @@ export function ModelsFlowList() {
                         setColumns(value);
                         writeStored(COLUMNS_KEY, value);
                     }}
+                    nested={nested}
+                    onNested={(value) => {
+                        setNested(value);
+                        writeStored(NESTED_KEY, value);
+                        if (!value) {
+                            clear();
+                        }
+                    }}
                     onDeleteModels={() => setDeletingModels(true)}
                 />
             )}
@@ -983,7 +1041,7 @@ export function ModelsFlowList() {
                         "h-9 border-b bg-secondary font-medium text-muted-foreground",
                     )}
                 >
-                    <span>Model</span>
+                    <span className={nested ? "pl-8" : undefined}>Model</span>
                     {COLUMNS.filter((column) => columns.includes(column.id)).map((column) => (
                         <span key={column.id} className="whitespace-nowrap">
                             {column.label}
@@ -1007,13 +1065,12 @@ export function ModelsFlowList() {
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <KbdHint keys={["↑", "↓"]}>move</KbdHint>
-                <KbdHint keys={["→", "←"]}>expand, collapse</KbdHint>
+                {nested && <KbdHint keys={["→", "←"]}>expand, collapse</KbdHint>}
                 <KbdHint keys={["Enter"]}>open</KbdHint>
                 <KbdHint keys={["Space"]}>
-                    quick look on a model, select a version or variant
+                    {nested ? "quick look on a model, select a version or variant" : "quick look"}
                 </KbdHint>
             </div>
-            <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
             <DeleteModelsDialog
                 open={deletingModels}

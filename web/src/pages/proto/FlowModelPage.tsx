@@ -1,270 +1,67 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import { GraduationCap, KeyRound, Play } from "lucide-react";
-import {
-    Badge,
-    Button,
-    CodeTabs,
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Field,
-    FieldGroup,
-    Input,
-    Link,
-    NumberField,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-    TabNav,
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-    cn,
-} from "obp-ui";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { Play } from "lucide-react";
+import { Badge, Button, Link, TabNav, useToast } from "obp-ui";
+import type { ReactNode } from "react";
 import type { ModelUsage } from "~/api/client";
-import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { Page, Section, Stat } from "~/components/Section";
 import { Requests } from "~/components/models/ModelMetrics";
-import { StatusText } from "~/components/models/StatusText";
+import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { relativeTime } from "~/lib/time";
 import {
+    KeysTab,
+    TrainingTab,
+    VariantsTab,
+    VersionsTab,
+    trainBlock,
+    useStartTraining,
+} from "./flowModelTabs";
+import { ModelMonitoring } from "./flowMonitoring";
+import {
+    type CatalogEntry,
     FLOW,
     type FlowModel,
-    KIND_LABELS,
     type ModelTab,
-    type TrainingSettings,
-    attachDataset,
     baseModelSlug,
+    bestCandidate,
     catalogEntry,
     compareHref,
-    createKey,
-    createdAt,
     datasetHref,
-    defaultRecipe,
+    findVersion,
     flowHref,
+    installBase,
+    lastFailure,
+    liveSplit,
     liveVersion,
     modelHref,
-    newestFirst,
     nextStep,
+    openIntent,
     pct,
-    startTraining,
+    playgroundHref,
+    points,
+    retryWithQLoRA,
+    scoreDelta,
+    shortAgo,
+    timeLeft,
+    trainingVersion,
     useFlowModel,
     useFlowState,
     versionHref,
 } from "./modelsFlowData";
-import {
-    Crumbs,
-    Delta,
-    DeployDialog,
-    type DeployIntent,
-    ModelAvatar,
-    StateBadge,
-    deployBlocked,
-    deployLabel,
-} from "./modelsFlowParts";
+import { Crumbs, Delta, ModelAvatar, OnApiSwitch, Tip, openConnect } from "./modelsFlowParts";
 
 const TAB_LABELS: Record<ModelTab, string> = {
     overview: "Overview",
     versions: "Versions",
-    data: "Data",
-    api: "API",
+    training: "Training",
+    monitoring: "Monitoring",
+    keys: "API keys",
+    variants: "Variants",
 };
 
-const RANKS = [8, 16, 32, 64];
-const RATES = [5e-5, 1e-4, 2e-4];
-const WORKER_GB = 24;
-
-function trainBlock(model: FlowModel): string | null {
-    if (model.serveOnly) {
-        return `${model.base} is serve-only: GGUF weights cannot be trained. Switch base to train.`;
-    }
-    if (!model.dataset) {
-        return "Add data first: training needs examples.";
-    }
-    if (model.versions.some((version) => version.status === "training")) {
-        return "A version is already training.";
-    }
-    return null;
-}
-
-function nextNumber(model: FlowModel): number {
-    return Math.max(0, ...model.versions.map((version) => version.number)) + 1;
-}
-
-function memoryNeeded(recipe: TrainingSettings): number {
-    return 2.1 + recipe.rank * 0.04 + recipe.batch * 0.12;
-}
-
-export function TrainDialog({
-    model,
-    open,
-    onOpenChange,
-}: {
-    model: FlowModel;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
-    const router = useRouter();
-    const [recipe, setRecipe] = useState<TrainingSettings>(() => defaultRecipe(model));
-    const number = nextNumber(model);
-    const needed = memoryNeeded(recipe);
-    const fits = needed <= WORKER_GB;
-    const start = (event: FormEvent) => {
-        event.preventDefault();
-        const job = startTraining(model.slug, recipe);
-        onOpenChange(false);
-        router.history.push(`${FLOW}/jobs/${job}`);
-    };
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
-                <form onSubmit={start} noValidate className="flex flex-col gap-6">
-                    <DialogHeader>
-                        <DialogTitle>{`Train v${number} of ${model.name}`}</DialogTitle>
-                        <DialogDescription>
-                            {`LoRA on ${model.base}, from the install's default recipe.${model.accepted > 0 ? ` Includes ${model.accepted} accepted feedback rows.` : ""}`}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <FieldGroup className="grid grid-cols-2">
-                        <Field id="train-rank" label="LoRA rank">
-                            <Select
-                                value={String(recipe.rank)}
-                                onValueChange={(value) =>
-                                    setRecipe({ ...recipe, rank: Number(value) })
-                                }
-                            >
-                                <SelectTrigger id="train-rank">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {RANKS.map((rank) => (
-                                        <SelectItem key={rank} value={String(rank)}>
-                                            {String(rank)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-                        <Field id="train-epochs" label="Epochs">
-                            <NumberField
-                                id="train-epochs"
-                                value={recipe.epochs}
-                                onValueChange={(value) =>
-                                    setRecipe({ ...recipe, epochs: value ?? 1 })
-                                }
-                                min={1}
-                                max={10}
-                                step={1}
-                                format={{ maximumFractionDigits: 0 }}
-                            />
-                        </Field>
-                        <Field id="train-rate" label="Learning rate">
-                            <Select
-                                value={String(recipe.learningRate)}
-                                onValueChange={(value) =>
-                                    setRecipe({ ...recipe, learningRate: Number(value) })
-                                }
-                            >
-                                <SelectTrigger id="train-rate">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {RATES.map((rate) => (
-                                        <SelectItem key={rate} value={String(rate)}>
-                                            {rate.toExponential(0)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </Field>
-                        <Field id="train-rows" label="Training rows">
-                            <NumberField
-                                id="train-rows"
-                                value={recipe.rows}
-                                onValueChange={(value) =>
-                                    setRecipe({ ...recipe, rows: value ?? recipe.rows })
-                                }
-                                min={10}
-                                step={100}
-                                format={{ maximumFractionDigits: 0 }}
-                            />
-                        </Field>
-                    </FieldGroup>
-                    <p className="flex items-center gap-2">
-                        <StatusText tone={fits ? "success" : "destructive"}>
-                            {fits ? "Fits" : "Does not fit"}
-                        </StatusText>
-                        <span className="text-muted-foreground tabular-nums">
-                            {`Needs about ${needed.toFixed(1)} GB of ${WORKER_GB} GB on gpu-a10-1 · about 12 minutes`}
-                        </span>
-                    </p>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button variant="outline" type="button">
-                                Cancel
-                            </Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={!fits}>
-                            {`Start v${number}`}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export function TrainButton({
-    model,
-    label,
-    variant = "outline",
-}: {
-    model: FlowModel;
-    label?: string;
-    variant?: "outline" | "default";
-}) {
-    const [open, setOpen] = useState(false);
-    const blocked = trainBlock(model);
-    const button = (
-        <Button variant={variant} disabled={Boolean(blocked)} onClick={() => setOpen(true)}>
-            <GraduationCap aria-hidden="true" />
-            {label ?? `Train v${nextNumber(model)}`}
-        </Button>
-    );
-    return (
-        <>
-            {blocked ? (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <span className="inline-flex">{button}</span>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs whitespace-normal">
-                        {blocked}
-                    </TooltipContent>
-                </Tooltip>
-            ) : (
-                button
-            )}
-            {open && <TrainDialog model={model} open={open} onOpenChange={setOpen} />}
-        </>
-    );
-}
+const ALIASES: Record<string, ModelTab> = { data: "training", api: "keys" };
 
 function usageOf(model: FlowModel): ModelUsage | null {
     const total = model.traffic.reduce((sum, value) => sum + value, 0);
@@ -289,31 +86,30 @@ function Panel({
 }: { title: string; children: ReactNode; footer?: ReactNode }) {
     return (
         <section className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-panel">
-            <h2 className="text-lg font-semibold">{title}</h2>
+            <h2 className="text-base leading-tight font-semibold">{title}</h2>
             <div className="flex flex-1 flex-col gap-3">{children}</div>
             {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
         </section>
     );
 }
 
-function IsItGood({ model }: { model: FlowModel }) {
+function LivePanel({ model }: { model: FlowModel }) {
     const live = liveVersion(model);
-    const best = live ?? newestFirst(model).find((version) => version.scores);
-    const zero = model.versions.find((version) => version.number === 0);
-    if (!best?.scores) {
+    const zero = findVersion(model, 0);
+    const canary = model.canary ? findVersion(model, model.canary.version) : undefined;
+    if (!live) {
         return (
-            <Panel title="Is it good?">
+            <Panel title="Live">
+                <p className="text-2xl">Nothing is live yet</p>
                 <p className="text-muted-foreground">
-                    {model.kind === "base"
-                        ? "Base models are not scored here; build a custom model on it to score it on your data."
-                        : "Not scored yet: add data and v0 is scored on its held-out rows."}
+                    {`Make a version live and ${model.slug} answers with it. Until then each version is still callable as ${model.slug}@N.`}
                 </p>
             </Panel>
         );
     }
     return (
         <Panel
-            title="Is it good?"
+            title="Live"
             footer={
                 <Link
                     href={modelHref(model.slug, "versions")}
@@ -323,191 +119,279 @@ function IsItGood({ model }: { model: FlowModel }) {
                 </Link>
             }
         >
-            <div className="flex items-baseline gap-3">
-                <span className="text-3xl tabular-nums">{pct(best.scores[0])}</span>
-                <span className="text-muted-foreground">{`${model.metrics[0].toLowerCase()}, v${best.number}${live ? " (live)" : ""}`}</span>
-            </div>
-            {zero?.scores && zero.number !== best.number && (
+            {canary && model.canary ? (
+                <div className="flex flex-col gap-1">
+                    <span className="text-2xl tabular-nums">
+                        {`v${live.number} ${100 - model.canary.share}% · v${canary.number} ${model.canary.share}%`}
+                    </span>
+                    <span className="text-muted-foreground tabular-nums">
+                        {`v${live.number} ${pct(live.scores?.[0])} · v${canary.number} ${pct(canary.scores?.[0])} canary${model.autopilot?.run ? `, ${model.autopilot.run.minutesLeft} min left` : ""}`}
+                    </span>
+                </div>
+            ) : (
+                <div className="flex items-baseline gap-3">
+                    <Link
+                        href={versionHref(model.slug, live.number)}
+                        className="text-3xl tabular-nums hover:underline"
+                    >
+                        {`v${live.number} · ${pct(live.scores?.[0])}`}
+                    </Link>
+                    <span className="text-muted-foreground">{model.metrics[0].toLowerCase()}</span>
+                </div>
+            )}
+            {zero?.scores && live.scores && zero.number !== live.number && (
                 <p className="text-sm">
-                    <Delta
-                        value={best.scores[0] - zero.scores[0]}
-                        suffix="vs v0, the base with instructions only"
-                    />
+                    <Delta value={live.scores[0] - zero.scores[0]} suffix="vs v0 Baseline" />
                 </p>
             )}
-            <p className="text-sm text-muted-foreground">{`Scored on ${count(model.heldOut)} held-out rows.`}</p>
+            <p className="text-sm text-muted-foreground">
+                {`Scored on ${count(model.heldOut)} held-out rows. ${model.deployed ? `${model.slug} is on the API.` : `${model.slug} is off the API.`}`}
+            </p>
         </Panel>
     );
 }
 
-function IsItWorking({ model }: { model: FlowModel }) {
-    if (!model.deployed) {
-        return (
-            <Panel title="Is it working?">
-                <p className="text-muted-foreground">Not deployed, so nothing calls it yet.</p>
-            </Panel>
-        );
-    }
+function TrafficPanel({ model }: { model: FlowModel }) {
+    const high = model.errors > model.usualErrors * 3;
     return (
         <Panel
-            title="Is it working?"
+            title="Traffic"
             footer={
                 <Link
-                    href={`${FLOW}/monitor?model=${model.slug}`}
+                    href={modelHref(model.slug, "monitoring")}
                     className="text-primary hover:underline"
                 >
-                    Traffic in Monitor →
+                    Monitoring →
                 </Link>
             }
         >
-            <Requests usage={usageOf(model)} live />
+            <Requests usage={usageOf(model)} live={model.deployed} />
             <div className="flex flex-wrap gap-x-8 gap-y-2">
                 <Stat label="Latency p95" value={model.p95 ? `${model.p95} ms` : "–"} />
-                <Stat label="Errors" value={`${(model.errors * 100).toFixed(1)}%`} />
+                <Stat
+                    label="Errors"
+                    value={
+                        <span className={high ? "text-destructive" : undefined}>
+                            {model.deployed ? `${(model.errors * 100).toFixed(1)}%` : "–"}
+                        </span>
+                    }
+                />
             </div>
         </Panel>
     );
 }
 
-function WhatNext({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const step = nextStep(state, model);
-    if (!step) {
-        return (
-            <Panel title="What next?">
-                <p className="text-muted-foreground">
-                    Build a custom model on it to train on your data.
-                </p>
-                <div>
-                    <Button asChild>
-                        <Link href={`${FLOW}/models/new?base=${model.slug}`}>
-                            Add a model on it
-                        </Link>
-                    </Button>
-                </div>
-            </Panel>
-        );
-    }
+function StripRow({ children, actions }: { children: ReactNode; actions: ReactNode }) {
     return (
-        <Panel title="What next?">
-            <p className="text-muted-foreground">{step.detail}</p>
-            <div>
-                {step.train ? (
-                    <TrainButton model={model} label={step.label} variant="default" />
-                ) : (
-                    <Button asChild>
-                        <Link href={step.href}>{step.label}</Link>
-                    </Button>
-                )}
-            </div>
-        </Panel>
+        <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-panel py-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">{children}</div>
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        </li>
     );
 }
 
-const CANNED = "refund_request";
-
-function TryIt({ model }: { model: FlowModel }) {
-    const [text, setText] = useState("I was charged twice, please send one payment back.");
-    const [answer, setAnswer] = useState<string | null>(null);
-    const ready =
-        model.versions.some((version) => version.status === "ready") || model.kind === "base";
+function OtherVersions({ model }: { model: FlowModel }) {
+    const router = useRouter();
+    const toast = useToast();
+    const training = trainingVersion(model);
+    const candidate = model.live !== null ? bestCandidate(model) : undefined;
+    const failure = lastFailure(model);
+    const newestFailure =
+        failure &&
+        !model.versions.some(
+            (version) => version.number > failure.number && version.status === "ready",
+        )
+            ? failure
+            : undefined;
+    if (!training && !candidate && !newestFailure) {
+        return null;
+    }
+    const delta = candidate ? scoreDelta(model, candidate) : null;
+    const memory = /memory/i.test(newestFailure?.error ?? "");
     return (
         <Section
-            title="Try it"
-            caption={
-                model.deployed
-                    ? "Asks the live version."
-                    : "Loads the newest ready version for a quick test; nothing is deployed."
-            }
+            title="Other versions"
+            caption="Only what is worth acting on. Every version is in the Versions tab."
+            flush
         >
-            <form
-                className="flex flex-col gap-3"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    setAnswer(
-                        model.kind === "base"
-                            ? "This sounds like a billing issue: a duplicate charge that should be refunded."
-                            : CANNED,
-                    );
-                }}
-            >
-                <div className="flex gap-2">
-                    <Input
-                        aria-label="Message"
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
-                    />
-                    <Button type="submit" disabled={!ready || !text.trim()}>
-                        Ask
-                    </Button>
-                </div>
-                {answer && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted px-3 py-2">
-                        <span className={model.kind === "base" ? undefined : "font-mono text-sm"}>
-                            {answer}
+            <ul className="divide-y">
+                {training && (
+                    <StripRow
+                        actions={
+                            <Button variant="outline" asChild>
+                                <Link href={versionHref(model.slug, training.number, "training")}>
+                                    Watch
+                                </Link>
+                            </Button>
+                        }
+                    >
+                        <span className="flex flex-wrap items-baseline gap-x-2">
+                            <Link
+                                href={versionHref(model.slug, training.number)}
+                                className="font-medium hover:underline"
+                            >
+                                {`v${training.number} is training`}
+                            </Link>
+                            <span className="text-sm text-muted-foreground tabular-nums">
+                                {`${Math.round((training.progress ?? 0) * 100)}% · ${timeLeft(training)} left`}
+                            </span>
                         </span>
-                        <Link
-                            href={`${FLOW}/playground?model=${model.slug}`}
-                            className="text-sm text-primary hover:underline"
-                        >
-                            Continue in the Playground →
-                        </Link>
-                    </div>
+                        <ProgressBar
+                            value={training.progress ?? 0}
+                            label={`v${training.number} progress`}
+                            className="w-full max-w-96"
+                        />
+                    </StripRow>
                 )}
-            </form>
+                {candidate && delta !== null && model.live !== null && (
+                    <StripRow
+                        actions={
+                            <>
+                                <Button variant="outline" asChild>
+                                    <Link href={playgroundHref(model.slug, candidate.number)}>
+                                        Try in Playground
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={compareHref(model.slug, model.live, candidate.number)}
+                                    >
+                                        Compare
+                                    </Link>
+                                </Button>
+                                <Button
+                                    onClick={() =>
+                                        openIntent({
+                                            kind: "make-live",
+                                            slug: model.slug,
+                                            number: candidate.number,
+                                        })
+                                    }
+                                >
+                                    Make live
+                                </Button>
+                            </>
+                        }
+                    >
+                        <Link
+                            href={versionHref(model.slug, candidate.number)}
+                            className="font-medium hover:underline"
+                        >
+                            {`v${candidate.number} beats live by ${points(delta)}`}
+                        </Link>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                            {`${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for v${model.live}; passed the promotion rule · ${shortAgo(candidate)}`}
+                        </span>
+                    </StripRow>
+                )}
+                {newestFailure && (
+                    <StripRow
+                        actions={
+                            <>
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={versionHref(
+                                            model.slug,
+                                            newestFailure.number,
+                                            "training",
+                                        )}
+                                    >
+                                        Open
+                                    </Link>
+                                </Button>
+                                {memory && (
+                                    <Tip tip={trainBlock(model)}>
+                                        <Button
+                                            variant="outline"
+                                            disabled={Boolean(trainBlock(model))}
+                                            onClick={() => {
+                                                const number = retryWithQLoRA(
+                                                    model.slug,
+                                                    newestFailure.number,
+                                                );
+                                                toast({
+                                                    title: `v${number} is training with QLoRA`,
+                                                    tone: "success",
+                                                });
+                                                router.history.push(
+                                                    versionHref(model.slug, number, "training"),
+                                                );
+                                            }}
+                                        >
+                                            Retry with QLoRA
+                                        </Button>
+                                    </Tip>
+                                )}
+                            </>
+                        }
+                    >
+                        <span className="font-medium">
+                            {`v${newestFailure.number} failed${memory ? ": out of memory" : ""}`}
+                        </span>
+                        <span className="truncate text-sm text-muted-foreground">
+                            {`${shortAgo(newestFailure)} · ${newestFailure.error ?? ""}`}
+                        </span>
+                    </StripRow>
+                )}
+            </ul>
         </Section>
+    );
+}
+
+function NextPanel({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    const step = nextStep(state, model);
+    return (
+        <Panel title="Next step">
+            {step ? (
+                <>
+                    <p className="font-medium">{step.label}</p>
+                    <p className="text-muted-foreground">{step.detail}</p>
+                </>
+            ) : (
+                <p className="text-muted-foreground">
+                    Nothing waits. Feedback from the API arrives on the Feedback page.
+                </p>
+            )}
+        </Panel>
     );
 }
 
 function Details({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const data = state.datasets.find((item) => item.slug === model.dataset);
-    const items: [string, ReactNode][] =
-        model.kind === "base"
-            ? [
-                  ["Publisher", model.publisher],
-                  ["Size", model.size ?? "–"],
-                  ["Licence", model.licence],
-                  ["Serving", model.serveOnly ? "Serve-only (GGUF)" : "Serve and train"],
-                  [
-                      "API name",
-                      <span key="api" className="font-mono text-sm">
-                          {model.slug}
-                      </span>,
-                  ],
-              ]
-            : [
-                  [
-                      "Base",
-                      <Link
-                          key="base"
-                          href={modelHref(baseSlug(model))}
-                          className="text-primary hover:underline"
-                      >
-                          {model.base}
-                      </Link>,
-                  ],
-                  ["Licence", model.licence],
-                  [
-                      "Data",
-                      data ? (
-                          <Link
-                              key="data"
-                              href={datasetHref(data.slug)}
-                              className="text-primary hover:underline"
-                          >{`${data.name} v${data.version}`}</Link>
-                      ) : (
-                          "None yet"
-                      ),
-                  ],
-                  [
-                      "API name",
-                      <span key="api" className="font-mono text-sm">
-                          {model.slug}
-                      </span>,
-                  ],
-                  ["Versions", String(model.versions.length)],
-              ];
+    const items: [string, ReactNode][] = [
+        [
+            "Base",
+            <Link
+                key="base"
+                href={modelHref(model.base ? baseModelSlug(model.base) : model.slug)}
+                className="text-primary hover:underline"
+            >
+                {model.base}
+            </Link>,
+        ],
+        [
+            "Data",
+            data ? (
+                <Link
+                    key="data"
+                    href={datasetHref(data.slug)}
+                    className="text-primary hover:underline"
+                >{`${data.name} v${data.version}`}</Link>
+            ) : (
+                "None yet"
+            ),
+        ],
+        [
+            "API name",
+            <span key="api" className="font-mono text-sm">
+                {`${model.slug}, ${model.slug}@N`}
+            </span>,
+        ],
+        ["Licence", model.licence],
+        ["Task", model.task],
+    ];
     return (
         <Section title="Details">
             <Facts items={items} />
@@ -515,326 +399,179 @@ function Details({ model }: { model: FlowModel }) {
     );
 }
 
-function baseSlug(model: FlowModel): string {
-    return model.base ? baseModelSlug(model.base) : model.slug;
-}
-
 function Overview({ model }: { model: FlowModel }) {
     return (
         <div className="flex flex-col gap-4">
-            <div className="grid gap-4 lg:grid-cols-3">
-                <IsItGood model={model} />
-                <IsItWorking model={model} />
-                <WhatNext model={model} />
-            </div>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <TryIt model={model} />
+                <LivePanel model={model} />
+                <TrafficPanel model={model} />
+            </div>
+            <OtherVersions model={model} />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <NextPanel model={model} />
                 <Details model={model} />
             </div>
         </div>
     );
 }
 
-function VersionsTab({ model }: { model: FlowModel }) {
-    const [deploy, setDeploy] = useState<DeployIntent>(null);
-    const live = liveVersion(model);
-    if (model.versions.length === 0) {
-        return (
-            <Section title="Versions">
-                <p className="text-muted-foreground">
-                    No versions yet: add data and v0 is scored at once.
-                </p>
-            </Section>
-        );
-    }
+function builtOn(models: FlowModel[], base: string): FlowModel[] {
+    return models.filter(
+        (model) => model.kind === "custom" && model.base && baseModelSlug(model.base) === base,
+    );
+}
+
+function CatalogFacts({ entry, model }: { entry: CatalogEntry | undefined; model?: FlowModel }) {
     return (
-        <Section
-            title="Versions"
-            caption="Every version, newest first. Open one for its scores, answers and model card."
-            actions={<TrainButton model={model} />}
-        >
-            <div className="overflow-x-auto rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Kind</TableHead>
-                            <TableHead className="text-right">{model.metrics[0]}</TableHead>
-                            <TableHead className="text-right">Against live</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Created</TableHead>
-                            <TableHead />
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {newestFirst(model).map((version) => {
-                            const label = deployLabel(model, version);
-                            const blocked = deployBlocked(version);
-                            return (
-                                <TableRow key={version.number}>
-                                    <TableCell>
-                                        <Link
-                                            href={versionHref(model.slug, version.number)}
-                                            className="font-medium hover:underline"
-                                        >
-                                            {`v${version.number}`}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        {KIND_LABELS[version.kind]}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {pct(version.scores?.[0])}
-                                    </TableCell>
-                                    <TableCell className="text-right text-sm">
-                                        {live &&
-                                        version.scores &&
-                                        live.scores &&
-                                        live.number !== version.number ? (
-                                            <Delta value={version.scores[0] - live.scores[0]} />
-                                        ) : null}
-                                    </TableCell>
-                                    <TableCell>
-                                        <StateBadge model={model} version={version} />
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        {relativeTime(createdAt(version))}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <span className="inline-flex gap-1">
-                                            {label && !blocked && (
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() => setDeploy({ model, version })}
-                                                >
-                                                    {label}
-                                                </Button>
-                                            )}
-                                            {live &&
-                                                version.scores &&
-                                                live.number !== version.number && (
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link
-                                                            href={compareHref(
-                                                                model.slug,
-                                                                live.number,
-                                                                version.number,
-                                                            )}
-                                                        >
-                                                            Compare
-                                                        </Link>
-                                                    </Button>
-                                                )}
+        <Section title="About">
+            <Facts
+                items={[
+                    ["Publisher", entry?.publisher ?? model?.publisher ?? "–"],
+                    ["Parameters", entry?.params ?? "–"],
+                    ["Context", entry?.context ?? "–"],
+                    ["Licence", entry?.licence ?? model?.licence ?? "–"],
+                    ["Memory to serve", entry?.memory ?? "–"],
+                    [
+                        "Training",
+                        entry?.serveOnly || model?.serveOnly
+                            ? "Serve-only: cannot be trained"
+                            : "LoRA and QLoRA",
+                    ],
+                ]}
+            />
+        </Section>
+    );
+}
+
+function BaseOverview({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    const entry = catalogEntry(model.slug);
+    const children = builtOn(state.models, model.slug);
+    const live = model.variants.filter((item) => item.live).length;
+    return (
+        <div className="grid gap-4 lg:grid-cols-2">
+            <CatalogFacts entry={entry} model={model} />
+            <div className="flex flex-col gap-4">
+                <Section
+                    title="Installed"
+                    actions={
+                        <Button variant="outline" asChild>
+                            <Link href={modelHref(model.slug, "variants")}>Variants</Link>
+                        </Button>
+                    }
+                >
+                    <Facts
+                        items={[
+                            [
+                                "Formats",
+                                <span key="f" className="tabular-nums">
+                                    {`${model.variants.map((item) => item.format).join(", ")} · ${live} on the API`}
+                                </span>,
+                            ],
+                            [
+                                "gpu-a10-1 (24 GB)",
+                                <StatusText key="g" tone="success">
+                                    Serves and trains
+                                </StatusText>,
+                            ],
+                            [
+                                "cpu-pool",
+                                <span key="c" className="text-muted-foreground">
+                                    Serves GGUF slowly; cannot train
+                                </span>,
+                            ],
+                        ]}
+                    />
+                </Section>
+                <Section title="Built on it" flush>
+                    {children.length === 0 ? (
+                        <p className="px-panel pb-panel text-muted-foreground">
+                            No custom models yet.
+                        </p>
+                    ) : (
+                        <ul className="divide-y">
+                            {children.map((child) => (
+                                <li key={child.slug}>
+                                    <Link
+                                        href={modelHref(child.slug)}
+                                        className="flex items-center gap-3 px-panel py-2.5 hover:bg-secondary"
+                                    >
+                                        <ModelAvatar model={child} />
+                                        <span className="flex-1 font-medium">{child.name}</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {liveSplit(child) ?? "Nothing live"}
                                         </span>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Section>
             </div>
-            <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
-        </Section>
-    );
-}
-
-function DataTab({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const current = state.datasets.find((item) => item.slug === model.dataset);
-    const [picked, setPicked] = useState(state.datasets[0]?.slug ?? "");
-    if (current) {
-        return (
-            <Section
-                title="Training data"
-                caption="What the next version trains on and every version is scored on."
-                actions={
-                    <Button variant="outline" asChild>
-                        <Link href={datasetHref(current.slug)}>Open dataset</Link>
-                    </Button>
-                }
-            >
-                <Facts
-                    items={[
-                        [
-                            "Dataset",
-                            <Link
-                                key="d"
-                                href={datasetHref(current.slug)}
-                                className="text-primary hover:underline"
-                            >
-                                {current.name}
-                            </Link>,
-                        ],
-                        [
-                            "Version",
-                            <span
-                                key="v"
-                                className="tabular-nums"
-                            >{`v${current.version} · ${count(current.rows)} rows`}</span>,
-                        ],
-                        [
-                            "Split",
-                            <span
-                                key="s"
-                                className="tabular-nums"
-                            >{`${count(current.split[0])} train · ${count(current.split[1])} held out`}</span>,
-                        ],
-                        ["Labels", current.labels.map(([label]) => label).join(", ")],
-                        [
-                            "Accepted feedback",
-                            model.accepted > 0
-                                ? `${model.accepted} rows join the next version`
-                                : "None waiting",
-                        ],
-                    ]}
-                />
-            </Section>
-        );
-    }
-    return (
-        <Section
-            title="Training data"
-            caption="Pick a dataset, or upload a file on the Data page first."
-        >
-            <div className="flex flex-col gap-3">
-                <ul className="divide-y rounded-md border">
-                    {state.datasets.map((item) => (
-                        <li key={item.slug}>
-                            <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-secondary has-[:checked]:bg-accent">
-                                <input
-                                    type="radio"
-                                    name="dataset"
-                                    value={item.slug}
-                                    checked={picked === item.slug}
-                                    onChange={() => setPicked(item.slug)}
-                                    className="accent-primary"
-                                />
-                                <span className="flex-1 font-medium">{item.name}</span>
-                                <span className="font-mono text-sm text-muted-foreground">
-                                    {item.file}
-                                </span>
-                                <span className="w-24 text-right text-muted-foreground tabular-nums">{`${count(item.rows)} rows`}</span>
-                            </label>
-                        </li>
-                    ))}
-                </ul>
-                <div className="flex flex-wrap gap-2">
-                    <Button disabled={!picked} onClick={() => attachDataset(model.slug, picked)}>
-                        Use this dataset
-                    </Button>
-                    <Button variant="outline" asChild>
-                        <Link href={`${FLOW}/data?for=${model.slug}`}>Upload a file</Link>
-                    </Button>
-                </div>
-            </div>
-        </Section>
-    );
-}
-
-function snippets(model: string, key: string) {
-    const url = "https://minibrain.internal/v1/chat/completions";
-    return [
-        {
-            id: "curl",
-            label: "curl",
-            language: "bash" as const,
-            code: `curl ${url} \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "${model}", "messages": [{"role": "user", "content": "I was charged twice"}]}'`,
-        },
-        {
-            id: "python",
-            label: "Python",
-            language: "python" as const,
-            code: `from openai import OpenAI\n\nclient = OpenAI(base_url="https://minibrain.internal/v1", api_key="${key}")\nreply = client.chat.completions.create(\n    model="${model}",\n    messages=[{"role": "user", "content": "I was charged twice"}],\n)\nprint(reply.choices[0].message.content)`,
-        },
-    ];
-}
-
-function ApiTab({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const [created, setCreated] = useState<string | null>(null);
-    const [shown, setShown] = useState<string | null>(null);
-    const keys = state.keys[model.slug] ?? [];
-    const key = created ?? "$MINIBRAIN_API_KEY";
-    return (
-        <div className="flex flex-col gap-4">
-            <Section
-                title="Keys"
-                caption={`Keys that can call ${model.slug}. A key is shown once, when it is created.`}
-                actions={
-                    <Button
-                        onClick={() => {
-                            const fresh = createKey(model.slug);
-                            setCreated(fresh);
-                            setShown(fresh);
-                        }}
-                    >
-                        <KeyRound aria-hidden="true" />
-                        Create key
-                    </Button>
-                }
-            >
-                {keys.length === 0 ? (
-                    <p className="text-muted-foreground">No keys yet.</p>
-                ) : (
-                    <ul className="flex flex-col gap-1">
-                        {keys.map((prefix) => (
-                            <li key={prefix} className="font-mono text-sm">
-                                {prefix}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </Section>
-            <Section
-                title="Call it"
-                caption={
-                    model.deployed
-                        ? `OpenAI-compatible, by name. ${created ? "The snippets carry the key you just created." : "Create a key and the snippets fill with it."}`
-                        : "Deploy a version first; until then these calls are refused."
-                }
-            >
-                <CodeTabs items={snippets(model.slug, key)} />
-            </Section>
-            <Dialog open={shown !== null} onOpenChange={(open) => !open && setShown(null)}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Copy your key now</DialogTitle>
-                        <DialogDescription>
-                            It is not shown again. The snippets below now use it.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2">
-                        <span className="flex-1 font-mono text-sm break-all">{shown}</span>
-                        <CopyButton value={shown ?? ""} label="Copy key" />
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button>Done</Button>
-                        </DialogClose>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
 
-function tabOf(value: string | undefined, model: FlowModel): ModelTab {
-    const tabs = tabsOf(model);
-    return tabs.find((tab) => tab === value) ?? "overview";
-}
-
-function tabsOf(model: FlowModel): ModelTab[] {
-    return model.kind === "base" ? ["overview", "api"] : ["overview", "versions", "data", "api"];
+function PrimaryAction({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    const router = useRouter();
+    const train = useStartTraining(model);
+    if (model.kind === "base") {
+        return (
+            <Button asChild>
+                <Link href={`${FLOW}/models/new?base=${model.slug}`}>Add a model on it</Link>
+            </Button>
+        );
+    }
+    const step = nextStep(state, model);
+    if (!step) {
+        return null;
+    }
+    if (step.action === "train") {
+        const blocked = trainBlock(model);
+        return (
+            <Tip tip={blocked}>
+                <Button disabled={Boolean(blocked)} onClick={() => train()}>
+                    {step.label}
+                </Button>
+            </Tip>
+        );
+    }
+    if (step.action === "retry" && step.version !== undefined) {
+        const failed = step.version;
+        return (
+            <Button
+                onClick={() => {
+                    const number = retryWithQLoRA(model.slug, failed);
+                    router.history.push(versionHref(model.slug, number, "training"));
+                }}
+            >
+                {step.label}
+            </Button>
+        );
+    }
+    if (step.action === "make-live" && step.version !== undefined) {
+        const number = step.version;
+        return (
+            <Button onClick={() => openIntent({ kind: "make-live", slug: model.slug, number })}>
+                {step.label}
+            </Button>
+        );
+    }
+    return (
+        <Button variant={step.label.startsWith("Training") ? "outline" : "default"} asChild>
+            <Link href={step.href}>{step.label}</Link>
+        </Button>
+    );
 }
 
 function Header({ model }: { model: FlowModel }) {
-    const live = liveVersion(model);
-    const entry = catalogEntry(model.slug);
+    const canPlay =
+        model.kind === "base" || model.versions.some((version) => version.status === "ready");
     const caption =
         model.kind === "base"
-            ? `${model.size} · ${model.licence}${entry ? "" : ""}`
-            : `On ${model.base} · ${live ? `v${live.number} live` : "not deployed"}`;
+            ? `Base · ${model.size} · ${model.licence}`
+            : `On ${model.base} · ${liveSplit(model) ?? "nothing live yet"}`;
     return (
         <PageHeader
             title={model.name}
@@ -843,32 +580,107 @@ function Header({ model }: { model: FlowModel }) {
             caption={caption}
             actions={
                 <>
-                    {model.deployed ? (
-                        <StatusText tone="success" className="px-1 text-sm">
-                            Live
-                        </StatusText>
-                    ) : (
-                        <span className="px-1 text-sm text-muted-foreground">Not deployed</span>
-                    )}
-                    {(model.kind === "base" ||
-                        model.versions.some((version) => version.status === "ready")) && (
+                    <OnApiSwitch model={model} />
+                    {canPlay && (
                         <Button variant="outline" asChild>
-                            <Link href={`${FLOW}/playground?model=${model.slug}`}>
+                            <Link href={playgroundHref(model.slug)}>
                                 <Play aria-hidden="true" />
-                                Try in Playground
+                                Open in Playground
                             </Link>
                         </Button>
                     )}
-                    {model.kind === "custom" && <TrainButton model={model} />}
+                    <Button variant="outline" onClick={() => openConnect(model.slug)}>
+                        Connect
+                    </Button>
+                    <PrimaryAction model={model} />
                 </>
             }
         />
     );
 }
 
+function tabsOf(model: FlowModel): ModelTab[] {
+    return model.kind === "base"
+        ? ["overview", "variants", "monitoring", "keys"]
+        : ["overview", "versions", "training", "monitoring", "keys"];
+}
+
+function tabOf(value: string | undefined, model: FlowModel): ModelTab {
+    const wanted = value ? (ALIASES[value] ?? value) : "overview";
+    return tabsOf(model).find((tab) => tab === wanted) ?? "overview";
+}
+
+function CatalogOnly({ entry }: { entry: CatalogEntry }) {
+    const toast = useToast();
+    return (
+        <Page>
+            <Crumbs
+                items={[{ label: "Discover", href: `${FLOW}/discover` }, { label: entry.name }]}
+            />
+            <PageHeader
+                title={entry.name}
+                icon={<PublisherLogo publisher={entry.publisher} name={entry.name} size="lg" />}
+                badge={<Badge variant="outline">Base</Badge>}
+                caption={`Not installed · ${entry.summary}`}
+                actions={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                installBase(entry.id);
+                                toast({
+                                    title: `${entry.name} is installed`,
+                                    description: `Downloaded ${entry.size}; its BF16 variant is ready to put on the API.`,
+                                    tone: "success",
+                                });
+                            }}
+                        >
+                            {`Download ${entry.size}`}
+                        </Button>
+                        <Button asChild>
+                            <Link href={`${FLOW}/models/new?base=${entry.id}`}>
+                                Add a model on it
+                            </Link>
+                        </Button>
+                    </>
+                }
+            />
+            <div className="grid gap-4 lg:grid-cols-2">
+                <CatalogFacts entry={entry} />
+                <Section title="Runs here">
+                    <Facts
+                        items={[
+                            ["Download", entry.size],
+                            [
+                                "gpu-a10-1 (24 GB)",
+                                <StatusText key="g" tone="success">
+                                    Serves and trains
+                                </StatusText>,
+                            ],
+                            [
+                                "cpu-pool",
+                                <span key="c" className="text-muted-foreground">
+                                    Serves slowly; cannot train
+                                </span>,
+                            ],
+                        ]}
+                    />
+                </Section>
+            </div>
+        </Page>
+    );
+}
+
 export function FlowModelPage() {
-    const params = useParams({ strict: false }) as { model?: string; tab?: string };
+    const params = useParams({ strict: false }) as {
+        model?: string;
+        tab?: string;
+    };
     const model = useFlowModel(params.model);
+    const entry = catalogEntry(params.model);
+    if (!model && entry) {
+        return <CatalogOnly entry={entry} />;
+    }
     if (!model) {
         return (
             <Page>
@@ -891,11 +703,18 @@ export function FlowModelPage() {
                     label: TAB_LABELS[item],
                 }))}
             />
-            <div className={cn("pt-2")}>
-                {tab === "overview" && <Overview model={model} />}
+            <div className="pt-2">
+                {tab === "overview" &&
+                    (model.kind === "base" ? (
+                        <BaseOverview model={model} />
+                    ) : (
+                        <Overview model={model} />
+                    ))}
                 {tab === "versions" && <VersionsTab model={model} />}
-                {tab === "data" && <DataTab model={model} />}
-                {tab === "api" && <ApiTab model={model} />}
+                {tab === "training" && <TrainingTab model={model} />}
+                {tab === "monitoring" && <ModelMonitoring model={model} />}
+                {tab === "keys" && <KeysTab model={model} />}
+                {tab === "variants" && <VariantsTab model={model} />}
             </div>
         </Page>
     );

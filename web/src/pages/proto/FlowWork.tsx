@@ -12,7 +12,9 @@ import {
     SegmentedTabs,
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
     TabNav,
@@ -60,7 +62,7 @@ import {
     useFlowState,
     versionHref,
 } from "./modelsFlowData";
-import { Crumbs, DeployDialog, type DeployIntent } from "./modelsFlowParts";
+import { Crumbs, MakeLiveButton } from "./modelsFlowParts";
 
 function modelName(models: FlowModel[], slug: string): string {
     return models.find((model) => model.slug === slug)?.name ?? slug;
@@ -130,7 +132,7 @@ export function FlowDataPage() {
                                                 <span key={model.slug}>
                                                     {index > 0 && ", "}
                                                     <Link
-                                                        href={modelHref(model.slug, "data")}
+                                                        href={modelHref(model.slug, "training")}
                                                         className="text-primary hover:underline"
                                                     >
                                                         {model.name}
@@ -152,10 +154,15 @@ export function FlowDataPage() {
     );
 }
 
-const CHECK_TONES: Record<string, "success" | "warning"> = { ok: "success", warning: "warning" };
+const CHECK_TONES: Record<string, "success" | "warning"> = {
+    ok: "success",
+    warning: "warning",
+};
 
 export function FlowDatasetPage() {
-    const { dataset: slug } = useParams({ strict: false }) as { dataset?: string };
+    const { dataset: slug } = useParams({ strict: false }) as {
+        dataset?: string;
+    };
     const state = useFlowState();
     const router = useRouter();
     const toast = useToast();
@@ -178,7 +185,7 @@ export function FlowDatasetPage() {
             description: "v0 was scored on its held-out rows: 71.2%.",
             tone: "success",
         });
-        router.history.push(modelHref(model));
+        router.history.push(modelHref(model, "training"));
     };
     const total = item.labels.reduce((sum, [, value]) => sum + value, 0);
     return (
@@ -308,7 +315,12 @@ export function FlowDatasetPage() {
 
 const LOSS_SERIES: StepSeries[] = [
     { key: "loss", label: "Training loss", color: "var(--primary)" },
-    { key: "heldOut", label: "Held-out loss", color: "var(--file-sql)", dots: true },
+    {
+        key: "heldOut",
+        label: "Held-out loss",
+        color: "var(--file-sql)",
+        dots: true,
+    },
 ];
 
 const JOB_KINDS: Record<JobKind, string> = {
@@ -402,7 +414,6 @@ function logLines(job: Job): LogEntry[] {
 export function FlowJobPage() {
     const { id } = useParams({ strict: false }) as { id?: string };
     const state = useFlowState();
-    const [deploy, setDeploy] = useState<DeployIntent>(null);
     const job = state.jobs.find((item) => item.id === Number(id));
     if (!job) {
         return (
@@ -449,11 +460,20 @@ export function FlowJobPage() {
                     </span>
                 }
                 actions={
-                    job.status === "running" && (
-                        <Button variant="outline" onClick={() => cancelJobs([job.id])}>
-                            Cancel
-                        </Button>
-                    )
+                    <>
+                        {model && version && job.kind === "train" && (
+                            <Button variant="outline" asChild>
+                                <Link href={versionHref(model.slug, version.number, "training")}>
+                                    {`v${version.number} Training tab`}
+                                </Link>
+                            </Button>
+                        )}
+                        {job.status === "running" && (
+                            <Button variant="outline" onClick={() => cancelJobs([job.id])}>
+                                Cancel
+                            </Button>
+                        )}
+                    </>
                 }
             />
             {finished && model && version?.scores && (
@@ -461,7 +481,7 @@ export function FlowJobPage() {
                     <span>
                         <span className="font-semibold">{`v${version.number} scored ${pct(version.scores[0])}`}</span>
                         {zero?.scores &&
-                            `, beats v0 (${pct(zero.scores[0])}) by ${((version.scores[0] - zero.scores[0]) * 100).toFixed(1)} points.`}
+                            `, beats v0 Baseline (${pct(zero.scores[0])}) by ${((version.scores[0] - zero.scores[0]) * 100).toFixed(1)} points.`}
                     </span>
                     <span className="flex gap-2">
                         <Button variant="outline" asChild>
@@ -469,11 +489,11 @@ export function FlowJobPage() {
                                 href={versionHref(model.slug, version.number)}
                             >{`Open v${version.number}`}</Link>
                         </Button>
-                        {!model.deployed || model.live !== version.number ? (
-                            <Button
-                                onClick={() => setDeploy({ model, version })}
-                            >{`Deploy v${version.number}`}</Button>
-                        ) : null}
+                        <MakeLiveButton
+                            model={model}
+                            version={version}
+                            label={`Make live v${version.number}`}
+                        />
                     </span>
                 </div>
             )}
@@ -529,7 +549,6 @@ export function FlowJobPage() {
                 label="Job log"
                 maxHeight="16rem"
             />
-            <DeployDialog intent={deploy} onOpenChange={(open) => !open && setDeploy(null)} />
         </Page>
     );
 }
@@ -561,7 +580,8 @@ export function FlowPlaygroundPage() {
         },
         [],
     );
-    const model = state.models.find((item) => item.slug === slug);
+    const [owner, pinned] = slug.split("@");
+    const model = state.models.find((item) => item.slug === owner);
     const send = (event: FormEvent) => {
         event.preventDefault();
         if (!draft.trim() || streaming) {
@@ -596,7 +616,7 @@ export function FlowPlaygroundPage() {
         );
         toast({
             title: "Saved as a test example",
-            description: `${model?.name ?? slug} is checked against it on every new version.`,
+            description: `${model?.name ?? owner} is checked against it on every new version.`,
             tone: "success",
         });
     };
@@ -604,17 +624,33 @@ export function FlowPlaygroundPage() {
         <Page>
             <PageHeader
                 title="Playground"
-                caption="Chat with any model. Answers here are not logged as traffic feedback."
+                caption="Chat with any model, or one version as name@N. Answers here are not counted as traffic."
                 actions={
                     <Select value={slug} onValueChange={(value) => setSlug(String(value))}>
-                        <SelectTrigger aria-label="Model" className="w-auto min-w-52">
+                        <SelectTrigger aria-label="Model" className="w-auto min-w-64">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {usable.map((item) => (
-                                <SelectItem key={item.slug} value={item.slug}>
-                                    {item.name}
-                                </SelectItem>
+                                <SelectGroup key={item.slug}>
+                                    <SelectLabel>{item.name}</SelectLabel>
+                                    <SelectItem value={item.slug}>
+                                        {item.kind === "base"
+                                            ? item.slug
+                                            : `${item.slug}${item.live === null ? "" : ` (live v${item.live})`}`}
+                                    </SelectItem>
+                                    {[...item.versions]
+                                        .filter((version) => version.status === "ready")
+                                        .sort((a, b) => b.number - a.number)
+                                        .map((version) => (
+                                            <SelectItem
+                                                key={version.number}
+                                                value={`${item.slug}@${version.number}`}
+                                            >
+                                                {`${item.slug}@${version.number}${version.kind === "prompt" ? " · Baseline" : ""}`}
+                                            </SelectItem>
+                                        ))}
+                                </SelectGroup>
                             ))}
                         </SelectContent>
                     </Select>
@@ -624,7 +660,9 @@ export function FlowPlaygroundPage() {
                 <div className="flex flex-1 flex-col gap-4 p-panel">
                     {messages.length === 0 && (
                         <p className="text-muted-foreground">
-                            {model ? `Ask ${model.name} something.` : "Pick a model."}
+                            {model
+                                ? `Ask ${pinned ? `${model.slug}@${pinned}` : model.name} something.`
+                                : "Pick a model."}
                             {model && (
                                 <>
                                     {" "}

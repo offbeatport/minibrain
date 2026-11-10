@@ -1,10 +1,12 @@
 import { useSyncExternalStore } from "react";
-import type { AvatarChoice } from "./avatarDicebear";
+import { type AvatarChoice, choiceFor } from "./avatarDicebear";
 
 export type VersionKind = "trained" | "prompt";
 export type VersionStatus = "ready" | "training" | "failed";
+export type Method = "LoRA" | "QLoRA";
 
 export type TrainingSettings = {
+    method: Method;
     rank: number;
     epochs: number;
     learningRate: number;
@@ -61,7 +63,13 @@ export type Autopilot = {
     run: { version: number; minutesLeft: number } | null;
 };
 
-export type RecentAnswer = { question: string; answer: string; minutesAgo: number };
+export type Canary = { version: number; share: number };
+
+export type RecentAnswer = {
+    question: string;
+    answer: string;
+    minutesAgo: number;
+};
 
 export type FlowModel = {
     slug: string;
@@ -85,12 +93,15 @@ export type FlowModel = {
     accepted: number;
     p95: number;
     errors: number;
+    usualErrors: number;
     licence: string;
     task: string;
     gpuSeconds: number;
     replicas: string[];
     variants: BaseVariant[];
     autopilot: Autopilot | null;
+    canary: Canary | null;
+    recipe: TrainingSettings | null;
     pinned: boolean;
     recent: RecentAnswer[];
 };
@@ -105,7 +116,7 @@ function settings(
     learningRate: number,
     rows: number,
 ): TrainingSettings {
-    return { rank, epochs, learningRate, rows, batch: 8 };
+    return { method: "LoRA", rank, epochs, learningRate, rows, batch: 8 };
 }
 
 function data(
@@ -162,6 +173,9 @@ function promptOnly(
 
 const DAY = 24;
 
+const OUT_OF_MEMORY =
+    "Out of memory at step 212 of 720 on gpu-a10-1. Retry with QLoRA, a lower batch or gradient checkpointing.";
+
 const SUPPORT_TRIAGE: FlowVersion[] = [
     promptOnly([0.712, 0.642], false, 34 * DAY, 1210),
     trained(1, [0.804, 0.771], true, 33 * DAY, {
@@ -187,29 +201,20 @@ const SUPPORT_TRIAGE: FlowVersion[] = [
         data: data(8, 2140, 312, 48, 14),
         settings: settings(32, 3, 1e-4, 1928),
     }),
-    trained(6, [0.859, 0.839], true, 5 * DAY, {
+    trained(6, [0.842, 0.81], false, 5 * DAY, {
         data: data(8, 2140, 0, 0),
         settings: settings(32, 2, 1e-4, 1928),
     }),
-    trained(7, null, null, 4 * DAY, {
+    trained(7, null, null, 3 * DAY, {
         status: "failed",
-        error: "Out of memory at step 212 of 720 on gpu-a10-1. Lower the batch or switch on gradient checkpointing.",
-        data: data(8, 2140, 0, 0),
-        settings: settings(64, 3, 1e-4, 1928),
+        error: OUT_OF_MEMORY,
+        data: data(9, 2290, 162, 12),
+        settings: settings(64, 3, 1e-4, 2061),
     }),
-    trained(8, [0.842, 0.81], false, 3 * DAY, {
-        data: data(9, 2310, 220, 50),
-        settings: settings(32, 3, 1e-4, 2079),
-    }),
-    trained(9, [0.861, 0.842], true, 2 * DAY, {
-        data: data(9, 2310, 0, 0),
-        settings: settings(32, 4, 5e-5, 2079),
-    }),
-    trained(10, [0.83, 0.79], false, DAY, {
-        data: data(10, 2290, 12, 32),
-        settings: settings(16, 3, 2e-4, 2061),
-    }),
-    trained(11, [0.865, 0.851], true, 2, {
+    trained(8, null, null, 0.4, {
+        status: "training",
+        progress: 0.45,
+        jobId: 1188,
         data: data(10, 2290, 0, 0),
         settings: settings(32, 3, 1e-4, 2061),
     }),
@@ -234,28 +239,20 @@ const INVOICE_EXTRACTOR: FlowVersion[] = [
 
 const CONTRACT_REVIEWER: FlowVersion[] = [
     promptOnly([0.58, 0.51], false, 20 * DAY, 420),
-    trained(1, [0.74, 0.69], true, 15 * DAY, {
-        wasLive: true,
+    trained(1, [0.774, 0.72], true, 15 * DAY, {
         data: data(2, 610, 190, 0),
         settings: settings(16, 3, 2e-4, 549),
     }),
-    trained(2, [0.792, 0.751], true, 8 * DAY, {
+    trained(2, [0.741, 0.7], false, 8 * DAY, {
         data: data(3, 780, 180, 10),
         settings: settings(16, 4, 2e-4, 702),
     }),
     trained(3, null, null, 5, {
         status: "failed",
         jobId: 1176,
-        error: "Held-out loss rose for two epochs in a row, so training stopped at epoch 2 of 4. More varied rows usually help.",
+        error: OUT_OF_MEMORY,
         data: data(4, 1020, 260, 20),
-        settings: settings(32, 4, 2e-4, 918),
-    }),
-    trained(4, null, null, 0.7, {
-        status: "training",
-        progress: 0.45,
-        jobId: 1187,
-        data: data(4, 1020, 0, 0),
-        settings: settings(16, 3, 2e-4, 918),
+        settings: settings(64, 4, 2e-4, 918),
     }),
 ];
 
@@ -274,12 +271,15 @@ type RawModel = Omit<
     | "accepted"
     | "p95"
     | "errors"
+    | "usualErrors"
     | "licence"
     | "task"
     | "gpuSeconds"
     | "replicas"
     | "variants"
     | "autopilot"
+    | "canary"
+    | "recipe"
     | "pinned"
     | "recent"
 >;
@@ -326,7 +326,7 @@ const VARIANTS: Record<string, BaseVariant[]> = {
             previous: 560,
             p95: 290,
         }),
-        variant("gguf-q4", "GGUF Q4", "5 GB", "qwen3-8b-gguf", 3.8, {
+        variant("gguf-q4", "GGUF Q4", "5 GB", "qwen3-8b-gguf-q4", 3.8, {
             trainable: false,
             update: "Upstream rebuilt the Q4_K_M weights on 2 Nov with a tokenizer fix; 5 GB to download.",
         }),
@@ -340,12 +340,17 @@ const VARIANTS: Record<string, BaseVariant[]> = {
             previous: 230,
             p95: 150,
         }),
-        variant("fp8", "FP8", "1.3 GB", "llama-3.2-1b-fp8", 0.9, { trainable: false }),
+        variant("fp8", "FP8", "1.3 GB", "llama-3.2-1b-fp8", 0.9, {
+            trainable: false,
+        }),
     ],
 };
 
 type Extra = Pick<FlowModel, "task" | "gpuSeconds" | "replicas" | "p95" | "recent"> & {
     autopilot?: Autopilot;
+    canary?: Canary;
+    errors?: number;
+    usualErrors?: number;
 };
 
 function answer(question: string, text: string, minutesAgo: number): RecentAnswer {
@@ -369,6 +374,9 @@ const EXTRA: Record<string, Extra> = {
         gpuSeconds: 1.4,
         replicas: ["gpu-a10-2"],
         p95: 310,
+        errors: 0.04,
+        usualErrors: 0.005,
+        canary: { version: 3, share: 10 },
         autopilot: {
             threshold: 50,
             canary: 10,
@@ -388,6 +396,8 @@ const EXTRA: Record<string, Extra> = {
         gpuSeconds: 2.1,
         replicas: ["gpu-a10-1"],
         p95: 280,
+        errors: 0.021,
+        usualErrors: 0.02,
         recent: [
             answer("Clause 14.2: supplier may raise prices at any time.", "risky", 35),
             answer("Clause 3.1: payment within 30 days of invoice.", "standard", 52),
@@ -401,7 +411,13 @@ const EXTRA: Record<string, Extra> = {
         p95: 95,
         recent: [answer("test", "billing", 300)],
     },
-    "sql-helper": { task: "SQL", gpuSeconds: 3.8, replicas: [], p95: 0, recent: [] },
+    "sql-helper": {
+        task: "SQL",
+        gpuSeconds: 3.8,
+        replicas: [],
+        p95: 0,
+        recent: [],
+    },
 };
 
 const BASE_RECENT: RecentAnswer[] = [
@@ -432,6 +448,26 @@ function summarise(model: FlowModel): FlowModel {
         gpuSeconds: Math.min(...model.variants.map((item) => item.gpuSeconds), 99),
         replicas: [...new Set(live.flatMap((item) => item.replicas))],
         p95: p95s.length > 0 ? Math.max(...p95s) : 0,
+    };
+}
+
+function baseRaw(slug: string, name: string, publisher: string): RawModel {
+    return {
+        slug,
+        name,
+        kind: "base",
+        publisher,
+        base: null,
+        description: "",
+        metrics: CLASSIFY,
+        rule: [0, 0],
+        heldOut: 0,
+        live: null,
+        deployed: false,
+        ...week([0, 0, 0, 0, 0, 0, 0], 0),
+        serveOnly: false,
+        size: null,
+        versions: [],
     };
 }
 
@@ -480,7 +516,7 @@ const RAW: RawModel[] = [
         metrics: CLASSIFY,
         rule: [0.75, 0.02],
         heldOut: 78,
-        live: 2,
+        live: 1,
         deployed: true,
         ...week([14, 22, 18, 30, 26, 4, 9], 160),
         serveOnly: false,
@@ -509,7 +545,7 @@ const RAW: RawModel[] = [
         name: "SQL helper",
         kind: "custom",
         publisher: "Qwen",
-        base: "Qwen3 8B GGUF",
+        base: "Qwen3 8B GGUF Q4",
         description: "Writes SQL for the finance warehouse.",
         metrics: SQL,
         rule: [0.7, 0.02],
@@ -521,57 +557,9 @@ const RAW: RawModel[] = [
         size: null,
         versions: SQL_HELPER,
     },
-    {
-        slug: "qwen3-8b",
-        name: "Qwen3 8B",
-        kind: "base",
-        publisher: "Qwen",
-        base: null,
-        description: "",
-        metrics: CLASSIFY,
-        rule: [0, 0],
-        heldOut: 0,
-        live: null,
-        deployed: false,
-        ...week([0, 0, 0, 0, 0, 0, 0], 0),
-        serveOnly: false,
-        size: null,
-        versions: [],
-    },
-    {
-        slug: "qwen3-0.6b",
-        name: "Qwen3 0.6B",
-        kind: "base",
-        publisher: "Qwen",
-        base: null,
-        description: "",
-        metrics: CLASSIFY,
-        rule: [0, 0],
-        heldOut: 0,
-        live: null,
-        deployed: false,
-        ...week([0, 0, 0, 0, 0, 0, 0], 0),
-        serveOnly: false,
-        size: null,
-        versions: [],
-    },
-    {
-        slug: "llama-3.2-1b",
-        name: "Llama 3.2 1B",
-        kind: "base",
-        publisher: "Meta",
-        base: null,
-        description: "",
-        metrics: CLASSIFY,
-        rule: [0, 0],
-        heldOut: 0,
-        live: null,
-        deployed: false,
-        ...week([0, 0, 0, 0, 0, 0, 0], 0),
-        serveOnly: false,
-        size: null,
-        versions: [],
-    },
+    baseRaw("qwen3-8b", "Qwen3 8B", "Qwen"),
+    baseRaw("qwen3-0.6b", "Qwen3 0.6B", "Qwen"),
+    baseRaw("llama-3.2-1b", "Llama 3.2 1B", "Meta"),
 ];
 
 const DATASET_OF: Record<string, string> = {
@@ -587,9 +575,9 @@ const LICENCES: Record<string, string> = {
     Meta: "Llama 3.2 Community",
 };
 
-const FIXED_JOBS = new Set([1176, 1187]);
+const FIXED_JOBS = new Set([1176, 1188]);
 
-const INITIAL: FlowModel[] = RAW.map((model, index) => {
+function complete(model: RawModel, index: number): FlowModel {
     const extra = EXTRA[model.slug];
     return summarise({
         ...model,
@@ -603,22 +591,22 @@ const INITIAL: FlowModel[] = RAW.map((model, index) => {
         dataset: DATASET_OF[model.slug] ?? null,
         accepted: 0,
         p95: extra?.p95 ?? 0,
-        errors:
-            model.slug === "contract-reviewer"
-                ? 0.021
-                : model.deployed || model.kind === "base"
-                  ? 0.002
-                  : 0,
+        errors: extra?.errors ?? (model.deployed || model.kind === "base" ? 0.002 : 0),
+        usualErrors: extra?.usualErrors ?? 0.003,
         licence: LICENCES[model.publisher] ?? "Apache 2.0",
         task: extra?.task ?? "Base",
         gpuSeconds: extra?.gpuSeconds ?? 0,
         replicas: extra?.replicas ?? [],
         variants: VARIANTS[model.slug] ?? [],
         autopilot: extra?.autopilot ?? null,
+        canary: extra?.canary ?? null,
+        recipe: null,
         pinned: false,
         recent: extra?.recent ?? BASE_RECENT,
     });
-});
+}
+
+const INITIAL: FlowModel[] = RAW.map(complete);
 
 export type Check = { name: string; state: "ok" | "warning"; detail: string };
 
@@ -657,14 +645,26 @@ const TICKET_PREVIEW: [string, string][] = [
 
 const TICKET_CHECKS: Check[] = [
     { name: "Duplicates", state: "ok", detail: "No repeated rows." },
-    { name: "Conflicting labels", state: "ok", detail: "No text carries two labels." },
+    {
+        name: "Conflicting labels",
+        state: "ok",
+        detail: "No text carries two labels.",
+    },
     {
         name: "Label balance",
         state: "warning",
         detail: "feature_request has 9% of rows; the others 13 to 24%.",
     },
-    { name: "Leakage", state: "ok", detail: "No held-out text appears in training." },
-    { name: "Personal data", state: "ok", detail: "Emails and phone numbers scrubbed (41 rows)." },
+    {
+        name: "Leakage",
+        state: "ok",
+        detail: "No held-out text appears in training.",
+    },
+    {
+        name: "Personal data",
+        state: "ok",
+        detail: "Emails and phone numbers scrubbed (41 rows).",
+    },
 ];
 
 function dataset(
@@ -742,7 +742,16 @@ function transfer(
     hoursAgo: number,
     minutes: number,
 ): Job {
-    return { id, kind, model, version: null, status: "done", progress: 1, hoursAgo, minutes };
+    return {
+        id,
+        kind,
+        model,
+        version: null,
+        status: "done",
+        progress: 1,
+        hoursAgo,
+        minutes,
+    };
 }
 
 function jobsOf(models: FlowModel[]): Job[] {
@@ -788,33 +797,26 @@ function feedback(
     return { id, model, question, answer, suggested, state: "pending", hoursAgo };
 }
 
+const SUPPORT_FEEDBACK: [string, string, string][] = [
+    ["Need my money back for the duplicate seat.", "billing", "refund_request"],
+    ["The app logs me out every 5 minutes.", "account_access", "bug_report"],
+    ["Courier left the parcel at the wrong address.", "billing", "shipping"],
+    ["Card declined but the invoice says paid.", "bug_report", "billing"],
+    ["Cancel my plan and refund this month.", "billing", "refund_request"],
+    ["Reset link expired before I opened it.", "bug_report", "account_access"],
+    ["Parcel tracking shows delivered, nothing here.", "bug_report", "shipping"],
+    ["Add a CSV export to the reports page.", "bug_report", "feature_request"],
+    ["Charged in USD instead of EUR.", "refund_request", "billing"],
+    ["My teammate can't accept the invite.", "bug_report", "account_access"],
+    ["Refund the second seat I never used.", "billing", "refund_request"],
+];
+
 const FEEDBACK: FeedbackRow[] = [
-    feedback(
-        301,
-        "support-triage",
-        "Need my money back for the duplicate seat.",
-        "billing",
-        "refund_request",
-        3,
+    ...SUPPORT_FEEDBACK.map(([question, answer, suggested], index) =>
+        feedback(301 + index, "support-triage", question, answer, suggested, 2 + index * 3),
     ),
     feedback(
-        302,
-        "support-triage",
-        "The app logs me out every 5 minutes.",
-        "account_access",
-        "bug_report",
-        5,
-    ),
-    feedback(
-        303,
-        "support-triage",
-        "Courier left the parcel at the wrong address.",
-        "billing",
-        "shipping",
-        20,
-    ),
-    feedback(
-        304,
+        320,
         "invoice-extractor",
         "Invoice INV-2291 from Nordlicht GmbH",
         "total: 1,240.00",
@@ -833,7 +835,6 @@ export type CatalogEntry = {
     licence: string;
     context: string;
     summary: string;
-    downloaded: boolean;
     serveOnly: boolean;
 };
 
@@ -846,7 +847,7 @@ function entry(
     licence: string,
     context: string,
     summary: string,
-    flags: { downloaded?: boolean; serveOnly?: boolean } = {},
+    serveOnly = false,
 ): CatalogEntry {
     return {
         id,
@@ -858,8 +859,7 @@ function entry(
         licence,
         context,
         summary,
-        downloaded: flags.downloaded ?? false,
-        serveOnly: flags.serveOnly ?? false,
+        serveOnly,
     };
 }
 
@@ -873,7 +873,6 @@ export const CATALOG: CatalogEntry[] = [
         "Apache 2.0",
         "32K",
         "Small and fast; a good first base for classifying and routing.",
-        { downloaded: true },
     ),
     entry(
         "llama-3.2-1b",
@@ -884,18 +883,16 @@ export const CATALOG: CatalogEntry[] = [
         "Llama 3.2 Community",
         "128K",
         "Long context for its size; extraction and summaries.",
-        { downloaded: true },
     ),
     entry(
-        "qwen3-8b-gguf",
-        "Qwen3 8B GGUF",
+        "qwen3-8b",
+        "Qwen3 8B",
         "Qwen",
         "8.2B",
-        ["5.0 GB", "7 GB"],
+        ["16 GB", "20 GB"],
         "Apache 2.0",
         "32K",
-        "Quantised for serving on one GPU or CPU; cannot be trained.",
-        { downloaded: true, serveOnly: true },
+        "Strong general base; FP8 and GGUF formats serve it on smaller GPUs or CPU.",
     ),
     entry(
         "gemma-3-1b",
@@ -939,34 +936,170 @@ export const CATALOG: CatalogEntry[] = [
     ),
 ];
 
-export type FlowState = {
+export type Recipe = {
+    id: string;
+    title: string;
+    task: string;
+    summary: string;
+    base: string;
+    file: string;
+    rows: number;
+    metrics: [string, string];
+    dataset: string;
+};
+
+export const RECIPES: Recipe[] = [
+    {
+        id: "support-triage",
+        title: "Support ticket triage",
+        task: "Classify",
+        summary: "Routes tickets to one of six queues.",
+        base: "qwen3-0.6b",
+        file: SAMPLE_FILE,
+        rows: 2140,
+        metrics: CLASSIFY,
+        dataset: "support-tickets",
+    },
+    {
+        id: "invoice-extraction",
+        title: "Invoice extraction",
+        task: "Extract",
+        summary: "Pulls totals, dates and vendor names into JSON.",
+        base: "llama-3.2-1b",
+        file: "sample-invoices.jsonl",
+        rows: 900,
+        metrics: EXTRACT,
+        dataset: "sample-invoices",
+    },
+    {
+        id: "contract-clauses",
+        title: "Contract clause review",
+        task: "Classify",
+        summary: "Flags risky clauses as standard, risky or blocking.",
+        base: "llama-3.2-1b",
+        file: "sample-clauses.csv",
+        rows: 1200,
+        metrics: CLASSIFY,
+        dataset: "sample-clauses",
+    },
+    {
+        id: "clinical-coding",
+        title: "Clinical note coding",
+        task: "Classify",
+        summary: "Suggests ICD-10 codes for discharge notes.",
+        base: "qwen3-8b",
+        file: "sample-notes.jsonl",
+        rows: 1600,
+        metrics: CLASSIFY,
+        dataset: "sample-notes",
+    },
+    {
+        id: "trade-confirmations",
+        title: "Trade confirmation extraction",
+        task: "Extract",
+        summary: "Reads counterparty, notional, dates and rate from confirmations.",
+        base: "granite-3.3-2b",
+        file: "sample-confirmations.jsonl",
+        rows: 750,
+        metrics: EXTRACT,
+        dataset: "sample-confirmations",
+    },
+    {
+        id: "sql-from-questions",
+        title: "SQL from questions",
+        task: "SQL",
+        summary: "Writes SQL for a sample warehouse schema.",
+        base: "qwen3-8b",
+        file: "sample-questions.csv",
+        rows: 1100,
+        metrics: SQL,
+        dataset: "sample-questions",
+    },
+];
+
+export type ApiKey = {
+    id: string;
+    prefix: string;
+    hoursAgo: number;
+    atMs?: number;
+    lastUsed: number | null;
+};
+
+export type Mode = "empty" | "full";
+
+export type Intent =
+    | { kind: "make-live"; slug: string; number: number; source?: "inbox" }
+    | { kind: "connect"; slug: string }
+    | null;
+
+type World = {
     models: FlowModel[];
     datasets: Dataset[];
     jobs: Job[];
     feedback: FeedbackRow[];
-    keys: Record<string, string[]>;
-    visited: string[];
+    keys: Record<string, ApiKey[]>;
     focus: string | null;
     examples: number;
+    dismissed: string[];
 };
 
-let state: FlowState = {
+type Shared = { visited: string[]; mode: Mode; intent: Intent };
+
+export type FlowState = World & Shared;
+
+const FULL: World = {
     models: INITIAL,
     datasets: DATASETS,
     jobs: jobsOf(INITIAL),
     feedback: FEEDBACK,
-    keys: { "support-triage": ["mb_live_7Qx2…"] },
-    visited: [],
+    keys: {
+        "support-triage": [
+            { id: "k1", prefix: "mb_live_7Qx2…", hoursAgo: 30 * DAY, lastUsed: 0.05 },
+            { id: "k2", prefix: "mb_live_c81F…", hoursAgo: 9 * DAY, lastUsed: 50 },
+        ],
+        "invoice-extractor": [
+            { id: "k3", prefix: "mb_live_Lm4k…", hoursAgo: 8 * DAY, lastUsed: 0.2 },
+        ],
+    },
     focus: null,
     examples: 0,
+    dismissed: [],
 };
-const listeners = new Set<() => void>();
 
-function set(change: (current: FlowState) => FlowState) {
-    state = change(state);
+const EMPTY: World = {
+    models: [],
+    datasets: [],
+    jobs: [],
+    feedback: [],
+    keys: {},
+    focus: null,
+    examples: 0,
+    dismissed: [],
+};
+
+let worlds: Record<Mode, World> = { full: FULL, empty: EMPTY };
+let shared: Shared = { visited: [], mode: "full", intent: null };
+let state: FlowState = { ...worlds.full, ...shared };
+const listeners = new Set<() => void>();
+let nextJob = 1300;
+
+function notify() {
+    state = { ...worlds[shared.mode], ...shared };
     for (const listener of listeners) {
         listener();
     }
+}
+
+function set(change: (current: FlowState) => FlowState) {
+    const { visited, mode, intent, ...world } = change(state);
+    worlds = { ...worlds, [shared.mode]: world };
+    shared = { visited, mode, intent };
+    notify();
+}
+
+function setWorld(mode: Mode, change: (world: World) => World) {
+    worlds = { ...worlds, [mode]: change(worlds[mode]) };
+    notify();
 }
 
 function subscribe(listener: () => void) {
@@ -986,24 +1119,51 @@ export function useFlowModel(slug: string | undefined): FlowModel | undefined {
     return useFlowModels().find((model) => model.slug === slug);
 }
 
-function update(slug: string, change: (model: FlowModel) => FlowModel) {
-    set((current) => ({
-        ...current,
-        models: current.models.map((model) => (model.slug === slug ? change(model) : model)),
+export function restartJourney() {
+    worlds = { ...worlds, empty: EMPTY };
+    shared = { visited: [], mode: "empty", intent: null };
+    notify();
+}
+
+export function setMode(mode: Mode) {
+    if (shared.mode !== mode) {
+        shared = { ...shared, mode, intent: null };
+        notify();
+    }
+}
+
+export function openIntent(intent: Intent) {
+    shared = { ...shared, intent };
+    notify();
+}
+
+function modelsIn(mode: Mode, slug: string, change: (model: FlowModel) => FlowModel) {
+    setWorld(mode, (world) => ({
+        ...world,
+        models: world.models.map((model) => (model.slug === slug ? change(model) : model)),
     }));
 }
 
-function setJob(id: number, change: (job: Job) => Job) {
-    set((current) => ({
-        ...current,
-        jobs: current.jobs.map((job) => (job.id === id ? change(job) : job)),
+function update(slug: string, change: (model: FlowModel) => FlowModel) {
+    modelsIn(shared.mode, slug, change);
+}
+
+function jobIn(mode: Mode, id: number, change: (job: Job) => Job) {
+    setWorld(mode, (world) => ({
+        ...world,
+        jobs: world.jobs.map((job) => (job.id === id ? change(job) : job)),
     }));
 }
 
 export function markVisited(step: string) {
-    if (!state.visited.includes(step)) {
-        set((current) => ({ ...current, visited: [...current.visited, step] }));
+    if (!shared.visited.includes(step)) {
+        shared = { ...shared, visited: [...shared.visited, step] };
+        notify();
     }
+}
+
+export function dismiss(id: string) {
+    set((current) => ({ ...current, dismissed: [...current.dismissed, id] }));
 }
 
 const ARRIVING: [string, string, string][] = [
@@ -1019,16 +1179,24 @@ function arrivingFeedback(slug: string): FeedbackRow[] {
     );
 }
 
-export function deployVersion(slug: string, number: number) {
-    const first = !state.models.find((model) => model.slug === slug)?.deployed;
+export function makeLive(slug: string, number: number, source?: "inbox") {
+    const model = state.models.find((item) => item.slug === slug);
+    if (!model) {
+        return;
+    }
+    const first = model.live === null && !model.deployed;
+    const rollback = model.live !== null && number < model.live;
     const known = state.feedback.some((row) => row.model === slug);
-    update(slug, (model) => ({
-        ...model,
+    update(slug, (current) => ({
+        ...current,
         live: number,
-        deployed: true,
-        replicas: model.replicas.length > 0 ? model.replicas : ["gpu-a10-1"],
-        versions: model.versions.map((version) =>
-            version.number === model.live ? { ...version, wasLive: true } : version,
+        deployed: current.deployed || first,
+        canary: null,
+        autopilot: current.autopilot ? { ...current.autopilot, run: null } : null,
+        replicas: current.replicas.length > 0 ? current.replicas : ["gpu-a10-1"],
+        traffic: first ? [0, 0, 0, 0, 0, 0, 3] : current.traffic,
+        versions: current.versions.map((version) =>
+            version.number === current.live ? { ...version, wasLive: true } : version,
         ),
     }));
     if (first && !known) {
@@ -1037,6 +1205,37 @@ export function deployVersion(slug: string, number: number) {
             feedback: [...arrivingFeedback(slug), ...current.feedback],
         }));
     }
+    markVisited("live");
+    if (rollback && model.live !== null) {
+        dismiss(`live:${slug}:${model.live}`);
+        markVisited("rollback");
+    }
+    if (source === "inbox") {
+        markVisited("inbox");
+    }
+}
+
+export function setOnApi(slug: string, on: boolean) {
+    const model = state.models.find((item) => item.slug === slug);
+    if (!model) {
+        return;
+    }
+    if (model.kind === "base") {
+        const keys = on
+            ? model.variants.slice(0, 1).map((item) => variantKey(slug, item.id))
+            : model.variants.map((item) => variantKey(slug, item.id));
+        if (on) {
+            deployVariants(keys);
+        } else {
+            undeployVariants(keys);
+        }
+        return;
+    }
+    update(slug, (current) => ({
+        ...current,
+        deployed: on,
+        replicas: on ? (current.replicas.length > 0 ? current.replicas : ["gpu-a10-1"]) : [],
+    }));
 }
 
 export function undeployModels(slugs: string[]) {
@@ -1047,7 +1246,6 @@ export function undeployModels(slugs: string[]) {
                 ? summarise({
                       ...model,
                       deployed: false,
-                      live: null,
                       replicas: [],
                       variants: model.variants.map((item) => ({
                           ...item,
@@ -1097,12 +1295,25 @@ export function deleteVariantFiles(keys: string[]) {
     changeVariants(keys, (item) => (item.live ? item : null));
 }
 
+export function applyUpdate(slug: string, id: string) {
+    changeVariants([variantKey(slug, id)], (item) => ({ ...item, update: null }));
+    const jobId = nextJob++;
+    set((current) => ({
+        ...current,
+        jobs: [{ ...transfer(jobId, "download", slug, 0, 2), atMs: Date.now() }, ...current.jobs],
+    }));
+}
+
 export function togglePin(slug: string) {
     update(slug, (model) => ({ ...model, pinned: !model.pinned }));
 }
 
 export function setAutopilot(slug: string, autopilot: Autopilot | null) {
     update(slug, (model) => ({ ...model, autopilot }));
+}
+
+export function setRecipe(slug: string, recipe: TrainingSettings) {
+    update(slug, (model) => ({ ...model, recipe }));
 }
 
 export function baseModelSlug(name: string): string {
@@ -1112,7 +1323,7 @@ export function baseModelSlug(name: string): string {
             (model.name === name ||
                 (model.variants.length > 1 && name.startsWith(`${model.name} `))),
     );
-    return found?.slug ?? slugify(name);
+    return found?.slug ?? CATALOG.find((item) => item.name === name)?.id ?? slugify(name);
 }
 
 export function deleteModels(slugs: string[]) {
@@ -1145,14 +1356,70 @@ export function catalogEntry(id: string | null | undefined): CatalogEntry | unde
     return CATALOG.find((item) => item.id === id);
 }
 
-export function createModel(name: string, baseId: string, avatar: AvatarChoice): string {
-    const base = catalogEntry(baseId) ?? CATALOG[0];
+export function isInstalled(current: FlowState, id: string): boolean {
+    return current.models.some((model) => model.kind === "base" && model.slug === id);
+}
+
+export function installBase(id: string) {
+    const source = catalogEntry(id);
+    if (!source || isInstalled(state, id)) {
+        return;
+    }
+    const seeded = INITIAL.find((model) => model.slug === id);
+    const model: FlowModel = seeded
+        ? summarise({
+              ...seeded,
+              variants: seeded.variants.map((item) => ({
+                  ...item,
+                  live: false,
+                  replicas: [],
+                  traffic: [0, 0, 0, 0, 0, 0, 0],
+                  previous: 0,
+                  update: null,
+              })),
+          })
+        : complete(
+              {
+                  ...baseRaw(id, source.name, source.publisher),
+                  serveOnly: source.serveOnly,
+              },
+              0,
+          );
+    const withVariants =
+        model.variants.length > 0
+            ? model
+            : summarise({
+                  ...model,
+                  licence: source.licence,
+                  variants: [variant("bf16", "BF16", source.size, id, 1.2)],
+              });
+    const jobId = nextJob++;
+    set((current) => ({
+        ...current,
+        models: [...current.models, { ...withVariants, licence: source.licence }],
+        jobs: [{ ...transfer(jobId, "download", id, 0, 3), atMs: Date.now() }, ...current.jobs],
+    }));
+}
+
+function freeSlug(name: string): string {
     const taken = new Set(state.models.map((model) => model.slug));
     const stem = slugify(name) || "model";
     let slug = stem;
     for (let suffix = 2; taken.has(slug); suffix += 1) {
         slug = `${stem}-${suffix}`;
     }
+    return slug;
+}
+
+export function createModel(
+    name: string,
+    baseId: string,
+    avatar: AvatarChoice,
+    extra: Partial<FlowModel> = {},
+): string {
+    const base = catalogEntry(baseId) ?? CATALOG[0];
+    installBase(base.id);
+    const slug = freeSlug(name);
     const model: FlowModel = {
         slug,
         name,
@@ -1175,32 +1442,54 @@ export function createModel(name: string, baseId: string, avatar: AvatarChoice):
         accepted: 0,
         p95: 0,
         errors: 0,
+        usualErrors: 0.003,
         licence: base.licence,
         task: "Classify",
-        gpuSeconds: 0,
+        gpuSeconds: base.id === "qwen3-8b" ? 9.6 : 1.1,
         replicas: [],
         variants: [],
         autopilot: null,
+        canary: null,
+        recipe: null,
         pinned: false,
         recent: [],
+        ...extra,
     };
-    set((current) => ({ ...current, models: [model, ...current.models], focus: slug }));
+    set((current) => ({
+        ...current,
+        models: [model, ...current.models],
+        focus: slug,
+    }));
+    markVisited("start");
     return slug;
+}
+
+export function createFromRecipe(id: string): string {
+    const recipe = RECIPES.find((item) => item.id === id) ?? RECIPES[0];
+    const slug = createModel(recipe.title, recipe.base, choiceFor("initials", recipe.title), {
+        description: recipe.summary,
+        task: recipe.task,
+        metrics: recipe.metrics,
+    });
+    addDataset(recipe.dataset, `${recipe.title} sample`, recipe.file, recipe.rows);
+    attachDataset(slug, recipe.dataset);
+    return slug;
+}
+
+function addDataset(slug: string, name: string, file: string, rows: number) {
+    if (!state.datasets.some((item) => item.slug === slug)) {
+        const added = {
+            ...dataset(slug, name, file, rows, 1, 0),
+            atMs: Date.now(),
+        };
+        set((current) => ({ ...current, datasets: [added, ...current.datasets] }));
+    }
 }
 
 export function uploadSample(): string {
-    const slug = "support-tickets";
-    if (!state.datasets.some((item) => item.slug === slug)) {
-        const uploaded = {
-            ...dataset(slug, "Support tickets", SAMPLE_FILE, 2140, 1, 0),
-            atMs: Date.now(),
-        };
-        set((current) => ({ ...current, datasets: [uploaded, ...current.datasets] }));
-    }
-    return slug;
+    addDataset("support-tickets", "Support tickets", SAMPLE_FILE, 2140);
+    return "support-tickets";
 }
-
-let nextJob = 1300;
 
 export function attachDataset(slug: string, datasetSlug: string) {
     const source = state.datasets.find((item) => item.slug === datasetSlug);
@@ -1242,27 +1531,33 @@ function nextScores(model: FlowModel, number: number): [number, number] {
 }
 
 export function defaultRecipe(model: FlowModel): TrainingSettings {
+    if (model.recipe) {
+        return model.recipe;
+    }
     const source = state.datasets.find((item) => item.slug === model.dataset);
-    const last = newestFirst(model).find((version) => version.settings)?.settings;
+    const last = newestFirst(model).find(
+        (version) => version.settings && version.status === "ready",
+    )?.settings;
     return last ?? settings(16, 3, 2e-4, source?.split[0] ?? 1926);
 }
 
-function tick(slug: string, number: number, jobId: number, timer: number) {
-    const job = state.jobs.find((item) => item.id === jobId);
+function tick(mode: Mode, slug: string, number: number, jobId: number, timer: number) {
+    const world = worlds[mode];
+    const job = world.jobs.find((item) => item.id === jobId);
     if (!job || job.status !== "running") {
         window.clearInterval(timer);
         return;
     }
     const progress = Math.min(1, job.progress + TICK_MS / TRAIN_MS);
-    const owner = state.models.find((item) => item.slug === slug);
+    const owner = world.models.find((item) => item.slug === slug);
     const scores = progress >= 1 && owner ? nextScores(owner, number) : null;
-    setJob(jobId, (item) => ({
+    jobIn(mode, jobId, (item) => ({
         ...item,
         progress,
         status: scores ? "done" : "running",
         minutes: scores ? 12 : null,
     }));
-    update(slug, (current) => ({
+    modelsIn(mode, slug, (current) => ({
         ...current,
         versions: current.versions.map((item) => {
             if (item.number !== number) {
@@ -1284,13 +1579,14 @@ function tick(slug: string, number: number, jobId: number, timer: number) {
     }
 }
 
-export function startTraining(slug: string, recipe: TrainingSettings): number {
+export function startTraining(slug: string, recipe?: TrainingSettings): number {
     const model = state.models.find((item) => item.slug === slug);
     if (!model) {
         return 0;
     }
+    const chosen = recipe ?? defaultRecipe(model);
     const source = state.datasets.find((item) => item.slug === model.dataset);
-    const number = Math.max(0, ...model.versions.map((version) => version.number)) + 1;
+    const number = nextNumber(model);
     const jobId = nextJob++;
     const added = model.accepted;
     const version: FlowVersion = {
@@ -1305,20 +1601,32 @@ export function startTraining(slug: string, recipe: TrainingSettings): number {
         wasLive: false,
         jobId,
         data: data(source?.version ?? 1, (source?.rows ?? 2140) + added, added, 0),
-        settings: { ...recipe, rows: recipe.rows + added },
+        settings: { ...chosen, rows: chosen.rows + added },
         p50: 44,
     };
     update(slug, (current) => ({
         ...current,
         accepted: 0,
+        recipe: chosen,
         versions: [...current.versions, version],
     }));
     set((current) => ({
         ...current,
         jobs: [{ ...versionJob(model, version), atMs: Date.now() }, ...current.jobs],
     }));
-    const timer = window.setInterval(() => tick(slug, number, jobId, timer), TICK_MS);
-    return jobId;
+    const mode = shared.mode;
+    const timer = window.setInterval(() => tick(mode, slug, number, jobId, timer), TICK_MS);
+    markVisited(number === 1 ? "train" : "train2");
+    return number;
+}
+
+export function retryWithQLoRA(slug: string, number: number): number {
+    const model = state.models.find((item) => item.slug === slug);
+    const failed = model ? findVersion(model, number) : undefined;
+    if (!model || !failed?.settings) {
+        return 0;
+    }
+    return startTraining(slug, { ...failed.settings, method: "QLoRA" });
 }
 
 export function cancelJobs(ids: number[]) {
@@ -1364,11 +1672,29 @@ export function createKey(slug: string): string {
         (byte % 36).toString(36),
     ).join("");
     const key = `mb_live_${random}`;
+    const record: ApiKey = {
+        id: `k${Date.now()}`,
+        prefix: `${key.slice(0, 12)}…`,
+        hoursAgo: 0,
+        atMs: Date.now(),
+        lastUsed: null,
+    };
     set((current) => ({
         ...current,
-        keys: { ...current.keys, [slug]: [...(current.keys[slug] ?? []), `${key.slice(0, 12)}…`] },
+        keys: { ...current.keys, [slug]: [...(current.keys[slug] ?? []), record] },
     }));
+    markVisited("connect");
     return key;
+}
+
+export function revokeKey(slug: string, id: string) {
+    set((current) => ({
+        ...current,
+        keys: {
+            ...current.keys,
+            [slug]: (current.keys[slug] ?? []).filter((k) => k.id !== id),
+        },
+    }));
 }
 
 export function saveExample() {
@@ -1376,29 +1702,47 @@ export function saveExample() {
 }
 
 export function countRequest(slug: string) {
-    update(slug, (model) => ({
+    update(slug.split("@")[0], (model) => ({
         ...model,
         traffic: [...model.traffic.slice(0, -1), (model.traffic.at(-1) ?? 0) + 1],
     }));
 }
 
-export type NextStep = { label: string; detail: string; href: string; train?: boolean };
-
-function nextNumber(model: FlowModel): number {
+export function nextNumber(model: FlowModel): number {
     return Math.max(0, ...model.versions.map((version) => version.number)) + 1;
 }
 
-function deployCandidate(model: FlowModel): FlowVersion | undefined {
+export function bestCandidate(model: FlowModel): FlowVersion | undefined {
     const live = liveVersion(model);
-    return newestFirst(model).find(
-        (version) =>
-            version.passed === true &&
-            version.kind === "trained" &&
-            (!live ||
-                (version.number > live.number &&
-                    (version.scores?.[0] ?? 0) > (live.scores?.[0] ?? 0))),
-    );
+    return [...model.versions]
+        .filter(
+            (version) =>
+                version.status === "ready" &&
+                version.kind === "trained" &&
+                version.passed === true &&
+                version.number !== model.canary?.version &&
+                (!live || (version.scores?.[0] ?? 0) > (live.scores?.[0] ?? 0)),
+        )
+        .sort((a, b) => (b.scores?.[0] ?? 0) - (a.scores?.[0] ?? 0))[0];
 }
+
+export function trainingVersion(model: FlowModel): FlowVersion | undefined {
+    return model.versions.find((version) => version.status === "training");
+}
+
+export function lastFailure(model: FlowModel): FlowVersion | undefined {
+    return newestFirst(model).find((version) => version.status === "failed");
+}
+
+export type NextAction = "train" | "make-live" | "retry" | "link";
+
+export type NextStep = {
+    label: string;
+    detail: string;
+    href: string;
+    action: NextAction;
+    version?: number;
+};
 
 export function nextStep(current: FlowState, model: FlowModel): NextStep | null {
     if (model.kind === "base") {
@@ -1407,53 +1751,92 @@ export function nextStep(current: FlowState, model: FlowModel): NextStep | null 
     const pending = current.feedback.filter(
         (row) => row.model === model.slug && row.state === "pending",
     ).length;
-    const training = model.versions.find((version) => version.status === "training");
-    const live = liveVersion(model);
-    const candidate = deployCandidate(model);
+    const training = trainingVersion(model);
+    const trainedReady = newestFirst(model).find(
+        (version) => version.kind === "trained" && version.status === "ready",
+    );
+    const candidate = bestCandidate(model);
+    const watch: NextStep | null = training
+        ? {
+              label: `Training v${training.number} · ${Math.round((training.progress ?? 0) * 100)}%`,
+              detail: "It is scored against live and v0 Baseline when it finishes.",
+              href: versionHref(model.slug, training.number, "training"),
+              action: "link",
+          }
+        : null;
     if (!model.dataset) {
         return {
             label: "Add data",
-            detail: "Pick or upload the examples it learns from and is scored on.",
-            href: modelHref(model.slug, "data"),
+            detail: "Attach the examples it learns from and is scored on.",
+            href: modelHref(model.slug, "training"),
+            action: "link",
         };
     }
-    if (training) {
-        return {
-            label: `Training v${training.number} · ${Math.round((training.progress ?? 0) * 100)}%`,
-            detail: "It is scored against v0 when it finishes.",
-            href: jobHref(training.jobId),
-        };
+    if (watch && !trainedReady) {
+        return watch;
     }
-    if (model.serveOnly && !model.versions.some((version) => version.kind === "trained")) {
-        return {
-            label: "Switch base to train",
-            detail: `${model.base} is serve-only: GGUF weights cannot be trained. Its v0 can still be deployed.`,
-            href: modelHref(model.slug),
-        };
+    if (model.serveOnly && !trainedReady) {
+        return model.live === null
+            ? {
+                  label: "Make live v0",
+                  detail: `${model.base} cannot be trained, but v0 Baseline can answer requests.`,
+                  href: versionHref(model.slug, 0),
+                  action: "make-live",
+                  version: 0,
+              }
+            : {
+                  label: "Try it in the Playground",
+                  detail: `${model.base} cannot be trained; pick a trainable base to fine-tune.`,
+                  href: `${FLOW}/playground?model=${model.slug}`,
+                  action: "link",
+              };
     }
-    if (!model.versions.some((version) => version.kind === "trained")) {
+    if (!trainedReady) {
         return {
             label: "Train v1",
-            detail: "v0 is the base with instructions only; training teaches it your labels.",
-            href: modelHref(model.slug),
-            train: true,
+            detail: "v0 Baseline is the base with instructions only; training teaches it your data.",
+            href: modelHref(model.slug, "training"),
+            action: "train",
+        };
+    }
+    if (model.live === null) {
+        return {
+            label: `Make live v${trainedReady.number}`,
+            detail: `Its name then answers with v${trainedReady.number}; every version stays callable as ${model.slug}@N.`,
+            href: versionHref(model.slug, trainedReady.number),
+            action: "make-live",
+            version: trainedReady.number,
         };
     }
     if (candidate) {
+        const delta = scoreDelta(model, candidate);
         return {
-            label: `Deploy v${candidate.number}`,
-            detail: live
-                ? `It beats live v${live.number} and passed the promotion rule.`
-                : "It passed the promotion rule.",
+            label: `Make live v${candidate.number}`,
+            detail: `It beats live v${model.live} by ${points(delta ?? 0)} points.`,
             href: versionHref(model.slug, candidate.number),
+            action: "make-live",
+            version: candidate.number,
+        };
+    }
+    if (watch) {
+        return watch;
+    }
+    const newest = newestFirst(model)[0];
+    if (newest?.status === "failed" && /memory/i.test(newest.error ?? "")) {
+        return {
+            label: "Retry with QLoRA",
+            detail: `v${newest.number} ran out of memory. QLoRA trains the same data and settings in 4-bit, as v${nextNumber(model)}.`,
+            href: versionHref(model.slug, newest.number, "training"),
+            action: "retry",
+            version: newest.number,
         };
     }
     if (model.accepted > 0) {
         return {
-            label: `Train v${nextNumber(model)} (+${model.accepted} accepted ${model.accepted === 1 ? "row" : "rows"})`,
+            label: `Train v${nextNumber(model)} (+${model.accepted} feedback ${model.accepted === 1 ? "row" : "rows"})`,
             detail: "Accepted feedback joins the training data.",
-            href: modelHref(model.slug),
-            train: true,
+            href: modelHref(model.slug, "training"),
+            action: "train",
         };
     }
     if (pending > 0) {
@@ -1461,13 +1844,10 @@ export function nextStep(current: FlowState, model: FlowModel): NextStep | null 
             label: `Review ${pending} feedback ${pending === 1 ? "row" : "rows"}`,
             detail: "People flagged answers as wrong.",
             href: `${FLOW}/feedback`,
+            action: "link",
         };
     }
-    return {
-        label: "Try it in the Playground",
-        detail: "Nothing needs doing.",
-        href: `${FLOW}/playground?model=${model.slug}`,
-    };
+    return null;
 }
 
 export function versionKey(slug: string, number: number): string {
@@ -1475,7 +1855,7 @@ export function versionKey(slug: string, number: number): string {
 }
 
 export function liveVersion(model: FlowModel): FlowVersion | undefined {
-    return model.deployed && model.live !== null
+    return model.live !== null
         ? model.versions.find((version) => version.number === model.live)
         : undefined;
 }
@@ -1505,23 +1885,255 @@ export function beatsLive(model: FlowModel, version: FlowVersion): boolean {
     return version.passed === true && delta !== null && delta > 0;
 }
 
-export function attention(model: FlowModel): string | null {
-    const newest = newestFirst(model)[0];
-    if (!newest) {
+export type RuleCheck = { label: string; value: string; met: boolean };
+
+export function ruleChecks(model: FlowModel, version: FlowVersion): RuleCheck[] {
+    if (!version.scores) {
+        return [];
+    }
+    const live = liveVersion(model);
+    const [floor, slack] = model.rule;
+    const checks: RuleCheck[] = [
+        {
+            label: `${model.metrics[0]} is at least ${pct(floor)}`,
+            value: pct(version.scores[0]),
+            met: version.scores[0] >= floor,
+        },
+    ];
+    if (live?.scores && live.number !== version.number) {
+        const drop = version.scores[1] - live.scores[1];
+        checks.push({
+            label: `${model.metrics[1]} is no more than ${(slack * 100).toFixed(1)} points below live`,
+            value: `${points(drop)} points`,
+            met: drop >= -slack,
+        });
+    }
+    return checks;
+}
+
+export function ruleReason(model: FlowModel, version: FlowVersion): string {
+    const missed = ruleChecks(model, version).filter((check) => !check.met);
+    const first = missed[0] ?? ruleChecks(model, version)[0];
+    if (!first) {
+        return "The promotion rule was not met.";
+    }
+    return `Promotion rule: ${first.label.charAt(0).toLowerCase()}${first.label.slice(1)}; it scored ${first.value}.`;
+}
+
+export type ScoreNote = { kind: "beats"; delta: number } | { kind: "below"; reason: string } | null;
+
+export function scoreNote(model: FlowModel, version: FlowVersion): ScoreNote {
+    if (!version.scores || model.live === version.number) {
         return null;
     }
-    const training = model.versions.find((version) => version.status === "training");
-    if (training) {
-        return `v${training.number} training · ${Math.round((training.progress ?? 0) * 100)}%`;
+    if (version.passed === false) {
+        return { kind: "below", reason: ruleReason(model, version) };
     }
-    if (newest.status === "failed") {
-        return `v${newest.number} failed`;
-    }
-    const better = newestFirst(model).find((version) => beatsLive(model, version));
-    if (better) {
-        return `v${better.number} beats live`;
+    const delta = scoreDelta(model, version);
+    if (delta !== null && delta > 0.0005) {
+        return { kind: "beats", delta };
     }
     return null;
+}
+
+export function liveShare(model: FlowModel, number: number): number | null {
+    if (model.live === number) {
+        return model.canary ? 100 - model.canary.share : 100;
+    }
+    if (model.canary?.version === number) {
+        return model.canary.share;
+    }
+    return null;
+}
+
+export function liveSplit(model: FlowModel): string | null {
+    if (model.live === null) {
+        return null;
+    }
+    if (model.canary) {
+        return `Live: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%`;
+    }
+    const live = liveVersion(model);
+    return `Live: v${model.live}${live?.scores ? ` · ${pct(live.scores[0])}` : ""}`;
+}
+
+export type StatusKind =
+    | "canary"
+    | "candidate"
+    | "failed"
+    | "training"
+    | "setup"
+    | "idle"
+    | "on"
+    | "off"
+    | "update";
+
+export type StatusLine = { kind: StatusKind; text: string; version?: number };
+
+export function statusLine(model: FlowModel): StatusLine {
+    if (model.kind === "base") {
+        const update = model.variants.find((item) => item.update);
+        if (update) {
+            return { kind: "update", text: `${update.format} has an update` };
+        }
+        return model.deployed
+            ? { kind: "on", text: "On the API" }
+            : { kind: "off", text: "Off the API" };
+    }
+    const training = trainingVersion(model);
+    const newest = newestFirst(model)[0];
+    const candidate = bestCandidate(model);
+    if (model.canary) {
+        return { kind: "canary", text: liveSplit(model) ?? "" };
+    }
+    if (candidate && model.live !== null) {
+        const delta = scoreDelta(model, candidate) ?? 0;
+        return {
+            kind: "candidate",
+            text: `v${candidate.number} beats live ${points(delta)}`,
+            version: candidate.number,
+        };
+    }
+    if (newest?.status === "failed") {
+        return {
+            kind: "failed",
+            text: `v${newest.number} failed`,
+            version: newest.number,
+        };
+    }
+    if (training) {
+        return {
+            kind: "training",
+            text: `v${training.number} training ${Math.round((training.progress ?? 0) * 100)}%`,
+            version: training.number,
+        };
+    }
+    if (!model.dataset) {
+        return { kind: "setup", text: "Needs data" };
+    }
+    if (model.live === null) {
+        return candidate
+            ? {
+                  kind: "candidate",
+                  text: `v${candidate.number} ready`,
+                  version: candidate.number,
+              }
+            : { kind: "idle", text: "Nothing live yet" };
+    }
+    return model.deployed
+        ? { kind: "on", text: "On the API" }
+        : { kind: "off", text: "Off the API" };
+}
+
+export function attention(model: FlowModel): string | null {
+    const line = statusLine(model);
+    return ["candidate", "failed", "training", "canary", "update"].includes(line.kind)
+        ? line.text
+        : null;
+}
+
+export type InboxAction = "make-live" | "review" | "retry" | "update" | "monitor";
+
+export type InboxItem = {
+    id: string;
+    model: FlowModel | null;
+    text: string;
+    detail: string;
+    action: InboxAction;
+    label: string;
+    hoursAgo: number;
+    atMs?: number;
+    version?: number;
+    variant?: string;
+};
+
+function hoursOf(item: { hoursAgo: number; atMs?: number }): number {
+    return item.atMs ? (Date.now() - item.atMs) / 3600000 : item.hoursAgo;
+}
+
+function percent(value: number): string {
+    const shown = value * 100;
+    return `${shown < 1 ? shown.toFixed(1) : Math.round(shown)}%`;
+}
+
+export function inbox(current: FlowState): InboxItem[] {
+    const items: InboxItem[] = [];
+    for (const model of current.models) {
+        if (model.kind === "base") {
+            for (const item of model.variants.filter((v) => v.update)) {
+                items.push({
+                    id: `update:${model.slug}:${item.id}`,
+                    model,
+                    text: `${model.name} has an update`,
+                    detail: `${item.format}: ${item.update}`,
+                    action: "update",
+                    label: "Update",
+                    hoursAgo: 30,
+                    variant: item.id,
+                });
+            }
+            continue;
+        }
+        const candidate = bestCandidate(model);
+        const delta = candidate ? scoreDelta(model, candidate) : null;
+        if (candidate && delta !== null) {
+            items.push({
+                id: `live:${model.slug}:${candidate.number}`,
+                model,
+                text: `${model.name} v${candidate.number} beats live (${points(delta)})`,
+                detail: `${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for live v${model.live}, and it passed the promotion rule.`,
+                action: "make-live",
+                label: "Make live",
+                hoursAgo: candidate.hoursAgo,
+                atMs: candidate.atMs,
+                version: candidate.number,
+            });
+        }
+        const newest = newestFirst(model)[0];
+        if (newest?.status === "failed") {
+            const memory = /memory/i.test(newest.error ?? "");
+            items.push({
+                id: `failed:${model.slug}:${newest.number}`,
+                model,
+                text: `${model.name} v${newest.number} failed${memory ? ": out of memory" : ""}`,
+                detail: newest.error ?? "",
+                action: "retry",
+                label: memory ? "Retry with QLoRA" : "Open",
+                hoursAgo: newest.hoursAgo,
+                atMs: newest.atMs,
+                version: newest.number,
+            });
+        }
+        if (model.deployed && model.errors > model.usualErrors * 3) {
+            items.push({
+                id: `errors:${model.slug}`,
+                model,
+                text: `${model.name} errors ${percent(model.errors)} (usually ${percent(model.usualErrors)})`,
+                detail: "Most failures in the last hour are timeouts from the canary version.",
+                action: "monitor",
+                label: "Open monitoring",
+                hoursAgo: 0.6,
+            });
+        }
+    }
+    const pending = current.feedback.filter((row) => row.state === "pending");
+    if (pending.length > 0) {
+        const owners = [...new Set(pending.map((row) => row.model))].map(
+            (slug) => current.models.find((model) => model.slug === slug)?.name ?? slug,
+        );
+        items.push({
+            id: `feedback:${pending.length}`,
+            model: null,
+            text: `${pending.length} feedback ${pending.length === 1 ? "row" : "rows"} to review`,
+            detail: `Answers people marked wrong, for ${owners.join(", ")}.`,
+            action: "review",
+            label: "Review",
+            hoursAgo: Math.min(...pending.map((row) => row.hoursAgo)),
+        });
+    }
+    return items
+        .filter((item) => !current.dismissed.includes(item.id))
+        .sort((a, b) => hoursOf(a) - hoursOf(b));
 }
 
 export const SHOWN_VERSIONS = 5;
@@ -1529,7 +2141,10 @@ export const SHOWN_VERSIONS = 5;
 export function shownVersions(model: FlowModel): FlowVersion[] {
     const ordered = newestFirst(model);
     const pinned = ordered.filter(
-        (version) => version.number === liveVersion(model)?.number || beatsLive(model, version),
+        (version) =>
+            version.number === model.live ||
+            version.number === model.canary?.version ||
+            beatsLive(model, version),
     );
     const rest = ordered.filter((version) => !pinned.includes(version));
     const picked = [...pinned, ...rest.slice(0, Math.max(0, SHOWN_VERSIONS - pinned.length))];
@@ -1541,7 +2156,7 @@ export function createdAt(item: { hoursAgo: number; atMs?: number }): string {
 }
 
 export function shortAgo(item: { hoursAgo: number; atMs?: number }): string {
-    const hours = item.atMs ? (Date.now() - item.atMs) / 3600000 : item.hoursAgo;
+    const hours = hoursOf(item);
     if (hours < 1) {
         return `${Math.max(1, Math.round(hours * 60))} min ago`;
     }
@@ -1550,6 +2165,14 @@ export function shortAgo(item: { hoursAgo: number; atMs?: number }): string {
     }
     const days = Math.round(hours / DAY);
     return days < 14 ? `${days} d ago` : `${Math.round(days / 7)} wk ago`;
+}
+
+export function timeLeft(version: FlowVersion): string {
+    const left = 1 - (version.progress ?? 0);
+    if (version.atMs) {
+        return `${Math.max(1, Math.ceil((left * TRAIN_MS) / 1000))} s`;
+    }
+    return `about ${Math.max(1, Math.ceil(left * 14))} min`;
 }
 
 export function pct(value: number | null | undefined): string {
@@ -1573,23 +2196,33 @@ export function versionState(model: FlowModel, version: FlowVersion): VersionSta
     if (version.status === "failed") {
         return { label: "Failed", tone: "destructive" };
     }
-    if (liveVersion(model)?.number === version.number) {
-        return { label: "Live", tone: "success" };
+    const share = liveShare(model, version.number);
+    if (share !== null) {
+        return {
+            label: share === 100 ? "Live" : `Live · ${share}%`,
+            tone: "success",
+        };
     }
-    if (version.passed === false) {
-        return { label: "Rejected", tone: "warning" };
-    }
-    return { label: "Passed", tone: "approval" };
+    return { label: "Ready", tone: "neutral" };
 }
 
 export const KIND_LABELS: Record<VersionKind, string> = {
-    trained: "Trained",
-    prompt: "Prompt only",
+    trained: "Fine-tuned",
+    prompt: "Baseline",
 };
+
+export const BASELINE_HINT = "Prompt only, not fine-tuned";
+
+export function versionName(version: {
+    number: number;
+    kind: VersionKind;
+}): string {
+    return version.kind === "prompt" ? `v${version.number} · Baseline` : `v${version.number}`;
+}
 
 export const FLOW = "/proto/flow";
 
-export type ModelTab = "overview" | "versions" | "data" | "api";
+export type ModelTab = "overview" | "versions" | "training" | "monitoring" | "keys" | "variants";
 
 export function modelHref(slug: string, tab: ModelTab = "overview"): string {
     return `${FLOW}/models/${slug}${tab === "overview" ? "" : `/${tab}`}`;
@@ -1597,6 +2230,10 @@ export function modelHref(slug: string, tab: ModelTab = "overview"): string {
 
 export function versionHref(slug: string, version: number, tab?: string): string {
     return `${FLOW}/models/${slug}/versions/v${version}${tab ? `/${tab}` : ""}`;
+}
+
+export function playgroundHref(slug: string, version?: number): string {
+    return `${FLOW}/playground?model=${slug}${version === undefined ? "" : `@${version}`}`;
 }
 
 export function flowHref(slug?: string, version?: number, tab?: string): string {
@@ -1622,7 +2259,7 @@ export function datasetHref(slug: string): string {
 }
 
 export function catalogHref(id: string): string {
-    return `${FLOW}/discover/${id}`;
+    return modelHref(id);
 }
 
 export type Answer = {
@@ -1738,7 +2375,9 @@ export function answerOf(answer: Answer, number: number): string {
     if (known) {
         return known;
     }
-    const miss = (answer.id * (number + 3)) % 5 === 0;
+    const miss =
+        (answer.id * (number + 3)) % 5 === 0 ||
+        (number === 0 && (answer.id % 3 === 0 || answer.id % 5 === 0));
     return miss ? LABELS[(answer.id + number) % LABELS.length] : answer.expected;
 }
 
@@ -1752,9 +2391,18 @@ export type RowDiff = { text: string; label: string };
 
 export const ROWS_ADDED: RowDiff[] = [
     { text: "Refund my order, the size was wrong.", label: "refund_request" },
-    { text: "Charge reversed but the invoice still shows unpaid.", label: "billing" },
-    { text: "Please cancel and refund the add-on seats.", label: "refund_request" },
-    { text: "Password manager autofill breaks the login form.", label: "bug_report" },
+    {
+        text: "Charge reversed but the invoice still shows unpaid.",
+        label: "billing",
+    },
+    {
+        text: "Please cancel and refund the add-on seats.",
+        label: "refund_request",
+    },
+    {
+        text: "Password manager autofill breaks the login form.",
+        label: "bug_report",
+    },
 ];
 
 export const ROWS_REMOVED: RowDiff[] = [
