@@ -42,13 +42,5 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 - obp-ui theme: the kit's Cobalt preset, applied from obp-ui in `web/src/lib/theme.ts` (`themePresetStyle`, re-applied
   when light/dark changes). Never copy or override its tokens in `web/src/styles.css` (2026-11-02). Cobalt's type
   pairing (Mona Sans, JetBrains Mono, since 2026-11-04) needs `obp-ui/fonts-alt.css`.
-- Sidebar nav items carry icons (the kit's `NavItem` needs one, and the collapsed rail shows only icons): the
-  user's choice on 2026-10-30, an exception to the portfolio's no-icon-per-nav-item rule.
-- `PanelSection` (`web/src/components/Section.tsx`) puts an icon before each section title, with the title and
-  description above the panel: the user's choice on 2026-11-02 for Settings, Security, Compute and model details,
-  an exception to the no-icon-per-heading rule.
-- The base model picker shows memory needed and disk size as an icon and a number (`MemoryStick`, `HardDrive`, with
-  screen-reader labels) instead of repeating "Needs X GB memory": the user's choice on 2026-11-05, an exception to the
-  functional-icons-only rule.
 - Sidebar section titles are 12px uppercase (`SectionLabel` in `web/src/components/Shell.tsx`): the user's
   choice on 2026-10-30, an exception to the portfolio's sentence-case label rule and 13px floor.
