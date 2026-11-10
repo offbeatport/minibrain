@@ -945,15 +945,6 @@ export function VariantRow({
     );
 }
 
-export function GroupHeading({ label, facts }: { label: string; facts: string }) {
-    return (
-        <li className="col-span-full flex items-baseline gap-2 px-4 pt-4 pb-1.5 text-sm text-muted-foreground">
-            <span className="font-medium">{label}</span>
-            <span className="tabular-nums">{facts}</span>
-        </li>
-    );
-}
-
 export function MoreRow({
     model,
     shown,

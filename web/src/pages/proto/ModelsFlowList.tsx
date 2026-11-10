@@ -1,24 +1,11 @@
 import { useRouter } from "@tanstack/react-router";
-import { ArrowUpDown, Columns3, GitCompare, Layers, PowerOff, Trash2, X } from "lucide-react";
+import { GitCompare, PowerOff, Trash2, X } from "lucide-react";
 import {
     Button,
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-    FilterMenu,
     InfoTip,
     KbdHint,
-    Label,
     SearchInput,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
     Separator,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -32,7 +19,6 @@ import {
     type FlowVersion,
     KIND_LABELS,
     attention,
-    baseModelSlug,
     compareHref,
     deleteModels,
     deleteVariantFiles,
@@ -51,17 +37,11 @@ import {
     versionKey,
     versionState,
 } from "./modelsFlowData";
-import {
-    AutopilotDialog,
-    type Confirm,
-    ConfirmDialog,
-    DeleteModelsDialog,
-} from "./modelsFlowDialogs";
+import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 import { QuickLook } from "./modelsFlowPeek";
 import {
     COLUMNS,
     type Column,
-    GroupHeading,
     type Handlers,
     type Hint,
     ModelRow,
@@ -73,6 +53,16 @@ import {
     gridTemplate,
     plural,
 } from "./modelsFlowRows";
+import {
+    DEFAULT_SORT,
+    FilterChips,
+    type Filters,
+    NO_FILTERS,
+    type SortKey,
+    ViewOptions,
+    passes,
+    sortModels,
+} from "./modelsFlowView";
 
 type Line =
     | { key: string; type: "model"; model: FlowModel; expanded: boolean }
@@ -84,26 +74,8 @@ type Line =
           model: FlowModel;
           shown: number;
           searching: boolean;
-      }
-    | { key: string; type: "group"; label: string; facts: string };
+      };
 type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
-
-type Filters = { deployed: boolean; attention: boolean };
-type SortKey = "attention" | "score" | "name";
-type GroupKey = "none" | "base" | "task" | "status";
-
-const SORTS: { value: SortKey; label: string }[] = [
-    { value: "attention", label: "Needs attention first" },
-    { value: "score", label: "Score, high to low" },
-    { value: "name", label: "Name, A to Z" },
-];
-
-const GROUPS: { value: GroupKey; label: string }[] = [
-    { value: "none", label: "No grouping" },
-    { value: "base", label: "Group by base" },
-    { value: "task", label: "Group by task" },
-    { value: "status", label: "Group by status" },
-];
 
 const HINTS: Record<string, Hint> = {
     "support-triage": {
@@ -133,29 +105,6 @@ function writeStored(key: string, value: unknown) {
     } catch {
         return;
     }
-}
-
-function passes(model: FlowModel, filters: Filters): boolean {
-    return (
-        (!filters.deployed || model.deployed) && (!filters.attention || attention(model) !== null)
-    );
-}
-
-function scoreOf(model: FlowModel): number {
-    const live = liveVersion(model)?.scores?.[0];
-    return live ?? Math.max(-1, ...model.versions.map((version) => version.scores?.[0] ?? -1));
-}
-
-function sortModels(models: FlowModel[], sort: SortKey): FlowModel[] {
-    const sorted = [...models];
-    if (sort === "score") {
-        sorted.sort((a, b) => scoreOf(b) - scoreOf(a));
-    } else if (sort === "name") {
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-    } else {
-        sorted.sort((a, b) => Number(attention(b) !== null) - Number(attention(a) !== null));
-    }
-    return sorted.sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 function lineId(key: string): string {
@@ -190,61 +139,6 @@ function childHits(model: FlowModel, text: string): number {
     return model.kind === "base"
         ? model.variants.filter((item) => variantMatches(item, text)).length
         : model.versions.filter((version) => versionMatches(model, version, text)).length;
-}
-
-function groupOf(model: FlowModel, group: GroupKey, names: Map<string, string>): string {
-    if (group === "base") {
-        const slug = model.kind === "base" ? model.slug : baseModelSlug(model.base ?? "");
-        return names.get(slug) ?? model.base ?? "Other";
-    }
-    if (group === "task") {
-        return model.kind === "base" ? "Base models" : model.task;
-    }
-    if (group === "status") {
-        if (attention(model) !== null || model.autopilot?.run) {
-            return "Needs attention";
-        }
-        return model.deployed ? "On the API" : "Off the API";
-    }
-    return model.kind === "base" ? "Base models" : "Your models";
-}
-
-const GROUP_ORDER: Record<GroupKey, string[]> = {
-    none: ["Your models", "Base models"],
-    base: [],
-    task: ["Classify", "Extract", "SQL", "Base models"],
-    status: ["Needs attention", "On the API", "Off the API"],
-};
-
-function grouped(models: FlowModel[], group: GroupKey): [string, FlowModel[]][] {
-    const names = new Map(
-        models.filter((model) => model.kind === "base").map((model) => [model.slug, model.name]),
-    );
-    const buckets = new Map<string, FlowModel[]>();
-    for (const model of models) {
-        const label = groupOf(model, group, names);
-        buckets.set(label, [...(buckets.get(label) ?? []), model]);
-    }
-    const order = GROUP_ORDER[group];
-    const rank = (label: string) => (order.includes(label) ? order.indexOf(label) : order.length);
-    const entries = [...buckets.entries()].sort(
-        (a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]),
-    );
-    if (group === "base") {
-        return entries.map(([label, items]) => [
-            label,
-            [...items].sort((a, b) => Number(b.kind === "base") - Number(a.kind === "base")),
-        ]);
-    }
-    return entries;
-}
-
-function groupFacts(items: FlowModel[]): string {
-    const custom = items.filter((model) => model.kind === "custom").length;
-    const bases = items.length - custom;
-    return [custom > 0 && plural(custom, "model"), bases > 0 && plural(bases, "base")]
-        .filter(Boolean)
-        .join(" · ");
 }
 
 function childLines(model: FlowModel, text: string): Line[] {
@@ -285,44 +179,29 @@ function defaultExpanded(model: FlowModel): boolean {
     return attention(model) !== null || model.autopilot?.run !== undefined;
 }
 
+function matchesText(model: FlowModel, text: string): boolean {
+    return !text || modelText(model).includes(text) || childHits(model, text) > 0;
+}
+
 function buildLines(
     models: FlowModel[],
-    group: GroupKey,
     text: string,
     stored: Record<string, boolean>,
     searchToggles: Record<string, boolean>,
     nested: boolean,
 ): Line[] {
-    const lines: Line[] = [];
-    for (const [label, items] of grouped(models, group)) {
-        const visible = items.filter(
-            (model) => !text || modelText(model).includes(text) || childHits(model, text) > 0,
-        );
-        if (visible.length === 0) {
-            continue;
-        }
-        lines.push({
-            key: `group:${label}`,
-            type: "group",
-            label,
-            facts: groupFacts(visible),
-        });
-        for (const model of visible) {
-            const children = model.kind === "base" ? model.variants : model.versions;
-            const searching = childHits(model, text) > 0;
-            const expanded =
-                nested &&
-                children.length > 0 &&
-                (searching
-                    ? (searchToggles[model.slug] ?? true)
-                    : (stored[model.slug] ?? defaultExpanded(model)));
-            lines.push({ key: model.slug, type: "model", model, expanded });
-            if (expanded) {
-                lines.push(...childLines(model, searching ? text : ""));
-            }
-        }
-    }
-    return lines;
+    return models.flatMap((model): Line[] => {
+        const children = model.kind === "base" ? model.variants : model.versions;
+        const searching = childHits(model, text) > 0;
+        const expanded =
+            nested &&
+            children.length > 0 &&
+            (searching
+                ? (searchToggles[model.slug] ?? true)
+                : (stored[model.slug] ?? defaultExpanded(model)));
+        const row: Line = { key: model.slug, type: "model", model, expanded };
+        return expanded ? [row, ...childLines(model, searching ? text : "")] : [row];
+    });
 }
 
 type PickedVersion = { model: FlowModel; version: FlowVersion };
@@ -506,46 +385,6 @@ function SelectionBar({
     );
 }
 
-function ColumnPicker({
-    shown,
-    onChange,
-}: {
-    shown: Column[];
-    onChange: (columns: Column[]) => void;
-}) {
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                    <Columns3 aria-hidden="true" />
-                    Columns
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Show columns</DropdownMenuLabel>
-                {COLUMNS.map((column) => (
-                    <DropdownMenuCheckboxItem
-                        key={column.id}
-                        checked={shown.includes(column.id)}
-                        closeOnClick={false}
-                        onCheckedChange={(on) =>
-                            onChange(
-                                on
-                                    ? COLUMNS.map((c) => c.id).filter(
-                                          (id) => id === column.id || shown.includes(id),
-                                      )
-                                    : shown.filter((id) => id !== column.id),
-                            )
-                        }
-                    >
-                        {column.label}
-                    </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-
 function useExpanded() {
     const [stored, setStored] = useState<Record<string, boolean>>(() =>
         readStored(EXPANDED_KEY, {}),
@@ -600,112 +439,6 @@ function confirmDeletion(
     };
 }
 
-function Toolbar({
-    models,
-    query,
-    onQuery,
-    filters,
-    onFilters,
-    group,
-    onGroup,
-    sort,
-    onSort,
-    columns,
-    onColumns,
-    nested,
-    onNested,
-    onDeleteModels,
-}: {
-    models: FlowModel[];
-    query: string;
-    onQuery: (value: string) => void;
-    filters: Filters;
-    onFilters: (value: Filters) => void;
-    group: GroupKey;
-    onGroup: (value: GroupKey) => void;
-    sort: SortKey;
-    onSort: (value: SortKey) => void;
-    columns: Column[];
-    onColumns: (value: Column[]) => void;
-    nested: boolean;
-    onNested: (value: boolean) => void;
-    onDeleteModels: () => void;
-}) {
-    return (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <SearchInput
-                aria-label="Search models, versions and variants"
-                placeholder="Search"
-                value={query}
-                onValueChange={onQuery}
-                className="w-full max-w-64 flex-1"
-            />
-            <div className="flex h-8 items-center gap-2">
-                <Switch id="flow-show-versions" checked={nested} onCheckedChange={onNested} />
-                <Label htmlFor="flow-show-versions" className="cursor-pointer font-normal">
-                    Show versions
-                </Label>
-            </div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-                <FilterMenu
-                    sections={[
-                        {
-                            kind: "toggle",
-                            key: "deployed",
-                            title: "API",
-                            label: "On the API",
-                            count: models.filter((model) => model.deployed).length,
-                            checked: filters.deployed,
-                            onCheckedChange: (deployed) => onFilters({ ...filters, deployed }),
-                        },
-                        {
-                            kind: "toggle",
-                            key: "attention",
-                            title: "Attention",
-                            label: "Needs attention",
-                            count: models.filter((model) => attention(model) !== null).length,
-                            checked: filters.attention,
-                            onCheckedChange: (value) => onFilters({ ...filters, attention: value }),
-                        },
-                    ]}
-                    onClear={() => onFilters({ deployed: false, attention: false })}
-                />
-                <Select value={group} onValueChange={(value) => onGroup(value as GroupKey)}>
-                    <SelectTrigger aria-label="Group models" className="w-auto">
-                        <Layers aria-hidden="true" className="size-4 text-muted-foreground" />
-                        <SelectValue className="flex-1 text-left" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {GROUPS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Select value={sort} onValueChange={(value) => onSort(value as SortKey)}>
-                    <SelectTrigger aria-label="Sort models" className="w-auto">
-                        <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
-                        <SelectValue className="flex-1 text-left" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {SORTS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <ColumnPicker shown={columns} onChange={onColumns} />
-                <Button variant="outline" onClick={onDeleteModels}>
-                    <Trash2 aria-hidden="true" />
-                    Delete models…
-                </Button>
-            </div>
-        </div>
-    );
-}
-
 export function ModelsFlowList() {
     const models = useFlowModels();
     const router = useRouter();
@@ -717,33 +450,28 @@ export function ModelsFlowList() {
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const [nested, setNested] = useState<boolean>(() => readStored(NESTED_KEY, false));
     const [confirm, setConfirm] = useState<Confirm | null>(null);
-    const [filters, setFilters] = useState<Filters>({
-        deployed: false,
-        attention: false,
-    });
-    const [sort, setSort] = useState<SortKey>("attention");
-    const [group, setGroup] = useState<GroupKey>("none");
+    const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+    const [sort, setSort] = useState<SortKey>(DEFAULT_SORT);
     const [columns, setColumns] = useState<Column[]>(() =>
         readStored(COLUMNS_KEY, DEFAULT_COLUMNS),
     );
     const [peek, setPeek] = useState<string | null>(null);
-    const [deletingModels, setDeletingModels] = useState(false);
     const [autopilotFor, setAutopilotFor] = useState<string | null>(null);
     const text = query.trim().toLowerCase();
+    const pool = useMemo(() => models.filter((model) => matchesText(model, text)), [models, text]);
     const lines = useMemo(
         () =>
             buildLines(
                 sortModels(
-                    models.filter((model) => passes(model, filters)),
+                    pool.filter((model) => passes(model, filters)),
                     sort,
                 ),
-                group,
                 text,
                 expanded.stored,
                 searchToggles,
                 nested,
             ),
-        [models, filters, sort, group, text, expanded.stored, searchToggles, nested],
+        [pool, filters, sort, text, expanded.stored, searchToggles, nested],
     );
     const rows = lines.filter((line): line is RowLine =>
         ["model", "version", "variant"].includes(line.type),
@@ -934,9 +662,6 @@ export function ModelsFlowList() {
         open: () => on.open(hrefOf(line)),
     });
     const render = (line: Line) => {
-        if (line.type === "group") {
-            return <GroupHeading key={line.key} label={line.label} facts={line.facts} />;
-        }
         if (line.type === "model") {
             return (
                 <ModelRow
@@ -1002,35 +727,43 @@ export function ModelsFlowList() {
                     }
                 />
             ) : (
-                <Toolbar
-                    models={models}
-                    query={query}
-                    onQuery={(value) => {
-                        setQuery(value);
-                        setSearchToggles({});
-                    }}
-                    filters={filters}
-                    onFilters={setFilters}
-                    group={group}
-                    onGroup={setGroup}
-                    sort={sort}
-                    onSort={setSort}
-                    columns={columns}
-                    onColumns={(value) => {
-                        setColumns(value);
-                        writeStored(COLUMNS_KEY, value);
-                    }}
-                    nested={nested}
-                    onNested={(value) => {
-                        setNested(value);
-                        writeStored(NESTED_KEY, value);
-                        if (!value) {
-                            clear();
-                        }
-                    }}
-                    onDeleteModels={() => setDeletingModels(true)}
-                />
+                <div className="flex items-center gap-2">
+                    <SearchInput
+                        aria-label="Search models, versions and variants"
+                        placeholder="Search"
+                        value={query}
+                        onValueChange={(value) => {
+                            setQuery(value);
+                            setSearchToggles({});
+                        }}
+                        className="w-full max-w-72 flex-1"
+                    />
+                    <div className="ml-auto">
+                        <ViewOptions
+                            pool={pool}
+                            models={models}
+                            filters={filters}
+                            onFilters={setFilters}
+                            sort={sort}
+                            onSort={setSort}
+                            columns={columns}
+                            onColumns={(value) => {
+                                setColumns(value);
+                                writeStored(COLUMNS_KEY, value);
+                            }}
+                            nested={nested}
+                            onNested={(value) => {
+                                setNested(value);
+                                writeStored(NESTED_KEY, value);
+                                if (!value) {
+                                    clear();
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
             )}
+            <FilterChips models={models} filters={filters} onFilters={setFilters} />
             <div
                 className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card"
                 style={{ gridTemplateColumns: gridTemplate(columns) }}
@@ -1072,11 +805,6 @@ export function ModelsFlowList() {
                 </KbdHint>
             </div>
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
-            <DeleteModelsDialog
-                open={deletingModels}
-                models={models}
-                onOpenChange={setDeletingModels}
-            />
             <AutopilotDialog
                 model={models.find((model) => model.slug === autopilotFor) ?? null}
                 onClose={() => setAutopilotFor(null)}
