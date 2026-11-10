@@ -21,7 +21,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
-import { AnswersTable, dataRows, settingsRows, verdictOf } from "./ModelsFlowVersion";
+import { AnswersTable, dataRows, settingsRows } from "./ModelsFlowVersion";
 import {
     type FlowModel,
     type FlowVersion,
@@ -38,6 +38,7 @@ import {
     playgroundHref,
     points,
     useFlowModel,
+    verdictOf,
     versionName,
 } from "./modelsFlowData";
 import { Crumbs, MakeLiveButton } from "./modelsFlowParts";

@@ -24,6 +24,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
 import { AvatarTile, choiceFor } from "./avatarDicebear";
+import { useCan } from "./flowOverlays";
 import {
     BASELINE_HINT,
     type FlowModel,
@@ -213,7 +214,8 @@ export function MakeLiveButton({
     label?: string;
 }) {
     const text = makeLiveLabel(model, version);
-    if (!text) {
+    const can = useCan("builder");
+    if (!text || !can) {
         return null;
     }
     const quiet = text !== "Make live" || version.passed === false;
@@ -435,7 +437,11 @@ export function openConnect(slug: string) {
 export function OnApiSwitch({ model }: { model: FlowModel }) {
     const toast = useToast();
     const [asking, setAsking] = useState(false);
+    const can = useCan("builder");
     const nothing = model.kind === "custom" && model.live === null;
+    if (!can) {
+        return null;
+    }
     const change = (on: boolean) => {
         if (!on) {
             setAsking(true);

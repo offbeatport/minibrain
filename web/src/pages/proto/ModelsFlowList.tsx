@@ -13,6 +13,7 @@ import {
     useToast,
 } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
+import { openVersion } from "./flowOverlays";
 import {
     type BaseVariant,
     type FlowModel,
@@ -36,6 +37,7 @@ import {
     variantKey,
     versionKey,
     versionState,
+    versionTarget,
 } from "./modelsFlowData";
 import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 import { QuickLook } from "./modelsFlowPeek";
@@ -484,7 +486,14 @@ export function ModelsFlowList() {
     const clear = () => setSelection([]);
     const peekModel = models.find((model) => model.slug === peek) ?? null;
     const on: Handlers = {
-        open: (href) => router.history.push(href),
+        open: (href) => {
+            const target = versionTarget(href);
+            if (target) {
+                openVersion(target.slug, target.number);
+                return;
+            }
+            router.history.push(href);
+        },
         peek: (model) => {
             setPeek(model.slug);
             focusLine(model.slug);

@@ -6,7 +6,10 @@ import {
     ChevronDown,
     Compass,
     Database,
+    Gauge,
+    GraduationCap,
     Home,
+    ListChecks,
     Play,
     Search,
     Server,
@@ -24,17 +27,23 @@ import {
 } from "obp-ui/shell";
 import { type ReactNode, useEffect, useState } from "react";
 import { CommandPalette } from "./FlowCommand";
+import { type Role, allows, openVersion, setRole, useOverlays } from "./flowOverlays";
+import { TrainDialog } from "./flowTrainDialog";
+import { VersionSheet } from "./flowVersionCard";
 import {
     FLOW,
     type FlowState,
     type Mode,
     compareHref,
+    findVersion,
+    jobHref,
     markVisited,
     modelHref,
     restartJourney,
     setMode,
     useFlowState,
     versionHref,
+    versionTarget,
 } from "./modelsFlowData";
 import { IntentDialogs } from "./modelsFlowParts";
 
@@ -45,39 +54,56 @@ type Entry = {
     path: string;
     icon: IconComponent;
     exact?: boolean;
+    role?: Role;
 };
 
 const SECTIONS: { label: string | null; items: Entry[] }[] = [
     {
         label: null,
-        items: [{ label: "Home", path: FLOW, icon: Home, exact: true }],
-    },
-    {
-        label: "Build",
         items: [
+            { label: "Home", path: FLOW, icon: Home, exact: true },
             { label: "Models", path: `${FLOW}/models`, icon: Box },
-            { label: "Data", path: `${FLOW}/data`, icon: Database },
-            { label: "Feedback", path: `${FLOW}/feedback`, icon: ThumbsUp },
         ],
     },
     {
         label: "Explore",
         items: [
-            { label: "Discover", path: `${FLOW}/discover`, icon: Compass },
+            { label: "Discover", path: `${FLOW}/discover`, icon: Compass, role: "builder" },
             { label: "Playground", path: `${FLOW}/playground`, icon: Play },
+        ],
+    },
+    {
+        label: "Create",
+        items: [
+            { label: "Data", path: `${FLOW}/data`, icon: Database, role: "builder" },
+            { label: "Training", path: `${FLOW}/training`, icon: GraduationCap, role: "builder" },
+            { label: "Evaluations", path: `${FLOW}/evaluations`, icon: Gauge, role: "builder" },
+            { label: "Feedback", path: `${FLOW}/feedback`, icon: ThumbsUp, role: "builder" },
         ],
     },
     {
         label: "Operate",
         items: [
             { label: "Monitor", path: `${FLOW}/monitor`, icon: Activity },
-            { label: "Infrastructure", path: `${FLOW}/infrastructure`, icon: Server },
+            { label: "Jobs", path: `${FLOW}/jobs`, icon: ListChecks, role: "builder" },
+            {
+                label: "Infrastructure",
+                path: `${FLOW}/infrastructure`,
+                icon: Server,
+                role: "admin",
+            },
         ],
     },
     {
         label: null,
         items: [{ label: "Settings", path: `${FLOW}/settings`, icon: Settings }],
     },
+];
+
+const ROLES: { key: Role; label: string }[] = [
+    { key: "viewer", label: "Viewer" },
+    { key: "builder", label: "Builder" },
+    { key: "admin", label: "Admin" },
 ];
 
 type Step = {
@@ -100,6 +126,8 @@ function focusOf(state: FlowState): string {
 
 function steps(state: FlowState): Step[] {
     const focus = focusOf(state);
+    const model = state.models.find((item) => item.slug === focus);
+    const first = model ? findVersion(model, 1) : undefined;
     return [
         {
             id: "home",
@@ -108,6 +136,12 @@ function steps(state: FlowState): Step[] {
             mode: "empty",
             match: (path, current) =>
                 path === FLOW && !current.models.some((model) => model.kind === "custom"),
+        },
+        {
+            id: "evaluate",
+            label: "Evaluations: pick a base from the chart",
+            href: `${FLOW}/evaluations`,
+            match: (path) => path.startsWith(`${FLOW}/evaluations`),
         },
         {
             id: "start",
@@ -122,16 +156,22 @@ function steps(state: FlowState): Step[] {
             match: (path) => MODEL_PAGE.test(path),
         },
         {
+            id: "data",
+            label: "Data page: attach a dataset",
+            href: `${FLOW}/data?for=${focus}`,
+            match: (path) => path.startsWith(`${FLOW}/data`),
+        },
+        {
             id: "training",
-            label: "Training tab: attach data, Train v1",
+            label: "Model › Training: Train v1",
             href: modelHref(focus, "training"),
             match: (path) => /\/models\/[^/]+\/training$/.test(path),
         },
         {
             id: "watch",
-            label: "Watch training on v1's Training tab",
-            href: versionHref(focus, 1, "training"),
-            match: (path) => /\/versions\/v\d+\/training$/.test(path),
+            label: "Watch v1 train on its job page",
+            href: first ? jobHref(first.jobId) : modelHref(focus, "training"),
+            match: (path) => /\/jobs\/\d+$/.test(path),
         },
         {
             id: "ready",
@@ -139,7 +179,7 @@ function steps(state: FlowState): Step[] {
             href: compareHref(focus, 0, 1),
             match: (path) => path.endsWith("/compare") || path.startsWith(`${FLOW}/playground`),
         },
-        { id: "live", label: "Make live", href: versionHref(focus, 1) },
+        { id: "live", label: "Open v1's report card, Make live", href: versionHref(focus, 1) },
         {
             id: "connect",
             label: "Connect, plus an API key",
@@ -158,8 +198,19 @@ function steps(state: FlowState): Step[] {
             href: `${FLOW}/feedback`,
             match: (path) => path.startsWith(`${FLOW}/feedback`),
         },
-        { id: "train2", label: "Train v2", href: modelHref(focus, "training") },
+        {
+            id: "train2",
+            label: "Training page: Train v2",
+            href: `${FLOW}/training`,
+            match: (path) => path === `${FLOW}/training`,
+        },
         { id: "inbox", label: "Inbox: v2 beats live, Make live", href: FLOW },
+        {
+            id: "jobs",
+            label: "Jobs: every job, bulk retry",
+            href: `${FLOW}/jobs`,
+            match: (path) => path === `${FLOW}/jobs`,
+        },
         { id: "rollback", label: "Roll back", href: modelHref(focus, "versions") },
     ];
 }
@@ -252,9 +303,14 @@ function Journey({ pathname }: { pathname: string }) {
 }
 
 function Navigation({ pathname, pending }: { pathname: string; pending: number }) {
+    const { role } = useOverlays();
+    const sections = SECTIONS.map((section) => ({
+        ...section,
+        items: section.items.filter((entry) => allows(role, entry.role ?? "viewer")),
+    })).filter((section) => section.items.length > 0);
     return (
         <>
-            {SECTIONS.map((section) => (
+            {sections.map((section) => (
                 <div key={section.label ?? section.items[0].path} className="flex flex-col">
                     {section.label && (
                         <SectionLabel tone="subtle" className={SECTION_LABEL}>
@@ -311,6 +367,7 @@ export function FlowShell() {
         select: (state) => state.location.pathname,
     }).replace(/\/$/, "");
     const state = useFlowState();
+    const { role } = useOverlays();
     const [searching, setSearching] = useState(false);
     const step = stepFor(pathname, state);
     useEffect(() => {
@@ -328,6 +385,32 @@ export function FlowShell() {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, []);
+    useEffect(() => {
+        const onClick = (event: MouseEvent) => {
+            if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+            ) {
+                return;
+            }
+            const anchor = (event.target as HTMLElement).closest("a");
+            const href = anchor?.getAttribute("href");
+            const target = href ? versionTarget(href) : null;
+            const model = target
+                ? state.models.find((item) => item.slug === target.slug)
+                : undefined;
+            if (!target || !model || !findVersion(model, target.number)) {
+                return;
+            }
+            event.preventDefault();
+            openVersion(target.slug, target.number);
+        };
+        document.addEventListener("click", onClick, true);
+        return () => document.removeEventListener("click", onClick, true);
+    }, [state.models]);
     const pending = state.feedback.filter((row) => row.state === "pending").length;
     const rail = (
         <Rail
@@ -347,7 +430,7 @@ export function FlowShell() {
                 <Button
                     variant="outline"
                     onClick={() => setSearching(true)}
-                    className="w-64 justify-start text-muted-foreground"
+                    className="w-52 justify-start text-muted-foreground"
                 >
                     <Search aria-hidden="true" />
                     Search
@@ -358,6 +441,11 @@ export function FlowShell() {
                     active={state.mode}
                     onSelect={(key) => setMode(key as Mode)}
                 />
+                <SegmentedTabs
+                    tabs={ROLES}
+                    active={role}
+                    onSelect={(key) => setRole(key as Role)}
+                />
                 <span className="hidden truncate text-sm text-muted-foreground 2xl:inline">
                     Prototype · fake data, nothing is saved
                 </span>
@@ -366,6 +454,8 @@ export function FlowShell() {
                 </div>
             </div>
             <Outlet />
+            <VersionSheet />
+            <TrainDialog />
             <IntentDialogs />
             <CommandPalette open={searching} onOpenChange={setSearching} />
         </AppShell>

@@ -2,6 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, Input, KbdHint, cn } from "obp-ui";
 import { type KeyboardEvent, useEffect, useState } from "react";
+import { openTrain, openVersion, useCan } from "./flowOverlays";
 import {
     FLOW,
     type FlowState,
@@ -14,7 +15,6 @@ import {
     points,
     scoreDelta,
     useFlowState,
-    versionHref,
     versionName,
     versionState,
 } from "./modelsFlowData";
@@ -74,6 +74,38 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
             run: () => go(`${FLOW}/models/new`),
         },
         {
+            id: "training",
+            group: "Actions",
+            label: "Open Training",
+            detail: "Every model's training jobs",
+            text: "open training jobs runs train fine-tune",
+            run: () => go(`${FLOW}/training`),
+        },
+        {
+            id: "evaluations",
+            group: "Actions",
+            label: "Open Evaluations",
+            detail: "Test sets, graders and a model comparison",
+            text: "open evaluations evals test sets graders judge compare bases",
+            run: () => go(`${FLOW}/evaluations`),
+        },
+        {
+            id: "jobs",
+            group: "Actions",
+            label: "Open Jobs",
+            detail: "Every job of every kind",
+            text: "open jobs queue cancel retry downloads imports scoring judge",
+            run: () => go(`${FLOW}/jobs`),
+        },
+        {
+            id: "monitor",
+            group: "Actions",
+            label: "Open Monitor",
+            detail: "Requests, latency, errors and cost",
+            text: "open monitor traffic requests latency errors cost log",
+            run: () => go(`${FLOW}/monitor`),
+        },
+        {
             id: "playground",
             group: "Actions",
             label: "Open Playground",
@@ -103,9 +135,9 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
                 id: `train:${model.slug}`,
                 group: "Actions" as const,
                 label: `Train v${nextNumber(model)} of ${model.name}`,
-                detail: "Training tab",
+                detail: "Pick the data, method and settings",
                 text: `train v${nextNumber(model)} ${model.name} ${model.slug}`,
-                run: () => go(modelHref(model.slug, "training")),
+                run: () => openTrain(model.slug),
             })),
     ];
     const models: Command[] = state.models.map((model) => ({
@@ -125,7 +157,7 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
                 label: `${model.name} ${versionName(version)}`,
                 detail: versionState(model, version).label,
                 text: `${model.name} ${model.slug} v${version.number} ${model.slug}@${version.number} ${version.kind === "prompt" ? "baseline" : ""}`,
-                run: () => go(versionHref(model.slug, version.number)),
+                run: () => openVersion(model.slug, version.number),
             })),
     );
     const datasets: Command[] = state.datasets.map((item) => ({
@@ -149,6 +181,12 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
         };
     });
     return [...actions, ...models, ...versions, ...datasets, ...jobs];
+}
+
+const BUILDER_ONLY = /^(live|train|key|add$|training$|evaluations$|jobs$|data|job)/;
+
+function viewable(command: Command): boolean {
+    return !BUILDER_ONLY.test(command.id);
 }
 
 function filtered(commands: Command[], query: string): Command[] {
@@ -176,7 +214,8 @@ export function CommandPalette({
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const go = (href: string) => router.history.push(href);
-    const commands = commandsOf(state, go);
+    const can = useCan("builder");
+    const commands = commandsOf(state, go).filter((command) => can || viewable(command));
     const shown = filtered(commands, query);
     const current = Math.min(active, Math.max(0, shown.length - 1));
     useEffect(() => {

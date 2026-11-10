@@ -10,15 +10,10 @@ import { Page, Section, Stat } from "~/components/Section";
 import { Requests } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import {
-    KeysTab,
-    TrainingTab,
-    VariantsTab,
-    VersionsTab,
-    trainBlock,
-    useStartTraining,
-} from "./flowModelTabs";
+import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs";
 import { ModelMonitoring } from "./flowMonitoring";
+import { openTrain, useCan } from "./flowOverlays";
+import { TrainButton, trainBlock } from "./flowTraining";
 import {
     type CatalogEntry,
     FLOW,
@@ -32,6 +27,8 @@ import {
     findVersion,
     flowHref,
     installBase,
+    jobHref,
+    jobOfVersion,
     lastFailure,
     liveSplit,
     liveVersion,
@@ -193,6 +190,7 @@ function StripRow({ children, actions }: { children: ReactNode; actions: ReactNo
 function OtherVersions({ model }: { model: FlowModel }) {
     const router = useRouter();
     const toast = useToast();
+    const can = useCan("builder");
     const training = trainingVersion(model);
     const candidate = model.live !== null ? bestCandidate(model) : undefined;
     const failure = lastFailure(model);
@@ -219,9 +217,7 @@ function OtherVersions({ model }: { model: FlowModel }) {
                     <StripRow
                         actions={
                             <Button variant="outline" asChild>
-                                <Link href={versionHref(model.slug, training.number, "training")}>
-                                    Watch
-                                </Link>
+                                <Link href={jobHref(training.jobId)}>Watch</Link>
                             </Button>
                         }
                     >
@@ -259,17 +255,19 @@ function OtherVersions({ model }: { model: FlowModel }) {
                                         Compare
                                     </Link>
                                 </Button>
-                                <Button
-                                    onClick={() =>
-                                        openIntent({
-                                            kind: "make-live",
-                                            slug: model.slug,
-                                            number: candidate.number,
-                                        })
-                                    }
-                                >
-                                    Make live
-                                </Button>
+                                {can && (
+                                    <Button
+                                        onClick={() =>
+                                            openIntent({
+                                                kind: "make-live",
+                                                slug: model.slug,
+                                                number: candidate.number,
+                                            })
+                                        }
+                                    >
+                                        Make live
+                                    </Button>
+                                )}
                             </>
                         }
                     >
@@ -289,17 +287,11 @@ function OtherVersions({ model }: { model: FlowModel }) {
                         actions={
                             <>
                                 <Button variant="outline" asChild>
-                                    <Link
-                                        href={versionHref(
-                                            model.slug,
-                                            newestFailure.number,
-                                            "training",
-                                        )}
-                                    >
+                                    <Link href={versionHref(model.slug, newestFailure.number)}>
                                         Open
                                     </Link>
                                 </Button>
-                                {memory && (
+                                {memory && can && (
                                     <Tip tip={trainBlock(model)}>
                                         <Button
                                             variant="outline"
@@ -313,9 +305,10 @@ function OtherVersions({ model }: { model: FlowModel }) {
                                                     title: `v${number} is training with QLoRA`,
                                                     tone: "success",
                                                 });
-                                                router.history.push(
-                                                    versionHref(model.slug, number, "training"),
-                                                );
+                                                const job = jobOfVersion(model.slug, number);
+                                                if (job) {
+                                                    router.history.push(jobHref(job));
+                                                }
                                             }}
                                         >
                                             Retry with QLoRA
@@ -341,6 +334,9 @@ function OtherVersions({ model }: { model: FlowModel }) {
 function NextPanel({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const step = nextStep(state, model);
+    if (!useCan("builder")) {
+        return null;
+    }
     return (
         <Panel title="Next step">
             {step ? (
@@ -359,6 +355,7 @@ function NextPanel({ model }: { model: FlowModel }) {
 
 function Details({ model }: { model: FlowModel }) {
     const state = useFlowState();
+    const builder = useCan("builder");
     const data = state.datasets.find((item) => item.slug === model.dataset);
     const items: [string, ReactNode][] = [
         [
@@ -373,15 +370,28 @@ function Details({ model }: { model: FlowModel }) {
         ],
         [
             "Data",
-            data ? (
-                <Link
-                    key="data"
-                    href={datasetHref(data.slug)}
-                    className="text-primary hover:underline"
-                >{`${data.name} v${data.version}`}</Link>
-            ) : (
-                "None yet"
-            ),
+            <span key="data" className="flex flex-wrap items-baseline gap-x-2">
+                {data ? (
+                    <Link href={datasetHref(data.slug)} className="text-primary hover:underline">
+                        {`${data.slug} v${data.version}`}
+                    </Link>
+                ) : (
+                    <span className="text-muted-foreground">None yet</span>
+                )}
+                {builder && (
+                    <>
+                        <span aria-hidden="true" className="text-faint">
+                            ·
+                        </span>
+                        <Link
+                            href={`${FLOW}/data?for=${model.slug}`}
+                            className="text-primary hover:underline"
+                        >
+                            {data ? "Change" : "Add data"}
+                        </Link>
+                    </>
+                )}
+            </span>,
         ],
         [
             "API name",
@@ -515,7 +525,10 @@ function BaseOverview({ model }: { model: FlowModel }) {
 function PrimaryAction({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const router = useRouter();
-    const train = useStartTraining(model);
+    const can = useCan("builder");
+    if (!can) {
+        return null;
+    }
     if (model.kind === "base") {
         return (
             <Button asChild>
@@ -531,7 +544,7 @@ function PrimaryAction({ model }: { model: FlowModel }) {
         const blocked = trainBlock(model);
         return (
             <Tip tip={blocked}>
-                <Button disabled={Boolean(blocked)} onClick={() => train()}>
+                <Button disabled={Boolean(blocked)} onClick={() => openTrain(model.slug)}>
                     {step.label}
                 </Button>
             </Tip>
@@ -543,7 +556,10 @@ function PrimaryAction({ model }: { model: FlowModel }) {
             <Button
                 onClick={() => {
                     const number = retryWithQLoRA(model.slug, failed);
-                    router.history.push(versionHref(model.slug, number, "training"));
+                    const job = jobOfVersion(model.slug, number);
+                    if (job) {
+                        router.history.push(jobHref(job));
+                    }
                 }}
             >
                 {step.label}
@@ -563,6 +579,17 @@ function PrimaryAction({ model }: { model: FlowModel }) {
             <Link href={step.href}>{step.label}</Link>
         </Button>
     );
+}
+
+function SecondaryTrain({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    if (model.kind === "base" || model.serveOnly || !model.dataset) {
+        return null;
+    }
+    if (nextStep(state, model)?.action === "train") {
+        return null;
+    }
+    return <TrainButton model={model} variant="outline" />;
 }
 
 function Header({ model }: { model: FlowModel }) {
@@ -592,6 +619,7 @@ function Header({ model }: { model: FlowModel }) {
                     <Button variant="outline" onClick={() => openConnect(model.slug)}>
                         Connect
                     </Button>
+                    <SecondaryTrain model={model} />
                     <PrimaryAction model={model} />
                 </>
             }
@@ -599,15 +627,18 @@ function Header({ model }: { model: FlowModel }) {
     );
 }
 
-function tabsOf(model: FlowModel): ModelTab[] {
-    return model.kind === "base"
-        ? ["overview", "variants", "monitoring", "keys"]
-        : ["overview", "versions", "training", "monitoring", "keys"];
+function tabsOf(model: FlowModel, builder: boolean): ModelTab[] {
+    if (model.kind === "base") {
+        return ["overview", "variants", "monitoring", "keys"];
+    }
+    return builder
+        ? ["overview", "versions", "training", "monitoring", "keys"]
+        : ["overview", "versions", "monitoring", "keys"];
 }
 
-function tabOf(value: string | undefined, model: FlowModel): ModelTab {
+function tabOf(value: string | undefined, tabs: ModelTab[]): ModelTab {
     const wanted = value ? (ALIASES[value] ?? value) : "overview";
-    return tabsOf(model).find((tab) => tab === wanted) ?? "overview";
+    return tabs.find((tab) => tab === wanted) ?? "overview";
 }
 
 function CatalogOnly({ entry }: { entry: CatalogEntry }) {
@@ -677,6 +708,7 @@ export function FlowModelPage() {
         tab?: string;
     };
     const model = useFlowModel(params.model);
+    const builder = useCan("builder");
     const entry = catalogEntry(params.model);
     if (!model && entry) {
         return <CatalogOnly entry={entry} />;
@@ -691,14 +723,15 @@ export function FlowModelPage() {
             </Page>
         );
     }
-    const tab = tabOf(params.tab, model);
+    const tabs = tabsOf(model, builder);
+    const tab = tabOf(params.tab, tabs);
     return (
         <Page>
             <Crumbs items={[{ label: "Models", href: flowHref() }, { label: model.name }]} />
             <Header model={model} />
             <TabNav
                 label={`${model.name} pages`}
-                tabs={tabsOf(model).map((item) => ({
+                tabs={tabs.map((item) => ({
                     href: modelHref(model.slug, item),
                     label: TAB_LABELS[item],
                 }))}

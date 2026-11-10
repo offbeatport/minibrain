@@ -27,6 +27,7 @@ import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { PickerDialog } from "./AvatarStylesSection";
 import { type AvatarChoice, AvatarTile, choiceFor } from "./avatarDicebear";
+import { openVersion, useCan } from "./flowOverlays";
 import {
     CATALOG,
     type CatalogEntry,
@@ -41,6 +42,8 @@ import {
     dismiss,
     inbox,
     isInstalled,
+    jobHref,
+    jobOfVersion,
     modelHref,
     openIntent,
     retryWithQLoRA,
@@ -171,6 +174,7 @@ function Overview() {
 function InboxRow({ item }: { item: InboxItem }) {
     const router = useRouter();
     const toast = useToast();
+    const can = useCan("builder") || item.action === "monitor";
     const act = () => {
         const slug = item.model?.slug ?? "";
         if (item.action === "make-live" && item.version !== undefined) {
@@ -189,7 +193,7 @@ function InboxRow({ item }: { item: InboxItem }) {
             toast({ title: `${item.model?.name} updated`, tone: "success" });
         } else if (item.action === "retry" && item.version !== undefined) {
             if (item.label === "Open") {
-                router.history.push(versionHref(slug, item.version, "training"));
+                openVersion(slug, item.version);
                 return;
             }
             const number = retryWithQLoRA(slug, item.version);
@@ -199,7 +203,12 @@ function InboxRow({ item }: { item: InboxItem }) {
                 tone: "success",
                 action: {
                     label: "Watch",
-                    onClick: () => router.history.push(versionHref(slug, number, "training")),
+                    onClick: () => {
+                        const job = jobOfVersion(slug, number);
+                        if (job) {
+                            router.history.push(jobHref(job));
+                        }
+                    },
                 },
             });
         }
@@ -212,19 +221,32 @@ function InboxRow({ item }: { item: InboxItem }) {
                 <span aria-hidden="true" className="size-8 shrink-0" />
             )}
             <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{item.text}</span>
+                {item.model && item.version !== undefined ? (
+                    <Link
+                        href={versionHref(item.model.slug, item.version)}
+                        className="truncate font-medium hover:underline"
+                    >
+                        {item.text}
+                    </Link>
+                ) : (
+                    <span className="truncate font-medium">{item.text}</span>
+                )}
                 <span className="truncate text-sm text-muted-foreground">{item.detail}</span>
             </span>
             <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
                 {shortAgo(item)}
             </span>
-            <Button
-                variant={item.action === "make-live" ? "default" : "outline"}
-                className="w-40 shrink-0"
-                onClick={act}
-            >
-                {item.label}
-            </Button>
+            {can ? (
+                <Button
+                    variant={item.action === "make-live" ? "default" : "outline"}
+                    className="w-40 shrink-0"
+                    onClick={act}
+                >
+                    {item.label}
+                </Button>
+            ) : (
+                <span className="w-40 shrink-0" />
+            )}
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button

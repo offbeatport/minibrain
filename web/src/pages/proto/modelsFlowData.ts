@@ -3,10 +3,10 @@ import { type AvatarChoice, choiceFor } from "./avatarDicebear";
 
 export type VersionKind = "trained" | "prompt";
 export type VersionStatus = "ready" | "training" | "failed";
-export type Method = "LoRA" | "QLoRA";
+export type Adapter = "LoRA" | "QLoRA";
 
 export type TrainingSettings = {
-    method: Method;
+    adapter: Adapter;
     rank: number;
     epochs: number;
     learningRate: number;
@@ -116,7 +116,7 @@ function settings(
     learningRate: number,
     rows: number,
 ): TrainingSettings {
-    return { method: "LoRA", rank, epochs, learningRate, rows, batch: 8 };
+    return { adapter: "LoRA", rank, epochs, learningRate, rows, batch: 8 };
 }
 
 function data(
@@ -589,7 +589,7 @@ function complete(model: RawModel, index: number): FlowModel {
         })),
         avatar: null,
         dataset: DATASET_OF[model.slug] ?? null,
-        accepted: 0,
+        accepted: model.slug === "support-triage" ? 12 : 0,
         p95: extra?.p95 ?? 0,
         errors: extra?.errors ?? (model.deployed || model.kind === "base" ? 0.002 : 0),
         usualErrors: extra?.usualErrors ?? 0.003,
@@ -700,7 +700,7 @@ const DATASETS: Dataset[] = [
 
 export const SAMPLE_FILE = "support-tickets.csv";
 
-export type JobKind = "train" | "score" | "download" | "import";
+export type JobKind = "train" | "score" | "judge" | "download" | "import";
 export type JobStatus = "running" | "queued" | "done" | "failed" | "cancelled";
 
 export type Job = {
@@ -714,6 +714,7 @@ export type Job = {
     atMs?: number;
     minutes: number | null;
     error?: string;
+    device?: string;
 };
 
 function versionJob(model: FlowModel, version: FlowVersion): Job {
@@ -730,7 +731,12 @@ function versionJob(model: FlowModel, version: FlowVersion): Job {
                   : "done",
         progress: version.progress ?? 1,
         hoursAgo: version.hoursAgo,
-        minutes: version.status === "ready" ? (version.kind === "prompt" ? 2 : 14) : null,
+        minutes:
+            version.status === "ready"
+                ? version.kind === "prompt"
+                    ? 2
+                    : 9 + ((version.number * 5) % 7)
+                : null,
         error: version.error,
     };
 }
@@ -762,6 +768,26 @@ function jobsOf(models: FlowModel[]): Job[] {
         transfer(1201, "download", "qwen3-8b", 6 * DAY, 9),
         transfer(1202, "download", "llama-3.2-1b", 15 * DAY, 4),
         transfer(1203, "import", "qwen3-0.6b", 35 * DAY, 1),
+        {
+            id: 1205,
+            kind: "judge",
+            model: "support-triage",
+            version: 5,
+            status: "done",
+            progress: 1,
+            hoursAgo: 5.8 * DAY,
+            minutes: 4,
+        },
+        {
+            id: 1206,
+            kind: "judge",
+            model: "sql-helper",
+            version: 0,
+            status: "running",
+            progress: 0.6,
+            hoursAgo: 0.3,
+            minutes: null,
+        },
         {
             id: 1204,
             kind: "score",
@@ -1579,13 +1605,18 @@ function tick(mode: Mode, slug: string, number: number, jobId: number, timer: nu
     }
 }
 
-export function startTraining(slug: string, recipe?: TrainingSettings): number {
+export function startTraining(
+    slug: string,
+    recipe?: TrainingSettings,
+    picked?: DataChoice,
+): number {
     const model = state.models.find((item) => item.slug === slug);
     if (!model) {
         return 0;
     }
     const chosen = recipe ?? defaultRecipe(model);
-    const source = state.datasets.find((item) => item.slug === model.dataset);
+    const latest = dataChoices(model)[0];
+    const source = picked ?? latest;
     const number = nextNumber(model);
     const jobId = nextJob++;
     const added = model.accepted;
@@ -1600,7 +1631,7 @@ export function startTraining(slug: string, recipe?: TrainingSettings): number {
         atMs: Date.now(),
         wasLive: false,
         jobId,
-        data: data(source?.version ?? 1, (source?.rows ?? 2140) + added, added, 0),
+        data: data(source?.number ?? 1, (source?.rows ?? 2140) + added, added, 0),
         settings: { ...chosen, rows: chosen.rows + added },
         p50: 44,
     };
@@ -1610,13 +1641,14 @@ export function startTraining(slug: string, recipe?: TrainingSettings): number {
         recipe: chosen,
         versions: [...current.versions, version],
     }));
+    const device = trainingVersion(model) ? "gpu-a10-2" : DEVICE;
     set((current) => ({
         ...current,
-        jobs: [{ ...versionJob(model, version), atMs: Date.now() }, ...current.jobs],
+        jobs: [{ ...versionJob(model, version), atMs: Date.now(), device }, ...current.jobs],
     }));
     const mode = shared.mode;
     const timer = window.setInterval(() => tick(mode, slug, number, jobId, timer), TICK_MS);
-    markVisited(number === 1 ? "train" : "train2");
+    markVisited(number === 1 ? "training" : "train2");
     return number;
 }
 
@@ -1626,7 +1658,7 @@ export function retryWithQLoRA(slug: string, number: number): number {
     if (!model || !failed?.settings) {
         return 0;
     }
-    return startTraining(slug, { ...failed.settings, method: "QLoRA" });
+    return startTraining(slug, { ...failed.settings, adapter: "QLoRA" });
 }
 
 export function cancelJobs(ids: number[]) {
@@ -1760,15 +1792,15 @@ export function nextStep(current: FlowState, model: FlowModel): NextStep | null 
         ? {
               label: `Training v${training.number} · ${Math.round((training.progress ?? 0) * 100)}%`,
               detail: "It is scored against live and v0 Baseline when it finishes.",
-              href: versionHref(model.slug, training.number, "training"),
+              href: jobHref(training.jobId),
               action: "link",
           }
         : null;
     if (!model.dataset) {
         return {
             label: "Add data",
-            detail: "Attach the examples it learns from and is scored on.",
-            href: modelHref(model.slug, "training"),
+            detail: "Attach the examples it learns from and is scored on, on the Data page.",
+            href: `${FLOW}/data?for=${model.slug}`,
             action: "link",
         };
     }
@@ -1826,7 +1858,7 @@ export function nextStep(current: FlowState, model: FlowModel): NextStep | null 
         return {
             label: "Retry with QLoRA",
             detail: `v${newest.number} ran out of memory. QLoRA trains the same data and settings in 4-bit, as v${nextNumber(model)}.`,
-            href: versionHref(model.slug, newest.number, "training"),
+            href: versionHref(model.slug, newest.number),
             action: "retry",
             version: newest.number,
         };
@@ -2430,3 +2462,100 @@ export function lossCurve(
     }
     return rows;
 }
+
+export type Verdict = "worse" | "better" | "same";
+
+export function verdictOf(answer: Answer, mine: number, theirs: number): Verdict {
+    const a = answerOf(answer, mine) === answer.expected;
+    const b = answerOf(answer, theirs) === answer.expected;
+    return a === b ? "same" : a ? "better" : "worse";
+}
+
+export type DataChoice = { number: number; rows: number };
+
+export function datasetOf(model: FlowModel): Dataset | undefined {
+    return state.datasets.find((item) => item.slug === model.dataset);
+}
+
+export function dataChoices(model: FlowModel): DataChoice[] {
+    const source = datasetOf(model);
+    if (!source) {
+        return [];
+    }
+    return [0, 1, 2]
+        .map((back) => ({ number: source.version - back, rows: source.rows - back * 75 }))
+        .filter((choice) => choice.number >= 1);
+}
+
+export function rowsSinceLive(model: FlowModel, rows: number): number | null {
+    const live = liveVersion(model);
+    return live ? rows - live.data.rows : null;
+}
+
+export const DEFAULT_SETTINGS: Omit<TrainingSettings, "rows"> = {
+    adapter: "LoRA",
+    rank: 16,
+    epochs: 3,
+    learningRate: 2e-4,
+    batch: 8,
+};
+
+export function rate(value: number): string {
+    return value.toExponential(0);
+}
+
+export function changedSettings(chosen: TrainingSettings): string[] {
+    const changes: string[] = [];
+    if (chosen.adapter !== DEFAULT_SETTINGS.adapter) {
+        changes.push(chosen.adapter);
+    }
+    if (chosen.rank !== DEFAULT_SETTINGS.rank) {
+        changes.push(`rank ${chosen.rank}`);
+    }
+    if (chosen.epochs !== DEFAULT_SETTINGS.epochs) {
+        changes.push(`${chosen.epochs} epochs`);
+    }
+    if (chosen.learningRate !== DEFAULT_SETTINGS.learningRate) {
+        changes.push(`learning rate ${rate(chosen.learningRate)}`);
+    }
+    if (chosen.batch !== DEFAULT_SETTINGS.batch) {
+        changes.push(`batch ${chosen.batch}`);
+    }
+    return changes;
+}
+
+export function previousLive(model: FlowModel): FlowVersion | undefined {
+    return newestFirst(model).find(
+        (version) => version.wasLive && version.number !== model.live && version.scores,
+    );
+}
+
+export function shortHash(slug: string, number: number): string {
+    let hash = 2166136261;
+    for (const char of `${slug}@${number}`) {
+        hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    }
+    return hash.toString(16).padStart(8, "0").slice(0, 7);
+}
+
+const VERSION_PAGE = /^\/proto\/flow\/models\/([^/?#]+)\/versions\/v(\d+)\/?$/;
+
+export function versionTarget(href: string): { slug: string; number: number } | null {
+    const match = VERSION_PAGE.exec(href);
+    return match ? { slug: match[1], number: Number(match[2]) } : null;
+}
+
+export function cardHref(slug: string, number: number): string {
+    return versionHref(slug, number, "card");
+}
+
+export function trainingJobs(current: FlowState, slug: string): Job[] {
+    return current.jobs.filter((job) => job.model === slug && job.kind === "train");
+}
+
+export function jobOfVersion(slug: string, number: number): number | undefined {
+    const model = state.models.find((item) => item.slug === slug);
+    return model ? findVersion(model, number)?.jobId : undefined;
+}
+
+export const DEVICE = "gpu-a10-1";

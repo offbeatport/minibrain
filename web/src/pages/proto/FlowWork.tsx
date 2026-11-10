@@ -1,5 +1,5 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import { Check, RotateCcw, Send, X } from "lucide-react";
+import { Check, Send } from "lucide-react";
 import {
     Badge,
     Button,
@@ -17,50 +17,71 @@ import {
     SelectLabel,
     SelectTrigger,
     SelectValue,
-    TabNav,
     Table,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
+    Tabs,
+    TabsList,
+    TabsTrigger,
     useToast,
 } from "obp-ui";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+    type FormEvent,
+    type MouseEvent,
+    type ReactNode,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { StepChart, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend, type ChartSeries, TimeChart } from "~/components/charts/TimeChart";
-import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { relativeTime } from "~/lib/time";
+import { useCan } from "./flowOverlays";
+import { BulkJobs, JobStatusText } from "./flowTraining";
 import {
+    BASELINE_HINT,
+    DEVICE,
     FLOW,
     type FlowModel,
+    type FlowVersion,
     type Job,
     type JobKind,
-    type JobStatus,
     LOSS_STEPS,
     SAMPLE_FILE,
     attachDataset,
     cancelJobs,
+    changedSettings,
     countRequest,
     createdAt,
     datasetHref,
+    datasetOf,
     findVersion,
     jobHref,
+    jobOfVersion,
+    liveVersion,
     lossCurve,
     modelHref,
     nextStep,
     pct,
-    retryJobs,
+    points,
+    rate,
+    retryWithQLoRA,
     reviewFeedback,
+    rowsSinceLive,
     saveExample,
     uploadSample,
     useFlowState,
     versionHref,
+    versionName,
 } from "./modelsFlowData";
 import { Crumbs, MakeLiveButton } from "./modelsFlowParts";
 
@@ -132,7 +153,7 @@ export function FlowDataPage() {
                                                 <span key={model.slug}>
                                                     {index > 0 && ", "}
                                                     <Link
-                                                        href={modelHref(model.slug, "training")}
+                                                        href={modelHref(model.slug)}
                                                         className="text-primary hover:underline"
                                                     >
                                                         {model.name}
@@ -185,7 +206,7 @@ export function FlowDatasetPage() {
             description: "v0 was scored on its held-out rows: 71.2%.",
             tone: "success",
         });
-        router.history.push(modelHref(model, "training"));
+        router.history.push(modelHref(model));
     };
     const total = item.labels.reduce((sum, [, value]) => sum + value, 0);
     return (
@@ -326,37 +347,19 @@ const LOSS_SERIES: StepSeries[] = [
 const JOB_KINDS: Record<JobKind, string> = {
     train: "Training",
     score: "Scoring",
+    judge: "Judge",
     download: "Download",
     import: "Import",
 };
 
-const JOB_STATUS: Record<JobStatus, { tone: Tone; label: string }> = {
-    running: { tone: "info", label: "Running" },
-    queued: { tone: "neutral", label: "Queued" },
-    done: { tone: "success", label: "Done" },
-    failed: { tone: "destructive", label: "Failed" },
-    cancelled: { tone: "neutral", label: "Cancelled" },
-};
-
-function JobStatusText({ job }: { job: Job }) {
-    const status = JOB_STATUS[job.status];
-    return (
-        <span className="flex items-center gap-2">
-            <StatusText tone={status.tone}>
-                {status.label}
-                {job.status === "running" && (
-                    <span className="tabular-nums">{` · ${Math.round(job.progress * 100)}%`}</span>
-                )}
-            </StatusText>
-            {job.status === "running" && (
-                <ProgressBar value={job.progress} label={`Job ${job.id}`} className="w-16" />
-            )}
-        </span>
-    );
+function reached(job: Job): number {
+    return job.status === "failed" ? 0.3 : job.progress;
 }
 
-function logLines(job: Job): LogEntry[] {
+function logLines(job: Job, version: FlowVersion | undefined): LogEntry[] {
     const start = new Date(createdAt(job)).getTime();
+    const settings = version?.settings;
+    const rows = settings?.rows ?? version?.data.rows ?? 0;
     const lines: LogEntry[] = [
         {
             id: 1,
@@ -369,18 +372,29 @@ function logLines(job: Job): LogEntry[] {
             id: 2,
             level: "info",
             source: "trainer",
-            message: "Split: 1,926 train · 214 held out",
+            message: `Data v${version?.data.number ?? 1}: ${count(rows)} train rows, held-out rows kept apart`,
             time: start + 2000,
         },
-        {
+    ];
+    if (settings) {
+        lines.push({
             id: 3,
             level: "info",
             source: "trainer",
-            message: "Plan: LoRA rank 16, batch 8, gradient checkpointing off",
+            message: `Plan: SFT, ${settings.adapter} rank ${settings.rank}, ${settings.epochs} epochs, rate ${rate(settings.learningRate)}, batch ${settings.batch}`,
             time: start + 3000,
-        },
-    ];
-    const steps = Math.floor(job.progress * 6);
+        });
+    }
+    if (job.kind === "judge") {
+        lines.push({
+            id: 4,
+            level: "info",
+            source: "judge",
+            message: "Rubric: right queue, no invented facts, polite tone; scored 1 to 5",
+            time: start + 3000,
+        });
+    }
+    const steps = job.kind === "train" ? Math.floor(reached(job) * 6) : 0;
     for (let index = 1; index <= steps; index += 1) {
         lines.push({
             id: 3 + index,
@@ -411,6 +425,187 @@ function logLines(job: Job): LogEntry[] {
     return lines;
 }
 
+function Outcome({ model, version }: { model: FlowModel; version: FlowVersion }) {
+    const live = liveVersion(model);
+    const zero = findVersion(model, 0);
+    const score = version.scores?.[0];
+    if (score === undefined) {
+        return null;
+    }
+    const against = [
+        live && live.number !== version.number && live.scores
+            ? `${points(score - live.scores[0])} vs live v${live.number}`
+            : null,
+        zero?.scores && zero.number !== version.number
+            ? `${points(score - zero.scores[0])} vs baseline v0`
+            : null,
+    ].filter(Boolean);
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success/40 bg-success-soft px-4 py-3">
+            <span className="tabular-nums">
+                <span className="font-semibold">{`v${version.number} scored ${pct(score)}`}</span>
+                {against.length > 0 && `: ${against.join(", ")}.`}
+            </span>
+            <span className="flex gap-2">
+                <Button variant="outline" asChild>
+                    <Link href={versionHref(model.slug, version.number)}>
+                        {`Open v${version.number}`}
+                    </Link>
+                </Button>
+                <MakeLiveButton
+                    model={model}
+                    version={version}
+                    label={`Make v${version.number} live`}
+                />
+            </span>
+        </div>
+    );
+}
+
+function Inputs({
+    model,
+    version,
+    kind,
+}: { model: FlowModel; version: FlowVersion; kind: JobKind }) {
+    const dataset = datasetOf(model);
+    const since = model.live === version.number ? null : rowsSinceLive(model, version.data.rows);
+    const settings = version.settings;
+    const items: [string, ReactNode][] = [
+        [
+            kind === "train" ? "Produced" : "Version",
+            <Link
+                key="v"
+                href={versionHref(model.slug, version.number)}
+                className="text-primary hover:underline"
+            >
+                {`${versionName(version)} of ${model.name}`}
+            </Link>,
+        ],
+        [
+            "Data",
+            <span key="d" className="tabular-nums">
+                {`${dataset?.slug ?? "data"} v${version.data.number} · ${count(version.data.rows)} rows`}
+                {since !== null && since !== 0 && (
+                    <span className="text-muted-foreground">{`, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since live`}</span>
+                )}
+            </span>,
+        ],
+        ["Base", model.base ?? model.name],
+        [
+            "Method",
+            kind === "judge"
+                ? "Judge model Qwen3 8B with the rubric on the Evaluations page"
+                : version.kind === "prompt"
+                  ? `${BASELINE_HINT}, scored only`
+                  : "Supervised fine-tuning (SFT)",
+        ],
+    ];
+    if (settings && kind === "train") {
+        const changed = changedSettings(settings);
+        items.push(
+            [
+                "Settings",
+                <span key="s" className="tabular-nums">
+                    {`${settings.adapter} rank ${settings.rank} · ${settings.epochs} epochs · rate ${rate(settings.learningRate)} · batch ${settings.batch}`}
+                    <span className="block text-sm text-muted-foreground">
+                        {changed.length === 0
+                            ? "The install defaults."
+                            : `Changed from the defaults: ${changed.join(", ")}.`}
+                    </span>
+                </span>,
+            ],
+            [
+                "Training rows",
+                <span key="r" className="tabular-nums">
+                    {`${count(settings.rows)} train · ${count(model.heldOut)} held out`}
+                </span>,
+            ],
+        );
+    }
+    return (
+        <Section title="Inputs">
+            <Facts items={items} />
+        </Section>
+    );
+}
+
+function Run({ job }: { job: Job }) {
+    const step = Math.round(reached(job) * LOSS_STEPS);
+    return (
+        <Section title="Run">
+            <div className="flex flex-col gap-4">
+                <JobStatusText job={job} />
+                <ProgressBar
+                    value={reached(job)}
+                    label={`Job ${job.id} progress`}
+                    className="w-full"
+                />
+                <Facts
+                    items={[
+                        [
+                            "Step",
+                            <span key="s" className="tabular-nums">
+                                {`${count(step)} of ${count(LOSS_STEPS)}`}
+                            </span>,
+                        ],
+                        [
+                            "Device",
+                            <span key="d" className="font-mono text-sm">
+                                {job.device ?? DEVICE}
+                            </span>,
+                        ],
+                        [
+                            "Started",
+                            <time key="t" dateTime={createdAt(job)} className="tabular-nums">
+                                {relativeTime(createdAt(job))}
+                            </time>,
+                        ],
+                        [
+                            job.status === "running" ? "Time left" : "Took",
+                            <span key="m" className="tabular-nums">
+                                {job.status === "running"
+                                    ? `${Math.max(1, Math.ceil((1 - job.progress) * 10))} s`
+                                    : job.minutes
+                                      ? `${job.minutes} min`
+                                      : "–"}
+                            </span>,
+                        ],
+                    ]}
+                />
+            </div>
+        </Section>
+    );
+}
+
+function Failed({ model, version, job }: { model: FlowModel; version: FlowVersion; job: Job }) {
+    const router = useRouter();
+    const toast = useToast();
+    const memory = /memory/i.test(job.error ?? "");
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive-soft px-4 py-3">
+            <span className="flex min-w-0 flex-col">
+                <span className="font-semibold">{`v${version.number} failed, so it was never scored`}</span>
+                <span className="text-sm">{job.error}</span>
+            </span>
+            {memory && (
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        const number = retryWithQLoRA(model.slug, version.number);
+                        const next = jobOfVersion(model.slug, number);
+                        toast({ title: `v${number} is training with QLoRA`, tone: "success" });
+                        if (next) {
+                            router.history.push(jobHref(next));
+                        }
+                    }}
+                >
+                    Retry with QLoRA
+                </Button>
+            )}
+        </div>
+    );
+}
+
 export function FlowJobPage() {
     const { id } = useParams({ strict: false }) as { id?: string };
     const state = useFlowState();
@@ -419,10 +614,7 @@ export function FlowJobPage() {
         return (
             <Page>
                 <Crumbs
-                    items={[
-                        { label: "Monitor", href: `${FLOW}/monitor/jobs` },
-                        { label: `Job #${id}` },
-                    ]}
+                    items={[{ label: "Jobs", href: `${FLOW}/jobs` }, { label: `Job #${id}` }]}
                 />
                 <p className="text-muted-foreground">No such job.</p>
             </Page>
@@ -430,17 +622,22 @@ export function FlowJobPage() {
     }
     const model = state.models.find((item) => item.slug === job.model);
     const version = model && job.version !== null ? findVersion(model, job.version) : undefined;
-    const zero = model ? findVersion(model, 0) : undefined;
     const subject = `${JOB_KINDS[job.kind]}${job.version !== null ? ` v${job.version}` : ""} of ${model?.name ?? job.model}`;
-    const rows = lossCurve(job.version ?? 1).filter((row) => row.step <= LOSS_STEPS * job.progress);
-    const finished = job.status === "done" && job.kind === "train" && version?.scores;
+    const rows = lossCurve(job.version ?? 1).filter((row) => row.step <= LOSS_STEPS * reached(job));
+    const owned = model?.kind === "custom" && version;
     return (
         <Page>
             <Crumbs
-                items={[
-                    { label: "Monitor", href: `${FLOW}/monitor/jobs` },
-                    { label: `Job #${job.id}` },
-                ]}
+                items={
+                    owned
+                        ? [
+                              { label: "Models", href: `${FLOW}/models` },
+                              { label: model.name, href: modelHref(model.slug) },
+                              { label: "Training", href: modelHref(model.slug, "training") },
+                              { label: `Job #${job.id}` },
+                          ]
+                        : [{ label: "Jobs", href: `${FLOW}/jobs` }, { label: `Job #${job.id}` }]
+                }
             />
             <PageHeader
                 title={`Job #${job.id}`}
@@ -461,10 +658,10 @@ export function FlowJobPage() {
                 }
                 actions={
                     <>
-                        {model && version && job.kind === "train" && (
+                        {model && version && (
                             <Button variant="outline" asChild>
-                                <Link href={versionHref(model.slug, version.number, "training")}>
-                                    {`v${version.number} Training tab`}
+                                <Link href={versionHref(model.slug, version.number)}>
+                                    {`Open v${version.number}`}
                                 </Link>
                             </Button>
                         )}
@@ -476,54 +673,22 @@ export function FlowJobPage() {
                     </>
                 }
             />
-            {finished && model && version?.scores && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-success/40 bg-success-soft px-4 py-3">
-                    <span>
-                        <span className="font-semibold">{`v${version.number} scored ${pct(version.scores[0])}`}</span>
-                        {zero?.scores &&
-                            `, beats v0 Baseline (${pct(zero.scores[0])}) by ${((version.scores[0] - zero.scores[0]) * 100).toFixed(1)} points.`}
-                    </span>
-                    <span className="flex gap-2">
-                        <Button variant="outline" asChild>
-                            <Link
-                                href={versionHref(model.slug, version.number)}
-                            >{`Open v${version.number}`}</Link>
-                        </Button>
-                        <MakeLiveButton
-                            model={model}
-                            version={version}
-                            label={`Make live v${version.number}`}
-                        />
-                    </span>
-                </div>
+            {model && version && job.status === "done" && version.scores && (
+                <Outcome model={model} version={version} />
             )}
-            <Section title="Progress">
-                <div className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-                        <JobStatusText job={job} />
-                        <Stat
-                            label="Step"
-                            value={`${count(Math.round(job.progress * LOSS_STEPS))} of ${count(LOSS_STEPS)}`}
-                        />
-                        <Stat label="Worker" value="gpu-a10-1" />
-                        <Stat
-                            label={job.status === "running" ? "Time left" : "Took"}
-                            value={
-                                job.status === "running"
-                                    ? `${Math.ceil((1 - job.progress) * 10)} s`
-                                    : job.minutes
-                                      ? `${job.minutes} min`
-                                      : "–"
-                            }
-                        />
-                    </div>
-                    <ProgressBar
-                        value={job.progress}
-                        label={`Job ${job.id} progress`}
-                        className="w-full"
-                    />
-                </div>
-            </Section>
+            {model && version && job.status === "failed" && (
+                <Failed model={model} version={version} job={job} />
+            )}
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                <Run job={job} />
+                {model && version ? (
+                    <Inputs model={model} version={version} kind={job.kind} />
+                ) : (
+                    <Section title="Inputs">
+                        <p className="text-muted-foreground">{subject}</p>
+                    </Section>
+                )}
+            </div>
             {job.kind === "train" && (
                 <Section
                     title="Loss"
@@ -544,7 +709,7 @@ export function FlowJobPage() {
                 </Section>
             )}
             <LogViewer
-                entries={logLines(job)}
+                entries={logLines(job, version)}
                 live={job.status === "running"}
                 label="Job log"
                 maxHeight="16rem"
@@ -726,25 +891,47 @@ const SLOT_COLORS = ["var(--primary)", "var(--file-sql)", "var(--file-parquet)",
 const OTHER_COLOR = "var(--neutral)";
 const DAY_MS = 24 * 3600 * 1000;
 
-function MonitorTabs() {
-    return (
-        <TabNav
-            label="Monitor pages"
-            tabs={[
-                { href: `${FLOW}/monitor`, label: "Traffic" },
-                { href: `${FLOW}/monitor/jobs`, label: "Jobs" },
-            ]}
-        />
-    );
+function totalOf(model: FlowModel): number {
+    return model.traffic.reduce((sum, value) => sum + value, 0);
+}
+
+type Request = {
+    id: string;
+    model: FlowModel;
+    question: string;
+    minutesAgo: number;
+    ms: number;
+    ok: boolean;
+};
+
+function requestLog(models: FlowModel[]): Request[] {
+    return models
+        .filter((model) => model.deployed)
+        .flatMap((model) =>
+            model.recent.map((item, index) => ({
+                id: `${model.slug}-${index}`,
+                model,
+                question: item.question,
+                minutesAgo: item.minutesAgo,
+                ms: Math.round((model.p95 || 200) * (0.45 + index * 0.18)),
+                ok: !(model.errors > model.usualErrors * 3 && index === 1),
+            })),
+        )
+        .sort((a, b) => a.minutesAgo - b.minutesAgo);
+}
+
+function servedBy(model: FlowModel): string {
+    if (model.kind === "base") {
+        return model.variants.find((item) => item.live)?.apiName ?? model.slug;
+    }
+    return `${model.slug}@${model.live ?? 0}`;
 }
 
 export function FlowMonitorPage() {
     const state = useFlowState();
     const live = state.models
         .filter((model) => model.deployed)
-        .sort(
-            (a, b) => b.traffic.reduce((s, v) => s + v, 0) - a.traffic.reduce((s, v) => s + v, 0),
-        );
+        .sort((a, b) => totalOf(b) - totalOf(a));
     const top = live.slice(0, SLOT_COLORS.length);
     const rest = live.slice(SLOT_COLORS.length);
     const series: ChartSeries[] = [
@@ -771,13 +958,13 @@ export function FlowMonitorPage() {
         }
         return row;
     });
+    const log = requestLog(state.models);
     return (
         <Page wide>
             <PageHeader
                 title="Monitor"
-                caption="Traffic across live models, and every job on this install."
+                caption="Traffic across the models on the API: requests, latency, errors and cost."
             />
-            <MonitorTabs />
             <Section title="Requests per day" caption="Last 7 days, stacked by model.">
                 <div className="flex flex-col gap-3">
                     <ChartLegend series={series} />
@@ -795,158 +982,208 @@ export function FlowMonitorPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Model</TableHead>
+                            <TableHead className="pl-panel">Model</TableHead>
                             <TableHead className="text-right">Requests, 7 days</TableHead>
                             <TableHead className="text-right">Latency p95</TableHead>
                             <TableHead className="text-right">Errors</TableHead>
+                            <TableHead className="text-right">Cost / 1k req.</TableHead>
+                            <TableHead className="pr-panel text-right">GPU·s, 7 days</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {live.map((model) => (
                             <TableRow key={model.slug}>
-                                <TableCell>
+                                <TableCell className="pl-panel">
                                     <Link
-                                        href={modelHref(model.slug)}
+                                        href={modelHref(model.slug, "monitoring")}
                                         className="font-medium hover:underline"
                                     >
                                         {model.name}
                                     </Link>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {count(model.traffic.reduce((sum, value) => sum + value, 0))}
+                                    {count(totalOf(model))}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     {model.p95 ? `${model.p95} ms` : "–"}
                                 </TableCell>
                                 <TableCell
                                     className={
-                                        model.errors > 0.01
+                                        model.errors > model.usualErrors * 3
                                             ? "text-right text-destructive"
                                             : "text-right"
                                     }
                                 >
                                     {`${(model.errors * 100).toFixed(1)}%`}
                                 </TableCell>
+                                <TableCell className="text-right">{`${model.gpuSeconds.toFixed(1)} GPU·s`}</TableCell>
+                                <TableCell className="pr-panel text-right">
+                                    {((totalOf(model) / 1000) * model.gpuSeconds).toFixed(1)}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </div>
+            <Section
+                title="Request log"
+                caption="Newest first. Prompts and answers stay on this install."
+                flush
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="pl-panel">Time</TableHead>
+                            <TableHead>Model</TableHead>
+                            <TableHead>Request</TableHead>
+                            <TableHead className="text-right">Latency</TableHead>
+                            <TableHead className="pr-panel">Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {log.map((item) => (
+                            <TableRow key={item.id}>
+                                <TableCell className="pl-panel font-mono text-sm text-muted-foreground">
+                                    {`${item.minutesAgo} min ago`}
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">
+                                    {servedBy(item.model)}
+                                </TableCell>
+                                <TableCell className="max-w-96 truncate" title={item.question}>
+                                    {item.question}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {item.ok ? `${item.ms} ms` : "30,000 ms"}
+                                </TableCell>
+                                <TableCell className="pr-panel">
+                                    <StatusText tone={item.ok ? "success" : "destructive"}>
+                                        {item.ok ? "200" : "504 timeout"}
+                                    </StatusText>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </Section>
         </Page>
     );
 }
 
-const KIND_FILTERS = [
-    { key: "all", label: "All" },
-    { key: "train", label: "Training" },
-    { key: "score", label: "Scoring" },
-    { key: "transfer", label: "Downloads and imports" },
+const KIND_FILTERS: { key: string; label: string; kinds: JobKind[] }[] = [
+    { key: "all", label: "All", kinds: ["train", "score", "judge", "download", "import"] },
+    { key: "train", label: "Training", kinds: ["train"] },
+    { key: "score", label: "Scoring", kinds: ["score"] },
+    { key: "judge", label: "Judge", kinds: ["judge"] },
+    { key: "download", label: "Downloads", kinds: ["download"] },
+    { key: "import", label: "Imports", kinds: ["import"] },
 ];
 
 function kindMatches(job: Job, filter: string): boolean {
-    if (filter === "all") {
-        return true;
-    }
-    if (filter === "transfer") {
-        return job.kind === "download" || job.kind === "import";
-    }
-    return job.kind === filter;
+    return (KIND_FILTERS.find((item) => item.key === filter) ?? KIND_FILTERS[0]).kinds.includes(
+        job.kind,
+    );
+}
+
+function fromControl(event: MouseEvent): boolean {
+    return (event.target as HTMLElement).closest("a,button,input,label,[role=checkbox]") !== null;
 }
 
 export function FlowJobsPage() {
     const state = useFlowState();
     const toast = useToast();
-    const [filter, setFilter] = useState("all");
+    const router = useRouter();
+    const wanted = useSearchParam("kind");
+    const [filter, setFilter] = useState(
+        KIND_FILTERS.some((item) => item.key === wanted) ? (wanted ?? "all") : "all",
+    );
     const [picked, setPicked] = useState<number[]>([]);
     const jobs = state.jobs.filter((job) => kindMatches(job, filter));
     const chosen = state.jobs.filter((job) => picked.includes(job.id));
     const cancellable = chosen.filter((job) => job.status === "running" || job.status === "queued");
     const retryable = chosen.filter((job) => job.status === "failed" || job.status === "cancelled");
-    const tabs = KIND_FILTERS.map((item) => ({
-        ...item,
-        badge: state.jobs.filter((job) => kindMatches(job, item.key)).length,
-    }));
     const toggle = (id: number, on: boolean) =>
         setPicked(on ? [...picked, id] : picked.filter((item) => item !== id));
+    const every = jobs.length > 0 && jobs.every((job) => picked.includes(job.id));
     return (
         <Page wide>
             <PageHeader
-                title="Monitor"
-                caption="Traffic across live models, and every job on this install."
+                title="Jobs"
+                caption="Every job on this install: training, scoring, judging, downloads and imports."
             />
-            <MonitorTabs />
-            {picked.length > 0 ? (
-                <div className="flex min-h-8 flex-wrap items-center gap-2">
-                    <span className="font-medium tabular-nums">{`${picked.length} selected`}</span>
-                    <Button variant="outline" onClick={() => setPicked([])}>
-                        <X aria-hidden="true" />
-                        Clear selection
-                    </Button>
-                    <div className="ml-auto flex gap-2">
-                        <Button
-                            variant="outline"
-                            disabled={retryable.length === 0}
-                            onClick={() => {
-                                retryJobs(retryable.map((job) => job.id));
+            <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-2">
+                <Tabs
+                    value={filter}
+                    onValueChange={(value) => {
+                        setFilter(String(value));
+                        setPicked([]);
+                    }}
+                >
+                    <TabsList aria-label="Job kind">
+                        {KIND_FILTERS.map((item) => (
+                            <TabsTrigger key={item.key} value={item.key}>
+                                {item.label}
+                                <span className="text-sm text-muted-foreground tabular-nums">
+                                    {state.jobs.filter((job) => kindMatches(job, item.key)).length}
+                                </span>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
+                {picked.length > 0 && (
+                    <div className="ml-auto">
+                        <BulkJobs
+                            picked={picked.length}
+                            retryable={retryable}
+                            cancellable={cancellable}
+                            onClear={() => setPicked([])}
+                            onDone={(what, n) => {
                                 setPicked([]);
-                                toast({
-                                    title: `Retrying ${retryable.length} jobs`,
-                                    tone: "success",
-                                });
+                                toast({ title: `${what} ${n} jobs`, tone: "success" });
                             }}
-                        >
-                            <RotateCcw aria-hidden="true" />
-                            Retry
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            disabled={cancellable.length === 0}
-                            onClick={() => {
-                                cancelJobs(cancellable.map((job) => job.id));
-                                setPicked([]);
-                                toast({
-                                    title: `Cancelled ${cancellable.length} jobs`,
-                                    tone: "success",
-                                });
-                            }}
-                        >
-                            Cancel jobs
-                        </Button>
+                        />
                     </div>
-                </div>
-            ) : (
-                <div className="flex min-h-8 items-center">
-                    <SegmentedTabs
-                        tabs={tabs.map((tab) => ({
-                            key: tab.key,
-                            label: tab.label,
-                            badge: tab.badge,
-                        }))}
-                        active={filter}
-                        onSelect={setFilter}
-                    />
-                </div>
-            )}
+                )}
+            </div>
             <div className="overflow-x-auto rounded-lg border bg-card">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-10" />
+                            <TableHead className="w-10 pl-4">
+                                <Checkbox
+                                    aria-label="Select every job shown"
+                                    checked={every}
+                                    disabled={jobs.length === 0}
+                                    onCheckedChange={(value) =>
+                                        setPicked(value === true ? jobs.map((job) => job.id) : [])
+                                    }
+                                />
+                            </TableHead>
                             <TableHead>Job</TableHead>
                             <TableHead>Kind</TableHead>
                             <TableHead>Model</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Started</TableHead>
-                            <TableHead className="text-right">Took</TableHead>
+                            <TableHead className="pr-4 text-right">Took</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {jobs.map((job) => (
                             <TableRow
                                 key={job.id}
+                                className="cursor-pointer"
                                 data-state={picked.includes(job.id) ? "selected" : undefined}
+                                onClick={(event) => {
+                                    if (fromControl(event)) {
+                                        return;
+                                    }
+                                    if (picked.length > 0) {
+                                        toggle(job.id, !picked.includes(job.id));
+                                        return;
+                                    }
+                                    router.history.push(jobHref(job.id));
+                                }}
                             >
-                                <TableCell>
+                                <TableCell className="pl-4">
                                     <Checkbox
                                         aria-label={`Select job ${job.id}`}
                                         checked={picked.includes(job.id)}
@@ -973,7 +1210,7 @@ export function FlowJobsPage() {
                                 <TableCell className="text-muted-foreground">
                                     {relativeTime(createdAt(job))}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="pr-4 text-right">
                                     {job.minutes ? `${job.minutes} min` : "–"}
                                 </TableCell>
                             </TableRow>
@@ -983,6 +1220,14 @@ export function FlowJobsPage() {
             </div>
         </Page>
     );
+}
+
+export function FlowOldJobsRedirect() {
+    const router = useRouter();
+    useEffect(() => {
+        router.history.replace(`${FLOW}/jobs`);
+    }, [router]);
+    return null;
 }
 
 type ReviewFilter = "pending" | "accepted" | "dismissed";
@@ -1134,7 +1379,12 @@ export function FlowInfrastructurePage() {
     );
 }
 
-const SETTINGS = [
+const PERSONAL = [
+    ["Your account", "Name, password and signed-in sessions"],
+    ["Appearance", "Light, dark or the system setting"],
+];
+
+const ADMIN_SETTINGS = [
     [
         "General",
         "Model catalogue, judge model, safety model, default training recipe, compute prices",
@@ -1148,20 +1398,35 @@ const SETTINGS = [
     ["This install", "Version, licence, support bundle"],
 ];
 
+function SettingsList({ title, rows }: { title: string; rows: string[][] }) {
+    return (
+        <Section title={title}>
+            <Facts
+                items={rows.map(([label, detail]) => [
+                    label,
+                    <span key={label} className="text-muted-foreground">
+                        {detail}
+                    </span>,
+                ])}
+            />
+        </Section>
+    );
+}
+
 export function FlowSettingsPage() {
+    const admin = useCan("admin");
     return (
         <Page>
-            <PageHeader title="Settings" caption="Stub: the sections stay as they are today." />
-            <Section title="Sections">
-                <Facts
-                    items={SETTINGS.map(([label, detail]) => [
-                        label,
-                        <span key={label} className="text-muted-foreground">
-                            {detail}
-                        </span>,
-                    ])}
-                />
-            </Section>
+            <PageHeader
+                title="Settings"
+                caption={
+                    admin
+                        ? "Stub: the sections stay as they are today."
+                        : "Stub: your own settings. Admins also see the install's sections."
+                }
+            />
+            <SettingsList title="You" rows={PERSONAL} />
+            {admin && <SettingsList title="This install" rows={ADMIN_SETTINGS} />}
         </Page>
     );
 }

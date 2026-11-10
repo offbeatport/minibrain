@@ -11,7 +11,7 @@ import {
 import { Section, Stat } from "~/components/Section";
 import { ChartLegend, type ChartSeries, TimeChart } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
-import { FLOW, type FlowModel, type FlowVersion, liveShare, versionHref } from "./modelsFlowData";
+import { FLOW, type FlowModel, versionHref } from "./modelsFlowData";
 
 type Slice = {
     key: string;
@@ -228,32 +228,6 @@ export function ModelMonitoring({ model }: { model: FlowModel }) {
             </Section>
             <Section title={`By ${noun.toLowerCase()}`}>
                 <SliceTable slices={slices} noun={noun} />
-            </Section>
-        </div>
-    );
-}
-
-export function VersionMonitoring({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    const share = liveShare(model, version.number);
-    const slice = slicesOf(model).find((item) => item.key === `v${version.number}`);
-    if (share === null || !slice) {
-        return (
-            <EmptyState
-                variant="panel"
-                title={`v${version.number} has not served traffic this week`}
-            >
-                {`${version.wasLive ? `v${version.number} was live before; ` : ""}${model.slug} answers with the live version. v${version.number} answers only when called as ${model.slug}@${version.number}, and Playground calls are not counted.`}
-            </EmptyState>
-        );
-    }
-    return (
-        <div className="flex flex-col gap-4">
-            <Overview model={{ ...model, errors: slice.errors }} slices={[slice]} />
-            <Section
-                title="Requests per day"
-                caption={`Only v${version.number}: ${share}% of the requests to ${model.slug}.`}
-            >
-                <Charts slices={[slice]} label={`Requests per day for v${version.number}`} />
             </Section>
         </div>
     );

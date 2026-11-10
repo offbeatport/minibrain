@@ -38,6 +38,7 @@ import {
     type BaseVariant,
     type FlowModel,
     type FlowVersion,
+    cardHref,
     compareHref,
     flowHref,
     liveShare,
@@ -741,7 +742,7 @@ function VersionMenu({
                 )}
                 {version.status === "ready" && (
                     <DropdownMenuItem
-                        onSelect={() => on.open(flowHref(model.slug, version.number, "card"))}
+                        onSelect={() => on.open(cardHref(model.slug, version.number))}
                     >
                         <FileText />
                         Model card
