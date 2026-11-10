@@ -27,7 +27,7 @@ import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { PickerDialog } from "./AvatarStylesSection";
 import { type AvatarChoice, AvatarTile, choiceFor } from "./avatarDicebear";
-import { openVersion, useCan } from "./flowOverlays";
+import { useCan } from "./flowOverlays";
 import {
     CATALOG,
     type CatalogEntry,
@@ -163,7 +163,7 @@ function Overview() {
     return (
         <div className="flex flex-wrap gap-x-10 gap-y-3 rounded-lg border bg-card px-panel py-4">
             <Stat label="Your models" value={count(custom.length)} />
-            <Stat label="On the API" value={count(onApi.length)} />
+            <Stat label="Deployed" value={count(onApi.length)} />
             <Stat label="Requests, 7 days" value={count(requests)} />
             <Stat label="Training now" value={count(training)} />
             <Stat label="Datasets" value={count(state.datasets.length)} />
@@ -193,7 +193,7 @@ function InboxRow({ item }: { item: InboxItem }) {
             toast({ title: `${item.model?.name} updated`, tone: "success" });
         } else if (item.action === "retry" && item.version !== undefined) {
             if (item.label === "Open") {
-                openVersion(slug, item.version);
+                router.history.push(versionHref(slug, item.version));
                 return;
             }
             const number = retryWithQLoRA(slug, item.version);

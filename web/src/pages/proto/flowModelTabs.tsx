@@ -338,7 +338,7 @@ export function VariantsTab({ model }: { model: FlowModel }) {
     return (
         <Section
             title="Variants"
-            caption="The formats installed on this install. Each one on the API has its own model name."
+            caption="The formats installed on this install. Each deployed one has its own model name."
             flush
         >
             <Table>
@@ -369,10 +369,10 @@ export function VariantsTab({ model }: { model: FlowModel }) {
                                 <TableCell>
                                     {item.live ? (
                                         <StatusText tone="success">
-                                            {`On the API${item.replicas.length > 1 ? ` · ${item.replicas.length} replicas` : ""}`}
+                                            {`Deployed${item.replicas.length > 1 ? ` · ${item.replicas.length} replicas` : ""}`}
                                         </StatusText>
                                     ) : (
-                                        <span className="text-muted-foreground">Off</span>
+                                        <span className="text-muted-foreground">Not deployed</span>
                                     )}
                                     {item.update && (
                                         <span className="block text-sm text-info">
@@ -405,9 +405,9 @@ export function VariantsTab({ model }: { model: FlowModel }) {
                                                     : deployVariants([key])
                                             }
                                         >
-                                            {item.live ? "Take off the API" : "Put on the API"}
+                                            {item.live ? "Undeploy" : "Deploy"}
                                         </Button>
-                                        <Tip tip={item.live ? "Take it off the API first." : null}>
+                                        <Tip tip={item.live ? "Undeploy it first." : null}>
                                             <Button
                                                 variant="outline"
                                                 disabled={item.live}

@@ -27,9 +27,8 @@ import {
 } from "obp-ui/shell";
 import { type ReactNode, useEffect, useState } from "react";
 import { CommandPalette } from "./FlowCommand";
-import { type Role, allows, openVersion, setRole, useOverlays } from "./flowOverlays";
+import { type Role, allows, setRole, useOverlays } from "./flowOverlays";
 import { TrainDialog } from "./flowTrainDialog";
-import { VersionSheet } from "./flowVersionCard";
 import {
     FLOW,
     type FlowState,
@@ -43,9 +42,7 @@ import {
     setMode,
     useFlowState,
     versionHref,
-    versionTarget,
 } from "./modelsFlowData";
-import { HeaderSwitch } from "./modelsFlowHeader";
 import { IntentDialogs } from "./modelsFlowParts";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
@@ -180,7 +177,7 @@ function steps(state: FlowState): Step[] {
             href: compareHref(focus, 0, 1),
             match: (path) => path.endsWith("/compare") || path.startsWith(`${FLOW}/playground`),
         },
-        { id: "live", label: "Open v1's report card, Make live", href: versionHref(focus, 1) },
+        { id: "live", label: "Open v1 and make it live", href: versionHref(focus, 1) },
         {
             id: "connect",
             label: "Connect, plus an API key",
@@ -390,32 +387,6 @@ export function FlowShell() {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, []);
-    useEffect(() => {
-        const onClick = (event: MouseEvent) => {
-            if (
-                event.button !== 0 ||
-                event.metaKey ||
-                event.ctrlKey ||
-                event.shiftKey ||
-                event.altKey
-            ) {
-                return;
-            }
-            const anchor = (event.target as HTMLElement).closest("a");
-            const href = anchor?.getAttribute("href");
-            const target = href ? versionTarget(href) : null;
-            const model = target
-                ? state.models.find((item) => item.slug === target.slug)
-                : undefined;
-            if (!target || !model || !findVersion(model, target.number)) {
-                return;
-            }
-            event.preventDefault();
-            openVersion(target.slug, target.number);
-        };
-        document.addEventListener("click", onClick, true);
-        return () => document.removeEventListener("click", onClick, true);
-    }, [state.models]);
     const pending = state.feedback.filter((row) => row.state === "pending").length;
     const rail = (
         <Rail
@@ -451,7 +422,6 @@ export function FlowShell() {
                     active={role}
                     onSelect={(key) => setRole(key as Role)}
                 />
-                {onModels && <HeaderSwitch />}
                 <span className="hidden truncate text-sm text-muted-foreground 2xl:inline">
                     Prototype · fake data, nothing is saved
                 </span>
@@ -460,7 +430,6 @@ export function FlowShell() {
                 </div>
             </div>
             <Outlet />
-            <VersionSheet />
             <TrainDialog />
             <IntentDialogs />
             <CommandPalette open={searching} onOpenChange={setSearching} />

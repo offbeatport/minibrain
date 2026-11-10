@@ -2,7 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, Input, KbdHint, cn } from "obp-ui";
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { openTrain, openVersion, useCan } from "./flowOverlays";
+import { openTrain, useCan } from "./flowOverlays";
 import {
     FLOW,
     type FlowState,
@@ -15,6 +15,7 @@ import {
     points,
     scoreDelta,
     useFlowState,
+    versionHref,
     versionName,
     versionState,
 } from "./modelsFlowData";
@@ -157,7 +158,7 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
                 label: `${model.name} ${versionName(version)}`,
                 detail: versionState(model, version).label,
                 text: `${model.name} ${model.slug} v${version.number} ${model.slug}@${version.number} ${version.kind === "prompt" ? "baseline" : ""}`,
-                run: () => openVersion(model.slug, version.number),
+                run: () => go(versionHref(model.slug, version.number)),
             })),
     );
     const datasets: Command[] = state.datasets.map((item) => ({

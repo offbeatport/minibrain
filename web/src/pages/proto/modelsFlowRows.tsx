@@ -234,7 +234,7 @@ function Chevron({
 
 export function LiveStatus({
     machines,
-    text = "On the API",
+    text = "Deployed",
 }: {
     machines: string[];
     text?: string;
@@ -337,9 +337,7 @@ function ModelMenu({ model, on }: { model: FlowModel; on: Handlers }) {
                 {model.deployed && (
                     <DropdownMenuItem variant="destructive" onSelect={() => on.undeploy([model])}>
                         <PowerOff />
-                        {model.kind === "base"
-                            ? "Take every format off the API"
-                            : "Take off the API"}
+                        {model.kind === "base" ? "Undeploy every format" : "Undeploy"}
                     </DropdownMenuItem>
                 )}
                 <DropdownMenuItem variant="destructive" onSelect={() => on.removeModels([model])}>
@@ -492,7 +490,7 @@ function ModelStatus({ model }: { model: FlowModel }) {
 
 function baseFacts(model: FlowModel): string {
     const live = model.variants.filter((item) => item.live).length;
-    return `${plural(model.variants.length, "variant")} · ${live} on the API`;
+    return `${plural(model.variants.length, "variant")} · ${live} deployed`;
 }
 
 export type Hint = { text: string; action: string; href: string };
@@ -819,7 +817,11 @@ export function VersionRow({
 function VariantStatus({ variant }: { variant: BaseVariant }) {
     return (
         <span className="flex min-w-0 flex-col items-start">
-            {variant.live ? <LiveStatus machines={variant.replicas} /> : <Muted>Off the API</Muted>}
+            {variant.live ? (
+                <LiveStatus machines={variant.replicas} />
+            ) : (
+                <Muted>Not deployed</Muted>
+            )}
             {variant.update && (
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -908,11 +910,11 @@ export function VariantRow({
             <div className="relative z-10 flex items-center justify-end gap-1">
                 {variant.live ? (
                     <Button variant="outline" onClick={() => on.undeployVariants([key])}>
-                        Take off
+                        Undeploy
                     </Button>
                 ) : (
                     <Button variant="secondary" onClick={() => on.deployVariants([key])}>
-                        Put on API
+                        Deploy
                     </Button>
                 )}
                 <DropdownMenu>

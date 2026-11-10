@@ -202,8 +202,8 @@ export function ModelMonitoring({ model }: { model: FlowModel }) {
         return (
             <EmptyState variant="panel" title="No traffic to show">
                 {model.live === null
-                    ? "Nothing is live yet, so its name answers nothing. Make a version live and switch it on the API."
-                    : `${model.name} is off the API, so nothing calls it. Switch it on in the header.`}
+                    ? "Not deployed, so its name answers nothing. Make a version live to deploy it."
+                    : `${model.name} is not deployed, so nothing calls it. Deploy it from the header.`}
             </EmptyState>
         );
     }

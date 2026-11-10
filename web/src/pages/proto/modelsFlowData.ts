@@ -2009,8 +2009,8 @@ export function statusLine(model: FlowModel): StatusLine {
             return { kind: "update", text: `${update.format} has an update` };
         }
         return model.deployed
-            ? { kind: "on", text: "On the API" }
-            : { kind: "off", text: "Off the API" };
+            ? { kind: "on", text: "Deployed" }
+            : { kind: "off", text: "Not deployed" };
     }
     const training = trainingVersion(model);
     const newest = newestFirst(model)[0];
@@ -2050,11 +2050,11 @@ export function statusLine(model: FlowModel): StatusLine {
                   text: `v${candidate.number} ready`,
                   version: candidate.number,
               }
-            : { kind: "idle", text: "Nothing live yet" };
+            : { kind: "idle", text: "Not deployed" };
     }
     return model.deployed
-        ? { kind: "on", text: "On the API" }
-        : { kind: "off", text: "Off the API" };
+        ? { kind: "on", text: "Deployed" }
+        : { kind: "off", text: "Not deployed" };
 }
 
 export function attention(model: FlowModel): string | null {
@@ -2536,13 +2536,6 @@ export function shortHash(slug: string, number: number): string {
         hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
     }
     return hash.toString(16).padStart(8, "0").slice(0, 7);
-}
-
-const VERSION_PAGE = /^\/proto\/flow\/models\/([^/?#]+)\/versions\/v(\d+)\/?$/;
-
-export function versionTarget(href: string): { slug: string; number: number } | null {
-    const match = VERSION_PAGE.exec(href);
-    return match ? { slug: match[1], number: Number(match[2]) } : null;
 }
 
 export function cardHref(slug: string, number: number): string {

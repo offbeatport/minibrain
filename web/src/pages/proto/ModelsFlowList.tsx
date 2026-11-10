@@ -12,7 +12,8 @@ import {
     useToast,
 } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
-import { openVersion, useCan } from "./flowOverlays";
+import { PageHeader } from "~/components/PageHeader";
+import { useCan } from "./flowOverlays";
 import {
     type BaseVariant,
     type FlowModel,
@@ -36,10 +37,9 @@ import {
     variantKey,
     versionKey,
     versionState,
-    versionTarget,
 } from "./modelsFlowData";
 import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
-import { ModelsHeader, ShortcutsHelp, hiddenChips, useHeaderStyle } from "./modelsFlowHeader";
+import { AddModel, ModelsToolbar, ShortcutsHelp } from "./modelsFlowHeader";
 import { QuickLook } from "./modelsFlowPeek";
 import {
     COLUMNS,
@@ -65,7 +65,6 @@ import {
     ViewOptions,
     passes,
     sortModels,
-    statusScope,
 } from "./modelsFlowView";
 
 type Line =
@@ -137,7 +136,7 @@ function versionMatches(model: FlowModel, version: FlowVersion, text: string): b
 }
 
 function variantMatches(item: BaseVariant, text: string): boolean {
-    return `${item.format} ${item.apiName} ${item.live ? "on the api" : "off"}`
+    return `${item.format} ${item.apiName} ${item.live ? "deployed" : "not deployed"}`
         .toLowerCase()
         .includes(text);
 }
@@ -317,9 +316,9 @@ function SelectionBar({
                     <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         Only Delete fits both
                         <InfoTip label="Why only Delete">
-                            Compare works on two versions of one custom model; Put on API and Take
-                            off work on base formats, since a custom model makes one version live
-                            from its row. Tick only versions or only variants to see those.
+                            Compare works on two versions of one custom model; Deploy and Undeploy
+                            work on base formats, since a custom model makes one version live from
+                            its row. Tick only versions or only variants to see those.
                         </InfoTip>
                     </span>
                 )}
@@ -363,7 +362,7 @@ function SelectionBar({
                                     )
                                 }
                             >
-                                Put on API
+                                Deploy
                             </Button>
                         </WithTip>
                         <WithTip tip={liveVariants.length === 0 ? "None of them is live." : null}>
@@ -375,7 +374,7 @@ function SelectionBar({
                                 }
                             >
                                 <PowerOff aria-hidden="true" />
-                                Take off
+                                Undeploy
                             </Button>
                         </WithTip>
                     </>
@@ -434,7 +433,7 @@ function confirmDeletion(
                     <p>Variant files can be downloaded again from Discover.</p>
                 )}
                 {skipped > 0 && (
-                    <p>{`${plural(skipped, "live item")} skipped: take it off the API or move the live pointer first.`}</p>
+                    <p>{`${plural(skipped, "live item")} skipped: undeploy it or move the live pointer first.`}</p>
                 )}
             </div>
         ),
@@ -467,7 +466,6 @@ export function ModelsFlowList() {
     );
     const [peek, setPeek] = useState<string | null>(null);
     const [autopilotFor, setAutopilotFor] = useState<string | null>(null);
-    const headerStyle = useHeaderStyle();
     const canAdd = useCan("builder");
     const text = query.trim().toLowerCase();
     const pool = useMemo(() => models.filter((model) => matchesText(model, text)), [models, text]);
@@ -498,14 +496,7 @@ export function ModelsFlowList() {
     const clear = () => setSelection([]);
     const peekModel = models.find((model) => model.slug === peek) ?? null;
     const on: Handlers = {
-        open: (href) => {
-            const target = versionTarget(href);
-            if (target) {
-                openVersion(target.slug, target.number);
-                return;
-            }
-            router.history.push(href);
-        },
+        open: (href) => router.history.push(href),
         peek: (model) => {
             setPeek(model.slug);
             focusLine(model.slug);
@@ -521,18 +512,18 @@ export function ModelsFlowList() {
             setConfirm({
                 title:
                     chosen.length === 1
-                        ? `Take ${chosen[0].name} off the API?`
-                        : `Take ${plural(chosen.length, "model")} off the API?`,
+                        ? `Undeploy ${chosen[0].name}?`
+                        : `Undeploy ${plural(chosen.length, "model")}?`,
                 description: (
                     <p>
                         Their names stop answering; the live pointer, versions, keys and files stay.
                     </p>
                 ),
-                label: "Take off the API",
+                label: "Undeploy",
                 run: () => {
                     undeployModels(chosen.map((model) => model.slug));
                     toast({
-                        title: `${chosen.map((model) => model.name).join(", ")} off the API`,
+                        title: `${chosen.map((model) => model.name).join(", ")} undeployed`,
                         tone: "success",
                     });
                 },
@@ -562,22 +553,22 @@ export function ModelsFlowList() {
             deployVariants(keys);
             clear();
             toast({
-                title: `${plural(keys.length, "variant")} on the API`,
+                title: `${plural(keys.length, "variant")} deployed`,
                 tone: "success",
             });
         },
         undeployVariants: (keys) => {
             const chosen = pickedVariants(models, keys);
             setConfirm({
-                title: `Take ${chosen.map((item) => `${item.model.name} ${item.variant.format}`).join(", ")} off the API?`,
+                title: `Undeploy ${chosen.map((item) => `${item.model.name} ${item.variant.format}`).join(", ")}?`,
                 description: (
                     <p>{`Requests to ${chosen.map((item) => item.variant.apiName).join(", ")} stop being answered; the files stay.`}</p>
                 ),
-                label: "Take off the API",
+                label: "Undeploy",
                 run: () => {
                     undeployVariants(keys);
                     clear();
-                    toast({ title: `${plural(keys.length, "variant")} off the API` });
+                    toast({ title: `${plural(keys.length, "variant")} undeployed` });
                 },
             });
         },
@@ -747,60 +738,53 @@ export function ModelsFlowList() {
                 }
             />
         ) : (
-            <div className="flex min-w-0 items-center gap-2">
-                <SearchInput
-                    aria-label="Search models, versions and variants"
-                    placeholder="Search"
-                    value={query}
-                    onValueChange={(value) => {
-                        setQuery(value);
-                        setSearchToggles({});
-                    }}
-                    className="min-w-0 flex-1"
-                />
-                <ViewOptions
-                    pool={pool}
-                    models={models}
-                    filters={filters}
-                    onFilters={setFilters}
-                    sort={sort}
-                    onSort={setSort}
-                    columns={columns}
-                    onColumns={(value) => {
-                        setColumns(value);
-                        writeStored(COLUMNS_KEY, value);
-                    }}
-                    nested={nested}
-                    onNested={(value) => {
-                        setNested(value);
-                        writeStored(NESTED_KEY, value);
-                        if (!value) {
-                            clear();
-                        }
-                    }}
-                />
-                <ShortcutsHelp nested={nested} />
-            </div>
+            <ModelsToolbar
+                search={
+                    <SearchInput
+                        aria-label="Search models, versions and variants"
+                        placeholder="Search"
+                        value={query}
+                        onValueChange={(value) => {
+                            setQuery(value);
+                            setSearchToggles({});
+                        }}
+                        className="w-64 shrink-0"
+                    />
+                }
+                chips={<FilterChips models={models} filters={filters} onFilters={setFilters} />}
+                actions={
+                    <>
+                        <ShortcutsHelp nested={nested} />
+                        <ViewOptions
+                            pool={pool}
+                            models={models}
+                            filters={filters}
+                            onFilters={setFilters}
+                            sort={sort}
+                            onSort={setSort}
+                            columns={columns}
+                            onColumns={(value) => {
+                                setColumns(value);
+                                writeStored(COLUMNS_KEY, value);
+                            }}
+                            nested={nested}
+                            onNested={(value) => {
+                                setNested(value);
+                                writeStored(NESTED_KEY, value);
+                                if (!value) {
+                                    clear();
+                                }
+                            }}
+                        />
+                        {canAdd && <AddModel />}
+                    </>
+                }
+            />
         );
     return (
         <div className="flex flex-col gap-3">
-            <ModelsHeader
-                style={headerStyle}
-                toolbar={toolbar}
-                selecting={picked.length > 0}
-                canAdd={canAdd}
-                scope={statusScope(pool, filters)}
-                filters={filters}
-                onFilters={setFilters}
-                sort={sort}
-                onSort={setSort}
-            />
-            <FilterChips
-                models={models}
-                filters={filters}
-                onFilters={setFilters}
-                hidden={hiddenChips(headerStyle)}
-            />
+            <PageHeader title="Models" caption="Your models and the bases they run on." />
+            {toolbar}
             <div
                 className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card"
                 style={{ gridTemplateColumns: gridTemplate(columns) }}

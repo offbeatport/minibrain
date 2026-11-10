@@ -1,5 +1,4 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import { Play } from "lucide-react";
 import { Badge, Button, Link, TabNav, useToast } from "obp-ui";
 import type { ReactNode } from "react";
 import type { ModelUsage } from "~/api/client";
@@ -10,10 +9,11 @@ import { Page, Section, Stat } from "~/components/Section";
 import { Requests } from "~/components/models/ModelMetrics";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
+import { ModelHeaderActions } from "./flowModelActions";
 import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs";
 import { ModelMonitoring } from "./flowMonitoring";
-import { openTrain, useCan } from "./flowOverlays";
-import { TrainButton, trainBlock } from "./flowTraining";
+import { useCan } from "./flowOverlays";
+import { trainBlock } from "./flowTraining";
 import {
     type CatalogEntry,
     FLOW,
@@ -47,7 +47,7 @@ import {
     useFlowState,
     versionHref,
 } from "./modelsFlowData";
-import { Crumbs, Delta, ModelAvatar, OnApiSwitch, Tip, openConnect } from "./modelsFlowParts";
+import { Crumbs, Delta, ModelAvatar, Tip } from "./modelsFlowParts";
 
 const TAB_LABELS: Record<ModelTab, string> = {
     overview: "Overview",
@@ -97,7 +97,7 @@ function LivePanel({ model }: { model: FlowModel }) {
     if (!live) {
         return (
             <Panel title="Live">
-                <p className="text-2xl">Nothing is live yet</p>
+                <p className="text-2xl">Not deployed</p>
                 <p className="text-muted-foreground">
                     {`Make a version live and ${model.slug} answers with it. Until then each version is still callable as ${model.slug}@N.`}
                 </p>
@@ -142,7 +142,7 @@ function LivePanel({ model }: { model: FlowModel }) {
                 </p>
             )}
             <p className="text-sm text-muted-foreground">
-                {`Scored on ${count(model.heldOut)} held-out rows. ${model.deployed ? `${model.slug} is on the API.` : `${model.slug} is off the API.`}`}
+                {`Scored on ${count(model.heldOut)} held-out rows. ${model.deployed ? `${model.slug} is deployed.` : `${model.slug} is not deployed.`}`}
             </p>
         </Panel>
     );
@@ -475,7 +475,7 @@ function BaseOverview({ model }: { model: FlowModel }) {
                             [
                                 "Formats",
                                 <span key="f" className="tabular-nums">
-                                    {`${model.variants.map((item) => item.format).join(", ")} · ${live} on the API`}
+                                    {`${model.variants.map((item) => item.format).join(", ")} · ${live} deployed`}
                                 </span>,
                             ],
                             [
@@ -509,7 +509,7 @@ function BaseOverview({ model }: { model: FlowModel }) {
                                         <ModelAvatar model={child} />
                                         <span className="flex-1 font-medium">{child.name}</span>
                                         <span className="text-sm text-muted-foreground">
-                                            {liveSplit(child) ?? "Nothing live"}
+                                            {liveSplit(child) ?? "Not deployed"}
                                         </span>
                                     </Link>
                                 </li>
@@ -522,107 +522,18 @@ function BaseOverview({ model }: { model: FlowModel }) {
     );
 }
 
-function PrimaryAction({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const router = useRouter();
-    const can = useCan("builder");
-    if (!can) {
-        return null;
-    }
-    if (model.kind === "base") {
-        return (
-            <Button asChild>
-                <Link href={`${FLOW}/models/new?base=${model.slug}`}>Add a model on it</Link>
-            </Button>
-        );
-    }
-    const step = nextStep(state, model);
-    if (!step) {
-        return null;
-    }
-    if (step.action === "train") {
-        const blocked = trainBlock(model);
-        return (
-            <Tip tip={blocked}>
-                <Button disabled={Boolean(blocked)} onClick={() => openTrain(model.slug)}>
-                    {step.label}
-                </Button>
-            </Tip>
-        );
-    }
-    if (step.action === "retry" && step.version !== undefined) {
-        const failed = step.version;
-        return (
-            <Button
-                onClick={() => {
-                    const number = retryWithQLoRA(model.slug, failed);
-                    const job = jobOfVersion(model.slug, number);
-                    if (job) {
-                        router.history.push(jobHref(job));
-                    }
-                }}
-            >
-                {step.label}
-            </Button>
-        );
-    }
-    if (step.action === "make-live" && step.version !== undefined) {
-        const number = step.version;
-        return (
-            <Button onClick={() => openIntent({ kind: "make-live", slug: model.slug, number })}>
-                {step.label}
-            </Button>
-        );
-    }
-    return (
-        <Button variant={step.label.startsWith("Training") ? "outline" : "default"} asChild>
-            <Link href={step.href}>{step.label}</Link>
-        </Button>
-    );
-}
-
-function SecondaryTrain({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    if (model.kind === "base" || model.serveOnly || !model.dataset) {
-        return null;
-    }
-    if (nextStep(state, model)?.action === "train") {
-        return null;
-    }
-    return <TrainButton model={model} variant="outline" />;
-}
-
 function Header({ model }: { model: FlowModel }) {
-    const canPlay =
-        model.kind === "base" || model.versions.some((version) => version.status === "ready");
     const caption =
         model.kind === "base"
             ? `Base · ${model.size} · ${model.licence}`
-            : `On ${model.base} · ${liveSplit(model) ?? "nothing live yet"}`;
+            : `On ${model.base} · ${liveSplit(model) ?? "not deployed"}`;
     return (
         <PageHeader
             title={model.name}
             icon={<ModelAvatar model={model} size="lg" />}
             badge={<Badge variant="outline">{model.kind === "base" ? "Base" : "Custom"}</Badge>}
             caption={caption}
-            actions={
-                <>
-                    <OnApiSwitch model={model} />
-                    {canPlay && (
-                        <Button variant="outline" asChild>
-                            <Link href={playgroundHref(model.slug)}>
-                                <Play aria-hidden="true" />
-                                Open in Playground
-                            </Link>
-                        </Button>
-                    )}
-                    <Button variant="outline" onClick={() => openConnect(model.slug)}>
-                        Connect
-                    </Button>
-                    <SecondaryTrain model={model} />
-                    <PrimaryAction model={model} />
-                </>
-            }
+            actions={<ModelHeaderActions model={model} />}
         />
     );
 }
@@ -661,7 +572,7 @@ function CatalogOnly({ entry }: { entry: CatalogEntry }) {
                                 installBase(entry.id);
                                 toast({
                                     title: `${entry.name} is installed`,
-                                    description: `Downloaded ${entry.size}; its BF16 variant is ready to put on the API.`,
+                                    description: `Downloaded ${entry.size}; its BF16 variant is ready to deploy.`,
                                     tone: "success",
                                 });
                             }}

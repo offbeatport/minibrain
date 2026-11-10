@@ -19,7 +19,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
-import { ReportCard, VersionActions, versionTitle } from "./flowVersionCard";
+import { ReportCard, VersionMenu, VersionPrimary } from "./flowVersionCard";
 import {
     type Answer,
     type FlowModel,
@@ -38,6 +38,8 @@ import {
     useFlowModel,
     verdictOf,
     versionHref,
+    versionName,
+    versionState,
 } from "./modelsFlowData";
 import { Crumbs } from "./modelsFlowParts";
 
@@ -375,13 +377,30 @@ export function ModelsFlowVersionPage() {
             </Page>
         );
     }
+    const status = versionState(model, version);
     return (
-        <Page>
+        <Page wide>
             <Crumbs items={[...crumbs, { label: `v${version.number}` }]} />
             <PageHeader
-                title={versionTitle(model, version)}
+                title={versionName(version)}
+                badge={
+                    <Badge
+                        variant={status.tone === "destructive" ? "outline" : status.tone}
+                        className={cn(
+                            status.tone === "destructive" &&
+                                "border-destructive/40 text-destructive",
+                        )}
+                    >
+                        {status.label}
+                    </Badge>
+                }
                 caption={`${model.name} on ${model.base} · created ${shortAgo(version)}`}
-                actions={<VersionActions model={model} version={version} />}
+                actions={
+                    <>
+                        <VersionPrimary model={model} version={version} />
+                        <VersionMenu model={model} version={version} />
+                    </>
+                }
             />
             <div className="rounded-lg border bg-card p-panel">
                 <ReportCard model={model} version={version} />

@@ -100,7 +100,7 @@ function Variants({ model }: { model: FlowModel }) {
                     {item.live ? (
                         <LiveStatus machines={item.replicas} />
                     ) : (
-                        <span className="text-muted-foreground">Off the API</span>
+                        <span className="text-muted-foreground">Not deployed</span>
                     )}
                 </li>
             ))}
@@ -123,7 +123,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                         <SheetTitle className="truncate">{model.name}</SheetTitle>
                         <SheetDescription>
                             {model.kind === "custom"
-                                ? `On ${model.base} · ${live ? `v${live.number} live` : "nothing live"}${model.deployed ? "" : " · off the API"}`
+                                ? `On ${model.base} · ${live ? `v${live.number} live` : "not deployed"}${live && !model.deployed ? " · not deployed" : ""}`
                                 : `Base · ${plural(model.variants.length, "variant")}`}
                         </SheetDescription>
                     </div>

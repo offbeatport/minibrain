@@ -963,7 +963,7 @@ export function FlowMonitorPage() {
         <Page wide>
             <PageHeader
                 title="Monitor"
-                caption="Traffic across the models on the API: requests, latency, errors and cost."
+                caption="Traffic across the deployed models: requests, latency, errors and cost."
             />
             <Section title="Requests per day" caption="Last 7 days, stacked by model.">
                 <div className="flex flex-col gap-3">

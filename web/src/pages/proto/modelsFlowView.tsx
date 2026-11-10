@@ -125,15 +125,6 @@ const COMPARE: Record<SortKey, (a: FlowModel, b: FlowModel) => number> = {
     recent: (a, b) => hoursSinceUpdate(a) - hoursSinceUpdate(b),
 };
 
-export function statusScope(pool: FlowModel[], filters: Filters): FlowModel[] {
-    return pool.filter((model) => passes(model, filters, "status"));
-}
-
-export function statusCount(scope: FlowModel[], status: StatusKey): number {
-    const test = STATUSES.find((option) => option.value === status)?.test;
-    return test ? scope.filter(test).length : 0;
-}
-
 export function sortModels(models: FlowModel[], sort: SortKey): FlowModel[] {
     return [...models].sort(COMPARE[sort]).sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
@@ -569,21 +560,17 @@ export function FilterChips({
     models,
     filters,
     onFilters,
-    hidden = [],
 }: {
     models: FlowModel[];
     filters: Filters;
     onFilters: (value: Filters) => void;
-    hidden?: StatusKey[];
 }) {
-    const chips = chipsOf(filters, baseOptions(models)).filter(
-        (chip) => !hidden.some((status) => chip.key === `status:${status}`),
-    );
+    const chips = chipsOf(filters, baseOptions(models));
     if (chips.length === 0) {
         return null;
     }
     return (
-        <ul aria-label="Active filters" className="flex flex-wrap items-center gap-1.5">
+        <ul aria-label="Active filters" className="contents">
             {chips.map((chip) => (
                 <li
                     key={chip.key}
@@ -606,11 +593,13 @@ export function FilterChips({
                     </Tooltip>
                 </li>
             ))}
-            <li>
-                <Button variant="ghost" size="sm" onClick={() => onFilters(NO_FILTERS)}>
-                    Clear all
-                </Button>
-            </li>
+            {chips.length > 1 && (
+                <li>
+                    <Button variant="ghost" size="sm" onClick={() => onFilters(NO_FILTERS)}>
+                        Clear all
+                    </Button>
+                </li>
+            )}
         </ul>
     );
 }

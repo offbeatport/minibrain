@@ -1,16 +1,16 @@
 import { useRouter } from "@tanstack/react-router";
-import { Download, Play } from "lucide-react";
+import { BookOpen, Copy, Download, GitCompare, MoreHorizontal, Play, Trash2 } from "lucide-react";
 import {
     Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
     Link,
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    Tabs,
-    TabsList,
-    TabsTrigger,
     cn,
     useToast,
 } from "obp-ui";
@@ -19,7 +19,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { closeVersion, useCan, useOverlays } from "./flowOverlays";
+import { useCan } from "./flowOverlays";
 import {
     type Answer,
     BASELINE_HINT,
@@ -30,25 +30,28 @@ import {
     answersFor,
     cardHref,
     changedSettings,
+    compareHref,
     datasetOf,
+    deleteVersions,
     findVersion,
     jobHref,
     jobOfVersion,
     liveVersion,
+    modelHref,
     openIntent,
     pct,
     playgroundHref,
     previousLive,
     retryWithQLoRA,
     rowsSinceLive,
-    shortAgo,
     shortHash,
     timeLeft,
     useFlowState,
     verdictOf,
+    versionKey,
     versionName,
-    versionState,
 } from "./modelsFlowData";
+import { type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 import { Delta, Tip, makeLiveLabel } from "./modelsFlowParts";
 
 type Reference = { version: FlowVersion; label: string };
@@ -70,74 +73,173 @@ function references(model: FlowModel, version: FlowVersion): Reference[] {
     return found;
 }
 
-export function versionTitle(model: FlowModel, version: FlowVersion): string {
-    return `${versionName(version)} · ${versionState(model, version).label}`;
-}
-
 function memoryError(version: FlowVersion): boolean {
     return /memory/i.test(version.error ?? "");
 }
 
-export function VersionActions({ model, version }: { model: FlowModel; version: FlowVersion }) {
+export function VersionPrimary({ model, version }: { model: FlowModel; version: FlowVersion }) {
+    const router = useRouter();
+    const toast = useToast();
+    if (!useCan("builder")) {
+        return null;
+    }
+    if (version.status === "failed") {
+        return memoryError(version) ? (
+            <Button
+                onClick={() => {
+                    const number = retryWithQLoRA(model.slug, version.number);
+                    const job = jobOfVersion(model.slug, number);
+                    toast({ title: `v${number} is training with QLoRA`, tone: "success" });
+                    if (job) {
+                        router.history.push(jobHref(job));
+                    }
+                }}
+            >
+                Retry with QLoRA
+            </Button>
+        ) : null;
+    }
+    const live = makeLiveLabel(model, version);
+    if (!live) {
+        return null;
+    }
+    return (
+        <Button
+            onClick={() =>
+                openIntent({ kind: "make-live", slug: model.slug, number: version.number })
+            }
+        >
+            {live === "Make live" ? `Make v${version.number} live` : live}
+        </Button>
+    );
+}
+
+function copyText(value: string): Promise<void> {
+    return navigator.clipboard ? navigator.clipboard.writeText(value) : Promise.reject();
+}
+
+export function VersionMenu({ model, version }: { model: FlowModel; version: FlowVersion }) {
     const router = useRouter();
     const toast = useToast();
     const can = useCan("builder");
-    if (version.status === "failed") {
-        return (
-            <>
-                <Button variant="outline" asChild>
-                    <Link href={jobHref(version.jobId)}>{`Job #${version.jobId}`}</Link>
-                </Button>
-                {can && memoryError(version) && (
-                    <Button
-                        onClick={() => {
-                            const number = retryWithQLoRA(model.slug, version.number);
-                            const job = jobOfVersion(model.slug, number);
-                            closeVersion();
-                            toast({ title: `v${number} is training with QLoRA`, tone: "success" });
-                            if (job) {
-                                router.history.push(jobHref(job));
-                            }
-                        }}
-                    >
-                        Retry with QLoRA
-                    </Button>
-                )}
-            </>
-        );
-    }
-    if (version.status === "training") {
-        return (
-            <Button variant="outline" asChild>
-                <Link href={jobHref(version.jobId)}>{`Job #${version.jobId}`}</Link>
-            </Button>
-        );
-    }
-    const live = makeLiveLabel(model, version);
+    const [confirm, setConfirm] = useState<Confirm | null>(null);
+    const callable = `${model.slug}@${version.number}`;
+    const ready = version.status === "ready";
+    const isLive = model.live === version.number;
+    const others = model.versions
+        .filter((item) => item.number !== version.number && item.status === "ready")
+        .sort((x, y) => y.number - x.number);
+    const remove = () =>
+        setConfirm({
+            title: `Delete ${versionName(version)} of ${model.name}?`,
+            description: (
+                <p>{`${callable} stops answering and its adapter, scores and card are removed.`}</p>
+            ),
+            label: "Delete version",
+            run: () => {
+                deleteVersions([versionKey(model.slug, version.number)]);
+                toast({ title: `Deleted v${version.number}`, tone: "success" });
+                router.history.push(modelHref(model.slug, "versions"));
+            },
+        });
     return (
         <>
-            <Button variant="outline" asChild>
-                <Link href={playgroundHref(model.slug, version.number)}>
-                    <Play aria-hidden="true" />
-                    Try in Playground
-                </Link>
-            </Button>
-            {can && live && (
-                <Button
-                    variant={
-                        live === "Make live" && version.passed !== false ? "default" : "outline"
-                    }
-                    onClick={() =>
-                        openIntent({
-                            kind: "make-live",
-                            slug: model.slug,
-                            number: version.number,
-                        })
-                    }
-                >
-                    {live === "Make live" ? `Make v${version.number} live` : live}
-                </Button>
-            )}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={`More actions for v${version.number}`}
+                    >
+                        <MoreHorizontal />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuItem
+                        disabled={!ready}
+                        onSelect={() =>
+                            router.history.push(playgroundHref(model.slug, version.number))
+                        }
+                    >
+                        <Play />
+                        Try in Playground
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger disabled={!ready || others.length === 0}>
+                            <GitCompare />
+                            Compare with…
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-48">
+                            {others.map((item) => (
+                                <DropdownMenuItem
+                                    key={item.number}
+                                    onSelect={() =>
+                                        router.history.push(
+                                            compareHref(
+                                                model.slug,
+                                                Math.min(item.number, version.number),
+                                                Math.max(item.number, version.number),
+                                            ),
+                                        )
+                                    }
+                                >
+                                    {versionName(item)}
+                                    {model.live === item.number && (
+                                        <span className="ml-auto text-sm text-muted-foreground">
+                                            Live
+                                        </span>
+                                    )}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuItem
+                        onSelect={() =>
+                            copyText(callable).then(
+                                () => toast({ title: `Copied ${callable}` }),
+                                () => toast({ title: "This browser blocks copying here" }),
+                            )
+                        }
+                    >
+                        <Copy />
+                        <span>
+                            Copy <span className="font-mono">{callable}</span>
+                        </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() => router.history.push(cardHref(model.slug, version.number))}
+                    >
+                        <BookOpen />
+                        Model card
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        disabled={!ready}
+                        onSelect={() =>
+                            toast({
+                                title: "Not in the prototype",
+                                description: `Would download the ${version.kind === "prompt" ? "prompt" : "adapter"} for ${callable}.`,
+                            })
+                        }
+                    >
+                        <Download />
+                        Download
+                    </DropdownMenuItem>
+                    {can && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                variant="destructive"
+                                disabled={isLive}
+                                onSelect={remove}
+                            >
+                                <Trash2 />
+                                {isLive ? "Delete version (live)" : "Delete version"}
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
         </>
     );
 }
@@ -228,8 +330,7 @@ function ExampleList({
 }
 
 function Examples({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    const [open, setOpen] = useState(false);
-    const [shown, setShown] = useState<Exclude<Verdict, "same">>("worse");
+    const [shown, setShown] = useState<Exclude<Verdict, "same"> | null>(null);
     const reference = references(model, version)[0];
     const all = answersFor(model);
     if (!version.scores || !reference) {
@@ -248,65 +349,35 @@ function Examples({ model, version }: { model: FlowModel; version: FlowVersion }
         all.filter(
             (answer) => verdictOf(answer, version.number, reference.version.number) === verdict,
         );
-    const better = of("better");
-    const worse = of("worse");
-    const rows = shown === "worse" ? worse : better;
+    const groups = { better: of("better"), worse: of("worse") };
+    const toggle = (verdict: Exclude<Verdict, "same">) => (
+        <Button
+            variant="link"
+            className="h-auto p-0 tabular-nums"
+            aria-expanded={shown === verdict}
+            onClick={() => setShown(shown === verdict ? null : verdict)}
+        >
+            {shown === verdict ? "Hide them" : `Show the ${groups[verdict].length}`}
+        </Button>
+    );
+    const line = (verdict: Exclude<Verdict, "same">, label: string) => (
+        <span className="flex items-baseline gap-2">
+            <span className="font-medium tabular-nums">{`${label} on ${groups[verdict].length} ${groups[verdict].length === 1 ? "example" : "examples"}`}</span>
+            {groups[verdict].length > 0 && toggle(verdict)}
+        </span>
+    );
     return (
         <section className="flex flex-col gap-3 border-t pt-5">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <div className="flex flex-col">
-                    <span className="font-medium tabular-nums">
-                        {`Better on ${better.length} ${better.length === 1 ? "example" : "examples"} · worse on ${worse.length}`}
-                    </span>
-                    <span className="text-sm text-muted-foreground tabular-nums">
-                        {`Against ${reference.label}, on ${all.length} held-out rows drawn for review.`}
-                    </span>
+            <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                    {line("better", "Better")}
+                    {line("worse", "Worse")}
                 </div>
-                {worse.length + better.length > 0 && (
-                    <Button
-                        variant="outline"
-                        aria-expanded={open}
-                        onClick={() => {
-                            setOpen(!open);
-                            setShown(worse.length > 0 ? "worse" : "better");
-                        }}
-                    >
-                        {open
-                            ? "Hide examples"
-                            : worse.length > 0
-                              ? `Show the ${worse.length}`
-                              : `Show the ${better.length} better`}
-                    </Button>
-                )}
+                <span className="text-sm text-muted-foreground tabular-nums">
+                    {`Against ${reference.label}, on ${all.length} held-out rows drawn for review.`}
+                </span>
             </div>
-            {open && (
-                <div className="flex flex-col gap-3">
-                    <Tabs
-                        value={shown}
-                        onValueChange={(value) => setShown(value as Exclude<Verdict, "same">)}
-                    >
-                        <TabsList aria-label="Examples to show">
-                            <TabsTrigger value="worse">
-                                Worse
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {worse.length}
-                                </span>
-                            </TabsTrigger>
-                            <TabsTrigger value="better">
-                                Better
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {better.length}
-                                </span>
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                    {rows.length === 0 ? (
-                        <p className="text-muted-foreground">None in this group.</p>
-                    ) : (
-                        <ExampleList rows={rows} mine={version.number} theirs={reference} />
-                    )}
-                </div>
-            )}
+            {shown && <ExampleList rows={groups[shown]} mine={version.number} theirs={reference} />}
         </section>
     );
 }
@@ -407,7 +478,6 @@ function MadeFrom({ model, version }: { model: FlowModel; version: FlowVersion }
 }
 
 function Footer({ model, version }: { model: FlowModel; version: FlowVersion }) {
-    const toast = useToast();
     const callable = `${model.slug}@${version.number}`;
     return (
         <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4">
@@ -420,24 +490,6 @@ function Footer({ model, version }: { model: FlowModel; version: FlowVersion }) 
                     {shortHash(model.slug, version.number)}
                 </span>
             </Tip>
-            <span className="ml-auto flex items-center gap-2">
-                <Button variant="outline" asChild>
-                    <Link href={cardHref(model.slug, version.number)}>Model card</Link>
-                </Button>
-                <Button
-                    variant="outline"
-                    disabled={version.status !== "ready"}
-                    onClick={() =>
-                        toast({
-                            title: "Not in the prototype",
-                            description: `Would download the ${version.kind === "prompt" ? "prompt" : "adapter"} for ${callable}.`,
-                        })
-                    }
-                >
-                    <Download aria-hidden="true" />
-                    Download
-                </Button>
-            </span>
         </footer>
     );
 }
@@ -452,34 +504,5 @@ export function ReportCard({ model, version }: { model: FlowModel; version: Flow
             <MadeFrom model={model} version={version} />
             <Footer model={model} version={version} />
         </div>
-    );
-}
-
-export function VersionSheet() {
-    const { version: target } = useOverlays();
-    const state = useFlowState();
-    const model = target ? state.models.find((item) => item.slug === target.slug) : undefined;
-    const version = model && target ? findVersion(model, target.number) : undefined;
-    return (
-        <Sheet open={Boolean(version)} onOpenChange={(open) => !open && closeVersion()}>
-            <SheetContent className="gap-5 sm:max-w-xl">
-                {model && version && (
-                    <>
-                        <SheetHeader>
-                            <SheetTitle className="text-xl font-normal tabular-nums">
-                                {versionTitle(model, version)}
-                            </SheetTitle>
-                            <SheetDescription>
-                                {`${model.name} · on ${model.base} · created ${shortAgo(version)}`}
-                            </SheetDescription>
-                        </SheetHeader>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <VersionActions model={model} version={version} />
-                        </div>
-                        <ReportCard model={model} version={version} />
-                    </>
-                )}
-            </SheetContent>
-        </Sheet>
     );
 }

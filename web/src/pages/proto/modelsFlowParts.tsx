@@ -10,16 +10,13 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Label,
     Link,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
-    cn,
     useToast,
 } from "obp-ui";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
@@ -41,11 +38,9 @@ import {
     points,
     ruleReason,
     scoreNote,
-    setOnApi,
     useFlowState,
     versionState,
 } from "./modelsFlowData";
-import { ConfirmDialog } from "./modelsFlowDialogs";
 
 export function ModelAvatar({ model, size = "md" }: { model: FlowModel; size?: "md" | "lg" }) {
     if (model.kind === "base") {
@@ -299,10 +294,12 @@ function MakeLiveBody({
                     <p className="text-sm">{ruleReason(model, version)}</p>
                 </Callout>
             )}
-            {first && <Callout tone="info">{`This also puts ${model.slug} on the API.`}</Callout>}
+            {first && (
+                <Callout tone="info">{`${model.name} is not deployed yet: making v${version.number} live also deploys it, so ${model.slug} starts answering.`}</Callout>
+            )}
             {!first && !model.deployed && (
                 <Callout tone="info">
-                    {`${model.name} is off the API: nothing calls it until you switch it on.`}
+                    {`${model.name} is not deployed: nothing calls it until you deploy it.`}
                 </Callout>
             )}
             <DialogFooter>
@@ -373,12 +370,12 @@ function ConnectBody({ model, onClose }: { model: FlowModel; onClose: () => void
                 <DialogDescription>
                     {model.kind === "custom"
                         ? `OpenAI-compatible. ${model.slug} answers with the live version; ${model.slug}@N calls one version, live or not.`
-                        : "OpenAI-compatible. Each format on the API has its own model name."}
+                        : "OpenAI-compatible. Each deployed format has its own model name."}
                 </DialogDescription>
             </DialogHeader>
             {!model.deployed && (
                 <Callout tone="warning">
-                    {`${model.name} is off the API, so these calls are refused until you switch it on.`}
+                    {`${model.name} is not deployed, so these calls are refused until you deploy it.`}
                 </Callout>
             )}
             <div className="grid gap-field sm:grid-cols-[3fr_2fr_2fr]">
@@ -432,74 +429,4 @@ export function IntentDialogs() {
 export function openConnect(slug: string) {
     markVisited("connect");
     openIntent({ kind: "connect", slug });
-}
-
-export function OnApiSwitch({ model }: { model: FlowModel }) {
-    const toast = useToast();
-    const [asking, setAsking] = useState(false);
-    const can = useCan("builder");
-    const nothing = model.kind === "custom" && model.live === null;
-    if (!can) {
-        return null;
-    }
-    const change = (on: boolean) => {
-        if (!on) {
-            setAsking(true);
-            return;
-        }
-        setOnApi(model.slug, true);
-        toast({ title: `${model.name} is on the API`, tone: "success" });
-    };
-    const control = (
-        <div className="flex h-8 items-center gap-2 rounded-md border px-3">
-            <Switch
-                id={`api-${model.slug}`}
-                checked={model.deployed}
-                disabled={nothing && !model.deployed}
-                onCheckedChange={change}
-            />
-            <Label
-                htmlFor={`api-${model.slug}`}
-                className={cn(
-                    "cursor-pointer font-normal",
-                    !model.deployed && "text-muted-foreground",
-                )}
-            >
-                {model.deployed ? "On the API" : "Off"}
-            </Label>
-        </div>
-    );
-    return (
-        <>
-            <Tip
-                tip={
-                    nothing && !model.deployed
-                        ? "Make a version live first; the API answers with it."
-                        : model.deployed
-                          ? `${model.kind === "base" ? "Its formats answer" : `${model.slug} answers`} on the API.`
-                          : "Its name is not on the API."
-                }
-            >
-                {control}
-            </Tip>
-            <ConfirmDialog
-                confirm={
-                    asking
-                        ? {
-                              title: `Take ${model.name} off the API?`,
-                              description: (
-                                  <p>{`Apps calling ${model.slug} get errors at once. The live pointer, versions and keys stay.`}</p>
-                              ),
-                              label: "Take off the API",
-                              run: () => {
-                                  setOnApi(model.slug, false);
-                                  toast({ title: `${model.name} is off the API` });
-                              },
-                          }
-                        : null
-                }
-                onClose={() => setAsking(false)}
-            />
-        </>
-    );
 }
