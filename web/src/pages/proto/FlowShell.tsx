@@ -45,6 +45,7 @@ import {
     versionHref,
     versionTarget,
 } from "./modelsFlowData";
+import { HeaderSwitch } from "./modelsFlowHeader";
 import { IntentDialogs } from "./modelsFlowParts";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
@@ -221,7 +222,7 @@ function go(step: Step) {
     }
 }
 
-function Journey({ pathname }: { pathname: string }) {
+function Journey({ pathname, compact }: { pathname: string; compact: boolean }) {
     const state = useFlowState();
     const [open, setOpen] = useState(false);
     const list = steps(state);
@@ -234,7 +235,10 @@ function Journey({ pathname }: { pathname: string }) {
                     href={list[next].href}
                     onClick={() => go(list[next])}
                     title={list[next].label}
-                    className="hidden max-w-72 truncate text-sm text-primary hover:underline xl:block"
+                    className={cn(
+                        "hidden max-w-72 truncate text-sm text-primary hover:underline",
+                        compact ? "2xl:block" : "xl:block",
+                    )}
                 >
                     {`Next: ${next + 1}. ${list[next].label}`}
                 </Link>
@@ -370,6 +374,7 @@ export function FlowShell() {
     const { role } = useOverlays();
     const [searching, setSearching] = useState(false);
     const step = stepFor(pathname, state);
+    const onModels = pathname === `${FLOW}/models`;
     useEffect(() => {
         if (step) {
             markVisited(step);
@@ -446,11 +451,12 @@ export function FlowShell() {
                     active={role}
                     onSelect={(key) => setRole(key as Role)}
                 />
+                {onModels && <HeaderSwitch />}
                 <span className="hidden truncate text-sm text-muted-foreground 2xl:inline">
                     Prototype · fake data, nothing is saved
                 </span>
                 <div className="ml-auto flex min-w-0 items-center">
-                    <Journey pathname={pathname} />
+                    <Journey pathname={pathname} compact={onModels} />
                 </div>
             </div>
             <Outlet />

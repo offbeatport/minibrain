@@ -3,7 +3,6 @@ import { GitCompare, PowerOff, Trash2, X } from "lucide-react";
 import {
     Button,
     InfoTip,
-    KbdHint,
     SearchInput,
     Separator,
     Tooltip,
@@ -13,7 +12,7 @@ import {
     useToast,
 } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
-import { openVersion } from "./flowOverlays";
+import { openVersion, useCan } from "./flowOverlays";
 import {
     type BaseVariant,
     type FlowModel,
@@ -40,6 +39,7 @@ import {
     versionTarget,
 } from "./modelsFlowData";
 import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
+import { ModelsHeader, ShortcutsHelp, hiddenChips, useHeaderStyle } from "./modelsFlowHeader";
 import { QuickLook } from "./modelsFlowPeek";
 import {
     COLUMNS,
@@ -59,11 +59,13 @@ import {
     DEFAULT_SORT,
     FilterChips,
     type Filters,
+    type KindKey,
     NO_FILTERS,
     type SortKey,
     ViewOptions,
     passes,
     sortModels,
+    statusScope,
 } from "./modelsFlowView";
 
 type Line =
@@ -78,6 +80,12 @@ type Line =
           searching: boolean;
       };
 type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
+type Group = { kind: KindKey; label: string; count: number; lines: Line[] };
+
+const GROUPS: { kind: KindKey; label: string }[] = [
+    { kind: "custom", label: "Your models" },
+    { kind: "base", label: "Base models" },
+];
 
 const HINTS: Record<string, Hint> = {
     "support-triage": {
@@ -459,22 +467,26 @@ export function ModelsFlowList() {
     );
     const [peek, setPeek] = useState<string | null>(null);
     const [autopilotFor, setAutopilotFor] = useState<string | null>(null);
+    const headerStyle = useHeaderStyle();
+    const canAdd = useCan("builder");
     const text = query.trim().toLowerCase();
     const pool = useMemo(() => models.filter((model) => matchesText(model, text)), [models, text]);
-    const lines = useMemo(
+    const groups = useMemo(
         () =>
-            buildLines(
-                sortModels(
-                    pool.filter((model) => passes(model, filters)),
+            GROUPS.map((group): Group => {
+                const members = sortModels(
+                    pool.filter((model) => model.kind === group.kind && passes(model, filters)),
                     sort,
-                ),
-                text,
-                expanded.stored,
-                searchToggles,
-                nested,
-            ),
+                );
+                return {
+                    ...group,
+                    count: members.length,
+                    lines: buildLines(members, text, expanded.stored, searchToggles, nested),
+                };
+            }).filter((group) => group.count > 0),
         [pool, filters, sort, text, expanded.stored, searchToggles, nested],
     );
+    const lines = groups.flatMap((group) => group.lines);
     const rows = lines.filter((line): line is RowLine =>
         ["model", "version", "variant"].includes(line.type),
     );
@@ -715,64 +727,80 @@ export function ModelsFlowList() {
             />
         );
     };
+    const toolbar =
+        picked.length > 0 ? (
+            <SelectionBar
+                versions={versions}
+                variants={variants}
+                onClear={clear}
+                on={on}
+                onDelete={() =>
+                    setConfirm(
+                        confirmDeletion(versions, variants, (count) => {
+                            clear();
+                            toast({
+                                title: `Deleted ${plural(count, "item")}`,
+                                tone: "success",
+                            });
+                        }),
+                    )
+                }
+            />
+        ) : (
+            <div className="flex min-w-0 items-center gap-2">
+                <SearchInput
+                    aria-label="Search models, versions and variants"
+                    placeholder="Search"
+                    value={query}
+                    onValueChange={(value) => {
+                        setQuery(value);
+                        setSearchToggles({});
+                    }}
+                    className="min-w-0 flex-1"
+                />
+                <ViewOptions
+                    pool={pool}
+                    models={models}
+                    filters={filters}
+                    onFilters={setFilters}
+                    sort={sort}
+                    onSort={setSort}
+                    columns={columns}
+                    onColumns={(value) => {
+                        setColumns(value);
+                        writeStored(COLUMNS_KEY, value);
+                    }}
+                    nested={nested}
+                    onNested={(value) => {
+                        setNested(value);
+                        writeStored(NESTED_KEY, value);
+                        if (!value) {
+                            clear();
+                        }
+                    }}
+                />
+                <ShortcutsHelp nested={nested} />
+            </div>
+        );
     return (
         <div className="flex flex-col gap-3">
-            {picked.length > 0 ? (
-                <SelectionBar
-                    versions={versions}
-                    variants={variants}
-                    onClear={clear}
-                    on={on}
-                    onDelete={() =>
-                        setConfirm(
-                            confirmDeletion(versions, variants, (count) => {
-                                clear();
-                                toast({
-                                    title: `Deleted ${plural(count, "item")}`,
-                                    tone: "success",
-                                });
-                            }),
-                        )
-                    }
-                />
-            ) : (
-                <div className="flex items-center gap-2">
-                    <SearchInput
-                        aria-label="Search models, versions and variants"
-                        placeholder="Search"
-                        value={query}
-                        onValueChange={(value) => {
-                            setQuery(value);
-                            setSearchToggles({});
-                        }}
-                        className="w-full max-w-72 flex-1"
-                    />
-                    <div className="ml-auto">
-                        <ViewOptions
-                            pool={pool}
-                            models={models}
-                            filters={filters}
-                            onFilters={setFilters}
-                            sort={sort}
-                            onSort={setSort}
-                            columns={columns}
-                            onColumns={(value) => {
-                                setColumns(value);
-                                writeStored(COLUMNS_KEY, value);
-                            }}
-                            nested={nested}
-                            onNested={(value) => {
-                                setNested(value);
-                                writeStored(NESTED_KEY, value);
-                                if (!value) {
-                                    clear();
-                                }
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
-            <FilterChips models={models} filters={filters} onFilters={setFilters} />
+            <ModelsHeader
+                style={headerStyle}
+                toolbar={toolbar}
+                selecting={picked.length > 0}
+                canAdd={canAdd}
+                scope={statusScope(pool, filters)}
+                filters={filters}
+                onFilters={setFilters}
+                sort={sort}
+                onSort={setSort}
+            />
+            <FilterChips
+                models={models}
+                filters={filters}
+                onFilters={setFilters}
+                hidden={hiddenChips(headerStyle)}
+            />
             <div
                 className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card"
                 style={{ gridTemplateColumns: gridTemplate(columns) }}
@@ -797,21 +825,33 @@ export function ModelsFlowList() {
                         No models, versions or variants match.
                     </div>
                 ) : (
-                    <ul
-                        aria-label="Models"
-                        className="col-span-full grid grid-cols-subgrid divide-y"
-                    >
-                        {lines.map(render)}
-                    </ul>
+                    groups.map((group) => (
+                        <section
+                            key={group.kind}
+                            aria-labelledby={`flow-group-${group.kind}`}
+                            className="col-span-full grid grid-cols-subgrid border-t first-of-type:border-t-0"
+                        >
+                            <h2
+                                id={`flow-group-${group.kind}`}
+                                className={cn(
+                                    "col-span-full flex h-9 items-center gap-2 border-b px-4 font-medium",
+                                    nested && "pl-12",
+                                )}
+                            >
+                                {group.label}
+                                <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                                    {group.count}
+                                </span>
+                            </h2>
+                            <ul
+                                aria-labelledby={`flow-group-${group.kind}`}
+                                className="col-span-full grid grid-cols-subgrid divide-y"
+                            >
+                                {group.lines.map(render)}
+                            </ul>
+                        </section>
+                    ))
                 )}
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <KbdHint keys={["↑", "↓"]}>move</KbdHint>
-                {nested && <KbdHint keys={["→", "←"]}>expand, collapse</KbdHint>}
-                <KbdHint keys={["Enter"]}>open</KbdHint>
-                <KbdHint keys={["Space"]}>
-                    {nested ? "quick look on a model, select a version or variant" : "quick look"}
-                </KbdHint>
             </div>
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
             <AutopilotDialog

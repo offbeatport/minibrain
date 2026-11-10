@@ -41,17 +41,26 @@ export const NO_FILTERS: Filters = { status: [], kind: [], base: null };
 export const DEFAULT_SORT: SortKey = "attention";
 const ANY_BASE = "any";
 
-const STATUSES: { value: StatusKey; label: string; test: (model: FlowModel) => boolean }[] = [
-    { value: "deployed", label: "Deployed", test: (model) => model.deployed },
-    { value: "off", label: "Not deployed", test: (model) => !model.deployed },
-    { value: "attention", label: "Needs attention", test: (model) => attention(model) !== null },
-    { value: "training", label: "Training", test: (model) => trainingVersion(model) !== undefined },
-    {
-        value: "failed",
-        label: "Failed",
-        test: (model) => newestFirst(model)[0]?.status === "failed",
-    },
-];
+export const STATUSES: { value: StatusKey; label: string; test: (model: FlowModel) => boolean }[] =
+    [
+        { value: "deployed", label: "Deployed", test: (model) => model.deployed },
+        { value: "off", label: "Not deployed", test: (model) => !model.deployed },
+        {
+            value: "attention",
+            label: "Needs attention",
+            test: (model) => attention(model) !== null,
+        },
+        {
+            value: "training",
+            label: "Training",
+            test: (model) => trainingVersion(model) !== undefined,
+        },
+        {
+            value: "failed",
+            label: "Failed",
+            test: (model) => newestFirst(model)[0]?.status === "failed",
+        },
+    ];
 
 const KINDS: { value: KindKey; label: string }[] = [
     { value: "custom", label: "Custom" },
@@ -115,6 +124,15 @@ const COMPARE: Record<SortKey, (a: FlowModel, b: FlowModel) => number> = {
     requests: (a, b) => requestsOf(b) - requestsOf(a),
     recent: (a, b) => hoursSinceUpdate(a) - hoursSinceUpdate(b),
 };
+
+export function statusScope(pool: FlowModel[], filters: Filters): FlowModel[] {
+    return pool.filter((model) => passes(model, filters, "status"));
+}
+
+export function statusCount(scope: FlowModel[], status: StatusKey): number {
+    const test = STATUSES.find((option) => option.value === status)?.test;
+    return test ? scope.filter(test).length : 0;
+}
 
 export function sortModels(models: FlowModel[], sort: SortKey): FlowModel[] {
     return [...models].sort(COMPARE[sort]).sort((a, b) => Number(b.pinned) - Number(a.pinned));
@@ -551,12 +569,16 @@ export function FilterChips({
     models,
     filters,
     onFilters,
+    hidden = [],
 }: {
     models: FlowModel[];
     filters: Filters;
     onFilters: (value: Filters) => void;
+    hidden?: StatusKey[];
 }) {
-    const chips = chipsOf(filters, baseOptions(models));
+    const chips = chipsOf(filters, baseOptions(models)).filter(
+        (chip) => !hidden.some((status) => chip.key === `status:${status}`),
+    );
     if (chips.length === 0) {
         return null;
     }
