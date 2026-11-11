@@ -34,6 +34,12 @@ export type StatusKind =
     | "on"
     | "off";
 
+export type JobLink = { id: number; kind: string };
+
+export function jobOf(id: number | null | undefined, kind: string): JobLink | null {
+    return id === null || id === undefined ? null : { id, kind };
+}
+
 export type StatusLine = {
     kind: StatusKind;
     text: string;
@@ -42,7 +48,7 @@ export type StatusLine = {
     detail?: string;
     version?: number;
     progress?: number | null;
-    jobId?: number | null;
+    job?: JobLink | null;
 };
 
 const ATTENTION: StatusKind[] = [
@@ -314,7 +320,6 @@ function customLine(model: ListModel): StatusLine {
             tone: "destructive",
             detail: newest.error || "The job failed without a message.",
             version: newest.number,
-            jobId: newest.job_id,
             row,
         };
     }
@@ -327,7 +332,7 @@ function customLine(model: ListModel): StatusLine {
             tone: "info",
             version: busy.number,
             progress: busy.progress,
-            jobId: busy.job_id,
+            job: jobOf(busy.job_id, busy.status === "training" ? "train" : "eval"),
             row,
         };
     }
@@ -337,7 +342,6 @@ function customLine(model: ListModel): StatusLine {
             text: row.activity.label,
             tone: "destructive",
             detail: row.error || "The last job failed without a message.",
-            jobId: row.activity.job_id,
             row,
         };
     }
@@ -370,7 +374,10 @@ export function variantLine(row: ModelRow): StatusLine {
             text: `${label}${percentage(row.availability.progress)}`,
             tone: "info",
             progress: row.availability.progress,
-            jobId: row.availability.job_id,
+            job: jobOf(
+                row.availability.job_id,
+                row.availability.state === "downloading" ? "download" : "import",
+            ),
             row,
         };
     }
@@ -380,7 +387,7 @@ export function variantLine(row: ModelRow): StatusLine {
             text: `${row.activity.label}${percentage(row.activity.progress)}`,
             tone: "info",
             progress: row.activity.progress,
-            jobId: row.activity.job_id,
+            job: jobOf(row.activity.job_id, row.activity.kind ?? "download"),
             row,
         };
     }
@@ -390,7 +397,6 @@ export function variantLine(row: ModelRow): StatusLine {
             text: row.activity.label,
             tone: "destructive",
             detail: row.error || "The last job failed without a message.",
-            jobId: row.activity.job_id,
             row,
         };
     }
@@ -504,7 +510,10 @@ export function shownVersions(model: ListModel): ModelVersionRow[] {
     return model.versions.filter((version) => picked.includes(version));
 }
 
-export function versionState(version: ModelVersionRow): { label: string; tone: Tone } {
+export function versionState(version: ModelVersionRow): {
+    label: string;
+    tone: Tone;
+} {
     if (version.status === "training") {
         return { label: "Training", tone: "info" };
     }

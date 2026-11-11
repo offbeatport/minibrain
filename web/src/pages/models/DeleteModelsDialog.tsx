@@ -18,7 +18,8 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
 import { StatusText } from "~/components/models/StatusText";
-import { jobPageHref, kindName } from "~/lib/jobs";
+import { kindName } from "~/lib/jobs";
+import { jobHref } from "~/lib/modelLinks";
 import { builtOn, isLiveRow, rowId } from "~/lib/teardown";
 import { bytes } from "~/lib/time";
 import type { Entry } from "./entries";
@@ -105,7 +106,7 @@ function JobList({ jobs }: { jobs: JobInfo[] }) {
                 <li key={job.id} className="flex items-center gap-3 px-3 py-2">
                     <span className="flex min-w-0 flex-1 flex-col">
                         <Link
-                            href={jobPageHref(job.id)}
+                            href={jobHref(job)}
                             className="truncate font-medium text-primary hover:underline"
                         >
                             {jobName(job)}

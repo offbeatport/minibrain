@@ -5,7 +5,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
-import { jobPageHref } from "~/lib/jobs";
+import { jobHref } from "~/lib/modelLinks";
 import {
     BASELINE_HINT,
     type ListModel,
@@ -138,8 +138,8 @@ export function StatusLineText({
     if (line.kind === "training" || line.kind === "transfer") {
         return (
             <span className="flex items-center gap-2">
-                {line.jobId ? (
-                    <Link href={jobPageHref(line.jobId)} className="relative z-10 hover:underline">
+                {line.job ? (
+                    <Link href={jobHref(line.job)} className="relative z-10 hover:underline">
                         {text}
                     </Link>
                 ) : (
@@ -222,7 +222,10 @@ export function VersionStatus({
                 </StatusText>
                 {version.job_id && (
                     <Link
-                        href={jobPageHref(version.job_id)}
+                        href={jobHref({
+                            id: version.job_id,
+                            kind: version.status === "training" ? "train" : "eval",
+                        })}
                         className="relative z-10 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
                     >
                         {`Job #${version.job_id}`}
