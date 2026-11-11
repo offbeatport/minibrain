@@ -27,6 +27,7 @@ import { useSearchParam } from "~/lib/listSearch";
 import { Inline } from "./flowHeader";
 import { useCan } from "./flowOverlays";
 import { TrainButton, TrainingJobsList } from "./flowTraining";
+import { TrainingChart } from "./flowTrainingChart";
 import {
     FLOW,
     type FlowModel,
@@ -83,6 +84,7 @@ export function TrainingTab({ model }: { model: FlowModel }) {
                     <Inline items={facts} />
                 </p>
             )}
+            <TrainingChart model={model} />
             <TrainingJobsList scope={model} actions={<TrainButton model={model} />} />
         </div>
     );

@@ -14,6 +14,7 @@ export type StepSeries = {
     label: string;
     color: string;
     dots?: boolean;
+    width?: number;
 };
 export type StepRow = { step: number; [series: string]: number | null };
 export type StepMarker = { at: number; label: string };
@@ -80,7 +81,9 @@ export function StepChart({
     height = 220,
     marker,
     markers = [],
+    levels = [],
     domain,
+    yDomain,
     xFormat = (value: number) => STEPS.format(value),
     readoutTitle = (value: number) => `Step ${STEPS.format(value)}`,
     connectNulls = true,
@@ -93,7 +96,9 @@ export function StepChart({
     height?: number;
     marker?: number | null;
     markers?: StepMarker[];
+    levels?: StepMarker[];
     domain?: [number, number];
+    yDomain?: [number, number];
     xFormat?: (value: number) => string;
     readoutTitle?: (value: number) => string;
     connectNulls?: boolean;
@@ -130,7 +135,7 @@ export function StepChart({
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={axisFormat ?? format}
-                        domain={["auto", "auto"]}
+                        domain={yDomain ?? ["auto", "auto"]}
                     />
                     <Tooltip
                         cursor={{ stroke: "var(--input)", strokeWidth: 1 }}
@@ -169,6 +174,22 @@ export function StepChart({
                             }}
                         />
                     ))}
+                    {levels.map((item) => (
+                        <ReferenceLine
+                            key={`level-${item.at}-${item.label}`}
+                            y={item.at}
+                            stroke="var(--muted-foreground)"
+                            strokeDasharray="4 4"
+                            strokeWidth={1}
+                            ifOverflow="extendDomain"
+                            label={{
+                                value: item.label,
+                                position: "insideTopLeft",
+                                fill: "var(--muted-foreground)",
+                                fontSize: "var(--type-sm)",
+                            }}
+                        />
+                    ))}
                     {series.map((item) => (
                         <Line
                             key={item.key}
@@ -176,7 +197,7 @@ export function StepChart({
                             name={item.label}
                             type="linear"
                             stroke={item.color}
-                            strokeWidth={2}
+                            strokeWidth={item.width ?? 2}
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             dot={

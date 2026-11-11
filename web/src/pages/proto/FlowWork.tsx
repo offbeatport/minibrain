@@ -728,10 +728,12 @@ export function FlowJobPage() {
     const job = state.jobs.find((item) => item.id === Number(id));
     const canonical = job ? jobHref(job.id) : null;
     useEffect(() => {
-        if (canonical && pathname.replace(/\/$/, "") !== canonical) {
+        const here = pathname.replace(/\/$/, "");
+        const onThisJob = [`${FLOW}/jobs/${id}`, `${FLOW}/training/${id}`].includes(here);
+        if (canonical && onThisJob && here !== canonical) {
             router.history.replace(canonical);
         }
-    }, [canonical, pathname, router]);
+    }, [canonical, pathname, router, id]);
     if (!job) {
         return (
             <Page>

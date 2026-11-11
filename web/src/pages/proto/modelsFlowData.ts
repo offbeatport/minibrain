@@ -806,8 +806,8 @@ function jobsOf(models: FlowModel[]): Job[] {
         model.versions.map((version) => versionJob(model, version)),
     );
     const others: Job[] = [
-        transfer(1201, "download", "qwen3-8b", 6 * DAY, 9),
-        transfer(1202, "download", "llama-3.2-1b", 15 * DAY, 4),
+        transfer(1201, "download", "qwen3-8b", 36 * DAY, 9),
+        transfer(1202, "download", "llama-3.2-1b", 22 * DAY, 4),
         transfer(1203, "import", "qwen3-0.6b", 35 * DAY, 1),
         {
             id: 1205,

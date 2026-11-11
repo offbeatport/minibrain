@@ -1,4 +1,5 @@
 export { FlowModelPage } from "./FlowModelPage";
+export { FlowActivityPage } from "./flowActivity";
 export { FlowAddModelPage, FlowCatalogPage, FlowDiscoverPage, FlowHomePage } from "./FlowPages";
 export { FlowRedirect, FlowShell } from "./FlowShell";
 export { FlowEvaluationsPage } from "./flowEvaluations";

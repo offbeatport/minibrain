@@ -101,6 +101,7 @@ function flowRoutes(): AnyRoute {
         page("evaluations", "FlowEvaluationsPage"),
         page("jobs/$id", "FlowJobPage"),
         page("feedback", "FlowFeedbackPage"),
+        page("activity", "FlowActivityPage"),
         page("infrastructure", "FlowInfrastructurePage"),
         page("settings", "FlowSettingsPage"),
     ]);

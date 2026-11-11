@@ -4,7 +4,11 @@ import type { FlowModel } from "./modelsFlowData";
 export type UsageRange = "24h" | "7d" | "30d";
 export type UsageMetric = "requests" | "p95" | "errors" | "cost";
 
-type Pointer = { hoursAgo: number; version: number; canary?: { version: number; share: number } };
+export type Pointer = {
+    hoursAgo: number;
+    version: number;
+    canary?: { version: number; share: number };
+};
 
 const DAY = 24;
 const HOUR_MS = 3600 * 1000;
@@ -53,7 +57,10 @@ function sameCanary(pointer: Pointer, model: FlowModel): boolean {
     );
 }
 
-function pointersOf(model: FlowModel): Pointer[] {
+export function pointersOf(model: FlowModel): Pointer[] {
+    if (model.kind === "base") {
+        return model.deployed ? [{ hoursAgo: 40 * DAY, version: 0 }] : [];
+    }
     if (model.live === null) {
         return HISTORY[model.slug] ?? [];
     }
@@ -209,7 +216,12 @@ export function usageOf(model: FlowModel, range: UsageRange, metric: UsageMetric
             .filter((version) => keys.has(`v${version}`))
             .map((version) => ({
                 key: `v${version}`,
-                label: model.live === version ? `v${version} live` : `v${version}`,
+                label:
+                    model.kind === "base"
+                        ? "Deployed variants"
+                        : model.live === version
+                          ? `v${version} live`
+                          : `v${version}`,
                 color: SLOTS[colored.indexOf(version)],
                 dots: rows.filter((row) => typeof row[`v${version}`] === "number").length < 3,
                 version,
