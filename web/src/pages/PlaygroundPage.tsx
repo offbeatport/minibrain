@@ -3,24 +3,15 @@ import {
     Button,
     Card,
     EmptyState,
-    Kbd,
     Link,
     Sheet,
     SheetContent,
     SheetDescription,
     SheetHeader,
     SheetTitle,
-    Textarea,
 } from "obp-ui";
-import {
-    type FormEvent,
-    type KeyboardEvent,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import { ChatComposer, ChatEmptyState, ChatNotice, ChatPanel } from "obp-ui/chat";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOpenChat, usePlaygroundModels, usePresets, useSaveChat } from "~/api/playgroundQueries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
@@ -131,60 +122,6 @@ function answered(turns: Turn[], call: ToolCall): boolean {
     }
     const results = new Set(turns.flatMap((turn) => (turn.kind === "tool" ? [turn.callId] : [])));
     return owner.calls.every((item) => results.has(item.id));
-}
-
-function Composer({
-    busy,
-    disabled,
-    onSend,
-    onStop,
-}: {
-    busy: boolean;
-    disabled: boolean;
-    onSend: (text: string) => void;
-    onStop: () => void;
-}) {
-    const [text, setText] = useState("");
-    const submit = (event?: FormEvent) => {
-        event?.preventDefault();
-        if (text.trim() && !busy) {
-            onSend(text.trim());
-            setText("");
-        }
-    };
-    const keys = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            submit();
-        }
-    };
-    return (
-        <form onSubmit={submit} className="flex flex-col gap-2 border-t p-4">
-            <Textarea
-                value={text}
-                rows={3}
-                disabled={disabled}
-                placeholder="Type a message"
-                aria-label="Message"
-                onChange={(event) => setText(event.target.value)}
-                onKeyDown={keys}
-            />
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">
-                    <Kbd>Ctrl</Kbd> <Kbd>Enter</Kbd> sends
-                </span>
-                {busy ? (
-                    <Button type="button" variant="outline" onClick={onStop}>
-                        Stop
-                    </Button>
-                ) : (
-                    <Button type="submit" disabled={disabled || !text.trim()}>
-                        Send
-                    </Button>
-                )}
-            </div>
-        </form>
-    );
 }
 
 export function PlaygroundPage() {
@@ -496,31 +433,43 @@ export function PlaygroundPage() {
                         </Card>
                     )}
                     <Card className="flex min-h-[32rem] flex-col p-0">
-                        <div className="flex-1 overflow-y-auto p-panel">
-                            {missing && <p className="mb-4 text-muted-foreground">{missing}</p>}
-                            {turns.length === 0 ? (
-                                <p className="text-muted-foreground">
-                                    Send a message to {target.model_name}. Answers stream in as the
-                                    model writes them, with any reasoning and tool calls shown
-                                    apart.
-                                </p>
-                            ) : (
-                                <Conversation
-                                    turns={turns}
-                                    target={target}
-                                    busy={busy}
-                                    onToolResult={toolResult}
-                                    onSaveExample={examples ? setExampleFor : null}
-                                />
-                            )}
-                            <div ref={end} />
-                        </div>
-                        <Composer
+                        <ChatPanel
+                            variant="inset"
                             busy={busy}
-                            disabled={!target}
-                            onSend={send}
-                            onStop={() => aborter.current?.abort()}
-                        />
+                            header={
+                                missing && (
+                                    <ChatNotice className="border-b px-panel py-3">
+                                        {missing}
+                                    </ChatNotice>
+                                )
+                            }
+                            isEmpty={turns.length === 0}
+                            empty={
+                                <ChatEmptyState
+                                    title={`Send a message to ${target.model_name}`}
+                                    description="Answers stream in as the model writes them, with any reasoning and tool calls shown apart."
+                                />
+                            }
+                            composer={
+                                <ChatComposer
+                                    variant="form"
+                                    placeholder="Type a message"
+                                    busy={busy}
+                                    disabled={!target}
+                                    onSend={send}
+                                    onStop={() => aborter.current?.abort()}
+                                />
+                            }
+                        >
+                            <Conversation
+                                turns={turns}
+                                target={target}
+                                busy={busy}
+                                onToolResult={toolResult}
+                                onSaveExample={examples ? setExampleFor : null}
+                            />
+                            <div ref={end} />
+                        </ChatPanel>
                     </Card>
                     {settingsColumn && (
                         <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto p-0">
