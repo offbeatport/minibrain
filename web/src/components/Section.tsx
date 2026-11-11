@@ -60,7 +60,7 @@ export function PanelSection({
     return (
         <section
             id={anchor}
-            className={cn("group/panel flex scroll-my-24 flex-col gap-2", bare && CARD_GRID)}
+            className={cn("group/panel flex scroll-my-24 flex-col gap-4", bare && CARD_GRID)}
         >
             <header className={cn("flex flex-wrap items-end justify-between gap-3", FLASH)}>
                 <div className="flex min-w-0 flex-col gap-0.5">
@@ -91,7 +91,7 @@ export function PanelSection({
 }
 
 export function PanelSections({ children }: { children: ReactNode }) {
-    return <div className="flex flex-col gap-8 pt-2">{children}</div>;
+    return <div className="flex flex-col gap-10 pt-4">{children}</div>;
 }
 
 export function Stat({ label, value }: { label: string; value: ReactNode }) {
