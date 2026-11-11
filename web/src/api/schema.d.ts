@@ -578,6 +578,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-pages/{name}/traffic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chart a model's requests by version
+         * @description Requests, errors, latency and device time per bucket and per version for the range, with what changed in it, the errors by status, the busiest keys and the replicas serving it.
+         */
+        get: operations["read_model_traffic_api_model_pages__name__traffic_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-pages/{name}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what changed on a model
+         * @description Audited changes to the model, its versions, its keys and its jobs, newest first, as sentences.
+         */
+        get: operations["read_model_activity_api_model_pages__name__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources": {
         parameters: {
             query?: never;
@@ -3187,6 +3227,24 @@ export interface components {
             progress?: number | null;
             /** Job Id */
             job_id?: number | null;
+        };
+        /** ActivityLink */
+        ActivityLink: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model" | "version" | "job" | "key" | "base" | "monitoring";
+            /** Label */
+            label: string;
+            /** Version */
+            version?: number | null;
+            /** Job Id */
+            job_id?: number | null;
+            /** Job Kind */
+            job_kind?: string | null;
+            /** Key */
+            key?: string | null;
         };
         /** AddedInfo */
         AddedInfo: {
@@ -6352,11 +6410,8 @@ export interface components {
         };
         /** KeyCreate */
         KeyCreate: {
-            /**
-             * Name
-             * @default default
-             */
-            name?: string;
+            /** Name */
+            name: string;
             /** Models */
             models: components["schemas"]["ModelRef"][];
         };
@@ -6552,6 +6607,31 @@ export interface components {
             /** Entries */
             entries: components["schemas"]["LogBody"][];
         };
+        /** MachinePlanInfo */
+        MachinePlanInfo: {
+            /** Name */
+            name: string;
+            /** Pool */
+            pool: string;
+            /** Kind */
+            kind: string;
+            /** Memory Label */
+            memory_label: string;
+            /** Available Bytes */
+            available_bytes: number | null;
+            /** Fits */
+            fits: boolean;
+            chosen: components["schemas"]["TrainingOptionInfo"] | null;
+            smallest: components["schemas"]["TrainingOptionInfo"] | null;
+            /** Reason */
+            reason: string | null;
+            /** Minutes */
+            minutes: number | null;
+            /** Steps */
+            steps: number | null;
+            /** Picked */
+            picked: boolean;
+        };
         /** MappingInfo */
         MappingInfo: {
             /** Input Column */
@@ -6620,6 +6700,35 @@ export interface components {
             gold: string;
             /** Output */
             output: string;
+        };
+        /** ModelActivity */
+        ModelActivity: {
+            /** Events */
+            events: components["schemas"]["ModelActivityEvent"][];
+            /** Total */
+            total: number;
+        };
+        /** ModelActivityEvent */
+        ModelActivityEvent: {
+            /** Id */
+            id: number;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Actor */
+            actor: string;
+            /** Action */
+            action: string;
+            /** Text */
+            text: string;
+            link: components["schemas"]["ActivityLink"] | null;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "neutral" | "success" | "failed";
         };
         /** ModelCard */
         ModelCard: {
@@ -6817,6 +6926,15 @@ export interface components {
             traffic: components["schemas"]["ModelTraffic"];
             /** @description The one step the model page suggests, or none while busy. */
             next: components["schemas"]["NextAction"] | null;
+            /** @description One line on the model's state, broken first, with at most one action. */
+            status: components["schemas"]["ModelStatus"];
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Created By
+             * @description Who created, duplicated, downloaded or imported it.
+             */
+            created_by?: string | null;
         };
         /** ModelRef */
         ModelRef: {
@@ -6939,6 +7057,17 @@ export interface components {
              */
             answers?: boolean;
         };
+        /** ModelStatus */
+        ModelStatus: {
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "success" | "info" | "warning" | "destructive" | "neutral";
+            /** Text */
+            text: string;
+            action: components["schemas"]["StatusAction"] | null;
+        };
         /** ModelSummary */
         ModelSummary: {
             /** Slug */
@@ -6987,6 +7116,44 @@ export interface components {
             error_rate: number | null;
             /** P95 Ms */
             p95_ms: number | null;
+        };
+        /** ModelTrafficReport */
+        ModelTrafficReport: {
+            /**
+             * Range
+             * @enum {string}
+             */
+            range: "24h" | "7d" | "30d";
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+            /** Bucket Seconds */
+            bucket_seconds: number;
+            /** Buckets */
+            buckets: components["schemas"]["TrafficBucket"][];
+            /** Versions */
+            versions: components["schemas"]["TrafficVersion"][];
+            /** Points */
+            points: components["schemas"]["TrafficPoint"][];
+            totals: components["schemas"]["TrafficStats"];
+            previous: components["schemas"]["TrafficStats"] | null;
+            /** Usual Error Rate */
+            usual_error_rate: number | null;
+            /** Markers */
+            markers: components["schemas"]["TrafficMarker"][];
+            /** Errors */
+            errors: components["schemas"]["TrafficStatus"][];
+            /** Callers */
+            callers: components["schemas"]["TrafficCaller"][];
+            /** Replicas */
+            replicas: components["schemas"]["TrafficReplica"][];
         };
         /** ModelUpdate */
         ModelUpdate: {
@@ -7489,6 +7656,21 @@ export interface components {
             columns: string[];
             /** Rows */
             rows: (string | null)[][];
+        };
+        /** QueuedJobInfo */
+        QueuedJobInfo: {
+            /** Job Id */
+            job_id: number;
+            /** Model */
+            model: string | null;
+            /** Model Name */
+            model_name: string | null;
+            /** Version */
+            version: number | null;
+            /** Status */
+            status: string;
+            /** Progress */
+            progress: number;
         };
         /** RelabelInfo */
         RelabelInfo: {
@@ -8278,6 +8460,30 @@ export interface components {
              */
             judge_pending?: number;
         };
+        /** StatusAction */
+        StatusAction: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "promote" | "deploy" | "open_job" | "retry_job" | "open_monitoring" | "review_feedback" | "add_data" | "train" | "switch_base" | "create_custom";
+            /** Label */
+            label: string;
+            /** Version */
+            version?: number | null;
+            /** Job Id */
+            job_id?: number | null;
+            /** Job Kind */
+            job_kind?: string | null;
+            /** Base */
+            base?: string | null;
+            /**
+             * Everyone
+             * @description Viewers may follow it too; the others need the Builder role.
+             * @default false
+             */
+            everyone?: boolean;
+        };
         /** StorageCheck */
         StorageCheck: {
             /** Ok */
@@ -8512,6 +8718,45 @@ export interface components {
             type?: "function";
             function: components["schemas"]["FunctionSpec"];
         };
+        /** TrafficBucket */
+        TrafficBucket: {
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** P99 Ms */
+            p99_ms: number | null;
+            /** Device Seconds */
+            device_seconds: number;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+        };
+        /** TrafficCaller */
+        TrafficCaller: {
+            /** Key Id */
+            key_id: number | null;
+            /** Name */
+            name: string | null;
+            /** Prefix */
+            prefix: string | null;
+            /** Revoked */
+            revoked: boolean;
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+        };
         /** TrafficDay */
         TrafficDay: {
             /**
@@ -8523,6 +8768,105 @@ export interface components {
             requests: number;
             /** Errors */
             errors: number;
+        };
+        /** TrafficMarker */
+        TrafficMarker: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "deploy" | "undeploy" | "live";
+            /** Version */
+            version: number | null;
+            /** Label */
+            label: string;
+        };
+        /** TrafficPoint */
+        TrafficPoint: {
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** P99 Ms */
+            p99_ms: number | null;
+            /** Device Seconds */
+            device_seconds: number;
+            /** Bucket */
+            bucket: number;
+            /** Version */
+            version: number | null;
+        };
+        /** TrafficReplica */
+        TrafficReplica: {
+            /** Host */
+            host: string;
+            /** Engine */
+            engine: string;
+            /** State */
+            state: string;
+        };
+        /** TrafficStats */
+        TrafficStats: {
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** P99 Ms */
+            p99_ms: number | null;
+            /** Device Seconds */
+            device_seconds: number;
+        };
+        /** TrafficStatus */
+        TrafficStatus: {
+            /** Status */
+            status: number;
+            /** Label */
+            label: string;
+            /** Requests */
+            requests: number;
+            /**
+             * Last At
+             * Format: date-time
+             */
+            last_at: string;
+        };
+        /** TrafficVersion */
+        TrafficVersion: {
+            /** Requests */
+            requests: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number | null;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** P99 Ms */
+            p99_ms: number | null;
+            /** Device Seconds */
+            device_seconds: number;
+            /** Version */
+            version: number | null;
+            /** Live */
+            live: boolean;
         };
         /** TrainFitInfo */
         TrainFitInfo: {
@@ -8575,6 +8919,14 @@ export interface components {
             epochs: number;
             /** Max Rows */
             max_rows: number;
+            /** Alpha */
+            alpha: number;
+            /** Grad Accum */
+            grad_accum: number | null;
+            /** Eval Every */
+            eval_every: number | null;
+            /** Seed */
+            seed: number;
         };
         /** TrainingMetrics */
         TrainingMetrics: {
@@ -8659,6 +9011,29 @@ export interface components {
             /** Overrides */
             overrides: string[];
             defaults: components["schemas"]["TrainingDefaults"];
+            /**
+             * Minutes
+             * @description Estimated minutes for the chosen plan, setup and scoring included.
+             */
+            minutes: number | null;
+            /** Steps */
+            steps: number | null;
+            /** Grad Accum */
+            grad_accum: number | null;
+            /** Held Out Rows */
+            held_out_rows: number;
+            /** Machines */
+            machines: components["schemas"]["MachinePlanInfo"][];
+            queue: components["schemas"]["TrainingQueueInfo"];
+        };
+        /** TrainingQueueInfo */
+        TrainingQueueInfo: {
+            /** Ahead */
+            ahead: number;
+            /** Running */
+            running: number;
+            /** Jobs */
+            jobs: components["schemas"]["QueuedJobInfo"][];
         };
         /** TrainingSetup */
         TrainingSetup: {
@@ -8772,6 +9147,22 @@ export interface components {
             epochs?: number | null;
             /** Max Rows */
             max_rows?: number | null;
+            /** Alpha */
+            alpha?: number | null;
+            /** Grad Accum */
+            grad_accum?: number | null;
+            /**
+             * Eval Every
+             * @description Score the held-out rows every this many optimiser steps.
+             */
+            eval_every?: number | null;
+            /** Seed */
+            seed?: number | null;
+            /**
+             * Machine
+             * @description Plan for this training machine, by name.
+             */
+            machine?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -10145,6 +10536,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_model_traffic_api_model_pages__name__traffic_get: {
+        parameters: {
+            query?: {
+                range?: "24h" | "7d" | "30d";
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrafficReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_model_activity_api_model_pages__name__activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelActivity"];
                 };
             };
             /** @description Validation Error */
@@ -12852,7 +13309,9 @@ export interface operations {
     };
     version_answers_api_models__slug__versions__number__answers_get: {
         parameters: {
-            query?: never;
+            query?: {
+                against?: number | null;
+            };
             header?: never;
             path: {
                 slug: string;
@@ -13536,6 +13995,13 @@ export interface operations {
                 learning_rate?: number | null;
                 epochs?: number | null;
                 max_rows?: number | null;
+                alpha?: number | null;
+                grad_accum?: number | null;
+                /** @description Score the held-out rows every this many optimiser steps. */
+                eval_every?: number | null;
+                seed?: number | null;
+                /** @description Plan for this training machine, by name. */
+                machine?: string | null;
                 dataset_version_id?: number | null;
             };
             header?: never;

@@ -1,0 +1,31 @@
+:root {
+    --chart-series-1: #2a78d6;
+    --chart-series-2: #eb6834;
+    --chart-series-3: #1baf7a;
+    --chart-series-4: #eda100;
+    --chart-latency-1: #86b6ef;
+    --chart-latency-2: #2a78d6;
+    --chart-latency-3: #104281;
+    --chart-memory-1: #1d5fc4;
+    --chart-memory-2: #5b93e6;
+    --chart-memory-3: #a4c3f2;
+    --chart-memory-over-1: #b42318;
+    --chart-memory-over-2: #e0675c;
+    --chart-memory-over-3: #f2b0aa;
+}
+
+.dark {
+    --chart-series-1: #3987e5;
+    --chart-series-2: #d95926;
+    --chart-series-3: #199e70;
+    --chart-series-4: #c98500;
+    --chart-latency-1: #1c5cab;
+    --chart-latency-2: #3987e5;
+    --chart-latency-3: #9ec5f4;
+    --chart-memory-1: #8ab8fa;
+    --chart-memory-2: #4f87de;
+    --chart-memory-3: #2d5aa0;
+    --chart-memory-over-1: #ff8a80;
+    --chart-memory-over-2: #d6483d;
+    --chart-memory-over-3: #8f2a23;
+}

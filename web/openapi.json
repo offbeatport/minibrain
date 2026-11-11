@@ -1644,6 +1644,119 @@
         }
       }
     },
+    "/api/model-pages/{name}/traffic": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Chart a model's requests by version",
+        "description": "Requests, errors, latency and device time per bucket and per version for the range, with what changed in it, the errors by status, the busiest keys and the replicas serving it.",
+        "operationId": "read_model_traffic_api_model_pages__name__traffic_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "24h",
+                "7d",
+                "30d"
+              ],
+              "type": "string",
+              "default": "30d",
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelTrafficReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/model-pages/{name}/activity": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "List what changed on a model",
+        "description": "Audited changes to the model, its versions, its keys and its jobs, newest first, as sentences.",
+        "operationId": "read_model_activity_api_model_pages__name__activity_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 40,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelActivity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sources": {
       "get": {
         "tags": [
@@ -5434,6 +5547,22 @@
               "type": "integer",
               "title": "Number"
             }
+          },
+          {
+            "name": "against",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Against"
+            }
           }
         ],
         "responses": {
@@ -6455,6 +6584,98 @@
               ],
               "title": "Max Rows"
             }
+          },
+          {
+            "name": "alpha",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 512,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Alpha"
+            }
+          },
+          {
+            "name": "grad_accum",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 256,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grad Accum"
+            }
+          },
+          {
+            "name": "eval_every",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Score the held-out rows every this many optimiser steps.",
+              "title": "Eval Every"
+            },
+            "description": "Score the held-out rows every this many optimiser steps."
+          },
+          {
+            "name": "seed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2147483647,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Seed"
+            }
+          },
+          {
+            "name": "machine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Plan for this training machine, by name.",
+              "title": "Machine"
+            },
+            "description": "Plan for this training machine, by name."
           },
           {
             "name": "dataset_version_id",
@@ -10812,6 +11033,76 @@
           "label"
         ],
         "title": "Activity"
+      },
+      "ActivityLink": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "version",
+              "job",
+              "key",
+              "base",
+              "monitoring"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Kind"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "ActivityLink"
       },
       "AddedInfo": {
         "properties": {
@@ -20648,8 +20939,8 @@
           "name": {
             "type": "string",
             "maxLength": 60,
-            "title": "Name",
-            "default": "default"
+            "minLength": 1,
+            "title": "Name"
           },
           "models": {
             "items": {
@@ -20662,6 +20953,7 @@
         },
         "type": "object",
         "required": [
+          "name",
           "models"
         ],
         "title": "KeyCreate"
@@ -21261,6 +21553,114 @@
         ],
         "title": "LogsBody"
       },
+      "MachinePlanInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "memory_label": {
+            "type": "string",
+            "title": "Memory Label"
+          },
+          "available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Bytes"
+          },
+          "fits": {
+            "type": "boolean",
+            "title": "Fits"
+          },
+          "chosen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingOptionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "smallest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingOptionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "picked": {
+            "type": "boolean",
+            "title": "Picked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "pool",
+          "kind",
+          "memory_label",
+          "available_bytes",
+          "fits",
+          "chosen",
+          "smallest",
+          "reason",
+          "minutes",
+          "steps",
+          "picked"
+        ],
+        "title": "MachinePlanInfo"
+      },
       "MappingInfo": {
         "properties": {
           "input_column": {
@@ -21478,6 +21878,82 @@
           "output"
         ],
         "title": "Mistake"
+      },
+      "ModelActivity": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ModelActivityEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events",
+          "total"
+        ],
+        "title": "ModelActivity"
+      },
+      "ModelActivityEvent": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "neutral",
+              "success",
+              "failed"
+            ],
+            "title": "Tone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "actor",
+          "action",
+          "text",
+          "link",
+          "tone"
+        ],
+        "title": "ModelActivityEvent"
       },
       "ModelCard": {
         "properties": {
@@ -22078,6 +22554,34 @@
               }
             ],
             "description": "The one step the model page suggests, or none while busy."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModelStatus",
+            "description": "One line on the model's state, broken first, with at most one action."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "Who created, duplicated, downloaded or imported it."
           }
         },
         "type": "object",
@@ -22086,7 +22590,8 @@
           "key",
           "name",
           "traffic",
-          "next"
+          "next",
+          "status"
         ],
         "title": "ModelPage"
       },
@@ -22481,6 +22986,42 @@
         ],
         "title": "ModelSafetyUpdate"
       },
+      "ModelStatus": {
+        "properties": {
+          "tone": {
+            "type": "string",
+            "enum": [
+              "success",
+              "info",
+              "warning",
+              "destructive",
+              "neutral"
+            ],
+            "title": "Tone"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatusAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tone",
+          "text",
+          "action"
+        ],
+        "title": "ModelStatus"
+      },
       "ModelSummary": {
         "properties": {
           "slug": {
@@ -22620,6 +23161,124 @@
           "p95_ms"
         ],
         "title": "ModelTraffic"
+      },
+      "ModelTrafficReport": {
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d"
+            ],
+            "title": "Range"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until"
+          },
+          "bucket_seconds": {
+            "type": "integer",
+            "title": "Bucket Seconds"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/TrafficStats"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrafficStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usual_error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usual Error Rate"
+          },
+          "markers": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficMarker"
+            },
+            "type": "array",
+            "title": "Markers"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficStatus"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "callers": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficCaller"
+            },
+            "type": "array",
+            "title": "Callers"
+          },
+          "replicas": {
+            "items": {
+              "$ref": "#/components/schemas/TrafficReplica"
+            },
+            "type": "array",
+            "title": "Replicas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "range",
+          "since",
+          "until",
+          "bucket_seconds",
+          "buckets",
+          "versions",
+          "points",
+          "totals",
+          "previous",
+          "usual_error_rate",
+          "markers",
+          "errors",
+          "callers",
+          "replicas"
+        ],
+        "title": "ModelTrafficReport"
       },
       "ModelUpdate": {
         "properties": {
@@ -24104,6 +24763,65 @@
           "rows"
         ],
         "title": "QueryResponse"
+      },
+      "QueuedJobInfo": {
+        "properties": {
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "progress": {
+            "type": "number",
+            "title": "Progress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "model",
+          "model_name",
+          "version",
+          "status",
+          "progress"
+        ],
+        "title": "QueuedJobInfo"
       },
       "RelabelInfo": {
         "properties": {
@@ -26530,6 +27248,86 @@
         ],
         "title": "SplitScore"
       },
+      "StatusAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "promote",
+              "deploy",
+              "open_job",
+              "retry_job",
+              "open_monitoring",
+              "review_feedback",
+              "add_data",
+              "train",
+              "switch_base",
+              "create_custom"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Kind"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "everyone": {
+            "type": "boolean",
+            "title": "Everyone",
+            "description": "Viewers may follow it too; the others need the Builder role.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "title": "StatusAction"
+      },
       "StorageCheck": {
         "properties": {
           "ok": {
@@ -27094,6 +27892,154 @@
         ],
         "title": "ToolSpec"
       },
+      "TrafficBucket": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99 Ms"
+          },
+          "device_seconds": {
+            "type": "number",
+            "title": "Device Seconds"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "p99_ms",
+          "device_seconds",
+          "at"
+        ],
+        "title": "TrafficBucket"
+      },
+      "TrafficCaller": {
+        "properties": {
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix"
+          },
+          "revoked": {
+            "type": "boolean",
+            "title": "Revoked"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key_id",
+          "name",
+          "prefix",
+          "revoked",
+          "requests",
+          "errors",
+          "error_rate"
+        ],
+        "title": "TrafficCaller"
+      },
       "TrafficDay": {
         "properties": {
           "day": {
@@ -27117,6 +28063,346 @@
           "errors"
         ],
         "title": "TrafficDay"
+      },
+      "TrafficMarker": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "deploy",
+              "undeploy",
+              "live"
+            ],
+            "title": "Kind"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "kind",
+          "version",
+          "label"
+        ],
+        "title": "TrafficMarker"
+      },
+      "TrafficPoint": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99 Ms"
+          },
+          "device_seconds": {
+            "type": "number",
+            "title": "Device Seconds"
+          },
+          "bucket": {
+            "type": "integer",
+            "title": "Bucket"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "p99_ms",
+          "device_seconds",
+          "bucket",
+          "version"
+        ],
+        "title": "TrafficPoint"
+      },
+      "TrafficReplica": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "engine",
+          "state"
+        ],
+        "title": "TrafficReplica"
+      },
+      "TrafficStats": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99 Ms"
+          },
+          "device_seconds": {
+            "type": "number",
+            "title": "Device Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "p99_ms",
+          "device_seconds"
+        ],
+        "title": "TrafficStats"
+      },
+      "TrafficStatus": {
+        "properties": {
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "last_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "label",
+          "requests",
+          "last_at"
+        ],
+        "title": "TrafficStatus"
+      },
+      "TrafficVersion": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "error_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Rate"
+          },
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "p99_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P99 Ms"
+          },
+          "device_seconds": {
+            "type": "number",
+            "title": "Device Seconds"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_ms",
+          "p95_ms",
+          "p99_ms",
+          "device_seconds",
+          "version",
+          "live"
+        ],
+        "title": "TrafficVersion"
       },
       "TrainFitInfo": {
         "properties": {
@@ -27311,6 +28597,36 @@
           "max_rows": {
             "type": "integer",
             "title": "Max Rows"
+          },
+          "alpha": {
+            "type": "integer",
+            "title": "Alpha"
+          },
+          "grad_accum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Accum"
+          },
+          "eval_every": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Every"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
           }
         },
         "type": "object",
@@ -27322,7 +28638,11 @@
           "rank",
           "learning_rate",
           "epochs",
-          "max_rows"
+          "max_rows",
+          "alpha",
+          "grad_accum",
+          "eval_every",
+          "seed"
         ],
         "title": "TrainingDefaults"
       },
@@ -27626,6 +28946,54 @@
           },
           "defaults": {
             "$ref": "#/components/schemas/TrainingDefaults"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes",
+            "description": "Estimated minutes for the chosen plan, setup and scoring included."
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "grad_accum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Accum"
+          },
+          "held_out_rows": {
+            "type": "integer",
+            "title": "Held Out Rows"
+          },
+          "machines": {
+            "items": {
+              "$ref": "#/components/schemas/MachinePlanInfo"
+            },
+            "type": "array",
+            "title": "Machines"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/TrainingQueueInfo"
           }
         },
         "type": "object",
@@ -27642,9 +29010,41 @@
           "longest_tokens",
           "context",
           "overrides",
-          "defaults"
+          "defaults",
+          "minutes",
+          "steps",
+          "grad_accum",
+          "held_out_rows",
+          "machines",
+          "queue"
         ],
         "title": "TrainingPlanInfo"
+      },
+      "TrainingQueueInfo": {
+        "properties": {
+          "ahead": {
+            "type": "integer",
+            "title": "Ahead"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/QueuedJobInfo"
+            },
+            "type": "array",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ahead",
+          "running",
+          "jobs"
+        ],
+        "title": "TrainingQueueInfo"
       },
       "TrainingSetup": {
         "properties": {
@@ -28099,6 +29499,71 @@
               }
             ],
             "title": "Max Rows"
+          },
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 512.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha"
+          },
+          "grad_accum": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 256.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Accum"
+          },
+          "eval_every": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Every",
+            "description": "Score the held-out rows every this many optimiser steps."
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine",
+            "description": "Plan for this training machine, by name."
           },
           "kind": {
             "type": "string",

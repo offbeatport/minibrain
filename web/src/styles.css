@@ -3,6 +3,7 @@
 @import "obp-ui/fonts.css";
 @import "obp-ui/fonts-alt.css";
 @import "obp-ui/styles.css";
+@import "./components/charts/chartTokens.css";
 
 @source "./**/*.{tsx,ts}";
 @source "../node_modules/obp-ui/src";
