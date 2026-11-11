@@ -1,8 +1,9 @@
 import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
-import { type ReactNode, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { Section } from "~/components/Section";
 import { type Identity, NameAvatarField, newIdentity } from "./NameAvatarField";
+import { type Lowest, RENDER_SIZES, type RenderedRow, measureRendered } from "./avatarContrast";
 import {
     type AvatarSize,
     AvatarTile,
@@ -12,10 +13,10 @@ import {
     modePalette,
     usePalette,
 } from "./avatarDicebear";
-import { AVATAR_STYLES, type AvatarStyle, contrast } from "./avatarStyles";
-import { MODELS, type SampleModel, TONE_KEYS, type ToneName } from "./modelIcons";
+import { AVATAR_STYLES, type AvatarStyle, type Palette, contrast } from "./avatarStyles";
+import { MODELS, type SampleModel, TONE_KEYS } from "./modelIcons";
 
-const SIZES: Exclude<AvatarSize, "xl">[] = ["lg", "md", "sm"];
+const SIZES: Exclude<AvatarSize, "xl" | "hero" | "fill">[] = ["lg", "md", "sm"];
 
 function Strip({ style }: { style: AvatarStyle }) {
     return (
@@ -101,7 +102,7 @@ function LogoLabel({ logo, name }: { logo: ReactNode; name: string }) {
 
 function MixedRow({ style }: { style: AvatarStyle }) {
     const [first, second, third] = [MODELS[0], MODELS[2], MODELS[4]];
-    const tile = (model: SampleModel, size: Exclude<AvatarSize, "xl">) => (
+    const tile = (model: SampleModel, size: Exclude<AvatarSize, "xl" | "hero" | "fill">) => (
         <AvatarTile choice={choiceFor(style.id, model.name)} name={model.name} size={size} />
     );
     return (
@@ -136,14 +137,21 @@ function MixedRow({ style }: { style: AvatarStyle }) {
     );
 }
 
-type Lowest = { value: number; tone: ToneName };
-
 type Measured = { label: string; floor: number; lowest: Record<ThemeMode, Lowest> };
 
-function useLowestContrast(style: AvatarStyle): Measured[] {
+type Rendered = Record<ThemeMode, RenderedRow[]>;
+
+function useModePalettes(): Record<ThemeMode, Palette> {
     const live = usePalette();
+    return useMemo(
+        () => ({ light: modePalette("light", live), dark: modePalette("dark", live) }),
+        [live],
+    );
+}
+
+function useLowestContrast(style: AvatarStyle): Measured[] {
+    const palettes = useModePalettes();
     return useMemo(() => {
-        const palettes = { light: modePalette("light", live), dark: modePalette("dark", live) };
         const lowestFor = (mode: ThemeMode, index: number): Lowest => {
             const palette = palettes[mode];
             return TONE_KEYS.map((tone) => {
@@ -156,10 +164,34 @@ function useLowestContrast(style: AvatarStyle): Measured[] {
             floor: pair.floor,
             lowest: { light: lowestFor("light", index), dark: lowestFor("dark", index) },
         }));
-    }, [style, live]);
+    }, [style, palettes]);
 }
 
-function Ratio({ lowest, floor }: { lowest: Lowest; floor: number }) {
+function useRendered(style: AvatarStyle): Rendered | null {
+    const palettes = useModePalettes();
+    const [rendered, setRendered] = useState<Rendered | null>(null);
+    useEffect(() => {
+        let live = true;
+        setRendered(null);
+        Promise.all([
+            measureRendered(style, palettes.light),
+            measureRendered(style, palettes.dark),
+        ]).then(([light, dark]) => {
+            if (live) {
+                setRendered({ light, dark });
+            }
+        });
+        return () => {
+            live = false;
+        };
+    }, [style, palettes]);
+    return rendered;
+}
+
+function Ratio({ lowest, floor }: { lowest: Lowest | undefined; floor: number }) {
+    if (!lowest || !Number.isFinite(lowest.value)) {
+        return <span className="text-muted-foreground">Measuring</span>;
+    }
     const fails = lowest.value < floor;
     return (
         <span className="flex flex-col">
@@ -173,17 +205,27 @@ function Ratio({ lowest, floor }: { lowest: Lowest; floor: number }) {
 
 function StyleRows({ style }: { style: AvatarStyle }) {
     const measured = useLowestContrast(style);
+    const rendered = useRendered(style);
     return measured.map((item, index) => (
-        <TableRow key={item.label}>
+        <TableRow key={item.label} data-style={style.id}>
             <TableCell className="font-medium">{index === 0 ? style.name : ""}</TableCell>
             <TableCell>{item.label}</TableCell>
             <TableCell className="tabular-nums">{item.floor}:1</TableCell>
-            <TableCell>
-                <Ratio lowest={item.lowest.light} floor={item.floor} />
-            </TableCell>
-            <TableCell>
-                <Ratio lowest={item.lowest.dark} floor={item.floor} />
-            </TableCell>
+            {(["light", "dark"] as const).map((mode) => (
+                <Fragment key={mode}>
+                    <TableCell>
+                        <Ratio lowest={item.lowest[mode]} floor={item.floor} />
+                    </TableCell>
+                    {RENDER_SIZES.map((size) => (
+                        <TableCell key={size}>
+                            <Ratio
+                                lowest={rendered?.[mode][index]?.lowest[size]}
+                                floor={item.floor}
+                            />
+                        </TableCell>
+                    ))}
+                </Fragment>
+            ))}
         </TableRow>
     ));
 }
@@ -192,7 +234,7 @@ function ContrastTable() {
     return (
         <Section
             title="Contrast"
-            caption="The lowest ratio across the ten tones, measured against Cobalt's light and dark tokens. Letters need 4.5:1, shapes 3:1."
+            caption="The lowest ratio across the ten tones against Cobalt's light and dark tokens: the token pair, then the strongest rendered pixel of that feature with the tile drawn at 176 and 20 px at 1x, over six seeds. Letters need 4.5:1, shapes 3:1."
         >
             <div className="overflow-x-auto rounded-lg border">
                 <Table data-testid="contrast-table">
@@ -201,8 +243,12 @@ function ContrastTable() {
                             <TableHead>Style</TableHead>
                             <TableHead>Pair</TableHead>
                             <TableHead>Floor</TableHead>
-                            <TableHead>Light, lowest</TableHead>
-                            <TableHead>Dark, lowest</TableHead>
+                            <TableHead>Light, tokens</TableHead>
+                            <TableHead>Light, 176 px</TableHead>
+                            <TableHead>Light, 20 px</TableHead>
+                            <TableHead>Dark, tokens</TableHead>
+                            <TableHead>Dark, 176 px</TableHead>
+                            <TableHead>Dark, 20 px</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

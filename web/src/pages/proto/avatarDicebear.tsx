@@ -24,6 +24,8 @@ import {
     toneToken,
 } from "./modelIcons";
 
+const DEFAULT_PX = 48;
+
 export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: ToneName; letters?: string };
 
 export const TONE_LABELS: Record<ToneName, string> = {
@@ -134,7 +136,7 @@ export function lettersOf(choice: AvatarChoice, name: string): string {
 function framed(svg: string, frame: Frame, fill: string | null): string {
     const open = svg.indexOf(">") + 1;
     const close = svg.lastIndexOf("</svg>");
-    const body = svg.slice(open, close).replace(/ clip-path="url\(#[^)]*\)"/g, "");
+    const body = svg.slice(open, close).replace(/ clip-path="url\(#clip-[^)]*\)"/g, "");
     const viewBox = `${frame.x} ${frame.y} ${frame.size} ${frame.size}`;
     const backdrop = fill
         ? `<rect x="${frame.x}" y="${frame.y}" width="${frame.size}" height="${frame.size}" fill="${fill}"/>`
@@ -142,11 +144,16 @@ function framed(svg: string, frame: Frame, fill: string | null): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="none">${backdrop}${body}</svg>`;
 }
 
-export function avatarSvg(choice: AvatarChoice, name: string, palette: Palette): string {
+export function avatarSvg(
+    choice: AvatarChoice,
+    name: string,
+    palette: Palette,
+    px = DEFAULT_PX,
+): string {
     const style = styleById(choice.style);
     const tone = palette.tones[choice.tone] ?? palette.tones.csv;
     if (style.id === "initials") {
-        return initialsMarkup(lettersOf(choice, name), palette, tone);
+        return initialsMarkup(lettersOf(choice, name), palette, tone, px);
     }
     const svg = cleanDicebear(
         new DicebearAvatar(styleOf(style.id), {
@@ -155,7 +162,7 @@ export function avatarSvg(choice: AvatarChoice, name: string, palette: Palette):
             ...style.options(palette, tone),
         }).toString(),
     );
-    const painted = style.paint ? style.paint(svg, palette, tone) : svg;
+    const painted = style.paint ? style.paint(svg, palette, tone, px) : svg;
     return framed(painted, style.frame, style.tile(palette, tone));
 }
 
@@ -306,22 +313,33 @@ export function usePalette(): Palette {
     return useSyncExternalStore(subscribe, currentPalette);
 }
 
-function useAvatarSvg(choice: AvatarChoice, name: string): string {
+function useAvatarSvg(choice: AvatarChoice, name: string, px: number): string {
     const current = usePalette();
     const { style, seed, tone, letters } = choice;
     return useMemo(
-        () => avatarSvg({ style, seed, tone, letters }, name, current),
-        [style, seed, tone, letters, name, current],
+        () => avatarSvg({ style, seed, tone, letters }, name, current, px),
+        [style, seed, tone, letters, name, current, px],
     );
 }
 
-export type AvatarSize = "sm" | "md" | "lg" | "xl";
+export type AvatarSize = "sm" | "md" | "lg" | "xl" | "hero" | "fill";
 
 const AVATAR_TILE: Record<AvatarSize, string> = {
     sm: "size-5",
     md: "size-8",
     lg: "size-12",
     xl: "size-24",
+    hero: "size-[calc(3rem*var(--hero-scale))] rounded-[calc((var(--radius)_-_2px)*var(--hero-scale))] border-[length:calc(1px*var(--hero-scale))]",
+    fill: "size-full",
+};
+
+const AVATAR_PX: Record<AvatarSize, number> = {
+    sm: 20,
+    md: 32,
+    lg: 48,
+    xl: 96,
+    hero: 120,
+    fill: 40,
 };
 
 export function AvatarTile({
@@ -335,7 +353,7 @@ export function AvatarTile({
     size: AvatarSize;
     className?: string;
 }) {
-    const markup = useAvatarSvg(choice, name);
+    const markup = useAvatarSvg(choice, name, AVATAR_PX[size]);
     return (
         <span
             aria-hidden="true"

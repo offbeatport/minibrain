@@ -14,7 +14,7 @@ export type Palette = {
 
 export type Options = Record<string, unknown>;
 
-export type ContrastPair = { label: string; fg: string; bg: string; floor: number };
+export type ContrastPair = { label: string; fg: string; bg: string; floor: number; mark?: string };
 
 export type Frame = { x: number; y: number; size: number };
 
@@ -26,7 +26,7 @@ export type AvatarStyle = {
     frame: Frame;
     tile: (palette: Palette, tone: string) => string | null;
     options: (palette: Palette, tone: string) => Options;
-    paint?: (svg: string, palette: Palette, tone: string) => string;
+    paint?: (svg: string, palette: Palette, tone: string, px: number) => string;
     pairs: (palette: Palette, tone: string) => ContrastPair[];
 };
 
@@ -37,6 +37,9 @@ const TINT_WEIGHT = 0.14;
 const LADDER_STEP = 0.05;
 const RING_WEIGHT = 0.5;
 const RING_GAP = 3;
+const RING_MIN_PX = 1.25;
+const PLANET_FRAME = 110;
+const SMALL_LETTERS_PX = 24;
 const VOXEL_BODY_WEIGHT = 0.75;
 const RING_PATTERN =
     /<ellipse ([^>]*?)stroke="#fff" stroke-opacity="[^"]*" stroke-width="([\d.]+)"\/>/g;
@@ -92,13 +95,19 @@ function ringInk(palette: Palette, tone: string): string {
     return mixHex(tone, palette.foreground, RING_WEIGHT);
 }
 
-function cutRings(svg: string, palette: Palette, tone: string): string {
+function cutRings(svg: string, palette: Palette, tone: string, px: number): string {
     const ring = ringInk(palette, tone);
-    return svg.replace(
-        RING_PATTERN,
-        (_match, attributes: string, width: string) =>
-            `<ellipse ${attributes}stroke="${palette.background}" stroke-width="${Number(width) + RING_GAP}"/><ellipse ${attributes}stroke="${ring}" stroke-width="${width}"/>`,
-    );
+    const floor = (RING_MIN_PX * PLANET_FRAME) / Math.max(px - 2, 1);
+    let index = 0;
+    return svg.replace(RING_PATTERN, (_match, attributes: string, width: string) => {
+        const drawn = Math.max(Number(width), floor);
+        const thickened = drawn > Number(width);
+        index += 1;
+        if (thickened && index > 1) {
+            return "";
+        }
+        return `<ellipse ${attributes}stroke="${palette.background}" stroke-width="${drawn + RING_GAP}"/><ellipse ${attributes}stroke="${ring}" stroke-width="${drawn}"/>`;
+    });
 }
 
 function voxelBody(palette: Palette, tone: string): string {
@@ -110,10 +119,11 @@ function voxelBody(palette: Palette, tone: string): string {
     );
 }
 
-export function initialsMarkup(text: string, palette: Palette, tone: string): string {
+export function initialsMarkup(text: string, palette: Palette, tone: string, px = 48): string {
     const size = text.length > 1 ? 44 : 54;
+    const weight = px <= SMALL_LETTERS_PX ? 700 : 600;
     const escaped = text.replace(/[<>&"]/g, "");
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${tint(palette, tone)}"/><text x="50" y="50" dy="0.35em" text-anchor="middle" font-family="${palette.font}" font-weight="600" font-size="${size}" letter-spacing="-0.5" fill="${letters(palette, tone)}">${escaped}</text></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${tint(palette, tone)}"/><text x="50" y="50" dy="0.35em" text-anchor="middle" font-family="${palette.font}" font-weight="${weight}" font-size="${size}" letter-spacing="-0.5" fill="${letters(palette, tone)}">${escaped}</text></svg>`;
 }
 
 export const AVATAR_STYLES: AvatarStyle[] = [
@@ -139,7 +149,7 @@ export const AVATAR_STYLES: AvatarStyle[] = [
         name: "Planets",
         licence: LICENCE,
         seeded: true,
-        frame: { x: -5, y: -5, size: 110 },
+        frame: { x: -5, y: -5, size: PLANET_FRAME },
         tile: () => null,
         options: (palette, tone) => ({
             backgroundColor: [],
@@ -156,6 +166,7 @@ export const AVATAR_STYLES: AvatarStyle[] = [
                 fg: ringInk(palette, tone),
                 bg: palette.background,
                 floor: GRAPHIC_FLOOR,
+                mark: `stroke="${ringInk(palette, tone)}"`,
             },
         ],
     },
