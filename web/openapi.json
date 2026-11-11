@@ -11979,6 +11979,38 @@
               }
             ]
           },
+          "replicas": {
+            "items": {
+              "$ref": "#/components/schemas/ServingReplica"
+            },
+            "type": "array",
+            "title": "Replicas",
+            "description": "Live engines serving it: its own for a base, its base's for a custom model."
+          },
+          "catalog_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Name",
+            "description": "The catalogue model a base variant belongs to."
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Label",
+            "description": "A base's format, such as BF16, FP8 or GGUF Q8_0."
+          },
           "source": {
             "type": "string",
             "title": "Source"
@@ -22853,6 +22885,38 @@
                 "type": "null"
               }
             ]
+          },
+          "replicas": {
+            "items": {
+              "$ref": "#/components/schemas/ServingReplica"
+            },
+            "type": "array",
+            "title": "Replicas",
+            "description": "Live engines serving it: its own for a base, its base's for a custom model."
+          },
+          "catalog_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Name",
+            "description": "The catalogue model a base variant belongs to."
+          },
+          "variant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant Label",
+            "description": "A base's format, such as BF16, FP8 or GGUF Q8_0."
           }
         },
         "type": "object",
@@ -26497,6 +26561,29 @@
         ],
         "title": "ServeOnlyInfo"
       },
+      "ServingReplica": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "pool",
+          "state"
+        ],
+        "title": "ServingReplica"
+      },
       "SessionInfo": {
         "properties": {
           "setup": {
@@ -29296,6 +29383,23 @@
               }
             ],
             "title": "P50 Ms"
+          },
+          "p95_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Ms"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors",
+            "description": "Requests in the last 7 days that ended in a 4xx or 5xx.",
+            "default": 0
           }
         },
         "type": "object",

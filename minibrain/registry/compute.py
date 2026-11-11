@@ -102,6 +102,17 @@ def live_engines(session: Session) -> list[EngineReplica]:
     return list(session.scalars(query))
 
 
+def replica_host(replica: EngineReplica) -> str:
+    return replica.node_id.split("/", 1)[-1]
+
+
+def engines_by_base(session: Session) -> dict[str, list[EngineReplica]]:
+    found: dict[str, list[EngineReplica]] = {}
+    for replica in live_engines(session):
+        found.setdefault(replica.base_model, []).append(replica)
+    return found
+
+
 def record_gateway(session: Session, report: GatewayReport) -> Gateway:
     gateway = session.get(Gateway, report.id) or Gateway(id=report.id)
     gateway.host = report.host

@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import event
 
 from minibrain.api.model_rows import usage_index
 from minibrain.models.hardware import GIB
@@ -153,3 +154,110 @@ def test_a_base_model_counts_only_requests_made_since_it_was_added(harness: Harn
         session.add(RequestLog(at=now(), model="tiny", status=200, latency_ms=5.0))
         session.commit()
         assert usage_index(session).base["tiny"].total == 1
+
+
+def count_queries(harness: Harness) -> int:
+    engine = harness.sessions.kw["bind"]
+    seen: list[object] = []
+
+    def record(*args: object) -> None:
+        seen.append(args[2])
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        assert harness.client.get("/api/all-models").status_code == 200
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    return len(seen)
+
+
+def scored_model(harness: Harness, name: str) -> None:
+    created = create_on_data(harness, name)
+    finish(harness, "eval", accuracy=0.7)
+    with harness.sessions() as session:
+        model = session.query(Model).filter_by(slug=created["slug"]).one()
+        for version in (0, None):
+            session.add(
+                RequestLog(at=now(), model_id=model.id, model=model.slug, version=version, status=200, latency_ms=9.0)
+            )
+        session.commit()
+
+
+def test_listing_takes_the_same_queries_however_many_models_and_versions_there_are(harness: Harness) -> None:
+    scored_model(harness, "First")
+    one = count_queries(harness)
+    for name in ("Second", "Third", "Fourth"):
+        scored_model(harness, name)
+    rows = [row for row in harness.client.get("/api/all-models").json() if row["kind"] == "custom"]
+    assert len(rows) == 4 and all(row["versions"][0]["score"] == 0.7 for row in rows)
+    assert count_queries(harness) == one
+
+
+def test_usage_reports_p95_and_errors_from_one_pass(harness: Harness) -> None:
+    harness.client.post(
+        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+    )
+    with harness.sessions() as session:
+        model = session.query(Model).filter_by(slug=SLUG).one()
+        for index in range(20):
+            status = 429 if index == 0 else 500 if index == 1 else 200
+            latency = float(index + 1) * 10
+            session.add(RequestLog(at=now(), model_id=model.id, model=SLUG, status=status, latency_ms=latency))
+        session.commit()
+    usage = custom_row(harness, SLUG)["usage"]
+    assert (usage["total"], usage["errors"], usage["failed"]) == (20, 2, 1)
+    assert (usage["p50_ms"], usage["p95_ms"]) == (100.0, 190.0)
+
+
+def announce(harness: Harness, number: int, base: str) -> None:
+    body = {
+        "id": f"e-{number}",
+        "host": f"gpu-{number}",
+        "url": f"http://gpu-{number}:9000",
+        "base_model": base,
+        "engine": "sglang",
+        "state": "ready",
+        "pool": "rack",
+    }
+    response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
+    assert response.status_code == 204
+
+
+def test_a_deployed_model_lists_the_engines_serving_its_base(harness: Harness) -> None:
+    create_on_data(harness)
+    finish(harness, "eval", accuracy=0.8)
+    base = custom_row(harness, SLUG)["base_model"]
+    announce(harness, 1, base)
+    announce(harness, 2, base)
+    assert custom_row(harness, SLUG)["replicas"] == []
+    deploy(harness)
+    replicas = custom_row(harness, SLUG)["replicas"]
+    assert [(item["host"], item["pool"], item["state"]) for item in replicas] == [
+        ("gpu-1", "rack", "ready"),
+        ("gpu-2", "rack", "ready"),
+    ]
+
+
+def add_variant(harness: Harness, key: str, variant: str, name: str) -> None:
+    with harness.sessions() as session:
+        session.add(
+            BaseModel(
+                id=key,
+                source="download",
+                name=name,
+                catalog_id="qwen3-0.6b",
+                variant_id=variant,
+                status=BaseModelStatus.AVAILABLE,
+            )
+        )
+        session.commit()
+
+
+def test_base_variants_name_their_catalogue_model_format_and_whether_they_train(harness: Harness) -> None:
+    add_variant(harness, "qwen3-0.6b", "qwen3-0.6b:bf16:safetensors", "Qwen3 0.6B")
+    add_variant(harness, "qwen3-0.6b-q8_0-gguf", "qwen3-0.6b:q8_0:gguf", "Qwen3 0.6B Q8_0")
+    rows = {row["key"]: row for row in harness.client.get("/api/all-models").json() if row["kind"] == "base"}
+    full, gguf = rows["qwen3-0.6b"], rows["qwen3-0.6b-q8_0-gguf"]
+    assert (full["catalog_name"], full["variant_label"], full["serve_only"]) == ("Qwen3 0.6B", "BF16", None)
+    assert (gguf["catalog_name"], gguf["variant_label"]) == ("Qwen3 0.6B", "GGUF Q8_0")
+    assert gguf["serve_only"]["format"] == "GGUF" and gguf["serve_only"]["switch_to"]["key"] == "qwen3-0.6b"

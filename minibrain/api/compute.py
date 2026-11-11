@@ -8,7 +8,7 @@ from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep
 from minibrain.auth.identity import current_actor
-from minibrain.registry.compute import Pool, pools
+from minibrain.registry.compute import Pool, pools, replica_host
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
 
@@ -81,7 +81,7 @@ def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
                 engine=replica.engine,
                 url=replica.url,
                 state=replica.state,
-                host=replica.node_id.split("/", 1)[-1],
+                host=replica_host(replica),
                 seen_at=replica.seen_at,
             )
             for replica in pool.engines

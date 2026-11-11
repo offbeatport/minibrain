@@ -1,13 +1,13 @@
-import statistics
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy import ColumnElement, func, select
-from sqlalchemy.orm import InstrumentedAttribute, Session
+from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload
 
 from minibrain.api.model_health import HealthContext, base_health, custom_health, version_health
+from minibrain.api.overview import Partition, partitions, ranked, shared_columns
 from minibrain.api.schemas import (
     Activity,
     Availability,
@@ -18,6 +18,7 @@ from minibrain.api.schemas import (
     Health,
     ModelRow,
     ServeOnlyInfo,
+    ServingReplica,
     TeardownInfo,
     Usage,
     VersionRow,
@@ -27,11 +28,15 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
 from minibrain.models.registry import base_publisher, files_present
+from minibrain.registry.compute import engines_by_base, replica_host
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     BaseModel,
     BaseModelStatus,
+    CatalogModel,
     CatalogVariant,
+    Dataset,
+    EngineReplica,
     Job,
     JobKind,
     JobStatus,
@@ -50,7 +55,7 @@ from minibrain.registry.models import (
 from minibrain.registry.prices import DevicePrices, load_prices
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
-from minibrain.tasks.rebase import serve_only
+from minibrain.tasks.rebase import ServeOnly, serve_only
 from minibrain.tasks.service import decision, held_out_score, serving_base, version_metric
 
 FAILED_LABELS: dict[str, str] = {
@@ -76,9 +81,9 @@ STATE_LABELS = {
 }
 FETCHING = "fetching"
 FETCHING_LABEL = "Fetching weights"
+SAFETENSORS = "safetensors"
 USAGE_DAYS = 7
 FAILED_STATUS = 500
-LATENCY_SAMPLE = 2000
 
 
 EngineHealth = Callable[[str], str | None]
@@ -158,6 +163,16 @@ def usage_window() -> tuple[datetime, list[str]]:
     return datetime.combine(days[0], time.min, tzinfo=UTC), [day.isoformat() for day in days]
 
 
+def latency_parts(
+    session: Session, keys: Sequence[InstrumentedAttribute[Any]], where: Sequence[ColumnElement[bool]]
+) -> dict[tuple[Any, ...], Partition]:
+    names = [f"key_{index}" for index in range(len(keys))]
+    labelled = [key.label(name) for key, name in zip(keys, names, strict=True)]
+    inner = select(*labelled, *shared_columns()).where(*where).subquery()
+    query = ranked(inner, [inner.c[name] for name in names], {})
+    return partitions(list(session.execute(query)), lambda row: tuple(row[: len(keys)]))
+
+
 def usage_for(
     session: Session, keys: Sequence[InstrumentedAttribute[Any]], scope: ColumnElement[bool]
 ) -> dict[tuple[Any, ...], Usage]:
@@ -178,21 +193,14 @@ def usage_for(
     failing = RequestLog.status >= FAILED_STATUS
     failed = {tuple(row[:width]): row[width] for row in grouped(func.count(), where=[recent, failing])}
     last = {tuple(row[:width]): row[width] for row in grouped(func.max(RequestLog.at), where=[])}
+    latency = latency_parts(session, keys, [scope, recent])
     found: dict[tuple[Any, ...], Usage] = {}
     for target, last_at in last.items():
         if any(part is None for part in target) or last_at is None:
             continue
         counts = daily.get(target, {})
         series = [counts.get(name, 0) for name in days]
-        matching = [key == part for key, part in zip(keys, target, strict=True)]
-        latencies = list(
-            session.scalars(
-                select(RequestLog.latency_ms)
-                .where(scope, *matching, recent)
-                .order_by(RequestLog.id.desc())
-                .limit(LATENCY_SAMPLE)
-            )
-        )
+        part = latency.get(target, Partition())
         found[target] = Usage(
             days=days,
             daily=series,
@@ -200,7 +208,9 @@ def usage_for(
             previous=previous.get(target, 0),
             failed=failed.get(target, 0),
             last_at=last_at if last_at.tzinfo else last_at.replace(tzinfo=UTC),
-            p50_ms=statistics.median(latencies) if latencies else None,
+            p50_ms=part.p50,
+            p95_ms=part.p95,
+            errors=part.errors,
         )
     return found
 
@@ -445,6 +455,52 @@ def base_weights(session: Session) -> dict[str, int]:
     return weights
 
 
+def row_id(row: ModelRow) -> str:
+    return f"{row.kind}:{row.key}"
+
+
+def variant_label(base: BaseModel, limit: ServeOnly | None) -> str | None:
+    variant = base.variant
+    if variant is None:
+        return limit.format if limit is not None else None
+    precision = variant.precision.upper()
+    return precision if variant.format == SAFETENSORS else f"{variant.format.upper()} {precision}"
+
+
+def replicas_of(engines: dict[str, list[EngineReplica]], key: str | None) -> list[ServingReplica]:
+    found = engines.get(key, []) if key is not None else []
+    return [ServingReplica(host=replica_host(item), pool=item.pool, state=item.state) for item in found]
+
+
+def catalog_names(session: Session, bases: list[BaseModel]) -> dict[str, str]:
+    ids = {base.catalog_id for base in bases if base.catalog_id}
+    query = select(CatalogModel).where(CatalogModel.id.in_(ids)).options(selectinload(CatalogModel.variants))
+    return {entry.id: entry.name for entry in session.scalars(query)} if ids else {}
+
+
+def serving_facts(
+    session: Session, settings: Settings, models: list[Model], bases: list[BaseModel]
+) -> dict[str, dict[str, Any]]:
+    engines = engines_by_base(session)
+    names = catalog_names(session, bases)
+    limits = {key: serve_only(session, settings, key) for key in {m.base_model for m in models} | {b.id for b in bases}}
+    facts: dict[str, dict[str, Any]] = {
+        f"custom:{model.slug}": {
+            "replicas": replicas_of(engines, serving_base(model) if model.deployed else None),
+            "serve_only": serve_only_info(limits.get(model.base_model)),
+        }
+        for model in models
+    }
+    for base in bases:
+        facts[f"base:{base.id}"] = {
+            "replicas": replicas_of(engines, base.id),
+            "serve_only": serve_only_info(limits.get(base.id)),
+            "catalog_name": names.get(base.catalog_id or ""),
+            "variant_label": variant_label(base, limits.get(base.id)),
+        }
+    return facts
+
+
 def all_rows(
     session: Session, settings: Settings, store: ArtifactStore, health: EngineHealth, context: HealthContext
 ) -> list[ModelRow]:
@@ -456,7 +512,7 @@ def all_rows(
     parents = {teardown.id: teardown.name for teardown in teardowns}
     custom_teardowns = {item.model_id: item for item in teardowns if item.model_id is not None}
     base_teardowns = {item.base_model_id: item for item in teardowns if item.base_model_id is not None}
-    bases_found = list(session.scalars(select(BaseModel)))
+    bases_found = list(session.scalars(select(BaseModel).options(selectinload(BaseModel.variant))))
     base_rows = [
         base_row(
             base,
@@ -485,8 +541,11 @@ def all_rows(
         for base, row in zip(bases_found, base_rows, strict=True)
     }
     hashes = {key: found[2] for key, found in bases.items()}
-    models = list(session.scalars(select(Model)))
-    limits = {key: serve_only_info(serve_only(session, settings, key)) for key in {m.base_model for m in models}}
+    loaded = select(Model).options(
+        selectinload(Model.versions), selectinload(Model.dataset).selectinload(Dataset.versions)
+    )
+    models = list(session.scalars(loaded))
+    facts = serving_facts(session, settings, models, bases_found)
     rows = [
         custom_row(
             model,
@@ -500,7 +559,6 @@ def all_rows(
             prices,
             custom_teardown(model),
             hashes,
-            limits.get(model.base_model),
         )
         for model in models
     ]
@@ -518,16 +576,11 @@ def all_rows(
         ).all()
     )
     slugs = dict(session.execute(select(Model.slug, Model.id)).all())
-    rows = [
-        row.model_copy(
-            update={
-                "key_count": custom_keys.get(slugs.get(row.key), 0)
-                if row.kind == "custom"
-                else base_keys.get(row.key, 0)
-            }
-        )
+    counts = {
+        row_id(row): custom_keys.get(slugs.get(row.key), 0) if row.kind == "custom" else base_keys.get(row.key, 0)
         for row in rows
-    ]
+    }
+    rows = [row.model_copy(update=facts.get(row_id(row), {}) | {"key_count": counts[row_id(row)]}) for row in rows]
     return sorted(rows, key=lambda row: row.updated_at, reverse=True)
 
 

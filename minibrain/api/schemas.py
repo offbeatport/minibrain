@@ -1218,6 +1218,14 @@ class Usage(BaseModel):
     failed: int
     last_at: datetime
     p50_ms: float | None
+    p95_ms: float | None = None
+    errors: int = Field(default=0, description="Requests in the last 7 days that ended in a 4xx or 5xx.")
+
+
+class ServingReplica(BaseModel):
+    host: str
+    pool: str
+    state: str
 
 
 HealthState = Literal[
@@ -1314,6 +1322,11 @@ class ModelRow(BaseModel):
     last_used_at: datetime | None = None
     teardown: TeardownInfo | None = None
     serve_only: ServeOnlyInfo | None = None
+    replicas: list[ServingReplica] = Field(
+        default_factory=list, description="Live engines serving it: its own for a base, its base's for a custom model."
+    )
+    catalog_name: str | None = Field(default=None, description="The catalogue model a base variant belongs to.")
+    variant_label: str | None = Field(default=None, description="A base's format, such as BF16, FP8 or GGUF Q8_0.")
 
 
 class BaseChoice(BaseModel):

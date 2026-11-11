@@ -3518,6 +3518,21 @@ export interface components {
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
             serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
+            /**
+             * Replicas
+             * @description Live engines serving it: its own for a base, its base's for a custom model.
+             */
+            replicas?: components["schemas"]["ServingReplica"][];
+            /**
+             * Catalog Name
+             * @description The catalogue model a base variant belongs to.
+             */
+            catalog_name?: string | null;
+            /**
+             * Variant Label
+             * @description A base's format, such as BF16, FP8 or GGUF Q8_0.
+             */
+            variant_label?: string | null;
             /** Source */
             source: string;
             /** Repo */
@@ -7011,6 +7026,21 @@ export interface components {
             last_used_at?: string | null;
             teardown?: components["schemas"]["TeardownInfo"] | null;
             serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
+            /**
+             * Replicas
+             * @description Live engines serving it: its own for a base, its base's for a custom model.
+             */
+            replicas?: components["schemas"]["ServingReplica"][];
+            /**
+             * Catalog Name
+             * @description The catalogue model a base variant belongs to.
+             */
+            catalog_name?: string | null;
+            /**
+             * Variant Label
+             * @description A base's format, such as BF16, FP8 or GGUF Q8_0.
+             */
+            variant_label?: string | null;
         };
         /** ModelSafety */
         ModelSafety: {
@@ -8235,6 +8265,15 @@ export interface components {
             /** @description The catalogue's full-precision variant of the base. */
             switch_to: components["schemas"]["BaseTargetInfo"] | null;
         };
+        /** ServingReplica */
+        ServingReplica: {
+            /** Host */
+            host: string;
+            /** Pool */
+            pool: string;
+            /** State */
+            state: string;
+        };
         /** SessionInfo */
         SessionInfo: {
             /** Setup */
@@ -9104,6 +9143,14 @@ export interface components {
             last_at: string;
             /** P50 Ms */
             p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms?: number | null;
+            /**
+             * Errors
+             * @description Requests in the last 7 days that ended in a 4xx or 5xx.
+             * @default 0
+             */
+            errors?: number;
         };
         /** ValidationError */
         ValidationError: {
