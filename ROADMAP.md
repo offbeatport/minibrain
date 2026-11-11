@@ -251,6 +251,14 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
 - Compute pools: workers and engines join a named pool and report GPUs, memory, CPU, platform and installed engines.
   Discover judges fit against the selected pool; the Compute page lists pools, machines and engines.
+- [ ] Pool use: each pool says what it runs, **Serving**, **Jobs** or **Both** (default Both, so one machine works
+  out of the box). The job scheduler only places jobs, and engine placement only places engines, on pools that allow
+  them, so a production pool set to Serving can never be starved by training. Pools stay one concept (capacity, like
+  Kubernetes node pools) rather than separate training and inference pools, because the same machine is often both.
+- [ ] Serving first on Both pools: GPU leases prefer engines; a job takes only GPUs no engine needs and waits (or, for
+  a long run, checkpoints and yields) when serving needs them back.
+- [ ] Infrastructure shows each pool's use and load, e.g. "gpu-a10 · Serving · 2 engines · 0 jobs", and the Train
+  dialog and Discover's fit check only offer pools that allow jobs or serving respectively.
 - Engines pick their engine at start from the node and the weights: SGLang on Linux with NVIDIA or ROCm, MLX on Apple
   silicon, llama.cpp for GGUF, `transformers` otherwise. Remote engines (`minibrain engine --model --pool`) pull
   adapters from main and base weights from the bucket on links main signs (from main itself when Storage is the
