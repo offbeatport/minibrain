@@ -10,8 +10,7 @@ import { ErrorLine, PanelSection } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
-import { jobPageHref } from "~/lib/jobs";
-import { modelPageHref, modelTrainHref, trainingJobHref } from "~/lib/modelLinks";
+import { jobHref, modelPageHref, trainHref } from "~/lib/modelLinks";
 import {
     METRICS,
     RANGES,
@@ -144,14 +143,12 @@ function retryJob(jobId: number) {
     return unwrap(api.POST("/api/jobs/{job_id}/retry", { params: { path: { job_id: jobId } } }));
 }
 
-function jobHref(row: ModelRow, jobId: number): string {
-    return row.kind === "custom" ? trainingJobHref(jobId) : jobPageHref(jobId);
-}
-
 function hrefOf(row: ModelRow, action: StatusAction): string | null {
     switch (action.kind) {
         case "open_job":
-            return action.job_id ? jobHref(row, action.job_id) : null;
+            return action.job_id
+                ? jobHref({ id: action.job_id, kind: action.job_kind ?? "" })
+                : null;
         case "open_monitoring":
             return modelPageHref(row.key, "monitoring");
         case "review_feedback":
@@ -159,7 +156,7 @@ function hrefOf(row: ModelRow, action: StatusAction): string | null {
         case "add_data":
             return modelPageHref(row.key, "training");
         case "train":
-            return modelTrainHref(row.key);
+            return trainHref(row.key);
         case "create_custom":
             return `/models/new?base=${encodeURIComponent(row.key)}`;
         default:
@@ -180,7 +177,7 @@ export function StatusLine({ row, versions }: { row: ModelRow; versions: Version
         mutationFn: retryJob,
         onSuccess: async (job) => {
             await client.invalidateQueries();
-            router.history.push(jobHref(row, job.id));
+            router.history.push(jobHref(job));
         },
     });
     const status = page.data?.status;

@@ -63,14 +63,6 @@ export function modelCompareHref(name: string, a: number, b: number): string {
     return `/models/${encodeURIComponent(name)}/compare?a=${a}&b=${b}`;
 }
 
-export function modelTrainHref(name: string): string {
-    return `${modelPageHref(name, "training")}?train=1`;
-}
-
-export function trainingJobHref(id: number): string {
-    return `/training/${id}`;
-}
-
 export function auditHref(name: string): string {
     return `/settings/audit?q=${encodeURIComponent(name)}`;
 }

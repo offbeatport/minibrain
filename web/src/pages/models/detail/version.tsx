@@ -54,10 +54,10 @@ import { count, percent } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
 import {
+    jobHref,
     modelCardHref,
     modelCompareHref,
     modelPageHref,
-    trainingJobHref,
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
@@ -439,7 +439,7 @@ function MadeFrom({
     if (job) {
         parts.push([
             "Job",
-            <Link key="job" href={trainingJobHref(job.id)} className="text-primary hover:underline">
+            <Link key="job" href={jobHref(job)} className="text-primary hover:underline">
                 {jobText(job)}
             </Link>,
         ]);

@@ -1,5 +1,5 @@
 import { Plug } from "lucide-react";
-import { Button } from "obp-ui";
+import { Button, Link } from "obp-ui";
 import { useState } from "react";
 import type { KeyCreated, ModelDetail, ModelRow } from "~/api/client";
 import { ApiKeys } from "~/components/ApiKeys";
@@ -9,6 +9,8 @@ import { RequestBodies } from "~/components/RequestBodies";
 import { ModelSafety } from "~/components/SafetySettings";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { useCan } from "~/lib/access";
+import { useSearchParam } from "~/lib/listSearch";
+import { modelPageHref } from "~/lib/modelLinks";
 import { ConnectDialog, isDeployed } from "./header";
 
 function Endpoint({ row, keyValue }: { row: ModelRow; keyValue: string | null }) {
@@ -49,23 +51,50 @@ function Endpoint({ row, keyValue }: { row: ModelRow; keyValue: string | null })
 
 export function KeysTab({ row, detail }: { row: ModelRow; detail: ModelDetail | undefined }) {
     const can = useCan();
+    const everyKey = useSearchParam("keys") === "all";
     const [created, setCreated] = useState<KeyCreated | null>(null);
     const [connecting, setConnecting] = useState(false);
     const baseUrl = `${window.location.origin}/v1`;
     return (
         <PanelSections>
-            {can.build && (
-                <ApiKeys
-                    scope={{ kind: row.kind, key: row.key }}
-                    onCreated={setCreated}
-                    description={`Keys that can call ${row.key}${row.kind === "custom" ? ` and ${row.key}@N` : ""}. Each is shown once, when it is created.`}
-                    secretActions={
-                        <Button variant="outline" onClick={() => setConnecting(true)}>
-                            Connect
-                        </Button>
-                    }
-                />
-            )}
+            {can.build &&
+                (everyKey ? (
+                    <ApiKeys
+                        onCreated={setCreated}
+                        description={
+                            <>
+                                {"Every key on this install, whatever models it calls. "}
+                                <Link
+                                    href={modelPageHref(row.key, "api")}
+                                    className="text-primary hover:underline"
+                                >
+                                    {`Only the keys for ${row.name}`}
+                                </Link>
+                            </>
+                        }
+                    />
+                ) : (
+                    <ApiKeys
+                        scope={{ kind: row.kind, key: row.key }}
+                        onCreated={setCreated}
+                        description={
+                            <>
+                                {`Keys that can call ${row.key}${row.kind === "custom" ? ` and ${row.key}@N` : ""}. Each is shown once, when it is created. `}
+                                <Link
+                                    href={`${modelPageHref(row.key, "api")}?keys=all`}
+                                    className="text-primary hover:underline"
+                                >
+                                    Every key on this install
+                                </Link>
+                            </>
+                        }
+                        secretActions={
+                            <Button variant="outline" onClick={() => setConnecting(true)}>
+                                Connect
+                            </Button>
+                        }
+                    />
+                ))}
             <Endpoint row={row} keyValue={created?.secret ?? null} />
             {detail && (
                 <FeedbackApi

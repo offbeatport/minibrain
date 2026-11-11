@@ -29,7 +29,7 @@ import { useFeedbackSummary } from "~/api/feedbackQueries";
 import { keys, useAllModels } from "~/api/queries";
 import { errorMessage } from "~/components/Section";
 import { count } from "~/lib/format";
-import { trainingJobHref } from "~/lib/modelLinks";
+import { jobHref } from "~/lib/modelLinks";
 import { baseNameOf, isDeployed, nextVersion } from "../header";
 import { liveOf } from "../makeLive";
 import { Advanced } from "./advanced";
@@ -199,7 +199,7 @@ function Body({
         onSuccess: async (version) => {
             await client.invalidateQueries();
             onClose();
-            const job = version.job?.id;
+            const job = version.job;
             toast({
                 title: `Training v${version.number} of ${row.name}`,
                 description: job
@@ -208,7 +208,7 @@ function Body({
                 tone: "success",
             });
             if (job) {
-                router.history.push(trainingJobHref(job));
+                router.history.push(jobHref(job));
             }
         },
         onError: (error, force) => {

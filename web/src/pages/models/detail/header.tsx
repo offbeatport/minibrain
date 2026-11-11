@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import {
-    ChevronRight,
     CopyPlus,
     FolderOpen,
     GraduationCap,
@@ -38,13 +37,14 @@ import {
 import { Fragment, type ReactElement, type ReactNode, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
 import { keys, useAllModels } from "~/api/queries";
+import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { modelPageHref, modelTrainHref, playgroundHref } from "~/lib/modelLinks";
+import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted, busyTearingDown, deleteModel, rowId, setDeployed } from "~/lib/teardown";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
@@ -74,31 +74,9 @@ export function Inline({ items }: { items: Fact[] }) {
     );
 }
 
-export function Crumbs({ items }: { items: { label: string; href?: string }[] }) {
-    return (
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-sm">
-            {items.map((item, index) => (
-                <Fragment key={`${index}-${item.label}`}>
-                    {index > 0 && (
-                        <ChevronRight aria-hidden="true" className="size-3.5 text-faint" />
-                    )}
-                    {item.href ? (
-                        <Link
-                            href={item.href}
-                            className="text-muted-foreground hover:text-foreground hover:underline"
-                        >
-                            {item.label}
-                        </Link>
-                    ) : (
-                        <span aria-current="page">{item.label}</span>
-                    )}
-                </Fragment>
-            ))}
-        </nav>
-    );
-}
+export { Breadcrumbs as Crumbs } from "~/components/Breadcrumbs";
 
-export function modelCrumbs(row: ModelRow, more: { label: string; href?: string }[] = []) {
+export function modelCrumbs(row: ModelRow, more: Crumb[] = []): Crumb[] {
     return [
         { label: "Models", href: modelsHref() },
         { label: row.name, href: more.length > 0 ? modelPageHref(row.key) : undefined },
@@ -444,7 +422,7 @@ function ModelMenu({
                                 icon={<GraduationCap />}
                                 label={`Train v${nextVersion(row)}`}
                                 blocked={trainBlock(row, detail)}
-                                onSelect={() => router.history.push(modelTrainHref(row.key))}
+                                onSelect={() => router.history.push(trainHref(row.key))}
                             />
                         )}
                     </DropdownMenuGroup>

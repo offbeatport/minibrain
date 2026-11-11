@@ -356,7 +356,11 @@ export const AUTO = "auto";
 
 function sideFor(item: MachinePlan): ReactNode {
     if (!item.chosen) {
-        return <span className="text-destructive">{item.reason ?? "Does not fit"}</span>;
+        return (
+            <span className="line-clamp-2 text-destructive" title={item.reason ?? undefined}>
+                {item.reason ?? "Does not fit"}
+            </span>
+        );
     }
     return (
         <span className="text-muted-foreground">{`${fitText(item.chosen)} · ≈ ${duration(item.minutes)}`}</span>
@@ -412,7 +416,11 @@ export function ComputePicker({
                                 key={item.name}
                                 value={item.name}
                                 title={item.name}
-                                meta={`${gigabytes(item.available_bytes)} ${item.memory_label}`}
+                                meta={
+                                    item.available_bytes
+                                        ? `${gigabytes(item.available_bytes)} ${item.memory_label}`
+                                        : "Memory not reported yet"
+                                }
                                 side={sideFor(item)}
                                 disabled={!item.chosen}
                                 indent

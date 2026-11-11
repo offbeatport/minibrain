@@ -15,6 +15,7 @@ import {
 import type { ReactNode } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
+import { useModelPage } from "~/api/queries";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
 import { StatusText } from "~/components/models/StatusText";
@@ -72,12 +73,27 @@ function Figure({
     );
 }
 
-function SummaryStrip({ report }: { report: TrafficReport }) {
+function fullPeriod(report: TrafficReport, createdAt: string | null | undefined): boolean {
+    if (!createdAt) {
+        return true;
+    }
+    const span = Date.parse(report.until) - Date.parse(report.since);
+    return Date.parse(createdAt) <= Date.parse(report.since) - span;
+}
+
+function SummaryStrip({ report, full }: { report: TrafficReport; full: boolean }) {
     const now = report.totals;
     const before = report.previous;
     const empty = now.requests === 0;
-    const compare = before !== null && before !== undefined && before.requests > 0 && !empty;
-    const none = empty ? null : before ? "No earlier traffic" : "No earlier period";
+    const compare =
+        full && before !== null && before !== undefined && before.requests > 0 && !empty;
+    const none = empty
+        ? null
+        : !full
+          ? "No full earlier period"
+          : before
+            ? "No earlier traffic"
+            : "No earlier period";
     const usual = report.usual_error_rate;
     const change = (pick: (stats: TrafficStats) => number | null) =>
         compare && before ? relativeChange(pick(now), pick(before)) : none;
@@ -474,6 +490,7 @@ function emptyText(row: ModelRow, range: TrafficRange): string {
 export function MonitoringTab({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
     const [range, setRange] = useTrafficRange();
     const traffic = useModelTraffic(row.key, range);
+    const page = useModelPage(row.key);
     const report = traffic.data;
     const empty = !report || report.totals.requests === 0;
     return (
@@ -495,7 +512,12 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                     description={`${LAST[range]}${row.kind === "custom" ? ", by the version that answered" : ""}. Changes compare with ${PERIOD[range]}.`}
                 >
                     <div className="flex flex-col gap-6">
-                        {report && !empty && <SummaryStrip report={report} />}
+                        {report && !empty && (
+                            <SummaryStrip
+                                report={report}
+                                full={fullPeriod(report, page.data?.created_at)}
+                            />
+                        )}
                         <TrafficChart
                             row={row}
                             versions={versions}

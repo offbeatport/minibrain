@@ -38,7 +38,7 @@ import { count, percent } from "~/lib/format";
 import { jobDuration, useInvalidate } from "~/lib/jobs";
 import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
-import { modelPageHref, modelVersionHref, trainingJobHref } from "~/lib/modelLinks";
+import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { TrainingData as DatasetChoice } from "../../data/TrainingData";
 import { ModelDataNotice } from "../../data/versionData";
@@ -350,13 +350,13 @@ function RunsSection({
                                     className="cursor-pointer"
                                     onClick={(event) => {
                                         if (!(event.target as HTMLElement).closest("a,button")) {
-                                            router.history.push(trainingJobHref(job.id));
+                                            router.history.push(jobHref(job));
                                         }
                                     }}
                                 >
                                     <TableCell className="pl-panel">
                                         <Link
-                                            href={trainingJobHref(job.id)}
+                                            href={jobHref(job)}
                                             className="font-mono text-sm hover:underline"
                                         >
                                             {`#${job.id}`}

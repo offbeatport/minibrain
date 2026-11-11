@@ -125,7 +125,7 @@ def failed_status(session: Session, model: Model) -> ModelStatus | None:
         return None
     job = latest_job(session, newest)
     memory = job is not None and "memory" in (job.error or "").lower()
-    action = StatusAction(kind="retry_job", label="Retry", job_id=job.id, job_kind=job.kind) if job is not None else None
+    action = None if job is None else StatusAction(kind="retry_job", label="Retry", job_id=job.id, job_kind=job.kind)
     return ModelStatus(
         tone="destructive", text=f"v{newest.number} failed{': out of memory' if memory else ''}", action=action
     )

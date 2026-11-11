@@ -4,8 +4,7 @@ import type { ModelRow } from "~/api/client";
 import { type ModelActivityEvent, useModelActivity } from "~/api/modelPageQueries";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { jobPageHref } from "~/lib/jobs";
-import { auditHref, modelPageHref, modelVersionHref, trainingJobHref } from "~/lib/modelLinks";
+import { auditHref, jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 import { TwoLines } from "./facts";
 
@@ -28,11 +27,7 @@ function hrefOf(row: ModelRow, event: ModelActivityEvent): string | null {
                 ? null
                 : modelVersionHref(row.key, link.version);
         case "job":
-            return link.job_id
-                ? row.kind === "custom"
-                    ? trainingJobHref(link.job_id)
-                    : jobPageHref(link.job_id)
-                : null;
+            return link.job_id ? jobHref({ id: link.job_id, kind: link.job_kind ?? "" }) : null;
         case "key":
             return modelPageHref(row.key, "api");
         case "base":

@@ -25,7 +25,7 @@ import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
-import { modelCompareHref, modelVersionHref, trainingJobHref } from "~/lib/modelLinks";
+import { jobHref, modelCompareHref, modelVersionHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
@@ -158,7 +158,7 @@ function VersionRow({
         mutationFn: retry,
         onSuccess: async (job) => {
             await client.invalidateQueries();
-            router.history.push(trainingJobHref(job.id));
+            router.history.push(jobHref(job));
         },
     });
     const jobId = version.job?.id;
@@ -203,7 +203,9 @@ function VersionRow({
                     {(version.status === "training" || version.status === "evaluating") &&
                         jobId && (
                             <Button variant="outline" asChild>
-                                <Link href={trainingJobHref(jobId)}>Watch</Link>
+                                <Link href={jobHref(version.job ?? { id: jobId, kind: "train" })}>
+                                    Watch
+                                </Link>
                             </Button>
                         )}
                     {can.build && version.status === "failed" && newest && jobId && (
