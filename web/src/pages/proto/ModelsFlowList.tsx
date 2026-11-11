@@ -82,16 +82,15 @@ type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
 type Group = {
     kind: KindKey;
     label: string;
-    caption: string;
     count: number;
     deployed: number;
     collapsed: boolean;
     lines: Line[];
 };
 
-const GROUPS: { kind: KindKey; label: string; caption: string }[] = [
-    { kind: "custom", label: "Your models", caption: "Trained on your data" },
-    { kind: "base", label: "Base models", caption: "Shared weights your models run on" },
+const GROUPS: { kind: KindKey; label: string }[] = [
+    { kind: "custom", label: "Your models" },
+    { kind: "base", label: "Base models" },
 ];
 
 const HINTS: Record<string, Hint> = {
@@ -416,34 +415,27 @@ function useCollapsed() {
 }
 
 function GroupBand({ group, onToggle }: { group: Group; onToggle: () => void }) {
-    const summary = `${plural(group.count, "model")} · ${group.deployed} deployed`;
     return (
         <h2
             id={`flow-group-${group.kind}`}
-            className="sticky top-21 z-[12] col-span-full -mt-px border-y bg-muted"
+            className="sticky top-21 z-[12] col-span-full -mt-px border-y bg-card"
         >
             <button
                 type="button"
                 aria-expanded={!group.collapsed}
                 aria-controls={`flow-group-rows-${group.kind}`}
                 onClick={onToggle}
-                className="flex h-9 w-full min-w-0 items-center gap-2 px-4 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="group/band flex h-8 w-full min-w-0 items-center gap-1.5 px-4 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
                 <ChevronRight
                     aria-hidden="true"
                     className={cn(
-                        "size-4 shrink-0 text-muted-foreground transition-transform duration-100 motion-reduce:transition-none",
+                        "size-3.5 shrink-0 text-faint transition-transform duration-100 group-hover/band:text-muted-foreground motion-reduce:transition-none",
                         !group.collapsed && "rotate-90",
                     )}
                 />
                 <span className="font-medium">{group.label}</span>
-                <span className="text-sm text-muted-foreground tabular-nums">{group.count}</span>
-                <span aria-hidden="true" className="text-faint">
-                    ·
-                </span>
-                <span className="min-w-0 truncate text-sm font-normal text-muted-foreground tabular-nums">
-                    {group.collapsed ? summary : group.caption}
-                </span>
+                <span className="font-normal text-faint tabular-nums">{group.count}</span>
             </button>
         </h2>
     );
