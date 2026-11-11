@@ -32,7 +32,12 @@ import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
 import { ModelCardPage } from "./pages/models/ModelCardPage";
-import { ModelPage, OldModelLink } from "./pages/models/detail/ModelPage";
+import {
+    ModelComparePage,
+    ModelPage,
+    ModelVersionPage,
+    OldModelLink,
+} from "./pages/models/detail/ModelPage";
 import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -133,8 +138,10 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/custom/$slug", OldModelLink),
     globalPage("/models/custom/$slug/versions/$number/card", OldModelLink),
     globalPage("/models/$name", ModelPage),
-    globalPage("/models/$name/$tab", ModelPage),
+    globalPage("/models/$name/compare", ModelComparePage),
+    globalPage("/models/$name/versions/$number", ModelVersionPage),
     globalPage("/models/$name/versions/$number/card", ModelCardPage),
+    globalPage("/models/$name/$tab", ModelPage),
     globalPage("/playground", PlaygroundPage),
     globalPage("/data", guarded("builder", DataPage)),
     globalPage("/training", TrainingListPage),

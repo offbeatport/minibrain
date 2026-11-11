@@ -1129,25 +1129,60 @@ keys, and `/v1` stays key-only.
   for bases, or the admin lock); otherwise nothing is saved and the Recent list says why in one line. Chats with no
   new message for Log retention (days) are deleted by the leader's hourly purge, with the request logs. No folders,
   sharing or search beyond the filter: that is the staff Chat app's job.
-- A model's page (built 2026-11-06) is one route for both kinds, `/models/<name>`: base keys and custom slugs share
-  one namespace with `/v1`, so create, import, download and rename refuse a name or address another model holds (409),
-  and `new`, `base` and `custom` are reserved. Old `/models/base/<key>` and `/models/custom/<slug>` links redirect. The
-  header carries the name and publisher logo, a Base or Custom badge, Open in Playground, and the deployment status
-  beside Deploy or Undeploy. Tabs are `TabNav` pages with their own URLs, Overview · Versions · Data · API for a custom
-  model and Overview · API for a base; an unknown tab redirects to Overview. Overview answers three questions in
-  compact rows: is it good (the live version's held-out score against v0 and the version before it; a base shows its
-  catalogue facts), is it working (requests per day for 7 days as a small line, p95 latency and error rate, from the
-  request logs as Monitoring computes them) and what next (one action computed on the server: deploy a passing version,
-  deploy, review pending feedback, add data, train the next version; for a base, deploy or build a custom model on it).
-  Health and teardown notices sit above them; a Try it box streams one answer through the Playground endpoint (same
-  safety, policy and logging), says when asking loads the model, and Continue in Playground carries the conversation.
-  The facts follow (Built on, task, live version, publisher, parameters, context, licence, memory, updated, the active
-  job while one runs) with a Weights row whose View files opens `/models/<name>/files`: a sheet with each file's size
-  and SHA-256 and Verify files for a base, the live version's adapter files and a link to the base's files for a custom
-  model. Versions is a timeline of attempts, each a fresh run from the base (number, kind, score, data, outcome, date,
-  model card, job), then Instructions and How it's judged. Data holds the training data, feedback and test examples.
-  API lists the model's keys first (Builders) and then the snippets; a key created there shows its secret once with
-  its own Copy and fills into the snippets.
+- A model's page (built 2026-11-06, rebuilt 2026-11-11 from the approved prototype) is one route for both kinds,
+  `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create, import, download and rename
+  refuse a name or address another model holds (409), and `new`, `base` and `custom` are reserved. Old
+  `/models/base/<key>` and `/models/custom/<slug>` links redirect. A breadcrumb sits above a compact header: the logo or
+  letter tile, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
+  On base). Its actions are Playground and Connect (the snippet dialog: base URL, name, `name@N`, harness configs) and,
+  for Builders, a ⋯ menu: Deploy or Undeploy, Train vN, Rename, Duplicate, Switch base, then Delete; there is no
+  state-driven primary button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Training · Monitoring
+  · API keys for a custom model (Viewers lose Training), Overview · Monitoring · API keys for a base (one installed
+  format is one base, so there is no Variants tab); `data` and `keys` redirect to Training and API keys, and an unknown
+  tab to Overview.
+  - Overview: Usage, About and Details in sections titled outside their panels, Activity in a right column. Usage
+    starts with a status line of one action computed on the server (`ModelPage.status`), broken first, then ship, then
+    improve, then start: a failed teardown or bad health, errors at three times the usual rate, a failed newest
+    version (Retry), a version that beats live (Make vN live), a running job ("Training v8 · 45% · 8 min left · View"),
+    feedback to review, no data (Add data), not deployed (Deploy), else "Live: v4 · 2 replicas". Under it the shared
+    line chart of requests by version (the four newest versions that were ever live take the validated series colours,
+    in order; the rest fold into Other versions), with made-live markers, a Requests · p95 · Errors · Cost switch and a
+    24h · 7d · 30d range shared with Monitoring, an empty frame when there is no traffic, and a footer line with p95,
+    errors and replicas. About lists Task, Live, Base, Data, Deployed and API name (with copy), then Tags, Created,
+    Updated and Description, the last two editable in place by a pencil on hover. Details, always shown: task setup
+    (labels, instructions, graders, promotion rule; their pencils open the Versions sections), data (splits, feedback
+    waiting, test examples), serving (safety, kept inputs, machines), lineage and integrity (the live adapter's and the
+    base's SHA-256 with copy, the model card). Activity is the audit log filtered to the model, its versions, keys and
+    jobs (`/api/model-pages/<name>/activity`), as sentences with day separators and runs of three or more folded; All
+    activity opens the audit log searched for it (Admins).
+  - Versions: a table with a Status column (dot and text), the main score and a badge against live ("beats live +1.4"
+    or "below rule", none on v0 · Baseline), Watch, Retry and Make vN live; ticking two compares them, ticking any
+    deletes them (the live one is kept). Then Instructions and How it's judged.
+  - A version's page (`/models/<name>/versions/<n>`): a breadcrumb, Make vN live (its confirmation says the direction,
+    "v5 scores +1.4 over live v4" or "v4 replaces live v5 (−1.4)") and a ⋯ menu (Try in Playground as `name@N`, Compare
+    with…, Copy the name, Model card, Export…, Delete version); then Score (against live and v0 · Baseline), Where it
+    differs (better and worse counts from the held-out answers, then the rows), Made from (data version, method,
+    settings, the training job), Identifiers and Exports. Export offers the adapter as a download today; merged
+    safetensors and GGUF say Coming soon. Compare (`/models/<name>/compare?a=&b=`) puts two versions in a
+    `CompareTable` (scores, latency, data, settings), their differing answers (the answers API takes `against`) and a
+    link to the data diff.
+  - Training: Score by version (the promotion rule as a dashed level, live marked) or Loss curves (the running job and
+    the last three runs, by share of training done); the model's training and scoring jobs, each opening
+    `/training/<job>`, with Train vN and Score prompt only; then training data, feedback and test examples.
+    `?train=1` opens the Train dialog: SFT (other methods Coming soon), Fast · Balanced · Higher quality presets each
+    with the planner's time, the dataset version with Change, Compute: Automatic with the planner's machine, a memory
+    bar, time, GPU-hours and the queue, Change listing every training machine by pool (one that does not fit is
+    disabled with the reason), Advanced (rank, alpha, learning rate, epochs, rows, batch, accumulation, sequence length,
+    LoRA or QLoRA, checkpointing, scoring steps, seed) re-planned live, Custom with a reset, and a summary over Train
+    vN. The plan comes from the real planner (`/training-plan` returns every machine, the time and the queue).
+  - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1,000 against the period
+    before, and the shared chart), Latency (p50, p95, p99), Errors (the rate against the usual one and a table by
+    status linking to the request log), By version, Callers (API keys) and the latest requests, all from
+    `/api/model-pages/<name>/traffic`, one query per range, so its numbers match the Overview and the Models list.
+    Line charts only.
+  - API keys: the model's keys (a name is required and unique among the keys that call the same model, shown in the
+    list, Callers and the request log; the secret is shown once), the endpoint and harness configs, the feedback API,
+    kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
 - Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
   and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"

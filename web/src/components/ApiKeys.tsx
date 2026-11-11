@@ -21,7 +21,7 @@ import {
     Input,
     Label,
 } from "obp-ui";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, succeed, unwrap } from "~/api/client";
 import { keys, useAllModels, useKeys } from "~/api/queries";
 import { ErrorLine, PanelSection } from "~/components/Section";
@@ -92,6 +92,29 @@ function ModelChecklist({
 
 export type KeyEditing = { mode: "create"; models: ModelRef[] } | { mode: "edit"; key: KeyInfo };
 
+function nameProblem(
+    name: string,
+    picked: Set<string>,
+    existing: KeyInfo[],
+    choices: Choice[],
+): string | null {
+    const wanted = name.trim().toLowerCase();
+    if (!wanted) {
+        return "Name the key, so you can tell its calls apart in the logs.";
+    }
+    const clash = existing.find(
+        (key) =>
+            key.name.trim().toLowerCase() === wanted &&
+            key.models.some((model) => picked.has(idOf(model))),
+    );
+    if (!clash) {
+        return null;
+    }
+    const model = clash.models.find((item) => picked.has(idOf(item)));
+    const label = choices.find((choice) => model && idOf(choice) === idOf(model))?.name;
+    return `A key called ${clash.name} already calls ${label ?? model?.name ?? "one of these models"}.`;
+}
+
 function KeyDialog({
     editing,
     onOpenChange,
@@ -103,6 +126,8 @@ function KeyDialog({
 }) {
     const refresh = useRefreshKeys();
     const choices = useChoices();
+    const existing = useKeys();
+    const [touched, setTouched] = useState(false);
     const [name, setName] = useState("");
     const [picked, setPicked] = useState<Set<string>>(new Set());
     useEffect(() => {
@@ -111,6 +136,7 @@ function KeyDialog({
             setPicked(new Set(editing.key.models.map(idOf)));
         } else if (editing) {
             setName("");
+            setTouched(false);
             setPicked(new Set(editing.models.map(idOf)));
         }
     }, [editing]);
@@ -126,11 +152,7 @@ function KeyDialog({
                 );
                 return;
             }
-            onCreated(
-                await unwrap(
-                    api.POST("/api/keys", { body: { name: name.trim() || "default", models } }),
-                ),
-            );
+            onCreated(await unwrap(api.POST("/api/keys", { body: { name: name.trim(), models } })));
         },
         onSuccess: async () => {
             await refresh();
@@ -148,14 +170,19 @@ function KeyDialog({
             return next;
         });
     const creating = editing?.mode !== "edit";
+    const problem = creating ? nameProblem(name, picked, existing.data ?? [], choices) : null;
     return (
         <Dialog open={editing !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
-                        save.mutate();
+                        setTouched(true);
+                        if (!problem) {
+                            save.mutate();
+                        }
                     }}
+                    noValidate
                     className="contents"
                 >
                     <DialogHeader>
@@ -169,13 +196,22 @@ function KeyDialog({
                         </DialogDescription>
                     </DialogHeader>
                     {creating && (
-                        <Field id="key-name" label="Name">
+                        <Field
+                            id="key-name"
+                            label="Name"
+                            hint="Shown in the key list, the request log and Callers."
+                            error={touched || name ? (problem ?? undefined) : undefined}
+                        >
                             <Input
                                 id="key-name"
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
+                                onBlur={() => setTouched(true)}
                                 placeholder="helpdesk-app"
                                 maxLength={60}
+                                required
+                                autoFocus
+                                aria-invalid={Boolean((touched || name) && problem)}
                             />
                         </Field>
                     )}
@@ -188,7 +224,12 @@ function KeyDialog({
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={picked.size === 0 || save.isPending}>
+                        <Button
+                            type="submit"
+                            disabled={
+                                picked.size === 0 || save.isPending || (touched && Boolean(problem))
+                            }
+                        >
                             {creating ? "Create key" : "Save"}
                         </Button>
                     </DialogFooter>
@@ -198,17 +239,31 @@ function KeyDialog({
     );
 }
 
-function NewSecret({ created, onDismiss }: { created: KeyCreated; onDismiss: () => void }) {
+function NewSecret({
+    created,
+    onDismiss,
+    extra,
+}: {
+    created: KeyCreated | null;
+    onDismiss: () => void;
+    extra?: ReactNode;
+}) {
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-success/40 bg-success-soft p-3">
-            <div className="font-semibold">{`New key ${created.name}: copy it now, it is not shown again`}</div>
-            <div className="flex items-center gap-2">
-                <CodeBlock code={created.secret} copyLabel="Copy the key" wrap className="flex-1" />
-                <Button size="xs" variant="ghost" onClick={onDismiss}>
-                    Done
-                </Button>
-            </div>
-        </div>
+        <Dialog open={created !== null} onOpenChange={(open) => !open && onDismiss()}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Copy your key now</DialogTitle>
+                    <DialogDescription>
+                        {`${created?.name ?? "The key"} is shown once. Store it where your app reads its secrets.`}
+                    </DialogDescription>
+                </DialogHeader>
+                <CodeBlock code={created?.secret ?? ""} copyLabel="Copy the key" wrap />
+                <DialogFooter>
+                    {extra}
+                    <Button onClick={onDismiss}>Done</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -284,6 +339,13 @@ function columns(
             },
         },
         {
+            header: "Created",
+            id: "created",
+            cell: ({ row }) => (
+                <span className="tabular-nums">{`${relativeTime(row.original.created_at)}`}</span>
+            ),
+        },
+        {
             header: "Last used",
             id: "used",
             cell: ({ row }) =>
@@ -320,9 +382,13 @@ function columns(
 export function ApiKeys({
     scope,
     onCreated,
+    secretActions,
+    description,
 }: {
     scope?: ModelRef;
     onCreated?: (key: KeyCreated) => void;
+    secretActions?: ReactNode;
+    description?: ReactNode;
 }) {
     const list = useKeys();
     const refresh = useRefreshKeys();
@@ -345,25 +411,26 @@ export function ApiKeys({
             icon={KeyRound}
             title="API keys"
             description={
-                scope
+                description ??
+                (scope
                     ? "Keys that can call this model. One key can cover several models."
-                    : undefined
+                    : undefined)
             }
             actions={
                 <Button
-                    variant="outline"
                     onClick={() => setEditing({ mode: "create", models: scope ? [scope] : [] })}
                 >
+                    <KeyRound aria-hidden="true" />
                     Create key
                 </Button>
             }
             bare
         >
             <div className="flex flex-col gap-3">
-                {created && <NewSecret created={created} onDismiss={() => setCreated(null)} />}
                 <ErrorLine error={list.error} />
                 <DataGrid columns={table} rows={rows} empty="No keys yet." />
             </div>
+            <NewSecret created={created} onDismiss={() => setCreated(null)} extra={secretActions} />
             <KeyDialog
                 editing={editing}
                 onOpenChange={(open) => !open && setEditing(null)}

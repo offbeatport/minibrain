@@ -48,9 +48,37 @@ export function jobHref(job: { id: number; kind: string }): string {
     return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
-export type ModelTab = "overview" | "versions" | "data" | "api" | "files";
+export type ModelTab = "overview" | "versions" | "training" | "monitoring" | "api" | "files";
 
 export function modelPageHref(name: string, tab: ModelTab = "overview"): string {
     const page = `/models/${encodeURIComponent(name)}`;
     return tab === "overview" ? page : `${page}/${tab}`;
+}
+
+export function modelVersionHref(name: string, number: number): string {
+    return `/models/${encodeURIComponent(name)}/versions/${number}`;
+}
+
+export function modelCompareHref(name: string, a: number, b: number): string {
+    return `/models/${encodeURIComponent(name)}/compare?a=${a}&b=${b}`;
+}
+
+export function modelTrainHref(name: string): string {
+    return `${modelPageHref(name, "training")}?train=1`;
+}
+
+export function trainingJobHref(id: number): string {
+    return `/training/${id}`;
+}
+
+export function auditHref(name: string): string {
+    return `/settings/audit?q=${encodeURIComponent(name)}`;
+}
+
+export function requestLogHref(search: Record<string, string>): string {
+    return `/monitor/requests?${new URLSearchParams(search).toString()}`;
+}
+
+export function versionPlaygroundHref(name: string, number: number): string {
+    return playgroundHref(`${name}@${number}`);
 }

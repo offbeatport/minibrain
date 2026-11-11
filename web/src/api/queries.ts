@@ -71,6 +71,7 @@ export function useModel(slug: string) {
         queryKey: keys.model(slug),
         queryFn: () => unwrap(api.GET("/api/models/{slug}", path(slug))),
         refetchInterval: (query) => ((query.state.data?.active_jobs ?? 0) > 0 ? POLL_MS : false),
+        enabled: slug !== "",
     });
 }
 
@@ -146,6 +147,7 @@ export function useVersions(slug: string) {
         queryKey: keys.versions(slug),
         queryFn: () => unwrap(api.GET("/api/models/{slug}/versions", path(slug))),
         refetchInterval: (query) => (query.state.data?.some(isActiveVersion) ? POLL_MS : false),
+        enabled: slug !== "",
     });
 }
 
@@ -261,6 +263,7 @@ export function useBaseModel(key: string) {
         queryFn: () => unwrap(api.GET("/api/base-models/{key}", { params: { path: { key } } })),
         refetchInterval: (query) =>
             query.state.data && isModelMoving(query.state.data) ? POLL_MS : 15000,
+        enabled: key !== "",
     });
 }
 
