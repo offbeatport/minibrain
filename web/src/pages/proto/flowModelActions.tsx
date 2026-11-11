@@ -25,6 +25,8 @@ import {
     useToast,
 } from "obp-ui";
 import { useState } from "react";
+import { PickerDialog } from "./AvatarPicker";
+import { choiceFor } from "./avatarDicebear";
 import { useCan } from "./flowOverlays";
 import { TrainButton } from "./flowTraining";
 import {
@@ -32,6 +34,7 @@ import {
     type FlowModel,
     type NextStep,
     deleteModels,
+    editModel,
     flowHref,
     jobHref,
     jobOfVersion,
@@ -125,6 +128,7 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
     const deploy = useDeploy(model);
     const [confirm, setConfirm] = useState<Confirm | null>(null);
     const [autopilot, setAutopilot] = useState(false);
+    const [picking, setPicking] = useState(false);
     const canPlay =
         model.kind === "base" || model.versions.some((version) => version.status === "ready");
     const custom = model.kind === "custom";
@@ -229,11 +233,7 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
                                             <Pencil />
                                             Rename
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={later(
-                                                `Would change the avatar of ${model.name}.`,
-                                            )}
-                                        >
+                                        <DropdownMenuItem onSelect={() => setPicking(true)}>
                                             <SmilePlus />
                                             Change avatar
                                         </DropdownMenuItem>
@@ -284,6 +284,15 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
             </DropdownMenu>
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
             <AutopilotDialog model={autopilot ? model : null} onClose={() => setAutopilot(false)} />
+            {custom && (
+                <PickerDialog
+                    open={picking}
+                    onOpenChange={setPicking}
+                    name={model.name}
+                    value={model.avatar ?? choiceFor("initials", model.name)}
+                    onUse={(avatar) => editModel(model.slug, { avatar })}
+                />
+            )}
         </>
     );
 }

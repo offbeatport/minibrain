@@ -1,10 +1,8 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import { Shuffle, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
     Badge,
     Button,
-    Input,
-    Label,
     Link,
     Table,
     TableBody,
@@ -25,8 +23,7 @@ import { Page, Section, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
-import { PickerDialog } from "./AvatarStylesSection";
-import { type AvatarChoice, AvatarTile, choiceFor } from "./avatarDicebear";
+import { type Identity, NameAvatarField, newIdentity } from "./NameAvatarField";
 import { useCan } from "./flowOverlays";
 import {
     CATALOG,
@@ -53,36 +50,6 @@ import {
     versionHref,
 } from "./modelsFlowData";
 import { Crumbs, ModelAvatar } from "./modelsFlowParts";
-
-const ADJECTIVES = [
-    "Steady",
-    "Quiet",
-    "Bright",
-    "Nimble",
-    "Patient",
-    "Lucid",
-    "Brisk",
-    "Gentle",
-    "Keen",
-    "Sturdy",
-];
-const NOUNS = [
-    "Heron",
-    "Otter",
-    "Falcon",
-    "Lynx",
-    "Badger",
-    "Wren",
-    "Marten",
-    "Ibex",
-    "Plover",
-    "Finch",
-];
-
-function randomName(): string {
-    const [first, second] = crypto.getRandomValues(new Uint8Array(2));
-    return `${ADJECTIVES[first % ADJECTIVES.length]} ${NOUNS[second % NOUNS.length]}`;
-}
 
 function sum(values: number[]): number {
     return values.reduce((total, value) => total + value, 0);
@@ -433,31 +400,22 @@ export function FlowAddModelPage() {
     const router = useRouter();
     const initial = catalogEntry(useSearchParam("base"))?.id ?? CATALOG[0].id;
     const [base, setBase] = useState(initial);
-    const [name, setName] = useState("Steady Heron");
-    const [avatar, setAvatar] = useState<AvatarChoice>(() => choiceFor("initials", "Steady Heron"));
-    const [picking, setPicking] = useState(false);
     const state = useFlowState();
+    const taken = state.models.map((model) => model.name);
+    const [identity, setIdentity] = useState<Identity>(() => newIdentity(taken));
     const installed = CATALOG.filter((entry) => isInstalled(state, entry.id));
     const shown =
         installed.length === 0
             ? CATALOG.slice(0, 3)
             : CATALOG.filter((entry) => entry.id === base || installed.includes(entry));
-    const display = name.trim() || "Untitled model";
+    const display = identity.name.trim() || "Untitled model";
     const apiName = display
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-    const rename = (next: string) => {
-        setName(next);
-        setAvatar((current) =>
-            current.seed === choiceFor(current.style, name).seed
-                ? choiceFor(current.style, next)
-                : current,
-        );
-    };
     const create = (event: FormEvent) => {
         event.preventDefault();
-        const slug = createModel(display, base, avatar);
+        const slug = createModel(display, base, identity.avatar);
         router.history.push(modelHref(slug));
     };
     return (
@@ -488,54 +446,22 @@ export function FlowAddModelPage() {
                         More bases in Discover →
                     </Link>
                 </fieldset>
-                <div className="flex flex-col gap-label">
-                    <Label htmlFor="add-name">Name</Label>
-                    <div className="flex items-center gap-2">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    type="button"
-                                    aria-label="Change avatar"
-                                    aria-haspopup="dialog"
-                                    onClick={() => setPicking(true)}
-                                    className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-                                >
-                                    <AvatarTile choice={avatar} name={display} size="md" />
-                                </button>
-                            </TooltipTrigger>
-                            <TooltipContent>Change avatar</TooltipContent>
-                        </Tooltip>
-                        <Input
-                            id="add-name"
-                            value={name}
-                            onChange={(event) => rename(event.target.value)}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => rename(randomName())}
-                        >
-                            <Shuffle aria-hidden="true" />
-                            Shuffle
-                        </Button>
-                    </div>
+                <NameAvatarField
+                    id="add-name"
+                    value={identity}
+                    onChange={setIdentity}
+                    taken={taken}
+                >
                     <span className="text-sm text-muted-foreground">
                         API name <span className="font-mono">{apiName || "model"}</span>
                     </span>
-                </div>
+                </NameAvatarField>
                 <div>
-                    <Button type="submit" disabled={!name.trim()}>
+                    <Button type="submit" disabled={!identity.name.trim()}>
                         Create
                     </Button>
                 </div>
             </form>
-            <PickerDialog
-                open={picking}
-                onOpenChange={setPicking}
-                name={display}
-                value={avatar}
-                onUse={setAvatar}
-            />
         </Page>
     );
 }

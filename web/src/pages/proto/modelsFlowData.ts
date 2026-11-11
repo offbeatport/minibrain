@@ -1715,7 +1715,7 @@ export function setTrainAt(slug: string, rows: number) {
 }
 
 export type ModelEdit = Partial<
-    Pick<FlowModel, "description" | "tags" | "instructions" | "safety" | "rule">
+    Pick<FlowModel, "description" | "tags" | "instructions" | "safety" | "rule" | "avatar">
 >;
 
 export function editModel(slug: string, edit: ModelEdit) {

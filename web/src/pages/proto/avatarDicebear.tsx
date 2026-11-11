@@ -1,12 +1,19 @@
 import { Avatar as DicebearAvatar, Style } from "@dicebear/core";
-import initialsDefinition from "@dicebear/styles/initials.json";
 import pixelbotDefinition from "@dicebear/styles/pixelbot.json";
 import planetsDefinition from "@dicebear/styles/planets.json";
 import voxelBotDefinition from "@dicebear/styles/voxel-bot.json";
 import { cn } from "obp-ui";
 import { useMemo, useSyncExternalStore } from "react";
 import { appPresetStyle } from "~/lib/theme";
-import { type AvatarStyleId, type Palette, hexOf, luminance, styleById } from "./avatarStyles";
+import {
+    type AvatarStyleId,
+    type Frame,
+    type Palette,
+    hexOf,
+    initialsMarkup,
+    luminance,
+    styleById,
+} from "./avatarStyles";
 import {
     SvgMarkup,
     TONE_KEYS,
@@ -17,23 +24,22 @@ import {
     toneToken,
 } from "./modelIcons";
 
-export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: ToneName };
+export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: ToneName; letters?: string };
 
 export const TONE_LABELS: Record<ToneName, string> = {
-    csv: "Green",
-    tsv: "Teal",
-    json: "Amber",
-    jsonl: "Orange",
-    parquet: "Indigo",
-    avro: "Purple",
-    iceberg: "Sky",
-    delta: "Lime",
-    sql: "Pink",
-    text: "Slate",
+    csv: "Forest green",
+    tsv: "Lagoon teal",
+    json: "Honey amber",
+    jsonl: "Ember orange",
+    parquet: "Twilight indigo",
+    avro: "Orchid purple",
+    iceberg: "Iceberg blue",
+    delta: "Moss lime",
+    sql: "Berry pink",
+    text: "Slate grey",
 };
 
-const DEFINITIONS: Record<AvatarStyleId, unknown> = {
-    initials: initialsDefinition,
+const DEFINITIONS: Record<Exclude<AvatarStyleId, "initials">, unknown> = {
     planets: planetsDefinition,
     "voxel-bot": voxelBotDefinition,
     pixelbot: pixelbotDefinition,
@@ -41,7 +47,7 @@ const DEFINITIONS: Record<AvatarStyleId, unknown> = {
 
 const STYLES = new Map<AvatarStyleId, Style>();
 
-function styleOf(id: AvatarStyleId): Style {
+function styleOf(id: Exclude<AvatarStyleId, "initials">): Style {
     const cached = STYLES.get(id);
     if (cached) {
         return cached;
@@ -55,39 +61,102 @@ function toneAt(hash: number): ToneName {
     return TONE_KEYS[hash % TONE_KEYS.length];
 }
 
-function defaultTone(name: string): ToneName {
-    return toneAt(cyrb53(slugOf(name)));
-}
-
 export function baseSeed(name: string): string {
     return slugOf(name) || "model";
 }
 
-export function seedTone(name: string, seed: string): ToneName {
-    return seed === baseSeed(name) ? defaultTone(name) : toneAt(cyrb53(seed));
-}
-
 export function choiceFor(style: AvatarStyleId, name: string, seed = baseSeed(name)): AvatarChoice {
-    return { style, seed, tone: seedTone(name, seed) };
+    return { style, seed, tone: toneAt(cyrb53(seed)) };
 }
 
-export function randomSeed(name: string): string {
+function randomHex(): string {
     const bytes = crypto.getRandomValues(new Uint8Array(4));
-    return `${baseSeed(name)}-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function randomTone(except?: ToneName): ToneName {
+    const pool = TONE_KEYS.filter((tone) => tone !== except);
+    return pool[crypto.getRandomValues(new Uint32Array(1))[0] % pool.length];
+}
+
+export function rerollChoice(current: AvatarChoice, keepTone = false): AvatarChoice {
+    return {
+        ...current,
+        seed: randomHex(),
+        tone: keepTone ? current.tone : randomTone(current.tone),
+    };
+}
+
+export function candidateChoices(
+    style: AvatarStyleId,
+    count: number,
+    tone: ToneName | null,
+    letters?: string,
+): AvatarChoice[] {
+    if (!styleById(style).seeded) {
+        return TONE_KEYS.map((key) => ({ style, seed: "initials", tone: key, letters }));
+    }
+    const offset = crypto.getRandomValues(new Uint32Array(1))[0];
+    return Array.from({ length: count }, (_, index) => ({
+        style,
+        seed: randomHex(),
+        tone: tone ?? TONE_KEYS[(offset + index) % TONE_KEYS.length],
+    }));
+}
+
+export function sameChoice(one: AvatarChoice, two: AvatarChoice): boolean {
+    const seeded = styleById(one.style).seeded;
+    return (
+        one.style === two.style &&
+        one.tone === two.tone &&
+        (seeded ? one.seed === two.seed : (one.letters ?? "") === (two.letters ?? ""))
+    );
+}
+
+export function defaultLetters(name: string): string {
+    const words = name
+        .trim()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(Boolean);
+    if (words.length === 0) {
+        return "?";
+    }
+    if (words.length === 1) {
+        return Array.from(words[0]).slice(0, 2).join("").toUpperCase();
+    }
+    return `${Array.from(words[0])[0]}${Array.from(words[1])[0]}`.toUpperCase();
+}
+
+export function lettersOf(choice: AvatarChoice, name: string): string {
+    return choice.letters?.trim() || defaultLetters(name);
+}
+
+function framed(svg: string, frame: Frame, fill: string | null): string {
+    const open = svg.indexOf(">") + 1;
+    const close = svg.lastIndexOf("</svg>");
+    const body = svg.slice(open, close).replace(/ clip-path="url\(#[^)]*\)"/g, "");
+    const viewBox = `${frame.x} ${frame.y} ${frame.size} ${frame.size}`;
+    const backdrop = fill
+        ? `<rect x="${frame.x}" y="${frame.y}" width="${frame.size}" height="${frame.size}" fill="${fill}"/>`
+        : "";
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="none">${backdrop}${body}</svg>`;
 }
 
 export function avatarSvg(choice: AvatarChoice, name: string, palette: Palette): string {
     const style = styleById(choice.style);
     const tone = palette.tones[choice.tone] ?? palette.tones.csv;
-    const seed = style.id === "initials" ? name.trim() || "?" : choice.seed;
+    if (style.id === "initials") {
+        return initialsMarkup(lettersOf(choice, name), palette, tone);
+    }
     const svg = cleanDicebear(
         new DicebearAvatar(styleOf(style.id), {
-            seed,
+            seed: choice.seed,
             idRandomization: true,
             ...style.options(palette, tone),
         }).toString(),
     );
-    return style.paint ? style.paint(svg, palette, tone) : svg;
+    const painted = style.paint ? style.paint(svg, palette, tone) : svg;
+    return framed(painted, style.frame, style.tile(palette, tone));
 }
 
 let canvas: HTMLCanvasElement | undefined;
@@ -239,10 +308,10 @@ export function usePalette(): Palette {
 
 function useAvatarSvg(choice: AvatarChoice, name: string): string {
     const current = usePalette();
-    const { style, seed, tone } = choice;
+    const { style, seed, tone, letters } = choice;
     return useMemo(
-        () => avatarSvg({ style, seed, tone }, name, current),
-        [style, seed, tone, name, current],
+        () => avatarSvg({ style, seed, tone, letters }, name, current),
+        [style, seed, tone, letters, name, current],
     );
 }
 

@@ -1,0 +1,15 @@
+@keyframes avatar-fade {
+    from {
+        opacity: 0;
+    }
+}
+
+.avatar-fade {
+    animation: avatar-fade 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .avatar-fade {
+        animation: none;
+    }
+}
