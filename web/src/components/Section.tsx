@@ -45,6 +45,7 @@ export function PanelSection({
     description,
     actions,
     bare = false,
+    flush = false,
     children,
 }: {
     icon: LucideIcon;
@@ -53,6 +54,7 @@ export function PanelSection({
     description?: ReactNode;
     actions?: ReactNode;
     bare?: boolean;
+    flush?: boolean;
     children: ReactNode;
 }) {
     return (
@@ -77,6 +79,8 @@ export function PanelSection({
             </header>
             {bare ? (
                 children
+            ) : flush ? (
+                <Card className="gap-0 overflow-clip py-0">{children}</Card>
             ) : (
                 <Card>
                     <CardContent>{children}</CardContent>

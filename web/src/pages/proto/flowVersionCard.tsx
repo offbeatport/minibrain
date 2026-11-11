@@ -1,5 +1,17 @@
 import { useRouter } from "@tanstack/react-router";
-import { BookOpen, Copy, Download, GitCompare, MoreHorizontal, Play, Trash2 } from "lucide-react";
+import {
+    BookOpen,
+    Copy,
+    Download,
+    Fingerprint,
+    Gauge,
+    GitCompare,
+    Hourglass,
+    MoreHorizontal,
+    Play,
+    SlidersHorizontal,
+    Trash2,
+} from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -17,6 +29,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
+import { PanelSection } from "~/components/Section";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { ExportDialog } from "./flowExport";
@@ -264,7 +277,11 @@ function ScoreLine({ model, version }: { model: FlowModel; version: FlowVersion 
         return null;
     }
     return (
-        <section className="flex flex-col gap-1">
+        <PanelSection
+            icon={Gauge}
+            title="Score"
+            description={`${model.metrics[0]} on ${count(model.heldOut)} held-out rows it never trained on.`}
+        >
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
                 <span className="text-3xl tabular-nums">{pct(score)}</span>
                 {references(model, version).map((reference) => (
@@ -276,10 +293,7 @@ function ScoreLine({ model, version }: { model: FlowModel; version: FlowVersion 
                     </span>
                 ))}
             </div>
-            <p className="text-sm text-muted-foreground tabular-nums">
-                {`${model.metrics[0]} on ${count(model.heldOut)} held-out rows it never trained on.`}
-            </p>
-        </section>
+        </PanelSection>
     );
 }
 
@@ -352,11 +366,15 @@ function Examples({ model, version }: { model: FlowModel; version: FlowVersion }
     }
     if (all.length === 0) {
         return (
-            <section className="flex flex-col gap-1 border-t pt-5">
+            <PanelSection
+                icon={GitCompare}
+                title="Where it differs"
+                description={`Held-out answers where it beats or trails ${reference.label}.`}
+            >
                 <p className="text-muted-foreground">
                     Example answers are drawn for Support triage only in this prototype.
                 </p>
-            </section>
+            </PanelSection>
         );
     }
     const of = (verdict: Verdict) =>
@@ -381,51 +399,63 @@ function Examples({ model, version }: { model: FlowModel; version: FlowVersion }
         </span>
     );
     return (
-        <section className="flex flex-col gap-3 border-t pt-5">
-            <div className="flex flex-col gap-1">
+        <PanelSection
+            icon={GitCompare}
+            title="Where it differs"
+            description={`Against ${reference.label}, on ${all.length} held-out rows drawn for review.`}
+        >
+            <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
                     {line("better", "Better")}
                     {line("worse", "Worse")}
                 </div>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {`Against ${reference.label}, on ${all.length} held-out rows drawn for review.`}
-                </span>
+                {shown && (
+                    <ExampleList rows={groups[shown]} mine={version.number} theirs={reference} />
+                )}
             </div>
-            {shown && <ExampleList rows={groups[shown]} mine={version.number} theirs={reference} />}
-        </section>
+        </PanelSection>
     );
 }
 
 function Progress({ model, version }: { model: FlowModel; version: FlowVersion }) {
     const share = Math.round((version.progress ?? 0) * 100);
     return (
-        <section className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <StatusText tone="info">
-                    <span className="tabular-nums">{`Training · ${share}%`}</span>
-                </StatusText>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {`${timeLeft(version)} left`}
-                </span>
+        <PanelSection
+            icon={Hourglass}
+            title="Progress"
+            description={`Scored against ${liveVersion(model) ? `live v${model.live} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
+        >
+            <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <StatusText tone="info">
+                        <span className="tabular-nums">{`Training · ${share}%`}</span>
+                    </StatusText>
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                        {`${timeLeft(version)} left`}
+                    </span>
+                </div>
+                <ProgressBar
+                    value={version.progress ?? 0}
+                    label={`v${version.number} progress`}
+                    className="w-full"
+                />
             </div>
-            <ProgressBar
-                value={version.progress ?? 0}
-                label={`v${version.number} progress`}
-                className="w-full"
-            />
-            <p className="text-sm text-muted-foreground">
-                {`Scored against ${liveVersion(model) ? `live v${model.live} and ` : ""}v0 · Baseline when it finishes. Loss and logs are on the job page.`}
-            </p>
-        </section>
+        </PanelSection>
     );
 }
 
 function Failure({ version }: { version: FlowVersion }) {
     return (
-        <section className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
-            <span className="font-medium">Training failed, so it was never scored</span>
-            <span className="text-sm">{version.error}</span>
-        </section>
+        <PanelSection
+            icon={Gauge}
+            title="Score"
+            description="Training failed, so it was never scored."
+        >
+            <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
+                <span className="font-medium">Training failed</span>
+                <span className="text-sm">{version.error}</span>
+            </div>
+        </PanelSection>
     );
 }
 
@@ -484,39 +514,48 @@ function MadeFrom({ model, version }: { model: FlowModel; version: FlowVersion }
         </Link>,
     ]);
     return (
-        <section className="flex flex-col gap-2 border-t pt-5">
-            <h3 className="font-semibold">Made from</h3>
+        <PanelSection
+            icon={SlidersHorizontal}
+            title="Made from"
+            description="The data, method and settings that built this version."
+        >
             <Facts items={parts} />
-        </section>
+        </PanelSection>
     );
 }
 
 function Footer({ model, version }: { model: FlowModel; version: FlowVersion }) {
     const callable = `${model.slug}@${version.number}`;
     return (
-        <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4">
-            <span className="flex items-center gap-0.5">
-                <span className="font-mono text-sm">{callable}</span>
-                <CopyButton value={callable} label={`Copy ${callable}`} />
-            </span>
-            <Tip tip="Short SHA-256 of the adapter">
-                <span className="cursor-help font-mono text-sm text-muted-foreground">
-                    {shortHash(model.slug, version.number)}
+        <PanelSection
+            icon={Fingerprint}
+            title="Identifiers"
+            description="Call this version by its name; the short SHA-256 identifies its adapter."
+        >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="flex items-center gap-0.5">
+                    <span className="font-mono text-sm">{callable}</span>
+                    <CopyButton value={callable} label={`Copy ${callable}`} />
                 </span>
-            </Tip>
-        </footer>
+                <Tip tip="Short SHA-256 of the adapter">
+                    <span className="cursor-help font-mono text-sm text-muted-foreground">
+                        {shortHash(model.slug, version.number)}
+                    </span>
+                </Tip>
+            </div>
+        </PanelSection>
     );
 }
 
 export function ReportCard({ model, version }: { model: FlowModel; version: FlowVersion }) {
     return (
-        <div className="flex flex-col gap-5">
+        <>
             {version.status === "ready" && <ScoreLine model={model} version={version} />}
             {version.status === "training" && <Progress model={model} version={version} />}
             {version.status === "failed" && <Failure version={version} />}
             <Examples model={model} version={version} />
             <MadeFrom model={model} version={version} />
             <Footer model={model} version={version} />
-        </div>
+        </>
     );
 }

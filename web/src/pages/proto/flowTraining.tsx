@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { RotateCcw, X } from "lucide-react";
+import { GraduationCap, RotateCcw, X } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -24,7 +24,7 @@ import {
 } from "obp-ui";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
-import { Page } from "~/components/Section";
+import { Page, PanelSection, PanelSections } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import { openTrain, useCan } from "./flowOverlays";
 import {
@@ -311,133 +311,148 @@ export function TrainingJobsList({ scope, actions }: { scope?: FlowModel; action
     const every = jobs.length > 0 && jobs.every((job) => picked.includes(job.id));
     const filtering = model !== ALL || status !== ALL || method !== ALL;
     return (
-        <div className="flex flex-col gap-3">
-            <div className="flex min-h-8 flex-wrap items-center gap-2">
-                {!scope && (
+        <PanelSection
+            icon={GraduationCap}
+            title={scope ? "Training runs" : "Runs"}
+            description={
+                scope
+                    ? `Each run trained one version of ${scope.name}; open one for its loss and logs.`
+                    : "Each run trained one version; open one for its data, settings, loss and logs."
+            }
+            actions={actions}
+            bare
+        >
+            <div className="flex flex-col gap-3">
+                <div className="flex min-h-8 flex-wrap items-center gap-2">
+                    {!scope && (
+                        <FilterSelect
+                            label="Model"
+                            value={model}
+                            onChange={setModel}
+                            options={[
+                                { id: ALL, label: "All models" },
+                                ...custom.map((item) => ({ id: item.slug, label: item.name })),
+                            ]}
+                        />
+                    )}
                     <FilterSelect
-                        label="Model"
-                        value={model}
-                        onChange={setModel}
+                        label="Status"
+                        value={status}
+                        onChange={setStatus}
                         options={[
-                            { id: ALL, label: "All models" },
-                            ...custom.map((item) => ({ id: item.slug, label: item.name })),
+                            { id: ALL, label: "Any status" },
+                            ...STATUSES.map((item) => ({
+                                id: item,
+                                label: JOB_STATUS[item].label,
+                            })),
                         ]}
                     />
-                )}
-                <FilterSelect
-                    label="Status"
-                    value={status}
-                    onChange={setStatus}
-                    options={[
-                        { id: ALL, label: "Any status" },
-                        ...STATUSES.map((item) => ({ id: item, label: JOB_STATUS[item].label })),
-                    ]}
-                />
-                <FilterSelect
-                    label="Method"
-                    value={method}
-                    onChange={setMethod}
-                    options={[
-                        { id: ALL, label: "Any method" },
-                        ...METHODS.map((item) => ({
-                            id: item.id,
-                            label: item.label,
-                            disabled: !item.ready,
-                        })),
-                    ]}
-                />
-                {filtering && (
-                    <Button
-                        variant="ghost"
-                        onClick={() => {
-                            setModel(ALL);
-                            setStatus(ALL);
-                            setMethod(ALL);
-                        }}
-                    >
-                        Clear filters
-                    </Button>
-                )}
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {jobs.length === all.length
-                        ? `${all.length} ${all.length === 1 ? "job" : "jobs"}`
-                        : `${jobs.length} of ${all.length} jobs`}
-                </span>
-                <div className="ml-auto flex flex-wrap items-center gap-2">
-                    {picked.length > 0 ? (
-                        <BulkJobs
-                            picked={picked.length}
-                            retryable={chosen.filter(
-                                (job) => job.status === "failed" || job.status === "cancelled",
-                            )}
-                            cancellable={chosen.filter(
-                                (job) => job.status === "running" || job.status === "queued",
-                            )}
-                            onClear={() => setPicked([])}
-                            onDone={(what, count) => {
-                                setPicked([]);
-                                toast({ title: `${what} ${count} jobs`, tone: "success" });
+                    <FilterSelect
+                        label="Method"
+                        value={method}
+                        onChange={setMethod}
+                        options={[
+                            { id: ALL, label: "Any method" },
+                            ...METHODS.map((item) => ({
+                                id: item.id,
+                                label: item.label,
+                                disabled: !item.ready,
+                            })),
+                        ]}
+                    />
+                    {filtering && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setModel(ALL);
+                                setStatus(ALL);
+                                setMethod(ALL);
                             }}
-                        />
-                    ) : (
-                        actions
+                        >
+                            Clear filters
+                        </Button>
+                    )}
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                        {jobs.length === all.length
+                            ? `${all.length} ${all.length === 1 ? "job" : "jobs"}`
+                            : `${jobs.length} of ${all.length} jobs`}
+                    </span>
+                    {picked.length > 0 && (
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                            <BulkJobs
+                                picked={picked.length}
+                                retryable={chosen.filter(
+                                    (job) => job.status === "failed" || job.status === "cancelled",
+                                )}
+                                cancellable={chosen.filter(
+                                    (job) => job.status === "running" || job.status === "queued",
+                                )}
+                                onClear={() => setPicked([])}
+                                onDone={(what, count) => {
+                                    setPicked([]);
+                                    toast({ title: `${what} ${count} jobs`, tone: "success" });
+                                }}
+                            />
+                        </div>
                     )}
                 </div>
-            </div>
-            <div className="overflow-x-auto rounded-lg border bg-card">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-10 pl-4">
-                                <Checkbox
-                                    aria-label="Select every job shown"
-                                    checked={every}
-                                    disabled={jobs.length === 0}
-                                    onCheckedChange={(value) =>
-                                        setPicked(value === true ? jobs.map((job) => job.id) : [])
-                                    }
-                                />
-                            </TableHead>
-                            <TableHead>Job</TableHead>
-                            {!scope && <TableHead>Model</TableHead>}
-                            <TableHead>Version</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Score</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead className="text-right">Duration</TableHead>
-                            <TableHead className="pr-4">Started</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {jobs.length === 0 && (
+                <div className="overflow-x-auto rounded-xl border bg-card">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell
-                                    colSpan={scope ? 8 : 9}
-                                    className="py-6 text-center text-muted-foreground"
-                                >
-                                    {all.length === 0
-                                        ? scope?.dataset === null
-                                            ? "No training runs yet. Attach a dataset on the Data page first."
-                                            : "No training runs yet."
-                                        : "No jobs match these filters."}
-                                </TableCell>
+                                <TableHead className="w-10 pl-4">
+                                    <Checkbox
+                                        aria-label="Select every job shown"
+                                        checked={every}
+                                        disabled={jobs.length === 0}
+                                        onCheckedChange={(value) =>
+                                            setPicked(
+                                                value === true ? jobs.map((job) => job.id) : [],
+                                            )
+                                        }
+                                    />
+                                </TableHead>
+                                <TableHead>Job</TableHead>
+                                {!scope && <TableHead>Model</TableHead>}
+                                <TableHead>Version</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Score</TableHead>
+                                <TableHead>Method</TableHead>
+                                <TableHead className="text-right">Duration</TableHead>
+                                <TableHead className="pr-4">Started</TableHead>
                             </TableRow>
-                        )}
-                        {jobs.map((job) => (
-                            <JobRow
-                                key={job.id}
-                                job={job}
-                                model={state.models.find((item) => item.slug === job.model)}
-                                showModel={!scope}
-                                picked={picked.includes(job.id)}
-                                selecting={picked.length > 0}
-                                onPick={(on) => pick(job.id, on)}
-                            />
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {jobs.length === 0 && (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={scope ? 8 : 9}
+                                        className="py-6 text-center text-muted-foreground"
+                                    >
+                                        {all.length === 0
+                                            ? scope?.dataset === null
+                                                ? "No training runs yet. Attach a dataset on the Data page first."
+                                                : "No training runs yet."
+                                            : "No jobs match these filters."}
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {jobs.map((job) => (
+                                <JobRow
+                                    key={job.id}
+                                    job={job}
+                                    model={state.models.find((item) => item.slug === job.model)}
+                                    showModel={!scope}
+                                    picked={picked.includes(job.id)}
+                                    selecting={picked.length > 0}
+                                    onPick={(on) => pick(job.id, on)}
+                                />
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
-        </div>
+        </PanelSection>
     );
 }
 
@@ -507,10 +522,12 @@ export function FlowTrainingPage() {
         <Page wide>
             <PageHeader
                 title="Training"
-                caption="Every training run across your models. Each produced one version; open a run for its data, settings, loss and logs."
+                caption="Every training run across your models."
                 actions={<Button onClick={() => setPicking(true)}>Train a model</Button>}
             />
-            <TrainingJobsList />
+            <PanelSections>
+                <TrainingJobsList />
+            </PanelSections>
             <TrainPicker open={picking} onClose={() => setPicking(false)} />
         </Page>
     );

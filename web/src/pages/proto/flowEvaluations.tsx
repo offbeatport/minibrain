@@ -1,3 +1,4 @@
+import { FlaskConical, GitCompare, Scale } from "lucide-react";
 import {
     Badge,
     CheckboxSelect,
@@ -18,7 +19,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
-import { Page, Section } from "~/components/Section";
+import { Page, PanelSection, PanelSections } from "~/components/Section";
 import { count } from "~/lib/format";
 import { type FlowModel, modelHref, pct, shortAgo, useFlowState } from "./modelsFlowData";
 import { ModelAvatar } from "./modelsFlowParts";
@@ -240,9 +241,10 @@ function UsedBy({ models }: { models: FlowModel[] }) {
 function TestSets({ models }: { models: FlowModel[] }) {
     const shown = TEST_SETS.filter((set) => models.some((model) => model.slug === set.model));
     return (
-        <Section
+        <PanelSection
+            icon={FlaskConical}
             title="Test sets"
-            caption="What each model is scored on. Held-out rows come from its dataset and are never trained on; golden sets are checked by hand."
+            description="What each model is scored on: held-out rows from its dataset, or golden sets checked by hand."
             flush
         >
             <Table>
@@ -303,15 +305,16 @@ function TestSets({ models }: { models: FlowModel[] }) {
                     })}
                 </TableBody>
             </Table>
-        </Section>
+        </PanelSection>
     );
 }
 
 function Graders({ models }: { models: FlowModel[] }) {
     return (
-        <Section
+        <PanelSection
+            icon={Scale}
             title="Graders"
-            caption="How an answer is turned into a score. A test set names its graders; every version is scored by the same ones."
+            description="How an answer becomes a score; every version of a model is scored by the same ones."
         >
             <ul className="grid gap-4 lg:grid-cols-3">
                 {GRADERS.map((grader) => {
@@ -348,7 +351,7 @@ function Graders({ models }: { models: FlowModel[] }) {
                     );
                 })}
             </ul>
-        </Section>
+        </PanelSection>
     );
 }
 
@@ -487,9 +490,10 @@ function Compare({ models }: { models: FlowModel[] }) {
     const best = Math.max(...picked.map((item) => scoreOn(item, testSet)));
     const cheapest = Math.min(...picked.map((item) => item.cost));
     return (
-        <Section
+        <PanelSection
+            icon={GitCompare}
             title="Compare models"
-            caption="Score versions and bases on one test set, then pick the base worth training from the chart. Scores here are made up for the prototype."
+            description="Score versions and bases on one test set, then pick the base worth training. Prototype scores."
         >
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -585,7 +589,7 @@ function Compare({ models }: { models: FlowModel[] }) {
                     </div>
                 )}
             </div>
-        </Section>
+        </PanelSection>
     );
 }
 
@@ -598,9 +602,11 @@ export function FlowEvaluationsPage() {
                 title="Evaluations"
                 caption="How quality is measured: the test sets versions are scored on, the graders that score them, and a side-by-side for picking a base."
             />
-            <TestSets models={custom} />
-            <Graders models={custom} />
-            <Compare models={custom} />
+            <PanelSections>
+                <TestSets models={custom} />
+                <Graders models={custom} />
+                <Compare models={custom} />
+            </PanelSections>
         </Page>
     );
 }

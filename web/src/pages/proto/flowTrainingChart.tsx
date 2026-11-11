@@ -1,5 +1,7 @@
+import { ChartLine } from "lucide-react";
 import { SegmentedTabs } from "obp-ui";
 import { useState } from "react";
+import { PanelSection } from "~/components/Section";
 import { StepChart, type StepRow, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
 import {
@@ -56,12 +58,35 @@ function niceDomain(values: number[]): [number, number] {
     return [low, low + step * 4];
 }
 
+function scoreNote(model: FlowModel): string {
+    const failed = model.versions.filter((version) => version.status === "failed");
+    const training = trainingVersion(model);
+    const notes = [
+        failed.length > 0
+            ? `${failed.map((version) => `v${version.number}`).join(", ")} failed and ${failed.length === 1 ? "has" : "have"} no score`
+            : null,
+        training ? `v${training.number} is training` : null,
+    ].filter(Boolean);
+    return `${model.metrics[0]} on the held-out set, by the date each version finished. Dashed: the promotion rule.${notes.length > 0 ? ` ${notes.join("; ")}.` : ""}`;
+}
+
+function finishedRuns(model: FlowModel): FlowVersion[] {
+    return newestFirst(model)
+        .filter((version) => version.kind === "trained" && version.status === "ready")
+        .slice(0, 3);
+}
+
+function lossNote(model: FlowModel): string {
+    const finished = finishedRuns(model).length;
+    return trainingVersion(model)
+        ? `Training loss of the running job and the last ${finished} finished runs.`
+        : `Training loss of the last ${finished} finished runs.`;
+}
+
 function ScoreChart({ model }: { model: FlowModel }) {
     const scored = model.versions
         .filter((version) => version.status === "ready" && version.scores)
         .sort((a, b) => finishedAt(a) - finishedAt(b));
-    const failed = model.versions.filter((version) => version.status === "failed");
-    const training = trainingVersion(model);
     const byStep = new Map(scored.map((version) => [finishedAt(version), version]));
     const rows: StepRow[] = scored.map((version) => ({
         step: finishedAt(version),
@@ -74,44 +99,33 @@ function ScoreChart({ model }: { model: FlowModel }) {
     const series: StepSeries[] = [
         { key: "score", label: model.metrics[0], color: SLOTS[0], dots: true },
     ];
-    const notes = [
-        failed.length > 0
-            ? `${failed.map((version) => `v${version.number}`).join(", ")} failed and ${failed.length === 1 ? "has" : "have"} no score`
-            : null,
-        training ? `v${training.number} is training` : null,
-    ].filter(Boolean);
     return (
-        <>
-            <p className="text-sm text-muted-foreground">
-                {`${model.metrics[0]} on the held-out set, by the date each version finished. Dashed: the promotion rule.${notes.length > 0 ? ` ${notes.join("; ")}.` : ""}`}
-            </p>
-            <div className="relative">
-                <StepChart
-                    rows={rows.length > 0 ? rows : [{ step: now - 7 * 86400000 }, { step: now }]}
-                    series={rows.length > 0 ? series : []}
-                    format={(value) => pct(value)}
-                    axisFormat={(value) => `${Number((value * 100).toFixed(1))}%`}
-                    label={`${model.metrics[0]} by version for ${model.name}`}
-                    height={220}
-                    yDomain={domain}
-                    levels={[
-                        {
-                            at: model.rule[0],
-                            label: `Rule ${Math.round(model.rule[0] * 100)}%`,
-                        },
-                    ]}
-                    markers={live ? [{ at: finishedAt(live), label: `v${live.number} live` }] : []}
-                    xFormat={(value) => DATE.format(new Date(value))}
-                    readoutTitle={(value) => {
-                        const version = byStep.get(value);
-                        return version
-                            ? `${versionName(version)} · ${DATE_TIME.format(new Date(value))}`
-                            : DATE_TIME.format(new Date(value));
-                    }}
-                />
-                {rows.length === 0 && <EmptyOverlay text="No scored versions yet" />}
-            </div>
-        </>
+        <div className="relative">
+            <StepChart
+                rows={rows.length > 0 ? rows : [{ step: now - 7 * 86400000 }, { step: now }]}
+                series={rows.length > 0 ? series : []}
+                format={(value) => pct(value)}
+                axisFormat={(value) => `${Number((value * 100).toFixed(1))}%`}
+                label={`${model.metrics[0]} by version for ${model.name}`}
+                height={220}
+                yDomain={domain}
+                levels={[
+                    {
+                        at: model.rule[0],
+                        label: `Rule ${Math.round(model.rule[0] * 100)}%`,
+                    },
+                ]}
+                markers={live ? [{ at: finishedAt(live), label: `v${live.number} live` }] : []}
+                xFormat={(value) => DATE.format(new Date(value))}
+                readoutTitle={(value) => {
+                    const version = byStep.get(value);
+                    return version
+                        ? `${versionName(version)} · ${DATE_TIME.format(new Date(value))}`
+                        : DATE_TIME.format(new Date(value));
+                }}
+            />
+            {rows.length === 0 && <EmptyOverlay text="No scored versions yet" />}
+        </div>
     );
 }
 
@@ -129,9 +143,7 @@ function lossOf(version: FlowVersion, until: number): Map<number, number> {
 
 function LossChart({ model }: { model: FlowModel }) {
     const training = trainingVersion(model);
-    const finished = newestFirst(model)
-        .filter((version) => version.kind === "trained" && version.status === "ready")
-        .slice(0, 3);
+    const finished = finishedRuns(model);
     const runs = [
         ...[...finished].reverse().map((version, index) => ({
             version,
@@ -167,15 +179,8 @@ function LossChart({ model }: { model: FlowModel }) {
         };
     });
     return (
-        <>
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="text-sm text-muted-foreground">
-                    {training
-                        ? `Training loss of the running job and the last ${finished.length} finished runs.`
-                        : `Training loss of the last ${finished.length} finished runs.`}
-                </p>
-                <ChartLegend series={[...series].reverse()} />
-            </div>
+        <div className="flex flex-col gap-3">
+            <ChartLegend series={[...series].reverse()} />
             <div className="relative">
                 <StepChart
                     rows={rows}
@@ -191,25 +196,26 @@ function LossChart({ model }: { model: FlowModel }) {
                 />
                 {curves.length === 0 && <EmptyOverlay text="No training runs yet" />}
             </div>
-        </>
+        </div>
     );
 }
 
 export function TrainingChart({ model }: { model: FlowModel }) {
     const [view, setView] = useState<View>("scores");
     return (
-        <section
-            aria-label={`${model.name} training progress`}
-            className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-panel"
-        >
-            <div className="self-start">
+        <PanelSection
+            icon={ChartLine}
+            title={view === "scores" ? "Score by version" : "Loss curves"}
+            description={view === "scores" ? scoreNote(model) : lossNote(model)}
+            actions={
                 <SegmentedTabs
                     tabs={VIEWS}
                     active={view}
                     onSelect={(key) => setView(key as View)}
                 />
-            </div>
+            }
+        >
             {view === "scores" ? <ScoreChart model={model} /> : <LossChart model={model} />}
-        </section>
+        </PanelSection>
     );
 }

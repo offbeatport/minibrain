@@ -16,7 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
-import { Page, Section } from "~/components/Section";
+import { Page, PanelSections, Section } from "~/components/Section";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { ExportsSection } from "./flowExport";
@@ -402,10 +402,10 @@ export function ModelsFlowVersionPage() {
                     </>
                 }
             />
-            <div className="rounded-lg border bg-card p-panel">
+            <PanelSections>
                 <ReportCard model={model} version={version} />
-            </div>
-            <ExportsSection model={model} version={version} />
+                <ExportsSection model={model} version={version} />
+            </PanelSections>
         </Page>
     );
 }

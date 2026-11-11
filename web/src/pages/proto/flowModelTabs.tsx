@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { KeyRound } from "lucide-react";
+import { History, KeyRound, Layers } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -21,7 +21,7 @@ import {
 } from "obp-ui";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { Section } from "~/components/Section";
+import { PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useSearchParam } from "~/lib/listSearch";
 import { Inline } from "./flowHeader";
@@ -78,14 +78,16 @@ export function TrainingTab({ model }: { model: FlowModel }) {
         ) : null,
     ];
     return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
             {(pending > 0 || model.accepted > 0) && (
                 <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-muted-foreground tabular-nums">
                     <Inline items={facts} />
                 </p>
             )}
-            <TrainingChart model={model} />
-            <TrainingJobsList scope={model} actions={<TrainButton model={model} />} />
+            <PanelSections>
+                <TrainingChart model={model} />
+                <TrainingJobsList scope={model} actions={<TrainButton model={model} />} />
+            </PanelSections>
         </div>
     );
 }
@@ -209,11 +211,18 @@ export function VersionsTab({ model }: { model: FlowModel }) {
     const every = ordered.length > 0 && ordered.every((version) => picked.includes(version.number));
     if (model.versions.length === 0) {
         return (
-            <Section title="Versions">
-                <p className="text-muted-foreground">
-                    No versions yet. Attach data on the Data page and v0 Baseline is scored at once.
-                </p>
-            </Section>
+            <PanelSections>
+                <PanelSection
+                    icon={History}
+                    title="Versions"
+                    description={`Every version is trained from ${model.base}, not from the one before.`}
+                >
+                    <p className="text-muted-foreground">
+                        No versions yet. Attach data on the Data page and v0 Baseline is scored at
+                        once.
+                    </p>
+                </PanelSection>
+            </PanelSections>
         );
     }
     const remove = () =>
@@ -239,96 +248,103 @@ export function VersionsTab({ model }: { model: FlowModel }) {
             },
         });
     return (
-        <Section
-            title="Versions"
-            caption={`Every version is trained from ${model.base}, not from the one before.`}
-            actions={
-                <>
-                    {picked.length > 0 && (
-                        <Button variant="outline" onClick={() => setPicked([])}>
-                            Clear
-                        </Button>
-                    )}
-                    <Tip
-                        tip={
-                            sorted.length === 2 ? null : "Tick two scored versions to compare them."
-                        }
-                    >
-                        <Button
-                            variant="outline"
-                            disabled={sorted.length !== 2}
-                            onClick={() =>
-                                router.history.push(compareHref(model.slug, sorted[0], sorted[1]))
-                            }
-                        >
-                            {sorted.length === 2
-                                ? `Compare v${sorted[0]} and v${sorted[1]}`
-                                : "Compare"}
-                        </Button>
-                    </Tip>
-                    {can && (
+        <PanelSections>
+            <PanelSection
+                icon={History}
+                title="Versions"
+                description={`Every version is trained from ${model.base}, not from the one before.`}
+                actions={
+                    <>
+                        {picked.length > 0 && (
+                            <Button variant="outline" onClick={() => setPicked([])}>
+                                Clear
+                            </Button>
+                        )}
                         <Tip
                             tip={
-                                picked.length === 0
-                                    ? "Tick the versions to delete."
-                                    : deletable.length === 0
-                                      ? "The live version cannot be deleted."
-                                      : null
+                                sorted.length === 2
+                                    ? null
+                                    : "Tick two scored versions to compare them."
                             }
                         >
                             <Button
                                 variant="outline"
-                                disabled={deletable.length === 0}
-                                onClick={remove}
-                            >
-                                {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
-                            </Button>
-                        </Tip>
-                    )}
-                </>
-            }
-            flush
-        >
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-10 pl-4">
-                            <Checkbox
-                                aria-label="Select every version"
-                                checked={every}
-                                onCheckedChange={(value) =>
-                                    setPicked(
-                                        value === true
-                                            ? ordered.map((version) => version.number)
-                                            : [],
+                                disabled={sorted.length !== 2}
+                                onClick={() =>
+                                    router.history.push(
+                                        compareHref(model.slug, sorted[0], sorted[1]),
                                     )
                                 }
+                            >
+                                {sorted.length === 2
+                                    ? `Compare v${sorted[0]} and v${sorted[1]}`
+                                    : "Compare"}
+                            </Button>
+                        </Tip>
+                        {can && (
+                            <Tip
+                                tip={
+                                    picked.length === 0
+                                        ? "Tick the versions to delete."
+                                        : deletable.length === 0
+                                          ? "The live version cannot be deleted."
+                                          : null
+                                }
+                            >
+                                <Button
+                                    variant="outline"
+                                    disabled={deletable.length === 0}
+                                    onClick={remove}
+                                >
+                                    {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
+                                </Button>
+                            </Tip>
+                        )}
+                    </>
+                }
+                flush
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-10 pl-4">
+                                <Checkbox
+                                    aria-label="Select every version"
+                                    checked={every}
+                                    onCheckedChange={(value) =>
+                                        setPicked(
+                                            value === true
+                                                ? ordered.map((version) => version.number)
+                                                : [],
+                                        )
+                                    }
+                                />
+                            </TableHead>
+                            <TableHead>Version</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">{model.metrics[0]}</TableHead>
+                            <TableHead>Against live</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead className="pr-4">
+                                <span className="sr-only">Actions</span>
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {ordered.map((version) => (
+                            <VersionRow
+                                key={version.number}
+                                model={model}
+                                version={version}
+                                picked={picked.includes(version.number)}
+                                onPick={(on) => pick(version.number, on)}
                             />
-                        </TableHead>
-                        <TableHead>Version</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">{model.metrics[0]}</TableHead>
-                        <TableHead>Against live</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="pr-4">
-                            <span className="sr-only">Actions</span>
-                        </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {ordered.map((version) => (
-                        <VersionRow
-                            key={version.number}
-                            model={model}
-                            version={version}
-                            picked={picked.includes(version.number)}
-                            onPick={(on) => pick(version.number, on)}
-                        />
-                    ))}
-                </TableBody>
-            </Table>
-            <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
-        </Section>
+                        ))}
+                    </TableBody>
+                </Table>
+                <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
+            </PanelSection>
+        </PanelSections>
     );
 }
 
@@ -346,10 +362,11 @@ export function KeysTab({ model }: { model: FlowModel }) {
         }
     }, [wantsNew, model.slug]);
     return (
-        <div className="flex flex-col gap-4">
-            <Section
+        <PanelSections>
+            <PanelSection
+                icon={KeyRound}
                 title="API keys"
-                caption={`Keys that can call ${model.slug} and ${model.slug}@N. A key is shown once, when it is created.`}
+                description={`Keys that can call ${model.slug} and ${model.slug}@N; each is shown once, when it is created.`}
                 actions={
                     <>
                         <Button variant="outline" onClick={() => openConnect(model.slug)}>
@@ -402,7 +419,7 @@ export function KeysTab({ model }: { model: FlowModel }) {
                         </TableBody>
                     </Table>
                 )}
-            </Section>
+            </PanelSection>
             <Dialog open={shown !== null} onOpenChange={(open) => !open && setShown(null)}>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -431,100 +448,107 @@ export function KeysTab({ model }: { model: FlowModel }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </PanelSections>
     );
 }
 
 export function VariantsTab({ model }: { model: FlowModel }) {
     const toast = useToast();
     return (
-        <Section
-            title="Variants"
-            caption="The formats installed on this install. Each deployed one has its own model name."
-            flush
-        >
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="pl-panel">Format</TableHead>
-                        <TableHead>API name</TableHead>
-                        <TableHead className="text-right">Size</TableHead>
-                        <TableHead>Training</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Cost / 1k req.</TableHead>
-                        <TableHead />
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {model.variants.map((item) => {
-                        const key = variantKey(model.slug, item.id);
-                        return (
-                            <TableRow key={item.id}>
-                                <TableCell className="pl-panel font-medium">
-                                    {item.format}
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">{item.apiName}</TableCell>
-                                <TableCell className="text-right">{item.size}</TableCell>
-                                <TableCell className="text-muted-foreground">
-                                    {item.trainable ? "Trainable" : "Serve-only"}
-                                </TableCell>
-                                <TableCell>
-                                    {item.live ? (
-                                        <StatusText tone="success">
-                                            {`Deployed${item.replicas.length > 1 ? ` · ${item.replicas.length} replicas` : ""}`}
-                                        </StatusText>
-                                    ) : (
-                                        <span className="text-muted-foreground">Not deployed</span>
-                                    )}
-                                    {item.update && (
-                                        <span className="block text-sm text-info">
-                                            Update available
-                                        </span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">{`${item.gpuSeconds.toFixed(1)} GPU·s`}</TableCell>
-                                <TableCell className="pr-panel text-right">
-                                    <span className="inline-flex gap-2">
-                                        {item.update && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => {
-                                                    applyUpdate(model.slug, item.id);
-                                                    toast({
-                                                        title: `${item.format} updated`,
-                                                        tone: "success",
-                                                    });
-                                                }}
-                                            >
-                                                Update
-                                            </Button>
+        <PanelSections>
+            <PanelSection
+                icon={Layers}
+                title="Variants"
+                description="The formats on this install. Each deployed one has its own model name."
+                flush
+            >
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="pl-panel">Format</TableHead>
+                            <TableHead>API name</TableHead>
+                            <TableHead className="text-right">Size</TableHead>
+                            <TableHead>Training</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Cost / 1k req.</TableHead>
+                            <TableHead />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {model.variants.map((item) => {
+                            const key = variantKey(model.slug, item.id);
+                            return (
+                                <TableRow key={item.id}>
+                                    <TableCell className="pl-panel font-medium">
+                                        {item.format}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm">
+                                        {item.apiName}
+                                    </TableCell>
+                                    <TableCell className="text-right">{item.size}</TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {item.trainable ? "Trainable" : "Serve-only"}
+                                    </TableCell>
+                                    <TableCell>
+                                        {item.live ? (
+                                            <StatusText tone="success">
+                                                {`Deployed${item.replicas.length > 1 ? ` · ${item.replicas.length} replicas` : ""}`}
+                                            </StatusText>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                Not deployed
+                                            </span>
                                         )}
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                item.live
-                                                    ? undeployVariants([key])
-                                                    : deployVariants([key])
-                                            }
-                                        >
-                                            {item.live ? "Undeploy" : "Deploy"}
-                                        </Button>
-                                        <Tip tip={item.live ? "Undeploy it first." : null}>
+                                        {item.update && (
+                                            <span className="block text-sm text-info">
+                                                Update available
+                                            </span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">{`${item.gpuSeconds.toFixed(1)} GPU·s`}</TableCell>
+                                    <TableCell className="pr-panel text-right">
+                                        <span className="inline-flex gap-2">
+                                            {item.update && (
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        applyUpdate(model.slug, item.id);
+                                                        toast({
+                                                            title: `${item.format} updated`,
+                                                            tone: "success",
+                                                        });
+                                                    }}
+                                                >
+                                                    Update
+                                                </Button>
+                                            )}
                                             <Button
                                                 variant="outline"
-                                                disabled={item.live}
-                                                onClick={() => deleteVariantFiles([key])}
+                                                onClick={() =>
+                                                    item.live
+                                                        ? undeployVariants([key])
+                                                        : deployVariants([key])
+                                                }
                                             >
-                                                Delete files
+                                                {item.live ? "Undeploy" : "Deploy"}
                                             </Button>
-                                        </Tip>
-                                    </span>
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })}
-                </TableBody>
-            </Table>
-        </Section>
+                                            <Tip tip={item.live ? "Undeploy it first." : null}>
+                                                <Button
+                                                    variant="outline"
+                                                    disabled={item.live}
+                                                    onClick={() => deleteVariantFiles([key])}
+                                                >
+                                                    Delete files
+                                                </Button>
+                                            </Tip>
+                                        </span>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </PanelSection>
+        </PanelSections>
     );
 }

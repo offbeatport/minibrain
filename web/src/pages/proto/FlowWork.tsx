@@ -1,5 +1,20 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { Check, Send } from "lucide-react";
+import {
+    Box,
+    ChartColumn,
+    ChartLine,
+    Check,
+    Database,
+    Hourglass,
+    ListChecks,
+    Logs,
+    Package,
+    Rows3,
+    Send,
+    ShieldCheck,
+    SlidersHorizontal,
+    Split,
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -38,7 +53,7 @@ import {
 } from "react";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
-import { Page, Section, Stat } from "~/components/Section";
+import { Page, PanelSection, PanelSections, Section, Stat } from "~/components/Section";
 import { StepChart, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend, type ChartSeries, TimeChart } from "~/components/charts/TimeChart";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
@@ -116,64 +131,75 @@ export function FlowDataPage() {
                     {`Use the sample ${SAMPLE_FILE}`}
                 </Button>
             </DropZone>
-            <div className="overflow-x-auto rounded-lg border bg-card">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Dataset</TableHead>
-                            <TableHead>File</TableHead>
-                            <TableHead className="text-right">Rows</TableHead>
-                            <TableHead className="text-right">Version</TableHead>
-                            <TableHead>Used by</TableHead>
-                            <TableHead>Updated</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {state.datasets.map((item) => {
-                            const users = state.models.filter(
-                                (model) => model.dataset === item.slug,
-                            );
-                            return (
-                                <TableRow key={item.slug}>
-                                    <TableCell>
-                                        <Link
-                                            href={datasetHref(item.slug)}
-                                            className="font-semibold hover:underline"
-                                        >
-                                            {item.name}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell className="font-mono text-sm text-muted-foreground">
-                                        {item.file}
-                                    </TableCell>
-                                    <TableCell className="text-right">{count(item.rows)}</TableCell>
-                                    <TableCell className="text-right">{`v${item.version}`}</TableCell>
-                                    <TableCell>
-                                        {users.length === 0 ? (
-                                            <span className="text-muted-foreground">No model</span>
-                                        ) : (
-                                            users.map((model, index) => (
-                                                <span key={model.slug}>
-                                                    {index > 0 && ", "}
-                                                    <Link
-                                                        href={modelHref(model.slug)}
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {model.name}
-                                                    </Link>
+            <PanelSections>
+                <PanelSection
+                    icon={Database}
+                    title="Datasets"
+                    description="Open a dataset to preview its rows, checks and splits."
+                    flush
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-panel">Dataset</TableHead>
+                                <TableHead>File</TableHead>
+                                <TableHead className="text-right">Rows</TableHead>
+                                <TableHead className="text-right">Version</TableHead>
+                                <TableHead>Used by</TableHead>
+                                <TableHead className="pr-panel">Updated</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {state.datasets.map((item) => {
+                                const users = state.models.filter(
+                                    (model) => model.dataset === item.slug,
+                                );
+                                return (
+                                    <TableRow key={item.slug}>
+                                        <TableCell className="pl-panel">
+                                            <Link
+                                                href={datasetHref(item.slug)}
+                                                className="font-semibold hover:underline"
+                                            >
+                                                {item.name}
+                                            </Link>
+                                        </TableCell>
+                                        <TableCell className="font-mono text-sm text-muted-foreground">
+                                            {item.file}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {count(item.rows)}
+                                        </TableCell>
+                                        <TableCell className="text-right">{`v${item.version}`}</TableCell>
+                                        <TableCell>
+                                            {users.length === 0 ? (
+                                                <span className="text-muted-foreground">
+                                                    No model
                                                 </span>
-                                            ))
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        {relativeTime(createdAt(item))}
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </div>
+                                            ) : (
+                                                users.map((model, index) => (
+                                                    <span key={model.slug}>
+                                                        {index > 0 && ", "}
+                                                        <Link
+                                                            href={modelHref(model.slug)}
+                                                            className="text-primary hover:underline"
+                                                        >
+                                                            {model.name}
+                                                        </Link>
+                                                    </span>
+                                                ))
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="pr-panel text-muted-foreground">
+                                            {relativeTime(createdAt(item))}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }
@@ -260,34 +286,40 @@ export function FlowDatasetPage() {
                     .
                 </p>
             )}
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <Section
+            <div className="grid items-start gap-x-6 gap-y-8 pt-2 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <PanelSection
+                    icon={Rows3}
                     title="Preview"
-                    caption={`First ${item.preview.length} of ${count(item.rows)} rows.`}
+                    description={`First ${item.preview.length} of ${count(item.rows)} rows.`}
+                    flush
                 >
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>{item.columns[0]}</TableHead>
-                                    <TableHead>{item.columns[1]}</TableHead>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-panel">{item.columns[0]}</TableHead>
+                                <TableHead className="pr-panel">{item.columns[1]}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {item.preview.map(([text, label]) => (
+                                <TableRow key={text}>
+                                    <TableCell className="max-w-96 truncate pl-panel" title={text}>
+                                        {text}
+                                    </TableCell>
+                                    <TableCell className="pr-panel font-mono text-sm">
+                                        {label}
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {item.preview.map(([text, label]) => (
-                                    <TableRow key={text}>
-                                        <TableCell className="max-w-96 truncate" title={text}>
-                                            {text}
-                                        </TableCell>
-                                        <TableCell className="font-mono text-sm">{label}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </Section>
-                <div className="flex flex-col gap-4">
-                    <Section title="Quality">
+                            ))}
+                        </TableBody>
+                    </Table>
+                </PanelSection>
+                <div className="flex flex-col gap-8">
+                    <PanelSection
+                        icon={ShieldCheck}
+                        title="Quality"
+                        description="Checks run on every new version before a model uses it."
+                    >
                         <ul className="flex flex-col gap-1.5">
                             {item.checks.map((check) => (
                                 <li
@@ -304,10 +336,11 @@ export function FlowDatasetPage() {
                                 </li>
                             ))}
                         </ul>
-                    </Section>
-                    <Section
+                    </PanelSection>
+                    <PanelSection
+                        icon={Split}
                         title="Splits"
-                        caption="Held-out rows are never trained on; every version is scored on them."
+                        description="Held-out rows are never trained on; every version is scored on them."
                     >
                         <div className="flex flex-col gap-3">
                             <div className="flex gap-8">
@@ -330,7 +363,7 @@ export function FlowDatasetPage() {
                                 </TableBody>
                             </Table>
                         </div>
-                    </Section>
+                    </PanelSection>
                 </div>
             </div>
         </Page>
@@ -571,16 +604,32 @@ function Inputs({
         );
     }
     return (
-        <Section title="Inputs">
+        <SettingsAndData>
             <Facts items={items} />
-        </Section>
+        </SettingsAndData>
+    );
+}
+
+function SettingsAndData({ children }: { children: ReactNode }) {
+    return (
+        <PanelSection
+            icon={SlidersHorizontal}
+            title="Settings and data"
+            description="What this job read and the settings it ran with."
+        >
+            {children}
+        </PanelSection>
     );
 }
 
 function Run({ job }: { job: Job }) {
     const step = Math.round(reached(job) * LOSS_STEPS);
     return (
-        <Section title="Run">
+        <PanelSection
+            icon={Hourglass}
+            title="Progress"
+            description="Where the job is and the device it runs on."
+        >
             <div className="flex flex-col gap-4">
                 <JobStatusText job={job} />
                 <ProgressBar
@@ -628,7 +677,7 @@ function Run({ job }: { job: Job }) {
                     ]}
                 />
             </div>
-        </Section>
+        </PanelSection>
     );
 }
 
@@ -781,83 +830,94 @@ export function FlowJobPage() {
                 job.status === "done" &&
                 version.scores &&
                 job.kind !== "export" && <Outcome model={model} version={version} />}
-            {model && version && artifact && (
-                <Section
-                    title={job.status === "done" ? "Artifact" : "Artifact, when done"}
-                    caption={`Also listed under Exports on v${version.number}'s page.`}
-                    flush
-                >
-                    <ul>
-                        <ArtifactLine
-                            model={model}
-                            version={version}
-                            artifact={artifact}
-                            job={job}
-                        />
-                    </ul>
-                </Section>
-            )}
             {model && version && job.status === "failed" && (
                 <Failed model={model} version={version} job={job} />
             )}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-                <Run job={job} />
-                {model && version && job.kind === "export" && job.format ? (
-                    <Section title="Inputs">
-                        <Facts
-                            items={[
-                                [
-                                    "Version",
-                                    <Link
-                                        key="v"
-                                        href={versionHref(model.slug, version.number)}
-                                        className="text-primary hover:underline"
-                                    >
-                                        {`${versionName(version)} of ${model.name}`}
-                                    </Link>,
-                                ],
-                                ["Base", model.base ?? model.name],
-                                ["Format", exportOption(job.format).label],
-                                ["Size", exportSize(model, version, job.format)],
-                                ["Runs", exportOption(job.format).runs],
-                            ]}
-                        />
-                    </Section>
-                ) : model && version ? (
-                    <Inputs model={model} version={version} kind={job.kind} />
-                ) : (
-                    <Section title="Inputs">
-                        <p className="text-muted-foreground">
-                            <JobContext job={job} model={model} />
-                        </p>
-                    </Section>
+            <PanelSections>
+                {model && version && artifact && (
+                    <PanelSection
+                        icon={Package}
+                        title={job.status === "done" ? "Artifact" : "Artifact, when done"}
+                        description={`Also listed under Exports on v${version.number}'s page.`}
+                        flush
+                    >
+                        <ul>
+                            <ArtifactLine
+                                model={model}
+                                version={version}
+                                artifact={artifact}
+                                job={job}
+                            />
+                        </ul>
+                    </PanelSection>
                 )}
-            </div>
-            {job.kind === "train" && (
-                <Section
-                    title="Loss"
-                    caption="Training loss every 24 steps, held-out loss every 120."
+                <div className="grid items-start gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                    <Run job={job} />
+                    {model && version && job.kind === "export" && job.format ? (
+                        <SettingsAndData>
+                            <Facts
+                                items={[
+                                    [
+                                        "Version",
+                                        <Link
+                                            key="v"
+                                            href={versionHref(model.slug, version.number)}
+                                            className="text-primary hover:underline"
+                                        >
+                                            {`${versionName(version)} of ${model.name}`}
+                                        </Link>,
+                                    ],
+                                    ["Base", model.base ?? model.name],
+                                    ["Format", exportOption(job.format).label],
+                                    ["Size", exportSize(model, version, job.format)],
+                                    ["Runs", exportOption(job.format).runs],
+                                ]}
+                            />
+                        </SettingsAndData>
+                    ) : model && version ? (
+                        <Inputs model={model} version={version} kind={job.kind} />
+                    ) : (
+                        <SettingsAndData>
+                            <p className="text-muted-foreground">
+                                <JobContext job={job} model={model} />
+                            </p>
+                        </SettingsAndData>
+                    )}
+                </div>
+                {job.kind === "train" && (
+                    <PanelSection
+                        icon={ChartLine}
+                        title="Loss"
+                        description="Training loss every 24 steps, held-out loss every 120."
+                    >
+                        <div className="flex flex-col gap-3">
+                            <ChartLegend series={LOSS_SERIES} />
+                            <StepChart
+                                rows={rows}
+                                series={LOSS_SERIES}
+                                format={(value) => value.toFixed(3)}
+                                axisFormat={(value) => value.toFixed(2)}
+                                label={`Loss for job ${job.id}`}
+                                domain={[0, LOSS_STEPS]}
+                                height={220}
+                            />
+                        </div>
+                    </PanelSection>
+                )}
+                <PanelSection
+                    icon={Logs}
+                    title="Logs"
+                    description="What the job printed, newest at the bottom."
+                    bare
                 >
-                    <div className="flex flex-col gap-3">
-                        <ChartLegend series={LOSS_SERIES} />
-                        <StepChart
-                            rows={rows}
-                            series={LOSS_SERIES}
-                            format={(value) => value.toFixed(3)}
-                            axisFormat={(value) => value.toFixed(2)}
-                            label={`Loss for job ${job.id}`}
-                            domain={[0, LOSS_STEPS]}
-                            height={220}
-                        />
-                    </div>
-                </Section>
-            )}
-            <LogViewer
-                entries={logLines(job, version)}
-                live={job.status === "running"}
-                label="Job log"
-                maxHeight="16rem"
-            />
+                    <LogViewer
+                        entries={logLines(job, version)}
+                        live={job.status === "running"}
+                        label="Job log"
+                        maxHeight="16rem"
+                    />
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }
@@ -1109,106 +1169,118 @@ export function FlowMonitorPage() {
                 title="Monitor"
                 caption="Traffic across the deployed models: requests, latency, errors and cost."
             />
-            <Section title="Requests per day" caption="Last 7 days, stacked by model.">
-                <div className="flex flex-col gap-3">
-                    <ChartLegend series={series} />
-                    <TimeChart
-                        kind="stacked-bars"
-                        rows={rows}
-                        series={series}
-                        format={(value) => count(value)}
-                        bucketMs={DAY_MS}
-                        label="Requests per day by model"
-                    />
-                </div>
-            </Section>
-            <div className="overflow-x-auto rounded-lg border bg-card">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="pl-panel">Model</TableHead>
-                            <TableHead className="text-right">Requests, 7 days</TableHead>
-                            <TableHead className="text-right">Latency p95</TableHead>
-                            <TableHead className="text-right">Errors</TableHead>
-                            <TableHead className="text-right">Cost / 1k req.</TableHead>
-                            <TableHead className="pr-panel text-right">GPU·s, 7 days</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {live.map((model) => (
-                            <TableRow key={model.slug}>
-                                <TableCell className="pl-panel">
-                                    <Link
-                                        href={modelHref(model.slug, "monitoring")}
-                                        className="font-medium hover:underline"
+            <PanelSections>
+                <PanelSection
+                    icon={ChartColumn}
+                    title="Requests per day"
+                    description="Last 7 days, stacked by model."
+                >
+                    <div className="flex flex-col gap-3">
+                        <ChartLegend series={series} />
+                        <TimeChart
+                            kind="stacked-bars"
+                            rows={rows}
+                            series={series}
+                            format={(value) => count(value)}
+                            bucketMs={DAY_MS}
+                            label="Requests per day by model"
+                        />
+                    </div>
+                </PanelSection>
+                <PanelSection
+                    icon={Box}
+                    title="By model"
+                    description="Each deployed model over the last 7 days, busiest first."
+                    flush
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-panel">Model</TableHead>
+                                <TableHead className="text-right">Requests, 7 days</TableHead>
+                                <TableHead className="text-right">Latency p95</TableHead>
+                                <TableHead className="text-right">Errors</TableHead>
+                                <TableHead className="text-right">Cost / 1k req.</TableHead>
+                                <TableHead className="pr-panel text-right">GPU·s, 7 days</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {live.map((model) => (
+                                <TableRow key={model.slug}>
+                                    <TableCell className="pl-panel">
+                                        <Link
+                                            href={modelHref(model.slug, "monitoring")}
+                                            className="font-medium hover:underline"
+                                        >
+                                            {model.name}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {count(totalOf(model))}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {model.p95 ? `${model.p95} ms` : "–"}
+                                    </TableCell>
+                                    <TableCell
+                                        className={
+                                            model.errors > model.usualErrors * 3
+                                                ? "text-right text-destructive"
+                                                : "text-right"
+                                        }
                                     >
-                                        {model.name}
-                                    </Link>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {count(totalOf(model))}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {model.p95 ? `${model.p95} ms` : "–"}
-                                </TableCell>
-                                <TableCell
-                                    className={
-                                        model.errors > model.usualErrors * 3
-                                            ? "text-right text-destructive"
-                                            : "text-right"
-                                    }
-                                >
-                                    {`${(model.errors * 100).toFixed(1)}%`}
-                                </TableCell>
-                                <TableCell className="text-right">{`${model.gpuSeconds.toFixed(1)} GPU·s`}</TableCell>
-                                <TableCell className="pr-panel text-right">
-                                    {((totalOf(model) / 1000) * model.gpuSeconds).toFixed(1)}
-                                </TableCell>
+                                        {`${(model.errors * 100).toFixed(1)}%`}
+                                    </TableCell>
+                                    <TableCell className="text-right">{`${model.gpuSeconds.toFixed(1)} GPU·s`}</TableCell>
+                                    <TableCell className="pr-panel text-right">
+                                        {((totalOf(model) / 1000) * model.gpuSeconds).toFixed(1)}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </PanelSection>
+                <PanelSection
+                    icon={Logs}
+                    title="Request log"
+                    description="Newest first. Prompts and answers stay on this install."
+                    flush
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="pl-panel">Time</TableHead>
+                                <TableHead>Model</TableHead>
+                                <TableHead>Request</TableHead>
+                                <TableHead className="text-right">Latency</TableHead>
+                                <TableHead className="pr-panel">Status</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
-            <Section
-                title="Request log"
-                caption="Newest first. Prompts and answers stay on this install."
-                flush
-            >
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="pl-panel">Time</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Request</TableHead>
-                            <TableHead className="text-right">Latency</TableHead>
-                            <TableHead className="pr-panel">Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {log.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell className="pl-panel font-mono text-sm text-muted-foreground">
-                                    {`${item.minutesAgo} min ago`}
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                    {servedBy(item.model)}
-                                </TableCell>
-                                <TableCell className="max-w-96 truncate" title={item.question}>
-                                    {item.question}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {item.ok ? `${item.ms} ms` : "30,000 ms"}
-                                </TableCell>
-                                <TableCell className="pr-panel">
-                                    <StatusText tone={item.ok ? "success" : "destructive"}>
-                                        {item.ok ? "200" : "504 timeout"}
-                                    </StatusText>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </Section>
+                        </TableHeader>
+                        <TableBody>
+                            {log.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="pl-panel font-mono text-sm text-muted-foreground">
+                                        {`${item.minutesAgo} min ago`}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-sm">
+                                        {servedBy(item.model)}
+                                    </TableCell>
+                                    <TableCell className="max-w-96 truncate" title={item.question}>
+                                        {item.question}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {item.ok ? `${item.ms} ms` : "30,000 ms"}
+                                    </TableCell>
+                                    <TableCell className="pr-panel">
+                                        <StatusText tone={item.ok ? "success" : "destructive"}>
+                                            {item.ok ? "200" : "504 timeout"}
+                                        </StatusText>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }
@@ -1259,114 +1331,140 @@ export function FlowJobsPage() {
                 title="Jobs"
                 caption="Every job on this install: training, scoring, judging, downloads and imports."
             />
-            <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-2">
-                <Tabs
-                    value={filter}
-                    onValueChange={(value) => {
-                        setFilter(String(value));
-                        setPicked([]);
-                    }}
+            <PanelSections>
+                <PanelSection
+                    icon={ListChecks}
+                    title="Queue and history"
+                    description="Open a job for its progress, settings and logs."
+                    bare
                 >
-                    <TabsList aria-label="Job kind">
-                        {KIND_FILTERS.map((item) => (
-                            <TabsTrigger key={item.key} value={item.key}>
-                                {item.label}
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {state.jobs.filter((job) => kindMatches(job, item.key)).length}
-                                </span>
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
-                </Tabs>
-                {picked.length > 0 && (
-                    <div className="ml-auto">
-                        <BulkJobs
-                            picked={picked.length}
-                            retryable={retryable}
-                            cancellable={cancellable}
-                            onClear={() => setPicked([])}
-                            onDone={(what, n) => {
-                                setPicked([]);
-                                toast({ title: `${what} ${n} jobs`, tone: "success" });
-                            }}
-                        />
-                    </div>
-                )}
-            </div>
-            <div className="overflow-x-auto rounded-lg border bg-card">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-10 pl-4">
-                                <Checkbox
-                                    aria-label="Select every job shown"
-                                    checked={every}
-                                    disabled={jobs.length === 0}
-                                    onCheckedChange={(value) =>
-                                        setPicked(value === true ? jobs.map((job) => job.id) : [])
-                                    }
-                                />
-                            </TableHead>
-                            <TableHead>Job</TableHead>
-                            <TableHead>Kind</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Started</TableHead>
-                            <TableHead className="pr-4 text-right">Took</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {jobs.map((job) => (
-                            <TableRow
-                                key={job.id}
-                                className="cursor-pointer"
-                                data-state={picked.includes(job.id) ? "selected" : undefined}
-                                onClick={(event) => {
-                                    if (fromControl(event)) {
-                                        return;
-                                    }
-                                    if (picked.length > 0) {
-                                        toggle(job.id, !picked.includes(job.id));
-                                        return;
-                                    }
-                                    router.history.push(jobHref(job.id));
+                    <div className="flex flex-col gap-3">
+                        <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-2">
+                            <Tabs
+                                value={filter}
+                                onValueChange={(value) => {
+                                    setFilter(String(value));
+                                    setPicked([]);
                                 }}
                             >
-                                <TableCell className="pl-4">
-                                    <Checkbox
-                                        aria-label={`Select job ${job.id}`}
-                                        checked={picked.includes(job.id)}
-                                        onCheckedChange={(value) => toggle(job.id, value === true)}
+                                <TabsList aria-label="Job kind">
+                                    {KIND_FILTERS.map((item) => (
+                                        <TabsTrigger key={item.key} value={item.key}>
+                                            {item.label}
+                                            <span className="text-sm text-muted-foreground tabular-nums">
+                                                {
+                                                    state.jobs.filter((job) =>
+                                                        kindMatches(job, item.key),
+                                                    ).length
+                                                }
+                                            </span>
+                                        </TabsTrigger>
+                                    ))}
+                                </TabsList>
+                            </Tabs>
+                            {picked.length > 0 && (
+                                <div className="ml-auto">
+                                    <BulkJobs
+                                        picked={picked.length}
+                                        retryable={retryable}
+                                        cancellable={cancellable}
+                                        onClear={() => setPicked([])}
+                                        onDone={(what, n) => {
+                                            setPicked([]);
+                                            toast({ title: `${what} ${n} jobs`, tone: "success" });
+                                        }}
                                     />
-                                </TableCell>
-                                <TableCell>
-                                    <Link
-                                        href={jobHref(job.id)}
-                                        className="font-mono text-sm hover:underline"
-                                    >
-                                        {`#${job.id}`}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>{`${JOB_KINDS[job.kind]}${job.version !== null ? ` v${job.version}` : ""}`}</TableCell>
-                                <TableCell>
-                                    <Link href={modelHref(job.model)} className="hover:underline">
-                                        {modelName(state.models, job.model)}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>
-                                    <JobStatusText job={job} />
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                    {relativeTime(createdAt(job))}
-                                </TableCell>
-                                <TableCell className="pr-4 text-right">
-                                    {job.minutes ? `${job.minutes} min` : "–"}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="overflow-x-auto rounded-xl border bg-card">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-10 pl-4">
+                                            <Checkbox
+                                                aria-label="Select every job shown"
+                                                checked={every}
+                                                disabled={jobs.length === 0}
+                                                onCheckedChange={(value) =>
+                                                    setPicked(
+                                                        value === true
+                                                            ? jobs.map((job) => job.id)
+                                                            : [],
+                                                    )
+                                                }
+                                            />
+                                        </TableHead>
+                                        <TableHead>Job</TableHead>
+                                        <TableHead>Kind</TableHead>
+                                        <TableHead>Model</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Started</TableHead>
+                                        <TableHead className="pr-4 text-right">Took</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {jobs.map((job) => (
+                                        <TableRow
+                                            key={job.id}
+                                            className="cursor-pointer"
+                                            data-state={
+                                                picked.includes(job.id) ? "selected" : undefined
+                                            }
+                                            onClick={(event) => {
+                                                if (fromControl(event)) {
+                                                    return;
+                                                }
+                                                if (picked.length > 0) {
+                                                    toggle(job.id, !picked.includes(job.id));
+                                                    return;
+                                                }
+                                                router.history.push(jobHref(job.id));
+                                            }}
+                                        >
+                                            <TableCell className="pl-4">
+                                                <Checkbox
+                                                    aria-label={`Select job ${job.id}`}
+                                                    checked={picked.includes(job.id)}
+                                                    onCheckedChange={(value) =>
+                                                        toggle(job.id, value === true)
+                                                    }
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link
+                                                    href={jobHref(job.id)}
+                                                    className="font-mono text-sm hover:underline"
+                                                >
+                                                    {`#${job.id}`}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>{`${JOB_KINDS[job.kind]}${job.version !== null ? ` v${job.version}` : ""}`}</TableCell>
+                                            <TableCell>
+                                                <Link
+                                                    href={modelHref(job.model)}
+                                                    className="hover:underline"
+                                                >
+                                                    {modelName(state.models, job.model)}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <JobStatusText job={job} />
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {relativeTime(createdAt(job))}
+                                            </TableCell>
+                                            <TableCell className="pr-4 text-right">
+                                                {job.minutes ? `${job.minutes} min` : "–"}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }

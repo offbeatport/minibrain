@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Download } from "lucide-react";
+import { Download, Package } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -18,7 +18,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { Section } from "~/components/Section";
+import { PanelSection } from "~/components/Section";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import {
     type ExportArtifact,
@@ -277,9 +277,10 @@ export function ExportsSection({ model, version }: { model: FlowModel; version: 
         return null;
     }
     return (
-        <Section
+        <PanelSection
+            icon={Package}
             title="Exports"
-            caption="Files written from this version. The SHA-256 lets the place that runs it check the file."
+            description="Files written from this version, each with a SHA-256 to check it where it runs."
             flush
         >
             <ul className="divide-y">
@@ -293,6 +294,6 @@ export function ExportsSection({ model, version }: { model: FlowModel; version: 
                     />
                 ))}
             </ul>
-        </Section>
+        </PanelSection>
     );
 }

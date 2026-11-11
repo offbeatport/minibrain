@@ -1,3 +1,4 @@
+import { ChartColumn, History, Layers } from "lucide-react";
 import {
     EmptyState,
     Link,
@@ -8,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { Section, Stat } from "~/components/Section";
+import { PanelSection, PanelSections, Stat } from "~/components/Section";
 import { ChartLegend, type ChartSeries, TimeChart } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
 import { FLOW, type FlowModel, versionHref } from "./modelsFlowData";
@@ -128,50 +129,48 @@ function Overview({ model, slices }: { model: FlowModel; slices: Slice[] }) {
 
 function SliceTable({ slices, noun }: { slices: Slice[]; noun: string }) {
     return (
-        <div className="overflow-x-auto rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>{noun}</TableHead>
-                        <TableHead className="text-right">Share</TableHead>
-                        <TableHead className="text-right">Requests, 7 days</TableHead>
-                        <TableHead className="text-right">p95</TableHead>
-                        <TableHead className="text-right">Errors</TableHead>
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead className="pl-panel">{noun}</TableHead>
+                    <TableHead className="text-right">Share</TableHead>
+                    <TableHead className="text-right">Requests, 7 days</TableHead>
+                    <TableHead className="text-right">p95</TableHead>
+                    <TableHead className="pr-panel text-right">Errors</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {slices.map((slice) => (
+                    <TableRow key={slice.key}>
+                        <TableCell className="pl-panel">
+                            {slice.href ? (
+                                <Link href={slice.href} className="font-medium hover:underline">
+                                    {slice.label}
+                                </Link>
+                            ) : (
+                                slice.label
+                            )}
+                        </TableCell>
+                        <TableCell className="text-right">{`${slice.share}%`}</TableCell>
+                        <TableCell className="text-right">
+                            {count(slice.daily.reduce((sum, value) => sum + value, 0))}
+                        </TableCell>
+                        <TableCell className="text-right">
+                            {slice.p95 ? `${slice.p95} ms` : "–"}
+                        </TableCell>
+                        <TableCell
+                            className={
+                                slice.errors > 0.05
+                                    ? "pr-panel text-right text-destructive"
+                                    : "pr-panel text-right"
+                            }
+                        >
+                            {rate(slice.errors)}
+                        </TableCell>
                     </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {slices.map((slice) => (
-                        <TableRow key={slice.key}>
-                            <TableCell>
-                                {slice.href ? (
-                                    <Link href={slice.href} className="font-medium hover:underline">
-                                        {slice.label}
-                                    </Link>
-                                ) : (
-                                    slice.label
-                                )}
-                            </TableCell>
-                            <TableCell className="text-right">{`${slice.share}%`}</TableCell>
-                            <TableCell className="text-right">
-                                {count(slice.daily.reduce((sum, value) => sum + value, 0))}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                {slice.p95 ? `${slice.p95} ms` : "–"}
-                            </TableCell>
-                            <TableCell
-                                className={
-                                    slice.errors > 0.05
-                                        ? "text-right text-destructive"
-                                        : "text-right"
-                                }
-                            >
-                                {rate(slice.errors)}
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
+                ))}
+            </TableBody>
+        </Table>
     );
 }
 
@@ -211,24 +210,35 @@ export function ModelMonitoring({ model }: { model: FlowModel }) {
     return (
         <div className="flex flex-col gap-4">
             <Overview model={model} slices={slices} />
-            <Section
-                title="Requests per day"
-                caption={
-                    model.canary
-                        ? `Last 7 days. The live pointer splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
-                        : "Last 7 days, by the version that answered."
-                }
-                actions={
-                    <Link href={`${FLOW}/monitor`} className="text-sm text-primary hover:underline">
-                        All models in Monitor →
-                    </Link>
-                }
-            >
-                <Charts slices={slices} label={`Requests per day for ${model.name}`} />
-            </Section>
-            <Section title={`By ${noun.toLowerCase()}`}>
-                <SliceTable slices={slices} noun={noun} />
-            </Section>
+            <PanelSections>
+                <PanelSection
+                    icon={ChartColumn}
+                    title="Requests per day"
+                    description={
+                        model.canary
+                            ? `Last 7 days. The live pointer splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
+                            : "Last 7 days, by the version that answered."
+                    }
+                    actions={
+                        <Link
+                            href={`${FLOW}/monitor`}
+                            className="text-sm text-primary hover:underline"
+                        >
+                            All models in Monitor →
+                        </Link>
+                    }
+                >
+                    <Charts slices={slices} label={`Requests per day for ${model.name}`} />
+                </PanelSection>
+                <PanelSection
+                    icon={model.kind === "base" ? Layers : History}
+                    title={`By ${noun.toLowerCase()}`}
+                    description={`Each ${noun.toLowerCase()}'s share of the last 7 days, with its latency and errors.`}
+                    flush
+                >
+                    <SliceTable slices={slices} noun={noun} />
+                </PanelSection>
+            </PanelSections>
         </div>
     );
 }
