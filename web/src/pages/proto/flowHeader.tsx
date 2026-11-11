@@ -39,7 +39,7 @@ export function CompactHeader({
     actions?: ReactNode;
 }) {
     return (
-        <header className="flex items-start gap-4">
+        <header className="flex items-center gap-4 py-4">
             {icon}
             <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
