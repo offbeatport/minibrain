@@ -2316,7 +2316,7 @@ function hoursOf(item: { hoursAgo: number; atMs?: number }): number {
     return item.atMs ? (Date.now() - item.atMs) / 3600000 : item.hoursAgo;
 }
 
-function percent(value: number): string {
+export function percent(value: number): string {
     const shown = value * 100;
     return `${shown < 1 ? shown.toFixed(1) : Math.round(shown)}%`;
 }

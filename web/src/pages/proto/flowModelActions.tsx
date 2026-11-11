@@ -1,6 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import {
     CopyPlus,
+    GraduationCap,
     MoreHorizontal,
     Pencil,
     Play,
@@ -24,114 +25,73 @@ import {
     Link,
     useToast,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { PickerDialog } from "./AvatarPicker";
 import { choiceFor } from "./avatarDicebear";
-import { useCan } from "./flowOverlays";
-import { TrainButton } from "./flowTraining";
+import { openTrain, useCan } from "./flowOverlays";
+import { trainBlock } from "./flowTraining";
 import {
     FLOW,
     type FlowModel,
-    type NextStep,
     deleteModels,
     editModel,
     flowHref,
-    jobHref,
-    jobOfVersion,
-    modelHref,
-    nextStep,
-    openIntent,
+    nextNumber,
     playgroundHref,
-    retryVersion,
     setOnApi,
 } from "./modelsFlowData";
 import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
-import { openConnect } from "./modelsFlowParts";
-
-type Primary = NextStep | { action: "deploy" | "connect"; label: string };
+import { Tip, openConnect } from "./modelsFlowParts";
 
 function nothingLive(model: FlowModel): boolean {
     return model.kind === "custom" && model.live === null;
-}
-
-function primaryOf(model: FlowModel): Primary {
-    if (model.kind === "base") {
-        return model.deployed
-            ? { action: "connect", label: "Connect" }
-            : { action: "deploy", label: "Deploy" };
-    }
-    return nextStep(model) ?? { action: "connect", label: "Connect" };
-}
-
-function useDeploy(model: FlowModel) {
-    const toast = useToast();
-    return () => {
-        setOnApi(model.slug, true);
-        toast({ title: `${model.name} deployed`, tone: "success" });
-    };
-}
-
-function PrimaryButton({ model, primary }: { model: FlowModel; primary: Primary }) {
-    const router = useRouter();
-    const toast = useToast();
-    const deploy = useDeploy(model);
-    const step = "href" in primary ? primary : null;
-    if (primary.action === "train") {
-        return <TrainButton model={model} label={primary.label} />;
-    }
-    if (primary.action === "make-live" && step?.version !== undefined) {
-        const number = step.version;
-        return (
-            <Button onClick={() => openIntent({ kind: "make-live", slug: model.slug, number })}>
-                {primary.label}
-            </Button>
-        );
-    }
-    if (primary.action === "retry" && step?.version !== undefined) {
-        const failed = step.version;
-        return (
-            <Button
-                onClick={() => {
-                    const number = retryVersion(model.slug, failed);
-                    toast({ title: `v${number} is training`, tone: "success" });
-                    const job = jobOfVersion(model.slug, number);
-                    if (job) {
-                        router.history.push(jobHref(job));
-                    }
-                }}
-            >
-                {primary.label}
-            </Button>
-        );
-    }
-    if (primary.action === "deploy") {
-        return <Button onClick={deploy}>Deploy</Button>;
-    }
-    if (primary.action === "connect") {
-        return <Button onClick={() => openConnect(model.slug)}>Connect</Button>;
-    }
-    return (
-        <Button asChild>
-            <Link href={step?.href ?? modelHref(model.slug)}>{primary.label}</Link>
-        </Button>
-    );
 }
 
 function notInPrototype(toast: ReturnType<typeof useToast>, what: string) {
     return () => toast({ title: "Not in the prototype", description: what });
 }
 
-function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | null }) {
+function BlockedItem({
+    icon,
+    label,
+    blocked,
+    onSelect,
+}: {
+    icon: ReactNode;
+    label: string;
+    blocked: string | null;
+    onSelect: () => void;
+}) {
+    return (
+        <DropdownMenuItem
+            disabled={Boolean(blocked)}
+            className={blocked ? "items-start [&>svg]:mt-0.5" : undefined}
+            onSelect={onSelect}
+        >
+            {icon}
+            <span className="flex flex-col">
+                <span>{label}</span>
+                {blocked && (
+                    <span className="text-sm whitespace-normal text-muted-foreground">
+                        {blocked}
+                    </span>
+                )}
+            </span>
+        </DropdownMenuItem>
+    );
+}
+
+function ModelMenu({ model }: { model: FlowModel }) {
     const router = useRouter();
     const toast = useToast();
-    const can = useCan("builder");
-    const deploy = useDeploy(model);
     const [confirm, setConfirm] = useState<Confirm | null>(null);
     const [autopilot, setAutopilot] = useState(false);
     const [picking, setPicking] = useState(false);
-    const canPlay =
-        model.kind === "base" || model.versions.some((version) => version.status === "ready");
     const custom = model.kind === "custom";
+    const deploy = () => {
+        setOnApi(model.slug, true);
+        toast({ title: `${model.name} deployed`, tone: "success" });
+    };
     const undeploy = () =>
         setConfirm({
             title: `Undeploy ${model.name}?`,
@@ -176,110 +136,75 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
                     <DropdownMenuGroup>
-                        <DropdownMenuItem
-                            disabled={!canPlay}
-                            onSelect={() => router.history.push(playgroundHref(model.slug))}
-                        >
-                            <Play />
-                            Open in Playground
-                        </DropdownMenuItem>
-                        {primary?.action !== "connect" && (
-                            <DropdownMenuItem onSelect={() => openConnect(model.slug)}>
-                                <Plug />
-                                Connect
+                        {model.deployed ? (
+                            <DropdownMenuItem onSelect={undeploy}>
+                                <PowerOff />
+                                {custom ? "Undeploy" : "Undeploy every format"}
+                            </DropdownMenuItem>
+                        ) : (
+                            <BlockedItem
+                                icon={<Power />}
+                                label="Deploy"
+                                blocked={nothingLive(model) ? "Make a version live first." : null}
+                                onSelect={deploy}
+                            />
+                        )}
+                        {custom && (
+                            <BlockedItem
+                                icon={<GraduationCap />}
+                                label={`Train v${nextNumber(model)}`}
+                                blocked={trainBlock(model)}
+                                onSelect={() => openTrain(model.slug)}
+                            />
+                        )}
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                        {custom ? (
+                            <>
+                                <DropdownMenuItem onSelect={later(`Would rename ${model.name}.`)}>
+                                    <Pencil />
+                                    Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setPicking(true)}>
+                                    <SmilePlus />
+                                    Change avatar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={later(
+                                        `Would copy ${model.name} with its data and settings.`,
+                                    )}
+                                >
+                                    <CopyPlus />
+                                    Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={later(`Would train ${model.name} on another base.`)}
+                                >
+                                    <Replace />
+                                    Switch base
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setAutopilot(true)}>
+                                    <Repeat />
+                                    {model.autopilot ? "Autopilot settings" : "Turn on autopilot"}
+                                </DropdownMenuItem>
+                            </>
+                        ) : (
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    router.history.push(`${FLOW}/models/new?base=${model.slug}`)
+                                }
+                            >
+                                <SquarePlus />
+                                Add a model on it
                             </DropdownMenuItem>
                         )}
                     </DropdownMenuGroup>
-                    {can && (model.deployed || primary?.action !== "deploy") && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                                {model.deployed ? (
-                                    <DropdownMenuItem onSelect={undeploy}>
-                                        <PowerOff />
-                                        {custom ? "Undeploy" : "Undeploy every format"}
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem
-                                        disabled={nothingLive(model)}
-                                        className={nothingLive(model) ? "items-start" : undefined}
-                                        onSelect={deploy}
-                                    >
-                                        <Power
-                                            className={nothingLive(model) ? "mt-0.5" : undefined}
-                                        />
-                                        <span className="flex flex-col">
-                                            <span>Deploy</span>
-                                            {nothingLive(model) && (
-                                                <span className="text-sm whitespace-normal text-muted-foreground">
-                                                    Make a version live first.
-                                                </span>
-                                            )}
-                                        </span>
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuGroup>
-                        </>
-                    )}
-                    {can && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                                {custom ? (
-                                    <>
-                                        <DropdownMenuItem
-                                            onSelect={later(`Would rename ${model.name}.`)}
-                                        >
-                                            <Pencil />
-                                            Rename
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setPicking(true)}>
-                                            <SmilePlus />
-                                            Change avatar
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={later(
-                                                `Would copy ${model.name} with its data and settings.`,
-                                            )}
-                                        >
-                                            <CopyPlus />
-                                            Duplicate
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={later(
-                                                `Would train ${model.name} on another base.`,
-                                            )}
-                                        >
-                                            <Replace />
-                                            Switch base
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setAutopilot(true)}>
-                                            <Repeat />
-                                            {model.autopilot
-                                                ? "Autopilot settings"
-                                                : "Turn on autopilot"}
-                                        </DropdownMenuItem>
-                                    </>
-                                ) : (
-                                    <DropdownMenuItem
-                                        onSelect={() =>
-                                            router.history.push(
-                                                `${FLOW}/models/new?base=${model.slug}`,
-                                            )
-                                        }
-                                    >
-                                        <SquarePlus />
-                                        Add a model on it
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onSelect={remove}>
-                                <Trash2 />
-                                Delete model
-                            </DropdownMenuItem>
-                        </>
-                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={remove}>
+                        <Trash2 />
+                        Delete model
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
@@ -297,13 +222,41 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
     );
 }
 
+function PlaygroundButton({ model }: { model: FlowModel }) {
+    const playable =
+        model.kind === "base"
+            ? model.variants.length > 0
+            : model.versions.some((version) => version.status === "ready");
+    if (!playable) {
+        return (
+            <Tip tip="Nothing to try yet: train a version first.">
+                <Button variant="outline" disabled>
+                    <Play />
+                    Playground
+                </Button>
+            </Tip>
+        );
+    }
+    return (
+        <Button variant="outline" asChild>
+            <Link href={playgroundHref(model.slug)}>
+                <Play />
+                Playground
+            </Link>
+        </Button>
+    );
+}
+
 export function ModelHeaderActions({ model }: { model: FlowModel }) {
     const can = useCan("builder");
-    const primary = primaryOf(model);
     return (
         <>
-            {can && <PrimaryButton model={model} primary={primary} />}
-            <ModelMenu model={model} primary={can ? primary : null} />
+            <PlaygroundButton model={model} />
+            <Button variant="outline" onClick={() => openConnect(model.slug)}>
+                <Plug />
+                Connect
+            </Button>
+            {can && <ModelMenu model={model} />}
         </>
     );
 }

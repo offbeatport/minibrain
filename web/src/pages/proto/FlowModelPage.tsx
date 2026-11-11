@@ -13,7 +13,6 @@ import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs"
 import { ModelMonitoring } from "./flowMonitoring";
 import { useCan } from "./flowOverlays";
 import { UsagePanel } from "./flowUsagePanel";
-import { UseIt } from "./flowUseIt";
 import {
     type CatalogEntry,
     FLOW,
@@ -62,12 +61,7 @@ function Overview({ model }: { model: FlowModel }) {
                     )}
                 </>
             }
-            side={
-                <>
-                    <UseIt model={model} />
-                    <ActivityPanel model={model} />
-                </>
-            }
+            side={<ActivityPanel model={model} />}
         />
     );
 }

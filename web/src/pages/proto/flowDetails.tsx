@@ -1,19 +1,11 @@
+import { Pencil } from "lucide-react";
 import {
     Button,
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Field,
-    FieldGroup,
     Input,
-    Link,
+    Label,
     NumberField,
     Popover,
     PopoverContent,
@@ -24,13 +16,17 @@ import {
     SelectTrigger,
     SelectValue,
     Textarea,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { Clipped, ownerOf } from "./flowActivity";
+import { ownerOf } from "./flowActivity";
+import { Clipped } from "./flowClipped";
 import { useCan } from "./flowOverlays";
 import {
     FLOW,
@@ -57,127 +53,20 @@ type EditKind = "description" | "tags" | "instructions" | "rule" | "safety";
 
 const SAFETY_MODELS = ["Llama Guard 3 1B", "Qwen3Guard 0.6B"];
 const NONE = "none";
+const OPEN_KEY = "flow-details-open";
 
 const SCHEMAS: Record<string, string[]> = {
     "invoice-extractor": ["vendor", "invoice_number", "issued", "due", "total"],
     "contract-reviewer": ["standard", "risky"],
 };
 
-const TASK_TYPES: Record<string, string> = {
-    Classify: "Labels",
-    Extract: "JSON",
-    SQL: "Chat",
-};
+const LABEL_NOUNS: Record<string, string> = { "support-triage": "queues" };
 
 const GRADERS: Record<string, string> = {
     Classify: "Exact label match",
     Extract: "Field match, schema",
     SQL: "Result match · judge",
 };
-
-function Row({
-    label,
-    children,
-    onEdit,
-}: {
-    label: string;
-    children: ReactNode;
-    onEdit?: () => void;
-}) {
-    return (
-        <div className="flex h-6 items-center gap-3">
-            <dt className="w-24 shrink-0 truncate text-sm text-muted-foreground">{label}</dt>
-            <dd className="flex min-w-0 flex-1 items-center gap-1">{children}</dd>
-            {onEdit && (
-                <Button
-                    variant="link"
-                    className="h-auto shrink-0 p-0 text-sm"
-                    aria-label={`Edit ${label.toLowerCase()}`}
-                    onClick={onEdit}
-                >
-                    Edit
-                </Button>
-            )}
-        </div>
-    );
-}
-
-function Group({ title, children }: { title: string; children: ReactNode }) {
-    return (
-        <section className="flex min-w-0 flex-col gap-1">
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <dl className="flex flex-col">{children}</dl>
-        </section>
-    );
-}
-
-function Mono({ value, label, shown }: { value: string; label: string; shown?: string }) {
-    return (
-        <>
-            <Clipped text={shown ?? value} className="font-mono text-sm" />
-            <span className="-my-1.5 shrink-0">
-                <CopyButton value={value} label={label} />
-            </span>
-        </>
-    );
-}
-
-function Peek({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="link" className="h-auto shrink-0 p-0 text-sm">
-                    {label}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80">
-                {children}
-            </PopoverContent>
-        </Popover>
-    );
-}
-
-function Muted({ children }: { children: ReactNode }) {
-    return <span className="truncate text-muted-foreground">{children}</span>;
-}
-
-function TextLink({ href, text }: { href: string; text: string }) {
-    return (
-        <Link href={href} className="min-w-0 truncate text-primary hover:underline" title={text}>
-            {text}
-        </Link>
-    );
-}
-
-function DetailsCard({ model, children }: { model: FlowModel; children: ReactNode }) {
-    return (
-        <section
-            aria-label={`${model.name} details`}
-            className="@container flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-panel"
-        >
-            <h2 className="text-base leading-tight font-semibold">Details</h2>
-            <div className="grid gap-x-panel gap-y-4 @xl:grid-cols-2">{children}</div>
-        </section>
-    );
-}
-
-function EditDialog({
-    model,
-    kind,
-    onClose,
-}: {
-    model: FlowModel;
-    kind: EditKind | null;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-lg">
-                {kind && <EditBody model={model} kind={kind} onClose={onClose} />}
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 const EDIT_TITLES: Record<EditKind, string> = {
     description: "Description",
@@ -187,14 +76,69 @@ const EDIT_TITLES: Record<EditKind, string> = {
     safety: "Safety model",
 };
 
-function EditBody({
+function readOpen(): boolean {
+    try {
+        return localStorage.getItem(OPEN_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
+function writeOpen(open: boolean) {
+    try {
+        localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+    } catch {
+        return;
+    }
+}
+
+function shortSafety(name: string): string {
+    return name.replace(/\s\d.*$/, "");
+}
+
+function apiNameOf(model: FlowModel): string {
+    if (model.kind !== "base") {
+        return model.slug;
+    }
+    return (model.variants.find((item) => item.live) ?? model.variants[0])?.apiName ?? model.slug;
+}
+
+function Muted({ children }: { children: ReactNode }) {
+    return <span className="min-w-0 truncate text-muted-foreground">{children}</span>;
+}
+
+function Mono({ value, label }: { value: string; label: string }) {
+    return (
+        <>
+            <Clipped text={value} className="font-mono text-sm" />
+            <span className="-my-1 shrink-0">
+                <CopyButton value={value} label={label} />
+            </span>
+        </>
+    );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="flex min-w-0 flex-col gap-0.5">
+            <dt className="truncate text-sm text-muted-foreground">{label}</dt>
+            <dd className="flex h-6 min-w-0 items-center gap-1 tabular-nums">{children}</dd>
+        </div>
+    );
+}
+
+function Summary({ children }: { children: ReactNode }) {
+    return <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>;
+}
+
+function EditForm({
     model,
     kind,
-    onClose,
+    onDone,
 }: {
     model: FlowModel;
     kind: EditKind;
-    onClose: () => void;
+    onDone: () => void;
 }) {
     const toast = useToast();
     const [text, setText] = useState(
@@ -206,6 +150,7 @@ function EditBody({
     );
     const [floor, setFloor] = useState(Math.round(model.rule[0] * 100));
     const [safety, setSafety] = useState(model.safety ?? NONE);
+    const id = `edit-${kind}`;
     const save = () => {
         const edits: Record<EditKind, ModelEdit> = {
             description: { description: text.trim() },
@@ -221,188 +166,304 @@ function EditBody({
         };
         editModel(model.slug, edits[kind]);
         toast({ title: `${EDIT_TITLES[kind]} saved`, tone: "success" });
-        onClose();
+        onDone();
     };
+    const hint =
+        kind === "tags"
+            ? "Separate tags with commas."
+            : kind === "instructions" || kind === "rule"
+              ? "Applies to the next version you train and score."
+              : kind === "safety"
+                ? "Checks each request and answer; flagged ones are refused."
+                : null;
     return (
-        <>
-            <DialogHeader>
-                <DialogTitle>{`Edit ${EDIT_TITLES[kind].toLowerCase()}`}</DialogTitle>
-                <DialogDescription>
-                    {kind === "instructions" || kind === "rule"
-                        ? "It applies to the next version you train and score; versions already trained keep theirs."
-                        : `Shown on ${model.name}'s page and in the model card.`}
-                </DialogDescription>
-            </DialogHeader>
-            <FieldGroup>
+        <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                save();
+            }}
+        >
+            <div className="flex flex-col gap-label">
+                <Label htmlFor={id}>
+                    {kind === "rule" ? `${model.metrics[0]} at least` : EDIT_TITLES[kind]}
+                </Label>
                 {(kind === "description" || kind === "tags") && (
-                    <Field
-                        id="edit-text"
-                        label={EDIT_TITLES[kind]}
-                        hint={kind === "tags" ? "Separate tags with commas." : undefined}
-                    >
-                        <Input
-                            id="edit-text"
-                            value={text}
-                            onChange={(event) => setText(event.target.value)}
-                        />
-                    </Field>
+                    <Input
+                        id={id}
+                        autoFocus
+                        value={text}
+                        onChange={(event) => setText(event.target.value)}
+                    />
                 )}
                 {kind === "instructions" && (
-                    <Field id="edit-text" label="Instructions">
-                        <Textarea
-                            id="edit-text"
-                            rows={6}
-                            value={text}
-                            onChange={(event) => setText(event.target.value)}
-                        />
-                    </Field>
+                    <Textarea
+                        id={id}
+                        autoFocus
+                        rows={5}
+                        value={text}
+                        onChange={(event) => setText(event.target.value)}
+                    />
                 )}
                 {kind === "rule" && (
-                    <Field
-                        id="edit-floor"
-                        label={`${model.metrics[0]} at least`}
-                        hint="A version must also beat live before it is offered to make live."
-                    >
-                        <NumberField
-                            id="edit-floor"
-                            value={floor}
-                            onValueChange={(value) => setFloor(value ?? floor)}
-                            min={0}
-                            max={100}
-                            step={1}
-                            unit="%"
-                            format={{ maximumFractionDigits: 0 }}
-                        />
-                    </Field>
+                    <NumberField
+                        id={id}
+                        value={floor}
+                        onValueChange={(value) => setFloor(value ?? floor)}
+                        min={0}
+                        max={100}
+                        step={1}
+                        unit="%"
+                        format={{ maximumFractionDigits: 0 }}
+                    />
                 )}
                 {kind === "safety" && (
-                    <Field
-                        id="edit-safety"
-                        label="Safety model"
-                        hint="Checks each request and answer; flagged ones are refused."
-                    >
-                        <Select value={safety} onValueChange={(value) => setSafety(String(value))}>
-                            <SelectTrigger id="edit-safety">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={NONE} label="None">
-                                    None
+                    <Select value={safety} onValueChange={(value) => setSafety(String(value))}>
+                        <SelectTrigger id={id}>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={NONE} label="None">
+                                None
+                            </SelectItem>
+                            {SAFETY_MODELS.map((item) => (
+                                <SelectItem key={item} value={item} label={item}>
+                                    {item}
                                 </SelectItem>
-                                {SAFETY_MODELS.map((item) => (
-                                    <SelectItem key={item} value={item} label={item}>
-                                        {item}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </Field>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 )}
-            </FieldGroup>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button onClick={save}>Save</Button>
-            </DialogFooter>
-        </>
+                {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+            </div>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+            </div>
+        </form>
     );
 }
 
-function LineageAndIntegrity({ model }: { model: FlowModel }) {
-    const live = liveVersion(model);
-    const owner = ownerOf(model.slug);
-    const failed = model.versions.filter((version) => version.status === "failed").length;
-    const liveSha = live ? fakeSha(`${model.slug}@${live.number}`) : null;
-    const baseSha = fakeSha(model.base ?? model.slug);
+function EditPencil({ model, kind }: { model: FlowModel; kind: EditKind }) {
+    const [open, setOpen] = useState(false);
+    const label = `Edit ${EDIT_TITLES[kind].toLowerCase()}`;
     return (
-        <Collapsible className="self-start">
-            <CollapsibleTrigger className="h-6">Lineage and integrity</CollapsibleTrigger>
-            <CollapsibleContent>
-                <div className="flex flex-col gap-4 pt-2">
-                    <Group title="Lineage">
-                        <Row label="Duplicated">
-                            <Clipped text={owner.duplicated ?? "No, created new"} />
-                        </Row>
-                        <Row label="Base switches">
-                            <Clipped text={owner.switches ?? "None"} />
-                        </Row>
-                        <Row label="Versions">
-                            <Link
-                                href={modelHref(model.slug, "versions")}
-                                className="text-primary tabular-nums hover:underline"
-                            >
-                                {`${model.versions.length}${failed > 0 ? ` · ${failed} failed` : ""}`}
-                            </Link>
-                        </Row>
-                    </Group>
-                    <Group title="Integrity">
-                        <Row label="Live adapter">
-                            {liveSha ? (
-                                <Mono
-                                    value={liveSha}
-                                    shown={`${liveSha.slice(0, 12)}…`}
-                                    label="Copy live adapter SHA-256"
-                                />
-                            ) : (
-                                <Muted>None</Muted>
-                            )}
-                        </Row>
-                        <Row label="Base weights">
-                            <Mono
-                                value={baseSha}
-                                shown={`${baseSha.slice(0, 12)}…`}
-                                label="Copy base SHA-256"
-                            />
-                        </Row>
-                        <Row label="Model card">
-                            {live ? (
-                                <TextLink
-                                    href={cardHref(model.slug, live.number)}
-                                    text={`v${live.number} card →`}
-                                />
-                            ) : (
-                                <Muted>After a version is live</Muted>
-                            )}
-                        </Row>
-                        <p className="pt-1 text-sm text-muted-foreground">
-                            SHA-256, checked each time the weights load.
-                        </p>
-                    </Group>
-                </div>
-            </CollapsibleContent>
-        </Collapsible>
+        <Popover open={open} onOpenChange={setOpen}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={label}
+                            className="text-muted-foreground opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 hover:text-foreground data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
+                        >
+                            <Pencil />
+                        </Button>
+                    </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+            <PopoverContent align="start" className="w-80">
+                <EditForm model={model} kind={kind} onDone={() => setOpen(false)} />
+            </PopoverContent>
+        </Popover>
     );
+}
+
+function Row({
+    label,
+    children,
+    edit,
+}: {
+    label: string;
+    children: ReactNode;
+    edit?: ReactNode;
+}) {
+    return (
+        <div
+            data-edit-row={edit ? "" : undefined}
+            className="group/row flex h-7 items-center gap-3"
+        >
+            <dt className="w-32 shrink-0 truncate text-sm text-muted-foreground">{label}</dt>
+            <dd className="flex min-w-0 flex-1 items-center gap-1 tabular-nums">
+                {children}
+                {edit}
+            </dd>
+        </div>
+    );
+}
+
+function Group({
+    title,
+    caption,
+    children,
+}: {
+    title: string;
+    caption?: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="grid gap-x-panel border-t px-panel py-2 @xl:grid-cols-[8rem_minmax(0,1fr)]">
+            <div className="flex flex-col">
+                <h3 className="text-base leading-7 font-medium">{title}</h3>
+                {caption && <p className="pb-1 text-sm text-muted-foreground">{caption}</p>}
+            </div>
+            <dl className="flex min-w-0 flex-col">{children}</dl>
+        </section>
+    );
+}
+
+function DetailsCard({
+    summary,
+    contents,
+    children,
+}: {
+    summary: ReactNode;
+    contents: string;
+    children: ReactNode;
+}) {
+    const [open, setOpen] = useState(readOpen);
+    const toggle = (next: boolean) => {
+        setOpen(next);
+        writeOpen(next);
+    };
+    return (
+        <section
+            aria-labelledby="details-title"
+            className="@container flex min-w-0 flex-col rounded-lg border bg-card"
+        >
+            <div className="flex flex-col gap-3 p-panel pb-4">
+                <h2 id="details-title" className="text-base leading-tight font-semibold">
+                    Details
+                </h2>
+                {summary}
+            </div>
+            <Collapsible open={open} onOpenChange={toggle}>
+                <div className="flex h-11 min-w-0 items-center gap-3 border-t px-panel">
+                    <CollapsibleTrigger>
+                        {open ? "Hide details" : "Show all details"}
+                    </CollapsibleTrigger>
+                    {!open && (
+                        <span className="min-w-0 truncate text-sm text-muted-foreground">
+                            {contents}
+                        </span>
+                    )}
+                </div>
+                <CollapsibleContent>
+                    <div className="flex flex-col pb-2">{children}</div>
+                </CollapsibleContent>
+            </Collapsible>
+        </section>
+    );
+}
+
+function taskText(model: FlowModel, labels: string[]): string {
+    if (model.task === "Extract") {
+        return `JSON schema · ${labels.length} fields`;
+    }
+    if (model.task === "Classify") {
+        return `Labels · ${labels.length} ${LABEL_NOUNS[model.slug] ?? "classes"}`;
+    }
+    return "Chat";
+}
+
+function CustomSummary({ model, labels }: { model: FlowModel; labels: string[] }) {
+    const state = useFlowState();
+    const data = state.datasets.find((item) => item.slug === model.dataset);
+    const live = model.deployed ? liveVersion(model) : undefined;
+    const gguf = /gguf/i.test(model.base ?? "");
+    const replicas = model.replicas.length;
+    return (
+        <Summary>
+            <Fact label="Task">
+                <Clipped text={taskText(model, labels)} href={modelHref(model.slug, "training")} />
+            </Fact>
+            <Fact label="Live">
+                {live ? (
+                    <Clipped
+                        text={`v${live.number} · ${pct(live.scores?.[0])} ${model.metrics[0].toLowerCase()}`}
+                        href={versionHref(model.slug, live.number)}
+                    />
+                ) : (
+                    <Muted>Not deployed</Muted>
+                )}
+            </Fact>
+            <Fact label="Base">
+                <Clipped
+                    text={gguf ? (model.base ?? "") : `${model.base} · BF16`}
+                    href={modelHref(model.base ? baseModelSlug(model.base) : model.slug)}
+                />
+            </Fact>
+            <Fact label="Data">
+                {data ? (
+                    <Clipped
+                        text={`${data.slug} v${data.version} · ${count(data.rows)} rows`}
+                        href={datasetHref(data.slug)}
+                    />
+                ) : (
+                    <Clipped text="Add data" href={`${FLOW}/data?for=${model.slug}`} />
+                )}
+            </Fact>
+            <Fact label="Deployed">
+                {model.deployed ? (
+                    <Clipped
+                        text={[
+                            `${replicas} ${replicas === 1 ? "replica" : "replicas"}`,
+                            model.safety ? shortSafety(model.safety) : null,
+                        ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        href={modelHref(model.slug, "monitoring")}
+                    />
+                ) : (
+                    <Muted>Not deployed</Muted>
+                )}
+            </Fact>
+            <Fact label="API name">
+                <Mono value={apiNameOf(model)} label="Copy API name" />
+            </Fact>
+        </Summary>
+    );
+}
+
+function labelsOf(model: FlowModel, labels: string[] | undefined): string[] {
+    if (model.slug in SCHEMAS) {
+        return SCHEMAS[model.slug];
+    }
+    return model.task === "Classify" ? (labels ?? []) : [];
 }
 
 export function Details({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const can = useCan("builder");
-    const [editing, setEditing] = useState<EditKind | null>(null);
-    const edit = (kind: EditKind) => (can ? () => setEditing(kind) : undefined);
-    const entry = model.base ? catalogEntry(baseModelSlug(model.base)) : undefined;
+    const edit = (kind: EditKind) => (can ? <EditPencil model={model} kind={kind} /> : undefined);
     const data = state.datasets.find((item) => item.slug === model.dataset);
     const live = liveVersion(model);
     const ordered = newestFirst(model);
     const oldest = ordered.at(-1);
     const pending = pendingFeedback(state, model.slug).length;
     const owner = ownerOf(model.slug);
-    const labels =
-        model.slug in SCHEMAS
-            ? SCHEMAS[model.slug]
-            : model.task === "Classify"
-              ? (data?.labels.map(([label]) => label) ?? [])
-              : [];
-    const gguf = /gguf/i.test(model.base ?? "");
-    const firstLine = model.instructions.split("\n")[0];
+    const labels = labelsOf(
+        model,
+        data?.labels.map(([label]) => label),
+    );
+    const failed = model.versions.filter((version) => version.status === "failed").length;
+    const liveSha = live ? fakeSha(`${model.slug}@${live.number}`) : null;
     const reasoning = /qwen/i.test(model.base ?? "");
+    const firstLine = model.instructions.split("\n")[0];
     return (
-        <DetailsCard model={model}>
+        <DetailsCard
+            summary={<CustomSummary model={model} labels={labels} />}
+            contents="About, task setup, data, serving, lineage, integrity"
+        >
             <Group title="About">
-                <Row label="Description" onEdit={edit("description")}>
+                <Row label="Description" edit={edit("description")}>
                     {model.description ? <Clipped text={model.description} /> : <Muted>None</Muted>}
                 </Row>
-                <Row label="Tags" onEdit={edit("tags")}>
+                <Row label="Tags" edit={edit("tags")}>
                     {model.tags.length > 0 ? (
                         <Clipped text={model.tags.join(", ")} />
                     ) : (
@@ -410,82 +471,23 @@ export function Details({ model }: { model: FlowModel }) {
                     )}
                 </Row>
                 <Row label="Created">
-                    <Clipped
-                        text={`${owner.by} · ${oldest ? shortAgo(oldest) : "just now"}`}
-                        className="tabular-nums"
-                    />
+                    <Clipped text={`${owner.by} · ${oldest ? shortAgo(oldest) : "just now"}`} />
                 </Row>
                 <Row label="Updated">
-                    <Clipped
-                        text={ordered[0] ? shortAgo(ordered[0]) : "Never"}
-                        className="tabular-nums"
-                    />
+                    <Clipped text={ordered[0] ? shortAgo(ordered[0]) : "Never"} />
                 </Row>
             </Group>
-            <Group title="Base">
-                <Row label="Model">
-                    <TextLink
-                        href={modelHref(model.base ? baseModelSlug(model.base) : model.slug)}
-                        text={gguf ? (model.base ?? "") : `${model.base} · BF16`}
-                    />
-                </Row>
-                <Row label="Publisher">
-                    <Clipped text={model.publisher} />
-                </Row>
-                <Row label="Size">
-                    <Clipped
-                        text={entry ? `${entry.params} params · ${entry.context} context` : "–"}
-                        className="tabular-nums"
-                    />
-                </Row>
-                <Row label="Licence">
-                    <Clipped text={model.licence} />
-                </Row>
-                <Row label="Memory">
-                    <Clipped
-                        text={entry ? `${entry.memory} to serve` : "–"}
-                        className="tabular-nums"
-                    />
-                </Row>
-                <Row label="Training">
-                    <Clipped text={model.serveOnly ? "Serve-only" : "LoRA, QLoRA"} />
-                </Row>
-            </Group>
-            <Group title="Task">
-                <Row label="Type">
-                    <Clipped text={TASK_TYPES[model.task] ?? "Chat"} />
-                </Row>
-                <Row label={model.task === "Extract" ? "Schema" : "Labels"}>
-                    {labels.length === 0 ? (
-                        <Muted>Free text</Muted>
+            <Group title="Task setup">
+                <Row label={model.task === "Extract" ? "Fields" : "Labels"}>
+                    {labels.length > 0 ? (
+                        <Clipped text={labels.join(", ")} className="font-mono text-sm" />
                     ) : (
-                        <>
-                            <span className="tabular-nums">
-                                {model.task === "Extract"
-                                    ? `${labels.length} fields`
-                                    : `${labels.length} labels`}
-                            </span>
-                            <span aria-hidden="true" className="text-faint">
-                                ·
-                            </span>
-                            <Peek label="View">
-                                <ul className="flex flex-col gap-1 font-mono text-sm">
-                                    {labels.map((label) => (
-                                        <li key={label}>{label}</li>
-                                    ))}
-                                </ul>
-                            </Peek>
-                        </>
+                        <Muted>Free text</Muted>
                     )}
                 </Row>
-                <Row label="Instructions" onEdit={edit("instructions")}>
+                <Row label="Instructions" edit={edit("instructions")}>
                     {firstLine ? (
-                        <>
-                            <Clipped text={firstLine} />
-                            <Peek label="View">
-                                <p className="text-sm whitespace-pre-line">{model.instructions}</p>
-                            </Peek>
-                        </>
+                        <Clipped text={model.instructions.replace(/\n/g, " ")} />
                     ) : (
                         <Muted>None</Muted>
                     )}
@@ -493,67 +495,34 @@ export function Details({ model }: { model: FlowModel }) {
                 <Row label="Graders">
                     <Clipped text={GRADERS[model.task] ?? "Judge"} />
                 </Row>
-                <Row label="Promotion" onEdit={edit("rule")}>
+                <Row label="Promotion rule" edit={edit("rule")}>
                     <Clipped
-                        text={`≥ ${Math.round(model.rule[0] * 100)}%, beats live`}
-                        className="tabular-nums"
+                        text={`${model.metrics[0]} ≥ ${Math.round(model.rule[0] * 100)}%, beats live`}
                     />
                 </Row>
             </Group>
             <Group title="Data">
-                <Row label="Dataset">
+                <Row label="Splits">
                     {data ? (
-                        <TextLink
-                            href={datasetHref(data.slug)}
-                            text={`${data.slug} v${data.version}`}
+                        <Clipped
+                            text={`${count(data.split[0])} train · ${count(data.split[1])} held out`}
                         />
                     ) : (
-                        <TextLink href={`${FLOW}/data?for=${model.slug}`} text="Add data" />
+                        <Muted>No data yet</Muted>
                     )}
                 </Row>
-                <Row label="Splits">
-                    <Clipped
-                        text={
-                            data
-                                ? `${count(data.split[0])} train · ${count(data.split[1])} held out`
-                                : "–"
-                        }
-                        className="tabular-nums"
-                    />
-                </Row>
-                <Row label="Feedback">
+                <Row label="Feedback waiting">
                     <Clipped
                         text={`${pending} to review · ${model.accepted} reviewed`}
-                        className="tabular-nums"
+                        href={`${FLOW}/feedback`}
                     />
                 </Row>
                 <Row label="Test examples">
-                    <span className="tabular-nums">{count(24 + state.examples)}</span>
+                    <Clipped text={count(24 + state.examples)} />
                 </Row>
             </Group>
             <Group title="Serving">
-                <Row label="Live">
-                    {!model.deployed ? (
-                        <StatusText tone="neutral">Not deployed</StatusText>
-                    ) : live ? (
-                        <TextLink
-                            href={versionHref(model.slug, live.number)}
-                            text={`v${live.number} · ${pct(live.scores?.[0])}`}
-                        />
-                    ) : (
-                        <Muted>None</Muted>
-                    )}
-                </Row>
-                <Row label="Replicas">
-                    <Clipped
-                        text={
-                            model.replicas.length > 0
-                                ? `${model.replicas.length} on ${model.replicas.join(", ")}`
-                                : "None"
-                        }
-                    />
-                </Row>
-                <Row label="Safety" onEdit={edit("safety")}>
+                <Row label="Safety" edit={edit("safety")}>
                     {model.safety ? <Clipped text={model.safety} /> : <Muted>None</Muted>}
                 </Row>
                 <Row label="Supports">
@@ -570,10 +539,85 @@ export function Details({ model }: { model: FlowModel }) {
                         }
                     />
                 </Row>
+                <Row label="Machines">
+                    {model.replicas.length > 0 ? (
+                        <Clipped text={model.replicas.join(", ")} className="font-mono text-sm" />
+                    ) : (
+                        <Muted>None</Muted>
+                    )}
+                </Row>
             </Group>
-            <LineageAndIntegrity model={model} />
-            <EditDialog model={model} kind={editing} onClose={() => setEditing(null)} />
+            <Group title="Lineage">
+                <Row label="Created from">
+                    <Clipped text={owner.duplicated ? `Copy of ${owner.duplicated}` : "New"} />
+                </Row>
+                <Row label="Base switches">
+                    <Clipped text={owner.switches ?? "None"} />
+                </Row>
+                <Row label="Versions">
+                    <Clipped
+                        text={`${model.versions.length}${failed > 0 ? ` · ${failed} failed` : ""}`}
+                        href={modelHref(model.slug, "versions")}
+                    />
+                </Row>
+            </Group>
+            <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
+                <Row label="Live adapter">
+                    {liveSha ? (
+                        <Mono value={liveSha} label="Copy live adapter SHA-256" />
+                    ) : (
+                        <Muted>None</Muted>
+                    )}
+                </Row>
+                <Row label="Base weights">
+                    <Mono value={fakeSha(model.base ?? model.slug)} label="Copy base SHA-256" />
+                </Row>
+                <Row label="Model card">
+                    {live ? (
+                        <Clipped
+                            text={`v${live.number} card`}
+                            href={cardHref(model.slug, live.number)}
+                        />
+                    ) : (
+                        <Muted>After a version is live</Muted>
+                    )}
+                </Row>
+            </Group>
         </DetailsCard>
+    );
+}
+
+function BaseSummary({ model }: { model: FlowModel }) {
+    const entry = catalogEntry(model.slug);
+    const live = model.variants.filter((item) => item.live);
+    return (
+        <Summary>
+            <Fact label="Publisher">
+                <Clipped text={entry?.publisher ?? model.publisher} />
+            </Fact>
+            <Fact label="Size">
+                <Clipped text={entry ? `${entry.params} params · ${entry.context} context` : "–"} />
+            </Fact>
+            <Fact label="Licence">
+                <Clipped text={entry?.licence ?? model.licence} />
+            </Fact>
+            <Fact label="Variants deployed">
+                {live.length > 0 ? (
+                    <Clipped
+                        text={`${live.length} of ${model.variants.length} · ${live.map((item) => item.format).join(", ")}`}
+                        href={modelHref(model.slug, "variants")}
+                    />
+                ) : (
+                    <Muted>Not deployed</Muted>
+                )}
+            </Fact>
+            <Fact label="Memory to serve">
+                <Clipped text={entry?.memory ?? "–"} />
+            </Fact>
+            <Fact label="API name">
+                <Mono value={apiNameOf(model)} label="Copy API name" />
+            </Fact>
+        </Summary>
     );
 }
 
@@ -583,31 +627,15 @@ export function BaseDetails({ model }: { model: FlowModel }) {
     const children = state.models.filter(
         (item) => item.kind === "custom" && item.base && baseModelSlug(item.base) === model.slug,
     );
-    const live = model.variants.filter((item) => item.live);
     const update = model.variants.find((item) => item.update);
     const variantsHref = modelHref(model.slug, "variants");
     return (
-        <DetailsCard model={model}>
-            <Group title="Base">
-                <Row label="Publisher">
-                    <Clipped text={entry?.publisher ?? model.publisher} />
-                </Row>
-                <Row label="Parameters">
-                    <Clipped text={entry?.params ?? "–"} className="tabular-nums" />
-                </Row>
-                <Row label="Context">
-                    <Clipped text={entry?.context ?? "–"} className="tabular-nums" />
-                </Row>
-                <Row label="Licence">
-                    <Clipped text={entry?.licence ?? model.licence} />
-                </Row>
-                <Row label="Memory">
-                    <Clipped
-                        text={entry ? `${entry.memory} to serve` : "–"}
-                        className="tabular-nums"
-                    />
-                </Row>
-                <Row label="Training">
+        <DetailsCard
+            summary={<BaseSummary model={model} />}
+            contents="Training, serving, integrity"
+        >
+            <Group title="Training">
+                <Row label="Method">
                     <Clipped
                         text={entry?.serveOnly || model.serveOnly ? "Serve-only" : "LoRA, QLoRA"}
                     />
@@ -616,46 +644,23 @@ export function BaseDetails({ model }: { model: FlowModel }) {
                     {children.length === 0 ? (
                         <Muted>No custom models yet</Muted>
                     ) : (
-                        <span className="min-w-0 truncate">
-                            {children.map((child, index) => (
-                                <span key={child.slug}>
-                                    {index > 0 && ", "}
-                                    <Link
-                                        href={modelHref(child.slug)}
-                                        className="text-primary hover:underline"
-                                    >
-                                        {child.name}
-                                    </Link>
-                                </span>
-                            ))}
-                        </span>
+                        <Clipped text={children.map((child) => child.name).join(", ")} />
                     )}
                 </Row>
             </Group>
             <Group title="Serving">
-                <Row label="Deployed">
-                    {live.length > 0 ? (
-                        <StatusText tone="success">
-                            {`${live.length} of ${model.variants.length} variants`}
-                        </StatusText>
-                    ) : (
-                        <StatusText tone="neutral">Not deployed</StatusText>
-                    )}
-                </Row>
                 <Row label="Variants">
-                    <TextLink
-                        href={variantsHref}
+                    <Clipped
                         text={model.variants.map((item) => item.format).join(", ")}
+                        href={variantsHref}
                     />
                 </Row>
-                <Row label="Replicas">
-                    <Clipped
-                        text={
-                            model.replicas.length > 0
-                                ? `${model.replicas.length} on ${model.replicas.join(", ")}`
-                                : "None"
-                        }
-                    />
+                <Row label="Machines">
+                    {model.replicas.length > 0 ? (
+                        <Clipped text={model.replicas.join(", ")} className="font-mono text-sm" />
+                    ) : (
+                        <Muted>None</Muted>
+                    )}
                 </Row>
                 <Row label="gpu-a10-1">
                     <StatusText tone="success">Serves and trains</StatusText>
@@ -665,10 +670,15 @@ export function BaseDetails({ model }: { model: FlowModel }) {
                 </Row>
                 <Row label="Updates">
                     {update ? (
-                        <TextLink href={variantsHref} text={`${update.format} update available`} />
+                        <Clipped text={`${update.format} update available`} href={variantsHref} />
                     ) : (
                         <Muted>Up to date</Muted>
                     )}
+                </Row>
+            </Group>
+            <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
+                <Row label="Weights">
+                    <Mono value={fakeSha(model.slug)} label="Copy weights SHA-256" />
                 </Row>
             </Group>
         </DetailsCard>
