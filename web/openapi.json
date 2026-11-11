@@ -29400,6 +29400,12 @@
             "title": "Errors",
             "description": "Requests in the last 7 days that ended in a 4xx or 5xx.",
             "default": 0
+          },
+          "device_seconds": {
+            "type": "number",
+            "title": "Device Seconds",
+            "description": "Device time spent answering them, as Monitoring counts it.",
+            "default": 0.0
           }
         },
         "type": "object",

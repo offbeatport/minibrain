@@ -9151,6 +9151,12 @@ export interface components {
              * @default 0
              */
             errors?: number;
+            /**
+             * Device Seconds
+             * @description Device time spent answering them, as Monitoring counts it.
+             * @default 0
+             */
+            device_seconds?: number;
         };
         /** ValidationError */
         ValidationError: {

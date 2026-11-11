@@ -8,6 +8,7 @@ import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { jobHref } from "~/lib/modelLinks";
 import {
     BASELINE_HINT,
+    type CostShown,
     type ListModel,
     type Replica,
     type StatusLine,
@@ -19,6 +20,29 @@ import {
 
 export function Muted({ children = "—" }: { children?: ReactNode }) {
     return <span className="text-muted-foreground">{children}</span>;
+}
+
+export const ESTIMATE_HINT =
+    "Measured when this version was scored; there were no requests in the last 7 days.";
+
+export function CostCell({ shown }: { shown: CostShown }) {
+    if (!shown) {
+        return <Muted />;
+    }
+    const text = <span className="whitespace-nowrap tabular-nums">{shown.text}</span>;
+    if (!shown.estimated) {
+        return text;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="relative z-10 cursor-help whitespace-nowrap text-muted-foreground tabular-nums">
+                    {shown.text}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{ESTIMATE_HINT}</TooltipContent>
+        </Tooltip>
+    );
 }
 
 export function ModelAvatar({ model, size = "md" }: { model: ListModel; size?: "md" | "lg" }) {

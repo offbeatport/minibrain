@@ -17,7 +17,6 @@ import { Sparkline } from "~/components/Sparkline";
 import { Requests } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
 import type { Abilities } from "~/lib/access";
-import { costText } from "~/lib/cost";
 import { playgroundHref, trainingHref } from "~/lib/modelLinks";
 import { REQUESTS_PATH, STATUS_TONES } from "~/lib/requests";
 import { bytes, relativeTime } from "~/lib/time";
@@ -26,6 +25,7 @@ import {
     type ListModel,
     candidateOf,
     costOf,
+    costShown,
     deployed,
     hrefOf,
     isDeployed,
@@ -234,7 +234,7 @@ function Body({ model, on, can }: { model: ListModel; on: Handlers; can: Abiliti
     const live = deployed(model);
     const candidate = can.build ? candidateOf(model) : undefined;
     const errors = usage?.total ? (usage.errors ?? 0) / usage.total : null;
-    const cost = costOf(model);
+    const cost = costShown(usage, costOf(model));
     return (
         <>
             <SheetHeader>
@@ -271,7 +271,7 @@ function Body({ model, on, can }: { model: ListModel; on: Handlers; can: Abiliti
                     value={usage?.p95_ms != null ? `${Math.round(usage.p95_ms)} ms` : "—"}
                 />
                 <Figure label="Errors" value={errors === null ? "—" : pct(errors)} />
-                <Figure label="Cost / 1k req." value={cost ? costText(cost) : "—"} />
+                <Figure label="Cost / 1k req." value={cost?.text ?? "—"} />
             </div>
             <Block title="Latest requests">
                 <Latest model={model} />

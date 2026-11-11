@@ -61,7 +61,7 @@ export function Sparkline({
                     strokeWidth={2}
                     strokeLinejoin="round"
                     strokeLinecap="round"
-                    className="stroke-faint"
+                    className="stroke-[var(--chart-series-1)]"
                 />
                 {spots
                     .filter((point) => point.marked)

@@ -38,12 +38,12 @@ import { Sparkline } from "~/components/Sparkline";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { Requests } from "~/components/models/ModelMetrics";
 import type { Abilities } from "~/lib/access";
-import { costText } from "~/lib/cost";
 import { modelCardHref, modelPageHref, playgroundHref, trainingHref } from "~/lib/modelLinks";
 import { RETRY_LABELS, REVIEW_LABEL, busyTearingDown, needsReview } from "~/lib/teardown";
 import { bytes, relativeTime } from "~/lib/time";
 import type { Entry } from "../entries";
 import {
+    CostCell,
     LiveStatus,
     ModelAvatar,
     Muted,
@@ -58,6 +58,7 @@ import {
     canMakeLive,
     childCount,
     costOf,
+    costShown,
     deployed,
     headlineOf,
     hrefOf,
@@ -628,12 +629,8 @@ export function ModelLine({
                             <Requests usage={usage} live={live} />
                         </div>
                     ),
-                    cost: cost ? (
-                        <span className="whitespace-nowrap tabular-nums">{costText(cost)}</span>
-                    ) : (
-                        <Muted />
-                    ),
-                    p95: live ? <Milliseconds value={usage?.p95_ms} /> : <Muted />,
+                    cost: <CostCell shown={costShown(usage, cost)} />,
+                    p95: <Milliseconds value={usage?.p95_ms} />,
                 }}
             />
             <div className="min-w-0">
@@ -823,12 +820,10 @@ export function VersionLine({
                             <Requests usage={version.usage} live={version.live} />
                         </div>
                     ) : null,
-                    cost: version.cost ? (
-                        <span className="whitespace-nowrap tabular-nums">
-                            {costText(version.cost)}
-                        </span>
+                    cost: costShown(version.usage, version.cost) ? (
+                        <CostCell shown={costShown(version.usage, version.cost)} />
                     ) : null,
-                    p95: version.live ? <Milliseconds value={version.usage?.p95_ms} /> : null,
+                    p95: version.usage ? <Milliseconds value={version.usage.p95_ms} /> : null,
                 }}
             />
             <div className="min-w-0">
@@ -930,7 +925,8 @@ export function VariantLine({
                             <Requests usage={row.usage} live={live} />
                         </div>
                     ) : null,
-                    p95: live ? <Milliseconds value={row.usage?.p95_ms} /> : null,
+                    cost: row.usage ? <CostCell shown={costShown(row.usage, null)} /> : null,
+                    p95: row.usage ? <Milliseconds value={row.usage.p95_ms} /> : null,
                 }}
             />
             <div className="min-w-0">

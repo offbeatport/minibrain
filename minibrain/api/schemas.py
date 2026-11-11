@@ -1220,6 +1220,7 @@ class Usage(BaseModel):
     p50_ms: float | None
     p95_ms: float | None = None
     errors: int = Field(default=0, description="Requests in the last 7 days that ended in a 4xx or 5xx.")
+    device_seconds: float = Field(default=0.0, description="Device time spent answering them, as Monitoring counts it.")
 
 
 class ServingReplica(BaseModel):

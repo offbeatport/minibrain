@@ -2,7 +2,9 @@ import type { ModelRow, ModelUsage, ModelVersionRow } from "~/api/client";
 import type { components } from "~/api/schema";
 import { failingShare } from "~/components/models/ModelMetrics";
 import type { Tone } from "~/components/models/StatusText";
+import { costText } from "~/lib/cost";
 import { modelPageHref } from "~/lib/modelLinks";
+import { gpu } from "~/lib/traffic";
 
 export type Replica = components["schemas"]["ServingReplica"];
 
@@ -492,11 +494,24 @@ export function usageOf(model: ListModel): ModelUsage | null {
         last_at: latest(used.map((usage) => usage.last_at)) ?? used[0].last_at,
         p50_ms: highest(used.map((usage) => usage.p50_ms)),
         p95_ms: highest(used.map((usage) => usage.p95_ms)),
+        device_seconds: total((usage) => usage.device_seconds ?? 0),
     };
 }
 
 export function costOf(model: ListModel): ModelVersionRow["cost"] {
     return model.kind === "custom" ? (headlineOf(model)?.cost ?? null) : null;
+}
+
+export type CostShown = { text: string; estimated: boolean } | null;
+
+export function costShown(
+    usage: ModelUsage | null | undefined,
+    cost: ModelVersionRow["cost"],
+): CostShown {
+    if (usage && usage.total > 0) {
+        return { text: gpu(((usage.device_seconds ?? 0) * 1000) / usage.total), estimated: false };
+    }
+    return cost ? { text: costText(cost), estimated: true } : null;
 }
 
 export function updatedAt(model: ListModel): string {

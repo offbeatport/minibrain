@@ -7,7 +7,7 @@ from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload
 
 from minibrain.api.model_health import HealthContext, base_health, custom_health, version_health
-from minibrain.api.overview import Partition, partitions, ranked, shared_columns
+from minibrain.api.model_traffic import EMPTY, grouped_stats
 from minibrain.api.schemas import (
     Activity,
     Availability,
@@ -163,16 +163,6 @@ def usage_window() -> tuple[datetime, list[str]]:
     return datetime.combine(days[0], time.min, tzinfo=UTC), [day.isoformat() for day in days]
 
 
-def latency_parts(
-    session: Session, keys: Sequence[InstrumentedAttribute[Any]], where: Sequence[ColumnElement[bool]]
-) -> dict[tuple[Any, ...], Partition]:
-    names = [f"key_{index}" for index in range(len(keys))]
-    labelled = [key.label(name) for key, name in zip(keys, names, strict=True)]
-    inner = select(*labelled, *shared_columns()).where(*where).subquery()
-    query = ranked(inner, [inner.c[name] for name in names], {})
-    return partitions(list(session.execute(query)), lambda row: tuple(row[: len(keys)]))
-
-
 def usage_for(
     session: Session, keys: Sequence[InstrumentedAttribute[Any]], scope: ColumnElement[bool]
 ) -> dict[tuple[Any, ...], Usage]:
@@ -193,14 +183,14 @@ def usage_for(
     failing = RequestLog.status >= FAILED_STATUS
     failed = {tuple(row[:width]): row[width] for row in grouped(func.count(), where=[recent, failing])}
     last = {tuple(row[:width]): row[width] for row in grouped(func.max(RequestLog.at), where=[])}
-    latency = latency_parts(session, keys, [scope, recent])
+    stats = grouped_stats(session, [scope, recent], {f"key_{index}": key for index, key in enumerate(keys)})
     found: dict[tuple[Any, ...], Usage] = {}
     for target, last_at in last.items():
         if any(part is None for part in target) or last_at is None:
             continue
         counts = daily.get(target, {})
         series = [counts.get(name, 0) for name in days]
-        part = latency.get(target, Partition())
+        measured = stats.get(target, EMPTY)
         found[target] = Usage(
             days=days,
             daily=series,
@@ -208,9 +198,10 @@ def usage_for(
             previous=previous.get(target, 0),
             failed=failed.get(target, 0),
             last_at=last_at if last_at.tzinfo else last_at.replace(tzinfo=UTC),
-            p50_ms=part.p50,
-            p95_ms=part.p95,
-            errors=part.errors,
+            p50_ms=measured["p50_ms"],
+            p95_ms=measured["p95_ms"],
+            errors=measured["errors"],
+            device_seconds=measured["device_seconds"],
         )
     return found
 

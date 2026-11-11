@@ -206,7 +206,10 @@ def test_usage_reports_p95_and_errors_from_one_pass(harness: Harness) -> None:
         session.commit()
     usage = custom_row(harness, SLUG)["usage"]
     assert (usage["total"], usage["errors"], usage["failed"]) == (20, 2, 1)
-    assert (usage["p50_ms"], usage["p95_ms"]) == (100.0, 190.0)
+    assert (usage["p50_ms"], usage["p95_ms"], usage["device_seconds"]) == (100.0, 190.0, 2.1)
+    week = harness.client.get(f"/api/model-pages/{SLUG}/traffic", params={"range": "7d"}).json()["totals"]
+    listed = (usage["total"], usage["errors"], usage["p95_ms"], usage["device_seconds"])
+    assert listed == (week["requests"], week["errors"], week["p95_ms"], week["device_seconds"])
 
 
 def announce(harness: Harness, number: int, base: str) -> None:

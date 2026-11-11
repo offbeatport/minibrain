@@ -1136,18 +1136,20 @@ keys, and `/v1` stays key-only.
   base model, sorts (Needs attention first by default, Name, Score, Requests, Recently updated; within each group)
   and holds Display: Show versions and the Quality, Requests, Cost and p95 columns; filters and sort stay in the URL
   (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or letter tile, name and base,
-  the live score with a sparkline over versions, 7-day requests, cost per 1k from the live version's eval, p95, and one
-  status line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from
-  the live engines, Not deployed), then Connect or Try and a menu. A row opens the model page; arrows move, Enter
+  the live score with a sparkline over versions, then 7-day requests, device time per 1,000 requests and p95 measured
+  as the model page's Monitoring measures them (without traffic, the cost the eval measured, muted), and one status
+  line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from the
+  live engines, Not deployed), then Connect or Try and a menu. A row opens the model page; arrows move, Enter
   opens, Space opens the quick look. Show versions adds version rows under custom models (status as a dot and text,
   "beats live +1.4" or "below rule", never on v0 · Baseline, and Make vN live) and variant rows under base models
   (format, size, trainable or serve-only, API name, Deployed, Update available). Only those child rows tick: versions
   can be compared (two of one model) or deleted, variants deployed, undeployed or deleted, live ones skipped, through
   the shared delete dialog. The quick look is a `Sheet`: score over versions, a week of traffic, p95, errors and cost,
   the latest requests, the model page's next step, and Open model, Make vN live and Playground. `/api/all-models`
-  carries what it needs in a fixed number of queries: versions loaded in one batch, p50 and p95 and 4xx/5xx counts
-  from one ranked query, live replicas per base, and each base's catalogue model, format and trainability. Viewers
-  see no builder actions.
+  carries what it needs in a fixed number of queries: versions loaded in one batch, requests, p50, p95, 4xx/5xx and
+  device time from the model page's traffic statistics in one ranked query (so the 7-day numbers match its
+  Monitoring), live replicas per base, and each base's catalogue model, format and trainability. Viewers see no
+  builder actions.
 - A model's page (built 2026-11-06, rebuilt 2026-11-11 from the approved prototype) is one route for both kinds,
   `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create, import, download and rename
   refuse a name or address another model holds (409), and `new`, `base` and `custom` are reserved. Old
