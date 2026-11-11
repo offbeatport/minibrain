@@ -1,4 +1,4 @@
-import { useParams, useRouter } from "@tanstack/react-router";
+import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { Check, Send } from "lucide-react";
 import {
     Badge,
@@ -383,10 +383,28 @@ function exportLines(job: Job, start: number): LogEntry[] {
     }));
 }
 
+function transferLines(job: Job, start: number): LogEntry[] {
+    const verb = job.kind === "download" ? "Downloaded" : "Imported";
+    return [
+        `${job.kind === "download" ? "Fetching" : "Reading"} weights for ${job.model}`,
+        `${verb} every shard`,
+        "Checked SHA-256 of every file against the catalogue",
+    ].map((message, index) => ({
+        id: index + 1,
+        level: "info" as const,
+        source: job.kind,
+        message,
+        time: start + index * 4000,
+    }));
+}
+
 function logLines(job: Job, version: FlowVersion | undefined): LogEntry[] {
     const start = new Date(createdAt(job)).getTime();
     if (job.kind === "export") {
         return exportLines(job, start);
+    }
+    if (job.kind === "download" || job.kind === "import") {
+        return transferLines(job, start);
     }
     const settings = version?.settings;
     const rows = settings?.rows ?? version?.data.rows ?? 0;
@@ -572,7 +590,7 @@ function Run({ job }: { job: Job }) {
                 />
                 <Facts
                     items={[
-                        job.kind === "export"
+                        job.kind !== "train"
                             ? [
                                   "Done",
                                   <span key="s" className="tabular-nums">
@@ -643,10 +661,77 @@ function Failed({ model, version, job }: { model: FlowModel; version: FlowVersio
     );
 }
 
+const JOB_VERBS: Record<JobKind, string> = {
+    train: "Trains",
+    score: "Scores",
+    judge: "Judges",
+    download: "Downloads",
+    import: "Imports",
+    export: "Exports",
+};
+
+function JobContext({ job, model }: { job: Job; model: FlowModel | undefined }) {
+    const link = "text-primary hover:underline";
+    if (!model) {
+        return <span>{`${JOB_VERBS[job.kind]} ${job.model}`}</span>;
+    }
+    if (model.kind === "base") {
+        const variant = model.variants[0]?.format ?? "BF16";
+        return (
+            <span>
+                {`${JOB_VERBS[job.kind]} `}
+                <Link href={modelHref(model.slug)} className={link}>
+                    {`${model.name} · ${variant}`}
+                </Link>
+            </span>
+        );
+    }
+    if (job.version === null) {
+        return (
+            <span>
+                {`${JOB_VERBS[job.kind]} `}
+                <Link href={modelHref(model.slug)} className={link}>
+                    {model.name}
+                </Link>
+            </span>
+        );
+    }
+    if (job.kind === "train") {
+        return (
+            <span>
+                {"Trains "}
+                <Link href={modelHref(model.slug)} className={link}>
+                    {model.name}
+                </Link>
+                {" → "}
+                <Link href={versionHref(model.slug, job.version)} className={link}>
+                    {`v${job.version}`}
+                </Link>
+            </span>
+        );
+    }
+    return (
+        <span>
+            {`${JOB_VERBS[job.kind]} `}
+            <Link href={versionHref(model.slug, job.version)} className={link}>
+                {`${model.name} v${job.version}`}
+            </Link>
+        </span>
+    );
+}
+
 export function FlowJobPage() {
     const { id } = useParams({ strict: false }) as { id?: string };
+    const router = useRouter();
+    const pathname = useRouterState({ select: (current) => current.location.pathname });
     const state = useFlowState();
     const job = state.jobs.find((item) => item.id === Number(id));
+    const canonical = job ? jobHref(job.id) : null;
+    useEffect(() => {
+        if (canonical && pathname.replace(/\/$/, "") !== canonical) {
+            router.history.replace(canonical);
+        }
+    }, [canonical, pathname, router]);
     if (!job) {
         return (
             <Page>
@@ -659,24 +744,15 @@ export function FlowJobPage() {
     }
     const model = state.models.find((item) => item.slug === job.model);
     const version = model && job.version !== null ? findVersion(model, job.version) : undefined;
-    const subject = `${JOB_KINDS[job.kind]}${job.version !== null ? ` v${job.version}` : ""} of ${model?.name ?? job.model}`;
     const rows = lossCurve(job.version ?? 1).filter((row) => row.step <= LOSS_STEPS * reached(job));
-    const owned = model?.kind === "custom" && version;
     const artifact = state.exports.find((item) => item.jobId === job.id);
     return (
         <Page>
             <Crumbs
                 items={
-                    owned
+                    job.kind === "train"
                         ? [
-                              { label: "Models", href: `${FLOW}/models` },
-                              { label: model.name, href: modelHref(model.slug) },
-                              job.kind === "export"
-                                  ? {
-                                        label: `v${version.number}`,
-                                        href: versionHref(model.slug, version.number),
-                                    }
-                                  : { label: "Training", href: modelHref(model.slug, "training") },
+                              { label: "Training", href: `${FLOW}/training` },
                               { label: `Job #${job.id}` },
                           ]
                         : [{ label: "Jobs", href: `${FLOW}/jobs` }, { label: `Job #${job.id}` }]
@@ -686,34 +762,16 @@ export function FlowJobPage() {
                 title={`Job #${job.id}`}
                 caption={
                     <span>
-                        {model ? (
-                            <Link
-                                href={modelHref(model.slug)}
-                                className="text-primary hover:underline"
-                            >
-                                {subject}
-                            </Link>
-                        ) : (
-                            subject
-                        )}
+                        <JobContext job={job} model={model} />
                         {` · started ${relativeTime(createdAt(job))}`}
                     </span>
                 }
                 actions={
-                    <>
-                        {model && version && (
-                            <Button variant="outline" asChild>
-                                <Link href={versionHref(model.slug, version.number)}>
-                                    {`Open v${version.number}`}
-                                </Link>
-                            </Button>
-                        )}
-                        {job.status === "running" && (
-                            <Button variant="outline" onClick={() => cancelJobs([job.id])}>
-                                Cancel
-                            </Button>
-                        )}
-                    </>
+                    job.status === "running" && (
+                        <Button variant="outline" onClick={() => cancelJobs([job.id])}>
+                            Cancel
+                        </Button>
+                    )
                 }
             />
             {model &&
@@ -767,7 +825,9 @@ export function FlowJobPage() {
                     <Inputs model={model} version={version} kind={job.kind} />
                 ) : (
                     <Section title="Inputs">
-                        <p className="text-muted-foreground">{subject}</p>
+                        <p className="text-muted-foreground">
+                            <JobContext job={job} model={model} />
+                        </p>
                     </Section>
                 )}
             </div>

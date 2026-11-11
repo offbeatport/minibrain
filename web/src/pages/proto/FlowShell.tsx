@@ -168,7 +168,7 @@ function steps(state: FlowState): Step[] {
             id: "watch",
             label: "Watch v1 train on its job page",
             href: first ? jobHref(first.jobId) : modelHref(focus, "training"),
-            match: (path) => /\/jobs\/\d+$/.test(path),
+            match: (path) => /\/(jobs|training)\/\d+$/.test(path),
         },
         {
             id: "ready",

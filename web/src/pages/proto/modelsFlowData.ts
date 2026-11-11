@@ -2519,7 +2519,8 @@ export function compareHref(slug: string, a: number, b: number, deploy = false):
 }
 
 export function jobHref(id: number): string {
-    return `${FLOW}/jobs/${id}`;
+    const job = state.jobs.find((item) => item.id === id);
+    return job?.kind === "train" ? `${FLOW}/training/${id}` : `${FLOW}/jobs/${id}`;
 }
 
 export function datasetHref(slug: string): string {

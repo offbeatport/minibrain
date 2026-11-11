@@ -89,6 +89,7 @@ function flowRoutes(): AnyRoute {
         page("models/$model/versions/$version/$tab", "ModelsFlowVersionPage"),
         page("models/$model/$tab", "FlowModelPage"),
         page("training", "FlowTrainingPage"),
+        page("training/$id", "FlowJobPage"),
         page("data", "FlowDataPage"),
         page("data/$dataset", "FlowDatasetPage"),
         page("discover", "FlowDiscoverPage"),
