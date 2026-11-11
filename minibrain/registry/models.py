@@ -355,6 +355,7 @@ class Job(Base):
 
     model: Mapped[Model | None] = relationship(back_populates="jobs")
     version: Mapped[Version | None] = relationship()
+    base_model: Mapped["BaseModel | None"] = relationship(viewonly=True)
     attempts: Mapped[list["JobAttempt"]] = relationship(
         back_populates="job", cascade="all, delete-orphan", order_by="JobAttempt.number"
     )

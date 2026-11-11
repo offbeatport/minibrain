@@ -6110,6 +6110,38 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+            /**
+             * Base Model Name
+             * @description The base model's display name, for base jobs.
+             */
+            base_model_name?: string | null;
+            /**
+             * Publisher
+             * @description The base model's publisher, for base jobs.
+             */
+            publisher?: string | null;
+            /**
+             * Variant
+             * @description The precision of the base variant a download fetches.
+             */
+            variant?: string | null;
+            /**
+             * Score
+             * @description Held-out score of the version the job made or scored.
+             */
+            score?: number | null;
+            /**
+             * Method
+             * @description Training method: sft for supervised fine-tuning.
+             */
+            method?: string | null;
+            /**
+             * Strategy
+             * @description lora or qlora once the run is planned.
+             */
+            strategy?: string | null;
+            /** Rank */
+            rank?: number | null;
             /** Attempts */
             attempts: components["schemas"]["AttemptInfo"][];
             /** Result */
@@ -6129,6 +6161,7 @@ export interface components {
              * @default false
              */
             live?: boolean;
+            setup?: components["schemas"]["JobSetup"] | null;
         };
         /** JobFacets */
         JobFacets: {
@@ -6140,6 +6173,13 @@ export interface components {
             };
             /** Models */
             models: {
+                [key: string]: number;
+            };
+            /**
+             * Kinds
+             * @default {}
+             */
+            kinds?: {
                 [key: string]: number;
             };
             /**
@@ -6207,6 +6247,38 @@ export interface components {
             started_at: string | null;
             /** Finished At */
             finished_at: string | null;
+            /**
+             * Base Model Name
+             * @description The base model's display name, for base jobs.
+             */
+            base_model_name?: string | null;
+            /**
+             * Publisher
+             * @description The base model's publisher, for base jobs.
+             */
+            publisher?: string | null;
+            /**
+             * Variant
+             * @description The precision of the base variant a download fetches.
+             */
+            variant?: string | null;
+            /**
+             * Score
+             * @description Held-out score of the version the job made or scored.
+             */
+            score?: number | null;
+            /**
+             * Method
+             * @description Training method: sft for supervised fine-tuning.
+             */
+            method?: string | null;
+            /**
+             * Strategy
+             * @description lora or qlora once the run is planned.
+             */
+            strategy?: string | null;
+            /** Rank */
+            rank?: number | null;
         };
         /** JobMetrics */
         JobMetrics: {
@@ -6223,6 +6295,28 @@ export interface components {
             next_cursor: string | null;
             /** Total */
             total: number;
+        };
+        /** JobSetup */
+        JobSetup: {
+            /** Dataset */
+            dataset?: string | null;
+            /** Dataset Version */
+            dataset_version?: number | null;
+            /** Dataset Rows */
+            dataset_rows?: number | null;
+            /** Version Kind */
+            version_kind?: string | null;
+            /** Base Model */
+            base_model?: string | null;
+            /** Base Model Name */
+            base_model_name?: string | null;
+            /** Variant */
+            variant?: string | null;
+            /** Revision */
+            revision?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+            training?: components["schemas"]["TrainingSetup"] | null;
         };
         /** JudgeInfo */
         JudgeInfo: {
@@ -8565,6 +8659,38 @@ export interface components {
             /** Overrides */
             overrides: string[];
             defaults: components["schemas"]["TrainingDefaults"];
+        };
+        /** TrainingSetup */
+        TrainingSetup: {
+            /** Method */
+            method: string;
+            /**
+             * Planned
+             * @description Whether the settings are the worker's fitted plan or still the request.
+             */
+            planned: boolean;
+            /** Strategy */
+            strategy: string | null;
+            /** Precision */
+            precision: string | null;
+            /** Rank */
+            rank: number | null;
+            /** Epochs */
+            epochs: number | null;
+            /** Learning Rate */
+            learning_rate: number | null;
+            /** Batch */
+            batch: number | null;
+            /** Seq Len */
+            seq_len: number | null;
+            /** Max Rows */
+            max_rows: number | null;
+            /** Examples */
+            examples: number | null;
+            /** Held Out */
+            held_out: number | null;
+            /** Changed */
+            changed: string[];
         };
         /** TransferMetrics */
         TransferMetrics: {
@@ -14026,6 +14152,7 @@ export interface operations {
                 order?: "newest" | "oldest";
                 model?: string[] | null;
                 kind?: string[] | null;
+                method?: string[] | null;
                 status?: string[] | null;
                 id?: number[] | null;
                 q?: string;
@@ -14063,6 +14190,7 @@ export interface operations {
             query?: {
                 model?: string[] | null;
                 kind?: string[] | null;
+                method?: string[] | null;
                 status?: string[] | null;
                 id?: number[] | null;
                 q?: string;

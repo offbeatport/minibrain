@@ -471,6 +471,13 @@ class JobInfo(BaseModel):
     run_after: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    base_model_name: str | None = Field(default=None, description="The base model's display name, for base jobs.")
+    publisher: str | None = Field(default=None, description="The base model's publisher, for base jobs.")
+    variant: str | None = Field(default=None, description="The precision of the base variant a download fetches.")
+    score: float | None = Field(default=None, description="Held-out score of the version the job made or scored.")
+    method: str | None = Field(default=None, description="Training method: sft for supervised fine-tuning.")
+    strategy: str | None = Field(default=None, description="lora or qlora once the run is planned.")
+    rank: int | None = None
 
 
 class JobPage(BaseModel):
@@ -483,6 +490,7 @@ class JobFacets(BaseModel):
     total: int
     statuses: dict[str, int]
     models: dict[str, int]
+    kinds: dict[str, int] = {}
     deleted_models: dict[str, str] = {}
 
 
@@ -509,6 +517,35 @@ class AttemptInfo(BaseModel):
     finished_at: datetime | None
 
 
+class TrainingSetup(BaseModel):
+    method: str
+    planned: bool = Field(description="Whether the settings are the worker's fitted plan or still the request.")
+    strategy: str | None
+    precision: str | None
+    rank: int | None
+    epochs: float | None
+    learning_rate: float | None
+    batch: int | None
+    seq_len: int | None
+    max_rows: int | None
+    examples: int | None
+    held_out: int | None
+    changed: list[str]
+
+
+class JobSetup(BaseModel):
+    dataset: str | None = None
+    dataset_version: int | None = None
+    dataset_rows: int | None = None
+    version_kind: str | None = None
+    base_model: str | None = None
+    base_model_name: str | None = None
+    variant: str | None = None
+    revision: str | None = None
+    size_bytes: int | None = None
+    training: TrainingSetup | None = None
+
+
 class JobDetail(JobInfo):
     attempts: list[AttemptInfo]
     result: dict[str, Any] | None
@@ -516,6 +553,7 @@ class JobDetail(JobInfo):
     device: str | None = None
     host: str | None = None
     live: bool = False
+    setup: JobSetup | None = None
 
 
 class JobEventInfo(BaseModel):

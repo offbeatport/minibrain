@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, object_session
 
+from minibrain.api.job_facts import job_facts
 from minibrain.api.schemas import (
     AttemptInfo,
     BaseTargetInfo,
@@ -231,7 +232,7 @@ def job_fields(job: Job) -> dict:
         "run_after": job.run_after,
         "started_at": job.started_at,
         "finished_at": job.finished_at,
-    }
+    } | job_facts(job)
 
 
 def job_info(job: Job) -> JobInfo:

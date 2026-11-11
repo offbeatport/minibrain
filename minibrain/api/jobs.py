@@ -7,19 +7,31 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, false, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from starlette.concurrency import run_in_threadpool
 
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import QueueDep, SessionDep, StoreDep
+from minibrain.api.job_facts import TRAINING_METHODS, job_setup
 from minibrain.api.schemas import JobActionResult, JobDetail, JobEventInfo, JobFacets, JobIds, JobInfo, JobPage
 from minibrain.api.views import job_detail, job_info
 from minibrain.auth.identity import current_actor
 from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
 from minibrain.jobs.queue import JobStateError, SqlJobQueue
-from minibrain.registry.models import FINAL_JOB_STATUSES, Artifact, AuditEvent, Job, JobEvent, Model, Worker
+from minibrain.registry.models import (
+    FINAL_JOB_STATUSES,
+    Artifact,
+    AuditEvent,
+    BaseModel,
+    CatalogVariant,
+    Job,
+    JobEvent,
+    JobKind,
+    Model,
+    Worker,
+)
 from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -30,7 +42,7 @@ JOB_PAGE = 50
 JOB_PAGE_MAX = 200
 
 JobOrder = Literal["newest", "oldest"]
-Facet = Literal["status", "model"]
+Facet = Literal["status", "model", "kind"]
 
 
 def get_job(session: SessionDep, job_id: int) -> Job:
@@ -44,6 +56,7 @@ def get_job(session: SessionDep, job_id: int) -> Job:
 class JobFilter:
     models: list[str]
     kinds: list[str]
+    methods: list[str]
     statuses: list[str]
     ids: list[int]
     q: str
@@ -54,6 +67,7 @@ class JobFilter:
 def job_filter(
     model: Annotated[list[str] | None, Query()] = None,
     kind: Annotated[list[str] | None, Query()] = None,
+    method: Annotated[list[str] | None, Query()] = None,
     status: Annotated[list[str] | None, Query()] = None,
     ids: Annotated[list[int] | None, Query(alias="id")] = None,
     q: Annotated[str, Query(max_length=200)] = "",
@@ -63,6 +77,7 @@ def job_filter(
     return JobFilter(
         models=model or [],
         kinds=kind or [],
+        methods=method or [],
         statuses=status or [],
         ids=ids or [],
         q=q.strip(),
@@ -90,14 +105,21 @@ def text_match(text: str) -> ColumnElement[bool]:
     return or_(*matches)
 
 
+def method_match(methods: list[str]) -> ColumnElement[bool]:
+    known = [method for method in methods if method in TRAINING_METHODS]
+    return Job.kind == JobKind.TRAIN if known else false()
+
+
 def conditions(filters: JobFilter, skip: Facet | None = None) -> list[ColumnElement[bool]]:
     where: list[ColumnElement[bool]] = []
     if filters.models and skip != "model":
         where.append(Job.model_slug.in_(filters.models))
     if filters.statuses and skip != "status":
         where.append(Job.status.in_(filters.statuses))
-    if filters.kinds:
+    if filters.kinds and skip != "kind":
         where.append(Job.kind.in_(filters.kinds))
+    if filters.methods:
+        where.append(method_match(filters.methods))
     if filters.ids:
         where.append(Job.id.in_(filters.ids))
     if filters.q:
@@ -124,7 +146,12 @@ def list_jobs(
     where = conditions(filters)
     size = max(1, min(limit, JOB_PAGE_MAX))
     newest = order == "newest"
-    query = select(Job).options(joinedload(Job.model), joinedload(Job.version)).where(*where)
+    loads = (
+        joinedload(Job.model),
+        joinedload(Job.version),
+        joinedload(Job.base_model).joinedload(BaseModel.variant).joinedload(CatalogVariant.model),
+    )
+    query = select(Job).options(*loads).where(*where)
     if cursor is not None:
         query = query.where(Job.id < int(cursor) if newest else Job.id > int(cursor))
     query = query.order_by(Job.id.desc() if newest else Job.id.asc()).limit(size + 1)
@@ -141,6 +168,7 @@ def list_jobs(
 @router.get("/jobs/facets", dependencies=[Depends(viewer)])
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
+    by_kind = select(Job.kind, func.count()).where(*conditions(filters, "kind")).group_by(Job.kind)
     by_model = (
         select(Job.model_slug, func.count(), func.max(Job.model_name))
         .where(Job.model_slug.is_not(None), *conditions(filters, "model"))
@@ -152,6 +180,7 @@ def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
         total=count_jobs(session, conditions(filters)),
         statuses={status: count for status, count in session.execute(by_status)},
         models={str(slug): count for slug, count, _ in found},
+        kinds={kind: count for kind, count in session.execute(by_kind)},
         deleted_models={str(slug): str(name or slug) for slug, _, name in found if slug not in live},
     )
 
@@ -172,7 +201,12 @@ def worker_host(session: Session, job: Job) -> str | None:
 @router.get("/jobs/{job_id}", dependencies=[Depends(viewer)])
 def read_job(job_id: int, session: SessionDep) -> JobDetail:
     job = get_job(session, job_id)
-    context = {"device": device_of(session, job.id), "host": worker_host(session, job), "live": serving(job)}
+    context = {
+        "device": device_of(session, job.id),
+        "host": worker_host(session, job),
+        "live": serving(job),
+        "setup": job_setup(session, job),
+    }
     found = job_detail(job).model_copy(update=context)
     return found if sees_rows() else found.model_copy(update={"result": None, "outputs": {}})
 
