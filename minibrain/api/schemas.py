@@ -892,6 +892,13 @@ class TrainingSettings(BaseModel):
     learning_rate: float | None = Field(default=None, gt=0, le=0.01)
     epochs: float | None = Field(default=None, gt=0, le=10)
     max_rows: int | None = Field(default=None, ge=10)
+    alpha: int | None = Field(default=None, ge=1, le=512)
+    grad_accum: int | None = Field(default=None, ge=1, le=256)
+    eval_every: int | None = Field(
+        default=None, ge=1, le=100_000, description="Score the held-out rows every this many optimiser steps."
+    )
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+    machine: str | None = Field(default=None, description="Plan for this training machine, by name.")
 
 
 class VersionCreate(TrainingSettings):
@@ -930,6 +937,40 @@ class TrainingDefaults(BaseModel):
     learning_rate: float
     epochs: float
     max_rows: int
+    alpha: int
+    grad_accum: int | None
+    eval_every: int | None
+    seed: int
+
+
+class MachinePlanInfo(BaseModel):
+    name: str
+    pool: str
+    kind: str
+    memory_label: str
+    available_bytes: int | None
+    fits: bool
+    chosen: TrainingOptionInfo | None
+    smallest: TrainingOptionInfo | None
+    reason: str | None
+    minutes: float | None
+    steps: int | None
+    picked: bool
+
+
+class QueuedJobInfo(BaseModel):
+    job_id: int
+    model: str | None
+    model_name: str | None
+    version: int | None
+    status: str
+    progress: float
+
+
+class TrainingQueueInfo(BaseModel):
+    ahead: int
+    running: int
+    jobs: list[QueuedJobInfo]
 
 
 class TrainingPlanInfo(BaseModel):
@@ -946,6 +987,12 @@ class TrainingPlanInfo(BaseModel):
     context: int | None
     overrides: list[str]
     defaults: TrainingDefaults
+    minutes: float | None = Field(description="Estimated minutes for the chosen plan, setup and scoring included.")
+    steps: int | None
+    grad_accum: int | None
+    held_out_rows: int
+    machines: list[MachinePlanInfo]
+    queue: TrainingQueueInfo
 
 
 class VersionTest(BaseModel):
@@ -1041,7 +1088,7 @@ class KeyModel(ModelRef):
 
 
 class KeyCreate(BaseModel):
-    name: str = Field(default="default", max_length=60)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
     models: list[ModelRef] = Field(min_length=1)
 
 

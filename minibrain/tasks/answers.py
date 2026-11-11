@@ -92,8 +92,10 @@ def worse(mine: Side, live: Side | None, metric: str | None) -> bool | None:
     return mine.scores[metric] < live.scores[metric]
 
 
-def compared(session: Session, store: ArtifactStore, model: Model, version: Version) -> Compared:
-    live = live_version(model)
+def compared(
+    session: Session, store: ArtifactStore, model: Model, version: Version, reference: Version | None = None
+) -> Compared:
+    live = reference or live_version(model)
     against = live if live is not None and live.id != version.id else None
     theirs = sides(session, store, against) if against is not None else {}
     metric = version_metric(version)

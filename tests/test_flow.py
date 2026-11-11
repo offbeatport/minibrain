@@ -78,9 +78,13 @@ def deploy(harness: Harness, number: int = 0) -> None:
     assert response.status_code == 200, response.text
 
 
-def add_key(harness: Harness, *models: tuple[str, str], name: str = "ci") -> dict[str, Any]:
-    body = {"name": name, "models": [{"kind": kind, "key": key} for kind, key in models or [("custom", SLUG)]]}
-    response = harness.client.post("/api/keys", json=body)
+def add_key(harness: Harness, *models: tuple[str, str], name: str | None = None) -> dict[str, Any]:
+    scopes = [{"kind": kind, "key": key} for kind, key in models or [("custom", SLUG)]]
+    attempt = 1
+    response = harness.client.post("/api/keys", json={"name": name or "ci", "models": scopes})
+    while response.status_code == 409 and name is None:
+        attempt += 1
+        response = harness.client.post("/api/keys", json={"name": f"ci-{attempt}", "models": scopes})
     assert response.status_code == 201, response.text
     return response.json()
 

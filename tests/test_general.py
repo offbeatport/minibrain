@@ -265,6 +265,10 @@ def test_a_chat_assistant_end_to_end(harness: Harness) -> None:
     assert flagged[0]["live"]["reason"] == "Right and short."
     assert compared["examples"][0]["worse"] is False
     assert len(second["eval"]) == len(compared["examples"])
+    reverse = harness.client.get(f"/api/models/{SLUG}/versions/1/answers", params={"against": 2}).json()
+    assert reverse["live"] == 2
+    assert next(row["version"]["answer"] for row in reverse["examples"] if row["worse"] is False) == "No idea."
+    assert not any(row["worse"] for row in reverse["examples"])
 
     harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt"})
     answer(harness, {0: "No idea."})

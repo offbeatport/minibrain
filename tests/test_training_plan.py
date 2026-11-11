@@ -14,8 +14,12 @@ from minibrain.ml.planner import (
     Machine,
     PlanError,
     Settings,
+    estimate,
     estimated_tokens,
+    eval_checks,
     plan,
+    train_minutes,
+    train_steps,
 )
 from minibrain.models.hardware import Gpu, NodeReport
 from minibrain.tasks.contracts import label_set
@@ -334,3 +338,125 @@ def test_examples_are_measured_the_way_trl_tokenizes_them() -> None:
     assert len(found.tokens) == prompt + len("billing")
     assert longest([found]) == len(found.tokens)
     assert truncated([found], 10) == 1
+
+
+def test_time_grows_with_the_work_and_slows_with_qlora_and_checkpointing() -> None:
+    eight = base("qwen3-8b")
+    lora = estimate(eight, A100, LORA, False, 8, 512, 16)
+    minutes = train_minutes(eight, lora, 3000, 1, 16, 512, 300)
+    assert 20 < minutes < 30
+    assert train_minutes(eight, lora, 6000, 1, 16, 512, 300) > minutes
+    assert train_minutes(eight, lora, 3000, 2, 16, 512, 300) > minutes
+    assert train_minutes(eight, lora, 3000, 1, 32, 512, 300) > minutes
+    assert train_minutes(eight, lora, 3000, 1, 16, 1024, 300) > minutes
+    assert train_minutes(eight, estimate(eight, A100, QLORA, False, 8, 512, 16), 3000, 1, 16, 512, 300) > minutes
+    assert train_minutes(eight, estimate(eight, A100, LORA, True, 8, 512, 16), 3000, 1, 16, 512, 300) > minutes
+    assert train_minutes(eight, estimate(eight, XEON, LORA, False, 8, 512, 16), 3000, 1, 16, 512, 300) > minutes
+    assert train_minutes(eight, lora, 3000, 1, 16, 512, 300, 5) > train_minutes(eight, lora, 3000, 1, 16, 512, 300, 100)
+    assert train_minutes(eight, lora, 3000, 1, 16, 512, 0) < minutes
+    assert train_steps(3000, 1, 8, 2) == 188
+    assert train_steps(3000, 2.5, 4, 4) == 469
+    assert (eval_checks(188, 50), eval_checks(188, None), eval_checks(5, None), eval_checks(1, 10)) == (4, 9, 5, 1)
+
+
+def test_every_trainer_machine_is_planned_and_one_can_be_pinned() -> None:
+    eight = base("qwen3-8b")
+    silent = Machine("worker", "cuda", None, None)
+    found = plan(eight, [M1_PRO, A100, silent], Settings(), 160, 3000)
+    assert found.machine == A100
+    assert [item.machine for item in found.machines] == [M1_PRO, A100, silent]
+    mac, a100, unknown = found.machines
+    assert mac.chosen is None
+    assert mac.refusal is not None
+    assert mac.refusal.startswith("Qwen3 8B does not fit for training on Apple GPU (arm64)")
+    assert mac.smallest is not None
+    assert mac.smallest.peak_bytes > (M1_PRO.available_bytes or 0) * HEADROOM
+    assert a100.chosen is not None
+    assert a100.steps == train_steps(3000, 1, a100.chosen.micro_batch, a100.chosen.grad_accum)
+    assert (a100.minutes(100) or 0) > 2
+    assert (unknown.chosen, unknown.refusal, unknown.minutes(100)) == (None, None, None)
+    pinned = plan(eight, [M1_PRO, A100, silent], Settings(), 160, 3000, "Apple GPU (arm64)")
+    assert (pinned.machine, pinned.chosen, pinned.refusal) == (M1_PRO, None, mac.refusal)
+    assert len(pinned.machines) == 3
+    with pytest.raises(PlanError, match="No training machine called H100"):
+        plan(eight, [A100], Settings(), 160, 3000, "H100")
+
+
+def test_alpha_accumulation_scoring_and_seed_reach_the_recipe() -> None:
+    plain = plan(base("qwen3-0.6b"), [RTX_4090], Settings(rank=8), 160, 3000).recipe()
+    assert (plain["alpha"], plain["seed"], plain["grad_accum"]) == (16, 7, 2)
+    assert "eval_every" not in plain
+    settings = Settings(alpha=24, grad_accum=4, eval_every=25, seed=11)
+    found = plan(base("qwen3-0.6b"), [RTX_4090], settings, 160, 3000)
+    assert found.chosen is not None
+    assert found.chosen.grad_accum == 4
+    recipe = found.recipe()
+    assert (recipe["alpha"], recipe["grad_accum"], recipe["eval_every"], recipe["seed"]) == (24, 4, 25, 11)
+    assert recipe["overrides"] == ["alpha", "grad_accum", "eval_every", "seed"]
+
+
+def test_the_worker_keeps_alpha_seed_and_scoring_when_it_replans() -> None:
+    from minibrain.ml.strategies import fit_here
+
+    settings = Settings(alpha=8, grad_accum=4, eval_every=30, seed=3)
+    stored = plan(base("qwen3-8b"), [A100], settings, 160, 3000).recipe()
+    moved, replanned = fit_here(base("qwen3-8b"), RTX_4090, stored, encoded([100, 150]))
+    assert replanned
+    recipe = moved.recipe()
+    assert (recipe["alpha"], recipe["grad_accum"], recipe["eval_every"], recipe["seed"]) == (8, 4, 30, 3)
+
+
+def test_seed_and_scoring_steps_reach_the_trainer_config(tmp_path: Path) -> None:
+    from minibrain.ml import train
+
+    recipe = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000).recipe()
+    plain = train.sft_config(tmp_path, recipe, "cpu", evaluate=True)
+    assert (plain.seed, plain.eval_steps) == (7, 0.1)
+    chosen = train.sft_config(tmp_path, recipe | {"seed": 11, "eval_every": 25}, "cpu", evaluate=True)
+    assert (chosen.seed, chosen.eval_steps) == (11, 25)
+    assert train.sft_config(tmp_path, recipe | {"eval_every": 25}, "cpu").eval_steps is None
+
+
+def test_training_plan_lists_every_machine_the_time_and_the_queue(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    register(harness, worker_hardware(2 * GIB, accelerator="cpu"), host="cpu-box")
+    url = f"/api/models/{SLUG}/training-plan"
+    found = harness.client.get(url).json()
+    assert (found["level"], found["machine"]) == ("fits", "Test GPU")
+    assert found["minutes"] > 2
+    assert found["steps"] >= 1
+    assert found["grad_accum"] == found["chosen"]["grad_accum"]
+    assert found["held_out_rows"] > 0
+    assert found["queue"] == {"ahead": 0, "running": 0, "jobs": []}
+    assert found["defaults"] | {"alpha": 32, "seed": 7, "eval_every": None} == found["defaults"]
+    machines = {item["name"]: item for item in found["machines"]}
+    assert set(machines) == {"Test GPU", "Test CPU"}
+    gpu, cpu = machines["Test GPU"], machines["Test CPU"]
+    assert (gpu["fits"], gpu["picked"], gpu["pool"], gpu["kind"], gpu["reason"]) == (True, True, "local", "cuda", None)
+    assert gpu["minutes"] == found["minutes"]
+    assert (cpu["fits"], cpu["picked"], cpu["chosen"], cpu["minutes"]) == (False, False, None, None)
+    assert cpu["reason"].startswith("Qwen3 0.6B does not fit for training on Test CPU")
+    assert cpu["smallest"]["peak_bytes"] > cpu["available_bytes"] * HEADROOM
+    pinned = harness.client.get(url, params={"machine": "Test CPU"}).json()
+    assert (pinned["level"], pinned["machine"], pinned["minutes"]) == ("insufficient", "Test CPU", None)
+    assert len(pinned["machines"]) == 2
+    missing = harness.client.get(url, params={"machine": "H100"})
+    assert missing.status_code == 409
+    assert missing.json()["detail"] == "No training machine called H100"
+    refused = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora", "machine": "Test CPU"})
+    assert refused.status_code == 409
+    body = {"kind": "lora", "machine": "Test GPU", "alpha": 12, "grad_accum": 4, "eval_every": 20, "seed": 5}
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json=body)
+    assert version.status_code == 201, version.text
+    stored = version.json()["recipe"]
+    assert (stored["alpha"], stored["grad_accum"], stored["eval_every"], stored["seed"]) == (12, 4, 20, 5)
+    queued = harness.client.get(url).json()["queue"]
+    assert (queued["ahead"], queued["running"]) == (1, 0)
+    assert (
+        queued["jobs"][0] | {"model": SLUG, "version": version.json()["number"], "status": "queued"}
+        == (queued["jobs"][0])
+    )
+    claim = harness.claim(["train"])
+    assert claim is not None
+    assert claim["params"]["recipe"]["seed"] == 5

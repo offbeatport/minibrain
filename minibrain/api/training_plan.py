@@ -1,16 +1,20 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
+    MachinePlanInfo,
+    QueuedJobInfo,
     TrainFitInfo,
     TrainingDefaults,
     TrainingOptionInfo,
     TrainingPlanInfo,
     TrainingPlanQuery,
+    TrainingQueueInfo,
     TrainingSettings,
 )
 from minibrain.data.dataset_versions import chosen_dataset_version, require_splits
@@ -31,13 +35,24 @@ from minibrain.models.hardware import NodeReport
 from minibrain.models.train_facts import base_facts, catalogue_base, longest_example, trainer_machines
 from minibrain.registry.compute import pools
 from minibrain.registry.files import dataset_version_location, store_for
-from minibrain.registry.models import CatalogModel, CatalogVariant, DatasetVersion, Model
+from minibrain.registry.models import (
+    ACTIVE_JOB_STATUSES,
+    CatalogModel,
+    CatalogVariant,
+    DatasetVersion,
+    Job,
+    JobKind,
+    JobStatus,
+    Model,
+)
 from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 from minibrain.tasks.rebase import serve_only
 
 router = APIRouter(prefix="/api", tags=["training"])
 PlanLevel = Literal["fits", "insufficient", "unknown"]
+QUEUE_SHOWN = 10
+HELD_OUT_SPLIT = "eval"
 
 
 def planner_settings(body: TrainingSettings) -> Settings:
@@ -51,6 +66,10 @@ def planner_settings(body: TrainingSettings) -> Settings:
         learning_rate=body.learning_rate or defaults.learning_rate,
         epochs=body.epochs or defaults.epochs,
         max_rows=body.max_rows or defaults.max_rows,
+        alpha=body.alpha,
+        grad_accum=body.grad_accum,
+        eval_every=body.eval_every,
+        seed=defaults.seed if body.seed is None else body.seed,
     )
 
 
@@ -83,7 +102,7 @@ def training_plan(
     rows, longest = longest_example(location, chosen.max_rows)
     machines = trainer_machines(pools(session, node))
     try:
-        return plan(model_base(session, settings, model), machines, chosen, longest, rows), longest
+        return plan(model_base(session, settings, model), machines, chosen, longest, rows, body.machine), longest
     except PlanError as error:
         raise ConflictError(str(error)) from error
 
@@ -130,10 +149,67 @@ def defaults_of(found: Plan) -> TrainingDefaults:
         learning_rate=settings.learning_rate,
         epochs=settings.epochs,
         max_rows=settings.max_rows,
+        alpha=settings.lora_alpha,
+        grad_accum=chosen.grad_accum if chosen else None,
+        eval_every=settings.eval_every,
+        seed=settings.seed,
     )
 
 
-def plan_info(found: Plan, default: Plan, longest: int) -> TrainingPlanInfo:
+def unreported(machine: Machine) -> str:
+    return f"{machine.name} has not reported its {machine.memory_label} yet."
+
+
+def machine_info(found: Plan, picked: Machine | None, held_out: int) -> MachinePlanInfo | None:
+    machine = found.machine
+    if machine is None:
+        return None
+    reason = None if found.chosen else found.refusal or unreported(machine)
+    return MachinePlanInfo(
+        name=machine.name,
+        pool=machine.pool,
+        kind=machine.kind,
+        memory_label=machine.memory_label,
+        available_bytes=machine.available_bytes,
+        fits=found.chosen is not None,
+        chosen=option_info(found.chosen) if found.chosen else None,
+        smallest=option_info(found.smallest) if found.smallest else None,
+        reason=reason,
+        minutes=found.minutes(held_out),
+        steps=found.steps,
+        picked=picked is not None and machine.name == picked.name,
+    )
+
+
+def queue_info(session: Session) -> TrainingQueueInfo:
+    active = list(
+        session.scalars(
+            select(Job).where(Job.kind == JobKind.TRAIN, Job.status.in_(ACTIVE_JOB_STATUSES)).order_by(Job.id)
+        )
+    )
+    return TrainingQueueInfo(
+        ahead=len(active),
+        running=sum(1 for job in active if job.status == JobStatus.RUNNING),
+        jobs=[
+            QueuedJobInfo(
+                job_id=job.id,
+                model=job.model_slug,
+                model_name=job.model_name,
+                version=job.version_number,
+                status=job.status,
+                progress=job.progress,
+            )
+            for job in active[:QUEUE_SHOWN]
+        ],
+    )
+
+
+def held_out_rows(dataset_version: DatasetVersion) -> int:
+    return int((dataset_version.counts or {}).get(HELD_OUT_SPLIT, 0))
+
+
+def plan_info(found: Plan, default: Plan, longest: int, held_out: int, queue: TrainingQueueInfo) -> TrainingPlanInfo:
+    machines = [machine_info(item, found.machine, held_out) for item in found.machines]
     return TrainingPlanInfo(
         level=plan_level(found),
         basis=found.basis,
@@ -148,6 +224,12 @@ def plan_info(found: Plan, default: Plan, longest: int) -> TrainingPlanInfo:
         context=found.base.context,
         overrides=found.settings.overrides(),
         defaults=defaults_of(default),
+        minutes=found.minutes(held_out),
+        steps=found.steps,
+        grad_accum=found.chosen.grad_accum if found.chosen else None,
+        held_out_rows=held_out,
+        machines=[item for item in machines if item is not None],
+        queue=queue,
     )
 
 
@@ -164,8 +246,9 @@ def get_training_plan(
     found, longest = training_plan(session, settings, node, model, dataset_version, query)
     default = found
     if found.settings.overrides():
-        default, _ = training_plan(session, settings, node, model, dataset_version, TrainingSettings())
-    return plan_info(found, default, longest)
+        plain = TrainingSettings(machine=query.machine)
+        default, _ = training_plan(session, settings, node, model, dataset_version, plain)
+    return plan_info(found, default, longest, held_out_rows(dataset_version), queue_info(session))
 
 
 def train_fit(entry: CatalogModel, variant: CatalogVariant, machines: list[Machine]) -> TrainFitInfo:

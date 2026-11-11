@@ -175,6 +175,7 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     model.promotion = rule_from(body.promotion, chosen.promotion)
     if body.dataset:
         model.dataset = get_dataset(session, body.dataset)
+    session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     first_version(session, settings, store, model)
     return model
 
@@ -182,7 +183,6 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
 @router.post("", status_code=201, dependencies=[Depends(builder)])
 def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> ModelDetail:
     model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
-    session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     session.commit()
     return detail(settings, model)
 
@@ -199,15 +199,15 @@ def duplicate(
     require_idle(source.teardown, source.name)
     require_base(session, source.base_model)
     model = duplicate_model(session, source, body.name)
-    first_version(session, settings, store, model)
     version = source_version(source)
+    facts = created(model) | {"source": source.slug, "version": version.number if version is not None else None}
+    session.add(AuditEvent(actor=current_actor(), action="model.duplicate", target=model.slug, detail=facts))
+    first_version(session, settings, store, model)
     if version is not None:
         copy = copied_version(session, model, source, version)
         audit_version(
             session, model, copy.number, "version.create", kind=str(copy.kind), duplicated_from=copy.duplicated_from
         )
-    facts = created(model) | {"source": source.slug, "version": version.number if version is not None else None}
-    session.add(AuditEvent(actor=current_actor(), action="model.duplicate", target=model.slug, detail=facts))
     session.commit()
     return detail(settings, model)
 
@@ -220,6 +220,7 @@ def default_name(session: SessionDep, preset_key: str = Query(default="general",
 @router.patch("/{slug}", dependencies=[Depends(builder)])
 def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, slug)
+    before = {"name": model.name, "description": model.description, "tags": list(model.tags)}
     if body.name is not None:
         check_rename(session, model.name, body.name)
         model.name = body.name.strip()
@@ -227,9 +228,23 @@ def update(slug: str, body: ModelUpdate, session: SessionDep, settings: Settings
         model.description = body.description.strip()
     if body.tags is not None:
         model.tags = merged_tags(model.tags, body.tags)
+    audit_update(session, model, before)
     model.updated_at = now()
     session.commit()
     return detail(settings, model)
+
+
+def audit_update(session: Session, model: Model, before: dict[str, Any]) -> None:
+    after = {"name": model.name, "description": model.description, "tags": list(model.tags)}
+    changed = [field for field in after if after[field] != before[field]]
+    if not changed:
+        return
+    facts = {
+        "name": model.name,
+        "from": {field: before[field] for field in changed},
+        "to": {field: after[field] for field in changed},
+    }
+    session.add(AuditEvent(actor=current_actor(), action="model.update", target=model.slug, detail=facts))
 
 
 @router.get("/{slug}", dependencies=[Depends(viewer)])
@@ -344,7 +359,6 @@ def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     base_name, download_bytes = fetch_sample_base(session, settings, DEFAULT_BASE_MODEL)
     body = sample_body(session, settings, store)
     model = configured(session, settings, store, body, DEFAULT_BASE_MODEL)
-    session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     session.commit()
     return SampleDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
 

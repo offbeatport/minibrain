@@ -10,7 +10,16 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.ml.context import FinalError, JobSpec
 from minibrain.ml.devices import device_name, half_dtype, kind_of
 from minibrain.ml.examples import Encoded, longest, truncated
-from minibrain.ml.planner import QLORA, Base, Machine, Plan, Settings, plan_machine, seq_len_for
+from minibrain.ml.planner import (
+    DEFAULT_SEED,
+    QLORA,
+    Base,
+    Machine,
+    Plan,
+    Settings,
+    plan_machine,
+    seq_len_for,
+)
 from minibrain.ml.runtime import load_base_model
 from minibrain.models.hardware import ram_bytes
 from minibrain.versions import installed_versions
@@ -62,6 +71,10 @@ def settings_of(recipe: dict[str, Any], keep: tuple[str, ...]) -> Settings:
         learning_rate=float(recipe["learning_rate"]),
         epochs=float(recipe["epochs"]),
         max_rows=int(recipe["max_rows"]),
+        alpha=int(recipe["alpha"]) if "alpha" in overrides else None,
+        grad_accum=int(recipe["grad_accum"]) if "grad_accum" in overrides else None,
+        eval_every=int(recipe["eval_every"]) if recipe.get("eval_every") else None,
+        seed=int(recipe.get("seed", DEFAULT_SEED)),
     )
 
 

@@ -18,6 +18,7 @@ from minibrain.data.splits import read_split
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
+from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE
 from minibrain.ml.runtime import load_tokenizer
 from minibrain.ml.strategies import (
     fitted_recipe,
@@ -31,8 +32,6 @@ from minibrain.tasks.examples import Example, assistant_turns
 from minibrain.tasks.prompting import Prompting
 
 CHECKPOINT_STEPS = 50
-EVAL_ROWS = 64
-EVAL_SHARE = 0.1
 DEVICE_MARK = "training-device"
 FIRST_STEP_SECONDS = 900.0
 STALL_SECONDS = 180.0
@@ -184,6 +183,13 @@ def micro_batches(recipe: dict[str, Any], device: str) -> tuple[int, int]:
     return (1, batch * accumulate) if kind_of(device) == "mps" else (batch, accumulate)
 
 
+def eval_steps(recipe: dict[str, Any], evaluate: bool) -> float | int | None:
+    if not evaluate:
+        return None
+    every = recipe.get("eval_every")
+    return int(every) if every else EVAL_SHARE
+
+
 def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, evaluate: bool = False) -> SFTConfig:
     batch, accumulate = micro_batches(recipe, device)
     settings = trainer_settings(recipe)
@@ -201,7 +207,7 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, evaluate:
         warmup_steps=10,
         logging_steps=1,
         eval_strategy="steps" if evaluate else "no",
-        eval_steps=EVAL_SHARE if evaluate else None,
+        eval_steps=eval_steps(recipe, evaluate),
         per_device_eval_batch_size=batch,
         prediction_loss_only=True,
         save_strategy="steps",
@@ -214,7 +220,7 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, evaluate:
         use_cpu=device == "cpu",
         bf16=half_dtype(device) == torch.bfloat16,
         fp16=half_dtype(device) == torch.float16,
-        seed=7,
+        seed=int(recipe.get("seed", DEFAULT_SEED)),
     )
 
 

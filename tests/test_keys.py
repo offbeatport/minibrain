@@ -82,3 +82,20 @@ def test_keys_need_a_known_model(harness: Harness) -> None:
     unknown = {"name": "x", "models": [{"kind": "base", "key": "nope"}]}
     assert harness.client.post("/api/keys", json=unknown).status_code == 404
     assert harness.client.post("/api/keys", json={"name": "x", "models": []}).status_code == 422
+
+
+def test_keys_need_a_name_unique_per_model(harness: Harness, tmp_path: Path) -> None:
+    two_models(harness, tmp_path)
+    custom = [{"kind": "custom", "key": SLUG}]
+    assert harness.client.post("/api/keys", json={"models": custom}).status_code == 422
+    assert harness.client.post("/api/keys", json={"name": "   ", "models": custom}).status_code == 422
+    assert harness.client.post("/api/keys", json={"name": "x" * 61, "models": custom}).status_code == 422
+    first = harness.client.post("/api/keys", json={"name": " helpdesk ", "models": custom})
+    assert first.status_code == 201 and first.json()["name"] == "helpdesk"
+    clash = harness.client.post("/api/keys", json={"name": "HelpDesk", "models": custom})
+    assert clash.status_code == 409
+    assert clash.json()["detail"] == "A key called HelpDesk already calls Support Triage."
+    base = [{"kind": "base", "key": "base-one"}]
+    assert harness.client.post("/api/keys", json={"name": "helpdesk", "models": base}).status_code == 201
+    both = harness.client.post("/api/keys", json={"name": "helpdesk", "models": custom + base})
+    assert both.status_code == 409

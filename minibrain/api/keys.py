@@ -8,7 +8,7 @@ from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate
 from minibrain.api.views import key_info
 from minibrain.auth.identity import current_actor
 from minibrain.registry.models import ApiKey, AuditEvent, BaseModel, Model
-from minibrain.registry.service import NotFoundError, create_key, get_model, set_scopes
+from minibrain.registry.service import ConflictError, NotFoundError, create_key, get_model, set_scopes
 
 router = APIRouter(prefix="/api/keys", tags=["keys"])
 
@@ -25,6 +25,21 @@ def resolve(session: Session, refs: list[ModelRef]) -> tuple[list[Model], list[s
         else:
             model_ids.append(ref.key)
     return list(models.values()), model_ids
+
+
+def name_clash(session: Session, name: str, models: list[Model], model_ids: list[str]) -> str | None:
+    wanted = name.strip().casefold()
+    custom = {model.id: model.name for model in models}
+    for key in session.scalars(select(ApiKey)):
+        if key.name.strip().casefold() != wanted:
+            continue
+        for scope in key.scopes:
+            if scope.model_id is not None and scope.model_id in custom:
+                return custom[scope.model_id]
+            if scope.base_model_id is not None and scope.base_model_id in model_ids:
+                base = session.get(BaseModel, scope.base_model_id)
+                return base.name if base is not None else scope.base_model_id
+    return None
 
 
 def get_key(session: Session, key_id: int) -> ApiKey:
@@ -49,6 +64,9 @@ def list_keys(session: SessionDep) -> list[KeyInfo]:
 @router.post("", status_code=201, dependencies=[Depends(builder)])
 def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     models, model_ids = resolve(session, body.models)
+    taken = name_clash(session, body.name, models, model_ids)
+    if taken is not None:
+        raise ConflictError(f"A key called {body.name} already calls {taken}.")
     key, secret = create_key(session, body.name, models, model_ids)
     key.created_by = current_actor()
     audit(session, "key.create", key)

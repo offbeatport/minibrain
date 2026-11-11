@@ -143,9 +143,12 @@ def answer_side(side: Side | None) -> AnswerSide | None:
 
 
 @router.get("/models/{slug}/versions/{number}/answers", dependencies=[Depends(builder)])
-def version_answers(slug: str, number: int, session: SessionDep, store: StoreDep) -> VersionAnswers:
+def version_answers(
+    slug: str, number: int, session: SessionDep, store: StoreDep, against: int | None = None
+) -> VersionAnswers:
     model = get_model(session, slug)
-    found = compared(session, store, model, get_version(model, number))
+    other = get_version(model, against) if against is not None else None
+    found = compared(session, store, model, get_version(model, number), other)
     return VersionAnswers(
         number=found.number,
         live=found.live,

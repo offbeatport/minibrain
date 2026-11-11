@@ -148,7 +148,7 @@ def create_key(
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
     days = int(load(session)["key_expiry_days"])
     key = ApiKey(
-        name=name.strip() or "default",
+        name=name.strip(),
         prefix=raw[:10],
         digest=key_digest(raw),
         expires_at=now() + timedelta(days=days) if days else None,

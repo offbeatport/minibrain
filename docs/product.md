@@ -127,14 +127,20 @@ Principles: any size, own hardware, air-gapped, gated on scores
   See custom and base models with status, version and traffic.
   UI: Models · API: GET /api/all-models
 - **Model page** · shipped · product, ml, admin
-  One page per model, with Overview, Versions, Data and API tabs.
+  One page per model: Overview, Versions, Training, Monitoring and API keys.
   UI: Models › model · API: GET /api/model-pages/{name}, GET /api/base-models/{key}, PATCH /api/base-models/{key}
 - **Model overview** · shipped · product, ml
-  Score against earlier versions, a week of traffic and one next step.
-  UI: Models › model › Overview · API: GET /api/model-pages/{name}
-- **Try a model inline** · shipped · product, ml
-  Ask a question on the model page, then continue in the Playground.
-  UI: Models › model › Overview › Try it · API: POST /api/playground/chat/completions
+  Usage by version, one next step, its facts, details and activity.
+  UI: Models › model › Overview · API: GET /api/model-pages/{name}, GET /api/model-pages/{name}/traffic
+- **Model activity** · shipped · product, ml, admin
+  See a model's audited changes as a timeline, bursts folded.
+  UI: Models › model › Overview › Activity · API: GET /api/model-pages/{name}/activity
+- **Model monitoring** · shipped · engineer, admin
+  Traffic, latency, errors, versions, callers and requests of one model.
+  UI: Models › model › Monitoring · API: GET /api/model-pages/{name}/traffic, GET /api/requests
+- **Version page** · shipped · product, ml
+  A version's score, where it differs from live, its recipe and files.
+  UI: Models › model › Versions › version · API: GET /api/models/{slug}/versions, GET /api/models/{slug}/versions/{number}/answers
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/base-models/{key}, GET /api/models/{slug}/versions/{number}/files
@@ -143,7 +149,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › Add model, Models › model › Edit · API: POST /api/models, PATCH /api/models/{slug}, PATCH /api/base-models/{key}, POST /api/base-models/import
 - **Try a base model** · shipped · product, ml
   Send a prompt to a base model before building on it.
-  UI: Models › model › Test · API: POST /api/base-models/{key}/test
+  UI: Models › Test, Models › model › Playground · API: POST /api/base-models/{key}/test
 - **Base model health** · shipped · admin
   Verify, repair, re-import or relocate damaged weights in one action.
   UI: Models › model › View files, Models › model › Overview · API: POST /api/base-models/{key}/verify, POST /api/base-models/{key}/repair, POST /api/base-models/{key}/reimport, POST /api/base-models/{key}/relocate, POST /api/base-models/{key}/retry, POST /api/base-models/{key}/recheck
@@ -217,7 +223,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Training
 - **Training data per model** · shipped · product, ml
   Pick or map the dataset a model trains on.
-  UI: Models › model › Training · API: PUT /api/models/{slug}/dataset, PUT /api/models/{slug}/mapping, POST /api/models/{slug}/query, GET /api/models/{slug}/preview
+  UI: Models › model › Training › Training data · API: PUT /api/models/{slug}/dataset, PUT /api/models/{slug}/mapping, POST /api/models/{slug}/query, GET /api/models/{slug}/preview
 - **LoRA training** · shipped · product, ml
   Train a LoRA version on a picked dataset version.
   UI: Models › model › Training › Train · API: POST /api/models/{slug}/versions
@@ -232,13 +238,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Evaluations · API: GET /api/models/{slug}/versions, DELETE /api/models/{slug}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
-  UI: Models › model › Training › Train · API: GET /api/models/{slug}/training-plan
+  UI: Models › model › Training › Train › Compute · API: GET /api/models/{slug}/training-plan
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
   UI: Models › model › Training › Train · Roadmap: Training memory
 - **Training settings** · partial · ml
-  Override strategy, batch, sequence length, rank, rate, epochs and rows per run.
-  UI: Models › model › Training › Train › Settings, Settings › General › Default training recipe · API: POST /api/models/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
+  Pick a quality preset or override every planner and trainer setting.
+  UI: Models › model › Training › Train › Advanced, Settings › General › Default training recipe · API: POST /api/models/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE
@@ -251,9 +257,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Models as code** · planned · ml, engineer
   Keep each model in a minibrain.yaml and rerun it from CI.
   CLI: minibrain run · Roadmap: Config as code
-- **Exports** · planned · ml
-  Export adapters or merged weights as safetensors or GGUF.
-  Roadmap: For ML engineers
+- **Exports** · partial · ml
+  Download a version's adapter; merged weights and GGUF come later.
+  UI: Models › model › version › Export · API: GET /api/artifacts/{artifact_id} · Roadmap: For ML engineers
 - **Multi-node training** · planned · ml, admin
   Train across GPUs and nodes with Ray.
   Roadmap: v2
@@ -298,14 +304,14 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
   UI: Models › model › Versions › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
-- **Score diff** · planned · product, ml
-  Compare two versions' scores, not only their data.
-  Roadmap: v2
+- **Score diff** · shipped · product, ml
+  Compare two versions' scores, settings and held-out answers.
+  UI: Models › model › Versions › Compare · API: GET /api/models/{slug}/versions/{number}/answers
 
 ## Serving
 - **Deploy and roll back** · shipped · product, engineer
-  Deploy a version that passes its rule; roll back any time.
-  UI: Models › model, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
+  Make a passing version live, or an earlier one again.
+  UI: Models › model › version › Make live, Models › model › Deploy, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
   UI: Models › model › Deploy · API: POST /api/base-models/{key}/deploy
@@ -328,11 +334,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access
 - **API keys** · shipped · engineer, admin
-  Issue keys scoped to models, with expiry and an audit trail.
-  UI: Models › model › API · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
+  Issue named keys scoped to models, with expiry and an audit trail.
+  UI: Models › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
-  UI: Models › model › API
+  UI: Models › model › Connect
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
@@ -390,10 +396,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
 - **Playground test examples** · shipped · product, ml
   Turn a wrong Playground answer into a test the next version faces.
-  UI: Playground › Save as test example, Models › model › Data › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
+  UI: Playground › Save as test example, Models › model › Training › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
-  UI: Models › model › Data, Models › model › Training · API: GET /api/models/{slug}/feedback/summary
+  UI: Models › model › Training › Feedback · API: GET /api/models/{slug}/feedback/summary
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2

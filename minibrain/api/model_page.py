@@ -8,25 +8,26 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep, SettingsDep
+from minibrain.api.model_status import ModelStatus, base_status, custom_status, passing_candidate, rows_text
 from minibrain.api.overview import Identity, model_rows, series_points
 from minibrain.api.request_logs import model_match
 from minibrain.data import feedback as feedback_store
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    AuditEvent,
     BaseModelStatus,
     Feedback,
     FeedbackStatus,
     Job,
     Model,
     RequestLog,
-    VersionStatus,
     now,
 )
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import NotFoundError, latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
-from minibrain.tasks.service import decision, live_version
+from minibrain.tasks.service import live_version
 
 router = APIRouter(prefix="/api", tags=["models"])
 
@@ -66,6 +67,9 @@ class ModelPage(BaseModel):
     name: str
     traffic: ModelTraffic = Field(description="Requests per day, p95 latency and error rate over the last 7 days.")
     next: NextAction | None = Field(description="The one step the model page suggests, or none while busy.")
+    status: ModelStatus = Field(description="One line on the model's state, broken first, with at most one action.")
+    created_at: datetime | None = None
+    created_by: str | None = Field(default=None, description="Who created, duplicated, downloaded or imported it.")
 
 
 def day_edges(until: datetime) -> list[datetime]:
@@ -105,22 +109,6 @@ def busy(session: Session, model: Model) -> bool:
     return bool(session.scalar(active))
 
 
-def passing_candidate(model: Model) -> int | None:
-    current = model.current_version if model.deployed and model.current_version is not None else -1
-    ready = [
-        v
-        for v in model.versions
-        if v.status == VersionStatus.READY and v.number > current and v.base_model == model.base_model
-    ]
-    passing = [v for v in ready if v.live_at is not None or decision(model, v).passed]
-    best = max(passing, key=lambda v: v.number, default=None)
-    return best.number if best is not None else None
-
-
-def rows_text(count: int) -> str:
-    return f"{count} feedback {'row' if count == 1 else 'rows'} to review"
-
-
 def train_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
     if limit is None:
         upcoming = max((v.number for v in model.versions), default=0) + 1
@@ -154,18 +142,35 @@ def base_next(model: BaseRow) -> NextAction | None:
     return NextAction(kind="create_custom", label="Create a custom model from it")
 
 
+CREATING = ("model.create", "model.duplicate", "model.download", "model.import")
+
+
+def creator(session: Session, target: str) -> str | None:
+    query = (
+        select(AuditEvent.actor)
+        .where(AuditEvent.target == target, AuditEvent.action.in_(CREATING))
+        .order_by(AuditEvent.id)
+        .limit(1)
+    )
+    return session.scalar(query)
+
+
 def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
     custom = session.scalar(select(Model).where(Model.slug == name))
     if custom is not None:
         pending = feedback_store.count(
             session, [Feedback.model_id == custom.id, Feedback.status == FeedbackStatus.PENDING]
         )
+        limit = serve_only(session, settings, custom.base_model)
         return ModelPage(
             kind="custom",
             key=custom.slug,
             name=custom.name,
             traffic=traffic(session, name, Identity(custom.slug, None)),
-            next=custom_next(custom, pending, busy(session, custom), serve_only(session, settings, custom.base_model)),
+            next=custom_next(custom, pending, busy(session, custom), limit),
+            status=custom_status(session, custom, pending, limit),
+            created_at=custom.created_at,
+            created_by=creator(session, custom.slug),
         )
     base = session.get(BaseRow, name)
     if base is None:
@@ -176,6 +181,9 @@ def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
         name=base.name,
         traffic=traffic(session, name, Identity(None, base.id)),
         next=base_next(base),
+        status=base_status(session, settings, base),
+        created_at=base.created_at,
+        created_by=creator(session, base.id),
     )
 
 

@@ -1,5 +1,5 @@
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 GIB = 1024**3
@@ -14,6 +14,12 @@ SEQ_STEP = 16
 MIN_SEQ = 32
 REFERENCE_SEQ = 512
 MAX_RANK = 64
+DEFAULT_SEED = 7
+EVAL_ROWS = 64
+EVAL_SHARE = 0.1
+SETUP_MINUTES = 2.0
+WORK_MINUTES = 5.5e-4
+EVAL_MINUTES = 4e-4
 
 LORA = "lora"
 QLORA = "qlora"
@@ -149,6 +155,7 @@ class Machine:
     gpu_bytes: int | None
     ram_bytes: int | None
     libraries: frozenset[str] = field(default_factory=frozenset)
+    pool: str = ""
 
     @property
     def device(self) -> str:
@@ -171,11 +178,11 @@ class Machine:
         return MPS_MICRO_BATCHES if self.device == "mps" else MICRO_BATCHES
 
     @staticmethod
-    def from_report(report: Any) -> "Machine":
+    def from_report(report: Any, pool: str = "") -> "Machine":
         gpus = [int(gpu.memory_bytes) for gpu in report.gpus]
         memory = max(gpus) if gpus else report.usable_bytes
         name = report.accelerator_name or report.host
-        return Machine(name, report.accelerator, memory, report.ram_bytes, frozenset(report.versions))
+        return Machine(name, report.accelerator, memory, report.ram_bytes, frozenset(report.versions), pool)
 
 
 @dataclass(frozen=True)
@@ -188,10 +195,18 @@ class Settings:
     learning_rate: float = 2e-4
     epochs: float = 1.0
     max_rows: int = 3000
+    alpha: int | None = None
+    grad_accum: int | None = None
+    eval_every: int | None = None
+    seed: int = DEFAULT_SEED
 
     def overrides(self) -> list[str]:
         defaults = Settings()
         return [name for name, value in asdict(self).items() if value != getattr(defaults, name)]
+
+    @property
+    def lora_alpha(self) -> int:
+        return self.alpha if self.alpha is not None else 2 * self.rank
 
 
 @dataclass(frozen=True)
@@ -246,6 +261,29 @@ class Plan:
     options: list[Option]
     refusal: str | None = None
     note: str | None = None
+    smallest: Option | None = None
+    machines: list["Plan"] = field(default_factory=list)
+
+    @property
+    def steps(self) -> int | None:
+        if self.chosen is None:
+            return None
+        return train_steps(self.rows, self.settings.epochs, self.chosen.micro_batch, self.chosen.grad_accum)
+
+    def minutes(self, held_out_rows: int) -> float | None:
+        if self.chosen is None:
+            return None
+        settings = self.settings
+        return train_minutes(
+            self.base,
+            self.chosen,
+            self.rows,
+            settings.epochs,
+            settings.rank,
+            self.seq_len,
+            held_out_rows,
+            settings.eval_every,
+        )
 
     @property
     def basis(self) -> str:
@@ -263,12 +301,15 @@ class Plan:
             "max_rows": settings.max_rows,
             "epochs": settings.epochs,
             "rank": settings.rank,
-            "alpha": 2 * settings.rank,
+            "alpha": settings.lora_alpha,
             "learning_rate": settings.learning_rate,
             "dropout": LORA_DROPOUT,
             "seq_len": self.seq_len,
+            "seed": settings.seed,
             "overrides": settings.overrides(),
         }
+        if settings.eval_every is not None:
+            found["eval_every"] = settings.eval_every
         if chosen is None:
             return found
         return found | {
@@ -303,6 +344,36 @@ def estimated_tokens(characters: int) -> int:
 
 def grad_accum_for(micro_batch: int) -> int:
     return max(1, round(EFFECTIVE_BATCH / micro_batch))
+
+
+def train_steps(rows: int, epochs: float, micro_batch: int, grad_accum: int) -> int:
+    return max(1, math.ceil(rows * epochs / (micro_batch * grad_accum)))
+
+
+def eval_checks(steps: int, eval_every: int | None) -> int:
+    if eval_every is not None:
+        return (steps - 1) // eval_every + 1
+    return max(1, steps // math.ceil(steps * EVAL_SHARE))
+
+
+def train_minutes(
+    base: Base,
+    option: Option,
+    rows: int,
+    epochs: float,
+    rank: int,
+    seq: int,
+    held_out_rows: int,
+    eval_every: int | None = None,
+) -> float:
+    billions = base.params / 1e9
+    work = rows * epochs * billions * (seq / REFERENCE_SEQ) * (1 + rank / 32) * WORK_MINUTES
+    scored = min(held_out_rows, EVAL_ROWS)
+    if scored <= 0:
+        return SETUP_MINUTES + work / option.speed
+    device = DEVICE_SPEED.get(option.device, 0.05)
+    checks = eval_checks(train_steps(rows, epochs, option.micro_batch, option.grad_accum), eval_every)
+    return SETUP_MINUTES + work / option.speed + checks * scored * billions * EVAL_MINUTES / device
 
 
 def lora_params(shape: Shape, rank: int) -> int:
@@ -399,12 +470,15 @@ def candidates(base: Base, machine: Machine, settings: Settings, seq: int, rows:
     checkpoints = [settings.checkpointing] if settings.checkpointing is not None else [False, True]
     allowed = [size for size in machine.micro_batches if size <= max(rows, 1)] or [1]
     batches = [settings.micro_batch] if settings.micro_batch else allowed
-    return [
+    found = [
         estimate(base, machine, strategy, checkpointing, batch, seq, settings.rank)
         for strategy in strategies
         for checkpointing in checkpoints
         for batch in batches
     ]
+    if settings.grad_accum is None:
+        return found
+    return [replace(option, grad_accum=settings.grad_accum) for option in found]
 
 
 def fastest(options: list[Option]) -> Option | None:
@@ -451,13 +525,19 @@ def refusal(base: Base, machine: Machine, options: list[Option], settings: Setti
     )
 
 
+def smallest_of(options: list[Option]) -> Option | None:
+    return min((option for option in options if option.supported), key=lambda option: option.peak_bytes, default=None)
+
+
 def plan_machine(base: Base, machine: Machine, settings: Settings, seq: int, rows: int) -> Plan:
     options = candidates(base, machine, settings, seq, rows)
     chosen = best(options)
+    small = smallest_of(options)
     if chosen is None:
         reason = refusal(base, machine, options, settings, seq)
-        return Plan(base, machine, settings, seq, rows, None, shown(options), reason)
-    return Plan(base, machine, settings, seq, rows, chosen, shown(options), None, missed(options, chosen))
+        return Plan(base, machine, settings, seq, rows, None, shown(options), reason, smallest=small)
+    note = missed(options, chosen)
+    return Plan(base, machine, settings, seq, rows, chosen, shown(options), None, note, smallest=small)
 
 
 def validate(base: Base, settings: Settings) -> None:
@@ -472,18 +552,43 @@ def validate(base: Base, settings: Settings) -> None:
         raise PlanError(f"Unknown strategy {settings.strategy}; use one of {', '.join(STRATEGIES)}")
 
 
-def plan(base: Base, machines: list[Machine], settings: Settings, longest_tokens: int, rows: int | None = None) -> Plan:
+def plan_of(base: Base, machine: Machine, settings: Settings, seq: int, rows: int) -> Plan:
+    if not machine.available_bytes:
+        return Plan(base, machine, settings, seq, rows, None, [])
+    return plan_machine(base, machine, settings, seq, rows)
+
+
+def fastest_plan(plans: list[Plan]) -> Plan | None:
+    known = [found for found in plans if found.machine is not None and found.machine.available_bytes]
+    if not known:
+        return None
+    fitting = [found for found in known if found.chosen is not None]
+    if fitting:
+        return max(fitting, key=lambda found: found.chosen.speed if found.chosen else 0.0)
+    return max(known, key=lambda found: found.machine.available_bytes or 0 if found.machine else 0)
+
+
+def plan(
+    base: Base,
+    machines: list[Machine],
+    settings: Settings,
+    longest_tokens: int,
+    rows: int | None = None,
+    machine: str | None = None,
+) -> Plan:
     validate(base, settings)
     seq = seq_len_for(base, settings, longest_tokens)
     count = min(rows if rows is not None else settings.max_rows, settings.max_rows)
-    known = [machine for machine in machines if machine.available_bytes]
-    if not known:
-        return Plan(base, None, settings, seq, count, None, [])
-    plans = [plan_machine(base, machine, settings, seq, count) for machine in known]
-    fitting = [found for found in plans if found.chosen is not None]
-    if fitting:
-        return max(fitting, key=lambda found: found.chosen.speed if found.chosen else 0.0)
-    return max(plans, key=lambda found: found.machine.available_bytes or 0 if found.machine else 0)
+    plans = [plan_of(base, item, settings, seq, count) for item in machines]
+    if machine is not None:
+        pinned = next((found for found in plans if found.machine is not None and found.machine.name == machine), None)
+        if pinned is None:
+            raise PlanError(f"No training machine called {machine}")
+        return replace(pinned, machines=plans)
+    found = fastest_plan(plans)
+    if found is None:
+        return Plan(base, None, settings, seq, count, None, [], machines=plans)
+    return replace(found, machines=plans)
 
 
 def minimum(base: Base, machine: Machine | None) -> Option:

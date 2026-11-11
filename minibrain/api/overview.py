@@ -88,6 +88,7 @@ class Partition:
     completion: int = 0
     p50: float | None = None
     p95: float | None = None
+    p99: float | None = None
     last_at: datetime | None = None
 
 
@@ -146,7 +147,12 @@ def ranked(inner: Any, keys: list[Any], extra: dict[str, Any]) -> Any:
     labelled = [value.label(name) for name, value in measures.items()]
     middle = select(*keys, inner.c.latency_ms, *labelled).subquery()
     total = middle.c.total
-    picks = or_(middle.c.rank == 1, middle.c.rank == (total + 1) // 2, middle.c.rank == (total * 95 + 99) // 100)
+    picks = or_(
+        middle.c.rank == 1,
+        middle.c.rank == (total + 1) // 2,
+        middle.c.rank == (total * 95 + 99) // 100,
+        middle.c.rank == (total * 99 + 99) // 100,
+    )
     return select(middle).where(picks)
 
 
@@ -160,6 +166,8 @@ def partitions(rows: Sequence[Any], key: Any) -> dict[Any, Partition]:
             part.p50 = float(row.latency_ms)
         if row.rank == (part.total * 95 + 99) // 100:
             part.p95 = float(row.latency_ms)
+        if row.rank == (part.total * 99 + 99) // 100:
+            part.p99 = float(row.latency_ms)
         if getattr(row, "last_at", None) is not None:
             part.last_at = aware(row.last_at)
     return found

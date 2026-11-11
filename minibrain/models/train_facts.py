@@ -1,3 +1,5 @@
+from collections import Counter
+from dataclasses import replace
 from functools import lru_cache
 
 from sqlalchemy.orm import Session
@@ -60,11 +62,12 @@ def base_facts(session: Session, settings: Settings, key: str) -> Base:
 
 
 def trainer_machines(found: list[Pool]) -> list[Machine]:
+    nodes = [(pool, node) for pool in found for node in pool.nodes if node.online and TRAINER_ROLE in node.roles]
+    machines = [Machine.from_report(node.report, pool.name) for pool, node in nodes]
+    names = Counter(machine.name for machine in machines)
     return [
-        Machine.from_report(node.report)
-        for pool in found
-        for node in pool.nodes
-        if node.online and TRAINER_ROLE in node.roles
+        replace(machine, name=f"{machine.name} on {node.host}") if names[machine.name] > 1 else machine
+        for machine, (_, node) in zip(machines, nodes, strict=True)
     ]
 
 
