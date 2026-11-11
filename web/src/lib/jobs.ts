@@ -16,12 +16,65 @@ const KIND_NAMES: Record<string, string> = {
     verify: "Verify",
     repair: "Repair",
     catalog_sync: "Catalogue sync",
+    export: "Export",
 };
+
+const KIND_NOUNS: Record<string, string> = {
+    train: "Training",
+    eval: "Scoring",
+    judge: "Judging",
+    download: "Download",
+    import: "Import",
+    verify: "Verify",
+    repair: "Repair",
+    catalog_sync: "Catalogue sync",
+    export: "Export",
+};
+
+const KIND_GROUPS: Record<string, string> = {
+    train: "Training",
+    eval: "Scoring",
+    judge: "Judging",
+    download: "Downloads",
+    import: "Imports",
+    verify: "Verify",
+    repair: "Repair",
+    catalog_sync: "Catalogue sync",
+    export: "Exports",
+};
+
+const KIND_VERBS: Record<string, string> = {
+    train: "Trains",
+    eval: "Scores",
+    judge: "Judges",
+    download: "Downloads",
+    import: "Imports",
+    verify: "Verifies",
+    repair: "Repairs",
+    catalog_sync: "Syncs",
+    export: "Exports",
+};
+
+export const JOB_KINDS = Object.keys(KIND_NAMES);
 
 export const MODEL_JOB_KINDS = ["train", "eval", "judge"];
 
+export const TRAIN_KIND = "train";
+
 export function kindName(kind: string): string {
     return KIND_NAMES[kind] ?? kind;
+}
+
+export function kindNoun(kind: string): string {
+    return KIND_NOUNS[kind] ?? kindName(kind);
+}
+
+export function kindGroup(kind: string): string {
+    return KIND_GROUPS[kind] ?? kind;
+}
+
+export function kindVerb(kind: string): string {
+    return KIND_VERBS[kind] ?? kindName(kind);
 }
 
 export function jobTitle(job: JobInfo): string {

@@ -1,5 +1,7 @@
+import { ChartLine, TrendingDown } from "lucide-react";
+import type { ReactNode } from "react";
 import type { JobDetail, JobMetrics, TrainingMetrics } from "~/api/client";
-import { Section, Stat } from "~/components/Section";
+import { PanelSection } from "~/components/Section";
 import { StepChart, type StepRow, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
@@ -9,12 +11,14 @@ import { bytes } from "~/lib/time";
 const TRAIN = "var(--primary)";
 const HELD_OUT = "var(--file-sql)";
 const PREVIOUS = "var(--faint)";
-const LR_HEIGHT = 120;
+const LR_HEIGHT = 160;
 const LOSS = (value: number) => value.toFixed(3);
 const LOSS_AXIS = (value: number) => value.toFixed(2);
 const RATE = (value: number) => value.toExponential(1);
+const LEGEND = ["loss", "eval_loss", "previous"];
 
 type Previous = NonNullable<JobMetrics["previous"]>;
+type Fact = [string, ReactNode];
 
 function lossRows(training: TrainingMetrics, previous: Previous | null | undefined): StepRow[] {
     const rows = new Map<number, StepRow>();
@@ -61,8 +65,6 @@ function lossSeries(
     return series;
 }
 
-const LEGEND = ["loss", "eval_loss", "previous"];
-
 function legendOrder(series: StepSeries[]): StepSeries[] {
     return [...series].sort((left, right) => LEGEND.indexOf(left.key) - LEGEND.indexOf(right.key));
 }
@@ -86,6 +88,62 @@ function stepText(training: TrainingMetrics): string {
         : count(training.step);
 }
 
+function domainOf(training: TrainingMetrics, rows: StepRow[]): [number, number] {
+    const last = rows.at(-1)?.step ?? 0;
+    return [0, Math.max(training.steps ?? last, last)];
+}
+
+function lossText(value: number | null): string {
+    return value === null ? "–" : LOSS(value);
+}
+
+function Figure({ children }: { children: ReactNode }) {
+    return <span className="tabular-nums">{children}</span>;
+}
+
+export function trainingFacts(
+    job: JobDetail,
+    training: TrainingMetrics | null | undefined,
+): Fact[] {
+    if (!training || training.points.length === 0) {
+        return [];
+    }
+    const running = job.status === "running";
+    const facts: Fact[] = [["Step", <Figure key="step">{stepText(training)}</Figure>]];
+    if (training.epoch !== null && training.epoch !== undefined) {
+        facts.push(["Epoch", <Figure key="epoch">{training.epoch.toFixed(2)}</Figure>]);
+    }
+    if (running) {
+        const eta = training.eta_seconds;
+        facts.push([
+            "Time left",
+            <Figure key="eta">
+                {eta === null || eta === undefined ? "–" : durationText(eta)}
+            </Figure>,
+        ]);
+    }
+    facts.push(
+        [
+            "Training loss",
+            <Figure key="loss">
+                {lossText(latest(training.points.map((point) => point.loss)))}
+            </Figure>,
+        ],
+        [
+            "Held-out loss",
+            <Figure key="held">
+                {lossText(latest(training.evals.map((point) => point.eval_loss)))}
+            </Figure>,
+        ],
+        [
+            running ? "Tokens per second" : "Mean tokens per second",
+            <Figure key="speed">{count(training.tokens_per_second)}</Figure>,
+        ],
+        ["Peak memory", <Figure key="memory">{bytes(training.memory_bytes)}</Figure>],
+    );
+    return facts;
+}
+
 function OverfitHint({ step }: { step: number }) {
     return (
         <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
@@ -94,91 +152,83 @@ function OverfitHint({ step }: { step: number }) {
     );
 }
 
-function TrainingStats({ job, training }: { job: JobDetail; training: TrainingMetrics }) {
-    const running = job.status === "running";
-    const trainLoss = latest(training.points.map((point) => point.loss));
-    const heldOut = latest(training.evals.map((point) => point.eval_loss));
+function waiting(job: JobDetail): string {
+    return job.status === "queued" || job.status === "running"
+        ? "Waiting for the first training step."
+        : "This run recorded no training steps.";
+}
+
+export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
+    const training = metrics?.training;
+    const previous = metrics?.previous;
+    const recorded = training && training.points.length > 0;
     return (
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
-            <Stat label="Step" value={stepText(training)} />
-            {training.epoch !== null && training.epoch !== undefined && (
-                <Stat label="Epoch" value={training.epoch.toFixed(2)} />
+        <PanelSection
+            icon={ChartLine}
+            title="Loss"
+            description={
+                previous && previous.points.length > 0
+                    ? "Training and held-out loss per step, with the previous run behind them."
+                    : "Training loss per step, held-out loss at each evaluation."
+            }
+        >
+            {recorded ? (
+                <LossChart job={job} training={training} previous={previous} />
+            ) : (
+                <p className="text-muted-foreground">{waiting(job)}</p>
             )}
-            {running && (
-                <Stat
-                    label="Time left"
-                    value={
-                        training.eta_seconds === null || training.eta_seconds === undefined
-                            ? "–"
-                            : durationText(training.eta_seconds)
-                    }
-                />
+        </PanelSection>
+    );
+}
+
+function LossChart({
+    job,
+    training,
+    previous,
+}: { job: JobDetail; training: TrainingMetrics; previous: Previous | null | undefined }) {
+    const series = lossSeries(training, previous);
+    const rows = lossRows(training, previous);
+    return (
+        <div className="flex flex-col gap-3">
+            {training.rising_from !== null && training.rising_from !== undefined && (
+                <OverfitHint step={training.rising_from} />
             )}
-            <Stat label="Training loss" value={trainLoss === null ? "–" : LOSS(trainLoss)} />
-            <Stat label="Held-out loss" value={heldOut === null ? "–" : LOSS(heldOut)} />
-            <Stat
-                label={running ? "Tokens per second" : "Mean tokens per second"}
-                value={count(training.tokens_per_second)}
+            <ChartLegend series={legendOrder(series)} />
+            <StepChart
+                rows={rows}
+                series={series}
+                format={LOSS}
+                axisFormat={LOSS_AXIS}
+                label={`Loss by step for job ${job.id}: training loss ${lossText(latest(rows.map((row) => row.loss)))} at step ${training.step ?? 0}`}
+                marker={training.rising_from}
+                domain={domainOf(training, rows)}
             />
-            <Stat label="Peak memory" value={bytes(training.memory_bytes)} />
         </div>
     );
 }
 
-export function TrainingPanel({
-    job,
-    metrics,
-}: { job: JobDetail; metrics: JobMetrics | undefined }) {
+export function RateSection({ metrics }: { metrics: JobMetrics | undefined }) {
     const training = metrics?.training;
-    if (!training || training.points.length === 0) {
-        return (
-            <Section title="Training">
-                <p className="text-muted-foreground">
-                    {job.status === "queued" || job.status === "running"
-                        ? "Waiting for the first training step."
-                        : "This run recorded no training steps."}
-                </p>
-            </Section>
-        );
+    if (!training || !training.points.some((point) => typeof point.learning_rate === "number")) {
+        return null;
     }
-    const series = lossSeries(training, metrics?.previous);
-    const rows = lossRows(training, metrics?.previous);
-    const steps = training.steps ?? rows.at(-1)?.step ?? 0;
-    const domain: [number, number] = [0, Math.max(steps, rows.at(-1)?.step ?? 0)];
+    const rows = rateRows(training);
+    const peak = Math.max(...rows.map((row) => row.rate ?? 0));
     return (
-        <Section title="Training" caption="Loss per step, with held-out loss at each evaluation.">
-            <div className="flex flex-col gap-6">
-                <TrainingStats job={job} training={training} />
-                {training.rising_from !== null && training.rising_from !== undefined && (
-                    <OverfitHint step={training.rising_from} />
-                )}
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h3 className="text-base font-semibold">Loss</h3>
-                        <ChartLegend series={legendOrder(series)} />
-                    </div>
-                    <StepChart
-                        rows={rows}
-                        series={series}
-                        format={LOSS}
-                        axisFormat={LOSS_AXIS}
-                        label={`Loss by step: training loss ${LOSS(latest(rows.map((row) => row.loss)) ?? 0)} at step ${training.step ?? 0}`}
-                        marker={training.rising_from}
-                        domain={domain}
-                    />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <h3 className="text-base font-semibold">Learning rate</h3>
-                    <StepChart
-                        rows={rateRows(training)}
-                        series={[{ key: "rate", label: "Learning rate", color: TRAIN }]}
-                        format={RATE}
-                        label="Learning rate by step"
-                        height={LR_HEIGHT}
-                        domain={domain}
-                    />
-                </div>
-            </div>
-        </Section>
+        <PanelSection
+            icon={TrendingDown}
+            title="Learning rate"
+            description="How far each step moves the weights: it warms up, then decays."
+        >
+            <StepChart
+                rows={rows}
+                series={[{ key: "rate", label: "Learning rate", color: TRAIN }]}
+                format={RATE}
+                label="Learning rate by step"
+                height={LR_HEIGHT}
+                domain={domainOf(training, rows)}
+                yDomain={[0, peak]}
+            />
+        </PanelSection>
     );
 }

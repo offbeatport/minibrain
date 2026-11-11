@@ -1,86 +1,127 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
-import {
-    Button,
-    Card,
-    CardContent,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-    Link,
-    LogViewer,
-} from "obp-ui";
-import type { ReactNode } from "react";
-import { type JobDetail, type JobMetrics, api, unwrap } from "~/api/client";
+import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
+import { Logs, SlidersHorizontal } from "lucide-react";
+import { Button, Link, LogViewer } from "obp-ui";
+import { type ReactNode, useEffect } from "react";
+import { type JobDetail, api, unwrap } from "~/api/client";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import { isActiveJob, useJob } from "~/api/queries";
-import { canRetry } from "~/components/JobSelection";
+import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { Facts } from "~/components/Facts";
+import { canCancel, canRetry } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, Stat } from "~/components/Section";
-import { JobStatus } from "~/components/StatusBadge";
+import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
-import { MODEL_JOB_KINDS, jobDuration, jobPageHref, jobTitle, useJobEvents } from "~/lib/jobs";
-import { deploymentPageHref, modelPageHref } from "~/lib/modelLinks";
-import { JOBS_PATH } from "~/lib/requests";
-import { exactTime, relativeTime } from "~/lib/time";
-import { JudgePanel, PlainPanel, ScorePanel, TransferPanel } from "./ProgressPanels";
-import { TrainingPanel } from "./TrainingPanel";
+import { count } from "~/lib/format";
+import {
+    MODEL_JOB_KINDS,
+    TRAIN_KIND,
+    jobDuration,
+    kindNoun,
+    kindVerb,
+    useJobEvents,
+} from "~/lib/jobs";
+import { JOBS_PATH, TRAINING_PATH, jobHref, modelPageHref } from "~/lib/modelLinks";
+import { bytes, relativeTime } from "~/lib/time";
+import { ProgressSection, ScoresSection } from "./ProgressPanels";
+import { LossSection, RateSection } from "./TrainingPanel";
+import { JobState } from "./jobCells";
 
-const TRANSFERS = ["download", "import", "repair"];
-const QUIET_KINDS = ["verify", "catalog_sync"];
+type Fact = [string, ReactNode];
+
+const LINK = "text-primary hover:underline";
+const BASE_KINDS = ["download", "import", "verify", "repair"];
+const STRATEGIES: Record<string, string> = { lora: "LoRA", qlora: "QLoRA" };
+const SETTING_NAMES: Record<string, string> = {
+    rank: "rank",
+    learning_rate: "learning rate",
+    epochs: "epochs",
+    max_rows: "rows per run",
+    seq_len: "sequence length",
+    strategy: "strategy",
+    checkpointing: "checkpointing",
+    micro_batch: "micro-batch",
+};
+
+type Setup = NonNullable<JobDetail["setup"]>;
+type Training = NonNullable<Setup["training"]>;
 
 function idOf(value: string | undefined): number | null {
     const id = Number(value);
     return value && Number.isInteger(id) && id > 0 ? id : null;
 }
 
-function BackLink({ job }: { job: JobDetail | undefined }) {
-    const training = !job || MODEL_JOB_KINDS.includes(job.kind);
-    return (
-        <Link
-            href={training ? "/training" : JOBS_PATH}
-            className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-            <ChevronLeft className="size-4" />
-            {training ? "Training" : "Jobs"}
-        </Link>
-    );
+function sectionOf(kind: string | undefined, pathname: string) {
+    const training = kind ? kind === TRAIN_KIND : pathname.startsWith(`${TRAINING_PATH}/`);
+    return training
+        ? { label: "Training", href: TRAINING_PATH }
+        : { label: "Jobs", href: JOBS_PATH };
+}
+
+function versionName(job: JobDetail): string {
+    return job.version === null || job.version === undefined ? "" : `v${job.version}`;
+}
+
+function modelLabel(job: JobDetail): string {
+    return job.model_name ?? job.model ?? job.base_model_name ?? job.base_model ?? "Deleted model";
+}
+
+function baseLabel(job: JobDetail): string {
+    const name = job.base_model_name ?? job.base_model ?? "a base model";
+    return job.variant ? `${name} · ${job.variant}` : name;
 }
 
 function Subject({ job }: { job: JobDetail }) {
-    if (job.deleted) {
-        const name = job.model_name ?? job.model ?? job.base_model ?? "Model";
-        const version = job.version === null || job.version === undefined ? "" : ` v${job.version}`;
-        return <ModelName name={`${name}${version}`} deleted />;
-    }
-    if (job.model) {
-        const version = job.version === null || job.version === undefined ? "" : `@${job.version}`;
-        return (
-            <span className="inline-flex flex-wrap items-baseline gap-2">
-                <span>{job.model_name ?? job.model}</span>
-                <Link
-                    href={modelPageHref(job.model)}
-                    className="font-mono text-primary hover:underline"
-                >
-                    {`${job.model}${version}`}
-                </Link>
-            </span>
+    if (job.model || job.deleted) {
+        const version = versionName(job);
+        if (job.deleted || !job.model) {
+            return <ModelName name={`${modelLabel(job)} ${version}`.trim()} deleted />;
+        }
+        const model = (
+            <Link href={modelPageHref(job.model)} className={LINK}>
+                {modelLabel(job)}
+            </Link>
+        );
+        if (job.kind === TRAIN_KIND && version) {
+            return (
+                <>
+                    {model}
+                    {" → "}
+                    <Link href={modelPageHref(job.model, "versions")} className={LINK}>
+                        {version}
+                    </Link>
+                </>
+            );
+        }
+        return version ? (
+            <Link href={modelPageHref(job.model, "versions")} className={LINK}>
+                {`${modelLabel(job)} ${version}`}
+            </Link>
+        ) : (
+            model
         );
     }
     if (job.base_model) {
         return (
-            <Link
-                href={modelPageHref(job.base_model)}
-                className="font-mono text-primary hover:underline"
-            >
-                {job.base_model}
+            <Link href={modelPageHref(job.base_model)} className={LINK}>
+                {baseLabel(job)}
             </Link>
         );
     }
-    return <span>Install</span>;
+    return <>the model catalogue</>;
+}
+
+function Context({ job }: { job: JobDetail }) {
+    const moment = job.started_at ?? job.created_at;
+    return (
+        <span>
+            {`${kindVerb(job.kind)} `}
+            <Subject job={job} />
+            {` · ${job.started_at ? "started" : "queued"} ${relativeTime(moment)}`}
+        </span>
+    );
 }
 
 function Actions({ job }: { job: JobDetail }) {
@@ -96,17 +137,16 @@ function Actions({ job }: { job: JobDetail }) {
         mutationFn: () => unwrap(api.POST("/api/jobs/{job_id}/retry", target)),
         onSuccess: (again) => {
             client.invalidateQueries({ queryKey: ["jobs"] });
-            router.history.push(jobPageHref(again.id));
+            router.history.push(jobHref(again));
         },
     });
     if (!can.build) {
         return null;
     }
-    const retriable = canRetry(job);
     return (
         <>
             <ErrorLine error={cancel.error ?? retry.error} />
-            {isActiveJob(job) && !job.cancel_requested && (
+            {canCancel(job) && (
                 <Button
                     variant="outline"
                     disabled={cancel.isPending}
@@ -115,7 +155,7 @@ function Actions({ job }: { job: JobDetail }) {
                     Cancel
                 </Button>
             )}
-            {retriable && (
+            {canRetry(job) && (
                 <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
                     Retry
                 </Button>
@@ -124,25 +164,21 @@ function Actions({ job }: { job: JobDetail }) {
     );
 }
 
-function When({ value }: { value: string | null | undefined }) {
-    if (!value) {
-        return <span className="text-muted-foreground">Not yet</span>;
-    }
-    return <span title={exactTime(value)}>{relativeTime(value)}</span>;
-}
-
 function Summary({ job }: { job: JobDetail }) {
     return (
-        <div className="flex flex-wrap gap-x-8 gap-y-3">
-            <Stat label="Status" value={<JobStatus job={job} />} />
+        <div className="flex flex-wrap gap-x-10 gap-y-3">
+            <Stat label="Kind" value={kindNoun(job.kind)} />
+            <Stat label="Status" value={<JobState job={job} />} />
             <Stat label="Attempt" value={`${Math.max(1, job.attempt)} of ${job.max_attempts}`} />
-            {job.device && <Stat label="Device" value={job.device} />}
-            <Stat label="Worker" value={job.host ?? "–"} />
-            <Stat label="Started" value={<When value={job.started_at} />} />
-            <Stat label={job.finished_at ? "Took" : "Running for"} value={jobDuration(job)} />
+            {job.device && (
+                <Stat
+                    label="Device"
+                    value={<span className="font-mono font-normal">{job.device}</span>}
+                />
+            )}
             <Stat
-                label="Job"
-                value={<span className="font-mono font-normal">{`#${job.id}`}</span>}
+                label={job.finished_at || !job.started_at ? "Duration" : "Running for"}
+                value={jobDuration(job)}
             />
         </div>
     );
@@ -174,90 +210,269 @@ function Serving({ job }: { job: JobDetail }) {
     return (
         <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
             <StatusText tone="success">Serving</StatusText>
-            <span>{`v${job.version} is the live version of ${job.model_name ?? job.model}.`}</span>
-            <Link href={deploymentPageHref(job.model)} className="text-primary hover:underline">
-                Open its deployment
+            <span>{`${versionName(job)} is the live version of ${modelLabel(job)}.`}</span>
+            <Link href={modelPageHref(job.model, "api")} className={LINK}>
+                Call it
             </Link>
         </div>
     );
 }
 
-function KindPanel({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
-    if (job.kind === "train") {
-        return <TrainingPanel job={job} metrics={metrics} />;
-    }
-    if (job.kind === "eval") {
-        return <ScorePanel job={job} metrics={metrics} />;
-    }
-    if (job.kind === "judge") {
-        return <JudgePanel job={job} metrics={metrics} />;
-    }
-    if (TRANSFERS.includes(job.kind)) {
-        return <TransferPanel job={job} metrics={metrics} />;
-    }
-    return <PlainPanel job={job} />;
+function Figure({ children }: { children: ReactNode }) {
+    return <span className="tabular-nums">{children}</span>;
 }
 
-function JobLog({ job }: { job: JobDetail }) {
-    const entries = useJobEvents(job.id);
+function settingsText(training: Training): string {
+    const adapter = training.strategy
+        ? (STRATEGIES[training.strategy] ?? training.strategy)
+        : "LoRA";
+    const parts = [
+        training.rank ? `${adapter} rank ${training.rank}` : adapter,
+        training.epochs === null || training.epochs === undefined
+            ? null
+            : `${training.epochs} ${training.epochs === 1 ? "epoch" : "epochs"}`,
+        training.learning_rate ? `rate ${training.learning_rate.toExponential(0)}` : null,
+        training.batch ? `batch ${training.batch}` : null,
+        training.precision ? training.precision.toUpperCase() : null,
+    ];
+    return parts.filter(Boolean).join(" · ");
+}
+
+function changedText(training: Training): string {
+    if (!training.planned && training.changed.length === 0) {
+        return "The install defaults; the worker fits batch and memory when the run starts.";
+    }
+    if (training.changed.length === 0) {
+        return "The install defaults.";
+    }
+    const names = training.changed.map((name) => SETTING_NAMES[name] ?? name);
+    return `Changed from the defaults: ${names.join(", ")}.`;
+}
+
+function dataFacts(setup: Setup): Fact[] {
+    if (!setup.dataset) {
+        return [];
+    }
+    const label = setup.dataset_version
+        ? `${setup.dataset} v${setup.dataset_version}`
+        : setup.dataset;
+    return [
+        [
+            "Data",
+            <span key="data">
+                <Link
+                    href={`/data?item=${encodeURIComponent(`dataset:${setup.dataset}`)}`}
+                    className={LINK}
+                >
+                    {label}
+                </Link>
+                {setup.dataset_rows ? (
+                    <Figure>{` · ${count(setup.dataset_rows)} rows`}</Figure>
+                ) : null}
+            </span>,
+        ],
+    ];
+}
+
+function trainingRows(training: Training): Fact[] {
+    if (training.examples === null || training.examples === undefined) {
+        return [];
+    }
+    const held =
+        training.held_out === null || training.held_out === undefined
+            ? ""
+            : ` · ${count(training.held_out)} held out`;
+    return [
+        ["Training rows", <Figure key="rows">{`${count(training.examples)} train${held}`}</Figure>],
+    ];
+}
+
+function methodText(job: JobDetail, setup: Setup): string {
+    if (job.kind === TRAIN_KIND) {
+        return "Supervised fine-tuning (SFT)";
+    }
+    if (job.kind === "judge") {
+        return "A judge model scores each answer from 1 to 5 with a reason";
+    }
+    return setup.version_kind === "prompt"
+        ? "Instructions only on the base, scored"
+        : "The trained adapter on its base, scored";
+}
+
+function versionFacts(job: JobDetail, setup: Setup): Fact[] {
+    const facts: Fact[] = [];
+    const version = versionName(job);
+    if (version) {
+        facts.push([
+            job.kind === TRAIN_KIND ? "Produces" : "Version",
+            job.model && !job.deleted ? (
+                <Link key="version" href={modelPageHref(job.model, "versions")} className={LINK}>
+                    {`${version} of ${modelLabel(job)}`}
+                </Link>
+            ) : (
+                `${version} of ${modelLabel(job)}`
+            ),
+        ]);
+    }
+    facts.push(...dataFacts(setup));
+    if (setup.base_model) {
+        facts.push([
+            "Base",
+            <Link key="base" href={modelPageHref(setup.base_model)} className={LINK}>
+                {setup.base_model_name ?? setup.base_model}
+            </Link>,
+        ]);
+    }
+    facts.push(["Method", methodText(job, setup)]);
+    const training = setup.training;
+    if (training) {
+        facts.push([
+            "Settings",
+            <span key="settings">
+                <Figure>{settingsText(training)}</Figure>
+                <span className="block text-sm text-muted-foreground">{changedText(training)}</span>
+            </span>,
+        ]);
+        if (training.seq_len) {
+            facts.push([
+                "Sequence length",
+                <Figure key="seq">{`${count(training.seq_len)} tokens`}</Figure>,
+            ]);
+        }
+        facts.push(...trainingRows(training));
+    }
+    return facts;
+}
+
+function baseFacts(job: JobDetail, setup: Setup): Fact[] {
+    const facts: Fact[] = [];
+    if (setup.base_model) {
+        facts.push([
+            "Model",
+            <Link key="model" href={modelPageHref(setup.base_model)} className={LINK}>
+                {setup.base_model_name ?? setup.base_model}
+            </Link>,
+        ]);
+    }
+    if (setup.variant) {
+        facts.push(["Variant", setup.variant]);
+    }
+    if (setup.revision) {
+        facts.push([
+            "Revision",
+            <span key="revision" className="font-mono text-sm">
+                {setup.revision.slice(0, 12)}
+            </span>,
+        ]);
+    }
+    if (setup.size_bytes) {
+        facts.push(["Size", <Figure key="size">{bytes(setup.size_bytes)}</Figure>]);
+    }
+    if (BASE_KINDS.includes(job.kind)) {
+        facts.push(["Checks", "Every file's SHA-256 against the expected hash"]);
+    }
+    return facts;
+}
+
+function setupFacts(job: JobDetail): Fact[] {
+    const setup = job.setup;
+    if (!setup) {
+        return [];
+    }
+    return MODEL_JOB_KINDS.includes(job.kind) ? versionFacts(job, setup) : baseFacts(job, setup);
+}
+
+function SettingsSection({ job }: { job: JobDetail }) {
+    const facts = setupFacts(job);
     return (
-        <LogViewer
-            entries={entries}
-            live={isActiveJob(job)}
-            quietSource="library"
-            quietLabel="Show library output"
-            fileName={`job-${job.id}.log`}
-            label={`Log of job ${job.id}`}
-            empty={isActiveJob(job) ? "Waiting for output." : "No output recorded."}
-            maxHeight="32rem"
-        />
+        <PanelSection
+            icon={SlidersHorizontal}
+            title="Settings and data"
+            description="What this job read and the settings it ran with."
+        >
+            {facts.length > 0 ? (
+                <Facts items={facts} />
+            ) : (
+                <p>
+                    <Context job={job} />
+                </p>
+            )}
+        </PanelSection>
     );
 }
 
-function Logs({ job }: { job: JobDetail }) {
-    const open = job.status === "failed" || QUIET_KINDS.includes(job.kind);
+function LogsSection({ job }: { job: JobDetail }) {
+    const entries = useJobEvents(job.id);
     return (
-        <Card>
-            <CardContent>
-                <Collapsible defaultOpen={open}>
-                    <CollapsibleTrigger className="text-base font-semibold">
-                        Logs
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-3">
-                        <JobLog job={job} />
-                    </CollapsibleContent>
-                </Collapsible>
-            </CardContent>
-        </Card>
+        <PanelSection
+            icon={Logs}
+            title="Logs"
+            description="What the job printed, newest at the bottom."
+            bare
+        >
+            <LogViewer
+                entries={entries}
+                live={isActiveJob(job)}
+                quietSource="library"
+                quietLabel="Show library output"
+                fileName={`job-${job.id}.log`}
+                label={`Log of job ${job.id}`}
+                empty={isActiveJob(job) ? "Waiting for output." : "No output recorded."}
+                maxHeight="28rem"
+            />
+        </PanelSection>
     );
 }
 
 function JobView({ job }: { job: JobDetail }) {
     const metrics = useJobMetrics(job.id, isActiveJob(job));
+    const training = job.kind === TRAIN_KIND;
     return (
         <>
             <PageHeader
-                title={jobTitle(job)}
-                caption={<Subject job={job} />}
+                title={`Job #${job.id}`}
+                caption={<Context job={job} />}
                 actions={<Actions job={job} />}
             />
             <Summary job={job} />
             <Failure job={job} />
             <Serving job={job} />
             <ErrorLine error={metrics.error} />
-            <KindPanel job={job} metrics={metrics.data} />
-            <Logs key={job.id} job={job} />
+            <PanelSections>
+                <div className="grid items-start gap-x-6 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                    <ProgressSection job={job} metrics={metrics.data} />
+                    <SettingsSection job={job} />
+                </div>
+                {training && <LossSection job={job} metrics={metrics.data} />}
+                {training && <RateSection metrics={metrics.data} />}
+                {job.kind === "eval" && <ScoresSection job={job} />}
+                <LogsSection key={job.id} job={job} />
+            </PanelSections>
         </>
     );
 }
 
-export function JobPage(): ReactNode {
+function useCanonical(job: JobDetail | undefined, pathname: string) {
+    const router = useRouter();
+    const canonical = job ? jobHref(job) : null;
+    const here = pathname.replace(/\/+$/, "");
+    useEffect(() => {
+        if (canonical && here !== canonical) {
+            router.history.replace(canonical);
+        }
+    }, [canonical, here, router]);
+}
+
+export function JobPage() {
     const { id } = useParams({ strict: false }) as { id?: string };
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
     const jobId = idOf(id);
     const job = useJob(jobId);
+    useCanonical(job.data, pathname);
+    const section = sectionOf(job.data?.kind, pathname);
     return (
         <Page>
-            <BackLink job={job.data} />
+            <Breadcrumbs items={[section, { label: `Job #${id ?? ""}` }]} />
             {jobId === null && <p className="text-muted-foreground">No job called {id}.</p>}
             <ErrorLine error={job.error} />
             {job.data && <JobView job={job.data} />}

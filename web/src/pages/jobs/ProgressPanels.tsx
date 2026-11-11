@@ -1,42 +1,148 @@
+import { Gauge, Hourglass } from "lucide-react";
 import { Button, Link } from "obp-ui";
+import type { ReactNode } from "react";
 import type { JobDetail, JobMetrics, ModelVersionRow, VersionInfo } from "~/api/client";
 import { isActiveJob, useAllModels, useVersions } from "~/api/queries";
-import { ErrorLine, Section, Stat } from "~/components/Section";
+import { Facts } from "~/components/Facts";
+import { ErrorLine, PanelSection, Stat } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { PromotionDecision } from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { metricName, metricOf } from "~/lib/metrics";
-import { bytes } from "~/lib/time";
+import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeployButton, usePromote } from "../EvaluationsPage";
+import { trainingFacts } from "./TrainingPanel";
 
-function Progress({ job, label }: { job: JobDetail; label: string }) {
-    if (!isActiveJob(job)) {
-        return null;
+type Fact = [string, ReactNode];
+
+const TRANSFERS = ["download", "import", "repair"];
+const COUNTED_NOUNS: Record<string, string> = { eval: "Rows", judge: "Answers" };
+
+function Figure({ children }: { children: ReactNode }) {
+    return <span className="tabular-nums">{children}</span>;
+}
+
+function reached(job: JobDetail): number | null {
+    if (job.status === "succeeded") {
+        return 1;
+    }
+    if (job.status === "queued") {
+        return 0;
+    }
+    return job.progress > 0 ? job.progress : job.status === "running" ? null : 0;
+}
+
+function speed(value: number | null | undefined): string {
+    return value === null || value === undefined ? "–" : `${bytes(value)}/s`;
+}
+
+function transferFacts(job: JobDetail, metrics: JobMetrics | undefined): Fact[] {
+    const transfer = metrics?.transfer;
+    if (!transfer) {
+        return [];
+    }
+    const facts: Fact[] = [
+        [
+            "Moved",
+            <Figure key="moved">{`${bytes(transfer.bytes)} of ${bytes(transfer.total)}`}</Figure>,
+        ],
+    ];
+    if (job.status === "running") {
+        facts.push(["Speed", <Figure key="speed">{speed(transfer.bytes_per_second)}</Figure>]);
+        if (transfer.file) {
+            facts.push([
+                "File",
+                <span key="file" className="font-mono text-sm">
+                    {transfer.file}
+                </span>,
+            ]);
+        }
+    }
+    return facts;
+}
+
+function countedFacts(job: JobDetail, metrics: JobMetrics | undefined): Fact[] {
+    const counted = metrics?.counted;
+    const noun = COUNTED_NOUNS[job.kind];
+    if (!counted || !noun) {
+        return [];
+    }
+    return [
+        [
+            `${noun} done`,
+            <Figure key="done">{`${count(counted.done)} of ${count(counted.total)}`}</Figure>,
+        ],
+    ];
+}
+
+function kindFacts(job: JobDetail, metrics: JobMetrics | undefined): Fact[] {
+    if (job.kind === "train") {
+        return trainingFacts(job, metrics?.training);
+    }
+    if (TRANSFERS.includes(job.kind)) {
+        return transferFacts(job, metrics);
+    }
+    return countedFacts(job, metrics);
+}
+
+function When({ value }: { value: string | null | undefined }) {
+    if (!value) {
+        return <span className="text-muted-foreground">Not yet</span>;
     }
     return (
-        <div className="flex items-center gap-3">
-            <ProgressBar
-                value={job.status === "running" && job.progress > 0 ? job.progress : null}
-                label={label}
-                className="w-full max-w-md"
-            />
-            <span className="tabular-nums">{percent(job.progress)}</span>
-        </div>
+        <time dateTime={value} title={exactTime(value)} className="tabular-nums">
+            {relativeTime(value)}
+        </time>
     );
 }
 
-function Counted({
-    job,
-    metrics,
-    noun,
-}: { job: JobDetail; metrics: JobMetrics | undefined; noun: string }) {
-    const counted = metrics?.counted;
-    if (!counted || job.status === "succeeded") {
+function quietNote(job: JobDetail, facts: Fact[]): string | null {
+    if (facts.length > 0) {
         return null;
     }
+    if (job.status === "queued") {
+        return "Waiting for a worker.";
+    }
+    return TRANSFERS.includes(job.kind) && !isActiveJob(job) ? "No files moved in this run." : null;
+}
+
+export function ProgressSection({
+    job,
+    metrics,
+}: { job: JobDetail; metrics: JobMetrics | undefined }) {
+    const facts = kindFacts(job, metrics);
+    const share = reached(job);
+    const note = quietNote(job, facts);
     return (
-        <Stat label={`${noun} done`} value={`${count(counted.done)} of ${count(counted.total)}`} />
+        <PanelSection
+            icon={Hourglass}
+            title="Progress"
+            description="Where the job is and how fast it moves."
+        >
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                    <ProgressBar
+                        value={share}
+                        label={`Job ${job.id} progress`}
+                        tone={job.status === "failed" ? "destructive" : "primary"}
+                        className="w-full"
+                    />
+                    <span className="w-12 shrink-0 text-right tabular-nums">
+                        {share === null ? "–" : `${Math.round(share * 100)}%`}
+                    </span>
+                </div>
+                {note && <p className="text-muted-foreground">{note}</p>}
+                <Facts
+                    items={[
+                        ...facts,
+                        ["Queued", <When key="queued" value={job.created_at} />],
+                        ["Started", <When key="started" value={job.started_at} />],
+                        ["Worker", job.host ?? "–"],
+                    ]}
+                />
+            </div>
+        </PanelSection>
     );
 }
 
@@ -61,7 +167,7 @@ function Versus({ version, live }: { version: VersionInfo; live: ModelVersionRow
     return <span className={`tabular-nums ${tone}`}>{points(delta)}</span>;
 }
 
-function evaluationsHref(slug: string, number: number): string {
+function reviewHref(slug: string, number: number): string {
     return `/evaluations?version=${encodeURIComponent(`${slug}@${number}`)}`;
 }
 
@@ -101,14 +207,14 @@ function Scores({ slug, number }: { slug: string; number: number }) {
                     />
                 )}
                 <Button variant="outline" asChild>
-                    <Link href={evaluationsHref(slug, number)}>Scores and mistakes</Link>
+                    <Link href={reviewHref(slug, number)}>Scores and mistakes</Link>
                 </Button>
             </div>
         </div>
     );
 }
 
-export function ScorePanel({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
+export function ScoresSection({ job }: { job: JobDetail }) {
     const done =
         job.status === "succeeded" &&
         job.model &&
@@ -117,83 +223,22 @@ export function ScorePanel({ job, metrics }: { job: JobDetail; metrics: JobMetri
         job.version !== null &&
         job.version !== undefined;
     return (
-        <Section
+        <PanelSection
+            icon={Gauge}
             title="Scores"
-            caption={
+            description={
                 done
                     ? "This version against the live one, and whether the promotion rule lets it go live."
-                    : "Answers the held-out and test rows; the scores follow when it finishes."
+                    : "The held-out and test rows are answered first; the scores follow when it finishes."
             }
         >
-            <div className="flex flex-col gap-4">
-                <Counted job={job} metrics={metrics} noun="Rows" />
-                <Progress job={job} label="Scoring progress" />
-                {done && job.model && <Scores slug={job.model} number={job.version ?? 0} />}
-            </div>
-        </Section>
-    );
-}
-
-export function JudgePanel({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
-    return (
-        <Section
-            title="Judging"
-            caption="A judge model scores each answer from 1 to 5 with a reason."
-        >
-            <div className="flex flex-col gap-4">
-                <Counted job={job} metrics={metrics} noun="Answers" />
-                <Progress job={job} label="Judging progress" />
-            </div>
-        </Section>
-    );
-}
-
-function speed(value: number | null | undefined): string {
-    return value === null || value === undefined ? "–" : `${bytes(value)}/s`;
-}
-
-export function TransferPanel({
-    job,
-    metrics,
-}: { job: JobDetail; metrics: JobMetrics | undefined }) {
-    const transfer = metrics?.transfer;
-    const running = job.status === "running";
-    return (
-        <Section title="Transfer" caption="Files are checked against their SHA-256 as they arrive.">
-            <div className="flex flex-col gap-4">
-                {transfer && (
-                    <div className="flex flex-wrap gap-x-8 gap-y-3">
-                        <Stat
-                            label="Done"
-                            value={`${bytes(transfer.bytes)} of ${bytes(transfer.total)}`}
-                        />
-                        {running && <Stat label="Speed" value={speed(transfer.bytes_per_second)} />}
-                        {running && transfer.file && (
-                            <Stat
-                                label="File"
-                                value={
-                                    <span className="font-mono font-normal">{transfer.file}</span>
-                                }
-                            />
-                        )}
-                    </div>
-                )}
-                <Progress job={job} label="Transfer progress" />
-                {!transfer && !isActiveJob(job) && (
-                    <p className="text-muted-foreground">No files moved in this run.</p>
-                )}
-            </div>
-        </Section>
-    );
-}
-
-export function PlainPanel({ job }: { job: JobDetail }) {
-    if (!isActiveJob(job)) {
-        return null;
-    }
-    return (
-        <Section title="Progress">
-            <Progress job={job} label="Progress" />
-        </Section>
+            {done && job.model ? (
+                <Scores slug={job.model} number={job.version ?? 0} />
+            ) : (
+                <p className="text-muted-foreground">
+                    {isActiveJob(job) ? "Scores appear when scoring finishes." : "No scores."}
+                </p>
+            )}
+        </PanelSection>
     );
 }

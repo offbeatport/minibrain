@@ -7,6 +7,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
 import { count, dateTime, percent } from "~/lib/format";
+import { jobTitle } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 
 const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
@@ -16,7 +17,12 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
         cell: ({ row }) => (
             <Link className="text-primary" href={jobHref(row.original)}>
                 <ModelName
-                    name={row.original.model_name ?? row.original.base_model ?? "Install"}
+                    name={
+                        row.original.model_name ??
+                        row.original.base_model_name ??
+                        row.original.base_model ??
+                        "Install"
+                    }
                     deleted={row.original.deleted}
                 />
             </Link>
@@ -25,8 +31,7 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         header: "Job",
         id: "job",
-        cell: ({ row }) =>
-            `${row.original.kind === "train" ? "Training" : "Scoring"} v${row.original.version}`,
+        cell: ({ row }) => jobTitle(row.original),
     },
     { header: "Status", id: "status", cell: ({ row }) => <JobStatus job={row.original} /> },
     { header: "Progress", id: "progress", cell: ({ row }) => percent(row.original.progress) },

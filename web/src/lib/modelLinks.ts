@@ -1,7 +1,13 @@
-import type { JobInfo } from "~/api/client";
+export const TRAINING_PATH = "/training";
+export const JOBS_PATH = "/jobs";
+const TRAIN_KIND = "train";
 
 export function trainingHref(slug: string): string {
-    return `/training/${encodeURIComponent(slug)}`;
+    return `/models/${encodeURIComponent(slug)}/training`;
+}
+
+export function trainHref(slug: string): string {
+    return `${trainingHref(slug)}?train=1`;
 }
 
 export function evaluationsHref(slug: string): string {
@@ -23,7 +29,7 @@ export const API_REFERENCE_PATH = "/developers";
 export const MANAGEMENT_REFERENCE_PATH = "/developers/management";
 
 export function deploymentPageHref(slug: string): string {
-    return `/deployments/${encodeURIComponent(slug)}`;
+    return modelPageHref(slug, "api");
 }
 
 export function modelCardHref(slug: string, number: number): string {
@@ -38,8 +44,8 @@ export function modelAibomHref(slug: string, number: number): string {
     return `/api/models/${encodeURIComponent(slug)}/versions/${number}/aibom.json`;
 }
 
-export function jobHref(job: JobInfo): string {
-    return `/jobs/${job.id}`;
+export function jobHref(job: { id: number; kind: string }): string {
+    return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
 export type ModelTab = "overview" | "versions" | "data" | "api" | "files";

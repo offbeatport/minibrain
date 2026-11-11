@@ -1,7 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
-import { EmptyState, cn } from "obp-ui";
+import { cn } from "obp-ui";
 import type { ReactNode } from "react";
-import { Page } from "~/components/Section";
 import { navEntryFor } from "~/components/navigation";
 
 export function PageHeader({
@@ -50,20 +49,5 @@ export function PageHeader({
             )}
             {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
-    );
-}
-
-export function ComingSoon({
-    title,
-    caption,
-    body,
-}: { title: string; caption: string; body: string }) {
-    return (
-        <Page>
-            <PageHeader title={title} caption={caption} />
-            <EmptyState variant="panel" title="Coming next">
-                {body}
-            </EmptyState>
-        </Page>
     );
 }

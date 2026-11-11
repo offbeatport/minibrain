@@ -8,21 +8,26 @@ import {
 } from "@tanstack/react-router";
 import type { Role } from "./api/authQueries";
 import { NeedsRole } from "./components/NeedsRole";
+import { redirectTo } from "./components/Redirect";
 import { Shell } from "./components/Shell";
-import { API_REFERENCE_PATH, MANAGEMENT_REFERENCE_PATH } from "./lib/modelLinks";
+import {
+    API_REFERENCE_PATH,
+    JOBS_PATH,
+    MANAGEMENT_REFERENCE_PATH,
+    modelPageHref,
+} from "./lib/modelLinks";
 import { DataPage } from "./pages/DataPage";
-import { DeploymentPage, DeploymentsPage } from "./pages/DeploymentsPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
 import { HomePage } from "./pages/HomePage";
 import { InfrastructurePage } from "./pages/InfrastructurePage";
 import { DiscoverPage, ModelsPage } from "./pages/ModelsPage";
 import { MonitorPage } from "./pages/MonitorPage";
-import { PipelinesPage } from "./pages/PlaceholderPages";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { JobPage } from "./pages/jobs/JobPage";
+import { JobsPage } from "./pages/jobs/JobsPage";
 import { AddModelPage } from "./pages/models/AddModelPage";
 import { DiscoverComparePage } from "./pages/models/DiscoverCompare";
 import { DiscoverModelPage } from "./pages/models/DiscoverModelPage";
@@ -34,7 +39,7 @@ import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPag
 import { DataSettingsPage } from "./pages/settings/DataSettingsPage";
 import { InstallSettingsPage } from "./pages/settings/InstallSettingsPage";
 import { StorageSettingsPage } from "./pages/settings/StorageSettingsPage";
-import { ModelTrainingPage, TrainingListPage } from "./pages/training/TrainingPages";
+import { TrainingItemPage, TrainingListPage } from "./pages/training/TrainingPages";
 
 const rootRoute = createRootRoute({ component: Shell });
 
@@ -133,17 +138,30 @@ const routeTree = rootRoute.addChildren([
     globalPage("/playground", PlaygroundPage),
     globalPage("/data", guarded("builder", DataPage)),
     globalPage("/training", TrainingListPage),
-    globalPage("/training/$slug", guarded("builder", ModelTrainingPage)),
+    globalPage("/training/$id", TrainingItemPage),
+    globalPage(JOBS_PATH, JobsPage),
     globalPage("/jobs/$id", JobPage),
     globalPage("/evaluations", EvaluationsPage),
     globalPage("/feedback", guarded("builder", FeedbackPage)),
-    globalPage("/deployments", DeploymentsPage),
-    globalPage("/deployments/$slug", DeploymentPage),
-    globalPage("/pipelines", PipelinesPage),
+    globalPage(
+        "/deployments",
+        redirectTo(() => "/models"),
+    ),
+    globalPage(
+        "/deployments/$slug",
+        redirectTo(({ slug }) => modelPageHref(slug ?? "", "api")),
+    ),
+    globalPage(
+        "/pipelines",
+        redirectTo(() => "/"),
+    ),
     globalPage("/infrastructure", InfrastructurePage),
     globalPage("/infrastructure/$section", InfrastructurePage),
     globalPage("/monitor", MonitorPage),
-    globalPage("/monitor/jobs", MonitorPage),
+    globalPage(
+        "/monitor/jobs",
+        redirectTo(() => JOBS_PATH),
+    ),
     globalPage("/monitor/requests", MonitorPage),
     globalPage(API_REFERENCE_PATH, ApiReferencePage),
     globalPage(MANAGEMENT_REFERENCE_PATH, ApiReferencePage),

@@ -157,7 +157,7 @@ export function ApiReferencePage() {
                     kind === "gateway" &&
                     can.build && (
                         <Button variant="outline" asChild>
-                            <Link href="/deployments">Create a key</Link>
+                            <Link href="/models">Create a key</Link>
                         </Button>
                     )
                 }

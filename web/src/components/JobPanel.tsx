@@ -6,7 +6,8 @@ import { ErrorLine } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { jobDuration, jobPageHref, jobTitle, useInvalidate } from "~/lib/jobs";
+import { jobDuration, jobTitle, useInvalidate } from "~/lib/jobs";
+import { jobHref } from "~/lib/modelLinks";
 
 export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
     const invalidate = useInvalidate(slug);
@@ -26,7 +27,7 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
         <div className="flex flex-col gap-2 rounded-md border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Link href={jobPageHref(job.id)} className="font-semibold hover:underline">
+                    <Link href={jobHref(job)} className="font-semibold hover:underline">
                         {jobTitle(job)}
                     </Link>
                     <JobStatus job={job} />
@@ -47,7 +48,7 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
                         </Button>
                     )}
                     <Button variant="outline" size="sm" asChild>
-                        <Link href={jobPageHref(job.id)}>Open job</Link>
+                        <Link href={jobHref(job)}>Open job</Link>
                     </Button>
                 </div>
             </div>

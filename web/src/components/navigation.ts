@@ -9,16 +9,16 @@ import {
     HardDrive,
     Home,
     Info,
+    ListChecks,
     Play,
-    Rocket,
     ScrollText,
     Server,
+    Settings,
     ShieldCheck,
     SlidersHorizontal,
     Table2,
     ThumbsUp,
     Users,
-    Workflow,
 } from "lucide-react";
 import type { IconComponent } from "obp-ui/shell";
 import type { Role } from "~/api/authQueries";
@@ -26,13 +26,15 @@ import { allows } from "~/lib/access";
 
 export type NavEntry = { label: string; path: string; icon: IconComponent; role?: Role };
 
-export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
+export type NavSection = { label: string | null; items: NavEntry[] };
+
+export const SECTIONS: NavSection[] = [
     { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
     {
         label: "Explore",
         items: [
             { label: "Models", path: "/models", icon: Box },
-            { label: "Discover", path: "/discover", icon: Compass },
+            { label: "Discover", path: "/discover", icon: Compass, role: "builder" },
             { label: "Playground", path: "/playground", icon: Play },
         ],
     },
@@ -40,20 +42,20 @@ export const SECTIONS: { label: string | null; items: NavEntry[] }[] = [
         label: "Create",
         items: [
             { label: "Data", path: "/data", icon: Database, role: "builder" },
-            { label: "Training", path: "/training", icon: GraduationCap },
-            { label: "Evaluations", path: "/evaluations", icon: Gauge },
+            { label: "Training", path: "/training", icon: GraduationCap, role: "builder" },
+            { label: "Evaluations", path: "/evaluations", icon: Gauge, role: "builder" },
             { label: "Feedback", path: "/feedback", icon: ThumbsUp, role: "builder" },
         ],
     },
     {
-        label: "Run",
+        label: "Operate",
         items: [
-            { label: "Deployments", path: "/deployments", icon: Rocket },
-            { label: "Pipelines", path: "/pipelines", icon: Workflow },
-            { label: "Infrastructure", path: "/infrastructure", icon: Server },
-            { label: "Monitor", path: "/monitor", icon: Activity },
+            { label: "Monitoring", path: "/monitor", icon: Activity },
+            { label: "Jobs", path: "/jobs", icon: ListChecks, role: "builder" },
+            { label: "Infrastructure", path: "/infrastructure", icon: Server, role: "admin" },
         ],
     },
+    { label: null, items: [{ label: "Settings", path: "/settings", icon: Settings }] },
 ];
 
 export const SETTINGS_PAGES: NavEntry[] = [
@@ -71,12 +73,19 @@ export function visibleTo(role: Role | null | undefined): (entry: NavEntry) => b
     return (entry) => !entry.role || allows(role, entry.role);
 }
 
+export function sectionsFor(role: Role | null | undefined): NavSection[] {
+    const shown = visibleTo(role);
+    return SECTIONS.map((section) => ({ ...section, items: section.items.filter(shown) })).filter(
+        (section) => section.items.length > 0,
+    );
+}
+
 export function isSettingsPath(pathname: string): boolean {
     return pathname === "/settings" || pathname.startsWith("/settings/");
 }
 
 export function navEntryFor(pathname: string): NavEntry | undefined {
-    const entries = [...SECTIONS.flatMap((section) => section.items), ...SETTINGS_PAGES];
+    const entries = [...SETTINGS_PAGES, ...SECTIONS.flatMap((section) => section.items)];
     const matching = entries.filter(
         (entry) =>
             pathname === entry.path ||

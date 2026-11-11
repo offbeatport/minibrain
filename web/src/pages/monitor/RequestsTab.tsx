@@ -278,9 +278,9 @@ export function NothingYet({ summary, range }: { summary: RequestSummary; range:
     return (
         <EmptyState title="No requests yet">
             Calls to <span className="font-mono">/v1/chat/completions</span> show up here within a
-            few seconds. Create an API key for a model on{" "}
-            <Link href="/deployments" className="text-primary hover:underline">
-                Deployments
+            few seconds. Create an API key on a model's API tab in{" "}
+            <Link href="/models" className="text-primary hover:underline">
+                Models
             </Link>{" "}
             to start.
         </EmptyState>

@@ -1,6 +1,6 @@
 import { useParams, useRouter } from "@tanstack/react-router";
-import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { ChevronLeft } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { History } from "lucide-react";
 import {
     Button,
     CheckboxSelect,
@@ -18,182 +18,109 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
 } from "obp-ui";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { JobInfo, ModelSummary } from "~/api/client";
-import { type JobOrder, SINCE_CHOICES, useJobFacets, useJobList } from "~/api/jobQueries";
+import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useModels } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
-import { ModelName, withDeleted } from "~/components/ModelName";
+import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
-import { ErrorLine, Page } from "~/components/Section";
-import { JOB_STATUSES, JobStatus, jobStatusLabel } from "~/components/StatusBadge";
-import { ProgressBar } from "~/components/models/StatusText";
+import { Redirect } from "~/components/Redirect";
+import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
-import { jobDuration, jobPageHref, jobSeconds } from "~/lib/jobs";
+import { TRAIN_KIND, jobPageHref } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
-import { evaluationsHref, trainingHref } from "~/lib/modelLinks";
-import { Training } from "../TrainingPage";
-import { Updated } from "../models/MyModels";
+import { TRAINING_PATH, jobHref, modelPageHref, trainHref, trainingHref } from "~/lib/modelLinks";
+import { JobPage } from "../jobs/JobPage";
+import {
+    ATTEMPT_COLUMN,
+    DURATION_COLUMN,
+    ID_COLUMN,
+    SCORE_COLUMN,
+    STARTED_COLUMN,
+    STATUS_COLUMN,
+    jobRowLabel,
+    methodText,
+    orderFrom,
+    ownerName,
+    sortedById,
+    sortingFor,
+} from "../jobs/jobCells";
 
-const PATH = "/training";
-const KEYS = ["model", "status", "job", "q", "since"] as const;
-const TRAINING_KINDS = ["train", "eval"];
-const ANY_TIME = "any";
+const KEYS = ["model", "status", "method", "q", "job"] as const;
+const ANY = "any";
+const SFT = "sft";
 
-const KIND_NAMES: Record<string, string> = {
-    train: "Training",
-    eval: "Scoring",
-};
+const METHODS = [
+    { value: SFT, label: "Supervised fine-tuning (SFT)", ready: true },
+    { value: "dpo", label: "DPO", ready: false },
+    { value: "pretraining", label: "Continued pretraining", ready: false },
+    { value: "rl", label: "Reinforcement learning", ready: false },
+];
 
-function kindName(job: JobInfo): string {
-    return KIND_NAMES[job.kind] ?? job.kind;
-}
-
-function jobName(job: JobInfo): string {
-    return job.version === null ? kindName(job) : `${kindName(job)} v${job.version}`;
-}
-
-function modelName(job: JobInfo): string {
-    return job.model_name ?? job.model ?? "Deleted model";
-}
-
-function Status({ job }: { job: JobInfo }) {
-    if (job.status !== "failed" || !job.error) {
-        return <JobStatus job={job} />;
-    }
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="rounded-sm">
-                    <JobStatus job={job} />
-                </button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm whitespace-normal">{job.error}</TooltipContent>
-        </Tooltip>
-    );
-}
-
-function Progress({ job }: { job: JobInfo }) {
-    const share = `${Math.round(job.progress * 100)}%`;
-    if (job.status === "queued") {
-        return <span className="text-muted-foreground">Waiting</span>;
-    }
-    if (job.status !== "running") {
-        return <span className="tabular-nums text-muted-foreground">{share}</span>;
-    }
-    return (
-        <span className="flex items-center gap-2">
-            <ProgressBar
-                value={job.progress > 0 ? job.progress : null}
-                label={`${jobName(job)} progress`}
-                className="w-20"
-            />
-            <span className="tabular-nums">{share}</span>
+function TrainedModel({ job }: { job: JobInfo }) {
+    const name = ownerName(job);
+    const label = (
+        <span className="flex min-w-0 items-center gap-2">
+            <PublisherLogo name={name} size="sm" />
+            <ModelName name={name} deleted={job.deleted} className="truncate font-medium" />
         </span>
     );
+    if (job.deleted || !job.model) {
+        return label;
+    }
+    return (
+        <Link href={modelPageHref(job.model)} className="block min-w-0 hover:underline">
+            {label}
+        </Link>
+    );
 }
 
-function jobColumns(href: (job: JobInfo) => string): ColumnDef<JobInfo, unknown>[] {
-    const columns: ColumnDef<JobInfo, unknown>[] = [
-        {
-            id: "model",
-            header: "Model",
-            enableHiding: false,
-            accessorFn: (job) => (job.model_name ?? "").toLowerCase(),
-            cell: ({ row }) => (
-                <Link
-                    href={href(row.original)}
-                    className="block truncate font-semibold text-foreground"
-                >
-                    <ModelName name={modelName(row.original)} deleted={row.original.deleted} />
-                </Link>
+const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
+    ID_COLUMN,
+    {
+        id: "model",
+        header: "Model",
+        accessorFn: (job) => ownerName(job).toLowerCase(),
+        cell: ({ row }) => <TrainedModel job={row.original} />,
+    },
+    {
+        id: "version",
+        header: "Version",
+        accessorFn: (job) => job.version ?? -1,
+        cell: ({ row }) =>
+            row.original.version === null || row.original.version === undefined ? (
+                <span className="text-muted-foreground">–</span>
+            ) : (
+                <span className="tabular-nums">{`v${row.original.version}`}</span>
             ),
-        },
-        {
-            id: "version",
-            header: "Version",
-            accessorFn: (job) => job.version ?? -1,
-            cell: ({ row }) => (
-                <span className="tabular-nums">
-                    {row.original.version === null ? "–" : `v${row.original.version}`}
-                </span>
-            ),
-        },
-        { id: "kind", header: "Job", accessorFn: kindName },
-        {
-            id: "status",
-            header: "Status",
-            accessorFn: (job) => job.status,
-            cell: ({ row }) => <Status job={row.original} />,
-        },
-        {
-            id: "progress",
-            header: "Progress",
-            accessorFn: (job) => job.progress,
-            cell: ({ row }) => <Progress job={row.original} />,
-        },
-        {
-            id: "started",
-            header: "Started",
-            accessorFn: (job) => job.started_at ?? "",
-            cell: ({ row }) =>
-                row.original.started_at ? (
-                    <Updated value={row.original.started_at} />
-                ) : (
-                    <span className="text-muted-foreground">Not yet</span>
-                ),
-        },
-        {
-            id: "duration",
-            header: "Duration",
-            accessorFn: jobSeconds,
-            cell: ({ row }) => <span className="tabular-nums">{jobDuration(row.original)}</span>,
-        },
-        {
-            id: "id",
-            header: "Job ID",
-            accessorFn: (job) => job.id,
-            cell: ({ row }) => (
-                <span className="font-mono text-muted-foreground">{`#${row.original.id}`}</span>
-            ),
-        },
-        {
-            id: "attempt",
-            header: "Attempt",
-            accessorFn: (job) => job.attempt,
-            cell: ({ row }) => (
-                <span className="tabular-nums">{`${Math.max(1, row.original.attempt)} of ${row.original.max_attempts}`}</span>
-            ),
-        },
-    ];
-    return columns.map((column) => ({ ...column, enableSorting: column.id === "id" }));
-}
-
-function sortingFor(order: JobOrder): SortingState {
-    return [{ id: "id", desc: order === "newest" }];
-}
-
-function orderFrom(sorting: SortingState): JobOrder {
-    return sorting[0]?.desc === false ? "oldest" : "newest";
-}
+    },
+    STATUS_COLUMN,
+    SCORE_COLUMN,
+    {
+        id: "method",
+        header: "Method",
+        accessorFn: methodText,
+        cell: ({ row }) => <span className="tabular-nums">{methodText(row.original)}</span>,
+    },
+    DURATION_COLUMN,
+    STARTED_COLUMN,
+    ATTEMPT_COLUMN,
+]);
 
 function ModelChoice({ item }: { item: ModelSummary }) {
     return (
         <>
             <PublisherLogo name={item.name} />
             <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-semibold">{item.name}</span>
-                <span className="truncate text-muted-foreground">{item.base_model}</span>
+                <span className="truncate font-medium">{item.name}</span>
+                <span className="truncate text-sm text-muted-foreground">{`On ${item.base_model}`}</span>
             </span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-                {item.versions === 0
-                    ? "No versions"
-                    : `${item.versions} ${item.versions === 1 ? "version" : "versions"}`}
+            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                {item.versions === 1 ? "1 version" : `${item.versions} versions`}
             </span>
         </>
     );
@@ -210,16 +137,16 @@ function TrainPicker({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Train a model</DialogTitle>
+                    <DialogTitle>Train which model?</DialogTitle>
                     <DialogDescription>
-                        Pick a custom model to add training data, score a prompt or train a version.
+                        Its next version trains from its base on its training data.
                     </DialogDescription>
                 </DialogHeader>
                 {models.data && items.length === 0 ? (
-                    <p className="text-base text-muted-foreground">
+                    <p className="text-muted-foreground">
                         No custom models yet.{" "}
                         <Link href="/models/new" className="text-primary hover:underline">
-                            Create one
+                            Add a model
                         </Link>
                     </p>
                 ) : (
@@ -230,7 +157,7 @@ function TrainPicker({
                         renderItem={(item) => <ModelChoice item={item} />}
                         onPick={(item) => {
                             onOpenChange(false);
-                            router.history.push(trainingHref(item.slug));
+                            router.history.push(trainHref(item.slug));
                         }}
                         label="Search models"
                         placeholder="Search by name or base model"
@@ -242,47 +169,80 @@ function TrainPicker({
     );
 }
 
-function jobId(value: string | undefined): number | null {
-    const id = Number(value);
-    return value && Number.isInteger(id) ? id : null;
+function MethodFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+    return (
+        <Select value={value} onValueChange={(next) => onChange(String(next))}>
+            <SelectTrigger aria-label="Method" className="w-auto min-w-40">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value={ANY} label="Any method">
+                    Any method
+                </SelectItem>
+                {METHODS.map((method) => (
+                    <SelectItem
+                        key={method.value}
+                        value={method.value}
+                        label={method.label}
+                        disabled={!method.ready}
+                        description={method.ready ? undefined : "Coming soon"}
+                    >
+                        {method.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
 }
 
 function useOldJobLinks(job: string | undefined) {
     const router = useRouter();
     useEffect(() => {
-        const id = jobId(job);
-        if (id !== null) {
+        const id = Number(job);
+        if (job && Number.isInteger(id) && id > 0) {
             router.history.replace(jobPageHref(id));
         }
     }, [job, router]);
 }
 
-export function TrainingListPage() {
-    const { search, update } = useListSearch(PATH, KEYS);
+function plural(count: number, noun: string): string {
+    return `${count.toLocaleString()} ${count === 1 ? noun : `${noun}s`}`;
+}
+
+function shownCount(shown: number | undefined, all: number | undefined): string {
+    if (shown === undefined) {
+        return "";
+    }
+    return all === undefined || shown === all
+        ? plural(shown, "run")
+        : `${shown.toLocaleString()} of ${plural(all, "run")}`;
+}
+
+function Runs() {
+    const { search, update } = useListSearch(TRAINING_PATH, KEYS);
     const router = useRouter();
     useOldJobLinks(search.job);
-    const can = useCan();
     const owned = useModels();
-    const [picking, setPicking] = useState(false);
     const [order, setOrder] = useState<JobOrder>("newest");
     const models = splitList(search.model);
     const statuses = splitList(search.status);
+    const method = search.method === SFT ? SFT : ANY;
     const filter = {
-        kind: TRAINING_KINDS,
+        kind: [TRAIN_KIND],
         model: models,
         status: statuses,
+        method: method === ANY ? [] : [method],
         q: search.q,
-        since: search.since,
         order,
     };
     const jobs = useJobList(filter);
     const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
-    const filtering = models.length + statuses.length > 0 || Boolean(search.q || search.since);
+    const everything = useJobFacets({ kind: [TRAIN_KIND] }, false);
+    const filtering = models.length + statuses.length > 0 || method !== ANY || Boolean(search.q);
     const selection = useJobSelection(
         jobs.rows,
-        [search.model, search.status, search.q, search.since].join("\n"),
+        [search.model, search.status, search.method, search.q].join("\n"),
     );
-    const columns = useMemo(() => jobColumns((job) => jobPageHref(job.id)), []);
     const deleted = Object.entries(facets.data?.deleted_models ?? {}).map(([slug, name]) => ({
         value: slug,
         label: name,
@@ -297,19 +257,12 @@ export function TrainingListPage() {
         label: jobStatusLabel(status),
         count: facets.data?.statuses[status] ?? 0,
     }));
-    const clear = () => update({ model: "", status: "", q: "", since: "" });
+    const clear = () => update({ model: "", status: "", method: "", q: "" });
     return (
-        <Page wide>
-            <PageHeader
-                title="Training"
-                caption="Training and scoring runs across every model. One job runs at a time; the rest wait in the queue."
-                actions={
-                    can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
-                }
-            />
+        <div className="flex flex-col gap-3">
             <JobToolbar selection={selection}>
                 <SearchInput
-                    aria-label="Search jobs"
+                    aria-label="Search runs"
                     placeholder="Search by model or job ID"
                     value={search.q ?? ""}
                     onValueChange={(q) => update({ q })}
@@ -325,108 +278,94 @@ export function TrainingListPage() {
                 />
                 <CheckboxSelect
                     label="Status"
-                    allLabel="All statuses"
+                    allLabel="Any status"
                     noun="statuses"
                     options={statusOptions}
                     value={statuses}
                     onValueChange={(next) => update({ status: next.join(",") })}
                 />
-                <Select
-                    value={search.since ?? ANY_TIME}
-                    onValueChange={(next) =>
-                        update({ since: next === ANY_TIME ? "" : String(next) })
-                    }
-                >
-                    <SelectTrigger aria-label="Created" className="w-auto min-w-36">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ANY_TIME}>Any time</SelectItem>
-                        {SINCE_CHOICES.map((choice) => (
-                            <SelectItem key={choice.value} value={choice.value}>
-                                {choice.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <MethodFilter
+                    value={method}
+                    onChange={(next) => update({ method: next === ANY ? "" : next })}
+                />
                 {filtering && (
                     <Button variant="ghost" onClick={clear}>
                         Clear filters
                     </Button>
                 )}
+                <span className="text-sm tabular-nums text-muted-foreground">
+                    {shownCount(jobs.total, everything.data?.total)}
+                </span>
             </JobToolbar>
             <ErrorLine error={jobs.error} />
             <DataGrid
-                columns={columns}
+                columns={COLUMNS}
                 rows={jobs.rows}
                 getRowId={(job) => String(job.id)}
                 loading={jobs.isLoading}
-                storageKey="minibrain.training.columns"
+                storageKey="minibrain.training.runs"
                 columnPicker
-                hiddenColumns={["id", "attempt"]}
+                hiddenColumns={["attempt"]}
                 sorting={sortingFor(order)}
                 onSortingChange={(next) => setOrder(orderFrom(next))}
                 hasMore={jobs.hasMore}
                 loadingMore={jobs.loadingMore}
                 onLoadMore={jobs.loadMore}
                 total={jobs.total}
-                onOpen={(job) => router.history.push(jobPageHref(job.id))}
+                onOpen={(job) => router.history.push(jobHref(job))}
                 {...selection.grid}
-                rowLabel={(job) =>
-                    `${withDeleted(modelName(job), job.deleted)}, ${jobName(job)}, ${jobStatusLabel(job.status)}`
-                }
+                rowLabel={jobRowLabel}
                 empty={
                     filtering ? (
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-muted-foreground">No jobs match these filters.</p>
+                            <p className="text-muted-foreground">No runs match these filters.</p>
                             <Button variant="outline" onClick={clear}>
                                 Clear filters
                             </Button>
                         </div>
                     ) : (
                         <p className="text-muted-foreground">
-                            No training yet. Train a model to score or train its first version.
+                            No training runs yet. Train a model to make its first trained version.
                         </p>
                     )
                 }
-                minWidth="min-w-[760px]"
+                minWidth="min-w-[860px]"
             />
+        </div>
+    );
+}
+
+export function TrainingListPage() {
+    const can = useCan();
+    const [picking, setPicking] = useState(false);
+    return (
+        <Page wide>
+            <PageHeader
+                title="Training"
+                caption="Every training run across your models."
+                actions={
+                    can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
+                }
+            />
+            <PanelSections>
+                <PanelSection
+                    icon={History}
+                    title="Runs"
+                    description="Each run trained one version; open one for its data, settings, loss and logs."
+                    bare
+                >
+                    <Runs />
+                </PanelSection>
+            </PanelSections>
             <TrainPicker open={picking} onOpenChange={setPicking} />
         </Page>
     );
 }
 
-export function ModelTrainingPage() {
-    const { slug = "" } = useParams({ strict: false }) as { slug?: string };
-    const models = useModels();
-    const model = models.data?.find((item) => item.slug === slug);
-    return (
-        <Page>
-            <Link
-                href={PATH}
-                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-                <ChevronLeft className="size-4" />
-                Training
-            </Link>
-            <ErrorLine error={models.error} />
-            {models.data && !model && (
-                <p className="text-muted-foreground">No custom model called {slug}.</p>
-            )}
-            {model && (
-                <>
-                    <PageHeader
-                        title={model.name}
-                        caption="Score prompt-only versions and train new ones."
-                        actions={
-                            <Button variant="outline" asChild>
-                                <Link href={evaluationsHref(model.slug)}>Review results</Link>
-                            </Button>
-                        }
-                    />
-                    <Training key={model.slug} slug={model.slug} />
-                </>
-            )}
-        </Page>
-    );
+export function TrainingItemPage() {
+    const { id = "" } = useParams({ strict: false }) as { id?: string };
+    if (/^\d+$/.test(id)) {
+        return <JobPage />;
+    }
+    return <Redirect to={trainingHref(id)} />;
 }

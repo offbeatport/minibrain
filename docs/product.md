@@ -54,7 +54,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › dataset › Versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
 - **Change detection** · shipped · product, ml
   Know when sources or the query changed since the last version.
-  UI: Data › dataset, Training › model
+  UI: Data › dataset, Models › model › Training
 - **Version checks** · shipped · product, ml
   Catch duplicates, conflicts, imbalance, leakage and personal data before training.
   UI: Data › dataset › Checks · API: PUT /api/datasets/{slug}/checks/{check}/dismissal, DELETE /api/datasets/{slug}/checks/{check}/dismissal · Config: data.checks_off, data.majority_share, data.min_label_rows
@@ -164,13 +164,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Switch base, Models › Switch base · API: GET /api/models/{slug}/base-options, POST /api/models/{slug}/base
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
-  UI: Models, Deployments
+  UI: Models, Models › model
 - **Cancel jobs on delete** · shipped · product, ml, admin
   Delete dialogs list running jobs and cancel them before deleting.
   UI: Models › Delete, Models › model › Delete · API: DELETE /api/models/{slug}, DELETE /api/base-models/{key}, DELETE /api/models/{slug}/versions/{number}
 - **History outlives models** · shipped · product, admin
   Jobs and request logs of deleted models stay, marked deleted.
-  UI: Training, Monitor › Jobs, Monitor › Requests, Monitor › Overview, Jobs › job
+  UI: Training, Jobs, Monitoring › Requests, Monitoring › Overview, Jobs › job
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
   UI: Models › model › Versions › How it's judged › Answers, Evaluations › version · API: GET /api/presets
@@ -217,28 +217,28 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Training
 - **Training data per model** · shipped · product, ml
   Pick or map the dataset a model trains on.
-  UI: Training › model › Training data · API: PUT /api/models/{slug}/dataset, PUT /api/models/{slug}/mapping, POST /api/models/{slug}/query, GET /api/models/{slug}/preview
+  UI: Models › model › Training · API: PUT /api/models/{slug}/dataset, PUT /api/models/{slug}/mapping, POST /api/models/{slug}/query, GET /api/models/{slug}/preview
 - **LoRA training** · shipped · product, ml
   Train a LoRA version on a picked dataset version.
-  UI: Training › model › New version · API: POST /api/models/{slug}/versions
+  UI: Models › model › Training › Train · API: POST /api/models/{slug}/versions
 - **Training list** · shipped · product, ml
-  See every training and scoring job across models, filtered.
-  UI: Training
+  Every training run across models, filtered by model, status and method.
+  UI: Training · API: GET /api/jobs, GET /api/jobs/facets
 - **Bulk job actions** · shipped · product, ml
   Tick jobs to cancel or retry them together, each one audited.
-  UI: Training › select jobs, Monitor › Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry
+  UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry
 - **Versions** · shipped · product, ml
   Keep immutable prompt-only and trained versions per model.
   UI: Evaluations · API: GET /api/models/{slug}/versions, DELETE /api/models/{slug}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
-  UI: Training › model › Training plan · API: GET /api/models/{slug}/training-plan
+  UI: Models › model › Training › Train · API: GET /api/models/{slug}/training-plan
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
-  UI: Training › model › Training plan · Roadmap: Training memory
+  UI: Models › model › Training › Train · Roadmap: Training memory
 - **Training settings** · partial · ml
   Override strategy, batch, sequence length, rank, rate, epochs and rows per run.
-  UI: Training › model › Training plan › Settings, Settings › General › Default training recipe · API: POST /api/models/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
+  UI: Models › model › Training › Train › Settings, Settings › General › Default training recipe · API: POST /api/models/{slug}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE
@@ -250,7 +250,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   CLI: minibrain rebase · Roadmap: Rebase
 - **Models as code** · planned · ml, engineer
   Keep each model in a minibrain.yaml and rerun it from CI.
-  UI: Pipelines · CLI: minibrain run · Roadmap: Config as code
+  CLI: minibrain run · Roadmap: Config as code
 - **Exports** · planned · ml
   Export adapters or merged weights as safetensors or GGUF.
   Roadmap: For ML engineers
@@ -264,7 +264,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Evaluation
 - **Prompt-only versions** · shipped · product, ml
   Get a scored version 0 the moment a model exists.
-  UI: Training › model › Score a prompt, Playground · API: POST /api/models/{slug}/versions, POST /api/models/{slug}/versions/{number}/test
+  UI: Models › model › Training, Playground · API: POST /api/models/{slug}/versions, POST /api/models/{slug}/versions/{number}/test
 - **Scores** · shipped · product, ml
   Score every version on the test set and held-out split.
   UI: Evaluations · API: GET /api/models/{slug}/golden
@@ -305,13 +305,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Serving
 - **Deploy and roll back** · shipped · product, engineer
   Deploy a version that passes its rule; roll back any time.
-  UI: Deployments, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
+  UI: Models › model, Evaluations › Deploy · API: POST /api/models/{slug}/deploy, POST /api/models/{slug}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
   UI: Models › model › Deploy · API: POST /api/base-models/{key}/deploy
 - **OpenAI-compatible API** · shipped · engineer
   Call any model by name or pinned version, streamed token by token.
-  UI: Deployments › model › API · API: POST /v1/chat/completions, GET /v1/models
+  UI: Models › model › API · API: POST /v1/chat/completions, GET /v1/models
 - **Sampling settings** · shipped · engineer
   Set temperature, top_p, top_k, min_p, penalties, seed and stops.
   API: POST /v1/chat/completions
@@ -323,16 +323,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   API: POST /v1/chat/completions
 - **Safety model** · shipped · engineer, admin
   Block unsafe requests and answers with a guard model, audited.
-  UI: Settings › General › Safety model, Deployments › model, Monitor › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{slug}/safety, POST /v1/chat/completions
+  UI: Settings › General › Safety model, Models › model › API, Monitoring › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{slug}/safety, POST /v1/chat/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access
 - **API keys** · shipped · engineer, admin
   Issue keys scoped to models, with expiry and an audit trail.
-  UI: Models › model › API, Deployments › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
+  UI: Models › model › API · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
-  UI: Deployments › model › Connect
+  UI: Models › model › API
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
@@ -381,7 +381,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Improve
 - **Feedback API** · shipped · engineer
   Send thumbs and corrections from apps by response id.
-  UI: Deployments › model › Feedback · API: POST /v1/feedback
+  UI: Models › model › API · API: POST /v1/feedback
 - **Playground feedback** · shipped · product
   Rate or correct any playground answer.
   UI: Playground · API: POST /api/models/{slug}/feedback
@@ -393,7 +393,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Playground › Save as test example, Models › model › Data › Test examples, Data › dataset › Used by · API: POST /api/models/{slug}/test-examples, GET /api/models/{slug}/test-examples
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
-  UI: Models › model › Data, Training › model · API: GET /api/models/{slug}/feedback/summary
+  UI: Models › model › Data, Models › model › Training · API: GET /api/models/{slug}/feedback/summary
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2
@@ -463,7 +463,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Models · Policy: model_sources, licence_mode, licences, safetensors_only
 - **Request inputs and answers** · shipped · admin, engineer
   Keep or drop prompts and answers per model, lockable install-wide.
-  UI: Deployments › model, Settings › Security › Request logs and API keys · API: PUT /api/models/{slug}/request-bodies · Policy: request_bodies, request_bodies_locked
+  UI: Models › model › API, Settings › Security › Request logs and API keys · API: PUT /api/models/{slug}/request-bodies · Policy: request_bodies, request_bodies_locked
 - **Audit log** · shipped · admin
   Search, filter and export every audited change.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
@@ -506,18 +506,18 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Home** · shipped · product
   See models, serving and running jobs at a glance.
   UI: Home
-- **Monitor overview** · shipped · engineer, admin
+- **Monitoring overview** · shipped · engineer, admin
   Chart requests, errors, latency and tokens per model, live.
-  UI: Monitor › Overview · API: GET /api/requests/overview
+  UI: Monitoring › Overview · API: GET /api/requests/overview
 - **Request log** · shipped · engineer, admin
   Browse every /v1 call live, filtered, with its kept input.
-  UI: Monitor › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
+  UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Jobs** · shipped · ml, admin
-  Follow, cancel and retry every background job with its log.
-  UI: Monitor › Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
+  Every job of every kind, by kind and status; cancel or retry.
+  UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
 - **Job page** · shipped · product, ml, admin
-  See one job's outcome, loss and learning-rate curves, progress and log.
-  UI: Jobs › job, Training › job, Monitor › Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry
+  One job's progress, settings and data, loss, learning rate and log.
+  UI: Training › job, Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry
 - **Job log** · shipped · ml, admin
   Read a job's own events apart from library output, by level.
   UI: Jobs › job › Logs · API: GET /api/jobs/{job_id}/events
@@ -544,7 +544,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › This install › Download diagnostics · API: GET /api/system/diagnostics
 - **API reference** · shipped · engineer, ml
   Browse /v1 and /api with this install's examples and try calls.
-  UI: User menu › API reference, Deployments › model › Connect, Models › model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
+  UI: User menu › API reference, Models › model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
 - **OpenAPI schema** · shipped · engineer
   Print the /api and /v1 schema for generated clients.
   CLI: minibrain openapi

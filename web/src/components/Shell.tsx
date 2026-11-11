@@ -14,7 +14,7 @@ import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
 import { SettingsSearch } from "~/components/SettingsSearch";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
-import { SECTIONS, SETTINGS_PAGES, isSettingsPath, visibleTo } from "~/components/navigation";
+import { SETTINGS_PAGES, isSettingsPath, sectionsFor, visibleTo } from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
@@ -40,11 +40,7 @@ function KitLink({ href, onClick, ...rest }: UILinkProps) {
 }
 
 function Navigation({ pathname }: { pathname: string }) {
-    const shown = visibleTo(usePerson()?.role);
-    const sections = SECTIONS.map((section) => ({
-        ...section,
-        items: section.items.filter(shown),
-    }));
+    const sections = sectionsFor(usePerson()?.role);
     return (
         <>
             {sections.map((section) => (

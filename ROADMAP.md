@@ -762,7 +762,7 @@ once it matches; only deleting a base removes its files.
   the leader main advances, so they survive a restart and run however small or large the model is. Not jobs: workers
   never touch the database or the artifact store, and only main can remove rows and files. The API stores the teardown
   and answers 202 with the new state at once.
-- States on the Models table, the model pages and Deployments: Deleting (row greyed, actions off, gone when done),
+- States on the Models table and the model pages: Deleting (row greyed, actions off, gone when done),
   Delete failed, Stopping and Stop failed, each failure with its reason and a Retry that repeats the same call. Toasts
   come from a watcher in the shell, so they show on whichever page the person is on.
 - Stopping waits until every live gateway (main's own and standalone ones, which report what they route) has stopped
@@ -884,7 +884,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
    response while it waits for review updates it. The standalone gateway forwards the call to main. Playground thumbs
    and "Correct it" store the same record through `/api/models/<slug>/feedback`.
 2. Request logs always carry each response id. "Keep request inputs and answers", a per-model switch on the model's
-   deployment page (off by default; see API and access), also keeps the last user message and the answer, for as long
+   page (off by default; see API and access), also keeps the last user message and the answer, for as long
    as the logs. Feedback is stored per model and version and links to its request log by response id.
 3. Feedback lands in the review queue (the Feedback page): accept the suggested answer (the correction, or the model's
    own answer for a thumbs-up), fix and accept with another answer, or reject. Disagreement comes first (feedback on
@@ -962,12 +962,12 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - `model: "support-triage"` → current version; `"support-triage@3"` → pinned. The gateway maps it to SGLang's
   `<base>:<adapter>` name.
 - API keys cover one or more models; a call to a model the key does not cover gets 403. Keys are managed on
-  Deployments and on each endpoint. Audit log: who created, changed or revoked which key, when.
+  each model's API tab. Audit log: who created, changed or revoked which key, when.
 - Request metadata is logged for every `/v1` call: time, model, version, key, status, latency, tokens, finish reason
-  and response id, never content. Monitor, Overview, cost and the Requests tab depend on it, so it cannot be turned
+  and response id, never content. Monitoring, cost and the Requests tab depend on it, so it cannot be turned
   off; log retention deletes it.
 - Request inputs and answers (the last user message and the model's answer) are kept per model: "Keep request inputs
-  and answers" on the model's deployment page, off by default, changed by Builders and audited as
+  and answers" on the model's page, off by default, changed by Builders and audited as
   `model.request_bodies` (before and after). They feed feedback by response id, distillation and the Requests tab, and
   are deleted with the request logs. The install-wide "Request inputs and answers" policy is the default for new models
   and for base models served through `/v1`; an admin can lock it for every model ("Lock for every model" under
@@ -1018,7 +1018,7 @@ keys, and `/v1` stays key-only.
 
 | Can | Viewer | Builder | Admin |
 |---|---|---|---|
-| See models, versions, scores, deployments, Monitor and Infrastructure | Yes | Yes | Yes |
+| See models, versions, scores, deployments, Monitoring and Infrastructure | Yes | Yes | Yes |
 | Use the Playground | Yes | Yes | Yes |
 | See data rows: previews, golden sets, mistakes | No | Yes | Yes |
 | Upload data, edit mappings, add, train and evaluate models, label | No | Yes | Yes |
@@ -1044,15 +1044,20 @@ keys, and `/v1` stays key-only.
 ## UI
 
 - obp-ui, operator-console style.
-- Sidebar: Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations, Feedback) · Run
-  (Deployments, Pipelines, Batch jobs in v2, Infrastructure, Monitor) · user menu (Settings, API reference, Theme,
-  Sign out). Sidebar links are plain paths; no page carries a model into another.
-- Training, Evaluations and Feedback cover every model, like Deployments and Monitor. Training and Evaluations are the
+- Sidebar (2026-11-11): Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations,
+  Feedback) · Operate (Monitoring, Jobs, Infrastructure) · Settings, with the user menu (Settings, API reference,
+  Theme, Sign out) below. It follows the role: Viewers see Home, Models, Playground, Monitoring and Settings; Builders
+  add the rest; Admins add Infrastructure and the admin settings. Sidebar links are plain paths; no page carries a
+  model into another. Deployments and Pipelines left it: a model's endpoint and keys are on its API tab, and
+  `/deployments` redirects to Models, `/deployments/<slug>` to `/models/<slug>/api` and `/pipelines` to Home.
+- Training, Evaluations and Feedback cover every model, like Monitoring and Jobs. Training and Evaluations are the
   kit's `DataGrid` with model and status filters kept in the URL: `?model=<slug>,<slug>&status=<status>,<status>`.
-  - Training lists training and scoring jobs: model, version, job, status, progress, started, duration. A row opens
-    the job's page (`/jobs/<id>`; the old `?job=<id>` redirects there). "Train a model" picks a model and opens `/training/<slug>`: its training data
-    (picking a dataset saves its first version if it has none), new version (the dataset version to use, latest by
-    default, then score a prompt or train) and recent jobs.
+  - Training (rebuilt 2026-11-11) is one "Runs" section: every model's training jobs with job, model (its logo),
+    the version it produced, status, held-out score, method ("SFT · LoRA r32"), duration and started. Model, status
+    and method filters (`?method=sft`; DPO, continued pretraining and reinforcement learning show as coming soon),
+    a search, ticks with bulk Cancel and Retry. A row opens the job's page; the old `?job=<id>` redirects there.
+    "Train a model" asks which model and opens `/models/<slug>/training?train=1`, the model page's Train dialog.
+    `/training/<slug>`, the old per-model workspace, redirects to `/models/<slug>/training`.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
     view.
@@ -1062,17 +1067,27 @@ keys, and `/v1` stays key-only.
     (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
     right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
     Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
-- A job's page (`/jobs/<id>`, built 2026-11-06) serves every kind; Training rows, Monitor › Jobs rows, a model's jobs
-  and its activity link to it. Outcome first: kind and model@version, status, attempt, device, worker, started and
-  duration, with Cancel and Retry. Then a panel per kind: training charts loss per step (training and held-out on one
-  axis, the previous version's run behind them, a warning when held-out loss rises while training loss falls) and the
-  learning rate as its own chart, with step, time left, tokens per second and peak memory; scoring shows the scores
-  against the live version, the promotion rule and Deploy; downloads and imports show bytes, speed and the file. A
-  "Serving" line links the deployment when the job's version is live. The log sits collapsed under it (open when the
-  job failed): the kit's `LogViewer` with a level filter, library output off by default, search, follow, timestamps,
-  events that open to their fields, copy and download.
-- Monitor has three tabs: Overview (`/monitor`), Jobs (`/monitor/jobs`) and Requests (`/monitor/requests`), every
-  `/v1` call as it arrives. Overview charts the request logs for a time range and models
+- Jobs (`/jobs`, 2026-11-11) lists every job of every kind (training, scoring, judging, downloads, imports, verify,
+  repair, catalogue sync, and exports once they exist): job, kind and version, model or base, status, started and
+  took. Tabs by kind with their counts (`?kind=`), a status filter and a search (`?status=&q=`), ticks with bulk
+  Cancel and Retry; a row opens the job's page. It replaced Monitor's Jobs tab: `/monitor/jobs` redirects here.
+- A job has one canonical URL (2026-11-11): a training job is `/training/<id>` (Training highlighted, breadcrumb
+  Training › Job #id), every other kind `/jobs/<id>` (Jobs › Job #id); the other URL redirects to it, and every
+  link in the app uses `jobHref(job)`. Under the title "Job #id" a line says what it belongs to ("Trains Support
+  triage → v5", "Scores Support triage v5", "Downloads Qwen3 8B · BF16") and when it started; then kind, status,
+  attempt, device and duration, with Cancel and Retry, the failure or "Serving" line, and sections: Progress (the
+  bar, step, epoch, time left, losses, tokens per second, peak memory, or bytes, speed and file for transfers, rows
+  for scoring, then queued, started and worker) beside Settings and data (the version it produces, the dataset
+  version and rows, base, method, the settings as planned by the worker with what changed from the defaults,
+  sequence length, train and held-out rows; for a base, its variant, revision and size), then Loss (training and
+  held-out on one axis, the previous version's run behind them, a warning when held-out loss rises while training
+  loss falls), Learning rate (its own chart), Scores for scoring jobs (against the live version, the promotion rule
+  and Deploy), and Logs: the kit's `LogViewer` with a level filter, library output off by default, search, follow,
+  timestamps, events that open to their fields, copy and download. `GET /api/jobs/{id}` carries the setup;
+  `GET /api/jobs` adds the base name, publisher and variant, the held-out score, method, strategy and rank, and
+  filters by `method`; facets count kinds.
+- Monitoring has two tabs: Overview (`/monitor`) and Requests (`/monitor/requests`), every `/v1` call as it
+  arrives. Overview charts the request logs for a time range and models
   (`?range=&model=<slug>,<slug>`): requests per minute (stacked), error rate, p50 or p95 latency and tokens in or out,
   one series per model for the five busiest and "Other models" for the rest, in buckets sized to the range (about 60;
   15 seconds for 15 minutes, 30 minutes for a day), aggregated in SQL that runs on SQLite and Postgres
@@ -1088,8 +1103,8 @@ keys, and `/v1` stays key-only.
   id.
 - API reference: two `TabNav` pages, OpenAI-compatible API (`/developers`) and Management API
   (`/developers/management`), each a Scalar reference themed from the obp-ui tokens (Cobalt, light and dark, the
-  kit's sans and mono). Create a key (Builders) links to Deployments; the user menu, Connect on Deployments and a base
-  model's API link to it, and the copy-paste harness configs stay where they are.
+  kit's sans and mono). Create a key (Builders) links to Models, where each model's API tab makes keys; the user
+  menu and a model's API tab link to it, and the copy-paste harness configs stay where they are.
 - Playground (built 2026-11-06): the chat on the left, a settings panel on the right (a drawer below 1024px, hidden on
   request) with Model (any version of your models, the live name, or any installed base, deployed or not;
   `?model=<name or slug>` for links, the last pick remembered in the browser), Presets (saved, named sets of every
@@ -1122,7 +1137,7 @@ keys, and `/v1` stays key-only.
   model and Overview · API for a base; an unknown tab redirects to Overview. Overview answers three questions in
   compact rows: is it good (the live version's held-out score against v0 and the version before it; a base shows its
   catalogue facts), is it working (requests per day for 7 days as a small line, p95 latency and error rate, from the
-  request logs as Monitor computes them) and what next (one action computed on the server: deploy a passing version,
+  request logs as Monitoring computes them) and what next (one action computed on the server: deploy a passing version,
   deploy, review pending feedback, add data, train the next version; for a base, deploy or build a custom model on it).
   Health and teardown notices sit above them; a Try it box streams one answer through the Playground endpoint (same
   safety, policy and logging), says when asking loads the model, and Continue in Playground carries the conversation.
