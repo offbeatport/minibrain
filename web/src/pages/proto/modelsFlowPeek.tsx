@@ -18,7 +18,6 @@ import {
     modelHref,
     nextStep,
     pct,
-    useFlowState,
 } from "./modelsFlowData";
 import { MakeLiveButton, ModelAvatar, openConnect } from "./modelsFlowParts";
 import {
@@ -109,9 +108,8 @@ function Variants({ model }: { model: FlowModel }) {
 }
 
 function Body({ model, on }: { model: FlowModel; on: Handlers }) {
-    const state = useFlowState();
     const live = liveVersion(model);
-    const step = nextStep(state, model);
+    const step = nextStep(model);
     const candidate = model.live !== null ? bestCandidate(model) : undefined;
     const status = autopilotText(model);
     return (
@@ -198,7 +196,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                         model={model}
                         version={candidate}
                         variant="secondary"
-                        label={`Make live v${candidate.number}`}
+                        label={`Make v${candidate.number} live`}
                     />
                 )}
                 <Button variant="outline" onClick={() => openConnect(model.slug)}>

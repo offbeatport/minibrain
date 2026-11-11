@@ -1,19 +1,17 @@
-import { useParams, useRouter } from "@tanstack/react-router";
+import { useParams } from "@tanstack/react-router";
 import { Badge, Button, Link, TabNav, useToast } from "obp-ui";
 import type { ReactNode } from "react";
-import type { ModelUsage } from "~/api/client";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { Page, Section, Stat } from "~/components/Section";
-import { Requests } from "~/components/models/ModelMetrics";
+import { Page, Section } from "~/components/Section";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
-import { count } from "~/lib/format";
-import { ModelHeaderActions } from "./flowModelActions";
+import { FactSheet } from "./flowFactSheet";
+import { ModelHeader } from "./flowHeader";
 import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs";
 import { ModelMonitoring } from "./flowMonitoring";
 import { useCan } from "./flowOverlays";
-import { trainBlock } from "./flowTraining";
+import { UsagePanel } from "./flowUsagePanel";
 import {
     type CatalogEntry,
     FLOW,
@@ -23,22 +21,16 @@ import {
     bestCandidate,
     catalogEntry,
     compareHref,
-    datasetHref,
-    findVersion,
     flowHref,
     installBase,
     jobHref,
-    jobOfVersion,
     lastFailure,
     liveSplit,
     liveVersion,
     modelHref,
-    nextStep,
-    openIntent,
     pct,
     playgroundHref,
     points,
-    retryWithQLoRA,
     scoreDelta,
     shortAgo,
     timeLeft,
@@ -47,7 +39,7 @@ import {
     useFlowState,
     versionHref,
 } from "./modelsFlowData";
-import { Crumbs, Delta, ModelAvatar, Tip } from "./modelsFlowParts";
+import { Crumbs, ModelAvatar } from "./modelsFlowParts";
 
 const TAB_LABELS: Record<ModelTab, string> = {
     overview: "Overview",
@@ -60,124 +52,6 @@ const TAB_LABELS: Record<ModelTab, string> = {
 
 const ALIASES: Record<string, ModelTab> = { data: "training", api: "keys" };
 
-function usageOf(model: FlowModel): ModelUsage | null {
-    const total = model.traffic.reduce((sum, value) => sum + value, 0);
-    if (total === 0 && !model.deployed) {
-        return null;
-    }
-    return {
-        days: [],
-        daily: model.traffic,
-        total,
-        previous: model.previous,
-        failed: Math.round(total * model.errors),
-        last_at: new Date().toISOString(),
-        p50_ms: null,
-    };
-}
-
-function Panel({
-    title,
-    children,
-    footer,
-}: { title: string; children: ReactNode; footer?: ReactNode }) {
-    return (
-        <section className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-panel">
-            <h2 className="text-base leading-tight font-semibold">{title}</h2>
-            <div className="flex flex-1 flex-col gap-3">{children}</div>
-            {footer && <div className="flex flex-wrap items-center gap-2">{footer}</div>}
-        </section>
-    );
-}
-
-function LivePanel({ model }: { model: FlowModel }) {
-    const live = liveVersion(model);
-    const zero = findVersion(model, 0);
-    const canary = model.canary ? findVersion(model, model.canary.version) : undefined;
-    if (!live) {
-        return (
-            <Panel title="Live">
-                <p className="text-2xl">Not deployed</p>
-                <p className="text-muted-foreground">
-                    {`Make a version live and ${model.slug} answers with it. Until then each version is still callable as ${model.slug}@N.`}
-                </p>
-            </Panel>
-        );
-    }
-    return (
-        <Panel
-            title="Live"
-            footer={
-                <Link
-                    href={modelHref(model.slug, "versions")}
-                    className="text-primary hover:underline"
-                >
-                    {`All ${model.versions.length} versions →`}
-                </Link>
-            }
-        >
-            {canary && model.canary ? (
-                <div className="flex flex-col gap-1">
-                    <span className="text-2xl tabular-nums">
-                        {`v${live.number} ${100 - model.canary.share}% · v${canary.number} ${model.canary.share}%`}
-                    </span>
-                    <span className="text-muted-foreground tabular-nums">
-                        {`v${live.number} ${pct(live.scores?.[0])} · v${canary.number} ${pct(canary.scores?.[0])} canary${model.autopilot?.run ? `, ${model.autopilot.run.minutesLeft} min left` : ""}`}
-                    </span>
-                </div>
-            ) : (
-                <div className="flex items-baseline gap-3">
-                    <Link
-                        href={versionHref(model.slug, live.number)}
-                        className="text-3xl tabular-nums hover:underline"
-                    >
-                        {`v${live.number} · ${pct(live.scores?.[0])}`}
-                    </Link>
-                    <span className="text-muted-foreground">{model.metrics[0].toLowerCase()}</span>
-                </div>
-            )}
-            {zero?.scores && live.scores && zero.number !== live.number && (
-                <p className="text-sm">
-                    <Delta value={live.scores[0] - zero.scores[0]} suffix="vs v0 Baseline" />
-                </p>
-            )}
-            <p className="text-sm text-muted-foreground">
-                {`Scored on ${count(model.heldOut)} held-out rows. ${model.deployed ? `${model.slug} is deployed.` : `${model.slug} is not deployed.`}`}
-            </p>
-        </Panel>
-    );
-}
-
-function TrafficPanel({ model }: { model: FlowModel }) {
-    const high = model.errors > model.usualErrors * 3;
-    return (
-        <Panel
-            title="Traffic"
-            footer={
-                <Link
-                    href={modelHref(model.slug, "monitoring")}
-                    className="text-primary hover:underline"
-                >
-                    Monitoring →
-                </Link>
-            }
-        >
-            <Requests usage={usageOf(model)} live={model.deployed} />
-            <div className="flex flex-wrap gap-x-8 gap-y-2">
-                <Stat label="Latency p95" value={model.p95 ? `${model.p95} ms` : "–"} />
-                <Stat
-                    label="Errors"
-                    value={
-                        <span className={high ? "text-destructive" : undefined}>
-                            {model.deployed ? `${(model.errors * 100).toFixed(1)}%` : "–"}
-                        </span>
-                    }
-                />
-            </div>
-        </Panel>
-    );
-}
-
 function StripRow({ children, actions }: { children: ReactNode; actions: ReactNode }) {
     return (
         <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-panel py-3">
@@ -187,10 +61,7 @@ function StripRow({ children, actions }: { children: ReactNode; actions: ReactNo
     );
 }
 
-function OtherVersions({ model }: { model: FlowModel }) {
-    const router = useRouter();
-    const toast = useToast();
-    const can = useCan("builder");
+function Attention({ model }: { model: FlowModel }) {
     const training = trainingVersion(model);
     const candidate = model.live !== null ? bestCandidate(model) : undefined;
     const failure = lastFailure(model);
@@ -201,226 +72,123 @@ function OtherVersions({ model }: { model: FlowModel }) {
         )
             ? failure
             : undefined;
-    if (!training && !candidate && !newestFailure) {
-        return null;
-    }
     const delta = candidate ? scoreDelta(model, candidate) : null;
     const memory = /memory/i.test(newestFailure?.error ?? "");
+    const quiet = !training && !candidate && !newestFailure;
     return (
         <Section
-            title="Other versions"
-            caption="Only what is worth acting on. Every version is in the Versions tab."
+            title="Versions that need attention"
+            caption={
+                quiet
+                    ? "None right now. Every version is in the Versions tab."
+                    : "Training, a better candidate and the last failure. Every version is in the Versions tab."
+            }
+            actions={
+                <Link
+                    href={modelHref(model.slug, "versions")}
+                    className="text-primary hover:underline"
+                >
+                    {model.versions.length === 1
+                        ? "1 version →"
+                        : `All ${model.versions.length} versions →`}
+                </Link>
+            }
             flush
         >
-            <ul className="divide-y">
-                {training && (
-                    <StripRow
-                        actions={
-                            <Button variant="outline" asChild>
-                                <Link href={jobHref(training.jobId)}>Watch</Link>
-                            </Button>
-                        }
-                    >
-                        <span className="flex flex-wrap items-baseline gap-x-2">
+            {!quiet && (
+                <ul className="divide-y">
+                    {training && (
+                        <StripRow
+                            actions={
+                                <Button variant="outline" asChild>
+                                    <Link href={jobHref(training.jobId)}>Watch</Link>
+                                </Button>
+                            }
+                        >
+                            <span className="flex flex-wrap items-baseline gap-x-2">
+                                <Link
+                                    href={versionHref(model.slug, training.number)}
+                                    className="font-medium hover:underline"
+                                >
+                                    {`v${training.number} is training`}
+                                </Link>
+                                <span className="text-sm text-muted-foreground tabular-nums">
+                                    {`${Math.round((training.progress ?? 0) * 100)}% · ${timeLeft(training)} left`}
+                                </span>
+                            </span>
+                            <ProgressBar
+                                value={training.progress ?? 0}
+                                label={`v${training.number} progress`}
+                                className="w-full max-w-96"
+                            />
+                        </StripRow>
+                    )}
+                    {candidate && delta !== null && model.live !== null && (
+                        <StripRow
+                            actions={
+                                <>
+                                    <Button variant="outline" asChild>
+                                        <Link href={playgroundHref(model.slug, candidate.number)}>
+                                            Try in Playground
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" asChild>
+                                        <Link
+                                            href={compareHref(
+                                                model.slug,
+                                                model.live,
+                                                candidate.number,
+                                            )}
+                                        >
+                                            Compare
+                                        </Link>
+                                    </Button>
+                                </>
+                            }
+                        >
                             <Link
-                                href={versionHref(model.slug, training.number)}
+                                href={versionHref(model.slug, candidate.number)}
                                 className="font-medium hover:underline"
                             >
-                                {`v${training.number} is training`}
+                                {`v${candidate.number} is the best candidate: ${points(delta)} over live`}
                             </Link>
                             <span className="text-sm text-muted-foreground tabular-nums">
-                                {`${Math.round((training.progress ?? 0) * 100)}% · ${timeLeft(training)} left`}
+                                {`${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for v${model.live}; passed the promotion rule · ${shortAgo(candidate)}`}
                             </span>
-                        </span>
-                        <ProgressBar
-                            value={training.progress ?? 0}
-                            label={`v${training.number} progress`}
-                            className="w-full max-w-96"
-                        />
-                    </StripRow>
-                )}
-                {candidate && delta !== null && model.live !== null && (
-                    <StripRow
-                        actions={
-                            <>
-                                <Button variant="outline" asChild>
-                                    <Link href={playgroundHref(model.slug, candidate.number)}>
-                                        Try in Playground
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <Link
-                                        href={compareHref(model.slug, model.live, candidate.number)}
-                                    >
-                                        Compare
-                                    </Link>
-                                </Button>
-                                {can && (
-                                    <Button
-                                        onClick={() =>
-                                            openIntent({
-                                                kind: "make-live",
-                                                slug: model.slug,
-                                                number: candidate.number,
-                                            })
-                                        }
-                                    >
-                                        Make live
-                                    </Button>
-                                )}
-                            </>
-                        }
-                    >
-                        <Link
-                            href={versionHref(model.slug, candidate.number)}
-                            className="font-medium hover:underline"
-                        >
-                            {`v${candidate.number} beats live by ${points(delta)}`}
-                        </Link>
-                        <span className="text-sm text-muted-foreground tabular-nums">
-                            {`${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for v${model.live}; passed the promotion rule · ${shortAgo(candidate)}`}
-                        </span>
-                    </StripRow>
-                )}
-                {newestFailure && (
-                    <StripRow
-                        actions={
-                            <>
+                        </StripRow>
+                    )}
+                    {newestFailure && (
+                        <StripRow
+                            actions={
                                 <Button variant="outline" asChild>
                                     <Link href={versionHref(model.slug, newestFailure.number)}>
                                         Open
                                     </Link>
                                 </Button>
-                                {memory && can && (
-                                    <Tip tip={trainBlock(model)}>
-                                        <Button
-                                            variant="outline"
-                                            disabled={Boolean(trainBlock(model))}
-                                            onClick={() => {
-                                                const number = retryWithQLoRA(
-                                                    model.slug,
-                                                    newestFailure.number,
-                                                );
-                                                toast({
-                                                    title: `v${number} is training with QLoRA`,
-                                                    tone: "success",
-                                                });
-                                                const job = jobOfVersion(model.slug, number);
-                                                if (job) {
-                                                    router.history.push(jobHref(job));
-                                                }
-                                            }}
-                                        >
-                                            Retry with QLoRA
-                                        </Button>
-                                    </Tip>
-                                )}
-                            </>
-                        }
-                    >
-                        <span className="font-medium">
-                            {`v${newestFailure.number} failed${memory ? ": out of memory" : ""}`}
-                        </span>
-                        <span className="truncate text-sm text-muted-foreground">
-                            {`${shortAgo(newestFailure)} · ${newestFailure.error ?? ""}`}
-                        </span>
-                    </StripRow>
-                )}
-            </ul>
-        </Section>
-    );
-}
-
-function NextPanel({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const step = nextStep(state, model);
-    if (!useCan("builder")) {
-        return null;
-    }
-    return (
-        <Panel title="Next step">
-            {step ? (
-                <>
-                    <p className="font-medium">{step.label}</p>
-                    <p className="text-muted-foreground">{step.detail}</p>
-                </>
-            ) : (
-                <p className="text-muted-foreground">
-                    Nothing waits. Feedback from the API arrives on the Feedback page.
-                </p>
-            )}
-        </Panel>
-    );
-}
-
-function Details({ model }: { model: FlowModel }) {
-    const state = useFlowState();
-    const builder = useCan("builder");
-    const data = state.datasets.find((item) => item.slug === model.dataset);
-    const items: [string, ReactNode][] = [
-        [
-            "Base",
-            <Link
-                key="base"
-                href={modelHref(model.base ? baseModelSlug(model.base) : model.slug)}
-                className="text-primary hover:underline"
-            >
-                {model.base}
-            </Link>,
-        ],
-        [
-            "Data",
-            <span key="data" className="flex flex-wrap items-baseline gap-x-2">
-                {data ? (
-                    <Link href={datasetHref(data.slug)} className="text-primary hover:underline">
-                        {`${data.slug} v${data.version}`}
-                    </Link>
-                ) : (
-                    <span className="text-muted-foreground">None yet</span>
-                )}
-                {builder && (
-                    <>
-                        <span aria-hidden="true" className="text-faint">
-                            ·
-                        </span>
-                        <Link
-                            href={`${FLOW}/data?for=${model.slug}`}
-                            className="text-primary hover:underline"
+                            }
                         >
-                            {data ? "Change" : "Add data"}
-                        </Link>
-                    </>
-                )}
-            </span>,
-        ],
-        [
-            "API name",
-            <span key="api" className="font-mono text-sm">
-                {`${model.slug}, ${model.slug}@N`}
-            </span>,
-        ],
-        ["Licence", model.licence],
-        ["Task", model.task],
-    ];
-    return (
-        <Section title="Details">
-            <Facts items={items} />
+                            <span className="font-medium">
+                                {`v${newestFailure.number} failed${memory ? ": out of memory" : ""}`}
+                            </span>
+                            <span className="truncate text-sm text-muted-foreground">
+                                {`${shortAgo(newestFailure)} · ${newestFailure.error ?? ""}`}
+                            </span>
+                        </StripRow>
+                    )}
+                </ul>
+            )}
         </Section>
     );
 }
 
 function Overview({ model }: { model: FlowModel }) {
     return (
-        <div className="flex flex-col gap-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <LivePanel model={model} />
-                <TrafficPanel model={model} />
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="flex min-w-0 flex-col gap-4">
+                <UsagePanel model={model} />
+                <Attention model={model} />
             </div>
-            <OtherVersions model={model} />
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-                <NextPanel model={model} />
-                <Details model={model} />
-            </div>
+            <FactSheet model={model} />
         </div>
     );
 }
@@ -519,22 +287,6 @@ function BaseOverview({ model }: { model: FlowModel }) {
                 </Section>
             </div>
         </div>
-    );
-}
-
-function Header({ model }: { model: FlowModel }) {
-    const caption =
-        model.kind === "base"
-            ? `Base · ${model.size} · ${model.licence}`
-            : `On ${model.base} · ${liveSplit(model) ?? "not deployed"}`;
-    return (
-        <PageHeader
-            title={model.name}
-            icon={<ModelAvatar model={model} size="lg" />}
-            badge={<Badge variant="outline">{model.kind === "base" ? "Base" : "Custom"}</Badge>}
-            caption={caption}
-            actions={<ModelHeaderActions model={model} />}
-        />
     );
 }
 
@@ -637,17 +389,19 @@ export function FlowModelPage() {
     const tabs = tabsOf(model, builder);
     const tab = tabOf(params.tab, tabs);
     return (
-        <Page>
+        <Page wide>
             <Crumbs items={[{ label: "Models", href: flowHref() }, { label: model.name }]} />
-            <Header model={model} />
-            <TabNav
-                label={`${model.name} pages`}
-                tabs={tabs.map((item) => ({
-                    href: modelHref(model.slug, item),
-                    label: TAB_LABELS[item],
-                }))}
-            />
-            <div className="pt-2">
+            <div className="flex flex-col gap-3">
+                <ModelHeader model={model} />
+                <TabNav
+                    label={`${model.name} pages`}
+                    tabs={tabs.map((item) => ({
+                        href: modelHref(model.slug, item),
+                        label: TAB_LABELS[item],
+                    }))}
+                />
+            </div>
+            <div>
                 {tab === "overview" &&
                     (model.kind === "base" ? (
                         <BaseOverview model={model} />

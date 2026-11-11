@@ -65,8 +65,8 @@ const DEFAULT_AUTOPILOT: Autopilot = {
     threshold: 50,
     canary: 10,
     minutes: 60,
-    rollbackErrors: true,
-    rollbackScore: true,
+    revertOnErrors: true,
+    revertOnScore: true,
     run: null,
 };
 
@@ -95,7 +95,7 @@ function AutopilotForm({ model, onClose }: { model: FlowModel; onClose: () => vo
                 <DialogDescription>
                     Once accepted feedback reaches the threshold, it trains a new version, scores it
                     against live, sends it a canary share of traffic and deploys it when the canary
-                    ends. It rolls back on any trigger below.
+                    ends. Any trigger below makes the previous version live again.
                 </DialogDescription>
             </DialogHeader>
             <FieldGroup>
@@ -141,18 +141,20 @@ function AutopilotForm({ model, onClose }: { model: FlowModel; onClose: () => vo
                     </Field>
                 </div>
                 <fieldset className="flex flex-col gap-2.5">
-                    <legend className="mb-2 font-medium">Roll back if</legend>
+                    <legend className="mb-2 font-medium">
+                        Make the previous version live again if
+                    </legend>
                     <CheckboxField
                         label="Errors rise"
                         description="More than 1% of canary requests fail."
-                        checked={draft.rollbackErrors}
-                        onCheckedChange={(value) => change({ rollbackErrors: value === true })}
+                        checked={draft.revertOnErrors}
+                        onCheckedChange={(value) => change({ revertOnErrors: value === true })}
                     />
                     <CheckboxField
                         label="The score drops"
                         description="The new version scores below live on the held-out set or on rated canary answers."
-                        checked={draft.rollbackScore}
-                        onCheckedChange={(value) => change({ rollbackScore: value === true })}
+                        checked={draft.revertOnScore}
+                        onCheckedChange={(value) => change({ revertOnScore: value === true })}
                     />
                 </fieldset>
             </FieldGroup>

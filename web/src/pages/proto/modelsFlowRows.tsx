@@ -40,6 +40,7 @@ import {
     type FlowVersion,
     cardHref,
     compareHref,
+    duration,
     flowHref,
     liveShare,
     liveVersion,
@@ -142,7 +143,7 @@ export function autopilotText(model: FlowModel): string | null {
     if (!run) {
         return null;
     }
-    return `v${run.version} on ${model.autopilot?.canary}% canary · ${run.minutesLeft} min left`;
+    return `v${run.version} on ${model.autopilot?.canary}% canary · ${duration(run.minutesLeft)} left`;
 }
 
 function fromControl(event: MouseEvent | KeyboardEvent): boolean {
@@ -274,7 +275,7 @@ export function LiveStatus({
 }
 
 const AUTOPILOT_TIP =
-    "Autopilot: once accepted feedback reaches the threshold it trains a new version, scores it, sends it a canary share of traffic, then deploys it. It rolls back if errors rise or the score drops.";
+    "Autopilot: once accepted feedback reaches the threshold it trains a new version, scores it, sends it a canary share of traffic, then deploys it. It makes the previous version live again if errors rise or the score drops.";
 
 export function AutopilotBadge() {
     return (
@@ -479,7 +480,7 @@ function ModelStatus({ model }: { model: FlowModel }) {
                         }
                         className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                        Make live
+                        {`Make v${version} live`}
                     </button>
                 </>
             )}

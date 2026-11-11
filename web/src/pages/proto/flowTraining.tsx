@@ -57,9 +57,11 @@ export function trainBlock(model: FlowModel): string | null {
 export function TrainButton({
     model,
     variant = "default",
+    label,
 }: {
     model: FlowModel;
     variant?: "default" | "outline";
+    label?: string;
 }) {
     const blocked = trainBlock(model);
     if (!useCan("builder")) {
@@ -72,7 +74,7 @@ export function TrainButton({
                 disabled={Boolean(blocked)}
                 onClick={() => openTrain(model.slug)}
             >
-                {`Train v${nextNumber(model)}`}
+                {label ?? `Train v${nextNumber(model)}`}
             </Button>
         </Tip>
     );

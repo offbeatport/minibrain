@@ -54,7 +54,7 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
                 {
                     id: `live:${model.slug}`,
                     group: "Actions" as const,
-                    label: `Make live v${candidate.number}`,
+                    label: `Make v${candidate.number} live`,
                     detail: `${model.name} · beats live ${points(scoreDelta(model, candidate) ?? 0)}`,
                     text: `make v${candidate.number} live make live v${candidate.number} ${model.name} ${model.slug}`,
                     run: () =>
@@ -73,6 +73,22 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
             detail: "Pick a base and a name",
             text: "add model new create",
             run: () => go(`${FLOW}/models/new`),
+        },
+        {
+            id: "models",
+            group: "Actions",
+            label: "Open Models",
+            detail: "Models available on this install",
+            text: "open models list explore installed custom base",
+            run: () => go(`${FLOW}/models`),
+        },
+        {
+            id: "discover",
+            group: "Actions",
+            label: "Open Discover",
+            detail: "Open models you can add",
+            text: "open discover explore catalogue catalog bases download",
+            run: () => go(`${FLOW}/discover`),
         },
         {
             id: "training",
@@ -184,7 +200,7 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
     return [...actions, ...models, ...versions, ...datasets, ...jobs];
 }
 
-const BUILDER_ONLY = /^(live|train|key|add$|training$|evaluations$|jobs$|data|job)/;
+const BUILDER_ONLY = /^(live|train|key|add$|discover$|training$|evaluations$|jobs$|data|job)/;
 
 function viewable(command: Command): boolean {
     return !BUILDER_ONLY.test(command.id);

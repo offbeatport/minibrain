@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { GitCompare, PowerOff, Trash2, X } from "lucide-react";
+import { ChevronRight, GitCompare, PowerOff, Trash2, X } from "lucide-react";
 import {
     Button,
     InfoTip,
@@ -79,11 +79,19 @@ type Line =
           searching: boolean;
       };
 type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
-type Group = { kind: KindKey; label: string; count: number; lines: Line[] };
+type Group = {
+    kind: KindKey;
+    label: string;
+    caption: string;
+    count: number;
+    deployed: number;
+    collapsed: boolean;
+    lines: Line[];
+};
 
-const GROUPS: { kind: KindKey; label: string }[] = [
-    { kind: "custom", label: "Your models" },
-    { kind: "base", label: "Base models" },
+const GROUPS: { kind: KindKey; label: string; caption: string }[] = [
+    { kind: "custom", label: "Your models", caption: "Trained on your data" },
+    { kind: "base", label: "Base models", caption: "Shared weights your models run on" },
 ];
 
 const HINTS: Record<string, Hint> = {
@@ -97,6 +105,7 @@ const HINTS: Record<string, Hint> = {
 const EXPANDED_KEY = "minibrain.proto.flow.expanded";
 const COLUMNS_KEY = "minibrain.proto.flow.columns";
 const NESTED_KEY = "minibrain.proto.flow.showVersions";
+const COLLAPSED_KEY = "minibrain.proto.flow.collapsedGroups";
 const DEFAULT_COLUMNS: Column[] = ["quality", "requests", "cost"];
 
 function readStored<T>(key: string, fallback: T): T {
@@ -394,6 +403,52 @@ function SelectionBar({
     );
 }
 
+function useCollapsed() {
+    const [stored, setStored] = useState<Record<string, boolean>>(() =>
+        readStored(COLLAPSED_KEY, {}),
+    );
+    const toggle = (kind: KindKey) => {
+        const value = { ...stored, [kind]: !stored[kind] };
+        setStored(value);
+        writeStored(COLLAPSED_KEY, value);
+    };
+    return { stored, toggle };
+}
+
+function GroupBand({ group, onToggle }: { group: Group; onToggle: () => void }) {
+    const summary = `${plural(group.count, "model")} · ${group.deployed} deployed`;
+    return (
+        <h2
+            id={`flow-group-${group.kind}`}
+            className="sticky top-21 z-[12] col-span-full -mt-px border-y bg-muted"
+        >
+            <button
+                type="button"
+                aria-expanded={!group.collapsed}
+                aria-controls={`flow-group-rows-${group.kind}`}
+                onClick={onToggle}
+                className="flex h-9 w-full min-w-0 items-center gap-2 px-4 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            >
+                <ChevronRight
+                    aria-hidden="true"
+                    className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform duration-100 motion-reduce:transition-none",
+                        !group.collapsed && "rotate-90",
+                    )}
+                />
+                <span className="font-medium">{group.label}</span>
+                <span className="text-sm text-muted-foreground tabular-nums">{group.count}</span>
+                <span aria-hidden="true" className="text-faint">
+                    ·
+                </span>
+                <span className="min-w-0 truncate text-sm font-normal text-muted-foreground tabular-nums">
+                    {group.collapsed ? summary : group.caption}
+                </span>
+            </button>
+        </h2>
+    );
+}
+
 function useExpanded() {
     const [stored, setStored] = useState<Record<string, boolean>>(() =>
         readStored(EXPANDED_KEY, {}),
@@ -453,6 +508,7 @@ export function ModelsFlowList() {
     const router = useRouter();
     const toast = useToast();
     const expanded = useExpanded();
+    const collapsed = useCollapsed();
     const [query, setQuery] = useState("");
     const [searchToggles, setSearchToggles] = useState<Record<string, boolean>>({});
     const [selection, setSelection] = useState<string[]>([]);
@@ -476,13 +532,18 @@ export function ModelsFlowList() {
                     pool.filter((model) => model.kind === group.kind && passes(model, filters)),
                     sort,
                 );
+                const shut = Boolean(collapsed.stored[group.kind]);
                 return {
                     ...group,
                     count: members.length,
-                    lines: buildLines(members, text, expanded.stored, searchToggles, nested),
+                    deployed: members.filter((model) => model.deployed).length,
+                    collapsed: shut,
+                    lines: shut
+                        ? []
+                        : buildLines(members, text, expanded.stored, searchToggles, nested),
                 };
             }).filter((group) => group.count > 0),
-        [pool, filters, sort, text, expanded.stored, searchToggles, nested],
+        [pool, filters, sort, text, expanded.stored, searchToggles, nested, collapsed.stored],
     );
     const lines = groups.flatMap((group) => group.lines);
     const rows = lines.filter((line): line is RowLine =>
@@ -783,16 +844,16 @@ export function ModelsFlowList() {
         );
     return (
         <div className="flex flex-col gap-3">
-            <PageHeader title="Models" caption="Your models and the bases they run on." />
+            <PageHeader title="Models" caption="Models available on this install." />
             {toolbar}
             <div
-                className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card"
+                className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card lg:overflow-x-clip"
                 style={{ gridTemplateColumns: gridTemplate(columns) }}
             >
                 <div
                     className={cn(
                         ROW_GRID,
-                        "h-9 border-b bg-secondary font-medium text-muted-foreground",
+                        "sticky top-12 z-[15] h-9 border-b bg-secondary font-medium text-muted-foreground",
                     )}
                 >
                     <span className={nested ? "pl-8" : undefined}>Model</span>
@@ -804,7 +865,7 @@ export function ModelsFlowList() {
                     <span>Status</span>
                     <span className="sr-only">Actions</span>
                 </div>
-                {lines.length === 0 ? (
+                {groups.length === 0 ? (
                     <div className="col-span-full flex min-h-40 items-center justify-center gap-2 text-muted-foreground">
                         No models, versions or variants match.
                     </div>
@@ -813,26 +874,21 @@ export function ModelsFlowList() {
                         <section
                             key={group.kind}
                             aria-labelledby={`flow-group-${group.kind}`}
-                            className="col-span-full grid grid-cols-subgrid border-t first-of-type:border-t-0"
+                            className="col-span-full grid grid-cols-subgrid"
                         >
-                            <h2
-                                id={`flow-group-${group.kind}`}
-                                className={cn(
-                                    "col-span-full flex h-9 items-center gap-2 border-b px-4 font-medium",
-                                    nested && "pl-12",
-                                )}
-                            >
-                                {group.label}
-                                <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                                    {group.count}
-                                </span>
-                            </h2>
-                            <ul
-                                aria-labelledby={`flow-group-${group.kind}`}
-                                className="col-span-full grid grid-cols-subgrid divide-y"
-                            >
-                                {group.lines.map(render)}
-                            </ul>
+                            <GroupBand
+                                group={group}
+                                onToggle={() => collapsed.toggle(group.kind)}
+                            />
+                            {!group.collapsed && (
+                                <ul
+                                    id={`flow-group-rows-${group.kind}`}
+                                    aria-labelledby={`flow-group-${group.kind}`}
+                                    className="col-span-full grid grid-cols-subgrid divide-y"
+                                >
+                                    {group.lines.map(render)}
+                                </ul>
+                            )}
                         </section>
                     ))
                 )}

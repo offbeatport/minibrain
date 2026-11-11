@@ -16,6 +16,7 @@ export type StepSeries = {
     dots?: boolean;
 };
 export type StepRow = { step: number; [series: string]: number | null };
+export type StepMarker = { at: number; label: string };
 
 const AXIS_WIDTH = 56;
 const TICK = { fill: "var(--muted-foreground)", fontSize: "var(--type-sm)" };
@@ -31,12 +32,14 @@ function Readout({
     label,
     series,
     format,
+    title,
 }: {
     active?: boolean;
     payload?: readonly ReadoutEntry[];
     label?: unknown;
     series: StepSeries[];
     format: (value: number) => string;
+    title: (value: number) => string;
 }) {
     if (!active || !payload?.length || typeof label !== "number") {
         return null;
@@ -48,7 +51,7 @@ function Readout({
     }
     return (
         <div className="min-w-40 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-e2">
-            <div className="pb-1.5 text-muted-foreground tabular-nums">{`Step ${STEPS.format(label)}`}</div>
+            <div className="pb-1.5 text-muted-foreground tabular-nums">{title(label)}</div>
             <ul className="flex flex-col gap-1">
                 {shown.map((item) => (
                     <li key={item.key} className="flex items-center gap-2">
@@ -76,7 +79,11 @@ export function StepChart({
     label,
     height = 220,
     marker,
+    markers = [],
     domain,
+    xFormat = (value: number) => STEPS.format(value),
+    readoutTitle = (value: number) => `Step ${STEPS.format(value)}`,
+    connectNulls = true,
 }: {
     rows: StepRow[];
     series: StepSeries[];
@@ -85,7 +92,11 @@ export function StepChart({
     label: string;
     height?: number;
     marker?: number | null;
+    markers?: StepMarker[];
     domain?: [number, number];
+    xFormat?: (value: number) => string;
+    readoutTitle?: (value: number) => string;
+    connectNulls?: boolean;
 }) {
     const first = rows[0]?.step ?? 0;
     const last = rows.at(-1)?.step ?? first;
@@ -97,13 +108,16 @@ export function StepChart({
             style={{ height }}
         >
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                <LineChart
+                    data={rows}
+                    margin={{ top: markers.length > 0 ? 24 : 8, right: 16, bottom: 0, left: 0 }}
+                >
                     <CartesianGrid vertical={false} stroke={GRID} strokeWidth={1} />
                     <XAxis
                         dataKey="step"
                         type="number"
                         domain={domain ?? [first, last]}
-                        tickFormatter={(value: number) => STEPS.format(value)}
+                        tickFormatter={xFormat}
                         tick={TICK}
                         tickLine={false}
                         axisLine={{ stroke: GRID }}
@@ -128,6 +142,7 @@ export function StepChart({
                                 label={props.label}
                                 series={series}
                                 format={format}
+                                title={readoutTitle}
                             />
                         )}
                     />
@@ -139,6 +154,21 @@ export function StepChart({
                             ifOverflow="extendDomain"
                         />
                     )}
+                    {markers.map((item) => (
+                        <ReferenceLine
+                            key={`${item.at}-${item.label}`}
+                            x={item.at}
+                            stroke="var(--faint)"
+                            strokeDasharray="3 3"
+                            strokeWidth={1}
+                            label={{
+                                value: item.label,
+                                position: "top",
+                                fill: "var(--muted-foreground)",
+                                fontSize: "var(--type-sm)",
+                            }}
+                        />
+                    ))}
                     {series.map((item) => (
                         <Line
                             key={item.key}
@@ -155,7 +185,7 @@ export function StepChart({
                                     : false
                             }
                             activeDot={{ r: 4, stroke: SURFACE, strokeWidth: 2 }}
-                            connectNulls
+                            connectNulls={connectNulls}
                             isAnimationActive={false}
                         />
                     ))}

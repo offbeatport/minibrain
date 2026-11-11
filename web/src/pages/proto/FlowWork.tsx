@@ -45,6 +45,7 @@ import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { relativeTime } from "~/lib/time";
+import { ArtifactLine } from "./flowExport";
 import { useCan } from "./flowOverlays";
 import { BulkJobs, JobStatusText } from "./flowTraining";
 import {
@@ -64,6 +65,8 @@ import {
     createdAt,
     datasetHref,
     datasetOf,
+    exportOption,
+    exportSize,
     findVersion,
     jobHref,
     jobOfVersion,
@@ -350,14 +353,41 @@ const JOB_KINDS: Record<JobKind, string> = {
     judge: "Judge",
     download: "Download",
     import: "Import",
+    export: "Export",
 };
 
 function reached(job: Job): number {
     return job.status === "failed" ? 0.3 : job.progress;
 }
 
+function exportLines(job: Job, start: number): LogEntry[] {
+    const format = job.format ?? "adapter";
+    const steps = [
+        "Loaded the adapter and checked its SHA-256",
+        format === "adapter"
+            ? "Wrote adapter_model.safetensors"
+            : "Loaded base weights (hash checked)",
+        format === "adapter" ? "Wrote adapter_config.json" : "Merged the adapter into the base",
+        format === "gguf-q4" || format === "gguf-q8"
+            ? `Converted to GGUF and quantised to ${format === "gguf-q4" ? "Q4_K_M" : "Q8_0"}`
+            : "Wrote the model card",
+        "Computed SHA-256 of every file",
+    ];
+    const reached = Math.floor(job.progress * steps.length);
+    return steps.slice(0, Math.max(1, reached)).map((message, index) => ({
+        id: index + 1,
+        level: "info" as const,
+        source: "export",
+        message,
+        time: start + index * 1200,
+    }));
+}
+
 function logLines(job: Job, version: FlowVersion | undefined): LogEntry[] {
     const start = new Date(createdAt(job)).getTime();
+    if (job.kind === "export") {
+        return exportLines(job, start);
+    }
     const settings = version?.settings;
     const rows = settings?.rows ?? version?.data.rows ?? 0;
     const lines: LogEntry[] = [
@@ -542,12 +572,19 @@ function Run({ job }: { job: Job }) {
                 />
                 <Facts
                     items={[
-                        [
-                            "Step",
-                            <span key="s" className="tabular-nums">
-                                {`${count(step)} of ${count(LOSS_STEPS)}`}
-                            </span>,
-                        ],
+                        job.kind === "export"
+                            ? [
+                                  "Done",
+                                  <span key="s" className="tabular-nums">
+                                      {`${Math.round(job.progress * 100)}%`}
+                                  </span>,
+                              ]
+                            : [
+                                  "Step",
+                                  <span key="s" className="tabular-nums">
+                                      {`${count(step)} of ${count(LOSS_STEPS)}`}
+                                  </span>,
+                              ],
                         [
                             "Device",
                             <span key="d" className="font-mono text-sm">
@@ -625,6 +662,7 @@ export function FlowJobPage() {
     const subject = `${JOB_KINDS[job.kind]}${job.version !== null ? ` v${job.version}` : ""} of ${model?.name ?? job.model}`;
     const rows = lossCurve(job.version ?? 1).filter((row) => row.step <= LOSS_STEPS * reached(job));
     const owned = model?.kind === "custom" && version;
+    const artifact = state.exports.find((item) => item.jobId === job.id);
     return (
         <Page>
             <Crumbs
@@ -633,7 +671,12 @@ export function FlowJobPage() {
                         ? [
                               { label: "Models", href: `${FLOW}/models` },
                               { label: model.name, href: modelHref(model.slug) },
-                              { label: "Training", href: modelHref(model.slug, "training") },
+                              job.kind === "export"
+                                  ? {
+                                        label: `v${version.number}`,
+                                        href: versionHref(model.slug, version.number),
+                                    }
+                                  : { label: "Training", href: modelHref(model.slug, "training") },
                               { label: `Job #${job.id}` },
                           ]
                         : [{ label: "Jobs", href: `${FLOW}/jobs` }, { label: `Job #${job.id}` }]
@@ -673,15 +716,54 @@ export function FlowJobPage() {
                     </>
                 }
             />
-            {model && version && job.status === "done" && version.scores && (
-                <Outcome model={model} version={version} />
+            {model &&
+                version &&
+                job.status === "done" &&
+                version.scores &&
+                job.kind !== "export" && <Outcome model={model} version={version} />}
+            {model && version && artifact && (
+                <Section
+                    title={job.status === "done" ? "Artifact" : "Artifact, when done"}
+                    caption={`Also listed under Exports on v${version.number}'s page.`}
+                    flush
+                >
+                    <ul>
+                        <ArtifactLine
+                            model={model}
+                            version={version}
+                            artifact={artifact}
+                            job={job}
+                        />
+                    </ul>
+                </Section>
             )}
             {model && version && job.status === "failed" && (
                 <Failed model={model} version={version} job={job} />
             )}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 <Run job={job} />
-                {model && version ? (
+                {model && version && job.kind === "export" && job.format ? (
+                    <Section title="Inputs">
+                        <Facts
+                            items={[
+                                [
+                                    "Version",
+                                    <Link
+                                        key="v"
+                                        href={versionHref(model.slug, version.number)}
+                                        className="text-primary hover:underline"
+                                    >
+                                        {`${versionName(version)} of ${model.name}`}
+                                    </Link>,
+                                ],
+                                ["Base", model.base ?? model.name],
+                                ["Format", exportOption(job.format).label],
+                                ["Size", exportSize(model, version, job.format)],
+                                ["Runs", exportOption(job.format).runs],
+                            ]}
+                        />
+                    </Section>
+                ) : model && version ? (
                     <Inputs model={model} version={version} kind={job.kind} />
                 ) : (
                     <Section title="Inputs">
@@ -1070,12 +1152,17 @@ export function FlowMonitorPage() {
 }
 
 const KIND_FILTERS: { key: string; label: string; kinds: JobKind[] }[] = [
-    { key: "all", label: "All", kinds: ["train", "score", "judge", "download", "import"] },
+    {
+        key: "all",
+        label: "All",
+        kinds: ["train", "score", "judge", "download", "import", "export"],
+    },
     { key: "train", label: "Training", kinds: ["train"] },
     { key: "score", label: "Scoring", kinds: ["score"] },
     { key: "judge", label: "Judge", kinds: ["judge"] },
     { key: "download", label: "Downloads", kinds: ["download"] },
     { key: "import", label: "Imports", kinds: ["import"] },
+    { key: "export", label: "Exports", kinds: ["export"] },
 ];
 
 function kindMatches(job: Job, filter: string): boolean {
@@ -1245,7 +1332,7 @@ export function FlowFeedbackPage() {
     const accept = (id: number, slug: string) => {
         reviewFeedback(id, true);
         const model = state.models.find((item) => item.slug === slug);
-        const next = model ? nextStep(state, { ...model, accepted: model.accepted + 1 }) : null;
+        const next = model ? nextStep({ ...model, accepted: model.accepted + 1 }) : null;
         toast({
             title: "Accepted",
             description: next ? `${model?.name}'s next step: ${next.label}.` : undefined,

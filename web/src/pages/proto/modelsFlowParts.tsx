@@ -194,7 +194,7 @@ export function makeLiveLabel(model: FlowModel, version: FlowVersion): string | 
     if (model.live === version.number) {
         return "End canary";
     }
-    return model.live !== null && version.number < model.live ? "Roll back" : "Make live";
+    return `Make v${version.number} live`;
 }
 
 export function MakeLiveButton({
@@ -213,7 +213,8 @@ export function MakeLiveButton({
     if (!text || !can) {
         return null;
     }
-    const quiet = text !== "Make live" || version.passed === false;
+    const older = model.live !== null && version.number < model.live;
+    const quiet = text === "End canary" || older || version.passed === false;
     return (
         <Button
             variant={variant ?? (quiet ? "outline" : "default")}
@@ -244,6 +245,21 @@ function Callout({ tone, children }: { tone: "warning" | "info"; children: React
     );
 }
 
+function direction(model: FlowModel, version: FlowVersion): string {
+    const live = liveVersion(model);
+    if (!live || live.number === version.number) {
+        return "";
+    }
+    const delta =
+        live.scores && version.scores ? ` (${points(version.scores[0] - live.scores[0])})` : "";
+    if (version.number < live.number) {
+        return `v${version.number} replaces live v${live.number}${delta}.`;
+    }
+    return live.scores && version.scores
+        ? `v${version.number} scores ${points(version.scores[0] - live.scores[0])} over live v${live.number}.`
+        : `v${version.number} replaces live v${live.number}.`;
+}
+
 function MakeLiveBody({
     model,
     version,
@@ -257,16 +273,13 @@ function MakeLiveBody({
 }) {
     const toast = useToast();
     const live = liveVersion(model);
-    const rollback = live !== undefined && version.number < live.number;
     const below = version.passed === false;
     const first = model.live === null && !model.deployed;
     const confirm = () => {
         makeLive(model.slug, version.number, source);
         onClose();
         toast({
-            title: rollback
-                ? `${model.name} rolled back to v${version.number}`
-                : `v${version.number} of ${model.name} is live`,
+            title: `v${version.number} of ${model.name} is live`,
             description: live
                 ? `v${live.number} stays callable as ${model.slug}@${live.number}.`
                 : undefined,
@@ -276,16 +289,18 @@ function MakeLiveBody({
     return (
         <>
             <DialogHeader>
-                <DialogTitle>
-                    {rollback
-                        ? `Roll ${model.name} back to v${version.number}?`
-                        : `Make v${version.number} of ${model.name} live?`}
-                </DialogTitle>
+                <DialogTitle>{`Make v${version.number} of ${model.name} live?`}</DialogTitle>
                 <DialogDescription>
-                    {`Requests to ${model.slug} are answered by v${version.number} from now on.`}
-                    {model.canary && ` The v${model.canary.version} canary ends.`}
-                    {live &&
-                        ` v${live.number} stays callable as ${model.slug}@${live.number}, so you can roll back at any time.`}
+                    {[
+                        direction(model, version),
+                        `Requests to ${model.slug} are answered by v${version.number} from now on.`,
+                        model.canary ? `The v${model.canary.version} canary ends.` : "",
+                        live
+                            ? `v${live.number} stays callable as ${model.slug}@${live.number}, and you can make it live again at any time.`
+                            : "",
+                    ]
+                        .filter(Boolean)
+                        .join(" ")}
                 </DialogDescription>
             </DialogHeader>
             {below && (
@@ -307,11 +322,7 @@ function MakeLiveBody({
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
                 <Button onClick={confirm}>
-                    {rollback
-                        ? `Roll back to v${version.number}`
-                        : below
-                          ? "Make live anyway"
-                          : `Make live v${version.number}`}
+                    {below ? `Make v${version.number} live anyway` : `Make v${version.number} live`}
                 </Button>
             </DialogFooter>
         </>

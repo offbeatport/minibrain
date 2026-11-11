@@ -44,6 +44,7 @@ import {
     nextNumber,
     rate,
     rowsSinceLive,
+    setTrainAt,
     startTraining,
     trainingVersion,
     useFlowState,
@@ -142,8 +143,8 @@ function Body({ model }: { model: FlowModel }) {
                         <span className="flex flex-wrap gap-x-1">
                             <span className="tabular-nums">
                                 {model.accepted > 0
-                                    ? `${model.accepted} feedback ${model.accepted === 1 ? "row" : "rows"} will join.`
-                                    : "No accepted feedback waiting."}
+                                    ? `${model.accepted} reviewed feedback ${model.accepted === 1 ? "row joins" : "rows join"}.`
+                                    : "No reviewed feedback waiting."}
                             </span>
                             {pending > 0 && (
                                 <Link
@@ -185,6 +186,23 @@ function Body({ model }: { model: FlowModel }) {
                             </Link>
                         </span>
                     )}
+                </Field>
+                <Field
+                    id="train-at"
+                    label="Suggest training at"
+                    hint={`Train v${number} becomes ${model.name}'s next step once this many reviewed feedback rows wait. A setting of the model.`}
+                >
+                    <NumberField
+                        id="train-at"
+                        value={model.trainAt}
+                        onValueChange={(value) => setTrainAt(model.slug, value ?? model.trainAt)}
+                        min={1}
+                        max={500}
+                        step={1}
+                        largeStep={10}
+                        unit="reviewed rows"
+                        format={{ maximumFractionDigits: 0 }}
+                    />
                 </Field>
                 <Field id="train-method" label="Method">
                     <Select value="sft">

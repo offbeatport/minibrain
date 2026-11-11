@@ -58,8 +58,8 @@ export type Autopilot = {
     threshold: number;
     canary: number;
     minutes: number;
-    rollbackErrors: boolean;
-    rollbackScore: boolean;
+    revertOnErrors: boolean;
+    revertOnScore: boolean;
     run: { version: number; minutesLeft: number } | null;
 };
 
@@ -104,6 +104,10 @@ export type FlowModel = {
     recipe: TrainingSettings | null;
     pinned: boolean;
     recent: RecentAnswer[];
+    trainAt: number;
+    tags: string[];
+    instructions: string;
+    safety: string | null;
 };
 
 const CLASSIFY: [string, string] = ["Label accuracy", "Macro F1"];
@@ -231,7 +235,7 @@ const INVOICE_EXTRACTOR: FlowVersion[] = [
         data: data(3, 1140, 290, 30),
         settings: settings(16, 3, 2e-4, 1026),
     }),
-    trained(3, [0.851, 0.748], true, 1.2, {
+    trained(3, [0.851, 0.748], true, 21, {
         data: data(4, 1190, 50, 0),
         settings: settings(16, 3, 2e-4, 1071),
     }),
@@ -282,6 +286,10 @@ type RawModel = Omit<
     | "recipe"
     | "pinned"
     | "recent"
+    | "trainAt"
+    | "tags"
+    | "instructions"
+    | "safety"
 >;
 
 function variant(
@@ -380,10 +388,10 @@ const EXTRA: Record<string, Extra> = {
         autopilot: {
             threshold: 50,
             canary: 10,
-            minutes: 60,
-            rollbackErrors: true,
-            rollbackScore: true,
-            run: { version: 3, minutesLeft: 42 },
+            minutes: 1440,
+            revertOnErrors: true,
+            revertOnScore: true,
+            run: { version: 3, minutesLeft: 240 },
         },
         recent: [
             answer("Invoice INV-2291 from Nordlicht GmbH", "total 1,420.00 · due 30 Nov", 4),
@@ -478,7 +486,7 @@ const RAW: RawModel[] = [
         kind: "custom",
         publisher: "Qwen",
         base: "Qwen3 8B",
-        description: "Routes support tickets to one of six queues.",
+        description: "Routes tickets to one of six queues.",
         metrics: CLASSIFY,
         rule: [0.85, 0.01],
         heldOut: 212,
@@ -577,6 +585,24 @@ const LICENCES: Record<string, string> = {
 
 const FIXED_JOBS = new Set([1176, 1188]);
 
+const TAGS: Record<string, string[]> = {
+    "support-triage": ["support", "routing"],
+    "invoice-extractor": ["finance", "extraction"],
+    "contract-reviewer": ["legal"],
+    "sql-helper": ["finance", "sql"],
+};
+
+const INSTRUCTIONS: Record<string, string> = {
+    "support-triage":
+        "Read the ticket and answer with exactly one queue label.\nPick refund_request only when the customer asks for money back.\nNever answer with more than the label.",
+    "invoice-extractor":
+        "Return the vendor, invoice number, dates and total as JSON.\nUse ISO dates and the invoice currency.",
+    "contract-reviewer":
+        "Label each clause standard or risky.\nRisky means it shifts cost or liability to us.",
+    "sql-helper":
+        "Write one read-only SQL query for the finance warehouse.\nUse only the tables in the schema.",
+};
+
 function complete(model: RawModel, index: number): FlowModel {
     const extra = EXTRA[model.slug];
     return summarise({
@@ -603,6 +629,10 @@ function complete(model: RawModel, index: number): FlowModel {
         recipe: null,
         pinned: false,
         recent: extra?.recent ?? BASE_RECENT,
+        trainAt: 10,
+        tags: TAGS[model.slug] ?? [],
+        instructions: INSTRUCTIONS[model.slug] ?? "",
+        safety: model.slug === "support-triage" ? "Llama Guard 3 1B" : null,
     });
 }
 
@@ -700,7 +730,7 @@ const DATASETS: Dataset[] = [
 
 export const SAMPLE_FILE = "support-tickets.csv";
 
-export type JobKind = "train" | "score" | "judge" | "download" | "import";
+export type JobKind = "train" | "score" | "judge" | "download" | "import" | "export";
 export type JobStatus = "running" | "queued" | "done" | "failed" | "cancelled";
 
 export type Job = {
@@ -715,6 +745,17 @@ export type Job = {
     minutes: number | null;
     error?: string;
     device?: string;
+    format?: ExportFormat;
+};
+
+export type ExportFormat = "adapter" | "merged" | "gguf-q4" | "gguf-q8";
+
+export type ExportArtifact = {
+    jobId: number;
+    slug: string;
+    version: number;
+    format: ExportFormat;
+    sha: string;
 };
 
 function versionJob(model: FlowModel, version: FlowVersion): Job {
@@ -1067,6 +1108,7 @@ type World = {
     focus: string | null;
     examples: number;
     dismissed: string[];
+    exports: ExportArtifact[];
 };
 
 type Shared = { visited: string[]; mode: Mode; intent: Intent };
@@ -1090,6 +1132,7 @@ const FULL: World = {
     focus: null,
     examples: 0,
     dismissed: [],
+    exports: [],
 };
 
 const EMPTY: World = {
@@ -1101,6 +1144,7 @@ const EMPTY: World = {
     focus: null,
     examples: 0,
     dismissed: [],
+    exports: [],
 };
 
 let worlds: Record<Mode, World> = { full: FULL, empty: EMPTY };
@@ -1211,7 +1255,7 @@ export function makeLive(slug: string, number: number, source?: "inbox") {
         return;
     }
     const first = model.live === null && !model.deployed;
-    const rollback = model.live !== null && number < model.live;
+    const older = model.live !== null && number < model.live;
     const known = state.feedback.some((row) => row.model === slug);
     update(slug, (current) => ({
         ...current,
@@ -1232,9 +1276,9 @@ export function makeLive(slug: string, number: number, source?: "inbox") {
         }));
     }
     markVisited("live");
-    if (rollback && model.live !== null) {
+    if (older && model.live !== null) {
         dismiss(`live:${slug}:${model.live}`);
-        markVisited("rollback");
+        markVisited("older");
     }
     if (source === "inbox") {
         markVisited("inbox");
@@ -1479,6 +1523,10 @@ export function createModel(
         recipe: null,
         pinned: false,
         recent: [],
+        trainAt: 10,
+        tags: [],
+        instructions: "",
+        safety: null,
         ...extra,
     };
     set((current) => ({
@@ -1652,6 +1700,152 @@ export function startTraining(
     return number;
 }
 
+export function retryVersion(slug: string, number: number): number {
+    const model = state.models.find((item) => item.slug === slug);
+    const failed = model ? findVersion(model, number) : undefined;
+    if (!model || !failed?.settings) {
+        return 0;
+    }
+    const memory = /memory/i.test(failed.error ?? "");
+    return startTraining(slug, memory ? { ...failed.settings, adapter: "QLoRA" } : failed.settings);
+}
+
+export function setTrainAt(slug: string, rows: number) {
+    update(slug, (model) => ({ ...model, trainAt: rows }));
+}
+
+export type ModelEdit = Partial<
+    Pick<FlowModel, "description" | "tags" | "instructions" | "safety" | "rule">
+>;
+
+export function editModel(slug: string, edit: ModelEdit) {
+    update(slug, (model) => ({ ...model, ...edit }));
+}
+
+export function duration(minutes: number): string {
+    return minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
+}
+
+export type ExportOption = {
+    id: ExportFormat;
+    label: string;
+    file: string;
+    runs: string;
+};
+
+function paramsOf(model: FlowModel): number {
+    const entry = model.base ? catalogEntry(baseModelSlug(model.base)) : undefined;
+    return Number.parseFloat(entry?.params ?? "8") || 8;
+}
+
+function gigabytes(value: number): string {
+    return value < 10 ? `${value.toFixed(1)} GB` : `${Math.round(value)} GB`;
+}
+
+export function exportSize(model: FlowModel, version: FlowVersion, format: ExportFormat): string {
+    const params = paramsOf(model);
+    if (format === "adapter") {
+        const rank = version.settings?.rank ?? 16;
+        return `${Math.max(4, Math.round((84 * params * rank) / (8.2 * 32)))} MB`;
+    }
+    if (format === "merged") {
+        return gigabytes(params * 1.95);
+    }
+    return gigabytes(params * (format === "gguf-q4" ? 0.61 : 1.04));
+}
+
+export const EXPORT_OPTIONS: ExportOption[] = [
+    {
+        id: "adapter",
+        label: "Adapter only",
+        file: "safetensors",
+        runs: "Runs on minibrain or any server that loads LoRA adapters on the same base.",
+    },
+    {
+        id: "merged",
+        label: "Merged full model",
+        file: "safetensors",
+        runs: "Runs anywhere that serves Hugging Face models, such as vLLM.",
+    },
+    {
+        id: "gguf-q4",
+        label: "Merged and quantised GGUF, Q4",
+        file: "GGUF",
+        runs: "For llama.cpp or Ollama.",
+    },
+    {
+        id: "gguf-q8",
+        label: "Merged and quantised GGUF, Q8",
+        file: "GGUF",
+        runs: "For llama.cpp or Ollama.",
+    },
+];
+
+export function exportOption(format: ExportFormat): ExportOption {
+    return EXPORT_OPTIONS.find((option) => option.id === format) ?? EXPORT_OPTIONS[0];
+}
+
+export function fakeSha(seed: string): string {
+    let hash = 2166136261;
+    let out = "";
+    for (let round = 0; out.length < 64; round += 1) {
+        for (const char of `${seed}#${round}`) {
+            hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+        }
+        out += hash.toString(16).padStart(8, "0");
+    }
+    return out.slice(0, 64);
+}
+
+const EXPORT_MS = 6000;
+
+function exportTick(mode: Mode, jobId: number, timer: number) {
+    const job = worlds[mode].jobs.find((item) => item.id === jobId);
+    if (!job || job.status !== "running") {
+        window.clearInterval(timer);
+        return;
+    }
+    const progress = Math.min(1, job.progress + TICK_MS / EXPORT_MS);
+    jobIn(mode, jobId, (item) => ({
+        ...item,
+        progress,
+        status: progress >= 1 ? "done" : "running",
+        minutes: progress >= 1 ? 3 : null,
+    }));
+    if (progress >= 1) {
+        window.clearInterval(timer);
+    }
+}
+
+export function startExport(slug: string, number: number, format: ExportFormat): number {
+    const jobId = nextJob++;
+    const job: Job = {
+        id: jobId,
+        kind: "export",
+        model: slug,
+        version: number,
+        status: "running",
+        progress: 0,
+        hoursAgo: 0,
+        atMs: Date.now(),
+        minutes: null,
+        device: DEVICE,
+        format,
+    };
+    set((current) => ({
+        ...current,
+        jobs: [job, ...current.jobs],
+        exports: [
+            ...current.exports,
+            { jobId, slug, version: number, format, sha: fakeSha(`${slug}@${number}:${format}`) },
+        ],
+    }));
+    const mode = shared.mode;
+    const timer = window.setInterval(() => exportTick(mode, jobId, timer), TICK_MS);
+    markVisited("export");
+    return jobId;
+}
+
 export function retryWithQLoRA(slug: string, number: number): number {
     const model = state.models.find((item) => item.slug === slug);
     const failed = model ? findVersion(model, number) : undefined;
@@ -1766,7 +1960,15 @@ export function lastFailure(model: FlowModel): FlowVersion | undefined {
     return newestFirst(model).find((version) => version.status === "failed");
 }
 
-export type NextAction = "train" | "make-live" | "retry" | "link";
+export type NextAction =
+    | "add-data"
+    | "train"
+    | "make-live"
+    | "retry"
+    | "monitor"
+    | "deploy"
+    | "connect"
+    | "watch";
 
 export type NextStep = {
     label: string;
@@ -1774,58 +1976,96 @@ export type NextStep = {
     href: string;
     action: NextAction;
     version?: number;
+    rows?: number;
 };
 
-export function nextStep(current: FlowState, model: FlowModel): NextStep | null {
-    if (model.kind === "base") {
+export function errorsSpiked(model: FlowModel): boolean {
+    return model.deployed && model.errors > model.usualErrors * 3;
+}
+
+export function pendingFeedback(current: FlowState, slug?: string): FeedbackRow[] {
+    return current.feedback.filter(
+        (row) => row.state === "pending" && (slug === undefined || row.model === slug),
+    );
+}
+
+function broken(model: FlowModel): NextStep | null {
+    const newest = newestFirst(model)[0];
+    if (newest?.status === "failed") {
+        const memory = /memory/i.test(newest.error ?? "");
+        return {
+            label: memory ? "Retry with QLoRA" : "Retry",
+            detail: memory
+                ? `v${newest.number} ran out of memory. QLoRA trains the same data and settings in 4-bit, as v${nextNumber(model)}.`
+                : `v${newest.number} failed. Retry trains the same data and settings as v${nextNumber(model)}.`,
+            href: versionHref(model.slug, newest.number),
+            action: "retry",
+            version: newest.number,
+        };
+    }
+    if (errorsSpiked(model)) {
+        return {
+            label: "Open monitoring",
+            detail: `Errors are at ${percent(model.errors)}; usually ${percent(model.usualErrors)}.`,
+            href: modelHref(model.slug, "monitoring"),
+            action: "monitor",
+        };
+    }
+    return null;
+}
+
+function ship(model: FlowModel): NextStep | null {
+    const candidate = model.live !== null ? bestCandidate(model) : undefined;
+    if (!candidate) {
         return null;
     }
-    const pending = current.feedback.filter(
-        (row) => row.model === model.slug && row.state === "pending",
-    ).length;
-    const training = trainingVersion(model);
-    const trainedReady = newestFirst(model).find(
-        (version) => version.kind === "trained" && version.status === "ready",
-    );
-    const candidate = bestCandidate(model);
-    const watch: NextStep | null = training
-        ? {
-              label: `Training v${training.number} · ${Math.round((training.progress ?? 0) * 100)}%`,
-              detail: "It is scored against live and v0 Baseline when it finishes.",
-              href: jobHref(training.jobId),
-              action: "link",
-          }
-        : null;
+    return {
+        label: `Make v${candidate.number} live`,
+        detail: `v${candidate.number} scores ${points(scoreDelta(model, candidate) ?? 0)} over live v${model.live} and passed the promotion rule.`,
+        href: versionHref(model.slug, candidate.number),
+        action: "make-live",
+        version: candidate.number,
+    };
+}
+
+function improve(model: FlowModel): NextStep | null {
+    if (model.serveOnly || !model.dataset || model.accepted < model.trainAt) {
+        return null;
+    }
+    return {
+        label: `Train v${nextNumber(model)} (+${model.accepted} rows)`,
+        detail: `${model.accepted} reviewed feedback rows join the training data.`,
+        href: modelHref(model.slug, "training"),
+        action: "train",
+        rows: model.accepted,
+    };
+}
+
+function start(model: FlowModel): NextStep | null {
     if (!model.dataset) {
         return {
             label: "Add data",
-            detail: "Attach the examples it learns from and is scored on, on the Data page.",
+            detail: "Attach the examples it learns from and is scored on.",
             href: `${FLOW}/data?for=${model.slug}`,
-            action: "link",
+            action: "add-data",
         };
     }
-    if (watch && !trainedReady) {
-        return watch;
-    }
-    if (model.serveOnly && !trainedReady) {
-        return model.live === null
-            ? {
-                  label: "Make live v0",
-                  detail: `${model.base} cannot be trained, but v0 Baseline can answer requests.`,
-                  href: versionHref(model.slug, 0),
-                  action: "make-live",
-                  version: 0,
-              }
-            : {
-                  label: "Try it in the Playground",
-                  detail: `${model.base} cannot be trained; pick a trainable base to fine-tune.`,
-                  href: `${FLOW}/playground?model=${model.slug}`,
-                  action: "link",
-              };
-    }
-    if (!trainedReady) {
+    const ready = newestFirst(model).find(
+        (version) => version.status === "ready" && (version.kind === "trained" || model.serveOnly),
+    );
+    const training = trainingVersion(model);
+    if (!ready && training) {
         return {
-            label: "Train v1",
+            label: `Watch v${training.number}`,
+            detail: `v${training.number} is training; it is scored when it finishes.`,
+            href: jobHref(training.jobId),
+            action: "watch",
+            version: training.number,
+        };
+    }
+    if (!ready) {
+        return {
+            label: `Train v${nextNumber(model)}`,
             detail: "v0 Baseline is the base with instructions only; training teaches it your data.",
             href: modelHref(model.slug, "training"),
             action: "train",
@@ -1833,53 +2073,46 @@ export function nextStep(current: FlowState, model: FlowModel): NextStep | null 
     }
     if (model.live === null) {
         return {
-            label: `Make live v${trainedReady.number}`,
-            detail: `Its name then answers with v${trainedReady.number}; every version stays callable as ${model.slug}@N.`,
-            href: versionHref(model.slug, trainedReady.number),
+            label: `Make v${ready.number} live`,
+            detail: `${model.slug} then answers with v${ready.number}, and the model is deployed.`,
+            href: versionHref(model.slug, ready.number),
             action: "make-live",
-            version: trainedReady.number,
+            version: ready.number,
         };
     }
-    if (candidate) {
-        const delta = scoreDelta(model, candidate);
+    if (!model.deployed) {
         return {
-            label: `Make live v${candidate.number}`,
-            detail: `It beats live v${model.live} by ${points(delta ?? 0)} points.`,
-            href: versionHref(model.slug, candidate.number),
-            action: "make-live",
-            version: candidate.number,
-        };
-    }
-    if (watch) {
-        return watch;
-    }
-    const newest = newestFirst(model)[0];
-    if (newest?.status === "failed" && /memory/i.test(newest.error ?? "")) {
-        return {
-            label: "Retry with QLoRA",
-            detail: `v${newest.number} ran out of memory. QLoRA trains the same data and settings in 4-bit, as v${nextNumber(model)}.`,
-            href: versionHref(model.slug, newest.number),
-            action: "retry",
-            version: newest.number,
-        };
-    }
-    if (model.accepted > 0) {
-        return {
-            label: `Train v${nextNumber(model)} (+${model.accepted} feedback ${model.accepted === 1 ? "row" : "rows"})`,
-            detail: "Accepted feedback joins the training data.",
-            href: modelHref(model.slug, "training"),
-            action: "train",
-        };
-    }
-    if (pending > 0) {
-        return {
-            label: `Review ${pending} feedback ${pending === 1 ? "row" : "rows"}`,
-            detail: "People flagged answers as wrong.",
-            href: `${FLOW}/feedback`,
-            action: "link",
+            label: "Deploy",
+            detail: `${model.slug} answers with live v${model.live} once deployed.`,
+            href: modelHref(model.slug),
+            action: "deploy",
         };
     }
     return null;
+}
+
+export function nextStep(model: FlowModel): NextStep | null {
+    if (model.kind === "base") {
+        return null;
+    }
+    const step = broken(model) ?? ship(model) ?? improve(model) ?? start(model);
+    if (step) {
+        return step;
+    }
+    if (model.serveOnly) {
+        return {
+            label: "Connect",
+            detail: `${model.base} cannot be trained; call it from your app.`,
+            href: modelHref(model.slug, "keys"),
+            action: "connect",
+        };
+    }
+    return {
+        label: `Train v${nextNumber(model)}`,
+        detail: "Train again from the base on the latest data.",
+        href: modelHref(model.slug, "training"),
+        action: "train",
+    };
 }
 
 export function versionKey(slug: string, number: number): string {
@@ -2115,7 +2348,7 @@ export function inbox(current: FlowState): InboxItem[] {
                 text: `${model.name} v${candidate.number} beats live (${points(delta)})`,
                 detail: `${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for live v${model.live}, and it passed the promotion rule.`,
                 action: "make-live",
-                label: "Make live",
+                label: `Make v${candidate.number} live`,
                 hoursAgo: candidate.hoursAgo,
                 atMs: candidate.atMs,
                 version: candidate.number,
@@ -2148,8 +2381,9 @@ export function inbox(current: FlowState): InboxItem[] {
             });
         }
     }
-    const pending = current.feedback.filter((row) => row.state === "pending");
-    if (pending.length > 0) {
+    const pending = pendingFeedback(current);
+    const oldest = Math.max(0, ...pending.map((row) => row.hoursAgo));
+    if (pending.length >= FEEDBACK_INBOX_ROWS || (pending.length > 0 && oldest > 3 * DAY)) {
         const owners = [...new Set(pending.map((row) => row.model))].map(
             (slug) => current.models.find((model) => model.slug === slug)?.name ?? slug,
         );
@@ -2167,6 +2401,8 @@ export function inbox(current: FlowState): InboxItem[] {
         .filter((item) => !current.dismissed.includes(item.id))
         .sort((a, b) => hoursOf(a) - hoursOf(b));
 }
+
+export const FEEDBACK_INBOX_ROWS = 10;
 
 export const SHOWN_VERSIONS = 5;
 

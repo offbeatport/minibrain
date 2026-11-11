@@ -324,10 +324,7 @@ function Fit({ entry }: { entry: CatalogEntry }) {
 export function FlowDiscoverPage() {
     return (
         <Page wide>
-            <PageHeader
-                title="Discover"
-                caption="Approved open models. Each has one page: catalogue facts, and its formats once installed."
-            />
+            <PageHeader title="Discover" caption="Open models you can add." />
             <div className="overflow-x-auto rounded-lg border bg-card">
                 <Table>
                     <TableHeader>

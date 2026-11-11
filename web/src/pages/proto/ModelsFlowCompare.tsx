@@ -243,15 +243,7 @@ export function ModelsFlowComparePage() {
                                 </Link>
                             </Button>
                         )}
-                        <MakeLiveButton
-                            model={model}
-                            version={target}
-                            label={
-                                model.live !== null && target.number < model.live
-                                    ? `Roll back to v${target.number}`
-                                    : `Make live v${target.number}`
-                            }
-                        />
+                        <MakeLiveButton model={model} version={target} />
                     </>
                 }
             />

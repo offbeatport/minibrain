@@ -19,6 +19,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
+import { ExportDialog } from "./flowExport";
 import { useCan } from "./flowOverlays";
 import {
     type Answer,
@@ -109,7 +110,7 @@ export function VersionPrimary({ model, version }: { model: FlowModel; version: 
                 openIntent({ kind: "make-live", slug: model.slug, number: version.number })
             }
         >
-            {live === "Make live" ? `Make v${version.number} live` : live}
+            {live}
         </Button>
     );
 }
@@ -123,8 +124,10 @@ export function VersionMenu({ model, version }: { model: FlowModel; version: Flo
     const toast = useToast();
     const can = useCan("builder");
     const [confirm, setConfirm] = useState<Confirm | null>(null);
+    const [exporting, setExporting] = useState(false);
     const callable = `${model.slug}@${version.number}`;
     const ready = version.status === "ready";
+    const exportable = ready && version.kind === "trained";
     const isLive = model.live === version.number;
     const others = model.versions
         .filter((item) => item.number !== version.number && item.status === "ready")
@@ -213,16 +216,21 @@ export function VersionMenu({ model, version }: { model: FlowModel; version: Flo
                         Model card
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                        disabled={!ready}
-                        onSelect={() =>
-                            toast({
-                                title: "Not in the prototype",
-                                description: `Would download the ${version.kind === "prompt" ? "prompt" : "adapter"} for ${callable}.`,
-                            })
-                        }
+                        disabled={!exportable}
+                        className={exportable ? undefined : "items-start"}
+                        onSelect={() => setExporting(true)}
                     >
-                        <Download />
-                        Download
+                        <Download className={exportable ? undefined : "mt-0.5"} />
+                        <span className="flex flex-col">
+                            <span>Export…</span>
+                            {!exportable && (
+                                <span className="text-sm whitespace-normal text-muted-foreground">
+                                    {version.kind === "prompt"
+                                        ? "A baseline has no weights of its own."
+                                        : "Only a ready version can be exported."}
+                                </span>
+                            )}
+                        </span>
                     </DropdownMenuItem>
                     {can && (
                         <>
@@ -240,6 +248,12 @@ export function VersionMenu({ model, version }: { model: FlowModel; version: Flo
                 </DropdownMenuContent>
             </DropdownMenu>
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
+            <ExportDialog
+                model={model}
+                version={version}
+                open={exporting}
+                onClose={() => setExporting(false)}
+            />
         </>
     );
 }

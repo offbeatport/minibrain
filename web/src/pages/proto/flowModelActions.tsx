@@ -30,44 +30,34 @@ import { TrainButton } from "./flowTraining";
 import {
     FLOW,
     type FlowModel,
+    type NextStep,
     deleteModels,
     flowHref,
+    jobHref,
+    jobOfVersion,
+    modelHref,
     nextStep,
     openIntent,
     playgroundHref,
+    retryVersion,
     setOnApi,
-    useFlowState,
 } from "./modelsFlowData";
 import { AutopilotDialog, type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 import { openConnect } from "./modelsFlowParts";
 
-type Primary =
-    | { kind: "add-data" }
-    | { kind: "train" }
-    | { kind: "make-live"; number: number }
-    | { kind: "deploy" }
-    | { kind: "connect" };
+type Primary = NextStep | { action: "deploy" | "connect"; label: string };
 
 function nothingLive(model: FlowModel): boolean {
     return model.kind === "custom" && model.live === null;
 }
 
-function usePrimary(model: FlowModel): Primary {
-    const state = useFlowState();
+function primaryOf(model: FlowModel): Primary {
     if (model.kind === "base") {
-        return model.deployed ? { kind: "connect" } : { kind: "deploy" };
+        return model.deployed
+            ? { action: "connect", label: "Connect" }
+            : { action: "deploy", label: "Deploy" };
     }
-    if (!model.dataset) {
-        return { kind: "add-data" };
-    }
-    const step = nextStep(state, model);
-    if (step?.action === "make-live" && step.version !== undefined) {
-        return { kind: "make-live", number: step.version };
-    }
-    if (!model.deployed && model.live !== null) {
-        return { kind: "deploy" };
-    }
-    return model.serveOnly ? { kind: "connect" } : { kind: "train" };
+    return nextStep(model) ?? { action: "connect", label: "Connect" };
 }
 
 function useDeploy(model: FlowModel) {
@@ -79,32 +69,49 @@ function useDeploy(model: FlowModel) {
 }
 
 function PrimaryButton({ model, primary }: { model: FlowModel; primary: Primary }) {
+    const router = useRouter();
+    const toast = useToast();
     const deploy = useDeploy(model);
-    if (primary.kind === "add-data") {
+    const step = "href" in primary ? primary : null;
+    if (primary.action === "train") {
+        return <TrainButton model={model} label={primary.label} />;
+    }
+    if (primary.action === "make-live" && step?.version !== undefined) {
+        const number = step.version;
         return (
-            <Button asChild>
-                <Link href={`${FLOW}/data?for=${model.slug}`}>Add data</Link>
+            <Button onClick={() => openIntent({ kind: "make-live", slug: model.slug, number })}>
+                {primary.label}
             </Button>
         );
     }
-    if (primary.kind === "train") {
-        return <TrainButton model={model} />;
-    }
-    if (primary.kind === "make-live") {
+    if (primary.action === "retry" && step?.version !== undefined) {
+        const failed = step.version;
         return (
             <Button
-                onClick={() =>
-                    openIntent({ kind: "make-live", slug: model.slug, number: primary.number })
-                }
+                onClick={() => {
+                    const number = retryVersion(model.slug, failed);
+                    toast({ title: `v${number} is training`, tone: "success" });
+                    const job = jobOfVersion(model.slug, number);
+                    if (job) {
+                        router.history.push(jobHref(job));
+                    }
+                }}
             >
-                {`Make v${primary.number} live`}
+                {primary.label}
             </Button>
         );
     }
-    if (primary.kind === "deploy") {
+    if (primary.action === "deploy") {
         return <Button onClick={deploy}>Deploy</Button>;
     }
-    return <Button onClick={() => openConnect(model.slug)}>Connect</Button>;
+    if (primary.action === "connect") {
+        return <Button onClick={() => openConnect(model.slug)}>Connect</Button>;
+    }
+    return (
+        <Button asChild>
+            <Link href={step?.href ?? modelHref(model.slug)}>{primary.label}</Link>
+        </Button>
+    );
 }
 
 function notInPrototype(toast: ReturnType<typeof useToast>, what: string) {
@@ -172,14 +179,14 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
                             <Play />
                             Open in Playground
                         </DropdownMenuItem>
-                        {primary?.kind !== "connect" && (
+                        {primary?.action !== "connect" && (
                             <DropdownMenuItem onSelect={() => openConnect(model.slug)}>
                                 <Plug />
                                 Connect
                             </DropdownMenuItem>
                         )}
                     </DropdownMenuGroup>
-                    {can && (model.deployed || primary?.kind !== "deploy") && (
+                    {can && (model.deployed || primary?.action !== "deploy") && (
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuGroup>
@@ -283,7 +290,7 @@ function ModelMenu({ model, primary }: { model: FlowModel; primary: Primary | nu
 
 export function ModelHeaderActions({ model }: { model: FlowModel }) {
     const can = useCan("builder");
-    const primary = usePrimary(model);
+    const primary = primaryOf(model);
     return (
         <>
             {can && <PrimaryButton model={model} primary={primary} />}

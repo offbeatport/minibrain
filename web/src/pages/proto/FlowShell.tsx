@@ -44,6 +44,7 @@ import {
     versionHref,
 } from "./modelsFlowData";
 import { IntentDialogs } from "./modelsFlowParts";
+import "./flowTokens.css";
 
 const SECTION_LABEL = "pl-3.5 text-xs uppercase tracking-wide text-muted-foreground/45";
 
@@ -58,14 +59,12 @@ type Entry = {
 const SECTIONS: { label: string | null; items: Entry[] }[] = [
     {
         label: null,
-        items: [
-            { label: "Home", path: FLOW, icon: Home, exact: true },
-            { label: "Models", path: `${FLOW}/models`, icon: Box },
-        ],
+        items: [{ label: "Home", path: FLOW, icon: Home, exact: true }],
     },
     {
         label: "Explore",
         items: [
+            { label: "Models", path: `${FLOW}/models`, icon: Box },
             { label: "Discover", path: `${FLOW}/discover`, icon: Compass, role: "builder" },
             { label: "Playground", path: `${FLOW}/playground`, icon: Play },
         ],
@@ -202,14 +201,23 @@ function steps(state: FlowState): Step[] {
             href: `${FLOW}/training`,
             match: (path) => path === `${FLOW}/training`,
         },
-        { id: "inbox", label: "Inbox: v2 beats live, Make live", href: FLOW },
+        { id: "inbox", label: "Inbox: v2 beats live, Make v2 live", href: FLOW },
         {
             id: "jobs",
             label: "Jobs: every job, bulk retry",
             href: `${FLOW}/jobs`,
             match: (path) => path === `${FLOW}/jobs`,
         },
-        { id: "rollback", label: "Roll back", href: modelHref(focus, "versions") },
+        {
+            id: "older",
+            label: "Versions: make an older version live",
+            href: modelHref(focus, "versions"),
+        },
+        {
+            id: "export",
+            label: "Export a version from its ⋯ menu",
+            href: versionHref(focus, 1),
+        },
     ];
 }
 
