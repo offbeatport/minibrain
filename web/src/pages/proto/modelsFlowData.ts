@@ -1615,7 +1615,14 @@ export function defaultRecipe(model: FlowModel): TrainingSettings {
     return last ?? settings(16, 3, 2e-4, source?.split[0] ?? 1926);
 }
 
-function tick(mode: Mode, slug: string, number: number, jobId: number, timer: number) {
+function tick(
+    mode: Mode,
+    slug: string,
+    number: number,
+    jobId: number,
+    timer: number,
+    minutes: number,
+) {
     const world = worlds[mode];
     const job = world.jobs.find((item) => item.id === jobId);
     if (!job || job.status !== "running") {
@@ -1629,7 +1636,7 @@ function tick(mode: Mode, slug: string, number: number, jobId: number, timer: nu
         ...item,
         progress,
         status: scores ? "done" : "running",
-        minutes: scores ? 12 : null,
+        minutes: scores ? minutes : null,
     }));
     modelsIn(mode, slug, (current) => ({
         ...current,
@@ -1653,10 +1660,22 @@ function tick(mode: Mode, slug: string, number: number, jobId: number, timer: nu
     }
 }
 
+export type TrainStart = { device?: string; queued?: boolean; minutes?: number };
+
+const QUEUE_MS = 4000;
+
+function runJob(mode: Mode, slug: string, number: number, jobId: number, minutes: number) {
+    const timer = window.setInterval(
+        () => tick(mode, slug, number, jobId, timer, minutes),
+        TICK_MS,
+    );
+}
+
 export function startTraining(
     slug: string,
     recipe?: TrainingSettings,
     picked?: DataChoice,
+    start: TrainStart = {},
 ): number {
     const model = state.models.find((item) => item.slug === slug);
     if (!model) {
@@ -1689,13 +1708,27 @@ export function startTraining(
         recipe: chosen,
         versions: [...current.versions, version],
     }));
-    const device = trainingVersion(model) ? "gpu-a10-2" : DEVICE;
+    const device = start.device ?? (trainingVersion(model) ? "gpu-a10-2" : DEVICE);
+    const minutes = Math.max(1, Math.round(start.minutes ?? 12));
+    const status = start.queued ? "queued" : "running";
     set((current) => ({
         ...current,
-        jobs: [{ ...versionJob(model, version), atMs: Date.now(), device }, ...current.jobs],
+        jobs: [
+            { ...versionJob(model, version), atMs: Date.now(), device, status },
+            ...current.jobs,
+        ],
     }));
     const mode = shared.mode;
-    const timer = window.setInterval(() => tick(mode, slug, number, jobId, timer), TICK_MS);
+    if (start.queued) {
+        window.setTimeout(() => {
+            jobIn(mode, jobId, (job) =>
+                job.status === "queued" ? { ...job, status: "running" } : job,
+            );
+            runJob(mode, slug, number, jobId, minutes);
+        }, QUEUE_MS);
+    } else {
+        runJob(mode, slug, number, jobId, minutes);
+    }
     markVisited(number === 1 ? "training" : "train2");
     return number;
 }
@@ -1708,6 +1741,10 @@ export function retryVersion(slug: string, number: number): number {
     }
     const memory = /memory/i.test(failed.error ?? "");
     return startTraining(slug, memory ? { ...failed.settings, adapter: "QLoRA" } : failed.settings);
+}
+
+export function setHeldOut(slug: string, rows: number) {
+    update(slug, (model) => ({ ...model, heldOut: rows }));
 }
 
 export function setTrainAt(slug: string, rows: number) {
@@ -2732,7 +2769,7 @@ export function rowsSinceLive(model: FlowModel, rows: number): number | null {
 export const DEFAULT_SETTINGS: Omit<TrainingSettings, "rows"> = {
     adapter: "LoRA",
     rank: 16,
-    epochs: 3,
+    epochs: 2,
     learningRate: 2e-4,
     batch: 8,
 };
@@ -2743,9 +2780,6 @@ export function rate(value: number): string {
 
 export function changedSettings(chosen: TrainingSettings): string[] {
     const changes: string[] = [];
-    if (chosen.adapter !== DEFAULT_SETTINGS.adapter) {
-        changes.push(chosen.adapter);
-    }
     if (chosen.rank !== DEFAULT_SETTINGS.rank) {
         changes.push(`rank ${chosen.rank}`);
     }
@@ -2754,9 +2788,6 @@ export function changedSettings(chosen: TrainingSettings): string[] {
     }
     if (chosen.learningRate !== DEFAULT_SETTINGS.learningRate) {
         changes.push(`learning rate ${rate(chosen.learningRate)}`);
-    }
-    if (chosen.batch !== DEFAULT_SETTINGS.batch) {
-        changes.push(`batch ${chosen.batch}`);
     }
     return changes;
 }

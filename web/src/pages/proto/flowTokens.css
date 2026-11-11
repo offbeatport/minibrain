@@ -3,6 +3,12 @@
     --flow-series-2: #eb6834;
     --flow-series-3: #1baf7a;
     --flow-series-4: #eda100;
+    --flow-memory-1: #1d5fc4;
+    --flow-memory-2: #5b93e6;
+    --flow-memory-3: #a4c3f2;
+    --flow-memory-over-1: #b42318;
+    --flow-memory-over-2: #e0675c;
+    --flow-memory-over-3: #f2b0aa;
 }
 
 .dark {
@@ -10,4 +16,10 @@
     --flow-series-2: #d95926;
     --flow-series-3: #199e70;
     --flow-series-4: #c98500;
+    --flow-memory-1: #8ab8fa;
+    --flow-memory-2: #4f87de;
+    --flow-memory-3: #2d5aa0;
+    --flow-memory-over-1: #ff8a80;
+    --flow-memory-over-2: #d6483d;
+    --flow-memory-over-3: #8f2a23;
 }
