@@ -1727,6 +1727,11 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   what it is (a prompt-only version on the base; no teacher yet).
 - [x] Data → Uploads takes a dropped file: obp-ui's `DropZone` (dashed 1px edge, a quiet solid edge and fill while
   dragging, a Choose a file button), through the same duplicate and Replace / Keep both flow as the upload button.
+- [ ] Training says it mixes in "a small general instruction mix to limit forgetting" (Training), but
+  `minibrain/ml/train.py` trains only on the dataset version's rows. Add the mix: a pinned, licence-clean, bundled
+  general instruction set (works air-gapped, hashed like any dataset version), sampled at a recipe share (default
+  about 10% of rows, 0 to turn it off), recorded in the version's recipe and model card, and kept out of held-out
+  scoring. Check on a chat base that general answers stay as good while the task score holds.
 
 ## Risks to verify early
 
