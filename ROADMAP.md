@@ -1420,7 +1420,7 @@ Two modes, same code, same adapter format (PEFT safetensors).
 | | Local | Production |
 |---|---|---|
 | OS | Linux, macOS, Windows | Linux |
-| Install | Native via uv (Docker on macOS has no GPU access) | Docker image + compose; Helm / OpenShift in v2 |
+| Install | Native via uv (Docker on macOS has no GPU access) | Docker image + compose, or the Helm chart on Kubernetes; OpenShift in v2 |
 | Compute | PyTorch picks CUDA, ROCm, MPS, Intel XPU or CPU | NVIDIA CUDA; AMD ROCm in v2 |
 | Training | Same TRL/PEFT code; LoRA in fp32 on MPS or CPU, sized by the planner (~2B on a 16 GB Mac) | LoRA or QLoRA, picked by the training planner |
 | Serving | `transformers` backend, PEFT multi-adapter | SGLang pool |
@@ -1589,6 +1589,13 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
 - [x] Developer tasks in `mise.toml` (setup, dev, check, build)
 - [x] CI on every push: the `mise run check` checks, then build the UI and the wheel
+- [ ] docker-compose for one VM: main, gateway, a worker and an engine on one GPU host, Postgres optional, volumes for
+      `MINIBRAIN_HOME`, the same images as Helm
+- [ ] Helm chart for Kubernetes: main (one replica on SQLite, several on Postgres), gateway (scalable, behind an
+      Ingress), workers and one engine Deployment per pool with GPU requests, node selectors and tolerations,
+      `replicas` per pool in values, storage as a PVC or S3, secrets from Kubernetes Secrets, and an air-gapped values
+      file pointing at a private registry. The customer scales with `replicas` or their own autoscaler; minibrain
+      creating pods itself is the Kubernetes launcher in v2
 - [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
       (built: `release.yml` on `v*` tags puts the wheel, sdist, SBOMs and `SHA256SUMS` on GitHub Releases and CPU
       and CUDA images for amd64 and arm64 on GHCR, the images installing that same wheel; dry run passed, no tag
@@ -1647,7 +1654,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - Dedicated or merged-adapter instances for high-traffic models
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
-- Helm chart, OpenShift
+- OpenShift certification (the Helm chart ships in v1)
 - [ ] OCI / container registry model sources (Harbor, Quay; KitOps ModelKits)
 - [ ] Catalogue export/import and model bundles for air-gapped sites — only if needed
 - [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
