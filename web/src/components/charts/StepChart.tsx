@@ -34,6 +34,7 @@ function Readout({
     series,
     format,
     title,
+    notes,
 }: {
     active?: boolean;
     payload?: readonly ReadoutEntry[];
@@ -41,6 +42,7 @@ function Readout({
     series: StepSeries[];
     format: (value: number) => string;
     title: (value: number) => string;
+    notes?: (value: number) => string[];
 }) {
     if (!active || !payload?.length || typeof label !== "number") {
         return null;
@@ -68,6 +70,11 @@ function Readout({
                     </li>
                 ))}
             </ul>
+            {notes?.(label).map((note) => (
+                <p key={note} className="mt-1.5 border-t pt-1.5 text-muted-foreground">
+                    {note}
+                </p>
+            ))}
         </div>
     );
 }
@@ -86,6 +93,7 @@ export function StepChart({
     yDomain,
     xFormat = (value: number) => STEPS.format(value),
     readoutTitle = (value: number) => `Step ${STEPS.format(value)}`,
+    readoutNotes,
     connectNulls = true,
 }: {
     rows: StepRow[];
@@ -101,6 +109,7 @@ export function StepChart({
     yDomain?: [number, number];
     xFormat?: (value: number) => string;
     readoutTitle?: (value: number) => string;
+    readoutNotes?: (value: number) => string[];
     connectNulls?: boolean;
 }) {
     const first = rows[0]?.step ?? 0;
@@ -148,6 +157,7 @@ export function StepChart({
                                 series={series}
                                 format={format}
                                 title={readoutTitle}
+                                notes={readoutNotes}
                             />
                         )}
                     />

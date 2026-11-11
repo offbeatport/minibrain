@@ -107,7 +107,7 @@ function stepStatus(
         case "monitor":
             return {
                 tone: "warning",
-                text: `Errors ${percent(model.errors)} (usually ${percent(model.usualErrors)})`,
+                text: `Errors ${percent(model.errors)} in the last 24 hours (usually ${percent(model.usualErrors)})`,
                 action: { label: step.label, href: step.href, everyone: true },
             };
         case "make-live": {

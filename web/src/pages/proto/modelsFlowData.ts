@@ -445,7 +445,13 @@ function summarise(model: FlowModel): FlowModel {
         return model;
     }
     const live = model.variants.filter((item) => item.live);
-    const p95s = live.map((item) => item.p95 ?? 0);
+    const weights = live.map((item) => item.traffic.reduce((total, value) => total + value, 0));
+    const weight = weights.reduce((total, value) => total + value, 0);
+    const p95 =
+        weight > 0
+            ? live.reduce((total, item, index) => total + (item.p95 ?? 0) * weights[index], 0) /
+              weight
+            : Math.max(0, ...live.map((item) => item.p95 ?? 0));
     return {
         ...model,
         deployed: live.length > 0,
@@ -455,7 +461,7 @@ function summarise(model: FlowModel): FlowModel {
         size: model.variants[0]?.size ?? model.size,
         gpuSeconds: Math.min(...model.variants.map((item) => item.gpuSeconds), 99),
         replicas: [...new Set(live.flatMap((item) => item.replicas))],
-        p95: p95s.length > 0 ? Math.max(...p95s) : 0,
+        p95: Math.round(p95),
     };
 }
 
@@ -509,7 +515,7 @@ const RAW: RawModel[] = [
         heldOut: 96,
         live: 2,
         deployed: true,
-        ...week([88, 102, 95, 120, 131, 40, 22], 512),
+        ...week([88, 102, 95, 120, 131, 40, 22], 100),
         serveOnly: false,
         size: null,
         versions: INVOICE_EXTRACTOR,
@@ -543,7 +549,7 @@ const RAW: RawModel[] = [
         heldOut: 12,
         live: 0,
         deployed: true,
-        ...week([0, 2, 0, 5, 1, 0, 3], 4),
+        ...week([0, 0, 0, 0, 2, 5, 4], 0),
         serveOnly: false,
         size: null,
         versions: GUY1,

@@ -3,6 +3,7 @@ export { FlowActivityPage } from "./flowActivity";
 export { FlowAddModelPage, FlowCatalogPage, FlowDiscoverPage, FlowHomePage } from "./FlowPages";
 export { FlowRedirect, FlowShell } from "./FlowShell";
 export { FlowEvaluationsPage } from "./flowEvaluations";
+export { FlowMonitorPage } from "./flowMonitor";
 export { FlowTrainingPage } from "./flowTraining";
 export {
     FlowDataPage,
@@ -11,7 +12,6 @@ export {
     FlowInfrastructurePage,
     FlowJobPage,
     FlowJobsPage,
-    FlowMonitorPage,
     FlowOldJobsRedirect,
     FlowPlaygroundPage,
     FlowSettingsPage,

@@ -11,6 +11,8 @@ import {
 import type { ReactNode } from "react";
 import { Requests } from "~/components/models/ModelMetrics";
 import { Sparkline } from "./flowSparkline";
+import { summaryOf } from "./flowTraffic";
+import { ms, rate } from "./flowUsageChart";
 import {
     type FlowModel,
     bestCandidate,
@@ -112,6 +114,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
     const step = nextStep(model);
     const candidate = model.live !== null ? bestCandidate(model) : undefined;
     const status = autopilotText(model);
+    const week = summaryOf([{ model, keys: [] }], "7d");
     return (
         <>
             <SheetHeader>
@@ -149,11 +152,8 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                 />
             </Block>
             <div className="grid grid-cols-3 gap-4">
-                <Figure label="p95" value={model.deployed ? `${model.p95} ms` : "—"} />
-                <Figure
-                    label="Errors"
-                    value={model.deployed ? `${(model.errors * 100).toFixed(1)}%` : "—"}
-                />
+                <Figure label="p95" value={model.deployed ? ms(week.p95) : "—"} />
+                <Figure label="Errors" value={model.deployed ? rate(week.errors) : "—"} />
                 <Figure label="Cost / 1k req." value={gpuSeconds(model.gpuSeconds)} />
             </div>
             <Block title="Last answers">

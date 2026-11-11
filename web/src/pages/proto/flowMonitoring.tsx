@@ -1,7 +1,9 @@
-import { ChartColumn, History, Layers } from "lucide-react";
+import { ChartLine, History, Layers } from "lucide-react";
 import {
+    Badge,
     EmptyState,
     Link,
+    SegmentedTabs,
     Table,
     TableBody,
     TableCell,
@@ -9,235 +11,254 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { PanelSection, PanelSections, Stat } from "~/components/Section";
-import { ChartLegend, type ChartSeries, TimeChart } from "~/components/charts/TimeChart";
+import { PanelSection, PanelSections } from "~/components/Section";
 import { count } from "~/lib/format";
-import { FLOW, type FlowModel, versionHref } from "./modelsFlowData";
+import {
+    CallersSection,
+    ErrorsSection,
+    LAST,
+    LatencySection,
+    RequestLogSection,
+    SummaryStrip,
+    callerRows,
+    periodOf,
+    summaryPair,
+} from "./flowMonitorParts";
+import {
+    type Source,
+    type UsageRange,
+    callerLabel,
+    groupsOf,
+    logOf,
+    totalsOf,
+} from "./flowTraffic";
+import { usageOf, useUsageRange } from "./flowUsage";
+import { RANGES, SPAN, UsageChart, gpu, ms, rate } from "./flowUsageChart";
+import { FLOW, type FlowModel, modelHref, useFlowState, versionHref } from "./modelsFlowData";
 
-type Slice = {
+export function monitorHref(search: Record<string, string>): string {
+    const params = new URLSearchParams(search).toString();
+    return `${FLOW}/monitor${params ? `?${params}` : ""}#log`;
+}
+
+type PartRow = {
     key: string;
     label: string;
-    href?: string;
-    share: number;
-    daily: number[];
-    p95: number | null;
+    href: string | null;
+    role: { text: string; variant: "success" | "info" | "neutral" } | null;
+    requests: number;
+    p95: number;
     errors: number;
+    cost: number;
 };
 
-const COLORS = ["var(--primary)", "var(--file-sql)", "var(--file-parquet)", "var(--file-tsv)"];
-const DAY_MS = 24 * 3600 * 1000;
-
-function scaled(values: number[], share: number): number[] {
-    return values.map((value) => Math.round((value * share) / 100));
-}
-
-export function slicesOf(model: FlowModel): Slice[] {
-    if (model.kind === "base") {
-        const total = model.traffic.reduce((sum, value) => sum + value, 0) || 1;
-        return model.variants
-            .filter((item) => item.live)
-            .map((item) => ({
-                key: item.id,
-                label: item.format,
-                share: Math.round(
-                    (item.traffic.reduce((sum, value) => sum + value, 0) * 100) / total,
-                ),
-                daily: item.traffic,
-                p95: item.p95,
-                errors: model.errors,
-            }));
-    }
-    if (model.live === null || !model.deployed) {
-        return [];
-    }
-    const slices: Slice[] = [];
-    const canary = model.canary;
-    const liveErrors = canary ? model.usualErrors : model.errors;
-    slices.push({
-        key: `v${model.live}`,
-        label: `v${model.live}`,
-        href: versionHref(model.slug, model.live),
-        share: canary ? 100 - canary.share : 100,
-        daily: scaled(model.traffic, canary ? 100 - canary.share : 100),
-        p95: model.p95 || null,
-        errors: liveErrors,
-    });
-    if (canary) {
-        const share = canary.share / 100;
-        slices.push({
-            key: `v${canary.version}`,
-            label: `v${canary.version} canary`,
-            href: versionHref(model.slug, canary.version),
-            share: canary.share,
-            daily: scaled(model.traffic, canary.share),
-            p95: model.p95 ? Math.round(model.p95 * 1.6) : null,
-            errors: Math.max(0, (model.errors - model.usualErrors * (1 - share)) / share),
-        });
-    }
-    return slices;
-}
-
-function rate(value: number): string {
-    return `${(value * 100).toFixed(1)}%`;
-}
-
-function rowsOf(slices: Slice[]) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Array.from({ length: 7 }, (_, day) => {
-        const row: { at: number; [key: string]: number } = {
-            at: today.getTime() - (6 - day) * DAY_MS,
+function partRows(model: FlowModel, source: Source, range: UsageRange): PartRow[] {
+    const groups = groupsOf([source], range, (_, cell) => cell.part);
+    const rows = [...groups.entries()].map(([part, acc]): PartRow => {
+        const totals = totalsOf(acc);
+        const base = {
+            key: part,
+            requests: totals.requests,
+            p95: totals.p95,
+            errors: totals.errors,
+            cost: totals.cost,
         };
-        for (const slice of slices) {
-            row[slice.key] = slice.daily[day] ?? 0;
+        if (model.kind === "base") {
+            const variant = model.variants.find((item) => item.id === part);
+            return {
+                ...base,
+                label: variant ? `${variant.format} · ${variant.apiName}` : part,
+                href: modelHref(model.slug, "variants"),
+                role: variant?.live ? { text: "Deployed", variant: "success" } : null,
+            };
         }
-        return row;
+        const number = Number(part.slice(1));
+        const canary = model.canary?.version === number;
+        const live = model.live === number;
+        return {
+            ...base,
+            label: `v${number}`,
+            href: versionHref(model.slug, number),
+            role: canary
+                ? { text: `Canary ${model.canary?.share}%`, variant: "info" }
+                : live
+                  ? {
+                        text: model.canary ? `Live ${100 - model.canary.share}%` : "Live",
+                        variant: "success",
+                    }
+                  : { text: "Earlier", variant: "neutral" },
+        };
     });
+    return rows.sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true }));
 }
 
-function Overview({ model, slices }: { model: FlowModel; slices: Slice[] }) {
-    const total = slices.reduce(
-        (sum, slice) => sum + slice.daily.reduce((all, value) => all + value, 0),
-        0,
-    );
-    const errors =
-        slices.reduce(
-            (sum, slice) => sum + slice.errors * slice.daily.reduce((all, v) => all + v, 0),
-            0,
-        ) / Math.max(1, total);
-    const high = errors > model.usualErrors * 3;
-    const p95 = Math.max(0, ...slices.map((slice) => slice.p95 ?? 0));
+function PartsSection({
+    model,
+    source,
+    range,
+}: { model: FlowModel; source: Source; range: UsageRange }) {
+    const rows = partRows(model, source, range);
+    const total = rows.reduce((sum, row) => sum + row.requests, 0);
+    const noun = model.kind === "base" ? "Variant" : "Version";
     return (
-        <div className="flex flex-wrap gap-x-10 gap-y-3 rounded-lg border bg-card px-panel py-4">
-            <Stat label="Requests, 7 days" value={count(total)} />
-            <Stat label="Latency p95" value={p95 ? `${p95} ms` : "–"} />
-            <Stat
-                label="Errors"
-                value={
-                    <span className={high ? "text-destructive" : undefined}>
-                        {rate(errors)}
-                        {high && (
-                            <span className="font-normal text-muted-foreground">{` · usually ${rate(model.usualErrors)}`}</span>
-                        )}
-                    </span>
-                }
-            />
-            <Stat label="Cost / 1k requests" value={`${model.gpuSeconds.toFixed(1)} GPU·s`} />
-        </div>
-    );
-}
-
-function SliceTable({ slices, noun }: { slices: Slice[]; noun: string }) {
-    return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead className="pl-panel">{noun}</TableHead>
-                    <TableHead className="text-right">Share</TableHead>
-                    <TableHead className="text-right">Requests, 7 days</TableHead>
-                    <TableHead className="text-right">p95</TableHead>
-                    <TableHead className="pr-panel text-right">Errors</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {slices.map((slice) => (
-                    <TableRow key={slice.key}>
-                        <TableCell className="pl-panel">
-                            {slice.href ? (
-                                <Link href={slice.href} className="font-medium hover:underline">
-                                    {slice.label}
-                                </Link>
-                            ) : (
-                                slice.label
-                            )}
-                        </TableCell>
-                        <TableCell className="text-right">{`${slice.share}%`}</TableCell>
-                        <TableCell className="text-right">
-                            {count(slice.daily.reduce((sum, value) => sum + value, 0))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                            {slice.p95 ? `${slice.p95} ms` : "–"}
-                        </TableCell>
-                        <TableCell
-                            className={
-                                slice.errors > 0.05
-                                    ? "pr-panel text-right text-destructive"
-                                    : "pr-panel text-right"
-                            }
-                        >
-                            {rate(slice.errors)}
-                        </TableCell>
+        <PanelSection
+            icon={model.kind === "base" ? Layers : History}
+            title={`By ${noun.toLowerCase()}`}
+            description={
+                model.canary
+                    ? `Each version ${SPAN[range]}. The live pointer splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
+                    : `Each ${noun.toLowerCase()} that answered ${SPAN[range]}.`
+            }
+            flush
+        >
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="pl-panel">{noun}</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Requests</TableHead>
+                        <TableHead className="text-right">Share</TableHead>
+                        <TableHead className="text-right">Latency p95</TableHead>
+                        <TableHead className="text-right">Error rate</TableHead>
+                        <TableHead className="pr-panel text-right">Cost</TableHead>
                     </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+                </TableHeader>
+                <TableBody>
+                    {rows.map((row) => (
+                        <TableRow key={row.key}>
+                            <TableCell className="pl-panel">
+                                {row.href ? (
+                                    <Link href={row.href} className="font-medium hover:underline">
+                                        {row.label}
+                                    </Link>
+                                ) : (
+                                    row.label
+                                )}
+                            </TableCell>
+                            <TableCell>
+                                {row.role && (
+                                    <Badge variant={row.role.variant}>{row.role.text}</Badge>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-right">{count(row.requests)}</TableCell>
+                            <TableCell className="text-right">
+                                {total > 0 ? `${((row.requests * 100) / total).toFixed(1)}%` : "–"}
+                            </TableCell>
+                            <TableCell className="text-right">{ms(row.p95)}</TableCell>
+                            <TableCell
+                                className={
+                                    row.errors > model.usualErrors * 3
+                                        ? "text-right text-destructive"
+                                        : "text-right"
+                                }
+                            >
+                                {rate(row.errors)}
+                            </TableCell>
+                            <TableCell className="pr-panel text-right">{gpu(row.cost)}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </PanelSection>
     );
 }
 
-function Charts({ slices, label }: { slices: Slice[]; label: string }) {
-    const series: ChartSeries[] = slices.map((slice, index) => ({
-        key: slice.key,
-        label: slice.label,
-        color: COLORS[index % COLORS.length],
-    }));
-    return (
-        <div className="flex flex-col gap-3">
-            <ChartLegend series={series} />
-            <TimeChart
-                kind="stacked-bars"
-                rows={rowsOf(slices)}
-                series={series}
-                format={(value) => count(value)}
-                bucketMs={DAY_MS}
-                label={label}
-            />
-        </div>
-    );
+function emptyText(model: FlowModel, range: UsageRange): string {
+    if (model.live === null && model.kind !== "base") {
+        return "Not deployed, so its name answers nothing. Make a version live to deploy it.";
+    }
+    if (!model.deployed) {
+        return `${model.name} is not deployed, so nothing calls it. Deploy it from the header.`;
+    }
+    return `No requests ${SPAN[range]}. Latency, errors, versions and callers show here once requests arrive.`;
 }
 
 export function ModelMonitoring({ model }: { model: FlowModel }) {
-    const slices = slicesOf(model);
-    if (slices.length === 0) {
-        return (
-            <EmptyState variant="panel" title="No traffic to show">
-                {model.live === null
-                    ? "Not deployed, so its name answers nothing. Make a version live to deploy it."
-                    : `${model.name} is not deployed, so nothing calls it. Deploy it from the header.`}
-            </EmptyState>
-        );
-    }
-    const noun = model.kind === "base" ? "Format" : "Version";
+    const state = useFlowState();
+    const keys = state.keys[model.slug] ?? [];
+    const [range, setRange] = useUsageRange();
+    const source: Source = { model, keys };
+    const { now, before, comparable } = summaryPair([source], range);
+    const empty = now.requests === 0;
+    const never = usageOf(model, "30d", "requests", keys).total === 0;
+    const log = logOf([model], (slug) => state.keys[slug] ?? []).slice(0, 8);
+    const callerName = (id: string) =>
+        callerLabel(state.models, (slug) => state.keys[slug] ?? [], id);
     return (
         <div className="flex flex-col gap-4">
-            <Overview model={model} slices={slices} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <SegmentedTabs
+                    tabs={RANGES}
+                    active={range}
+                    onSelect={(key) => setRange(key as UsageRange)}
+                />
+                <Link href={`${FLOW}/monitor`} className="text-sm text-primary hover:underline">
+                    All models in Monitor →
+                </Link>
+            </div>
             <PanelSections>
                 <PanelSection
-                    icon={ChartColumn}
-                    title="Requests per day"
-                    description={
-                        model.canary
-                            ? `Last 7 days. The live pointer splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
-                            : "Last 7 days, by the version that answered."
-                    }
-                    actions={
-                        <Link
-                            href={`${FLOW}/monitor`}
-                            className="text-sm text-primary hover:underline"
-                        >
-                            All models in Monitor →
-                        </Link>
-                    }
+                    icon={ChartLine}
+                    title="Traffic"
+                    description={`${LAST[range]}, by the version that answered. Changes compare with ${periodOf(range)}.`}
                 >
-                    <Charts slices={slices} label={`Requests per day for ${model.name}`} />
+                    <div className="flex flex-col gap-6">
+                        {!never && (
+                            <SummaryStrip
+                                now={now}
+                                before={before}
+                                usual={model.usualErrors}
+                                comparable={comparable}
+                            />
+                        )}
+                        <UsageChart
+                            load={(metric) => usageOf(model, range, metric, keys)}
+                            range={range}
+                            subject={model.name}
+                            by={model.kind === "base" ? null : "by version"}
+                            height={300}
+                            headline={false}
+                            empty={never}
+                            emptyHint={emptyText(model, range)}
+                        />
+                    </div>
                 </PanelSection>
-                <PanelSection
-                    icon={model.kind === "base" ? Layers : History}
-                    title={`By ${noun.toLowerCase()}`}
-                    description={`Each ${noun.toLowerCase()}'s share of the last 7 days, with its latency and errors.`}
-                    flush
-                >
-                    <SliceTable slices={slices} noun={noun} />
-                </PanelSection>
+                {never ? null : empty ? (
+                    <EmptyState variant="panel" title="No traffic to show">
+                        {emptyText(model, range)}
+                    </EmptyState>
+                ) : (
+                    <>
+                        <LatencySection sources={[source]} range={range} subject={model.name} />
+                        <ErrorsSection
+                            sources={[source]}
+                            range={range}
+                            subject={model.name}
+                            usual={model.usualErrors}
+                            logHref={(kind) => monitorHref({ model: model.slug, error: kind })}
+                        />
+                        <PartsSection model={model} source={source} range={range} />
+                        <CallersSection
+                            rows={callerRows([source], range)}
+                            range={range}
+                            showModel={false}
+                        />
+                        <RequestLogSection
+                            entries={log}
+                            callerName={callerName}
+                            description="The latest requests, newest first. Prompts and answers stay on this install."
+                            actions={
+                                <Link
+                                    href={monitorHref({ model: model.slug })}
+                                    className="text-sm text-primary hover:underline"
+                                >
+                                    Full log in Monitor →
+                                </Link>
+                            }
+                            empty="No requests yet."
+                        />
+                    </>
+                )}
             </PanelSections>
         </div>
     );
