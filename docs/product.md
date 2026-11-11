@@ -124,8 +124,20 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Import weights from a folder or S3 path, checked before copying.
   UI: Models › Add model › Import · API: POST /api/base-models/inspect, POST /api/base-models/import · Config: MINIBRAIN_MODELS_S3_URL
 - **Models list** · shipped · product, ml
-  See custom and base models with status, version and traffic.
+  Custom and base models with score, traffic, cost and status.
   UI: Models · API: GET /api/all-models
+- **List view options** · shipped · product, ml
+  Filter by status, kind and base, sort, and pick columns.
+  UI: Models › View options
+- **Versions and variants in the list** · shipped · product, ml
+  Show versions under models and installed formats under base models.
+  UI: Models › View options › Show versions · API: GET /api/all-models
+- **Act on versions and variants** · shipped · product, ml, admin
+  Tick versions to compare or delete, variants to deploy or delete.
+  UI: Models › Show versions · API: POST /api/models/{slug}/versions/{number}/promote, POST /api/base-models/{key}/deploy, DELETE /api/models/{slug}/versions/{number}, DELETE /api/base-models/{key}
+- **Model quick look** · shipped · product, ml
+  Score history, a week of traffic and the next step.
+  UI: Models › Quick look · API: GET /api/model-pages/{name}, GET /api/requests
 - **Model page** · shipped · product, ml, admin
   One page per model: Overview, Versions, Training, Monitoring and API keys.
   UI: Models › model · API: GET /api/model-pages/{name}, GET /api/base-models/{key}, PATCH /api/base-models/{key}

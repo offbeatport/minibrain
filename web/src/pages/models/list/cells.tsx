@@ -1,0 +1,243 @@
+import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import type { ReactNode } from "react";
+import type { ModelVersionRow } from "~/api/client";
+import { PublisherLogo } from "~/components/PublisherLogo";
+import { HealthStatus } from "~/components/models/HealthStatus";
+import { ProgressBar, StatusText } from "~/components/models/StatusText";
+import { TeardownStatus } from "~/components/models/TeardownStatus";
+import { jobPageHref } from "~/lib/jobs";
+import {
+    BASELINE_HINT,
+    type ListModel,
+    type Replica,
+    type StatusLine,
+    isBaseline,
+    points,
+    scoreNote,
+    versionState,
+} from "./model";
+
+export function Muted({ children = "—" }: { children?: ReactNode }) {
+    return <span className="text-muted-foreground">{children}</span>;
+}
+
+export function ModelAvatar({ model, size = "md" }: { model: ListModel; size?: "md" | "lg" }) {
+    return (
+        <PublisherLogo
+            publisher={model.kind === "base" ? model.row.publisher : null}
+            name={model.name}
+            size={size}
+        />
+    );
+}
+
+export function Tip({ tip, children }: { tip: ReactNode; children: ReactNode }) {
+    if (!tip) {
+        return children;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="inline-flex">{children}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{tip}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+export function LiveStatus({
+    replicas,
+    text = "Deployed",
+}: { replicas: Replica[]; text?: string }) {
+    const label = (
+        <StatusText tone="success">
+            {text}
+            {replicas.length > 1 && (
+                <span className="tabular-nums">{` · ${replicas.length} replicas`}</span>
+            )}
+        </StatusText>
+    );
+    if (replicas.length === 0) {
+        return label;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="relative z-10 rounded-sm text-left">
+                    {label}
+                </button>
+            </TooltipTrigger>
+            <TooltipContent>
+                <span className="flex flex-col gap-0.5">
+                    <span className="font-semibold">
+                        {replicas.length === 1 ? "Served on" : `${replicas.length} replicas on`}
+                    </span>
+                    {replicas.map((replica) => (
+                        <span key={`${replica.pool}/${replica.host}`} className="font-mono">
+                            {replica.pool === "local"
+                                ? replica.host
+                                : `${replica.pool} / ${replica.host}`}
+                        </span>
+                    ))}
+                </span>
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
+function Explained({ detail, children }: { detail?: string; children: ReactNode }) {
+    if (!detail) {
+        return children;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="relative z-10 rounded-sm text-left">
+                    {children}
+                </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">{detail}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+export function StatusLineText({
+    line,
+    name,
+    replicas,
+}: {
+    line: StatusLine;
+    name: string;
+    replicas: Replica[];
+}) {
+    if (line.kind === "teardown" && line.row.teardown) {
+        return (
+            <span className="relative z-10">
+                <TeardownStatus teardown={line.row.teardown} name={name} />
+            </span>
+        );
+    }
+    if (line.kind === "health" && line.row.health) {
+        return (
+            <span className="relative z-10">
+                <HealthStatus health={line.row.health} />
+            </span>
+        );
+    }
+    if (line.kind === "on") {
+        return <LiveStatus replicas={replicas} />;
+    }
+    if (line.tone === null) {
+        return <Muted>{line.text}</Muted>;
+    }
+    const text = (
+        <StatusText tone={line.tone}>
+            <span className="tabular-nums">{line.text}</span>
+        </StatusText>
+    );
+    if (line.kind === "training" || line.kind === "transfer") {
+        return (
+            <span className="flex items-center gap-2">
+                {line.jobId ? (
+                    <Link href={jobPageHref(line.jobId)} className="relative z-10 hover:underline">
+                        {text}
+                    </Link>
+                ) : (
+                    text
+                )}
+                <ProgressBar
+                    value={line.progress}
+                    label={`${name} ${line.text}`}
+                    className="w-12"
+                />
+            </span>
+        );
+    }
+    return <Explained detail={line.detail}>{text}</Explained>;
+}
+
+export function VersionName({ version }: { version: Pick<ModelVersionRow, "number" | "kind"> }) {
+    if (!isBaseline(version)) {
+        return <span className="tabular-nums">{`v${version.number}`}</span>;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="relative z-10 cursor-help tabular-nums">
+                    {`v${version.number} · Baseline`}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{BASELINE_HINT}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+export function ScoreBadge({ model, version }: { model: ListModel; version: ModelVersionRow }) {
+    const note = scoreNote(model, version);
+    if (!note) {
+        return null;
+    }
+    if (note.kind === "beats") {
+        return <Badge variant="success">{`beats live ${points(note.delta)}`}</Badge>;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Badge variant="neutral" className="relative z-10 cursor-help" tabIndex={0}>
+                    below rule
+                </Badge>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{note.reason}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+export function VersionStatus({
+    version,
+    replicas,
+}: {
+    version: ModelVersionRow;
+    replicas: Replica[];
+}) {
+    if (version.health) {
+        return (
+            <span className="relative z-10">
+                <HealthStatus health={version.health} />
+            </span>
+        );
+    }
+    const state = versionState(version);
+    if (version.live) {
+        return <LiveStatus replicas={replicas} text="Live" />;
+    }
+    if (version.status === "training" || version.status === "evaluating") {
+        const share =
+            version.progress === null || version.progress === undefined
+                ? ""
+                : ` · ${Math.round(version.progress * 100)}%`;
+        return (
+            <span className="flex items-center gap-2 whitespace-nowrap">
+                <StatusText tone="info">
+                    <span className="tabular-nums">{`${state.label}${share}`}</span>
+                </StatusText>
+                {version.job_id && (
+                    <Link
+                        href={jobPageHref(version.job_id)}
+                        className="relative z-10 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
+                    >
+                        {`Job #${version.job_id}`}
+                    </Link>
+                )}
+            </span>
+        );
+    }
+    const text = <StatusText tone={state.tone}>{state.label}</StatusText>;
+    if (version.status === "failed") {
+        return (
+            <Explained detail={version.error || "The job failed without a message."}>
+                {text}
+            </Explained>
+        );
+    }
+    return text;
+}

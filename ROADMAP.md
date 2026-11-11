@@ -1129,6 +1129,25 @@ keys, and `/v1` stays key-only.
   for bases, or the admin lock); otherwise nothing is saved and the Recent list says why in one line. Chats with no
   new message for Log retention (days) are deleted by the leader's hourly purge, with the request logs. No folders,
   sharing or search beyond the filter: that is the staff Chat app's job.
+- Models (`/models`, built 2026-11-11) lists every model in two sticky, collapsible groups, Your models then Base
+  models (title and count only); base models are grouped by catalogue model, one row per catalogue entry with its
+  installed variants. One toolbar line: Search, the active filter chips, then a view-options button and Add model. The
+  view panel filters by status (Deployed, Not deployed, Needs attention, Training, Failed, with live counts), kind and
+  base model, sorts (Needs attention first by default, Name, Score, Requests, Recently updated; within each group)
+  and holds Display: Show versions and the Quality, Requests, Cost and p95 columns; filters and sort stay in the URL
+  (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or letter tile, name and base,
+  the live score with a sparkline over versions, 7-day requests, cost per 1k from the live version's eval, p95, and one
+  status line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from
+  the live engines, Not deployed), then Connect or Try and a menu. A row opens the model page; arrows move, Enter
+  opens, Space opens the quick look. Show versions adds version rows under custom models (status as a dot and text,
+  "beats live +1.4" or "below rule", never on v0 · Baseline, and Make vN live) and variant rows under base models
+  (format, size, trainable or serve-only, API name, Deployed, Update available). Only those child rows tick: versions
+  can be compared (two of one model) or deleted, variants deployed, undeployed or deleted, live ones skipped, through
+  the shared delete dialog. The quick look is a `Sheet`: score over versions, a week of traffic, p95, errors and cost,
+  the latest requests, the model page's next step, and Open model, Make vN live and Playground. `/api/all-models`
+  carries what it needs in a fixed number of queries: versions loaded in one batch, p50 and p95 and 4xx/5xx counts
+  from one ranked query, live replicas per base, and each base's catalogue model, format and trainability. Viewers
+  see no builder actions.
 - A model's page (built 2026-11-06, rebuilt 2026-11-11 from the approved prototype) is one route for both kinds,
   `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create, import, download and rename
   refuse a name or address another model holds (409), and `new`, `base` and `custom` are reserved. Old

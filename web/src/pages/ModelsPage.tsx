@@ -1,32 +1,15 @@
 import { useRouter } from "@tanstack/react-router";
-import { Button, CubePlus } from "obp-ui";
 import { PageHeader } from "~/components/PageHeader";
 import { Page } from "~/components/Section";
-import { useCan } from "~/lib/access";
 import { useModelsSearch } from "~/lib/modelsSearch";
 import { Discover } from "./models/Discover";
-import { MyModels } from "./models/MyModels";
+import { ModelsList } from "./models/list/ModelsList";
 
 export function ModelsPage() {
-    const router = useRouter();
-    const { search, update } = useModelsSearch("/models");
-    const add = () => router.history.push("/models/new");
-    const can = useCan();
     return (
         <Page wide>
-            <PageHeader
-                title="Models"
-                caption="Models added to this installation."
-                actions={
-                    can.build && (
-                        <Button onClick={add}>
-                            <CubePlus />
-                            Add model
-                        </Button>
-                    )
-                }
-            />
-            <MyModels search={search} update={update} />
+            <PageHeader title="Models" caption="Models available on this install." />
+            <ModelsList />
         </Page>
     );
 }
