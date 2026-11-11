@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { Page, Section } from "~/components/Section";
+import { Page, PanelSections, Section } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { ActivityPanel } from "./flowActivity";
-import { BaseDetails, Details } from "./flowDetails";
+import { About, BaseAbout, BaseDetails, Details } from "./flowDetails";
 import { ModelHeader } from "./flowHeader";
 import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs";
 import { ModelMonitoring } from "./flowMonitoring";
@@ -40,9 +40,13 @@ const ALIASES: Record<string, ModelTab> = { data: "training", api: "keys" };
 function OverviewLayout({ main, side }: { main: ReactNode; side: ReactNode }) {
     return (
         <div className="@container">
-            <div className="grid items-start gap-4 @5xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex min-w-0 flex-col gap-4">{main}</div>
-                <div className="flex min-w-0 flex-col gap-4">{side}</div>
+            <div className="grid items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="min-w-0">
+                    <PanelSections>{main}</PanelSections>
+                </div>
+                <div className="min-w-0">
+                    <PanelSections>{side}</PanelSections>
+                </div>
             </div>
         </div>
     );
@@ -55,9 +59,15 @@ function Overview({ model }: { model: FlowModel }) {
                 <>
                     <UsagePanel model={model} />
                     {model.kind === "base" ? (
-                        <BaseDetails model={model} />
+                        <>
+                            <BaseAbout model={model} />
+                            <BaseDetails model={model} />
+                        </>
                     ) : (
-                        <Details model={model} />
+                        <>
+                            <About model={model} />
+                            <Details model={model} />
+                        </>
                     )}
                 </>
             }

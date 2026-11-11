@@ -1,9 +1,6 @@
-import { Pencil } from "lucide-react";
+import { Info, Pencil, SlidersHorizontal } from "lucide-react";
 import {
     Button,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
     Input,
     Label,
     NumberField,
@@ -19,10 +16,12 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
+import { PanelSection } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { ownerOf } from "./flowActivity";
@@ -53,7 +52,6 @@ type EditKind = "description" | "tags" | "instructions" | "rule" | "safety";
 
 const SAFETY_MODELS = ["Llama Guard 3 1B", "Qwen3Guard 0.6B"];
 const NONE = "none";
-const OPEN_KEY = "flow-details-open";
 
 const SCHEMAS: Record<string, string[]> = {
     "invoice-extractor": ["vendor", "invoice_number", "issued", "due", "total"],
@@ -75,26 +73,6 @@ const EDIT_TITLES: Record<EditKind, string> = {
     rule: "Promotion rule",
     safety: "Safety model",
 };
-
-function readOpen(): boolean {
-    try {
-        return localStorage.getItem(OPEN_KEY) === "1";
-    } catch {
-        return false;
-    }
-}
-
-function writeOpen(open: boolean) {
-    try {
-        localStorage.setItem(OPEN_KEY, open ? "1" : "0");
-    } catch {
-        return;
-    }
-}
-
-function shortSafety(name: string): string {
-    return name.replace(/\s\d.*$/, "");
-}
 
 function apiNameOf(model: FlowModel): string {
     if (model.kind !== "base") {
@@ -118,17 +96,40 @@ function Mono({ value, label }: { value: string; label: string }) {
     );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({
+    label,
+    children,
+    edit,
+    wide = false,
+}: {
+    label: string;
+    children: ReactNode;
+    edit?: ReactNode;
+    wide?: boolean;
+}) {
     return (
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className={cn("group/row flex min-w-0 flex-col gap-0.5", wide && "col-span-full")}>
             <dt className="truncate text-sm text-muted-foreground">{label}</dt>
-            <dd className="flex h-6 min-w-0 items-center gap-1 tabular-nums">{children}</dd>
+            <dd className="flex h-6 min-w-0 items-center gap-1 tabular-nums">
+                {children}
+                {edit && <span className="-my-1 shrink-0">{edit}</span>}
+            </dd>
         </div>
     );
 }
 
-function Summary({ children }: { children: ReactNode }) {
-    return <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>;
+function AboutSection({ children }: { children: ReactNode }) {
+    return (
+        <PanelSection
+            icon={Info}
+            title="About"
+            description="What this model is and how to call it."
+        >
+            <div className="@container">
+                <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>
+            </div>
+        </PanelSection>
+    );
 }
 
 function EditForm({
@@ -306,7 +307,7 @@ function Group({
     children: ReactNode;
 }) {
     return (
-        <section className="grid gap-x-panel border-t px-panel py-2 @xl:grid-cols-[8rem_minmax(0,1fr)]">
+        <section className="grid gap-x-panel px-panel py-3 @xl:grid-cols-[8rem_minmax(0,1fr)]">
             <div className="flex flex-col">
                 <h3 className="text-base leading-7 font-medium">{title}</h3>
                 {caption && <p className="pb-1 text-sm text-muted-foreground">{caption}</p>}
@@ -316,47 +317,11 @@ function Group({
     );
 }
 
-function DetailsCard({
-    summary,
-    contents,
-    children,
-}: {
-    summary: ReactNode;
-    contents: string;
-    children: ReactNode;
-}) {
-    const [open, setOpen] = useState(readOpen);
-    const toggle = (next: boolean) => {
-        setOpen(next);
-        writeOpen(next);
-    };
+function DetailsSection({ description, children }: { description: string; children: ReactNode }) {
     return (
-        <section
-            aria-labelledby="details-title"
-            className="@container flex min-w-0 flex-col rounded-lg border bg-card"
-        >
-            <div className="flex flex-col gap-3 p-panel pb-4">
-                <h2 id="details-title" className="text-base leading-tight font-semibold">
-                    Details
-                </h2>
-                {summary}
-            </div>
-            <Collapsible open={open} onOpenChange={toggle}>
-                <div className="flex h-11 min-w-0 items-center gap-3 border-t px-panel">
-                    <CollapsibleTrigger>
-                        {open ? "Hide details" : "Show all details"}
-                    </CollapsibleTrigger>
-                    {!open && (
-                        <span className="min-w-0 truncate text-sm text-muted-foreground">
-                            {contents}
-                        </span>
-                    )}
-                </div>
-                <CollapsibleContent>
-                    <div className="flex flex-col pb-2">{children}</div>
-                </CollapsibleContent>
-            </Collapsible>
-        </section>
+        <PanelSection icon={SlidersHorizontal} title="Details" description={description} flush>
+            <div className="@container flex flex-col divide-y py-1">{children}</div>
+        </PanelSection>
     );
 }
 
@@ -370,14 +335,40 @@ function taskText(model: FlowModel, labels: string[]): string {
     return "Chat";
 }
 
-function CustomSummary({ model, labels }: { model: FlowModel; labels: string[] }) {
+function labelsOf(model: FlowModel, labels: string[] | undefined): string[] {
+    if (model.slug in SCHEMAS) {
+        return SCHEMAS[model.slug];
+    }
+    return model.task === "Classify" ? (labels ?? []) : [];
+}
+
+function useModelLabels(model: FlowModel): string[] {
     const state = useFlowState();
+    const data = state.datasets.find((item) => item.slug === model.dataset);
+    return labelsOf(
+        model,
+        data?.labels.map(([label]) => label),
+    );
+}
+
+function useEdit(model: FlowModel) {
+    const can = useCan("builder");
+    return (kind: EditKind) => (can ? <EditPencil model={model} kind={kind} /> : undefined);
+}
+
+export function About({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    const edit = useEdit(model);
+    const labels = useModelLabels(model);
     const data = state.datasets.find((item) => item.slug === model.dataset);
     const live = model.deployed ? liveVersion(model) : undefined;
     const gguf = /gguf/i.test(model.base ?? "");
     const replicas = model.replicas.length;
+    const ordered = newestFirst(model);
+    const oldest = ordered.at(-1);
+    const owner = ownerOf(model.slug);
     return (
-        <Summary>
+        <AboutSection>
             <Fact label="Task">
                 <Clipped text={taskText(model, labels)} href={modelHref(model.slug, "training")} />
             </Fact>
@@ -410,12 +401,7 @@ function CustomSummary({ model, labels }: { model: FlowModel; labels: string[] }
             <Fact label="Deployed">
                 {model.deployed ? (
                     <Clipped
-                        text={[
-                            `${replicas} ${replicas === 1 ? "replica" : "replicas"}`,
-                            model.safety ? shortSafety(model.safety) : null,
-                        ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                        text={`${replicas} ${replicas === 1 ? "replica" : "replicas"}`}
                         href={modelHref(model.slug, "monitoring")}
                     />
                 ) : (
@@ -425,58 +411,40 @@ function CustomSummary({ model, labels }: { model: FlowModel; labels: string[] }
             <Fact label="API name">
                 <Mono value={apiNameOf(model)} label="Copy API name" />
             </Fact>
-        </Summary>
+            <Fact label="Tags" edit={edit("tags")}>
+                {model.tags.length > 0 ? (
+                    <Clipped text={model.tags.join(", ")} />
+                ) : (
+                    <Muted>None</Muted>
+                )}
+            </Fact>
+            <Fact label="Created">
+                <Clipped text={`${owner.by} · ${oldest ? shortAgo(oldest) : "just now"}`} />
+            </Fact>
+            <Fact label="Updated">
+                <Clipped text={ordered[0] ? shortAgo(ordered[0]) : "Never"} />
+            </Fact>
+            <Fact label="Description" edit={edit("description")} wide>
+                {model.description ? <Clipped text={model.description} /> : <Muted>None</Muted>}
+            </Fact>
+        </AboutSection>
     );
-}
-
-function labelsOf(model: FlowModel, labels: string[] | undefined): string[] {
-    if (model.slug in SCHEMAS) {
-        return SCHEMAS[model.slug];
-    }
-    return model.task === "Classify" ? (labels ?? []) : [];
 }
 
 export function Details({ model }: { model: FlowModel }) {
     const state = useFlowState();
-    const can = useCan("builder");
-    const edit = (kind: EditKind) => (can ? <EditPencil model={model} kind={kind} /> : undefined);
+    const edit = useEdit(model);
+    const labels = useModelLabels(model);
     const data = state.datasets.find((item) => item.slug === model.dataset);
     const live = liveVersion(model);
-    const ordered = newestFirst(model);
-    const oldest = ordered.at(-1);
     const pending = pendingFeedback(state, model.slug).length;
     const owner = ownerOf(model.slug);
-    const labels = labelsOf(
-        model,
-        data?.labels.map(([label]) => label),
-    );
     const failed = model.versions.filter((version) => version.status === "failed").length;
     const liveSha = live ? fakeSha(`${model.slug}@${live.number}`) : null;
     const reasoning = /qwen/i.test(model.base ?? "");
     const firstLine = model.instructions.split("\n")[0];
     return (
-        <DetailsCard
-            summary={<CustomSummary model={model} labels={labels} />}
-            contents="About, task setup, data, serving, lineage, integrity"
-        >
-            <Group title="About">
-                <Row label="Description" edit={edit("description")}>
-                    {model.description ? <Clipped text={model.description} /> : <Muted>None</Muted>}
-                </Row>
-                <Row label="Tags" edit={edit("tags")}>
-                    {model.tags.length > 0 ? (
-                        <Clipped text={model.tags.join(", ")} />
-                    ) : (
-                        <Muted>None</Muted>
-                    )}
-                </Row>
-                <Row label="Created">
-                    <Clipped text={`${owner.by} · ${oldest ? shortAgo(oldest) : "just now"}`} />
-                </Row>
-                <Row label="Updated">
-                    <Clipped text={ordered[0] ? shortAgo(ordered[0]) : "Never"} />
-                </Row>
-            </Group>
+        <DetailsSection description="Task setup, data, serving, lineage and integrity.">
             <Group title="Task setup">
                 <Row label={model.task === "Extract" ? "Fields" : "Labels"}>
                     {labels.length > 0 ? (
@@ -583,15 +551,16 @@ export function Details({ model }: { model: FlowModel }) {
                     )}
                 </Row>
             </Group>
-        </DetailsCard>
+        </DetailsSection>
     );
 }
 
-function BaseSummary({ model }: { model: FlowModel }) {
+export function BaseAbout({ model }: { model: FlowModel }) {
     const entry = catalogEntry(model.slug);
     const live = model.variants.filter((item) => item.live);
+    const description = model.description || entry?.summary;
     return (
-        <Summary>
+        <AboutSection>
             <Fact label="Publisher">
                 <Clipped text={entry?.publisher ?? model.publisher} />
             </Fact>
@@ -617,7 +586,10 @@ function BaseSummary({ model }: { model: FlowModel }) {
             <Fact label="API name">
                 <Mono value={apiNameOf(model)} label="Copy API name" />
             </Fact>
-        </Summary>
+            <Fact label="Description" wide>
+                {description ? <Clipped text={description} /> : <Muted>None</Muted>}
+            </Fact>
+        </AboutSection>
     );
 }
 
@@ -630,24 +602,11 @@ export function BaseDetails({ model }: { model: FlowModel }) {
     const update = model.variants.find((item) => item.update);
     const variantsHref = modelHref(model.slug, "variants");
     return (
-        <DetailsCard
-            summary={<BaseSummary model={model} />}
-            contents="Training, serving, integrity"
+        <DetailsSection
+            description={
+                children.length > 0 ? "Serving, lineage and integrity." : "Serving and integrity."
+            }
         >
-            <Group title="Training">
-                <Row label="Method">
-                    <Clipped
-                        text={entry?.serveOnly || model.serveOnly ? "Serve-only" : "LoRA, QLoRA"}
-                    />
-                </Row>
-                <Row label="Built on it">
-                    {children.length === 0 ? (
-                        <Muted>No custom models yet</Muted>
-                    ) : (
-                        <Clipped text={children.map((child) => child.name).join(", ")} />
-                    )}
-                </Row>
-            </Group>
             <Group title="Serving">
                 <Row label="Variants">
                     <Clipped
@@ -668,6 +627,11 @@ export function BaseDetails({ model }: { model: FlowModel }) {
                 <Row label="cpu-pool">
                     <Muted>Serves GGUF slowly; cannot train</Muted>
                 </Row>
+                <Row label="Training">
+                    <Clipped
+                        text={entry?.serveOnly || model.serveOnly ? "Serve-only" : "LoRA, QLoRA"}
+                    />
+                </Row>
                 <Row label="Updates">
                     {update ? (
                         <Clipped text={`${update.format} update available`} href={variantsHref} />
@@ -676,11 +640,18 @@ export function BaseDetails({ model }: { model: FlowModel }) {
                     )}
                 </Row>
             </Group>
+            {children.length > 0 && (
+                <Group title="Lineage">
+                    <Row label="Built on it">
+                        <Clipped text={children.map((child) => child.name).join(", ")} />
+                    </Row>
+                </Group>
+            )}
             <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
                 <Row label="Weights">
                     <Mono value={fakeSha(model.slug)} label="Copy weights SHA-256" />
                 </Row>
             </Group>
-        </DetailsCard>
+        </DetailsSection>
     );
 }

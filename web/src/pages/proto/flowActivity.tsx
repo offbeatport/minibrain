@@ -1,3 +1,4 @@
+import { History } from "lucide-react";
 import {
     Link,
     Table,
@@ -11,7 +12,7 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { PageHeader } from "~/components/PageHeader";
-import { Page } from "~/components/Section";
+import { Page, PanelSection } from "~/components/Section";
 import { useSearchParam } from "~/lib/listSearch";
 import { TwoLines } from "./flowClipped";
 import { pointersOf } from "./flowUsage";
@@ -551,27 +552,23 @@ export function ActivityPanel({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const events = collapseBursts(activityOf(state, model)).slice(0, 7);
     return (
-        <section
-            aria-labelledby="activity-title"
-            className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-panel"
-        >
-            <h2 id="activity-title" className="text-base leading-tight font-semibold">
-                Activity
-            </h2>
-            {events.length === 0 ? (
-                <p className="text-muted-foreground">
-                    Nothing yet. Training, deploys and keys show here.
-                </p>
-            ) : (
-                <Timeline events={events} />
-            )}
-            <Link
-                href={activityHref(model.slug)}
-                className="self-start text-primary hover:underline"
-            >
-                All activity →
-            </Link>
-        </section>
+        <PanelSection icon={History} title="Activity" description="Recent changes to this model.">
+            <div className="flex min-w-0 flex-col gap-3">
+                {events.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        Nothing yet. Training, deploys and keys show here.
+                    </p>
+                ) : (
+                    <Timeline events={events} />
+                )}
+                <Link
+                    href={activityHref(model.slug)}
+                    className="self-start text-primary hover:underline"
+                >
+                    All activity →
+                </Link>
+            </div>
+        </PanelSection>
     );
 }
 

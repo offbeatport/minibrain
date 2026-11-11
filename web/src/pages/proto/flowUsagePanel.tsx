@@ -1,5 +1,7 @@
+import { ChartLine } from "lucide-react";
 import { SegmentedTabs } from "obp-ui";
 import { useState } from "react";
+import { PanelSection } from "~/components/Section";
 import { StepChart } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
@@ -75,61 +77,68 @@ export function UsagePanel({ model }: { model: FlowModel }) {
     const daily = usage.bucketHours >= 24;
     const replicas = model.replicas.length;
     return (
-        <section
-            aria-label={`${model.name} usage`}
-            className="flex min-w-0 flex-col gap-4 rounded-lg border bg-card p-panel"
+        <PanelSection
+            icon={ChartLine}
+            title="Usage"
+            description={
+                model.kind === "base"
+                    ? "Requests to its deployed variants, by format."
+                    : "Requests to the live model, by version."
+            }
         >
-            <StatusLine model={model} />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <SegmentedTabs
-                    tabs={METRICS}
-                    active={metric}
-                    onSelect={(key) => setMetric(key as UsageMetric)}
-                />
-                <SegmentedTabs
-                    tabs={RANGES}
-                    active={range}
-                    onSelect={(key) => setRange(key as UsageRange)}
-                />
-            </div>
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-                <p className="flex items-baseline gap-2">
-                    <span className="text-xl tabular-nums">{headline(metric, usage)}</span>
-                    <span className="text-sm text-muted-foreground">{SPAN[range]}</span>
+            <div className="flex min-w-0 flex-col gap-4">
+                <StatusLine model={model} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <SegmentedTabs
+                        tabs={METRICS}
+                        active={metric}
+                        onSelect={(key) => setMetric(key as UsageMetric)}
+                    />
+                    <SegmentedTabs
+                        tabs={RANGES}
+                        active={range}
+                        onSelect={(key) => setRange(key as UsageRange)}
+                    />
+                </div>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+                    <p className="flex items-baseline gap-2">
+                        <span className="text-xl tabular-nums">{headline(metric, usage)}</span>
+                        <span className="text-sm text-muted-foreground">{SPAN[range]}</span>
+                    </p>
+                    <ChartLegend series={usage.series} />
+                </div>
+                <div className="relative">
+                    <StepChart
+                        rows={usage.rows}
+                        series={usage.series}
+                        format={format}
+                        label={`${METRICS.find((item) => item.key === metric)?.label} for ${model.name} ${SPAN[range]}${model.kind === "base" ? "" : ", by version"}`}
+                        height={200}
+                        markers={usage.markers}
+                        connectNulls={false}
+                        yDomain={empty ? [0, 100] : undefined}
+                        xFormat={(value) => (range === "24h" ? HOUR : DAY).format(new Date(value))}
+                        readoutTitle={(value) =>
+                            daily
+                                ? WEEKDAY.format(new Date(value - usage.bucketHours * 3600 * 1000))
+                                : `${DAY_HOUR.format(new Date(value - usage.bucketHours * 3600 * 1000))} – ${HOUR.format(new Date(value))}`
+                        }
+                    />
+                    {empty && (
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 pb-6 pl-14 text-center">
+                            <p className="bg-card px-2 font-medium">No requests yet</p>
+                            {!model.deployed && (
+                                <p className="bg-card px-2 text-sm text-muted-foreground">
+                                    Deploy to start receiving requests
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <p className="text-sm text-muted-foreground tabular-nums">
+                    {`${empty ? "No traffic" : `p95 ${count(usage.p95)} ms · ${(usage.errors * 100).toFixed(1)}% errors`} · ${replicas} ${replicas === 1 ? "replica" : "replicas"}${replicas > 0 ? ` on ${model.replicas.join(", ")}` : ""}`}
                 </p>
-                <ChartLegend series={usage.series} />
             </div>
-            <div className="relative">
-                <StepChart
-                    rows={usage.rows}
-                    series={usage.series}
-                    format={format}
-                    label={`${METRICS.find((item) => item.key === metric)?.label} for ${model.name} ${SPAN[range]}${model.kind === "base" ? "" : ", by version"}`}
-                    height={200}
-                    markers={usage.markers}
-                    connectNulls={false}
-                    yDomain={empty ? [0, 100] : undefined}
-                    xFormat={(value) => (range === "24h" ? HOUR : DAY).format(new Date(value))}
-                    readoutTitle={(value) =>
-                        daily
-                            ? WEEKDAY.format(new Date(value - usage.bucketHours * 3600 * 1000))
-                            : `${DAY_HOUR.format(new Date(value - usage.bucketHours * 3600 * 1000))} – ${HOUR.format(new Date(value))}`
-                    }
-                />
-                {empty && (
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 pb-6 pl-14 text-center">
-                        <p className="bg-card px-2 font-medium">No requests yet</p>
-                        {!model.deployed && (
-                            <p className="bg-card px-2 text-sm text-muted-foreground">
-                                Deploy to start receiving requests
-                            </p>
-                        )}
-                    </div>
-                )}
-            </div>
-            <p className="text-sm text-muted-foreground tabular-nums">
-                {`${empty ? "No traffic" : `p95 ${count(usage.p95)} ms · ${(usage.errors * 100).toFixed(1)}% errors`} · ${replicas} ${replicas === 1 ? "replica" : "replicas"}${replicas > 0 ? ` on ${model.replicas.join(", ")}` : ""}`}
-            </p>
-        </section>
+        </PanelSection>
     );
 }
