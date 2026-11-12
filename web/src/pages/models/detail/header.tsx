@@ -124,7 +124,9 @@ export function CompactHeader({
                         </div>
                     )}
                 </div>
-                {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
+                {subtitle && (
+                    <div className="flex flex-col gap-0.5 text-muted-foreground">{subtitle}</div>
+                )}
             </div>
             {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </header>
@@ -201,6 +203,7 @@ export function ModelHeader({
 }) {
     const status = DEPLOYMENT[row.deployment.state];
     const live = liveText(row);
+    const description = subtitleOf(row, base);
     return (
         <CompactHeader
             icon={<ModelAvatar row={row} size="lg" />}
@@ -213,7 +216,17 @@ export function ModelHeader({
                 ) : null,
                 live ? <span key="live">{live}</span> : null,
             ]}
-            subtitle={subtitleOf(row, base)}
+            subtitle={
+                <>
+                    <span className="flex items-center gap-1">
+                        <span className="font-mono text-sm text-foreground">{row.key}</span>
+                        <span className="-my-1">
+                            <CopyButton value={row.key} label="Copy API name" />
+                        </span>
+                    </span>
+                    {description && <span>{description}</span>}
+                </>
+            }
             actions={<HeaderActions row={row} detail={detail} base={base} />}
         />
     );
