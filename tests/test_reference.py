@@ -21,7 +21,7 @@ def test_the_gateway_reference_covers_v1_from_its_base_url(harness: Harness) -> 
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "mb_...",
-        "description": "A minibrain API key, created on Deployments. It covers one or more models.",
+        "description": "A minibrain API key, created on the API keys page. It covers one or more models, or all models.",
     }
     operations = [operation for item in document["paths"].values() for operation in item.values()]
     assert all(operation["security"] == [{"apiKey": []}] for operation in operations)

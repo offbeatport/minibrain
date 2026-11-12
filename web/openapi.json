@@ -31621,7 +31621,7 @@
     "securitySchemes": {
       "apiKey": {
         "type": "http",
-        "description": "A minibrain API key, created on Deployments. It covers one or more models.",
+        "description": "A minibrain API key, created on the API keys page. It covers one or more models, or all models.",
         "scheme": "bearer",
         "bearerFormat": "mb_..."
       }

@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from httpx import Response
+from httpx2 import Response
 
 from minibrain.auth.roles import Role
 from minibrain.registry.models import ApiKey, AuditEvent
