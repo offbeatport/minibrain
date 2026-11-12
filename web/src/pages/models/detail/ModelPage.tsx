@@ -256,9 +256,7 @@ function Loaded({ row }: { row: ModelRow }) {
                 {(tab === "overview" || tab === "files") && (
                     <Overview row={row} detail={modelDetail} base={base.data} versions={list} />
                 )}
-                {tab === "versions" && (
-                    <VersionsTab row={row} detail={modelDetail} versions={list} />
-                )}
+                {tab === "versions" && <VersionsTab row={row} versions={list} />}
                 {tab === "training" && (
                     <TrainingTab row={row} detail={modelDetail} versions={list} />
                 )}

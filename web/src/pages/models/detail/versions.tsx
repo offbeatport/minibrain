@@ -18,7 +18,7 @@ import {
     useToast,
 } from "obp-ui";
 import { useState } from "react";
-import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
+import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -26,8 +26,6 @@ import { percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
 import { jobHref, modelCompareHref, modelVersionHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
-import { InstructionsSection } from "../InstructionsSection";
-import { JudgedSection } from "../JudgedSection";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed } from "./header";
 import {
@@ -403,20 +401,10 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     );
 }
 
-export function VersionsTab({
-    row,
-    detail,
-    versions,
-}: {
-    row: ModelRow;
-    detail: ModelDetail | undefined;
-    versions: VersionInfo[];
-}) {
+export function VersionsTab({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
     return (
         <PanelSections>
             <VersionsTable row={row} versions={versions} />
-            {detail && <InstructionsSection detail={detail} />}
-            {detail && <JudgedSection detail={detail} />}
         </PanelSections>
     );
 }

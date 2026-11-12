@@ -194,7 +194,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Training, Jobs, Monitoring › Requests, Monitoring › Overview, Jobs › job
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
-  UI: Models › model › Versions › How it's judged › Answers, Evaluations › version · API: GET /api/presets
+  UI: Models › model › Training › How it's judged › Answers, Evaluations › version · API: GET /api/presets
 - **Label proposal** · shipped · product, ml
   Offer to restrict a chat assistant to labels found in its data.
   UI: Models › model · API: PUT /api/models/{slug}/label-proposal/dismissal, PUT /api/models/{slug}/contract
@@ -212,16 +212,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › model › Versions › How it's judged › Answers · API: PUT /api/models/{slug}/graders
+  UI: Models › model › Training › How it's judged › Answers · API: PUT /api/models/{slug}/graders
 - **Instructions** · shipped · product, ml
   Write the system prompt; a prompt-only version tries it at once.
-  UI: Models › model › Versions › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
+  UI: Models › model › Training › Instructions · API: PUT /api/models/{slug}/instructions, POST /api/models/{slug}/versions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  UI: Models › model › Versions › How it's judged
+  UI: Models › model › Training › How it's judged
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema; breaking changes confirmed once live.
-  UI: Models › model › Versions › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
+  UI: Models › model › Training › How it's judged · API: POST /api/models/{slug}/contract/check, PUT /api/models/{slug}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -309,13 +309,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Eval and promote
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
-  UI: Models › model › Versions › How it's judged, Evaluations › version · Roadmap: Task types
+  UI: Models › model › Training › How it's judged, Evaluations › version · Roadmap: Task types
 - **Judge model** · shipped · ml, admin
   Pick the base that judges free-text answers, per install or model.
   UI: Settings › General › Judge model, Models › model › How it's judged · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{slug}/judge
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › Versions › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › Training › How it's judged, Evaluations › Deploy · API: PUT /api/models/{slug}/promotion, POST /api/models/{slug}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · shipped · product, ml
   Compare two versions' scores, settings and held-out answers.
   UI: Models › model › Versions › Compare · API: GET /api/models/{slug}/versions/{number}/answers

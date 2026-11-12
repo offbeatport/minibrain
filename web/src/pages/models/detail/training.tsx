@@ -42,6 +42,8 @@ import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { TrainingData as DatasetChoice } from "../../data/TrainingData";
 import { ModelDataNotice } from "../../data/versionData";
+import { InstructionsSection } from "../InstructionsSection";
+import { JudgedSection } from "../JudgedSection";
 import { Tip, isDeployed, nextVersion, trainBlock } from "./header";
 import { liveOf, versionLabel } from "./makeLive";
 import { TrainDialog } from "./train/TrainDialog";
@@ -616,6 +618,8 @@ export function TrainingTab({
                 }
             />
             {detail && <DataSection row={row} detail={detail} />}
+            {detail && <InstructionsSection detail={detail} />}
+            {detail && <JudgedSection detail={detail} />}
             <PanelSection
                 icon={ThumbsUp}
                 title="Feedback"
