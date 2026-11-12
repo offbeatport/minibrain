@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { type AvatarChoice, choiceFor } from "./avatarDicebear";
+import { type AvatarChoice, choiceFor } from "~/components/avatar/avatarSvg";
 
 export type VersionKind = "trained" | "prompt";
 export type VersionStatus = "ready" | "training" | "failed";

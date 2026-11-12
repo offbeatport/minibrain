@@ -17,6 +17,7 @@ SETTINGS = (
     "judge_model",
     "safety",
     "labels_dismissed",
+    "avatar",
 )
 
 

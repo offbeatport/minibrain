@@ -1,6 +1,12 @@
-import { avatarSvg } from "./avatarDicebear";
-import { type AvatarStyle, type ContrastPair, type Palette, contrast, hexOf } from "./avatarStyles";
-import { TONE_KEYS, type ToneName } from "./modelIcons";
+import {
+    type AvatarStyle,
+    type ContrastPair,
+    type Palette,
+    contrast,
+    hexOf,
+} from "~/components/avatar/avatarStyles";
+import { avatarSvg, loadDicebear } from "~/components/avatar/avatarSvg";
+import { TONE_KEYS, type ToneName } from "~/components/avatar/tones";
 
 export const RENDER_SIZES = [176, 20] as const;
 
@@ -87,11 +93,18 @@ export async function measureRendered(
         },
     }));
     const seeds = style.seeded ? SEEDS : ["initials"];
+    const renderer = await loadDicebear();
     for (const tone of TONE_KEYS) {
         const pairs = pairsFor(tone);
         for (const seed of seeds) {
             for (const size of RENDER_SIZES) {
-                const svg = avatarSvg({ style: style.id, seed, tone }, SAMPLE_NAME, palette, size);
+                const svg = avatarSvg(
+                    { style: style.id, seed, tone },
+                    SAMPLE_NAME,
+                    palette,
+                    size,
+                    renderer,
+                );
                 const markup = svg.toLowerCase();
                 const pixels = await rasterise(svg, artSize(size), palette.background);
                 pairs.forEach((pair, index) => {

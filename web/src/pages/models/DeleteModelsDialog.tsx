@@ -131,7 +131,7 @@ export function DeleteList({ items }: { items: DeleteItem[] }) {
         <ul className="flex max-h-64 flex-col divide-y overflow-y-auto rounded-lg border">
             {items.map((item) => (
                 <li key={item.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <PublisherLogo publisher={item.publisher} name={item.name} />
+                    <PublisherLogo publisher={item.publisher} name={item.name} modelKey={item.id} />
                     <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate font-medium">{item.name}</span>
                         <span className="truncate text-sm text-muted-foreground">

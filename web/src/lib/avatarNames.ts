@@ -426,13 +426,12 @@ function randomPair(): string {
     return adjective === noun ? randomPair() : `${adjective} ${noun}`;
 }
 
-const ATTEMPTS = 40;
+const ATTEMPTS = 200;
 
-export function generateName(taken: Iterable<string> = []): string {
-    const used = new Set(Array.from(taken, (name) => name.trim().toLowerCase()));
+export function generateName(taken: (name: string) => boolean = () => false): string {
     for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
         const name = randomPair();
-        if (!used.has(name.toLowerCase())) {
+        if (!taken(name)) {
             return name;
         }
     }

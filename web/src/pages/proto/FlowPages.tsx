@@ -20,10 +20,10 @@ import { type FormEvent, useEffect, useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { Page, Section, Stat } from "~/components/Section";
+import { type Identity, NameAvatarField, newIdentity } from "~/components/avatar/NameAvatarField";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
-import { type Identity, NameAvatarField, newIdentity } from "./NameAvatarField";
 import { useCan } from "./flowOverlays";
 import {
     CATALOG,
@@ -401,7 +401,8 @@ export function FlowAddModelPage() {
     const initial = catalogEntry(useSearchParam("base"))?.id ?? CATALOG[0].id;
     const [base, setBase] = useState(initial);
     const state = useFlowState();
-    const taken = state.models.map((model) => model.name);
+    const names = new Set(state.models.map((model) => model.name.toLowerCase()));
+    const taken = (name: string) => names.has(name.toLowerCase());
     const [identity, setIdentity] = useState<Identity>(() => newIdentity(taken));
     const installed = CATALOG.filter((entry) => isInstalled(state, entry.id));
     const shown =

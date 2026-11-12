@@ -51,6 +51,8 @@ export function ModelAvatar({ model, size = "md" }: { model: ListModel; size?: "
             publisher={model.kind === "base" ? model.row.publisher : null}
             name={model.name}
             size={size}
+            custom={model.kind === "custom"}
+            avatar={model.row.avatar}
         />
     );
 }

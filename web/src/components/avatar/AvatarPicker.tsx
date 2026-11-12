@@ -21,7 +21,7 @@ import {
     RecentStrip,
     StylePicker,
 } from "./AvatarPickerParts";
-import { type AvatarChoice, AvatarTile, defaultLetters, sameChoice } from "./avatarDicebear";
+import { AvatarTile } from "./AvatarTile";
 import {
     CUSTOM_LETTERS,
     GRID_SIZE,
@@ -41,6 +41,7 @@ import {
     withLetters,
 } from "./avatarSession";
 import { styleById } from "./avatarStyles";
+import { type AvatarChoice, defaultLetters, sameChoice } from "./avatarSvg";
 
 export function isTyping(target: EventTarget | null): boolean {
     return (
@@ -83,6 +84,14 @@ export function PickerDialog({
 }) {
     const [session, setSession] = useState(() => startSession(value));
     const [peek, setPeek] = useState<AvatarChoice | null>(null);
+    const [shownOpen, setShownOpen] = useState(open);
+    if (open !== shownOpen) {
+        setShownOpen(open);
+        if (open) {
+            setSession(startSession(value));
+            setPeek(null);
+        }
+    }
     const displayName = name.trim() || "Untitled model";
     const style = styleById(session.style);
     const draft = draftOf(session);
@@ -113,16 +122,7 @@ export function PickerDialog({
         }
     };
     return (
-        <Dialog
-            open={open}
-            onOpenChange={(next) => {
-                if (next) {
-                    setSession(startSession(value));
-                    setPeek(null);
-                }
-                onOpenChange(next);
-            }}
-        >
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-5xl" onKeyDown={onKeyDown}>
                 <DialogHeader>
                     <DialogTitle>Choose an avatar</DialogTitle>

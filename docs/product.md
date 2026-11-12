@@ -174,6 +174,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Duplicate models** · shipped · product, ml
   Copy a custom model's settings, data and live version, sharing its files.
   UI: Models › Duplicate, Models › model › Duplicate · API: POST /api/models/{slug}/duplicate
+- **Model avatars** · shipped · product
+  Give each custom model a generated name and an avatar.
+  UI: Models › Add model, Models › model › Change avatar · API: POST /api/models, PUT /api/models/{slug}/avatar
 - **Serve-only bases** · shipped · product, ml
   Build on GGUF, AWQ or FP8 bases; Train explains why not.
   UI: Models › Add model, Models › model, Models · API: GET /api/all-models, GET /api/model-pages/{name}
@@ -227,9 +230,6 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: v2
 - **GGUF and adapter imports** · planned · ml
   Import GGUF models and standalone LoRA adapters.
-  Roadmap: v2
-- **Custom model logos** · planned · product
-  Upload a small PNG, JPEG or WebP logo per model.
   Roadmap: v2
 
 ## Training

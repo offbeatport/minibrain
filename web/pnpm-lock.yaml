@@ -10,6 +10,12 @@ importers:
 
   .:
     dependencies:
+      '@dicebear/core':
+        specifier: 10.7.0
+        version: 10.7.0
+      '@dicebear/styles':
+        specifier: 10.6.0
+        version: 10.6.0
       '@scalar/api-reference-react':
         specifier: 0.9.82
         version: 0.9.82(change-case@5.4.4)(react@19.3.1)(tailwindcss@4.3.3)(typescript@5.9.3)(zod@4.6.7)
@@ -47,12 +53,6 @@ importers:
       '@biomejs/biome':
         specifier: ^1.9.4
         version: 1.9.4
-      '@dicebear/core':
-        specifier: 10.7.0
-        version: 10.7.0
-      '@dicebear/styles':
-        specifier: 10.6.0
-        version: 10.6.0
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.3.3(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.1))

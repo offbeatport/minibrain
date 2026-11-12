@@ -1,25 +1,22 @@
 import { Dices, Lock } from "lucide-react";
 import { Button, Input, Kbd, Label, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { generateName } from "~/lib/avatarNames";
 import { PickerDialog, isTyping } from "./AvatarPicker";
+import { AvatarTile } from "./AvatarTile";
 import "./avatarPicker.css";
-import {
-    type AvatarChoice,
-    AvatarTile,
-    randomTone,
-    rerollChoice,
-    sameChoice,
-} from "./avatarDicebear";
-import { generateName } from "./avatarNames";
+import { type AvatarChoice, TWO_LETTERS, randomTone, rerollChoice, sameChoice } from "./avatarSvg";
 
 export type Identity = { name: string; avatar: AvatarChoice };
 
+export type NameTaken = (name: string) => boolean;
+
 type Locks = { name: string | null; avatar: AvatarChoice | null };
 
-export function newIdentity(taken: string[]): Identity {
+export function newIdentity(taken: NameTaken): Identity {
     return {
         name: generateName(taken),
-        avatar: { style: "initials", seed: "initials", tone: randomTone() },
+        avatar: { style: "initials", seed: TWO_LETTERS, tone: randomTone() },
     };
 }
 
@@ -66,12 +63,14 @@ export function NameAvatarField({
     value,
     onChange,
     taken,
+    error,
     children,
 }: {
     id: string;
     value: Identity;
     onChange: (next: Identity) => void;
-    taken: string[];
+    taken: NameTaken;
+    error?: string;
     children?: ReactNode;
 }) {
     const [locks, setLocks] = useState<Locks>({ name: null, avatar: null });
@@ -82,12 +81,16 @@ export function NameAvatarField({
     const latest = useRef({ value, locks, taken, onChange });
     latest.current = { value, locks, taken, onChange };
     const shuffle = () => {
-        const { value: current, locks: held, taken: names, onChange: emit } = latest.current;
+        const { value: current, locks: held, taken: isTaken, onChange: emit } = latest.current;
         if (held.name !== null && held.avatar !== null) {
             return;
         }
+        const previous = current.name.trim().toLowerCase();
         emit({
-            name: held.name !== null ? current.name : generateName([...names, current.name]),
+            name:
+                held.name !== null
+                    ? current.name
+                    : generateName((name) => isTaken(name) || name.toLowerCase() === previous),
             avatar: held.avatar !== null ? current.avatar : rerollChoice(current.avatar),
         });
         setDealt((count) => count + 1);
@@ -166,9 +169,11 @@ export function NameAvatarField({
                     <Input
                         key={`name-${dealt}`}
                         id={id}
+                        required
                         value={value.name}
                         autoComplete="off"
                         spellCheck={false}
+                        aria-invalid={Boolean(error)}
                         onChange={(event) => rename(event.target.value)}
                         className={cn("avatar-fade", locks.name !== null && "pr-8")}
                     />
@@ -212,6 +217,7 @@ export function NameAvatarField({
                     <LockNote what="Avatar" previous="the last one" onUndo={undoAvatar} />
                 )}
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             {children}
             <PickerDialog
                 open={picking}

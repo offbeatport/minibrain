@@ -2,12 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, X } from "lucide-react";
 import { Button, Card, CubePlus, Field, InfoTip, Input, Link, Textarea, useToast } from "obp-ui";
-import { type FormEvent, type KeyboardEvent, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { type CatalogEntry, type ModelRow, api, unwrap } from "~/api/client";
-import { useAllModels, useCatalog, usePresets } from "~/api/queries";
+import { useAllModels, useCatalog } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, errorMessage } from "~/components/Section";
 import { TagsHelp } from "~/components/Tags";
+import { type Identity, NameAvatarField, newIdentity } from "~/components/avatar/NameAvatarField";
+import { avatarBody } from "~/components/avatar/avatarSvg";
+import { generateName } from "~/lib/avatarNames";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { AddModelSummary, Licence } from "./AddModelSummary";
@@ -23,7 +26,7 @@ import {
     servesOnly,
 } from "./baseOptions";
 import { splitTags, useModelsRefresh } from "./dialogs";
-import { isTaken, nextFree, takenNames } from "./names";
+import { isTaken, takenNames } from "./names";
 
 type Problems = {
     model?: string;
@@ -40,7 +43,6 @@ const PROBLEM_TARGETS: Record<keyof Problems, string> = {
 };
 
 const STARTING_PRESET = "general";
-const STARTING_NOUN = "Assistant";
 
 function Optional({ label }: { label: string }) {
     return (
@@ -96,14 +98,11 @@ export function AddModelPage() {
     const params = useRouterState({ select: (state) => state.location.search as Search });
     const models = useAllModels();
     const catalog = useCatalog();
-    const starting = usePresets().data?.presets.find((item) => item.key === STARTING_PRESET);
-    const [nameEdited, setNameEdited] = useState(false);
     const [picked, setPicked] = useState<Picked | null>(() => initialPick(params));
     const [accepted, setAccepted] = useState(false);
     const [checked, setChecked] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
     const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "imports" : "catalogue");
-    const [typedName, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
     const [dataset] = useState(params.dataset === undefined ? "" : String(params.dataset));
@@ -143,8 +142,19 @@ export function AddModelPage() {
         choose({ kind: "import", text: found.text, connection: found.connection });
     };
     const taken = takenNames(rows);
-    const suggestedName = nextFree(starting?.noun ?? STARTING_NOUN, taken);
-    const name = nameEdited ? typedName : suggestedName;
+    const nameTaken = (candidate: string) => isTaken(candidate, taken);
+    const [identity, setIdentity] = useState<Identity>(() => newIdentity(nameTaken));
+    const firstName = useRef(identity.name);
+    const loaded = models.isSuccess;
+    useEffect(() => {
+        if (loaded && identity.name === firstName.current && isTaken(identity.name, taken)) {
+            const fresh = generateName((candidate) => isTaken(candidate, taken));
+            firstName.current = fresh;
+            setIdentity((current) => ({ ...current, name: fresh }));
+        }
+    }, [loaded, identity.name, taken]);
+    const name = identity.name;
+    const nameTouched = name !== firstName.current;
     const add = useMutation({
         mutationFn: async () => {
             const baseModel =
@@ -158,6 +168,7 @@ export function AddModelPage() {
                         base_model: baseModel || null,
                         preset: STARTING_PRESET,
                         dataset: dataset || null,
+                        avatar: avatarBody(identity.avatar),
                     },
                 }),
             );
@@ -282,22 +293,15 @@ export function AddModelPage() {
                         <ErrorLine error={catalog.error} />
                         <BaseSummary option={option} plan={plan} />
                     </div>
-                    <Field
+                    <NameAvatarField
                         id="create-name"
-                        label="Name"
-                        error={problems.name && (checked || nameEdited) ? problems.name : undefined}
-                    >
-                        <Input
-                            id="create-name"
-                            required
-                            aria-invalid={Boolean(problems.name && (checked || nameEdited))}
-                            value={name}
-                            onChange={(event) => {
-                                setNameEdited(true);
-                                setName(event.target.value);
-                            }}
-                        />
-                    </Field>
+                        value={identity}
+                        onChange={setIdentity}
+                        taken={nameTaken}
+                        error={
+                            problems.name && (checked || nameTouched) ? problems.name : undefined
+                        }
+                    />
                     <Field id="create-description" label={<Optional label="Description" />}>
                         <Textarea
                             id="create-description"

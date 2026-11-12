@@ -246,6 +246,23 @@ export interface paths {
         patch: operations["update_api_models__slug__patch"];
         trace?: never;
     };
+    "/api/models/{slug}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Avatar */
+        put: operations["change_avatar_api_models__slug__avatar_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{slug}/deploy": {
         parameters: {
             query?: never;
@@ -3482,6 +3499,7 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
             /** Description */
             description: string;
             /** Tags */
@@ -6829,6 +6847,27 @@ export interface components {
              */
             tone: "neutral" | "success" | "failed";
         };
+        /** ModelAvatar */
+        ModelAvatar: {
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "initials" | "planets" | "voxel-bot" | "pixelbot";
+            /** Seed */
+            seed: string;
+            /**
+             * Tone
+             * @description One of the ten file tones, drawn in the current theme.
+             * @enum {string}
+             */
+            tone: "csv" | "tsv" | "json" | "jsonl" | "parquet" | "avro" | "iceberg" | "delta" | "sql" | "text";
+            /**
+             * Letters
+             * @description Initials only.
+             */
+            letters?: string | null;
+        };
         /** ModelCard */
         ModelCard: {
             /**
@@ -6901,6 +6940,7 @@ export interface components {
             promotion?: components["schemas"]["PromotionInfo"] | null;
             /** Dataset */
             dataset?: string | null;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
         };
         /** ModelDetail */
         ModelDetail: {
@@ -6927,6 +6967,7 @@ export interface components {
             versions: number;
             /** Active Jobs */
             active_jobs: number;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
             source: components["schemas"]["SourceInfo"] | null;
             mapping: components["schemas"]["MappingInfo"];
             /** Dataset */
@@ -7021,6 +7062,7 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
             /** @description Requests per day, p95 latency and error rate over the last 7 days. */
             traffic: components["schemas"]["ModelTraffic"];
             /** @description The one step the model page suggests, or none while busy. */
@@ -7056,6 +7098,7 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
             /** Description */
             description: string;
             /** Tags */
@@ -7209,6 +7252,7 @@ export interface components {
             versions: number;
             /** Active Jobs */
             active_jobs: number;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
         };
         /** ModelTraffic */
         ModelTraffic: {
@@ -8219,6 +8263,7 @@ export interface components {
             versions: number;
             /** Active Jobs */
             active_jobs: number;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
             source: components["schemas"]["SourceInfo"] | null;
             mapping: components["schemas"]["MappingInfo"];
             /** Dataset */
@@ -10035,6 +10080,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ModelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_avatar_api_models__slug__avatar_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelAvatar"];
             };
         };
         responses: {

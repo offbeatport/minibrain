@@ -16,6 +16,7 @@ import { useState } from "react";
 import { type ModelRow, api, unwrap } from "~/api/client";
 import { useAllModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
+import { ModelAvatar } from "~/components/avatar/ModelAvatar";
 import { modelPageHref } from "~/lib/modelLinks";
 import { useModelsRefresh } from "./dialogs";
 import { isTaken, nextFree, takenNames } from "./names";
@@ -33,7 +34,7 @@ function copiedVersion(row: ModelRow): number | null {
 function whatCopies(row: ModelRow): string {
     const version = copiedVersion(row);
     const settings =
-        "Same base, answers, instructions, graders, promotion rule, training data, description and tags.";
+        "Same base, avatar, answers, instructions, graders, promotion rule, training data, description and tags.";
     return version === null
         ? `${settings} It has no ready version to copy, so the copy starts at v0. Nothing is deployed.`
         : `${settings} Its v${version} becomes the copy's v1 with its scores, sharing the same stored files. Nothing is deployed.`;
@@ -99,15 +100,18 @@ export function DuplicateModelDialog({
                         <DialogDescription>{row ? whatCopies(row) : null}</DialogDescription>
                     </DialogHeader>
                     <Field id="duplicate-name" label="Name" error={problem ?? undefined}>
-                        <Input
-                            id="duplicate-name"
-                            autoFocus
-                            aria-invalid={Boolean(problem)}
-                            value={name}
-                            onChange={(event) =>
-                                row && setTyped({ key: row.key, value: event.target.value })
-                            }
-                        />
+                        <div className="flex items-center gap-2">
+                            {row && <ModelAvatar name={row.name} avatar={row.avatar} />}
+                            <Input
+                                id="duplicate-name"
+                                autoFocus
+                                aria-invalid={Boolean(problem)}
+                                value={name}
+                                onChange={(event) =>
+                                    row && setTyped({ key: row.key, value: event.target.value })
+                                }
+                            />
+                        </div>
                     </Field>
                     <ErrorLine error={duplicate.error} />
                     <DialogFooter>

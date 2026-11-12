@@ -1,15 +1,14 @@
+import { AVATAR_STYLES, type AvatarStyleId, styleById } from "./avatarStyles";
 import {
     type AvatarChoice,
     ONE_LETTER,
-    TONE_LABELS,
     TWO_LETTERS,
     lettersOf,
     randomSeeds,
     randomTone,
     sameChoice,
-} from "./avatarDicebear";
-import { AVATAR_STYLES, type AvatarStyleId, styleById } from "./avatarStyles";
-import type { ToneName } from "./modelIcons";
+} from "./avatarSvg";
+import { TONE_LABELS, type ToneName } from "./tones";
 
 export const GRID_SIZE = 12;
 export const RECENT_LIMIT = 6;

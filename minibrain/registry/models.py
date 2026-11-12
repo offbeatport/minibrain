@@ -223,6 +223,7 @@ class Model(Base):
     labels_dismissed: Mapped[list[int] | None] = mapped_column(JSON, default=None)
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     deployed_base: Mapped[str | None] = mapped_column(default=None)
+    avatar: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")

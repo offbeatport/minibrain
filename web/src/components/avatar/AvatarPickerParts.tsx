@@ -1,10 +1,11 @@
 import { Check } from "lucide-react";
 import { Badge, Input, Label, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
-import { type AvatarChoice, AvatarTile, TONE_LABELS, sameChoice } from "./avatarDicebear";
+import { AvatarTile } from "./AvatarTile";
 import { RECENT_LIMIT, describe } from "./avatarSession";
 import { AVATAR_STYLES, type AvatarStyleId } from "./avatarStyles";
-import { TONE_KEYS, type ToneName, toneToken } from "./modelIcons";
+import { type AvatarChoice, sameChoice } from "./avatarSvg";
+import { TONE_KEYS, TONE_LABELS, type ToneName, toneToken } from "./tones";
 
 const LETTERS_LIMIT = 2;
 const TIP_DELAY = 350;

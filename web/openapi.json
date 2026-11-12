@@ -730,6 +730,58 @@
         }
       }
     },
+    "/api/models/{slug}/avatar": {
+      "put": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Change Avatar",
+        "operationId": "change_avatar_api_models__slug__avatar_put",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelAvatar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{slug}/deploy": {
       "post": {
         "tags": [
@@ -11858,6 +11910,16 @@
             "type": "string",
             "title": "Name"
           },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -22263,6 +22325,65 @@
         ],
         "title": "ModelActivityEvent"
       },
+      "ModelAvatar": {
+        "properties": {
+          "style": {
+            "type": "string",
+            "enum": [
+              "initials",
+              "planets",
+              "voxel-bot",
+              "pixelbot"
+            ],
+            "title": "Style"
+          },
+          "seed": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Seed"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "tsv",
+              "json",
+              "jsonl",
+              "parquet",
+              "avro",
+              "iceberg",
+              "delta",
+              "sql",
+              "text"
+            ],
+            "title": "Tone",
+            "description": "One of the ten file tones, drawn in the current theme."
+          },
+          "letters": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letters",
+            "description": "Initials only."
+          }
+        },
+        "type": "object",
+        "required": [
+          "style",
+          "seed",
+          "tone"
+        ],
+        "title": "ModelAvatar"
+      },
       "ModelCard": {
         "properties": {
           "schema_name": {
@@ -22486,6 +22607,16 @@
               }
             ],
             "title": "Dataset"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -22557,6 +22688,16 @@
           "active_jobs": {
             "type": "integer",
             "title": "Active Jobs"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "anyOf": [
@@ -22848,6 +22989,16 @@
             "type": "string",
             "title": "Name"
           },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "traffic": {
             "$ref": "#/components/schemas/ModelTraffic",
             "description": "Requests per day, p95 latency and error rate over the last 7 days."
@@ -22942,6 +23093,16 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "description": {
             "type": "string",
@@ -23436,6 +23597,16 @@
           "active_jobs": {
             "type": "integer",
             "title": "Active Jobs"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -26408,6 +26579,16 @@
           "active_jobs": {
             "type": "integer",
             "title": "Active Jobs"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "anyOf": [

@@ -26,8 +26,8 @@ import {
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
-import { PickerDialog } from "./AvatarPicker";
-import { choiceFor } from "./avatarDicebear";
+import { PickerDialog } from "~/components/avatar/AvatarPicker";
+import { choiceFor } from "~/components/avatar/avatarSvg";
 import { openTrain, useCan } from "./flowOverlays";
 import { trainBlock } from "./flowTraining";
 import {

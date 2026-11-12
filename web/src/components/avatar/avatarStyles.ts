@@ -1,6 +1,8 @@
-import type { ToneName } from "./modelIcons";
+import type { ToneName } from "./tones";
 
 export type AvatarStyleId = "initials" | "planets" | "voxel-bot" | "pixelbot";
+
+export type SeededStyleId = Exclude<AvatarStyleId, "initials">;
 
 export type Palette = {
     tones: Record<ToneName, string>;

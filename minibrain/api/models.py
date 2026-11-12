@@ -23,6 +23,7 @@ from minibrain.api.schemas import (
     JudgeUpdate,
     LabelDismissal,
     MappingUpdate,
+    ModelAvatar,
     ModelCreate,
     ModelDetail,
     ModelDuplicate,
@@ -168,6 +169,7 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     model = create_model(session, body.name, body.preset, base)
     model.description = body.description.strip()
     model.tags = user_tags(body.tags)
+    model.avatar = body.avatar.model_dump(exclude_none=True) if body.avatar is not None else None
     contract = starting_contract(chosen, body)
     model.contract = contract.as_dict() if contract != FREE_TEXT or not chosen.labels_from_data else {}
     model.instructions = (body.instructions or "").strip() or None
@@ -188,7 +190,8 @@ def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store:
 
 
 def created(model: Model) -> dict[str, Any]:
-    return {"name": model.name, "preset": model.preset, "base": model.base_model}
+    facts = {"name": model.name, "preset": model.preset, "base": model.base_model}
+    return facts | {"avatar": model.avatar} if model.avatar else facts
 
 
 @router.post("/{slug}/duplicate", status_code=201, dependencies=[Depends(builder)])
@@ -245,6 +248,20 @@ def audit_update(session: Session, model: Model, before: dict[str, Any]) -> None
         "to": {field: after[field] for field in changed},
     }
     session.add(AuditEvent(actor=current_actor(), action="model.update", target=model.slug, detail=facts))
+
+
+@router.put("/{slug}/avatar", dependencies=[Depends(builder)])
+def change_avatar(slug: str, body: ModelAvatar, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, slug)
+    before = model.avatar
+    after = body.model_dump(exclude_none=True)
+    if after != before:
+        model.avatar = after
+        facts = {"name": model.name, "from": before, "to": after}
+        session.add(AuditEvent(actor=current_actor(), action="model.avatar", target=model.slug, detail=facts))
+        model.updated_at = now()
+        session.commit()
+    return detail(settings, model)
 
 
 @router.get("/{slug}", dependencies=[Depends(viewer)])

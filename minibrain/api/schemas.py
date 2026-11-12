@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from minibrain.ml.planner import MAX_RANK
 from minibrain.models.rules import LicenceUse
@@ -132,6 +132,27 @@ class InstructionsUpdate(BaseModel):
     instructions: str = Field(max_length=8000)
 
 
+AvatarStyle = Literal["initials", "planets", "voxel-bot", "pixelbot"]
+AvatarTone = Literal["csv", "tsv", "json", "jsonl", "parquet", "avro", "iceberg", "delta", "sql", "text"]
+
+
+class ModelAvatar(BaseModel):
+    style: AvatarStyle
+    seed: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    tone: AvatarTone = Field(description="One of the ten file tones, drawn in the current theme.")
+    letters: str | None = Field(default=None, min_length=1, max_length=2, description="Initials only.")
+
+    @model_validator(mode="after")
+    def letters_fit(self) -> "ModelAvatar":
+        if self.letters is None:
+            return self
+        if not all(character.isalnum() for character in self.letters):
+            raise ValueError("letters are letters or numbers")
+        if self.style != "initials":
+            raise ValueError("only the initials style takes letters")
+        return self
+
+
 class ModelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=280)
@@ -144,6 +165,7 @@ class ModelCreate(BaseModel):
     graders: list[GraderConfig] | None = None
     promotion: PromotionInfo | None = None
     dataset: str | None = None
+    avatar: ModelAvatar | None = None
 
 
 class ColumnInfo(BaseModel):
@@ -777,6 +799,7 @@ class ModelSummary(BaseModel):
     current_score: float | None
     versions: int
     active_jobs: int
+    avatar: ModelAvatar | None = None
 
 
 class RequestBodiesInfo(BaseModel):
@@ -1309,6 +1332,7 @@ class ModelRow(BaseModel):
     kind: Literal["base", "custom"]
     key: str
     name: str
+    avatar: ModelAvatar | None = None
     description: str
     tags: list[str]
     base_model: str | None

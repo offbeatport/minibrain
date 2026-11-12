@@ -24,7 +24,7 @@ from minibrain.api.schemas import (
     Usage,
     VersionRow,
 )
-from minibrain.api.views import cost_info, refusal_of, serve_only_info, teardown_info
+from minibrain.api.views import avatar_of, cost_info, refusal_of, serve_only_info, teardown_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.models.hardware import needed_bytes
 from minibrain.models.health import content_hash
@@ -336,6 +336,7 @@ def custom_row(
         kind="custom",
         key=model.slug,
         name=model.name,
+        avatar=avatar_of(model),
         description=model.description,
         tags=list(model.tags or []),
         base_model=model.base_model,

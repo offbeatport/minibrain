@@ -65,7 +65,7 @@ function TrainedModel({ job }: { job: JobInfo }) {
     const name = ownerName(job);
     const label = (
         <span className="flex min-w-0 items-center gap-2">
-            <PublisherLogo name={name} size="sm" />
+            <PublisherLogo name={name} modelKey={job.model ?? undefined} size="sm" />
             <ModelName name={name} deleted={job.deleted} className="truncate font-medium" />
         </span>
     );
@@ -114,7 +114,7 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
 function ModelChoice({ item }: { item: ModelSummary }) {
     return (
         <>
-            <PublisherLogo name={item.name} />
+            <PublisherLogo name={item.name} custom avatar={item.avatar} />
             <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-medium">{item.name}</span>
                 <span className="truncate text-sm text-muted-foreground">{`On ${item.base_model}`}</span>

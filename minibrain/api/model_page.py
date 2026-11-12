@@ -11,6 +11,8 @@ from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.api.model_status import ModelStatus, base_status, custom_status, passing_candidate, rows_text
 from minibrain.api.overview import Identity, model_rows, series_points
 from minibrain.api.request_logs import model_match
+from minibrain.api.schemas import ModelAvatar
+from minibrain.api.views import avatar_of
 from minibrain.data import feedback as feedback_store
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -65,6 +67,7 @@ class ModelPage(BaseModel):
     kind: Literal["base", "custom"]
     key: str
     name: str
+    avatar: ModelAvatar | None = None
     traffic: ModelTraffic = Field(description="Requests per day, p95 latency and error rate over the last 7 days.")
     next: NextAction | None = Field(description="The one step the model page suggests, or none while busy.")
     status: ModelStatus = Field(description="One line on the model's state, broken first, with at most one action.")
@@ -166,6 +169,7 @@ def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
             kind="custom",
             key=custom.slug,
             name=custom.name,
+            avatar=avatar_of(custom),
             traffic=traffic(session, name, Identity(custom.slug, None)),
             next=custom_next(custom, pending, busy(session, custom), limit),
             status=custom_status(session, custom, pending, limit),

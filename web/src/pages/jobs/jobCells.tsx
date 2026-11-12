@@ -99,7 +99,12 @@ export function JobState({ job }: { job: JobInfo }) {
 export function JobOwner({ job }: { job: JobInfo }) {
     return (
         <span className="flex min-w-0 items-center gap-2">
-            <PublisherLogo publisher={job.publisher} name={ownerName(job)} size="sm" />
+            <PublisherLogo
+                publisher={job.publisher}
+                name={ownerName(job)}
+                modelKey={job.model ?? undefined}
+                size="sm"
+            />
             <ModelName name={ownerName(job)} deleted={job.deleted} className="truncate" />
         </span>
     );

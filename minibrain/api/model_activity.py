@@ -200,6 +200,7 @@ SENTENCES: dict[str, Callable[[Owner, AuditEvent], Said]] = {
     "model.labels_dismiss": fixed("dismissed the proposed labels"),
     "model.request_bodies": kept,
     "model.update": updated,
+    "model.avatar": fixed("changed the avatar"),
     "model.verify": fixed("started checking the files"),
     "model.repair": fixed("started repairing the files"),
     "model.reimport": fixed("started importing the files again"),

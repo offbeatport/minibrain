@@ -2,19 +2,19 @@ import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, c
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { Section } from "~/components/Section";
-import { type Identity, NameAvatarField, newIdentity } from "./NameAvatarField";
-import { type Lowest, RENDER_SIZES, type RenderedRow, measureRendered } from "./avatarContrast";
+import { type AvatarSize, AvatarTile } from "~/components/avatar/AvatarTile";
+import { type Identity, NameAvatarField, newIdentity } from "~/components/avatar/NameAvatarField";
 import {
-    type AvatarSize,
-    AvatarTile,
-    TONE_LABELS,
-    type ThemeMode,
-    choiceFor,
-    modePalette,
-    usePalette,
-} from "./avatarDicebear";
-import { AVATAR_STYLES, type AvatarStyle, type Palette, contrast } from "./avatarStyles";
-import { MODELS, type SampleModel, TONE_KEYS } from "./modelIcons";
+    AVATAR_STYLES,
+    type AvatarStyle,
+    type Palette,
+    contrast,
+} from "~/components/avatar/avatarStyles";
+import { choiceFor } from "~/components/avatar/avatarSvg";
+import { type ThemeMode, modePalette, usePalette } from "~/components/avatar/palette";
+import { TONE_KEYS, TONE_LABELS } from "~/components/avatar/tones";
+import { type Lowest, RENDER_SIZES, type RenderedRow, measureRendered } from "./avatarContrast";
+import { MODELS, type SampleModel } from "./modelIcons";
 
 const SIZES: Exclude<AvatarSize, "xl" | "hero" | "fill">[] = ["lg", "md", "sm"];
 
@@ -278,7 +278,8 @@ function StyleSection({ style }: { style: AvatarStyle }) {
 }
 
 function AvatarPickerMock() {
-    const taken = MODELS.map((model) => model.name);
+    const names = new Set(MODELS.map((model) => model.name.toLowerCase()));
+    const taken = (name: string) => names.has(name.toLowerCase());
     const [identity, setIdentity] = useState<Identity>(() => newIdentity(taken));
     const { style, seed, tone, letters } = identity.avatar;
     const stored = JSON.stringify(letters ? { style, seed, tone, letters } : { style, seed, tone });

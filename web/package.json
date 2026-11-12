@@ -13,6 +13,8 @@
         "gen:api": "cd .. && uv run minibrain openapi --output web/openapi.json && cd web && openapi-typescript openapi.json --default-non-nullable false -o src/api/schema.d.ts"
     },
     "dependencies": {
+        "@dicebear/core": "10.7.0",
+        "@dicebear/styles": "10.6.0",
         "@scalar/api-reference-react": "0.9.82",
         "@tanstack/react-query": "^5.0.0",
         "@tanstack/react-router": "^1.168.22",
@@ -27,8 +29,6 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^1.9.4",
-        "@dicebear/core": "10.7.0",
-        "@dicebear/styles": "10.6.0",
         "@tailwindcss/vite": "^4.2.2",
         "@types/node": "^22.20.5",
         "@types/react": "^19.0.7",

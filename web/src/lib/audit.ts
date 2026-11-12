@@ -1,4 +1,6 @@
 import type { components } from "~/api/schema";
+import { AVATAR_STYLES } from "~/components/avatar/avatarStyles";
+import { TONE_LABELS, type ToneName } from "~/components/avatar/tones";
 import { listHref } from "~/lib/listSearch";
 import { bytes, exactTime } from "~/lib/time";
 
@@ -48,6 +50,7 @@ const ACTIONS: Record<string, string> = {
     "model.delete": "Model delete started",
     "model.delete_finished": "Model delete finished",
     "model.deploy": "Model deployed",
+    "model.avatar": "Avatar changed",
     "model.base_change": "Model base switched",
     "model.duplicate": "Model duplicated",
     "model.reimport": "Model re-imported",
@@ -260,6 +263,17 @@ function listChange(before: unknown[], after: unknown[], policy?: PolicyInfo): s
     return parts.join("; ") || "No change";
 }
 
+function avatarText(value: unknown): string {
+    if (!value || typeof value !== "object") {
+        return "Avatar";
+    }
+    const avatar = value as Detail;
+    const style = AVATAR_STYLES.find((item) => item.id === avatar.style)?.name ?? "Avatar";
+    const tone = TONE_LABELS[avatar.tone as ToneName] ?? "";
+    const letters = typeof avatar.letters === "string" ? ` ${avatar.letters}` : "";
+    return tone ? `${style}${letters} · ${tone}` : `${style}${letters}`;
+}
+
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "account.create": (detail) => `Role ${plainValue(detail.role, undefined, "role")}`,
     "account.password": (detail) =>
@@ -283,6 +297,7 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         typeof detail.job === "number" ? `Queued again as job #${detail.job}` : "Queued again",
     "model.delete": (detail) =>
         typeof detail.size_bytes === "number" ? `Freed ${bytes(detail.size_bytes)}` : "Deleted",
+    "model.avatar": (detail) => avatarText(detail.to),
     "model.base_change": (detail) => `${plainValue(detail.from)} → ${plainValue(detail.to)}`,
     "model.duplicate": (detail) =>
         typeof detail.version === "number"

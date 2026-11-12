@@ -19,8 +19,9 @@ import {
 import { Fragment, type ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { AvatarTile } from "~/components/avatar/AvatarTile";
+import { choiceFor } from "~/components/avatar/avatarSvg";
 import { StatusText } from "~/components/models/StatusText";
-import { AvatarTile, choiceFor } from "./avatarDicebear";
 import { useCan } from "./flowOverlays";
 import {
     BASELINE_HINT,

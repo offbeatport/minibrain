@@ -1148,7 +1148,7 @@ keys, and `/v1` stays key-only.
   view panel filters by status (Deployed, Not deployed, Needs attention, Training, Failed, with live counts), kind and
   base model, sorts (Needs attention first by default, Name, Score, Requests, Recently updated; within each group)
   and holds Display: Show versions and the Quality, Requests, Cost and p95 columns; filters and sort stay in the URL
-  (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or letter tile, name and base,
+  (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or avatar, name and base,
   the live score with a sparkline over versions, then 7-day requests, device time per 1,000 requests and p95 measured
   as the model page's Monitoring measures them (without traffic, the cost the eval measured, muted), and one status
   line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from the
@@ -1167,9 +1167,9 @@ keys, and `/v1` stays key-only.
   `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create, import, download and rename
   refuse a name or address another model holds (409), and `new`, `base` and `custom` are reserved. Old
   `/models/base/<key>` and `/models/custom/<slug>` links redirect. A breadcrumb sits above a compact header: the logo or
-  letter tile, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
+  avatar, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
   On base). Its actions are Playground and Connect (the snippet dialog: base URL, name, `name@N`, harness configs) and,
-  for Builders, a ⋯ menu: Deploy or Undeploy, Train vN, Rename, Duplicate, Switch base, then Delete; there is no
+  for Builders, a ⋯ menu: Deploy or Undeploy, Train vN, Rename, Change avatar, Duplicate, Switch base, then Delete; there is no
   state-driven primary button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Training · Monitoring
   · API keys for a custom model (Viewers lose Training), Overview · Monitoring · API keys for a base (one installed
   format is one base, so there is no Variants tab); `data` and `keys` redirect to Training and API keys, and an unknown
@@ -1219,9 +1219,10 @@ keys, and `/v1` stays key-only.
     kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
 - Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
-  and memory gauges stay. Every model starts as a Chat assistant. The name is prefilled and required: "Assistant"
-  and the next free number ("Assistant 1"), never a name a base or custom model already has, with an inline error
-  when a typed one is taken. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat
+  and memory gauges stay. Every model starts as a Chat assistant. The name row (built 2026-11-12) is the
+  avatar button, then the name, then a dice Shuffle (R): the name is prefilled and required, a generated adjective
+  and noun ("Brisk Heron") never held by a base or custom model, with an inline error when a typed one is taken.
+  Typing a name or picking an avatar keeps it ("Name kept · Undo"), and Shuffle then rerolls only the other. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat
   assistant, 7B+ works best." The picker lists base models only; to start from one of your models, Duplicate it
   (below). The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
   part as a plain default with an Edit action, collapsed until opened: the answers (free text, one of these labels or
@@ -1235,7 +1236,14 @@ keys, and `/v1` stays key-only.
     a Hugging Face id or link, an `s3://` path or a folder.
   - Each option shows publisher, parameters, licence use, "On this install" or the download size, and a fit hint.
   - Logos: a base model shows its publisher's logo (a letter tile when the publisher is unknown); a custom model
-    always shows a letter tile from its own name, with its base named in text, on every page.
+    shows its avatar, with its base named in text, on every page.
+  - Avatars (built 2026-11-12): the picker is a dialog in three steps, Style (Initials, Planets, Voxel Bot,
+    Pixelbot; the last three CC0 DiceBear styles, lazy-loaded), Shape (12 seeds, or the letters for Initials, with
+    custom letters) and Colour (the kit's ten `--file-*` tones), with a large preview, "In the app" at 48, 32 and
+    20 px, Recent and Surprise me. A model stores `{style, seed, tone, letters?}` (`models.avatar`, tone by name,
+    never hex), so it redraws in the current theme. `POST /api/models` takes it; `PUT /api/models/{slug}/avatar`
+    (Builder, audited as `model.avatar`) changes it from the model page's ⋯ › Change avatar; Duplicate copies it.
+    A model without one shows its initials in a tone from its name's hash.
   - Under the picker: the download against free space on the model files disk (blocked when it does not fit), the
     variant and licence, and for a base that needs more compute, the pools it fits and how to join a GPU machine to a
     pool. It can always be downloaded now and run later.
@@ -1244,8 +1252,8 @@ keys, and `/v1` stays key-only.
 - Duplicate (built 2026-11-07), in a custom model's row menu on Models and its page header, asks for a name
   ("<name> copy", the next free one in the shared namespace) and calls `POST /api/models/{slug}/duplicate` (Builder,
   audited as `model.duplicate` with the source slug and version; 409 on a taken name or a source being deleted). The
-  copy gets the same base, preset, answers, instructions, graders, rule, judge, safety, training data, description and
-  tags, and a fresh v0. The source's live version (else its latest ready one) becomes the copy's v1, ready and not
+  copy gets the same base, preset, answers, instructions, graders, rule, judge, safety, training data, description,
+  tags and avatar, and a fresh v0. The source's live version (else its latest ready one) becomes the copy's v1, ready and not
   deployed, with its scores, recipe and data version; it points at the same adapter artifact by SHA-256, so no bytes
   are copied (the store is content-addressed and write-once), and `versions.duplicated_from` records the source name,
   version and training job ("Duplicated from guy1 v4" on the Versions tab and the model card, whose run facts come
@@ -1743,7 +1751,6 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] Catalogue export/import and model bundles for air-gapped sites — only if needed
 - [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
-- [ ] Custom model logos: PNG, JPEG or WebP up to 256 KB, stored with the model; never SVG, which can carry scripts
 - Preinstalled appliance
 - Later, kept simple until the engine settles:
   - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base

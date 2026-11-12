@@ -26,6 +26,7 @@ from minibrain.api.schemas import (
     LabelScoreInfo,
     MappingInfo,
     Mistake,
+    ModelAvatar,
     ModelDetail,
     ModelSafety,
     ModelSummary,
@@ -387,6 +388,10 @@ def current_contract(model: Model) -> int:
     return newest.contract_number if newest is not None else 1
 
 
+def avatar_of(model: Model) -> ModelAvatar | None:
+    return ModelAvatar.model_validate(model.avatar) if model.avatar else None
+
+
 def summary(model: Model) -> ModelSummary:
     return ModelSummary(
         slug=model.slug,
@@ -399,6 +404,7 @@ def summary(model: Model) -> ModelSummary:
         current_score=current_score(model),
         versions=len(model.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in model.jobs),
+        avatar=avatar_of(model),
     )
 
 
@@ -469,6 +475,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         current_score=current_score(model),
         versions=len(model.versions),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in model.jobs),
+        avatar=avatar_of(model),
         source=source_info(settings, model),
         mapping=mapping_info(model.dataset),
         dataset=model.dataset.slug if model.dataset else None,

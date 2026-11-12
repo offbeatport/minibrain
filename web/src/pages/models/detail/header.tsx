@@ -11,6 +11,7 @@ import {
     Power,
     PowerOff,
     Replace,
+    Smile,
     SquarePlus,
     Trash2,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import { percent } from "~/lib/format";
 import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted, busyTearingDown, deleteModel, rowId, setDeployed } from "~/lib/teardown";
+import { ChangeAvatarDialog } from "../ChangeAvatarDialog";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
 import { DuplicateModelDialog } from "../DuplicateModelDialog";
 import { SwitchBaseDialog } from "../SwitchBaseDialog";
@@ -185,6 +187,8 @@ export function ModelAvatar({ row, size = "md" }: { row: ModelRow; size?: "sm" |
             publisher={row.kind === "base" ? row.publisher : null}
             name={row.name}
             size={size}
+            custom={row.kind === "custom"}
+            avatar={row.avatar}
         />
     );
 }
@@ -371,6 +375,7 @@ function ModelMenu({
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [editing, setEditing] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
+    const [picking, setPicking] = useState(false);
     const [switching, setSwitching] = useState(false);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const custom = row.kind === "custom";
@@ -435,6 +440,15 @@ function ModelMenu({
                             >
                                 <Pencil />
                                 Rename
+                            </DropdownMenuItem>
+                        )}
+                        {custom && (
+                            <DropdownMenuItem
+                                disabled={beingDeleted(row)}
+                                onSelect={() => setPicking(true)}
+                            >
+                                <Smile />
+                                Change avatar
                             </DropdownMenuItem>
                         )}
                         {custom ? (
@@ -504,6 +518,7 @@ function ModelMenu({
             />
             {custom && (
                 <>
+                    <ChangeAvatarDialog row={row} open={picking} onOpenChange={setPicking} />
                     <DuplicateModelDialog
                         row={duplicating ? row : null}
                         onOpenChange={(open) => !open && setDuplicating(false)}
