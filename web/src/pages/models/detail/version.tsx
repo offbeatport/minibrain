@@ -413,7 +413,7 @@ function MadeFrom({
                     key="method"
                     tip="Supervised fine-tuning: it learns to answer like your labelled rows."
                 >
-                    <span className="cursor-help underline decoration-dotted underline-offset-4">
+                    <span className="cursor-default underline decoration-dotted underline-offset-4">
                         Supervised fine-tuning (SFT)
                     </span>
                 </Tip>
@@ -475,7 +475,7 @@ function Identifiers({ row, version }: { row: ModelRow; version: VersionInfo }) 
                 </span>
                 {sha && (
                     <Tip tip={sha}>
-                        <span className="cursor-help font-mono text-sm text-muted-foreground">
+                        <span className="cursor-default font-mono text-sm text-muted-foreground">
                             {sha.slice(0, 12)}
                         </span>
                     </Tip>

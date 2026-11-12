@@ -111,6 +111,11 @@ const ROW_STATE =
     "relative cursor-pointer outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-[state=selected]:bg-accent data-[peeked=true]:bg-accent";
 export const ROW_GRID = "col-span-full grid grid-cols-subgrid items-center px-4";
 
+const CELL_HIT =
+    "group/hit relative z-10 flex shrink-0 cursor-pointer items-center outline-none disabled:pointer-events-none disabled:opacity-50";
+const HIT_FACE =
+    "flex shrink-0 items-center justify-center rounded-md text-foreground group-hover/hit:bg-accent group-focus-visible/hit:ring-2 group-focus-visible/hit:ring-ring";
+
 function fromControl(event: MouseEvent): boolean {
     return (event.target as HTMLElement).closest("a,button,label,input,[role=menuitem]") !== null;
 }
@@ -171,22 +176,24 @@ function Chevron({
         return <span aria-hidden="true" className="size-6 shrink-0" />;
     }
     return (
-        <Button
-            variant="ghost"
-            size="icon-xs"
+        <button
+            type="button"
             tabIndex={-1}
             aria-expanded={expanded}
             aria-label={`${expanded ? "Hide" : "Show"} ${noun} of ${name}`}
-            className="relative z-10 shrink-0"
+            className={cn(CELL_HIT, "-my-3 -ml-4 w-10 justify-end self-stretch")}
             onClick={onToggle}
         >
-            <ChevronRight
-                className={cn(
-                    "transition-transform duration-100 motion-reduce:transition-none",
-                    expanded && "rotate-90",
-                )}
-            />
-        </Button>
+            <span className={cn(HIT_FACE, "size-6")}>
+                <ChevronRight
+                    aria-hidden="true"
+                    className={cn(
+                        "size-3 transition-transform duration-100 motion-reduce:transition-none",
+                        expanded && "rotate-90",
+                    )}
+                />
+            </span>
+        </button>
     );
 }
 
@@ -467,19 +474,53 @@ function BaseItems({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
     );
 }
 
+function MenuTrigger({ label, disabled }: { label: string; disabled?: boolean }) {
+    return (
+        <DropdownMenuTrigger asChild>
+            <button
+                type="button"
+                disabled={disabled}
+                aria-label={label}
+                className={cn(CELL_HIT, "absolute inset-0 justify-end pr-4")}
+            >
+                <span className={cn(HIT_FACE, "size-8")}>
+                    <MoreHorizontal aria-hidden="true" className="size-4" />
+                </span>
+            </button>
+        </DropdownMenuTrigger>
+    );
+}
+
+function ActionsCell({
+    pad,
+    menu,
+    children,
+}: {
+    pad: string;
+    menu: ReactNode;
+    children?: ReactNode;
+}) {
+    return (
+        <div
+            className={cn(
+                "relative z-10 -mr-4 flex items-center justify-end gap-1 self-stretch pr-4",
+                pad,
+            )}
+        >
+            <div className="relative z-20 flex items-center gap-1">{children}</div>
+            <span aria-hidden="true" className="size-8 shrink-0" />
+            {menu}
+        </div>
+    );
+}
+
 function ModelMenu({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={busyTearingDown(model.row)}
-                    aria-label={`More actions for ${model.name}`}
-                >
-                    <MoreHorizontal />
-                </Button>
-            </DropdownMenuTrigger>
+            <MenuTrigger
+                label={`More actions for ${model.name}`}
+                disabled={busyTearingDown(model.row)}
+            />
             <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onSelect={() => on.open(hrefOf(model))}>
                     <Eye />
@@ -545,15 +586,14 @@ function primaryOf(model: ListModel, on: Handlers, can: Abilities) {
 function ModelActions({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
     const primary = primaryOf(model, on, can);
     return (
-        <div className="relative z-10 flex items-center justify-end gap-1">
+        <ActionsCell pad="-my-3 py-3" menu={<ModelMenu model={model} on={on} can={can} />}>
             {primary && (
                 <Button variant="secondary" onClick={primary.run}>
                     {primary.icon}
                     {primary.label}
                 </Button>
             )}
-            <ModelMenu model={model} on={on} can={can} />
-        </div>
+        </ActionsCell>
     );
 }
 
@@ -596,7 +636,7 @@ export function ModelLine({
             aria-label={model.name}
             className={cn(ROW_GRID, ROW_STATE, "gap-y-1 py-3", deleting && "opacity-60")}
         >
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2 self-stretch">
                 {props.nested && (
                     <Chevron
                         name={model.name}
@@ -697,15 +737,7 @@ function VersionMenu({
     const ready = version.status === "ready";
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`More actions for ${model.name} v${version.number}`}
-                >
-                    <MoreHorizontal />
-                </Button>
-            </DropdownMenuTrigger>
+            <MenuTrigger label={`More actions for ${model.name} v${version.number}`} />
             <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onSelect={() => on.open(modelPageHref(model.key, "versions"))}>
                     <Eye />
@@ -829,7 +861,10 @@ export function VersionLine({
             <div className="min-w-0">
                 <VersionStatus version={version} replicas={replicas} />
             </div>
-            <div className="relative z-10 flex items-center justify-end gap-1">
+            <ActionsCell
+                pad="-my-1.5 py-1.5"
+                menu={<VersionMenu model={model} version={version} on={on} can={props.can} />}
+            >
                 {props.can.build && canMakeLive(model, version) && (
                     <Button
                         variant={
@@ -840,8 +875,7 @@ export function VersionLine({
                         {`Make v${version.number} live`}
                     </Button>
                 )}
-                <VersionMenu model={model} version={version} on={on} can={props.can} />
-            </div>
+            </ActionsCell>
         </li>
     );
 }
@@ -932,7 +966,47 @@ export function VariantLine({
             <div className="min-w-0">
                 <VariantStatus row={row} />
             </div>
-            <div className="relative z-10 flex items-center justify-end gap-1">
+            <ActionsCell
+                pad="-my-1.5 py-1.5"
+                menu={
+                    <DropdownMenu>
+                        <MenuTrigger label={`More actions for ${model.name} ${label}`} />
+                        <DropdownMenuContent align="end" className="w-64">
+                            <DropdownMenuItem onSelect={() => on.open(modelPageHref(row.key))}>
+                                <Eye />
+                                {`Open ${label}`}
+                            </DropdownMenuItem>
+                            {row.availability.state === "available" && (
+                                <DropdownMenuItem onSelect={() => on.open(playgroundHref(row.key))}>
+                                    <Play />
+                                    {`Try ${label}`}
+                                </DropdownMenuItem>
+                            )}
+                            {props.can.admin && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        disabled={live}
+                                        onSelect={() =>
+                                            on.remove([
+                                                {
+                                                    key: `base:${row.key}`,
+                                                    model: row,
+                                                    version: null,
+                                                },
+                                            ])
+                                        }
+                                    >
+                                        <Trash2 />
+                                        {live ? `${label} is live` : "Delete files"}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                }
+            >
                 {props.can.build && live && (
                     <Button variant="outline" onClick={() => on.undeploy([row])}>
                         Undeploy
@@ -943,47 +1017,7 @@ export function VariantLine({
                         Deploy
                     </Button>
                 )}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`More actions for ${model.name} ${label}`}
-                        >
-                            <MoreHorizontal />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuItem onSelect={() => on.open(modelPageHref(row.key))}>
-                            <Eye />
-                            {`Open ${label}`}
-                        </DropdownMenuItem>
-                        {row.availability.state === "available" && (
-                            <DropdownMenuItem onSelect={() => on.open(playgroundHref(row.key))}>
-                                <Play />
-                                {`Try ${label}`}
-                            </DropdownMenuItem>
-                        )}
-                        {props.can.admin && (
-                            <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    variant="destructive"
-                                    disabled={live}
-                                    onSelect={() =>
-                                        on.remove([
-                                            { key: `base:${row.key}`, model: row, version: null },
-                                        ])
-                                    }
-                                >
-                                    <Trash2 />
-                                    {live ? `${label} is live` : "Delete files"}
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+            </ActionsCell>
         </li>
     );
 }

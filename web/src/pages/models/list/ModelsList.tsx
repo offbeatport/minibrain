@@ -1,5 +1,4 @@
 import { useRouter } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
 import { Button, CubePlus, Link, SearchInput, cn, useToast } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
@@ -33,6 +32,7 @@ import {
     type Filters,
     type KindKey,
     NO_FILTERS,
+    activeCount,
     filterSearch,
     gridTemplate,
     passes,
@@ -71,7 +71,7 @@ type Line =
     | { key: string; type: "variant"; model: ListModel; row: ModelRow }
     | { key: string; type: "more"; model: ListModel; shown: number; searching: boolean };
 type RowLine = Extract<Line, { type: "model" | "version" | "variant" }>;
-type Group = { kind: KindKey; label: string; count: number; collapsed: boolean; lines: Line[] };
+type Group = { kind: KindKey; label: string; count: number; lines: Line[] };
 
 const GROUPS: { kind: KindKey; label: string }[] = [
     { kind: "custom", label: "Your models" },
@@ -81,7 +81,6 @@ const GROUPS: { kind: KindKey; label: string }[] = [
 const EXPANDED_KEY = "minibrain.models.expanded";
 const COLUMNS_KEY = "minibrain.models.columns.shown";
 const NESTED_KEY = "minibrain.models.showVersions";
-const COLLAPSED_KEY = "minibrain.models.collapsedGroups";
 
 function readStored<T>(key: string, fallback: T): T {
     try {
@@ -107,6 +106,10 @@ function useStored<T>(key: string, fallback: T) {
         writeStored(key, next);
     };
     return [value, save] as const;
+}
+
+function sameColumns(a: Column[], b: Column[]): boolean {
+    return a.length === b.length && a.every((id) => b.includes(id));
 }
 
 function lineId(key: string): string {
@@ -171,29 +174,14 @@ function buildLines(
     });
 }
 
-function GroupBand({ group, onToggle }: { group: Group; onToggle: () => void }) {
+function GroupBand({ group }: { group: Group }) {
     return (
         <h2
             id={`models-group-${group.kind}`}
-            className="sticky top-9 z-[12] col-span-full -mt-px border-y bg-card"
+            className="sticky top-9 z-[12] col-span-full -mt-px flex h-8 min-w-0 items-center gap-1.5 border-y bg-card px-4 text-sm text-muted-foreground"
         >
-            <button
-                type="button"
-                aria-expanded={!group.collapsed}
-                aria-controls={`models-group-rows-${group.kind}`}
-                onClick={onToggle}
-                className="group/band flex h-8 w-full min-w-0 items-center gap-1.5 px-4 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-            >
-                <ChevronRight
-                    aria-hidden="true"
-                    className={cn(
-                        "size-3.5 shrink-0 text-faint transition-transform duration-100 group-hover/band:text-muted-foreground motion-reduce:transition-none",
-                        !group.collapsed && "rotate-90",
-                    )}
-                />
-                <span className="font-medium">{group.label}</span>
-                <span className="font-normal text-faint tabular-nums">{group.count}</span>
-            </button>
+            <span className="font-medium">{group.label}</span>
+            <span className="font-normal text-faint tabular-nums">{group.count}</span>
         </h2>
     );
 }
@@ -228,7 +216,6 @@ export function ModelsList() {
     const rows = all.data ?? [];
     const models = useMemo(() => listModels(rows), [rows]);
     const [expanded, setExpanded] = useStored<Record<string, boolean>>(EXPANDED_KEY, {});
-    const [collapsed, setCollapsed] = useStored<Record<string, boolean>>(COLLAPSED_KEY, {});
     const [nested, setNested] = useStored<boolean>(NESTED_KEY, false);
     const [columns, setColumns] = useStored<Column[]>(COLUMNS_KEY, DEFAULT_COLUMNS);
     const [searchToggles, setSearchToggles] = useState<Record<string, boolean>>({});
@@ -258,12 +245,10 @@ export function ModelsList() {
             pool.filter((model) => model.kind === group.kind && passes(model, filters)),
             sort,
         );
-        const shut = Boolean(collapsed[group.kind]);
         return {
             ...group,
             count: members.length,
-            collapsed: shut,
-            lines: shut ? [] : buildLines(members, text, expanded, searchToggles, nested),
+            lines: buildLines(members, text, expanded, searchToggles, nested),
         };
     }).filter((group) => group.count > 0);
     const lines = groups.flatMap((group) => group.lines);
@@ -546,7 +531,17 @@ export function ModelsList() {
                             onSort={(value) =>
                                 update({ sort: value === DEFAULT_SORT ? "" : value })
                             }
-                            onReset={() => update({ ...filterSearch(NO_FILTERS), sort: "" })}
+                            onReset={() => {
+                                update({ ...filterSearch(NO_FILTERS), sort: "" });
+                                setNested(false);
+                                setColumns(DEFAULT_COLUMNS);
+                            }}
+                            pristine={
+                                activeCount(filters) === 0 &&
+                                sort === DEFAULT_SORT &&
+                                !nested &&
+                                sameColumns(shownColumns, DEFAULT_COLUMNS)
+                            }
                             nested={nested}
                             onNested={(value) => {
                                 setNested(value);
@@ -622,24 +617,13 @@ export function ModelsList() {
                                 aria-labelledby={`models-group-${group.kind}`}
                                 className="col-span-full grid grid-cols-subgrid"
                             >
-                                <GroupBand
-                                    group={group}
-                                    onToggle={() =>
-                                        setCollapsed({
-                                            ...collapsed,
-                                            [group.kind]: !group.collapsed,
-                                        })
-                                    }
-                                />
-                                {!group.collapsed && (
-                                    <ul
-                                        id={`models-group-rows-${group.kind}`}
-                                        aria-labelledby={`models-group-${group.kind}`}
-                                        className="col-span-full grid grid-cols-subgrid divide-y"
-                                    >
-                                        {group.lines.map(render)}
-                                    </ul>
-                                )}
+                                <GroupBand group={group} />
+                                <ul
+                                    aria-labelledby={`models-group-${group.kind}`}
+                                    className="col-span-full grid grid-cols-subgrid divide-y"
+                                >
+                                    {group.lines.map(render)}
+                                </ul>
                             </section>
                         ))
                     )}

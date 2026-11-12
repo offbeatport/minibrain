@@ -36,7 +36,7 @@ export function CostCell({ shown }: { shown: CostShown }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span className="relative z-10 cursor-help whitespace-nowrap text-muted-foreground tabular-nums">
+                <span className="relative z-10 whitespace-nowrap text-muted-foreground tabular-nums">
                     {shown.text}
                 </span>
             </TooltipTrigger>
@@ -189,7 +189,7 @@ export function VersionName({ version }: { version: Pick<ModelVersionRow, "numbe
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span className="relative z-10 cursor-help tabular-nums">
+                <span className="relative z-10 tabular-nums">
                     {`v${version.number} · Baseline`}
                 </span>
             </TooltipTrigger>
@@ -209,7 +209,7 @@ export function ScoreBadge({ model, version }: { model: ListModel; version: Mode
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Badge variant="neutral" className="relative z-10 cursor-help" tabIndex={0}>
+                <Badge variant="neutral" className="relative z-10" tabIndex={0}>
                     below rule
                 </Badge>
             </TooltipTrigger>

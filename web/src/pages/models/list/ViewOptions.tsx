@@ -26,7 +26,6 @@ import {
     type BaseOption,
     COLUMNS,
     type Column,
-    DEFAULT_SORT,
     type Filters,
     KINDS,
     NO_FILTERS,
@@ -305,6 +304,7 @@ export function ViewOptions({
     sort,
     onSort,
     onReset,
+    pristine,
     nested,
     onNested,
     columns,
@@ -317,6 +317,7 @@ export function ViewOptions({
     sort: SortKey;
     onSort: (value: SortKey) => void;
     onReset: () => void;
+    pristine: boolean;
     nested: boolean;
     onNested: (value: boolean) => void;
     columns: Column[];
@@ -325,7 +326,6 @@ export function ViewOptions({
     const [open, setOpen] = useState(false);
     const active = activeCount(filters);
     const matching = pool.filter((model) => passes(model, filters)).length;
-    const pristine = active === 0 && sort === DEFAULT_SORT;
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <Tooltip open={open ? false : undefined}>
@@ -388,7 +388,7 @@ export function ViewOptions({
                             : `${matching} of ${plural(pool.length, "model")} match`}
                     </span>
                     <Button variant="ghost" disabled={pristine} onClick={onReset}>
-                        Reset
+                        Reset to default
                     </Button>
                 </div>
             </PopoverContent>

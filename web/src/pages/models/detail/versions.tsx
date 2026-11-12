@@ -108,7 +108,7 @@ export function ScoreBadge({
         return (
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Badge variant="neutral" className="cursor-help" tabIndex={0}>
+                    <Badge variant="neutral" tabIndex={0}>
                         below rule
                     </Badge>
                 </TooltipTrigger>
