@@ -182,13 +182,35 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 
 ## Concepts
 
+The platform is six things and three rules (2026-11-12):
+
+| Thing | Is |
+|---|---|
+| **Model** | A named thing apps call by its API name (`support-triage`); custom (base + versions) or base |
+| **Version** | An immutable result: base + adapter + instructions + dataset version + settings |
+| **Dataset** | Versioned training data |
+| **Deployment** | A desired state: this model's live version runs on this pool with N replicas, kept true continuously |
+| **Job** | Any finite work: train, score, judge, download, import, verify, export, deploy, undeploy |
+| **Pool** | Compute: machines and GPUs, used for serving, jobs or both |
+
+API keys decide who may call which models.
+
+1. **Everything you do runs as a job**, with steps, logs, a duration, cancel and retry, on one Jobs page. Deploy and
+   undeploy are jobs (rollouts) that bring the deployment to the state asked for.
+2. **Everything that runs is a deployment**: its health shows on the model and in Infrastructure, and it is kept alive
+   (restarts and reloads) without new jobs.
+3. **Everything is recorded**: jobs keep their logs, every change is in the audit log, and Activity shows it per model.
+
+New capabilities add a job kind (export, distill, rebase) or a pool type (Kubernetes, your cloud, managed compute),
+not a new concept.
+
 | Term | Meaning |
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
 | Version | Prompt-only (model + instructions + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its contract and number, graders and eval result. Immutable. Version 0 is always prompt-only and is created with the model |
 | Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
-| Job | Data build, training or eval run by the worker |
+| Job | Finite work run by a worker: data build, training, eval, judge, transfers, exports, deploy and undeploy rollouts |
 | Preset | General (Chat assistant), Classify or Custom today (Extract, Rewrite, Text-to-SQL coming); sets the contract, mapping, prompts, graders, checks and promotion rule defaults |
 | Contract | Free text or a JSON schema (a label set is one enum field); numbered, additive, on each version |
 | Grader | `score(answer, example) -> {metric: value}`, named and versioned |
