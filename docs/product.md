@@ -142,7 +142,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   One page per model: Overview, Versions, Training, Monitoring and API keys.
   UI: Models › model · API: GET /api/model-pages/{name}, GET /api/base-models/{key}, PATCH /api/base-models/{key}
 - **Model overview** · shipped · product, ml
-  Usage by version, one next step, its facts, details and activity.
+  Usage by version, its facts, details and activity.
   UI: Models › model › Overview · API: GET /api/model-pages/{name}, GET /api/model-pages/{name}/traffic
 - **Model activity** · shipped · product, ml, admin
   This model's audited changes as a timeline, never a deleted namesake's.
