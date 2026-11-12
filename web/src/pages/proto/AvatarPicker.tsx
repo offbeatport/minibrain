@@ -129,19 +129,19 @@ export function PickerDialog({
                             <TabsList
                                 variant="line"
                                 aria-label="Style"
-                                className="w-full justify-start gap-0 overflow-x-auto border-b"
+                                className="h-12 w-full justify-start gap-0 overflow-x-auto border-b"
                             >
                                 {AVATAR_STYLES.map((item) => (
                                     <TabsTrigger
                                         key={item.id}
                                         value={item.id}
-                                        className="h-11 flex-none gap-2.5 px-3 text-base sm:px-4"
+                                        className="flex-none gap-2.5 px-3 text-base sm:px-4"
                                     >
                                         <AvatarTile
                                             choice={session.selected[item.id]}
                                             name={displayName}
                                             size="md"
-                                            className="hidden sm:flex"
+                                            className="hidden sm:flex [&_svg]:!size-full"
                                         />
                                         {item.name}
                                     </TabsTrigger>
