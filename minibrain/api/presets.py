@@ -17,7 +17,7 @@ from minibrain.registry.models import AuditEvent
 from minibrain.tasks.graders import CATALOGUE
 from minibrain.tasks.judges import install_judge, set_install_judge
 
-router = APIRouter(prefix="/api", tags=["presets"])
+router = APIRouter(prefix="/api")
 
 
 def preset_info(item: Preset) -> PresetInfo:
@@ -41,7 +41,7 @@ def preset_info(item: Preset) -> PresetInfo:
     )
 
 
-@router.get("/presets", dependencies=[Depends(viewer)])
+@router.get("/presets", dependencies=[Depends(viewer)], summary="List model presets")
 def list_presets() -> PresetsResponse:
     return PresetsResponse(
         presets=[preset_info(item) for item in presets().values()],
@@ -64,12 +64,12 @@ def judge_setting(session: SessionDep) -> JudgeSetting:
     return JudgeSetting(model=found, name=base_name(session, found) if found else None)
 
 
-@router.get("/settings/judge", dependencies=[Depends(viewer)])
+@router.get("/settings/judge", dependencies=[Depends(viewer)], summary="Read the default judge")
 def read_judge(session: SessionDep) -> JudgeSetting:
     return judge_setting(session)
 
 
-@router.put("/settings/judge", dependencies=[Depends(admin)])
+@router.put("/settings/judge", dependencies=[Depends(admin)], summary="Change the default judge")
 def update_judge(body: JudgeUpdate, session: SessionDep) -> JudgeSetting:
     before = install_judge(session)
     set_install_judge(session, body.model)

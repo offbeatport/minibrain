@@ -29,7 +29,7 @@ from minibrain.data.dataset_folders import (
 from minibrain.data.shared import get_dataset
 from minibrain.registry.models import AuditEvent, DatasetFolder
 
-router = APIRouter(prefix="/api", tags=["data"])
+router = APIRouter(prefix="/api")
 
 
 def folder_info(folder: DatasetFolder) -> DatasetFolderInfo:
@@ -44,12 +44,12 @@ def folder_target(folder: DatasetFolder) -> str:
     return f"dataset_folder:{folder.id}"
 
 
-@router.get("/dataset-folders", dependencies=[Depends(builder)])
+@router.get("/dataset-folders", dependencies=[Depends(builder)], summary="List dataset folders")
 def read_folders(session: SessionDep) -> list[DatasetFolderInfo]:
     return [folder_info(folder) for folder in list_folders(session)]
 
 
-@router.post("/dataset-folders", status_code=201, dependencies=[Depends(builder)])
+@router.post("/dataset-folders", status_code=201, dependencies=[Depends(builder)], summary="Add a dataset folder")
 def add_folder(body: DatasetFolderCreate, session: SessionDep) -> DatasetFolderInfo:
     folder = create_folder(session, body.name, body.parent_id)
     detail = {"name": folder.name, "path": path_of(session, folder)}
@@ -58,7 +58,7 @@ def add_folder(body: DatasetFolderCreate, session: SessionDep) -> DatasetFolderI
     return folder_info(folder)
 
 
-@router.patch("/dataset-folders/{folder_id}", dependencies=[Depends(builder)])
+@router.patch("/dataset-folders/{folder_id}", dependencies=[Depends(builder)], summary="Rename a dataset folder")
 def rename(folder_id: int, body: DatasetFolderRename, session: SessionDep) -> DatasetFolderInfo:
     folder = get_folder(session, folder_id)
     before = folder.name
@@ -70,7 +70,7 @@ def rename(folder_id: int, body: DatasetFolderRename, session: SessionDep) -> Da
     return folder_info(folder)
 
 
-@router.put("/dataset-folders/{folder_id}/parent", dependencies=[Depends(builder)])
+@router.put("/dataset-folders/{folder_id}/parent", dependencies=[Depends(builder)], summary="Move a dataset folder")
 def move(folder_id: int, body: DatasetFolderParent, session: SessionDep) -> DatasetFolderInfo:
     folder = get_folder(session, folder_id)
     if body.parent_id != folder.parent_id:
@@ -82,7 +82,9 @@ def move(folder_id: int, body: DatasetFolderParent, session: SessionDep) -> Data
     return folder_info(folder)
 
 
-@router.delete("/dataset-folders/{folder_id}", status_code=204, dependencies=[Depends(builder)])
+@router.delete(
+    "/dataset-folders/{folder_id}", status_code=204, dependencies=[Depends(builder)], summary="Remove a dataset folder"
+)
 def remove(folder_id: int, session: SessionDep) -> None:
     folder = get_folder(session, folder_id)
     target, name, path = folder_target(folder), folder.name, path_of(session, folder)
@@ -94,7 +96,7 @@ def remove(folder_id: int, session: SessionDep) -> None:
     session.commit()
 
 
-@router.put("/datasets/{slug}/folder", dependencies=[Depends(builder)])
+@router.put("/datasets/{slug}/folder", dependencies=[Depends(builder)], summary="Move a dataset into a folder")
 def place_dataset(
     slug: str, body: DatasetFolderChoice, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> DatasetSummary:

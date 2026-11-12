@@ -15,7 +15,7 @@ from minibrain.api.owners import base_owned, base_token, custom_owned, log_custo
 from minibrain.api.request_logs import CLIENT_ERROR, aware, base_names, live_names, model_match
 from minibrain.registry.models import RequestLog, now
 
-router = APIRouter(prefix="/api", tags=["requests"])
+router = APIRouter(prefix="/api")
 
 TOP = 5
 TOP_MAX = 8
@@ -267,7 +267,7 @@ def table_row(series: OverviewSeries, part: Partition) -> OverviewModel:
     )
 
 
-@router.get("/requests/overview", dependencies=[Depends(viewer)])
+@router.get("/requests/overview", dependencies=[Depends(viewer)], summary="Chart requests across models")
 def request_overview(
     session: SessionDep,
     model: Annotated[list[str] | None, Query()] = None,

@@ -42,7 +42,7 @@ from minibrain.serve.dialects import detect_guard, reasoning_choices
 from minibrain.settings import Settings
 from minibrain.tasks.contracts import JSON, Contract
 
-router = APIRouter(prefix="/api/playground", tags=["playground"])
+router = APIRouter(prefix="/api/playground")
 
 ContractKind = Literal["text", "labels", "json"]
 CHAT_HELP = (
@@ -191,7 +191,7 @@ def playground_models(session: Session, settings: Settings, config: GatewayConfi
     return PlaygroundModels(targets=custom + bases, guards=guards(session))
 
 
-@router.get("/models", dependencies=[Depends(viewer)])
+@router.get("/models", dependencies=[Depends(viewer)], summary="List models the Playground can call")
 def list_targets(request: Request, session: SessionDep, settings: SettingsDep) -> PlaygroundModels:
     return playground_models(session, settings, request.app.state.gateway_config.current())
 
@@ -295,12 +295,12 @@ def make_default(session: Session, chosen: PlaygroundPreset) -> None:
         preset.is_default = preset.id == chosen.id
 
 
-@router.get("/presets", dependencies=[Depends(viewer)])
+@router.get("/presets", dependencies=[Depends(viewer)], summary="List Playground presets")
 def list_presets(session: SessionDep) -> list[SavedPresetInfo]:
     return [preset_info(preset) for preset in own_presets(session, owner_id())]
 
 
-@router.post("/presets", status_code=201, dependencies=[Depends(viewer)])
+@router.post("/presets", status_code=201, dependencies=[Depends(viewer)], summary="Save a Playground preset")
 def create_preset(body: SavedPresetBody, session: SessionDep) -> SavedPresetInfo:
     user_id = owner_id()
     name = body.name.strip()
@@ -314,7 +314,7 @@ def create_preset(body: SavedPresetBody, session: SessionDep) -> SavedPresetInfo
     return preset_info(preset)
 
 
-@router.put("/presets/{preset_id}", dependencies=[Depends(viewer)])
+@router.put("/presets/{preset_id}", dependencies=[Depends(viewer)], summary="Change a Playground preset")
 def update_preset(preset_id: int, body: SavedPresetUpdate, session: SessionDep) -> SavedPresetInfo:
     preset = own_preset(session, preset_id)
     if body.name is not None:
@@ -331,7 +331,9 @@ def update_preset(preset_id: int, body: SavedPresetUpdate, session: SessionDep) 
     return preset_info(preset)
 
 
-@router.delete("/presets/{preset_id}", status_code=204, dependencies=[Depends(viewer)])
+@router.delete(
+    "/presets/{preset_id}", status_code=204, dependencies=[Depends(viewer)], summary="Delete a Playground preset"
+)
 def delete_preset(preset_id: int, session: SessionDep) -> None:
     session.delete(own_preset(session, preset_id))
     session.commit()

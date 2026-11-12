@@ -17,7 +17,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry import playground_sessions as chats
 from minibrain.registry.models import Model, PlaygroundSession, now
 
-router = APIRouter(prefix="/api/playground", tags=["playground"])
+router = APIRouter(prefix="/api/playground")
 
 LISTED = 500
 MAX_TURNS = 1000

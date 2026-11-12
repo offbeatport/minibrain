@@ -184,7 +184,7 @@ function inlineCode(name: string): string {
 function installNote(baseUrl: string, models: string[]): string {
     const names = models.length
         ? `Models deployed now: ${models.map(inlineCode).join(", ")}. A key calls the ones it covers.`
-        : "No model is deployed yet. Deploy one from Deployments or a base model's page.";
+        : "No model is deployed yet. Deploy one from its model page.";
     return `## On this install\n\nBase URL: ${inlineCode(baseUrl)}\n\n${names}`;
 }
 

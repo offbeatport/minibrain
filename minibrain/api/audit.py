@@ -22,7 +22,7 @@ from minibrain.registry.models import PEER_ADDRESS, AuditEvent, now
 from minibrain.registry.service import NotFoundError
 from minibrain.siem import target_of, waiting
 
-router = APIRouter(prefix="/api/audit", tags=["audit"])
+router = APIRouter(prefix="/api/audit")
 
 PAGE_SIZE = 50
 PAGE_MAX = 500
@@ -176,7 +176,7 @@ def page_rows(
     return newest(session, conditions, size)
 
 
-@router.get("", dependencies=[Depends(admin)])
+@router.get("", dependencies=[Depends(admin)], summary="List audit events")
 def list_events(
     session: SessionDep,
     found: FilterDep,
@@ -201,7 +201,7 @@ def list_events(
     )
 
 
-@router.get("/facets", dependencies=[Depends(admin)])
+@router.get("/facets", dependencies=[Depends(admin)], summary="Count audit events by filter")
 def facets(session: SessionDep) -> AuditFacets:
     def counted(column: Any) -> list[AuditFacet]:
         rows = session.execute(select(column, func.count()).group_by(column).order_by(column)).all()
@@ -252,6 +252,7 @@ def export_stream(
     response_class=StreamingResponse,
     responses={200: {"content": {"text/csv": {}}}},
     dependencies=[Depends(admin)],
+    summary="Export the audit log",
 )
 def export(request: Request, found: FilterDep, format: Literal["csv", "jsonl"] = "csv") -> StreamingResponse:
     name = f"minibrain-audit-{now().strftime('%Y%m%d-%H%M%S')}.{format}"
@@ -289,12 +290,12 @@ def siem_info(session: Session) -> SiemInfo:
     )
 
 
-@router.get("/chain", dependencies=[Depends(admin)])
+@router.get("/chain", dependencies=[Depends(admin)], summary="Check the audit hash chain")
 def chain(session: SessionDep) -> AuditChainInfo:
     return chain_info(verify(session), siem_info(session))
 
 
-@router.get("/{event_id}", dependencies=[Depends(admin)])
+@router.get("/{event_id}", dependencies=[Depends(admin)], summary="Read an audit event")
 def event(event_id: int, session: SessionDep) -> AuditInfo:
     found = session.get(AuditEvent, event_id)
     if found is None:

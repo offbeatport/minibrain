@@ -39,7 +39,7 @@ from minibrain.telemetry.target import OtlpTarget, TargetError
 from minibrain.telemetry.target import target_of as otlp_target_of
 from minibrain.versions import library_version
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/api/system")
 
 BUILD_FILE = Path(__file__).resolve().parent.parent / "build.json"
 ENVIRONMENT_PREFIXES = ("MINIBRAIN_", "HF_", "HUGGING_FACE_", "AWS_")
@@ -288,7 +288,7 @@ def install_info(session: Session, settings: Settings, store: ArtifactStore, nod
     )
 
 
-@router.get("/install", dependencies=[Depends(admin)])
+@router.get("/install", dependencies=[Depends(admin)], summary="Read install facts")
 def install(session: SessionDep, settings: SettingsDep, store: StoreDep, node: LocalNodeDep) -> InstallInfo:
     return install_info(session, settings, store, node)
 
@@ -362,6 +362,7 @@ def diagnostics_files(session: Session, settings: Settings, store: ArtifactStore
     response_class=Response,
     responses={200: {"content": {"application/zip": {}}}},
     dependencies=[Depends(admin)],
+    summary="Download diagnostics",
 )
 def diagnostics(session: SessionDep, settings: SettingsDep, store: StoreDep, node: LocalNodeDep) -> Response:
     stamp = now().strftime("%Y%m%d-%H%M%S")

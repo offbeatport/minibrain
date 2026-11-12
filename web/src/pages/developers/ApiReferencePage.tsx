@@ -30,8 +30,10 @@ const TABS: TabNavItem[] = [
 ];
 
 const CAPTIONS: Record<Kind, string> = {
-    gateway: "Call models from your apps with an API key: models, chat completions and feedback.",
-    management: "Automate minibrain itself: data, models, training, deployments and settings.",
+    gateway:
+        "Stable. For apps. Drop-in for the OpenAI API: models, chat and text completions, and feedback, with an API key.",
+    management:
+        "For the minibrain UI and automation. May change between versions: data, models, training, keys and settings.",
 };
 
 const SOURCES = { gateway: "/api/openapi/v1.json", management: "/api/openapi/api.json" } as const;

@@ -29,7 +29,7 @@ from minibrain.jobs.metrics import (
 )
 from minibrain.registry.models import Job, JobKind
 
-router = APIRouter(prefix="/api", tags=["jobs"])
+router = APIRouter(prefix="/api")
 
 
 def number(data: dict[str, Any], key: str) -> float | None:
@@ -115,7 +115,7 @@ def counted(session: Session, job: Job) -> CountedMetrics | None:
     return CountedMetrics(done=whole(data, "done") or 0, total=whole(data, "total") or 0)
 
 
-@router.get("/jobs/{job_id}/metrics", dependencies=[Depends(viewer)])
+@router.get("/jobs/{job_id}/metrics", dependencies=[Depends(viewer)], summary="Read a job's training metrics")
 def job_metrics(job_id: int, session: SessionDep) -> JobMetrics:
     job = get_job(session, job_id)
     if job.kind == JobKind.TRAIN:

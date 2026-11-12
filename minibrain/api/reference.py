@@ -3,13 +3,13 @@ from collections.abc import Iterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Request
-from fastapi.routing import APIRoute
 
 from minibrain.api.access import PUBLIC_PATHS, SAFE_METHODS, Guard, viewer
+from minibrain.api.sections import routes_of, section_tags, tag_groups
 from minibrain.auth.accounts import SESSION_COOKIE
 from minibrain.auth.roles import LABELS, Role
 
-router = APIRouter(prefix="/api/openapi", tags=["reference"])
+router = APIRouter(prefix="/api/openapi")
 
 GATEWAY_PREFIX = "/v1"
 MANAGEMENT_PREFIX = "/api/"
@@ -17,12 +17,19 @@ SCHEMA_REF = "#/components/schemas/"
 CSRF_SCHEME = "csrf"
 ACCESS_NOTES = {"public": "No sign-in needed.", "signed_in": "Needs a signed-in person."}
 
-GATEWAY_INTRO = """Call minibrain models from any OpenAI client: set its base URL to this install's `/v1` and its \
-API key to a minibrain key.
+GATEWAY_TITLE = "OpenAI-compatible API"
+GATEWAY_LABEL = "Stable. For apps. Drop-in for the OpenAI API."
+GATEWAY_INTRO = f"""**{GATEWAY_LABEL}**
 
-- A custom model's name follows its live version, `name@3` pins version 3, and a served base model goes by its key. \
+Point any OpenAI client or SDK at minibrain and keep your code. Routes, fields and errors follow OpenAI's, and \
+changes to this API keep working for the apps that call it.
+
+- **Base URL:** this install's address followed by `/v1`. This install's base URL is below.
+- **API name:** every model, custom or base, is called by its API name, the name in its address on the model page \
+(`support-triage`). A custom model's name follows its live version; `name@N` pins version N (`support-triage@3`). \
 `GET /models` lists the names a key can call.
-- Keys are created on Deployments and cover one or more models; a call to a model the key does not cover gets 403.
+- **Keys:** create one on the API keys page and send it as `Authorization: Bearer mb_...`. A key covers picked \
+models or all models; a call to a model it does not cover gets 403, and an unknown or deleted name 404.
 - Sampling fields left out keep the model's default; `top_k`, `min_p` and `repetition_penalty` are the engine \
 extensions vLLM and SGLang share.
 - `tools` work with models whose chat template has a tool-call format (Qwen, Hermes, Llama 3.1 and later, Mistral, \
@@ -35,8 +42,16 @@ and `finish_reason: content_filter`.
 models; a custom model applies its adapter but not its instructions or contract.
 - Send a completion's `id` to `POST /feedback` to rate or correct its answer."""
 
-MANAGEMENT_INTRO = f"""The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, \
-monitoring and settings. Each operation names the role it needs.
+MANAGEMENT_TITLE = "Management API"
+MANAGEMENT_LABEL = "For the minibrain UI and automation. May change between versions."
+MANAGEMENT_INTRO = f"""**{MANAGEMENT_LABEL}**
+
+The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, monitoring and settings. \
+Each operation names the role it needs. Paths and fields can change in any release, so pin scripts to a minibrain \
+version and check this reference when you upgrade.
+
+Models are one resource keyed by their API name: `GET /api/models` lists custom and base models, and \
+`/api/models/{{name}}` reads, changes, deploys or deletes either kind.
 
 Calls carry a signed-in session, not an API key:
 
@@ -47,15 +62,6 @@ Calls carry a signed-in session, not an API key:
 Apps call models through the OpenAI-compatible `/v1` API with API keys instead."""
 
 CSRF_HELP = "The csrf_token from POST /api/auth/login or GET /api/auth/session, on every POST, PUT, PATCH and DELETE."
-
-
-def routes_of(routes: list[Any]) -> Iterator[APIRoute]:
-    for route in routes:
-        included = getattr(route, "original_router", None)
-        if included is not None:
-            yield from routes_of(included.routes)
-        elif isinstance(route, APIRoute):
-            yield route
 
 
 def access_of(app: FastAPI) -> dict[tuple[str, str], str]:
@@ -117,6 +123,15 @@ def tags_of(paths: dict[str, Any]) -> list[dict[str, str]]:
     return [{"name": name, "x-displayName": name[:1].upper() + name[1:]} for name in names]
 
 
+def grouped(paths: dict[str, Any]) -> dict[str, Any]:
+    present = {tag for item in paths.values() for operation in item.values() for tag in operation.get("tags", [])}
+    groups = [group | {"tags": [tag for tag in group["tags"] if tag in present]} for group in tag_groups()]
+    return {
+        "tags": [tag for tag in section_tags() if tag["name"] in present],
+        "x-tagGroups": [group for group in groups if group["tags"]],
+    }
+
+
 def document(
     full: dict[str, Any], title: str, intro: str, server: str, paths: dict[str, Any], schemes: dict[str, Any]
 ) -> dict[str, Any]:
@@ -137,7 +152,7 @@ def gateway_document(full: dict[str, Any]) -> dict[str, Any]:
         if path.startswith(f"{GATEWAY_PREFIX}/")
     }
     schemes = full["components"].get("securitySchemes", {})
-    return document(full, "OpenAI-compatible API", GATEWAY_INTRO, GATEWAY_PREFIX, paths, schemes)
+    return document(full, GATEWAY_TITLE, GATEWAY_INTRO, GATEWAY_PREFIX, paths, schemes)
 
 
 def annotated(operation: dict[str, Any], method: str, path: str, access: str | None, renamed: bool) -> dict[str, Any]:
@@ -164,14 +179,14 @@ def management_document(full: dict[str, Any], app: FastAPI) -> dict[str, Any]:
         if path.startswith(MANAGEMENT_PREFIX)
     }
     schemes = {CSRF_SCHEME: {"type": "apiKey", "in": "header", "name": "X-CSRF-Token", "description": CSRF_HELP}}
-    return document(full, "Management API", MANAGEMENT_INTRO, "/", paths, schemes)
+    return document(full, MANAGEMENT_TITLE, MANAGEMENT_INTRO, "/", paths, schemes) | grouped(paths)
 
 
-@router.get("/v1.json", dependencies=[Depends(viewer)], summary="OpenAPI document for /v1")
+@router.get("/v1.json", dependencies=[Depends(viewer)], summary="OpenAPI document for the OpenAI-compatible API")
 def gateway_reference(request: Request) -> dict[str, Any]:
     return gateway_document(request.app.openapi())
 
 
-@router.get("/api.json", dependencies=[Depends(viewer)], summary="OpenAPI document for /api")
+@router.get("/api.json", dependencies=[Depends(viewer)], summary="OpenAPI document for the Management API")
 def management_reference(request: Request) -> dict[str, Any]:
     return management_document(request.app.openapi(), request.app)

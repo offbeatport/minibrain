@@ -45,7 +45,7 @@ from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.registry.settings_store import write
 from minibrain.settings import Settings
 
-router = APIRouter(prefix="/api/catalog", tags=["catalog"])
+router = APIRouter(prefix="/api/catalog")
 SYNC_INTERVAL_SECONDS = 24 * 3600
 SCHEDULE_CHECK_SECONDS = 3600.0
 
@@ -159,7 +159,7 @@ def latest_sync(session: Session) -> Job | None:
     return session.scalar(query)
 
 
-@router.get("", dependencies=[Depends(viewer)])
+@router.get("", dependencies=[Depends(viewer)], summary="List the model catalogue")
 def catalogue(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, pool: str | None = None
 ) -> CatalogResponse:
@@ -194,7 +194,9 @@ def catalogue(
     )
 
 
-@router.post("/{catalog_id}/download", status_code=202, dependencies=[Depends(admin)])
+@router.post(
+    "/{catalog_id}/download", status_code=202, dependencies=[Depends(admin)], summary="Download a catalogue model"
+)
 def download(
     catalog_id: str, body: DownloadRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> ModelRow:
@@ -216,7 +218,9 @@ class HubAddRequest(pydantic.BaseModel):
     repo: str
 
 
-@router.post("/hub", status_code=201, dependencies=[Depends(admin)])
+@router.post(
+    "/hub", status_code=201, dependencies=[Depends(admin)], summary="Add a Hugging Face model to the catalogue"
+)
 def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> CatalogEntry:
     policy = load_policy(session)
     policy.add_from_hub()
@@ -244,7 +248,9 @@ def add_from_hub(body: HubAddRequest, session: SessionDep, settings: SettingsDep
     return local_info(session, settings, node, added)
 
 
-@router.delete("/{catalog_id}", status_code=204, dependencies=[Depends(admin)])
+@router.delete(
+    "/{catalog_id}", status_code=204, dependencies=[Depends(admin)], summary="Remove a model from the catalogue"
+)
 def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
     entry = session.get(CatalogModel, catalog_id)
     if entry is None:
@@ -257,7 +263,7 @@ def remove_from_catalogue(catalog_id: str, session: SessionDep) -> None:
     session.commit()
 
 
-@router.post("/sync", status_code=202, dependencies=[Depends(admin)])
+@router.post("/sync", status_code=202, dependencies=[Depends(admin)], summary="Sync the catalogue")
 def sync(session: SessionDep) -> JobInfo:
     if hub.offline():
         raise ConflictError("Offline: the catalogue sync needs a connection; the bundled catalogue stays in use")
@@ -283,12 +289,12 @@ def catalog_settings(session: Session) -> CatalogSettingsInfo:
     return CatalogSettingsInfo(daily_sync=daily_sync(session), daily_sync_locked=locked)
 
 
-@router.get("/settings", dependencies=[Depends(viewer)])
+@router.get("/settings", dependencies=[Depends(viewer)], summary="Read catalogue settings")
 def read_settings(session: SessionDep) -> CatalogSettingsInfo:
     return catalog_settings(session)
 
 
-@router.put("/settings", dependencies=[Depends(admin)])
+@router.put("/settings", dependencies=[Depends(admin)], summary="Change catalogue settings")
 def update_settings(body: CatalogSettings, session: SessionDep) -> CatalogSettingsInfo:
     if body.daily_sync != daily_sync(session):
         provision.provided("catalogue").refuse("daily_sync", "Check every day")

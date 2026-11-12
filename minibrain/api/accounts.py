@@ -25,7 +25,7 @@ from minibrain.auth.identity import current_actor, current_person
 from minibrain.auth.roles import Role, role_of
 from minibrain.registry.models import AuditEvent, LoginSession, User, now
 
-router = APIRouter(prefix="/api/accounts", tags=["accounts"])
+router = APIRouter(prefix="/api/accounts")
 
 RESET_PATH = "/reset-password"
 NAME_LENGTH = 200
@@ -145,7 +145,7 @@ def is_last_admin(session: Session, user: User) -> bool:
     return user.role == Role.ADMIN.value and not user.disabled and enabled_admins(session) <= 1
 
 
-@router.get("", dependencies=[Depends(admin)])
+@router.get("", dependencies=[Depends(admin)], summary="List accounts")
 def accounts(session: SessionDep, config: AuthDep) -> AccountsInfo:
     counts = session_counts(session)
     people = session.scalars(select(User).order_by(func.lower(User.name), User.id))
@@ -160,7 +160,7 @@ def accounts(session: SessionDep, config: AuthDep) -> AccountsInfo:
     )
 
 
-@router.post("", status_code=201, dependencies=[Depends(admin)])
+@router.post("", status_code=201, dependencies=[Depends(admin)], summary="Add an account")
 def add_account(body: AccountCreate, session: SessionDep, config: AuthDep) -> PasswordLink:
     user = create_local(session, body.email, body.name, body.role)
     return password_link(session, config, user, "account.create", {"role": body.role.value, "source": LOCAL})
@@ -196,7 +196,7 @@ def change_disabled(session: Session, user: User, disabled: bool) -> tuple[Any, 
     return not disabled, disabled
 
 
-@router.patch("/{account_id}", dependencies=[Depends(admin)])
+@router.patch("/{account_id}", dependencies=[Depends(admin)], summary="Change an account's role or status")
 def update_account(account_id: int, body: AccountUpdate, session: SessionDep, config: AuthDep) -> AccountInfo:
     user = get_user(session, account_id)
     changes: dict[str, tuple[Any, Any]] = {}
@@ -216,6 +216,6 @@ def update_account(account_id: int, body: AccountUpdate, session: SessionDep, co
     return one_account(session, config, user)
 
 
-@router.post("/{account_id}/password-link", dependencies=[Depends(admin)])
+@router.post("/{account_id}/password-link", dependencies=[Depends(admin)], summary="Make a password reset link")
 def reset_password(account_id: int, session: SessionDep, config: AuthDep) -> PasswordLink:
     return password_link(session, config, get_user(session, account_id), "account.reset", {})

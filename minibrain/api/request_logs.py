@@ -20,7 +20,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.models import ApiKey, BaseModel, Feedback, FeedbackStatus, Model, RequestLog
 from minibrain.registry.service import NotFoundError
 
-router = APIRouter(prefix="/api", tags=["requests"])
+router = APIRouter(prefix="/api")
 
 PAGE = 50
 PAGE_MAX = 200
@@ -314,7 +314,7 @@ def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
     return items
 
 
-@router.get("/requests", dependencies=[Depends(viewer)])
+@router.get("/requests", dependencies=[Depends(viewer)], summary="List requests")
 def list_requests(
     session: SessionDep,
     filters: FilterDep,
@@ -413,7 +413,7 @@ def status_facets(session: Session, where: list[ColumnElement[bool]]) -> dict[st
     return counts
 
 
-@router.get("/requests/facets", dependencies=[Depends(viewer)])
+@router.get("/requests/facets", dependencies=[Depends(viewer)], summary="Count requests by filter")
 def request_facets(session: SessionDep, filters: FilterDep) -> RequestFacets:
     return RequestFacets(
         total=count_requests(session, filters.conditions()),
@@ -432,7 +432,7 @@ def latency_at(session: Session, where: list[ColumnElement[bool]], share: float,
     return session.scalar(query)
 
 
-@router.get("/requests/summary", dependencies=[Depends(viewer)])
+@router.get("/requests/summary", dependencies=[Depends(viewer)], summary="Summarise requests")
 def request_summary(session: SessionDep, filters: FilterDep) -> RequestSummary:
     where = filters.conditions()
     failed = case((RequestLog.status >= CLIENT_ERROR, 1), else_=0)
@@ -485,7 +485,7 @@ def body_state(session: Session, log: RequestLog, rows: bool) -> tuple[BodyState
     return ("missing" if kept else "off"), lock is not None
 
 
-@router.get("/requests/{request_id}", dependencies=[Depends(viewer)])
+@router.get("/requests/{request_id}", dependencies=[Depends(viewer)], summary="Read a request")
 def read_request(request_id: int, session: SessionDep) -> RequestDetail:
     found = rows_for(session, [RequestLog.id == request_id], 1)
     if not found:

@@ -5,7 +5,7 @@ from sqlalchemy import text
 from minibrain.api.deps import SessionDep
 from minibrain.telemetry.prometheus import metrics_response
 
-router = APIRouter(tags=["ops"])
+router = APIRouter(include_in_schema=False)
 
 
 @router.get("/healthz")

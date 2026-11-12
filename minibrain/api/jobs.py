@@ -47,7 +47,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import NotFoundError
 from minibrain.settings import Settings
 
-router = APIRouter(prefix="/api", tags=["jobs"])
+router = APIRouter(prefix="/api")
 
 EVENT_POLL_SECONDS = 0.5
 EVENT_BATCH = 500
@@ -148,7 +148,7 @@ def count_jobs(session: Session, where: list[ColumnElement[bool]]) -> int:
     return session.scalar(select(func.count()).select_from(Job).where(*where)) or 0
 
 
-@router.get("/jobs", dependencies=[Depends(viewer)])
+@router.get("/jobs", dependencies=[Depends(viewer)], summary="List jobs")
 def list_jobs(
     session: SessionDep,
     filters: FilterDep,
@@ -178,7 +178,7 @@ def list_jobs(
     )
 
 
-@router.get("/jobs/facets", dependencies=[Depends(viewer)])
+@router.get("/jobs/facets", dependencies=[Depends(viewer)], summary="Count jobs by filter")
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
     by_kind = select(Job.kind, func.count()).where(*conditions(filters, "kind")).group_by(Job.kind)
@@ -212,7 +212,7 @@ def worker_host(session: Session, job: Job) -> str | None:
     return worker.host if worker is not None else None
 
 
-@router.get("/jobs/{job_id}", dependencies=[Depends(viewer)])
+@router.get("/jobs/{job_id}", dependencies=[Depends(viewer)], summary="Read a job")
 def read_job(job_id: int, session: SessionDep) -> JobDetail:
     job = get_job(session, job_id)
     context = {
@@ -310,17 +310,17 @@ def each_job(session: Session, ids: list[int], act: Callable[[Job], Job | None])
     return results
 
 
-@router.post("/jobs/cancel", dependencies=[Depends(builder)])
+@router.post("/jobs/cancel", dependencies=[Depends(builder)], summary="Cancel jobs")
 def cancel_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobActionResult]:
     return each_job(session, body.ids, lambda job: cancel(session, queue, job))
 
 
-@router.post("/jobs/retry", dependencies=[Depends(builder)])
+@router.post("/jobs/retry", dependencies=[Depends(builder)], summary="Retry jobs")
 def retry_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobActionResult]:
     return each_job(session, body.ids, lambda job: retry(session, queue, job))
 
 
-@router.post("/jobs/{job_id}/cancel", dependencies=[Depends(builder)])
+@router.post("/jobs/{job_id}/cancel", dependencies=[Depends(builder)], summary="Cancel a job")
 def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     job = get_job(session, job_id)
     cancel(session, queue, job)
@@ -328,7 +328,7 @@ def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     return job_info(job)
 
 
-@router.post("/jobs/{job_id}/retry", status_code=201, dependencies=[Depends(builder)])
+@router.post("/jobs/{job_id}/retry", status_code=201, dependencies=[Depends(builder)], summary="Retry a job")
 def retry_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     again = retry(session, queue, get_job(session, job_id))
     session.commit()
@@ -383,7 +383,7 @@ def delete_one(
     return JobActionResult(id=job_id, done=True, status=before if left.removed else job.status)
 
 
-@router.post("/jobs/delete", dependencies=[Depends(builder)])
+@router.post("/jobs/delete", dependencies=[Depends(builder)], summary="Delete jobs")
 def delete_jobs(
     body: JobDeletion, session: SessionDep, queue: QueueDep, settings: SettingsDep, store: StoreDep
 ) -> list[JobActionResult]:
@@ -401,6 +401,7 @@ def delete_jobs(
     response_model=None,
     responses={202: {"model": JobInfo, "description": "Cancelled; it goes once it stops"}},
     dependencies=[Depends(builder)],
+    summary="Delete a job",
 )
 def delete_job(
     job_id: int,
@@ -419,7 +420,12 @@ def delete_job(
     return Response(status_code=204)
 
 
-@router.get("/artifacts/{artifact_id}", response_class=StreamingResponse, dependencies=[Depends(builder)])
+@router.get(
+    "/artifacts/{artifact_id}",
+    response_class=StreamingResponse,
+    dependencies=[Depends(builder)],
+    summary="Download a job artifact",
+)
 def download(artifact_id: str, session: SessionDep, store: StoreDep) -> StreamingResponse:
     artifact = session.get(Artifact, artifact_id)
     if artifact is None or not store.has(artifact_id):

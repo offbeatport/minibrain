@@ -12,7 +12,7 @@ from minibrain.registry.compute import Pool, pools, replica_host
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
 
-router = APIRouter(prefix="/api/compute", tags=["compute"])
+router = APIRouter(prefix="/api/compute")
 
 MAX_HOURLY_PRICE = 1_000_000
 PoolName = Annotated[str, StringConstraints(min_length=1, max_length=200)]
@@ -59,7 +59,7 @@ class PoolInfo(BaseModel):
     engines: list[ReplicaInfo]
 
 
-@router.get("/pools", dependencies=[Depends(viewer)])
+@router.get("/pools", dependencies=[Depends(viewer)], summary="List compute pools")
 def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
     found: list[PoolInfo] = []
     for pool in pools(session, node):
@@ -140,12 +140,12 @@ def prices_info(found: list[Pool], prices: DevicePrices) -> DevicePricesInfo:
     return DevicePricesInfo(currency=prices.currency, currency_locked=provided.source("currency"), pools=listed + gone)
 
 
-@router.get("/prices", dependencies=[Depends(viewer)])
+@router.get("/prices", dependencies=[Depends(viewer)], summary="Read device prices")
 def read_prices(session: SessionDep, node: LocalNodeDep) -> DevicePricesInfo:
     return prices_info(pools(session, node), load_prices(session))
 
 
-@router.put("/prices", dependencies=[Depends(admin)])
+@router.put("/prices", dependencies=[Depends(admin)], summary="Change device prices")
 def update_prices(body: DevicePricesUpdate, session: SessionDep, node: LocalNodeDep) -> DevicePricesInfo:
     before = load_prices(session)
     saved = save_prices(session, body.currency, body.hourly)

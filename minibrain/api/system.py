@@ -42,7 +42,7 @@ from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
 
-router = APIRouter(prefix="/api", tags=["system"])
+router = APIRouter(prefix="/api")
 
 MEGABYTE = 1024 * 1024
 
@@ -80,7 +80,7 @@ def loaded_models(backend: ServingBackend) -> list[LoadedModel]:
     ]
 
 
-@router.get("/system", dependencies=[Depends(viewer)])
+@router.get("/system", dependencies=[Depends(viewer)], summary="Read the version and features")
 def system(request: Request, session: SessionDep, backend: BackendDep) -> SystemInfo:
     counts = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
     return SystemInfo(
@@ -193,12 +193,12 @@ def storage_update(body: StorageUpdate) -> StorageConfig:
     )
 
 
-@router.get("/settings/storage", dependencies=[Depends(admin)])
+@router.get("/settings/storage", dependencies=[Depends(admin)], summary="Read storage settings")
 def read_storage(session: SessionDep, settings: SettingsDep, store: StoreDep) -> StorageSettings:
     return storage_settings(session, settings, store)
 
 
-@router.put("/settings/storage", dependencies=[Depends(admin)])
+@router.put("/settings/storage", dependencies=[Depends(admin)], summary="Change storage settings")
 def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> StorageSettings:
     try:
         save_storage(session, settings, storage_update(body), body.secret, current_actor())
@@ -209,7 +209,7 @@ def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsD
     return storage_settings(session, settings, store)
 
 
-@router.post("/settings/storage/test", dependencies=[Depends(admin)])
+@router.post("/settings/storage/test", dependencies=[Depends(admin)], summary="Test storage settings")
 def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     config = storage_update(body)
     try:
@@ -220,7 +220,7 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
 
 
-@router.get("/system/infrastructure", dependencies=[Depends(viewer)])
+@router.get("/system/infrastructure", dependencies=[Depends(viewer)], summary="List servers, devices and engines")
 def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
@@ -261,7 +261,7 @@ def dataset_version_usage(session: Session) -> DatasetVersionUsage:
     )
 
 
-@router.get("/settings", dependencies=[Depends(viewer)])
+@router.get("/settings", dependencies=[Depends(viewer)], summary="Read install settings")
 def install_settings() -> InstallSettings:
     return InstallSettings(
         recipe=DEFAULT_RECIPE,

@@ -40,7 +40,7 @@ def worker_token(request: Request, authorization: Annotated[str, Header()] = "")
         raise HTTPException(status_code=401, detail="invalid worker token")
 
 
-router = APIRouter(prefix="/internal/worker", tags=["worker"], dependencies=[Depends(worker_token)])
+router = APIRouter(prefix="/internal/worker", include_in_schema=False, dependencies=[Depends(worker_token)])
 
 
 class WorkerBody(pydantic.BaseModel):

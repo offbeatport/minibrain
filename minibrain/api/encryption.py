@@ -26,7 +26,7 @@ from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read
 from minibrain.settings import Settings
 
-router = APIRouter(prefix="/api/settings/encryption", tags=["security"])
+router = APIRouter(prefix="/api/settings/encryption")
 
 PROVIDER_PREFIXES = ("vault_", "hsm_", "kms_")
 
@@ -203,12 +203,12 @@ def apply_values(session: Session, values: dict[str, Any], actor: str) -> None:
     session.flush()
 
 
-@router.get("", dependencies=[Depends(admin)])
+@router.get("", dependencies=[Depends(admin)], summary="Read encryption status")
 def encryption_status(session: SessionDep, settings: SettingsDep) -> EncryptionStatus:
     return status(session, settings)
 
 
-@router.put("", dependencies=[Depends(admin)])
+@router.put("", dependencies=[Depends(admin)], summary="Change encryption settings")
 def change_encryption(body: EncryptionUpdate, session: SessionDep, settings: SettingsDep) -> EncryptionStatus:
     actor = current_actor()
     try:
@@ -222,7 +222,7 @@ def change_encryption(body: EncryptionUpdate, session: SessionDep, settings: Set
     return status(session, settings)
 
 
-@router.post("/test", dependencies=[Depends(admin)])
+@router.post("/test", dependencies=[Depends(admin)], summary="Test an encryption key")
 def test_encryption(body: EncryptionUpdate, session: SessionDep, settings: SettingsDep) -> EncryptionCheck:
     try:
         apply_values(session, body.values, current_actor())
@@ -240,7 +240,7 @@ def test_encryption(body: EncryptionUpdate, session: SessionDep, settings: Setti
         session.rollback()
 
 
-@router.post("/tasks", dependencies=[Depends(admin)])
+@router.post("/tasks", dependencies=[Depends(admin)], summary="Start a re-encryption task")
 def start_task(body: EncryptionTaskRequest, session: SessionDep, settings: SettingsDep) -> EncryptionStatus:
     actor = current_actor()
     if body.kind != rekey.CHECK and not keys_for(settings).sealing():

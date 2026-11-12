@@ -29,7 +29,7 @@ def gateway_token(request: Request, authorization: Annotated[str, Header()] = ""
         raise HTTPException(status_code=401, detail="invalid gateway token")
 
 
-router = APIRouter(prefix="/internal/gateway", tags=["gateway"], dependencies=[Depends(gateway_token)])
+router = APIRouter(prefix="/internal/gateway", include_in_schema=False, dependencies=[Depends(gateway_token)])
 
 
 class LogBody(BaseModel):

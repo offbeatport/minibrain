@@ -1025,14 +1025,26 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - Harness config export: base URL, key and model name for common harnesses.
 - API reference (`/developers`): Scalar, bundled into the web build and loaded as its own chunk, with its telemetry,
   fonts, request proxy, agent, MCP, developer tools, SDK generation and client.scalar.com links off, so the page makes
-  no call outside the install. Two documents cut from main's schema, for any role: `GET /api/openapi/v1.json` (the
-  gateway, with `/v1` as its server and the bearer key scheme) and `GET /api/openapi/api.json` (every `/api` route
-  with the role it needs, and the CSRF header on changes). The page fills in this install's base URL and deployed
+  no call outside the install. Two documents cut from main's schema, for any role: `GET /api/openapi/v1.json`, the
+  OpenAI-compatible API ("Stable. For apps. Drop-in for the OpenAI API."; `/v1` as its server, the bearer key scheme,
+  and an intro on API names, `name@N`, keys and the base URL), and `GET /api/openapi/api.json`, the Management API
+  ("For the minibrain UI and automation. May change between versions."; every `/api` route with the role it needs and
+  the CSRF header on changes). Management routes carry one tag each from `minibrain/api/sections.py` (Models,
+  Versions, Data, Training and jobs, Evaluations, Feedback, Playground; Monitoring, Keys, Infrastructure; Settings,
+  Accounts, Audit, Reference), grouped by `x-tagGroups` into Build, Operate and Administer. `/internal` (workers and
+  gateways), `/healthz`, `/readyz` and `/metrics` are left out of the schema (`docs/observability.md` covers the
+  operator endpoints). The page fills in this install's base URL and deployed
   model names, and curl, Python and JavaScript samples (the `openai` SDK for `/v1`). Try it: `/v1` with a key pasted
   into the page, kept in memory and never sent to main; `/api` with the signed-in session, the page adding the CSRF
   token to same-origin `/api` calls only, so a call runs with the person's role and is audited like the same change in
   the UI. FastAPI's `/docs`, `/redoc` and `/openapi.json` are off on main, gateways and engines (404), and the schema
-  carries the package version; `minibrain openapi` still prints the whole schema for generated clients.
+  carries the package version; `minibrain openapi` still prints the public schema (`/v1` and `/api`) for generated
+  clients.
+- Models are one `/api` resource keyed by the shared API name: `GET /api/models` (`?kind=custom|base`),
+  `GET|PATCH|DELETE /api/models/{name}` and `POST /api/models/{name}/deploy` for either kind (a base's rename and
+  delete need Admin), custom-only sub-resources (`/versions`, `/training-plan`, `/contract`, `/dataset`, ...),
+  base-only actions (`/verify`, `/repair`, `/reimport`, `/relocate`, `/recheck`, `/retry`, `/test`), and the page's
+  views (`/overview`, `/traffic`, `/activity`).
 
 ### Accounts and roles
 
@@ -1187,7 +1199,7 @@ keys, and `/v1` stays key-only.
   (format, size, trainable or serve-only, API name, Deployed, Update available). Only those child rows tick: versions
   can be compared (two of one model) or deleted, variants deployed, undeployed or deleted, live ones skipped, through
   the shared delete dialog. The quick look is a `Sheet`: score over versions, a week of traffic, p95, errors and cost,
-  the latest requests, the model page's next step, and Open model, Make vN live and Playground. `/api/all-models`
+  the latest requests, the model page's next step, and Open model, Make vN live and Playground. `GET /api/models`
   carries what it needs in a fixed number of queries: versions loaded in one batch, requests, p50, p95, 4xx/5xx and
   device time from the model page's traffic statistics in one ranked query (so the 7-day numbers match its
   Monitoring), live replicas per base, and each base's catalogue model, format and trainability. Viewers see no
@@ -1217,7 +1229,7 @@ keys, and `/v1` stays key-only.
     (labels, instructions, graders, promotion rule; their pencils open the Versions sections), data (splits, feedback
     waiting, test examples), serving (safety, kept inputs, machines), lineage and integrity (the live adapter's and the
     base's SHA-256 with copy, the model card). Activity is the audit log filtered to the model, its versions, keys and
-    jobs (`/api/model-pages/<name>/activity`), as sentences with day separators and runs of three or more folded; All
+    jobs (`/api/models/<name>/activity`), as sentences with day separators and runs of three or more folded; All
     activity opens the audit log searched for it (Admins).
   - Versions: a table with a Status column (dot and text), the main score and a badge against live ("beats live +1.4"
     or "below rule", none on v0 · Baseline), Watch, Retry and Make vN live; ticking two compares them, ticking any
@@ -1242,7 +1254,7 @@ keys, and `/v1` stays key-only.
   - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1,000 against the period
     before, and the shared chart), Latency (p50, p95, p99), Errors (the rate against the usual one and a table by
     status linking to the request log), By version, Callers (API keys) and the latest requests, all from
-    `/api/model-pages/<name>/traffic`, one query per range, so its numbers match the Overview and the Models list.
+    `/api/models/<name>/traffic`, one query per range, so its numbers match the Overview and the Models list.
     Line charts only.
   - API keys: the model's keys (a name is required and unique among the keys that call the same model, shown in the
     list, Callers and the request log; the secret is shown once), the endpoint and harness configs, the feedback API,
@@ -1851,6 +1863,11 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   `/api/base-models/{key}/…`, the import routes are `/api/base-models/inspect` and `/api/base-models/import`, and the
   Models list (models you own and bases) is `GET /api/all-models`. Jobs carry `model` and `base_model`; gateway key
   owners are `model:<id>` and `base:<key>`, and a gateway config without `owners` is no longer read.
+- [x] One models resource keyed by the API name (2026-11-12): `GET /api/models` lists both kinds as rows
+  (`?kind=custom|base`), `GET|PATCH|DELETE /api/models/{name}` and `POST /api/models/{name}/deploy` take either kind,
+  base-only actions are `/api/models/{name}/verify|repair|reimport|relocate|recheck|retry|test`, imports are
+  `POST /api/models/inspect` and `/import`, and the page views are `/api/models/{name}/overview|traffic|activity`.
+  `/api/all-models`, `/api/base-models/…` and `/api/model-pages/…` are gone.
 - [x] "Snapshot" is "dataset version" in code, API and docs, as in the UI: the `dataset_versions` table and
   `DatasetVersion`, `dataset_version_id` on model versions, `/api/datasets/{slug}/versions`,
   `/api/models/{slug}/dataset-versions`, `/api/dataset-versions/{id}/diff/{other_id}`, the `dataset_version` job

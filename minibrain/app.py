@@ -53,6 +53,7 @@ from minibrain.api import (
 from minibrain.api.access import Identify, TrustedProxy
 from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
+from minibrain.api.sections import tag_sections
 from minibrain.artifacts import ArtifactError
 from minibrain.auth.accounts import AccountError, SignInError, ensure_csrf_key
 from minibrain.auth.config import load_auth
@@ -331,5 +332,6 @@ def create_app(
         ops,
     ):
         app.include_router(module.router)
+    tag_sections(app.routes)
     mount_web(app, settings.web_dist, settings.ui_url)
     return app

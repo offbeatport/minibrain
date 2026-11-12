@@ -112,7 +112,7 @@ from minibrain.settings import Settings
 from minibrain.tags import merged_tags
 from minibrain.tasks.examples import turns_of
 
-router = APIRouter(prefix="/api", tags=["data"])
+router = APIRouter(prefix="/api")
 
 PREVIEW_ROWS = 20
 SOURCE_ROWS = "SELECT * FROM source"
@@ -371,7 +371,7 @@ def dataset_preview_of(settings: Settings, store: ArtifactStore, dataset: Datase
     return preview_of(tables, aliases, dataset_sql(dataset))
 
 
-@router.get("/sources", dependencies=[Depends(builder)])
+@router.get("/sources", dependencies=[Depends(builder)], summary="List sources")
 def list_sources(session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[SourceSummary]:
     found = session.scalars(select(Source).order_by(Source.id.desc()))
     return [source_summary(settings, store, source) for source in found]
@@ -393,7 +393,13 @@ def added_source(
     return SourceAdded(**summary.model_dump(), outcome=added.outcome.value)
 
 
-@router.post("/sources", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Upload a file as a source",
+)
 def upload_source(
     file: UploadFile,
     response: Response,
@@ -406,12 +412,18 @@ def upload_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.get("/data/folders", dependencies=[Depends(builder)])
+@router.get("/data/folders", dependencies=[Depends(builder)], summary="List server folders for sources")
 def folder_roots(session: SessionDep) -> FolderRoots:
     return FolderRoots(roots=[str(root) for root in allowed_roots(session)], locked="data_folders" in locked_sources())
 
 
-@router.post("/sources/folders", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources/folders",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add a server folder source",
+)
 def add_folder_source(
     body: FolderCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
@@ -419,7 +431,13 @@ def add_folder_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/delta", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources/delta",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add a Delta table source",
+)
 def add_delta_source(
     body: DeltaSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
@@ -427,12 +445,18 @@ def add_delta_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.get("/samples", dependencies=[Depends(builder)])
+@router.get("/samples", dependencies=[Depends(builder)], summary="List sample files")
 def list_samples() -> list[SampleInfo]:
     return [SampleInfo(**vars(sample)) for sample in SAMPLES]
 
 
-@router.post("/samples/{file}", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/samples/{file}",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add a sample file as a source",
+)
 def add_sample_source(
     file: str,
     response: Response,
@@ -445,12 +469,17 @@ def add_sample_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.get("/sources/{source_id}", dependencies=[Depends(builder)])
+@router.get("/sources/{source_id}", dependencies=[Depends(builder)], summary="Read a source")
 def read_source(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceSummary:
     return source_summary(settings, store, get_source(session, source_id))
 
 
-@router.patch("/sources/{source_id}", responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
+@router.patch(
+    "/sources/{source_id}",
+    responses={409: {"model": NameTakenInfo}},
+    dependencies=[Depends(builder)],
+    summary="Change a source",
+)
 def update_source(
     source_id: int, body: CatalogueUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceSummary:
@@ -462,13 +491,13 @@ def update_source(
     return source_summary(settings, store, source)
 
 
-@router.get("/sources/{source_id}/rows", dependencies=[Depends(builder)])
+@router.get("/sources/{source_id}/rows", dependencies=[Depends(builder)], summary="Read a source's rows")
 def source_rows(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     source = get_source(session, source_id)
     return query_rows([table_of(settings, store, source)], SOURCE_ROWS, aliases_for([source]))
 
 
-@router.get("/sources/{source_id}/stats", dependencies=[Depends(builder)])
+@router.get("/sources/{source_id}/stats", dependencies=[Depends(builder)], summary="Read a source's column statistics")
 def source_stats(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceStats:
     table = table_of(settings, store, get_source(session, source_id))
     summaries, sampled = summarize(table, STATS_SAMPLE)
@@ -479,7 +508,7 @@ def source_stats(source_id: int, session: SessionDep, settings: SettingsDep, sto
     )
 
 
-@router.post("/sources/{source_id}/query", dependencies=[Depends(builder)])
+@router.post("/sources/{source_id}/query", dependencies=[Depends(builder)], summary="Run SQL over a source")
 def source_query(
     source_id: int, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryResponse:
@@ -488,13 +517,13 @@ def source_query(
     return query_rows(tables_of(settings, store, sources), body.sql, aliases_for([source]))
 
 
-@router.post("/query", dependencies=[Depends(builder)])
+@router.post("/query", dependencies=[Depends(builder)], summary="Run SQL over any sources")
 def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     sources = sources_in(session, body.sql)
     return query_rows(tables_of(settings, store, sources), body.sql)
 
 
-@router.delete("/sources/{source_id}", status_code=204, dependencies=[Depends(builder)])
+@router.delete("/sources/{source_id}", status_code=204, dependencies=[Depends(builder)], summary="Delete a source")
 def delete_source(source_id: int, session: SessionDep, store: StoreDep) -> None:
     source = get_source(session, source_id)
     if source.datasets:
@@ -506,13 +535,19 @@ def delete_source(source_id: int, session: SessionDep, store: StoreDep) -> None:
     session.commit()
 
 
-@router.get("/datasets", dependencies=[Depends(builder)])
+@router.get("/datasets", dependencies=[Depends(builder)], summary="List datasets")
 def list_datasets(session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[DatasetSummary]:
     found = session.scalars(select(Dataset).order_by(Dataset.name))
     return [dataset_summary(settings, store, dataset) for dataset in found]
 
 
-@router.post("/datasets", status_code=201, responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
+@router.post(
+    "/datasets",
+    status_code=201,
+    responses={409: {"model": NameTakenInfo}},
+    dependencies=[Depends(builder)],
+    summary="Create a dataset",
+)
 def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
     source = get_source(session, body.source_id) if body.source_id is not None else None
     if source is None and body.sql is None:
@@ -534,12 +569,17 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     return dataset_summary(settings, store, dataset)
 
 
-@router.get("/datasets/{slug}", dependencies=[Depends(builder)])
+@router.get("/datasets/{slug}", dependencies=[Depends(builder)], summary="Read a dataset")
 def read_dataset(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
     return dataset_summary(settings, store, get_dataset(session, slug))
 
 
-@router.patch("/datasets/{slug}", responses={409: {"model": NameTakenInfo}}, dependencies=[Depends(builder)])
+@router.patch(
+    "/datasets/{slug}",
+    responses={409: {"model": NameTakenInfo}},
+    dependencies=[Depends(builder)],
+    summary="Rename or describe a dataset",
+)
 def update_dataset(
     slug: str, body: CatalogueUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> DatasetSummary:
@@ -551,7 +591,7 @@ def update_dataset(
     return dataset_summary(settings, store, dataset)
 
 
-@router.put("/datasets/{slug}/mapping", dependencies=[Depends(builder)])
+@router.put("/datasets/{slug}/mapping", dependencies=[Depends(builder)], summary="Change a dataset's mapping")
 def update_dataset_mapping(
     slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> DatasetSummary:
@@ -563,12 +603,12 @@ def update_dataset_mapping(
     return dataset_summary(settings, store, dataset)
 
 
-@router.get("/datasets/{slug}/preview", dependencies=[Depends(builder)])
+@router.get("/datasets/{slug}/preview", dependencies=[Depends(builder)], summary="Preview a dataset's rows")
 def dataset_preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
     return dataset_preview_of(settings, store, get_dataset(session, slug))
 
 
-@router.post("/datasets/{slug}/query", dependencies=[Depends(builder)])
+@router.post("/datasets/{slug}/query", dependencies=[Depends(builder)], summary="Run SQL over a dataset's sources")
 def dataset_query(
     slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryResponse:
@@ -577,7 +617,7 @@ def dataset_query(
     return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
-@router.delete("/datasets/{slug}", status_code=204, dependencies=[Depends(builder)])
+@router.delete("/datasets/{slug}", status_code=204, dependencies=[Depends(builder)], summary="Delete a dataset")
 def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     dataset = get_dataset(session, slug)
     released = sorted(model.slug for model in dataset.models)
@@ -599,12 +639,14 @@ def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> Non
     session.commit()
 
 
-@router.get("/datasets/{slug}/versions", dependencies=[Depends(builder)])
+@router.get("/datasets/{slug}/versions", dependencies=[Depends(builder)], summary="List a dataset's versions")
 def list_dataset_versions(slug: str, session: SessionDep) -> list[DatasetVersionInfo]:
     return [dataset_version_info(dataset_version) for dataset_version in versions_of(get_dataset(session, slug))]
 
 
-@router.post("/datasets/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
+@router.post(
+    "/datasets/{slug}/versions", status_code=201, dependencies=[Depends(builder)], summary="Save a dataset version"
+)
 def save_dataset_version(slug: str, session: SessionDep, settings: SettingsDep) -> DatasetVersionInfo:
     dataset_version = take_version(session, settings, get_dataset(session, slug))
     cleanup(session, settings)
@@ -619,7 +661,11 @@ def get_dataset_version(session: Session, dataset_version_id: int) -> DatasetVer
     return found
 
 
-@router.get("/dataset-versions/{dataset_version_id}/diff/{other_id}", dependencies=[Depends(builder)])
+@router.get(
+    "/dataset-versions/{dataset_version_id}/diff/{other_id}",
+    dependencies=[Depends(builder)],
+    summary="Compare two dataset versions",
+)
 def diff_dataset_versions(
     dataset_version_id: int, other_id: int, session: SessionDep, store: StoreDep
 ) -> DatasetVersionDiff:
@@ -646,26 +692,36 @@ def data_settings(limits: DataLimits) -> DataSettings:
     return DataSettings.model_validate(asdict(limits) | {"checks_off": list(limits.checks_off), "locked": locked})
 
 
-@router.put("/datasets/{slug}/checks/{check}/dismissal", status_code=204, dependencies=[Depends(builder)])
+@router.put(
+    "/datasets/{slug}/checks/{check}/dismissal",
+    status_code=204,
+    dependencies=[Depends(builder)],
+    summary="Dismiss a data check",
+)
 def dismiss_check(slug: str, check: CheckName, body: DismissRequest, session: SessionDep) -> None:
     dataset = get_dataset(session, slug)
     dataset.dismissed = (dataset.dismissed or {}) | {check: body.signature}
     session.commit()
 
 
-@router.delete("/datasets/{slug}/checks/{check}/dismissal", status_code=204, dependencies=[Depends(builder)])
+@router.delete(
+    "/datasets/{slug}/checks/{check}/dismissal",
+    status_code=204,
+    dependencies=[Depends(builder)],
+    summary="Restore a dismissed data check",
+)
 def restore_check(slug: str, check: CheckName, session: SessionDep) -> None:
     dataset = get_dataset(session, slug)
     dataset.dismissed = {name: value for name, value in (dataset.dismissed or {}).items() if name != check} or None
     session.commit()
 
 
-@router.get("/settings/data", dependencies=[Depends(builder)])
+@router.get("/settings/data", dependencies=[Depends(builder)], summary="Read data settings")
 def read_data_settings(session: SessionDep) -> DataSettings:
     return data_settings(load_limits(session))
 
 
-@router.put("/settings/data", dependencies=[Depends(admin)])
+@router.put("/settings/data", dependencies=[Depends(admin)], summary="Change data settings")
 def update_data_settings(body: DataSettingsUpdate, session: SessionDep, settings: SettingsDep) -> DataSettings:
     limits = save_limits(session, body.model_dump(exclude_none=True))
     cleanup(session, settings)

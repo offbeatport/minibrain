@@ -19,7 +19,7 @@ from minibrain.registry.service import (
     set_scopes,
 )
 
-router = APIRouter(prefix="/api/keys", tags=["keys"])
+router = APIRouter(prefix="/api/keys")
 
 ALL_MODELS_NEEDS_ADMIN = f"A key for all models needs the {LABELS[Role.ADMIN]} role"
 
@@ -98,12 +98,12 @@ def expiry_days(session: Session, wanted: int | None) -> int | None:
     return wanted
 
 
-@router.get("", dependencies=[Depends(builder)])
+@router.get("", dependencies=[Depends(builder)], summary="List API keys")
 def list_keys(session: SessionDep) -> list[KeyInfo]:
     return [key_info(session, key) for key in session.scalars(visible_keys())]
 
 
-@router.post("", status_code=201, dependencies=[Depends(builder)])
+@router.post("", status_code=201, dependencies=[Depends(builder)], summary="Create an API key")
 def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     require_admin_for(body.all_models)
     models, model_ids = resolve(session, body.models)
@@ -118,7 +118,7 @@ def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     return KeyCreated(secret=secret, **key_info(session, key).model_dump())
 
 
-@router.put("/{key_id}/models", dependencies=[Depends(builder)])
+@router.put("/{key_id}/models", dependencies=[Depends(builder)], summary="Change the models a key covers")
 def update_models(key_id: int, body: KeyScopeUpdate, session: SessionDep) -> KeyInfo:
     key = get_key(session, key_id)
     require_admin_for(body.all_models or key.all_models)
@@ -129,7 +129,7 @@ def update_models(key_id: int, body: KeyScopeUpdate, session: SessionDep) -> Key
     return key_info(session, key)
 
 
-@router.delete("/{key_id}", status_code=204, dependencies=[Depends(builder)])
+@router.delete("/{key_id}", status_code=204, dependencies=[Depends(builder)], summary="Revoke an API key")
 def revoke(key_id: int, session: SessionDep) -> None:
     key = get_key(session, key_id)
     audit(session, "key.revoke", key)

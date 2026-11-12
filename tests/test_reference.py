@@ -21,7 +21,8 @@ def test_the_gateway_reference_covers_v1_from_its_base_url(harness: Harness) -> 
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "mb_...",
-        "description": "A minibrain API key, created on the API keys page. It covers one or more models, or all models.",
+        "description": "A minibrain API key, created on the API keys page. "
+        "It covers one or more models, or all models.",
     }
     operations = [operation for item in document["paths"].values() for operation in item.values()]
     assert all(operation["security"] == [{"apiKey": []}] for operation in operations)
@@ -63,3 +64,37 @@ def test_v1_models_keeps_its_openai_shape(harness: Harness) -> None:
     }
     assert harness.client.get("/v1/models", headers={"Authorization": f"Basic {secret}"}).status_code == 401
     assert harness.client.get("/v1/models").status_code == 401
+
+
+def test_internal_and_operator_routes_stay_out_of_the_schema(harness: Harness) -> None:
+    paths = set(harness.app.openapi()["paths"])
+    assert paths and all(path.startswith(("/v1/", "/api/")) for path in paths)
+    assert harness.client.get("/healthz").status_code == 200
+
+
+def test_the_two_references_say_who_they_are_for(harness: Harness) -> None:
+    gateway = harness.client.get("/api/openapi/v1.json").json()["info"]
+    management = harness.client.get("/api/openapi/api.json").json()["info"]
+    assert gateway["title"] == "OpenAI-compatible API"
+    assert gateway["description"].startswith("**Stable. For apps. Drop-in for the OpenAI API.**")
+    assert all(term in gateway["description"] for term in ("Base URL", "API name", "name@N", "Keys"))
+    assert management["title"] == "Management API"
+    assert management["description"].startswith("**For the minibrain UI and automation. May change between versions.**")
+
+
+def test_every_management_route_has_one_section(harness: Harness) -> None:
+    document = harness.client.get("/api/openapi/api.json").json()
+    paths = document["paths"]
+    operations = [operation for item in paths.values() for operation in item.values()]
+    assert all(len(operation["tags"]) == 1 for operation in operations)
+    names = [tag["name"] for tag in document["tags"]]
+    assert {operation["tags"][0] for operation in operations} == set(names)
+    groups = document["x-tagGroups"]
+    assert [group["name"] for group in groups] == ["Build", "Operate", "Administer"]
+    assert sorted(tag for group in groups for tag in group["tags"]) == sorted(names)
+    assert paths["/api/models/{name}"]["get"]["tags"] == ["Models"]
+    assert paths["/api/models/{name}/versions"]["get"]["tags"] == ["Versions"]
+    assert paths["/api/models/{name}/dataset"]["put"]["tags"] == ["Data"]
+    assert paths["/api/models/{name}/traffic"]["get"]["tags"] == ["Monitoring"]
+    assert paths["/api/settings/data"]["put"]["tags"] == ["Settings"]
+    assert paths["/api/models/{name}"]["patch"]["description"].startswith("Needs the Builder role.")

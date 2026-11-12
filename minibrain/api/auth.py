@@ -33,7 +33,7 @@ from minibrain.auth.oidc import PENDING_COOKIE, PENDING_PATH, PENDING_SECONDS, O
 from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent, LoginSession, User, peer_address
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth")
 
 FAILED_ACTOR_LENGTH = 200
 
@@ -142,13 +142,13 @@ def audit_sign_in(session: SessionDep, user: User, row: LoginSession) -> None:
     session.add(AuditEvent(actor=person.actor, action="auth.sign_in", target=person.actor, detail=detail))
 
 
-@router.get("/session", dependencies=[Depends(public)])
+@router.get("/session", dependencies=[Depends(public)], summary="Read the current session")
 def current_session(request: Request, session: SessionDep, found: IdentityDep) -> SessionInfo:
     setup = found.person is None and setup_open(session, request.app.state.auth)
     return session_info(request, setup, found.person, found.csrf_subject)
 
 
-@router.post("/login", dependencies=[Depends(public)])
+@router.post("/login", dependencies=[Depends(public)], summary="Sign in with a password")
 def login(body: SignInBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     try:
         user = sign_in(session, body.email, body.password)
@@ -161,7 +161,7 @@ def login(body: SignInBody, request: Request, response: Response, session: Sessi
     return signed_in_info(request, response, session, user)
 
 
-@router.post("/logout", status_code=204, dependencies=[Depends(signed_in)])
+@router.post("/logout", status_code=204, dependencies=[Depends(signed_in)], summary="Sign out")
 def logout(request: Request, response: Response, session: SessionDep, found: IdentityDep) -> None:
     token = request.cookies.get(SESSION_COOKIE)
     person = found.person
@@ -173,7 +173,7 @@ def logout(request: Request, response: Response, session: SessionDep, found: Ide
     clear_session_cookie(request, response)
 
 
-@router.post("/setup", dependencies=[Depends(public)])
+@router.post("/setup", dependencies=[Depends(public)], summary="Create the first admin from a setup link")
 def setup(body: SetupBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     claim_first_admin(session)
     redeem_setup_token(session, body.token)
@@ -185,7 +185,7 @@ def setup(body: SetupBody, request: Request, response: Response, session: Sessio
     return signed_in_info(request, response, session, user)
 
 
-@router.post("/reset", dependencies=[Depends(public)])
+@router.post("/reset", dependencies=[Depends(public)], summary="Set a password from a reset link")
 def reset(body: ResetBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     user = redeem_reset(session, body.token, body.password)
     person = person_of(user)
@@ -211,7 +211,9 @@ def failed_sign_in(message: str) -> RedirectResponse:
     return response
 
 
-@router.get("/oidc/start", dependencies=[Depends(public)], response_class=RedirectResponse)
+@router.get(
+    "/oidc/start", dependencies=[Depends(public)], response_class=RedirectResponse, summary="Start single sign-on"
+)
 def oidc_start(request: Request, next: str = "/") -> RedirectResponse:
     try:
         client = oidc_client(request)
@@ -231,7 +233,13 @@ def oidc_start(request: Request, next: str = "/") -> RedirectResponse:
     return response
 
 
-@router.get("/oidc/callback", dependencies=[Depends(public)], response_class=RedirectResponse, name="oidc_callback")
+@router.get(
+    "/oidc/callback",
+    dependencies=[Depends(public)],
+    response_class=RedirectResponse,
+    name="oidc_callback",
+    summary="Finish single sign-on",
+)
 def oidc_callback(
     request: Request,
     session: SessionDep,

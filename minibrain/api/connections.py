@@ -47,7 +47,7 @@ from minibrain.policy import PolicyError
 from minibrain.registry.models import Connection
 from minibrain.settings import Settings
 
-router = APIRouter(prefix="/api", tags=["connections"])
+router = APIRouter(prefix="/api")
 
 
 def body_config(body: ConnectionBody) -> ConnectionConfig:
@@ -83,21 +83,21 @@ def connection_info(session: Session, settings: Settings, connection: Connection
     )
 
 
-@router.get("/connections", dependencies=[Depends(builder)])
+@router.get("/connections", dependencies=[Depends(builder)], summary="List connections")
 def read_connections(session: SessionDep, settings: SettingsDep) -> list[ConnectionInfo]:
     found = list_connections(session)
     session.commit()
     return [connection_info(session, settings, connection) for connection in found]
 
 
-@router.post("/connections", status_code=201, dependencies=[Depends(admin)])
+@router.post("/connections", status_code=201, dependencies=[Depends(admin)], summary="Add a connection")
 def add_connection(body: ConnectionBody, session: SessionDep, settings: SettingsDep) -> ConnectionInfo:
     connection = create_connection(session, settings, body.name, body_config(body), body.secret, current_actor())
     session.commit()
     return connection_info(session, settings, connection)
 
 
-@router.put("/connections/{connection_id}", dependencies=[Depends(admin)])
+@router.put("/connections/{connection_id}", dependencies=[Depends(admin)], summary="Change a connection")
 def change_connection(
     connection_id: int, body: ConnectionBody, session: SessionDep, settings: SettingsDep
 ) -> ConnectionInfo:
@@ -107,7 +107,9 @@ def change_connection(
     return connection_info(session, settings, connection)
 
 
-@router.delete("/connections/{connection_id}", status_code=204, dependencies=[Depends(admin)])
+@router.delete(
+    "/connections/{connection_id}", status_code=204, dependencies=[Depends(admin)], summary="Remove a connection"
+)
 def remove_connection(connection_id: int, session: SessionDep) -> None:
     delete_connection(session, get_connection(session, connection_id), current_actor())
     session.commit()
@@ -124,7 +126,7 @@ def draft_resolved(session: Session, settings: Settings, body: ConnectionTestBod
     return Resolved(id=body.id or 0, name=name, config=config, secret=secret)
 
 
-@router.post("/connections/test", dependencies=[Depends(admin)])
+@router.post("/connections/test", dependencies=[Depends(admin)], summary="Test connection settings")
 def test_connection(body: ConnectionTestBody, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
     try:
         return ConnectionCheck(ok=True, message=probe(draft_resolved(session, settings, body)))
@@ -132,7 +134,7 @@ def test_connection(body: ConnectionTestBody, session: SessionDep, settings: Set
         return ConnectionCheck(ok=False, message=str(error))
 
 
-@router.post("/connections/{connection_id}/test", dependencies=[Depends(admin)])
+@router.post("/connections/{connection_id}/test", dependencies=[Depends(admin)], summary="Test a saved connection")
 def test_saved_connection(connection_id: int, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
     try:
         return ConnectionCheck(
@@ -142,7 +144,9 @@ def test_saved_connection(connection_id: int, session: SessionDep, settings: Set
         return ConnectionCheck(ok=False, message=str(error))
 
 
-@router.get("/connections/{connection_id}/tables", dependencies=[Depends(builder)])
+@router.get(
+    "/connections/{connection_id}/tables", dependencies=[Depends(builder)], summary="List a connection's tables"
+)
 def connection_tables(connection_id: int, session: SessionDep, settings: SettingsDep) -> ConnectionTables:
     connection = resolve(session, settings, get_connection(session, connection_id))
     if connection.config.kind not in ("postgres", "mysql"):
@@ -150,7 +154,7 @@ def connection_tables(connection_id: int, session: SessionDep, settings: Setting
     return ConnectionTables(tables=database_tables(connection))
 
 
-@router.get("/extensions", dependencies=[Depends(builder)])
+@router.get("/extensions", dependencies=[Depends(builder)], summary="List DuckDB extensions")
 def read_extensions() -> ExtensionsInfo:
     return ExtensionsInfo(
         version=extensions.engine_version(),
@@ -165,7 +169,13 @@ def read_extensions() -> ExtensionsInfo:
     )
 
 
-@router.post("/sources/s3", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources/s3",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add an S3 source",
+)
 def add_s3_source(
     body: S3SourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
@@ -173,7 +183,13 @@ def add_s3_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/database", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources/database",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add a database source",
+)
 def add_database_source(
     body: DatabaseSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
@@ -190,7 +206,13 @@ def add_database_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.post("/sources/iceberg", status_code=201, responses=ADDED_RESPONSES, dependencies=[Depends(builder)])
+@router.post(
+    "/sources/iceberg",
+    status_code=201,
+    responses=ADDED_RESPONSES,
+    dependencies=[Depends(builder)],
+    summary="Add an Iceberg source",
+)
 def add_iceberg_source(
     body: IcebergSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
