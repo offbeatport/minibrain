@@ -327,12 +327,10 @@ function Trigger({ value }: { value: PickerValue }) {
                         </>
                     )}
                 </span>
-                <span className="flex shrink-0 items-center gap-1 self-center text-primary">
-                    <span className="hidden sm:inline">
-                        {option || importText ? "Change" : "Choose"}
-                    </span>
-                    <ChevronDown aria-hidden="true" className="size-4" />
-                </span>
+                <ChevronDown
+                    aria-hidden="true"
+                    className="size-6 shrink-0 self-center text-muted-foreground"
+                />
             </button>
         </DialogTrigger>
     );
