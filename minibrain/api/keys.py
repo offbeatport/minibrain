@@ -8,7 +8,7 @@ from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate
 from minibrain.api.views import key_info
 from minibrain.auth.identity import current_actor
 from minibrain.registry.models import ApiKey, AuditEvent, BaseModel, Model
-from minibrain.registry.service import ConflictError, NotFoundError, create_key, get_model, set_scopes
+from minibrain.registry.service import ConflictError, NotFoundError, create_key, get_model, no_model, set_scopes
 
 router = APIRouter(prefix="/api/keys", tags=["keys"])
 
@@ -21,7 +21,7 @@ def resolve(session: Session, refs: list[ModelRef]) -> tuple[list[Model], list[s
             model = get_model(session, ref.key)
             models[model.id] = model
         elif session.get(BaseModel, ref.key) is None:
-            raise NotFoundError(f"model {ref.key} not found")
+            raise no_model(session, ref.key)
         else:
             model_ids.append(ref.key)
     return list(models.values()), model_ids

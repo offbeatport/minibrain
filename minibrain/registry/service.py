@@ -2,6 +2,7 @@ import hashlib
 import re
 import secrets
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 
 from sqlalchemy import delete, select
@@ -14,12 +15,15 @@ from minibrain.registry.models import (
     DatasetVersion,
     KeyScope,
     Model,
+    ReservedName,
     Version,
     now,
 )
 
 KEY_PREFIX = "mb_"
-RESERVED_ADDRESSES = frozenset({"new", "base", "custom"})
+RESERVED_ADDRESSES = frozenset({"new", "base", "custom", "name"})
+ADDRESS_LENGTH = 48
+ADDRESS = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,46}[a-z0-9])?")
 
 
 class NotFoundError(Exception):
@@ -51,10 +55,28 @@ def list_models(session: Session) -> list[Model]:
     return list(session.scalars(select(Model).order_by(Model.created_at)))
 
 
+def reserved_name(session: Session, name: str) -> ReservedName | None:
+    return session.get(ReservedName, name.partition("@")[0])
+
+
+def deleted_on(reserved: ReservedName) -> str:
+    return f"{reserved.name} was deleted on {reserved.deleted_at:%Y-%m-%d}"
+
+
+def no_model(session: Session, name: str) -> NotFoundError:
+    reserved = reserved_name(session, name)
+    return NotFoundError(deleted_on(reserved) if reserved is not None else f"no model called {name}")
+
+
+def reserve_name(session: Session, name: str, kind: str, model_name: str, actor: str) -> None:
+    if session.get(ReservedName, name) is None:
+        session.add(ReservedName(name=name, kind=kind, model_name=model_name, deleted_by=actor))
+
+
 def get_model(session: Session, slug: str) -> Model:
     model = session.scalar(select(Model).where(Model.slug == slug))
     if model is None:
-        raise NotFoundError(f"no model called {slug}")
+        raise no_model(session, slug)
     return model
 
 
@@ -63,12 +85,11 @@ def taken_names(session: Session) -> tuple[set[str], set[str]]:
     bases = session.execute(select(BaseModel.name, BaseModel.id)).all()
     names = {name.strip().lower() for name, _ in [*custom, *bases]}
     slugs = {slug for _, slug in custom} | {slugify(key) for _, key in bases} | {key for _, key in bases}
-    return names, slugs | RESERVED_ADDRESSES
+    return names, slugs | RESERVED_ADDRESSES | set(session.scalars(select(ReservedName.name)))
 
 
 def address_taken(session: Session, address: str) -> bool:
-    custom = session.scalar(select(Model.id).where(Model.slug == address))
-    return address in RESERVED_ADDRESSES or custom is not None or session.get(BaseModel, address) is not None
+    return address in taken_names(session)[1]
 
 
 def check_rename(session: Session, current: str, name: str) -> None:
@@ -81,8 +102,60 @@ def check_rename(session: Session, current: str, name: str) -> None:
 
 
 def name_taken(session: Session, name: str) -> bool:
-    names, slugs = taken_names(session)
-    return name.strip().lower() in names or slugify(name) in slugs
+    return name.strip().lower() in taken_names(session)[0]
+
+
+def require_free_name(session: Session, name: str) -> None:
+    if name_taken(session, name):
+        raise ConflictError(f"a model called {name.strip()} already exists; base and custom models share names")
+
+
+def suffixed(stem: str, number: int) -> str:
+    if number == 1:
+        return stem
+    tail = f"-{number}"
+    return f"{stem[: ADDRESS_LENGTH - len(tail)].rstrip('-.')}{tail}"
+
+
+def free_address(session: Session, stem: str) -> str:
+    _, held = taken_names(session)
+    return next(suffixed(stem, number) for number in range(1, 10_000) if suffixed(stem, number) not in held)
+
+
+def blocked_address(session: Session, address: str) -> ReservedName | None:
+    return session.get(ReservedName, address)
+
+
+def reserved_refusal(reserved: ReservedName) -> str:
+    day = f"{reserved.deleted_at:%b} {reserved.deleted_at.day}"
+    return f"{reserved.name} belonged to a deleted model (deleted {day}); pick another name"
+
+
+def require_address(session: Session, address: str) -> str:
+    if not ADDRESS.fullmatch(address):
+        raise ModelNameError(
+            f"{address} is not a valid API name: lowercase letters, numbers, dots and dashes, up to 48 characters"
+        )
+    reserved = blocked_address(session, address)
+    if reserved is not None:
+        raise ConflictError(reserved_refusal(reserved))
+    if address_taken(session, address):
+        raise ConflictError(f"another model already uses the API name {address}; pick another name")
+    return address
+
+
+def address_for(session: Session, stem: str, wanted: str | None = None) -> str:
+    return require_address(session, wanted.strip()) if wanted else free_address(session, stem)
+
+
+@dataclass(frozen=True)
+class AddressPreview:
+    address: str
+    reserved: ReservedName | None
+
+
+def preview_address(session: Session, stem: str) -> AddressPreview:
+    return AddressPreview(free_address(session, stem), blocked_address(session, stem))
 
 
 def free_model_name(session: Session, noun: str, numbered: bool = True) -> str:
@@ -91,14 +164,13 @@ def free_model_name(session: Session, noun: str, numbered: bool = True) -> str:
     return next(item for item in candidates if item.lower() not in names and slugify(item) not in slugs)
 
 
-def create_model(session: Session, name: str, preset: str, base_model: str) -> Model:
+def create_model(session: Session, name: str, preset: str, base_model: str, api_name: str | None = None) -> Model:
     from minibrain.policy import load
 
     if not re.search(r"[A-Za-z0-9]", name):
         raise ModelNameError("a model name needs at least one letter or number")
-    slug = slugify(name)
-    if name_taken(session, name):
-        raise ConflictError(f"a model called {name.strip()} already exists, or one with the same address ({slug})")
+    require_free_name(session, name)
+    slug = address_for(session, slugify(name), api_name)
     bodies = bool(load(session)["request_bodies"])
     model = Model(slug=slug, name=name.strip(), preset=preset, base_model=base_model, request_bodies=bodies)
     session.add(model)

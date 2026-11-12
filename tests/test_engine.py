@@ -235,10 +235,10 @@ def test_graders_must_fit_the_contract(harness: Harness) -> None:
 
 
 def test_default_names_count_up_and_names_are_unique_across_base_and_custom_models(harness: Harness) -> None:
-    assert harness.client.get("/api/models/name?preset=classify").json() == {"name": "Classifier 1"}
-    assert harness.client.get("/api/models/name?preset=custom").json() == {"name": "Custom 1"}
+    assert harness.client.get("/api/models/name?preset=classify").json()["name"] == "Classifier 1"
+    assert harness.client.get("/api/models/name?preset=custom").json()["name"] == "Custom 1"
     create_model(harness, "Classifier 1")
-    assert harness.client.get("/api/models/name?preset=classify").json() == {"name": "Classifier 2"}
+    assert harness.client.get("/api/models/name?preset=classify").json()["name"] == "Classifier 2"
     taken = harness.client.post(
         "/api/models", json={"name": "classifier 1", "preset": "classify", "labels": list(LABELS)}
     )

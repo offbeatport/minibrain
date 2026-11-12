@@ -235,11 +235,11 @@ def test_activity_of_a_recreated_model_holds_only_its_own_events(harness: Harnes
     harness.settle()
     with harness.sessions() as session:
         old = {event.id for event in session.query(AuditEvent).all()}
-    create_model(harness)
-    found = activity(harness)
+    assert create_model(harness)["slug"] == f"{SLUG}-2"
+    found = activity(harness, f"{SLUG}-2")
     assert [event["text"] for event in found["events"]] == ["scored v0, prompt only", "created Support Triage"]
     assert found["total"] == 2 and not old & {event["id"] for event in found["events"]}
-    assert page(harness)["created_by"]
+    assert page(harness, f"{SLUG}-2")["created_by"]
 
 
 def test_activity_names_people_and_tells_how_training_ended(harness: Harness) -> None:

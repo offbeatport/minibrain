@@ -157,8 +157,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/base-models/{key}, GET /api/models/{slug}/versions/{number}/files
 - **Unique model names** · shipped · product, ml
-  Base and custom models share one namespace of names and API addresses.
-  UI: Models › Add model, Models › model › Edit · API: POST /api/models, PATCH /api/models/{slug}, PATCH /api/base-models/{key}, POST /api/base-models/import
+  Names are unique; a taken API name gets the next free suffix.
+  UI: Models › Add model, Models › model › Edit · API: POST /api/models, GET /api/models/name, PATCH /api/models/{slug}, PATCH /api/base-models/{key}, POST /api/base-models/import
 - **Try a base model** · shipped · product, ml
   Send a prompt to a base model before building on it.
   UI: Models › Test, Models › model › Playground · API: POST /api/base-models/{key}/test
@@ -192,6 +192,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **History outlives models** · shipped · product, admin
   Jobs and request logs of deleted models stay, marked deleted.
   UI: Training, Jobs, Monitoring › Requests, Monitoring › Overview, Jobs › job
+- **Reserved API names** · shipped · product, engineer, admin
+  A deleted model's API name stays reserved; calls say it was deleted.
+  UI: Models › Add model, Models › Duplicate, Models › model, Playground · API: GET /api/reserved-names/{name}, GET /api/models/name, POST /v1/chat/completions
+- **Release reserved names** · planned · admin
+  Free a deleted model's API name from Settings, with a warning.
+  Roadmap: v2
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
   UI: Models › model › Training › How it's judged › Answers, Evaluations › version · API: GET /api/presets

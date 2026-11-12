@@ -325,7 +325,10 @@ KEY_ERRORS: Responses = {
 }
 MODEL_ERRORS: Responses = KEY_ERRORS | {
     403: {"model": ErrorDetail, "description": "The API key does not cover this model."},
-    404: {"model": ErrorDetail, "description": "No model has this name."},
+    404: {
+        "model": OpenAIErrorBody,
+        "description": "No model has this name (code model_not_found); a deleted model's name says when it went.",
+    },
 }
 STREAMED: Responses = {
     200: {

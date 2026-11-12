@@ -154,7 +154,8 @@ def test_a_v1_request_is_one_genai_span_without_prompt_or_answer(collector: Coll
     assert found["minibrain.model.slug"] == SLUG and found["minibrain.model.version"] == 0
     assert isinstance(found["minibrain.api_key.id"], int) and "error.type" not in found
     lost = attributes(failed.attributes)
-    assert failed.name == "chat nope" and lost["error.type"] == "404" and lost["gen_ai.request.model"] == "nope"
+    assert failed.name == "chat nope" and lost["error.type"] == "model_not_found"
+    assert lost["gen_ai.request.model"] == "nope"
     payload = b"".join(item.body for item in collector.received)
     assert b"charged twice" not in payload and b"billing" not in payload
     sent = collector.received[0].headers

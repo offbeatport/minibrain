@@ -27,7 +27,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.registry.models import BaseModel as BaseRow
-from minibrain.registry.service import NotFoundError, latest_dataset_version
+from minibrain.registry.service import latest_dataset_version, no_model
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
 from minibrain.tasks.service import live_version
@@ -184,7 +184,7 @@ def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
         )
     base = session.get(BaseRow, name)
     if base is None:
-        raise NotFoundError(f"no model called {name}")
+        raise no_model(session, name)
     return ModelPage(
         kind="base",
         key=base.id,

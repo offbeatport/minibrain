@@ -110,7 +110,7 @@ def test_deleting_the_copy_keeps_the_originals_adapter(harness: Harness) -> None
 def test_a_taken_name_or_a_source_being_deleted_is_refused(harness: Harness) -> None:
     create_with_dataset(harness)
     assert duplicate(harness, "Support Triage").status_code == 409
-    assert duplicate(harness, "support triage!").status_code == 409
+    assert duplicate(harness, "support triage!").json()["slug"] == f"{SLUG}-2"
     assert duplicate(harness).status_code == 201
     assert duplicate(harness).status_code == 409
     assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202

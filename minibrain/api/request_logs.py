@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import sees_rows, viewer
 from minibrain.api.deps import SessionDep
+from minibrain.api.owners import base_token, custom_owned, log_custom_token, log_owned, split_token
 from minibrain.data.feedback import UP
 from minibrain.models.registry import base_publisher
 from minibrain.policy import bodies_choice
@@ -128,13 +129,13 @@ def status_match(chosen: str) -> ColumnElement[bool]:
 
 
 def model_match(keys: list[str]) -> ColumnElement[bool]:
-    return or_(RequestLog.model_slug.in_(keys), and_(RequestLog.model_slug.is_(None), RequestLog.model.in_(keys)))
+    return log_owned(keys)
 
 
 def version_match(values: list[str]) -> ColumnElement[bool]:
     pairs = [value.rpartition("@") for value in values]
     chosen = [
-        and_(RequestLog.model_slug == slug, RequestLog.version == int(number))
+        and_(custom_owned(RequestLog.model_slug, RequestLog.model_id, slug), RequestLog.version == int(number))
         for slug, _, number in pairs
         if slug and number.isdigit()
     ]
@@ -263,23 +264,25 @@ class Owner:
     deleted: bool
 
 
-def owner_of(log: RequestLog, slug: str | None, name: str | None, names: dict[str, str]) -> Owner:
+def owner_of(log: RequestLog, slug: str | None, name: str | None, bases: dict[str, BaseModel]) -> Owner:
     if slug is not None and name is not None:
         return Owner(slug, name, custom=True, deleted=False)
     if log.model_slug is not None:
         return Owner(log.model_slug, log.model_name or log.model_slug, custom=True, deleted=True)
-    if log.model in names:
-        return Owner(log.model, names[log.model], custom=False, deleted=False)
-    return Owner(log.model, log.model_name or log.model, custom=False, deleted=log.model_name is not None)
+    base = bases.get(log.model)
+    if base is not None and aware(log.at) >= aware(base.created_at):
+        return Owner(log.model, base.name, custom=False, deleted=False)
+    kept = log.model_name is not None or base is not None
+    return Owner(log.model, log.model_name or log.model, custom=False, deleted=kept)
 
 
 def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
     logs = [row[0] for row in found]
     marks = feedback_marks(session, logs)
-    names = base_names(session, {log.model for log in logs if log.model_slug is None})
+    bases = bases_of(session, {log.model for log in logs if log.model_slug is None})
     items: list[RequestRow] = []
     for log, slug, name, key_name in found:
-        owner = owner_of(log, slug, name, names)
+        owner = owner_of(log, slug, name, bases)
         mark = marks.get((log.model_id, log.response_id), {}) if slug is not None and log.response_id else {}
         items.append(
             RequestRow(
@@ -335,10 +338,11 @@ def list_requests(
     )
 
 
-def base_facet(base: BaseModel | None, model: str, kept: str | None, total: int) -> RequestFacet:
-    if base is None:
-        return RequestFacet(value=model, label=kept or model, count=total, deleted=kept is not None)
-    return RequestFacet(value=model, label=base.name, count=total, publisher=base_publisher(base))
+def base_facet(base: BaseModel | None, token: str, kept: str | None, total: int) -> RequestFacet:
+    key, earlier = split_token(token)
+    if base is None or earlier:
+        return RequestFacet(value=token, label=kept or key, count=total, deleted=kept is not None or earlier)
+    return RequestFacet(value=token, label=base.name, count=total, publisher=base_publisher(base))
 
 
 def live_names(session: Session, slugs: set[str]) -> dict[str, str]:
@@ -347,30 +351,33 @@ def live_names(session: Session, slugs: set[str]) -> dict[str, str]:
 
 
 def custom_names(session: Session, where: list[ColumnElement[bool]], *by: Any) -> list[Any]:
+    token = log_custom_token()
     query = (
-        select(RequestLog.model_slug, *by, func.count(), func.max(RequestLog.model_name))
+        select(token, *by, func.count(), func.max(RequestLog.model_name))
         .where(RequestLog.model_slug.is_not(None), *where)
-        .group_by(RequestLog.model_slug, *by)
+        .group_by(token, *by)
     )
     found: list[Any] = list(session.execute(query))
     slugs = {str(row[0]) for row in found}
     live = live_names(session, slugs) if slugs else {}
-    return [(*row[:-1], live.get(row[0]) or row[-1] or row[0], row[0] not in live) for row in found]
+    named = [(row, split_token(str(row[0]))[0]) for row in found]
+    return [(*row[:-1], live.get(row[0]) or row[-1] or slug, row[0] not in live) for row, slug in named]
 
 
 def model_facets(session: Session, where: list[ColumnElement[bool]]) -> list[RequestFacet]:
+    token = base_token()
     base = (
-        select(RequestLog.model, func.max(RequestLog.model_name), func.count())
+        select(token, func.max(RequestLog.model_name), func.count())
         .where(RequestLog.model_slug.is_(None), *where)
-        .group_by(RequestLog.model)
+        .group_by(token)
     )
     facets = [
         RequestFacet(value=slug, label=name, count=total, deleted=deleted)
         for slug, total, name, deleted in custom_names(session, where)
     ]
     found = list(session.execute(base))
-    bases = bases_of(session, {model for model, _, _ in found})
-    facets += [base_facet(bases.get(model), model, kept, total) for model, kept, total in found]
+    bases = bases_of(session, {split_token(model)[0] for model, _, _ in found})
+    facets += [base_facet(bases.get(split_token(model)[0]), model, kept, total) for model, kept, total in found]
     return sorted(facets, key=lambda facet: (-facet.count, facet.label.lower()))
 
 

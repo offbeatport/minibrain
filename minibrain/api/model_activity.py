@@ -13,7 +13,7 @@ from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
 from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model, User
 from minibrain.registry.models import BaseModel as BaseRow
-from minibrain.registry.service import NotFoundError
+from minibrain.registry.service import no_model
 from minibrain.tasks.service import held_out_score
 
 router = APIRouter(prefix="/api", tags=["models"])
@@ -80,7 +80,7 @@ def owner_of(session: Session, name: str) -> Owner:
         return Owner(custom.slug, custom.name, True, custom.created_at, made, custom.id)
     base = session.get(BaseRow, name)
     if base is None:
-        raise NotFoundError(f"no model called {name}")
+        raise no_model(session, name)
     return Owner(base.id, base.name, False, base.created_at)
 
 

@@ -616,6 +616,16 @@ class BaseModel(Base):
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
 
 
+class ReservedName(Base):
+    __tablename__ = "reserved_names"
+
+    name: Mapped[str] = mapped_column(primary_key=True)
+    kind: Mapped[str]
+    model_name: Mapped[str]
+    deleted_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    deleted_by: Mapped[str]
+
+
 class Setting(Base):
     __tablename__ = "app_settings"
 

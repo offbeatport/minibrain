@@ -163,10 +163,15 @@ def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
     return ModelList(data=[ModelInfo(id=name, created=0, owned_by="minibrain") for name in names])
 
 
+def missing(config: GatewayConfig, name: str) -> OpenAIError:
+    message = config.deleted.get(name.partition("@")[0]) or f"model {name} not found"
+    return OpenAIError(404, message, "model", "model_not_found")
+
+
 def routed(config: GatewayConfig, grant: Grant, model: str) -> Route:
     route = config.routes.get(model)
     if route is None:
-        raise HTTPException(status_code=404, detail=f"model {model} not found")
+        raise missing(config, model)
     if not grant.covers(route):
         raise HTTPException(status_code=403, detail=f"this API key does not cover {model}")
     return route

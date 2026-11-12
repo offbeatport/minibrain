@@ -18,6 +18,7 @@ import { useAllModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { ModelAvatar } from "~/components/avatar/ModelAvatar";
 import { modelPageHref } from "~/lib/modelLinks";
+import { ApiNameHint } from "./ApiNameHint";
 import { useModelsRefresh } from "./dialogs";
 import { isTaken, nextFree, takenNames } from "./names";
 
@@ -112,6 +113,7 @@ export function DuplicateModelDialog({
                                 }
                             />
                         </div>
+                        {row && !problem && <ApiNameHint name={trimmed} />}
                     </Field>
                     <ErrorLine error={duplicate.error} />
                     <DialogFooter>

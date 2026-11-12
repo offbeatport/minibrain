@@ -166,6 +166,7 @@ class ModelCreate(BaseModel):
     promotion: PromotionInfo | None = None
     dataset: str | None = None
     avatar: ModelAvatar | None = None
+    api_name: str | None = Field(default=None, max_length=48)
 
 
 class ColumnInfo(BaseModel):
@@ -1041,8 +1042,19 @@ class VersionTestResult(BaseModel):
     completion_tokens: int
 
 
+class ReservedNameInfo(BaseModel):
+    name: str
+    kind: Literal["custom", "base"]
+    model_name: str
+    deleted_at: datetime
+    deleted_by: str
+    message: str
+
+
 class NameSuggestion(BaseModel):
     name: str
+    api_name: str
+    reserved: ReservedNameInfo | None = None
 
 
 class GraderKindInfo(BaseModel):
@@ -1425,6 +1437,7 @@ class BaseModelDetail(ModelRow):
 
 class ModelDuplicate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    api_name: str | None = Field(default=None, max_length=48)
 
 
 class ModelUpdate(BaseModel):
@@ -1441,6 +1454,7 @@ class ImportRequest(BaseModel):
     variant_id: str | None = None
     description: str = ""
     tags: list[str] = Field(default_factory=list)
+    api_name: str | None = Field(default=None, max_length=48)
 
 
 class LocationRequest(BaseModel):

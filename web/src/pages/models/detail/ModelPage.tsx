@@ -3,7 +3,14 @@ import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { TabNav } from "obp-ui";
 import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
-import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
+import {
+    keys,
+    useAllModels,
+    useBaseModel,
+    useModel,
+    useReservedName,
+    useVersions,
+} from "~/api/queries";
 import { ErrorLine, Page, PanelSections } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -56,13 +63,16 @@ function useScrollToHash(ready: boolean) {
 }
 
 function Missing({ name, loading, error }: { name: string; loading: boolean; error: unknown }) {
+    const reserved = useReservedName(loading || error ? null : name);
     return (
         <Page wide>
             <Crumbs items={[{ label: "Models", href: "/models" }, { label: name }]} />
-            {loading && <p className="text-muted-foreground">Loading…</p>}
+            {(loading || reserved.isLoading) && <p className="text-muted-foreground">Loading…</p>}
             <ErrorLine error={error} />
-            {!loading && !error && (
-                <p className="text-muted-foreground">{`No model called ${name}.`}</p>
+            {!loading && !error && !reserved.isLoading && (
+                <p className="text-muted-foreground">
+                    {reserved.data ? `${reserved.data.message}.` : `No model called ${name}.`}
+                </p>
             )}
         </Page>
     );

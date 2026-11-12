@@ -57,7 +57,7 @@ from minibrain.models.train_facts import base_facts, config_base, trainer_machin
 from minibrain.models.usage import touch
 from minibrain.registry.compute import find_pool, pools
 from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, now
-from minibrain.registry.service import ConflictError, NotFoundError, check_rename
+from minibrain.registry.service import ConflictError, check_rename, no_model
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
@@ -76,7 +76,7 @@ def health_for(request: Request) -> EngineHealth:
 def get_base_model(session: Session, key: str) -> BaseModel:
     model = session.get(BaseModel, key)
     if model is None:
-        raise NotFoundError(f"model {key} not found")
+        raise no_model(session, key)
     return model
 
 
@@ -102,7 +102,7 @@ def model_row(
     rows = all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
     found = next((row for row in rows if row.kind == kind and row.key == key), None)
     if found is None:
-        raise NotFoundError(f"model {key} not found")
+        raise no_model(session, key)
     return found
 
 
@@ -199,6 +199,7 @@ def import_model(body: ImportRequest, request: Request, session: SessionDep, set
         tags,
         body.variant_id,
         body.connection_id,
+        body.api_name,
     )
     session.commit()
     return row_of(session, settings, request, model)

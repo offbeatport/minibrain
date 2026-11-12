@@ -16,7 +16,7 @@ from minibrain.api.request_logs import CLIENT_ERROR, aware
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog, now
 from minibrain.registry.models import BaseModel as BaseRow
-from minibrain.registry.service import NotFoundError
+from minibrain.registry.service import no_model
 
 router = APIRouter(prefix="/api", tags=["models"])
 
@@ -145,7 +145,7 @@ def subject_of(session: Session, name: str) -> Subject:
         return Subject(custom.slug, RequestLog.model_id == custom.id, custom, None)
     base = session.get(BaseRow, name)
     if base is None:
-        raise NotFoundError(f"no model called {name}")
+        raise no_model(session, name)
     scope = and_(RequestLog.model_slug.is_(None), RequestLog.model == base.id, RequestLog.at >= base.created_at)
     return Subject(base.id, scope, None, base)
 

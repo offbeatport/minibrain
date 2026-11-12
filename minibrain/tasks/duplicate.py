@@ -42,8 +42,8 @@ def provenance(source: Model, version: Version) -> dict[str, Any]:
     return {"slug": source.slug, "name": source.name, "number": version.number, "job": training_job(version)}
 
 
-def duplicate_model(session: Session, source: Model, name: str) -> Model:
-    model = create_model(session, name, source.preset, source.base_model)
+def duplicate_model(session: Session, source: Model, name: str, api_name: str | None = None) -> Model:
+    model = create_model(session, name, source.preset, source.base_model, api_name)
     for field in SETTINGS:
         setattr(model, field, deepcopy(getattr(source, field)))
     model.dataset = source.dataset

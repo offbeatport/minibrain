@@ -6,11 +6,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Integer, and_, case, func, literal_column, or_, select, type_coerce
+from sqlalchemy import ColumnElement, Integer, case, func, literal_column, or_, select, type_coerce
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
+from minibrain.api.owners import base_owned, base_token, custom_owned, log_custom_token, split_token
 from minibrain.api.request_logs import CLIENT_ERROR, aware, base_names, live_names, model_match
 from minibrain.registry.models import RequestLog, now
 
@@ -116,14 +117,10 @@ def bucket_of(column: Any, edges: Sequence[datetime], low: int, high: int) -> Co
     )
 
 
-def base_of() -> ColumnElement[Any]:
-    return case((RequestLog.model_slug.is_(None), RequestLog.model), else_=None)
-
-
 def same_model(item: Identity) -> ColumnElement[bool]:
     if item.slug is not None:
-        return RequestLog.model_slug == item.slug
-    return and_(RequestLog.model_slug.is_(None), RequestLog.model == item.base)
+        return custom_owned(RequestLog.model_slug, RequestLog.model_id, item.slug)
+    return base_owned(item.base or "")
 
 
 def series_of(top: Sequence[Identity]) -> ColumnElement[int]:
@@ -183,7 +180,7 @@ def shared_columns() -> list[Any]:
 
 
 def model_rows(session: Session, where: Sequence[ColumnElement[bool]]) -> list[tuple[Identity, Partition]]:
-    identity = [RequestLog.model_slug.label("slug"), base_of().label("base"), RequestLog.at.label("at")]
+    identity = [log_custom_token().label("slug"), base_token().label("base"), RequestLog.at.label("at")]
     sub = select(*identity, *shared_columns()).where(*where).subquery()
     query = ranked(sub, [sub.c.slug, sub.c.base], {"last_at": func.max(sub.c.at)})
     found = partitions(list(session.execute(query)), lambda row: Identity(row.slug, row.base))
@@ -222,19 +219,21 @@ def kept_names(session: Session, column: Any, keys: set[str]) -> dict[str, str]:
 def names_for(session: Session, identities: Sequence[Identity]) -> dict[Identity, OverviewSeries]:
     slugs = {item.slug for item in identities if item.slug is not None}
     live = live_names(session, slugs) if slugs else {}
-    kept = kept_names(session, RequestLog.model_slug, slugs - set(live))
-    wanted = {item.base for item in identities if item.base is not None}
+    kept = kept_names(session, RequestLog.model_slug, {split_token(slug)[0] for slug in slugs - set(live)})
+    wanted = {split_token(item.base)[0] for item in identities if item.base is not None}
     bases = base_names(session, wanted)
-    kept_bases = kept_names(session, RequestLog.model, wanted - set(bases))
+    kept_bases = kept_names(session, RequestLog.model, wanted)
     found: dict[Identity, OverviewSeries] = {}
     for item in identities:
         if item.slug is not None:
-            label = live.get(item.slug) or kept.get(item.slug) or item.slug
+            slug = split_token(item.slug)[0]
+            label = live.get(item.slug) or kept.get(slug) or slug
             found[item] = OverviewSeries(key=item.slug, label=label, custom=True, deleted=item.slug not in live)
         else:
-            base = item.base or ""
-            label = bases.get(base) or kept_bases.get(base) or base
-            found[item] = OverviewSeries(key=base, label=label, custom=False, deleted=base in kept_bases)
+            base, earlier = split_token(item.base or "")
+            label = (None if earlier else bases.get(base)) or kept_bases.get(base) or base
+            gone = earlier or (base not in bases and base in kept_bases)
+            found[item] = OverviewSeries(key=item.base or "", label=label, custom=False, deleted=gone)
     return found
 
 

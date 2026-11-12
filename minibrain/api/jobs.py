@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
+from minibrain.api.owners import custom_owned, custom_token, split_token
 from minibrain.api.schemas import (
     JobActionResult,
     JobDeletion,
@@ -125,7 +126,7 @@ def method_match(methods: list[str]) -> ColumnElement[bool]:
 def conditions(filters: JobFilter, skip: Facet | None = None) -> list[ColumnElement[bool]]:
     where: list[ColumnElement[bool]] = []
     if filters.models and skip != "model":
-        where.append(Job.model_slug.in_(filters.models))
+        where.append(or_(*(custom_owned(Job.model_slug, Job.model_id, token) for token in filters.models)))
     if filters.statuses and skip != "status":
         where.append(Job.status.in_(filters.statuses))
     if filters.kinds and skip != "kind":
@@ -181,10 +182,11 @@ def list_jobs(
 def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
     by_status = select(Job.status, func.count()).where(*conditions(filters, "status")).group_by(Job.status)
     by_kind = select(Job.kind, func.count()).where(*conditions(filters, "kind")).group_by(Job.kind)
+    token = custom_token(Job.model_slug, Job.model_id)
     by_model = (
-        select(Job.model_slug, func.count(), func.max(Job.model_name))
+        select(token, func.count(), func.max(Job.model_name))
         .where(Job.model_slug.is_not(None), *conditions(filters, "model"))
-        .group_by(Job.model_slug)
+        .group_by(token)
     )
     found = list(session.execute(by_model))
     live = set(session.scalars(select(Model.slug).where(Model.slug.in_([row[0] for row in found]))))
@@ -193,7 +195,7 @@ def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
         statuses={status: count for status, count in session.execute(by_status)},
         models={str(slug): count for slug, count, _ in found},
         kinds={kind: count for kind, count in session.execute(by_kind)},
-        deleted_models={str(slug): str(name or slug) for slug, _, name in found if slug not in live},
+        deleted_models={str(slug): str(name or split_token(slug)[0]) for slug, _, name in found if slug not in live},
     )
 
 

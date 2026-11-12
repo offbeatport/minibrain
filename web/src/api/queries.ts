@@ -323,3 +323,27 @@ export function useModelPage(name: string) {
         refetchInterval: 30000,
     });
 }
+
+export function useApiName(name: string) {
+    const wanted = name.trim();
+    return useQuery({
+        queryKey: ["all-models", "api-name", wanted],
+        queryFn: () => unwrap(api.GET("/api/models/name", { params: { query: { name: wanted } } })),
+        enabled: wanted.length > 0,
+        placeholderData: (previous) => previous,
+    });
+}
+
+export function useReservedName(name: string | null) {
+    const wanted = name?.split("@")[0] ?? "";
+    return useQuery({
+        queryKey: ["all-models", "reserved", wanted],
+        queryFn: async () => {
+            const { data } = await api.GET("/api/reserved-names/{name}", {
+                params: { path: { name: wanted } },
+            });
+            return data ?? null;
+        },
+        enabled: wanted.length > 0,
+    });
+}

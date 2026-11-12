@@ -28,12 +28,13 @@ from minibrain.registry.models import (
     BaseModel,
     BaseModelStatus,
     Model,
+    ReservedName,
     Teardown,
     TeardownKind,
     VersionKind,
     VersionStatus,
 )
-from minibrain.registry.service import NotFoundError, adapter_name
+from minibrain.registry.service import NotFoundError, adapter_name, deleted_on
 from minibrain.settings import Settings
 from minibrain.tasks.service import prompting_of
 
@@ -89,6 +90,7 @@ class GatewayConfig:
     bases: dict[str, dict[str, Any]] = field(default_factory=dict)
     problems: dict[str, str] = field(default_factory=dict)
     guards: dict[str, dict[str, Any]] = field(default_factory=dict)
+    deleted: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -105,6 +107,7 @@ class GatewayConfig:
             bases=dict(data.get("bases", {})),
             problems=dict(data.get("problems", {})),
             guards=dict(data.get("guards", {})),
+            deleted=dict(data.get("deleted", {})),
         )
 
 
@@ -238,6 +241,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         bases=bases,
         problems=problems,
         guards=guard_specs(session, settings),
+        deleted={reserved.name: deleted_on(reserved) for reserved in session.scalars(select(ReservedName))},
     )
     return replace(config, version=hash_of(config.to_json()))
 

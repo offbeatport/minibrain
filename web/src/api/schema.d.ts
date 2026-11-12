@@ -217,7 +217,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Default Name */
+        /**
+         * Default Name
+         * @description A free name and the API name it gets; with name, the API name that name would get.
+         */
         get: operations["default_name_api_models_name_get"];
         put?: never;
         post?: never;
@@ -2553,6 +2556,26 @@ export interface paths {
         };
         /** Read Request */
         get: operations["read_request_api_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reserved-names/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Reserved
+         * @description An API name kept after its model was deleted, so it never reaches another model.
+         */
+        get: operations["read_reserved_api_reserved_names__name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6029,6 +6052,8 @@ export interface components {
             description?: string;
             /** Tags */
             tags?: string[];
+            /** Api Name */
+            api_name?: string | null;
         };
         /** InfrastructureInfo */
         InfrastructureInfo: {
@@ -6970,6 +6995,8 @@ export interface components {
             /** Dataset */
             dataset?: string | null;
             avatar?: components["schemas"]["ModelAvatar"] | null;
+            /** Api Name */
+            api_name?: string | null;
         };
         /** ModelDetail */
         ModelDetail: {
@@ -7035,6 +7062,8 @@ export interface components {
         ModelDuplicate: {
             /** Name */
             name: string;
+            /** Api Name */
+            api_name?: string | null;
         };
         /** ModelFile */
         ModelFile: {
@@ -7357,6 +7386,9 @@ export interface components {
         NameSuggestion: {
             /** Name */
             name: string;
+            /** Api Name */
+            api_name: string;
+            reserved?: components["schemas"]["ReservedNameInfo"] | null;
         };
         /**
          * NameTaken
@@ -8154,6 +8186,27 @@ export interface components {
             retention_days: number;
             /** Last At */
             last_at: string | null;
+        };
+        /** ReservedNameInfo */
+        ReservedNameInfo: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "custom" | "base";
+            /** Model Name */
+            model_name: string;
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
+            /** Deleted By */
+            deleted_by: string;
+            /** Message */
+            message: string;
         };
         /** ResetBody */
         ResetBody: {
@@ -10166,6 +10219,7 @@ export interface operations {
         parameters: {
             query?: {
                 preset?: string;
+                name?: string | null;
             };
             header?: never;
             path?: never;
@@ -14090,13 +14144,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description No model has this name. */
+            /** @description No model has this name (code model_not_found); a deleted model's name says when it went. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorDetail"];
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
                 };
             };
             /** @description The version was trained on base weights that changed since. */
@@ -15600,6 +15654,37 @@ export interface operations {
             };
         };
     };
+    read_reserved_api_reserved_names__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservedNameInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     gateway_reference_api_openapi_v1_json_get: {
         parameters: {
             query?: never;
@@ -15909,13 +15994,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description No model has this name. */
+            /** @description No model has this name (code model_not_found); a deleted model's name says when it went. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorDetail"];
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
                 };
             };
             /** @description The version was trained on base weights that changed since. */
@@ -15997,13 +16082,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description No model has this name. */
+            /** @description No model has this name (code model_not_found); a deleted model's name says when it went. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorDetail"];
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
                 };
             };
             /** @description The version was trained on base weights that changed since. */
@@ -16075,13 +16160,13 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorDetail"];
                 };
             };
-            /** @description No model has this name. */
+            /** @description No model has this name (code model_not_found); a deleted model's name says when it went. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ErrorDetail"];
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
                 };
             };
             /** @description The model is a base model, or the body is not valid. */

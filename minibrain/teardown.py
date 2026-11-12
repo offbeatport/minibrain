@@ -38,7 +38,7 @@ from minibrain.registry.models import (
     VersionStatus,
     now,
 )
-from minibrain.registry.service import ConflictError, adapter_name, drop_orphan_keys
+from minibrain.registry.service import ConflictError, adapter_name, drop_orphan_keys, reserve_name
 from minibrain.serve.engines import DRAIN_TIMEOUT, drain_engine
 from minibrain.settings import Settings
 from minibrain.tasks.service import serving_base
@@ -724,6 +724,7 @@ class Teardowns:
         adapters = {version.adapter_artifact_id for version in model.versions if version.adapter_artifact_id}
         removed = {"versions": len(model.versions), "key_scopes": len(model.key_scopes)}
         kept = keep_custom_history(session, model)
+        reserve_name(session, model.slug, "custom", model.name, record.actor)
         drop(session, teardown)
         session.delete(model)
         session.flush()
@@ -749,6 +750,7 @@ class Teardowns:
         removed = {"size_bytes": base.size_bytes, "key_scopes": scopes, "models": teardown.detail.get("models", [])}
         removed |= {"kept": base.path} if base.path else {}
         kept = keep_base_history(session, base)
+        reserve_name(session, base.id, "base", base.name, record.actor)
         drop(session, teardown)
         session.delete(base)
         session.flush()

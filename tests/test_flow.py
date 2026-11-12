@@ -309,6 +309,10 @@ def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness
     assert blank.status_code == 422 and "letter or number" in blank.json()["detail"]
     assert create_model(harness)["slug"] == SLUG
     taken = harness.client.post(
+        "/api/models", json={"name": "support triage", "preset": "classify", "labels": list(LABELS)}
+    )
+    assert taken.status_code == 409 and "support triage" in taken.json()["detail"]
+    same_address = harness.client.post(
         "/api/models", json={"name": "support  triage!", "preset": "classify", "labels": list(LABELS)}
     )
-    assert taken.status_code == 409 and "support  triage!" in taken.json()["detail"]
+    assert same_address.status_code == 201 and same_address.json()["slug"] == f"{SLUG}-2"

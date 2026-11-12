@@ -35,7 +35,8 @@ def test_add_model_needs_only_a_name_and_starts_a_chat_assistant(harness: Harnes
     assert (created["name"], created["preset"], created["versions"]) == ("Assistant 1", "general", 1)
     assert created["contract"] == {"kind": "text", "json_schema": None, "labels": None}
     assert (created["went_live"], created["label_proposal"]) == (False, None)
-    assert harness.client.get("/api/models/name").json() == {"name": "Assistant 2"}
+    suggested = harness.client.get("/api/models/name").json()
+    assert suggested == {"name": "Assistant 2", "api_name": "assistant-2", "reserved": None}
     taken = harness.client.post("/api/models", json={"name": "assistant 1"})
     assert taken.status_code == 409 and "already exists" in taken.json()["detail"]
     labelled = harness.client.post("/api/models", json={"name": "Router", "labels": ["billing", "bug"]})

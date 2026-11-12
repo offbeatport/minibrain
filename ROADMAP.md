@@ -794,7 +794,22 @@ once it matches; only deleting a base removes its files.
   model's slug and name and the version number on jobs, the base key on jobs, the slug and name on request logs (the
   base's name is written there when the base goes). Filters match the snapshot slug, so a deleted model still filters,
   and lists show its name with "(deleted)" and no link. A job whose model or version is gone is not retried (409, and
-  refused per job in the bulk retry). A new model that reuses a deleted slug shares that slug's history in filters.
+  refused per job in the bulk retry).
+- API names are never reused (2026-11-12). Deleting a custom or base model keeps a row in `reserved_names` (the API name,
+  kind, the model's name, `deleted_at`, `deleted_by`), written with the model's removal. Migration 0014 backfills one
+  for every slug or base key that jobs or request logs still mention and no model holds. Wherever an API name is
+  chosen (create, duplicate, import, download) it is the name's slug, or the next free one with a suffix
+  (`support-triage-2`) when another model holds it, it is reserved or it is a route word (`new`, `base`, `custom`,
+  `name`); display names stay unique (409). An explicit `api_name` on create, duplicate or import that is reserved
+  gets 409 "support-triage belonged to a deleted model (deleted Nov 12); pick another name". `/v1` answers a reserved
+  name (or `name@N`) with 404 `model_not_found` "support-triage was deleted on 2026-11-12" (the gateway config carries
+  the reserved names to standalone gateways); unknown names get the same code. The model page, model lookups and the
+  Playground show that message (`GET /api/reserved-names/{name}`), and the Add model page and Duplicate dialog show the
+  API name the model will get (`GET /api/models/name?name=`).
+- Histories stay apart. A row with a model id belongs to that live model (slugs never change); a filter on a live
+  slug matches by id, and on a slug no model holds, the rows without one. Rows of a deleted model whose slug a later
+  model took before names were reserved get their own facet, `deleted:<slug>` ("(deleted)"), on Requests, Monitoring,
+  Jobs and Training; a base's rows from before it was added count as `deleted:<key>`.
 - Deleting jobs: history stays until a Builder deletes it. Failed and cancelled jobs, finished jobs whose model or
   version is gone, and finished housekeeping jobs (download, import, verify, repair, catalogue sync) can be deleted. A
   finished train, eval or judge job of a version that still exists (or a copied version that cites its run) is
@@ -1170,8 +1185,9 @@ keys, and `/v1` stays key-only.
   Monitoring), live replicas per base, and each base's catalogue model, format and trainability. Viewers see no
   builder actions.
 - A model's page (built 2026-11-06, rebuilt 2026-11-11 from the approved prototype) is one route for both kinds,
-  `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create, import, download and rename
-  refuse a name or address another model holds (409), and `new`, `base` and `custom` are reserved. Old
+  `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create and rename refuse a name
+  another model holds (409), and create, import and download give the next free API name when the address is held,
+  reserved by a deleted model or a route word (`new`, `base`, `custom`, `name`). Old
   `/models/base/<key>` and `/models/custom/<slug>` links redirect. A breadcrumb sits above a compact header: the logo or
   avatar, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
   On base). Its actions are Playground and Connect (the snippet dialog: base URL, name, `name@N`, harness configs) and,
@@ -1759,6 +1775,8 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
 - Preinstalled appliance
+- [ ] Release a reserved name: an admin frees a deleted model's API name from Settings, with a warning that apps
+  still calling it will reach the next model to take it, audited as `model.name_release`
 - Later, kept simple until the engine settles:
   - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base
   - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency

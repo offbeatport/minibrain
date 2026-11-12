@@ -29,7 +29,7 @@ def import_base(harness: Harness, tmp_path: Path, name: str) -> Any:
 def test_names_are_unique_across_base_and_custom(harness: Harness, tmp_path: Path) -> None:
     create_model(harness)
     clash = import_base(harness, tmp_path, "Support Triage")
-    assert clash.status_code == 409 and "support-triage" in clash.json()["detail"]
+    assert clash.status_code == 409 and "Support Triage already exists" in clash.json()["detail"]
     assert import_base(harness, tmp_path, "Corp LLM").json()["key"] == "corp-llm"
     taken = harness.client.post("/api/models", json={"name": "Corp LLM", "preset": "general"})
     assert taken.status_code == 409
@@ -39,7 +39,9 @@ def test_names_are_unique_across_base_and_custom(harness: Harness, tmp_path: Pat
     assert base.status_code == 409
     assert harness.client.patch(f"/api/models/{SLUG}", json={"name": "SUPPORT triage"}).status_code == 200
     reserved = harness.client.post("/api/models", json={"name": "New", "preset": "general"})
-    assert reserved.status_code == 409
+    assert reserved.status_code == 201 and reserved.json()["slug"] == "new-2"
+    held = harness.client.post("/api/models", json={"name": "Corp-LLM!", "preset": "general"})
+    assert held.status_code == 201 and held.json()["slug"] == "corp-llm-2"
     with harness.sessions() as session:
         assert address_taken(session, SLUG) and address_taken(session, "corp-llm") and address_taken(session, "base")
         assert not address_taken(session, "free-name")

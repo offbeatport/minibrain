@@ -13,6 +13,7 @@ import {
 import { ChatComposer, ChatEmptyState, ChatNotice, ChatPanel } from "obp-ui/chat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOpenChat, usePlaygroundModels, usePresets, useSaveChat } from "~/api/playgroundQueries";
+import { useReservedName } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { useCan } from "~/lib/access";
@@ -336,10 +337,19 @@ export function PlaygroundPage() {
     const examples = target?.kind === "custom" && can.build;
     const last = lastAnswer(turns);
     const wholeChat = examples && last && exampleTurns(turns, last.id) ? last : null;
-    const missing =
-        openedModel && models.data && !targets.some((item) => item.name === openedModel)
-            ? `${openedModel} is not available any more, so answers now come from ${target?.model_name ?? "another model"}.`
-            : null;
+    const listed = (name: string) =>
+        targets.some((item) => item.name === name || (item.kind === "custom" && item.key === name));
+    const openedGone = openedModel && models.data && !listed(openedModel) ? openedModel : null;
+    const requestedGone =
+        !picked && requested && models.data && !listed(requested) ? requested : null;
+    const gone = openedGone ?? requestedGone;
+    const reserved = useReservedName(gone);
+    const answeredBy = `so answers now come from ${target?.model_name ?? "another model"}.`;
+    const missing = reserved.data
+        ? `${reserved.data.message}, ${answeredBy}`
+        : openedGone
+          ? `${openedGone} is not available any more, ${answeredBy}`
+          : null;
     const panelBody = target && (
         <SettingsPanel
             targets={targets}

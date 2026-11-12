@@ -541,6 +541,7 @@
           "models"
         ],
         "summary": "Default Name",
+        "description": "A free name and the API name it gets; with name, the API name that name would get.",
         "operationId": "default_name_api_models_name_get",
         "parameters": [
           {
@@ -551,6 +552,23 @@
               "type": "string",
               "default": "general",
               "title": "Preset"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
             }
           }
         ],
@@ -6096,11 +6114,11 @@
             }
           },
           "404": {
-            "description": "No model has this name.",
+            "description": "No model has this name (code model_not_found); a deleted model's name says when it went.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorDetail"
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
                 }
               }
             }
@@ -9213,6 +9231,49 @@
         }
       }
     },
+    "/api/reserved-names/{name}": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Read Reserved",
+        "description": "An API name kept after its model was deleted, so it never reaches another model.",
+        "operationId": "read_reserved_api_reserved_names__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservedNameInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/openapi/v1.json": {
       "get": {
         "tags": [
@@ -9563,11 +9624,11 @@
             }
           },
           "404": {
-            "description": "No model has this name.",
+            "description": "No model has this name (code model_not_found); a deleted model's name says when it went.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorDetail"
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
                 }
               }
             }
@@ -9675,11 +9736,11 @@
             }
           },
           "404": {
-            "description": "No model has this name.",
+            "description": "No model has this name (code model_not_found); a deleted model's name says when it went.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorDetail"
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
                 }
               }
             }
@@ -9772,11 +9833,11 @@
             }
           },
           "404": {
-            "description": "No model has this name.",
+            "description": "No model has this name (code model_not_found); a deleted model's name says when it went.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorDetail"
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
                 }
               }
             }
@@ -19792,6 +19853,18 @@
             },
             "type": "array",
             "title": "Tags"
+          },
+          "api_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 48
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Name"
           }
         },
         "type": "object",
@@ -22757,6 +22830,18 @@
                 "type": "null"
               }
             ]
+          },
+          "api_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 48
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Name"
           }
         },
         "type": "object",
@@ -23009,6 +23094,18 @@
             "maxLength": 80,
             "minLength": 1,
             "title": "Name"
+          },
+          "api_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 48
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Name"
           }
         },
         "type": "object",
@@ -23992,11 +24089,26 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "api_name": {
+            "type": "string",
+            "title": "Api Name"
+          },
+          "reserved": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReservedNameInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "api_name"
         ],
         "title": "NameSuggestion"
       },
@@ -26324,6 +26436,49 @@
           "last_at"
         ],
         "title": "RequestSummary"
+      },
+      "ReservedNameInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "base"
+            ],
+            "title": "Kind"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deleted At"
+          },
+          "deleted_by": {
+            "type": "string",
+            "title": "Deleted By"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "model_name",
+          "deleted_at",
+          "deleted_by",
+          "message"
+        ],
+        "title": "ReservedNameInfo"
       },
       "ResetBody": {
         "properties": {

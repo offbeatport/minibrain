@@ -9,6 +9,7 @@ from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.jobs import canceller
+from minibrain.api.reserved_names import reserved_info
 from minibrain.api.schemas import (
     ContractChange,
     ContractCheck,
@@ -78,6 +79,8 @@ from minibrain.registry.service import (
     get_model,
     latest_dataset_version,
     list_models,
+    preview_address,
+    slugify,
 )
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
@@ -166,7 +169,7 @@ def require_base(session: Session, base: str) -> None:
 def configured(session: Session, settings: Settings, store: ArtifactStore, body: ModelCreate, base: str) -> Model:
     chosen = preset(body.preset)
     require_base(session, base)
-    model = create_model(session, body.name, body.preset, base)
+    model = create_model(session, body.name, body.preset, base, body.api_name)
     model.description = body.description.strip()
     model.tags = user_tags(body.tags)
     model.avatar = body.avatar.model_dump(exclude_none=True) if body.avatar is not None else None
@@ -201,7 +204,7 @@ def duplicate(
     source = get_model(session, slug)
     require_idle(source.teardown, source.name)
     require_base(session, source.base_model)
-    model = duplicate_model(session, source, body.name)
+    model = duplicate_model(session, source, body.name, body.api_name)
     version = source_version(source)
     facts = created(model) | {"source": source.slug, "version": version.number if version is not None else None}
     session.add(AuditEvent(actor=current_actor(), action="model.duplicate", target=model.slug, detail=facts))
@@ -215,9 +218,20 @@ def duplicate(
     return detail(settings, model)
 
 
-@router.get("/name", dependencies=[Depends(viewer)])
-def default_name(session: SessionDep, preset_key: str = Query(default="general", alias="preset")) -> NameSuggestion:
-    return NameSuggestion(name=free_model_name(session, preset(preset_key).noun))
+@router.get(
+    "/name",
+    dependencies=[Depends(viewer)],
+    description="A free name and the API name it gets; with name, the API name that name would get.",
+)
+def default_name(
+    session: SessionDep,
+    preset_key: str = Query(default="general", alias="preset"),
+    name: str | None = Query(default=None, max_length=80),
+) -> NameSuggestion:
+    chosen = name.strip() if name and name.strip() else free_model_name(session, preset(preset_key).noun)
+    found = preview_address(session, slugify(chosen))
+    reserved = reserved_info(found.reserved) if found.reserved is not None else None
+    return NameSuggestion(name=chosen, api_name=found.address, reserved=reserved)
 
 
 @router.patch("/{slug}", dependencies=[Depends(builder)])

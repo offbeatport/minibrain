@@ -87,7 +87,7 @@ def judge(harness: Harness, score: float, reason: str) -> dict[str, Any]:
 
 
 def test_add_model_defaults_for_a_chat_assistant(harness: Harness) -> None:
-    assert harness.client.get("/api/models/name?preset=general").json() == {"name": "Assistant 1"}
+    assert harness.client.get("/api/models/name?preset=general").json()["name"] == "Assistant 1"
     created = create_assistant(harness)
     assert (created["name"], created["preset"]) == ("Assistant 1", "general")
     assert created["contract"] == {"kind": "text", "json_schema": None, "labels": None}
@@ -99,7 +99,7 @@ def test_add_model_defaults_for_a_chat_assistant(harness: Harness) -> None:
     assert "Concise" in found["default_rubric"]
     assert created["instructions"] == ""
     assert "helpful assistant" in created["default_instructions"]
-    assert harness.client.get("/api/models/name?preset=general").json() == {"name": "Assistant 2"}
+    assert harness.client.get("/api/models/name?preset=general").json()["name"] == "Assistant 2"
     v0 = versions(harness)[0]
     assert (v0["kind"], v0["status"], v0["view"], v0["main_metric"]) == (
         "prompt",

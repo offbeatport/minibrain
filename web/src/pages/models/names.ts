@@ -1,26 +1,11 @@
 import type { ModelRow } from "~/api/client";
 
-export function slugOf(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 48)
-        .replace(/-+$/, "");
-}
-
 export function takenNames(rows: ModelRow[]): Set<string> {
-    return new Set(
-        rows.flatMap((row) => [
-            row.name.trim().toLowerCase(),
-            row.key.toLowerCase(),
-            slugOf(row.key),
-        ]),
-    );
+    return new Set(rows.map((row) => row.name.trim().toLowerCase()));
 }
 
 export function isTaken(name: string, taken: Set<string>): boolean {
-    return taken.has(name.trim().toLowerCase()) || taken.has(slugOf(name));
+    return taken.has(name.trim().toLowerCase());
 }
 
 export function nextFree(noun: string, taken: Set<string>, numbered = true): string {

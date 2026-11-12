@@ -14,6 +14,7 @@ import { generateName } from "~/lib/avatarNames";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { AddModelSummary, Licence } from "./AddModelSummary";
+import { ApiNameHint } from "./ApiNameHint";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, diskBlocks, diskNeed } from "./BaseSummary";
@@ -295,7 +296,9 @@ export function AddModelPage() {
                         error={
                             problems.name && (checked || nameTouched) ? problems.name : undefined
                         }
-                    />
+                    >
+                        <ApiNameHint name={name} />
+                    </NameAvatarField>
                     <Field id="create-description" label={<Optional label="Description" />}>
                         <Textarea
                             id="create-description"

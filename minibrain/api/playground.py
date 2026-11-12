@@ -36,7 +36,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.models import AuditEvent, BaseModelStatus, CatalogModel, Model, PlaygroundPreset, now
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.playground_sessions import not_kept
-from minibrain.registry.service import ConflictError, NotFoundError
+from minibrain.registry.service import ConflictError, NotFoundError, no_model
 from minibrain.serve.backend import AdapterRef
 from minibrain.serve.dialects import detect_guard, reasoning_choices
 from minibrain.settings import Settings
@@ -205,7 +205,7 @@ def playground_route(
         return route, base, adapter
     row = session.get(BaseRow, name)
     if row is None or row.status != BaseModelStatus.AVAILABLE or detect_guard(row.repo, row.name):
-        raise HTTPException(status_code=404, detail=f"model {name} not found")
+        raise HTTPException(status_code=404, detail=str(no_model(session, name)))
     try:
         require_usable(session, settings, name)
     except (ConflictError, NotFoundError) as error:
