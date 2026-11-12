@@ -19,7 +19,6 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
-import { useAllModels } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -30,7 +29,7 @@ import { relativeTime } from "~/lib/time";
 import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
 import { ConfirmAction, type Confirmation } from "../dialogs";
-import { Tip, baseNameOf, isDeployed } from "./header";
+import { Tip, isDeployed } from "./header";
 import {
     MakeLiveDialog,
     canGoLive,
@@ -245,7 +244,6 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     const toast = useToast();
     const client = useQueryClient();
     const can = useCan();
-    const models = useAllModels();
     const [picked, setPicked] = useState<number[]>([]);
     const [promoting, setPromoting] = useState<number | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -296,7 +294,6 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
         <PanelSection
             icon={History}
             title="Versions"
-            description={`Every version is trained from ${baseNameOf(models.data, row.base_model)}, not from the one before.`}
             actions={
                 <>
                     {picked.length > 0 && (

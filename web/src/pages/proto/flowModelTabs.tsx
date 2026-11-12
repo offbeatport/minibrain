@@ -212,11 +212,7 @@ export function VersionsTab({ model }: { model: FlowModel }) {
     if (model.versions.length === 0) {
         return (
             <PanelSections>
-                <PanelSection
-                    icon={History}
-                    title="Versions"
-                    description={`Every version is trained from ${model.base}, not from the one before.`}
-                >
+                <PanelSection icon={History} title="Versions">
                     <p className="text-muted-foreground">
                         No versions yet. Attach data on the Data page and v0 Baseline is scored at
                         once.
@@ -252,7 +248,6 @@ export function VersionsTab({ model }: { model: FlowModel }) {
             <PanelSection
                 icon={History}
                 title="Versions"
-                description={`Every version is trained from ${model.base}, not from the one before.`}
                 actions={
                     <>
                         {picked.length > 0 && (
