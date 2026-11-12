@@ -3,6 +3,7 @@ import { Badge, Input, Label, Tooltip, TooltipContent, TooltipTrigger, cn } from
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { type AvatarChoice, AvatarTile, TONE_LABELS, sameChoice } from "./avatarDicebear";
 import { RECENT_LIMIT, describe } from "./avatarSession";
+import { AVATAR_STYLES, type AvatarStyleId } from "./avatarStyles";
 import { TONE_KEYS, type ToneName, toneToken } from "./modelIcons";
 
 const LETTERS_LIMIT = 2;
@@ -451,5 +452,57 @@ export function RecentStrip({
                 ))}
             </ul>
         </section>
+    );
+}
+
+const STYLE_SAMPLES: Record<AvatarStyleId, AvatarChoice> = {
+    initials: { style: "initials", seed: "initials", tone: "parquet", letters: "Ab" },
+    planets: { style: "planets", seed: "minibrain-planet", tone: "tsv" },
+    "voxel-bot": { style: "voxel-bot", seed: "minibrain-voxel", tone: "jsonl" },
+    pixelbot: { style: "pixelbot", seed: "minibrain-pixel", tone: "avro" },
+};
+
+export function StylePicker({
+    value,
+    name,
+    onChange,
+}: {
+    value: AvatarStyleId;
+    name: string;
+    onChange: (style: AvatarStyleId) => void;
+}) {
+    const group = useId();
+    return (
+        <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <legend className="sr-only">Style</legend>
+            {AVATAR_STYLES.map((item) => {
+                const checked = item.id === value;
+                return (
+                    <label
+                        key={item.id}
+                        className={cn(
+                            "relative flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border bg-background p-2.5 hover:bg-secondary has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                            checked && "border-primary hover:bg-background",
+                        )}
+                    >
+                        <input
+                            type="radio"
+                            name={group}
+                            value={item.id}
+                            checked={checked}
+                            onChange={() => onChange(item.id)}
+                            className="sr-only"
+                        />
+                        <AvatarTile choice={STYLE_SAMPLES[item.id]} name={name} size="md" />
+                        <span className="min-w-0 truncate font-medium">{item.name}</span>
+                        {checked && (
+                            <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+                            </span>
+                        )}
+                    </label>
+                );
+            })}
+        </fieldset>
     );
 }

@@ -9,9 +9,6 @@ import {
     DialogHeader,
     DialogTitle,
     Kbd,
-    Tabs,
-    TabsList,
-    TabsTrigger,
     cn,
 } from "obp-ui";
 import { useEffect, useState } from "react";
@@ -23,6 +20,7 @@ import {
     HeroStage,
     LettersField,
     RecentStrip,
+    StylePicker,
 } from "./AvatarPickerParts";
 import { type AvatarChoice, AvatarTile, defaultLetters, sameChoice } from "./avatarDicebear";
 import {
@@ -39,7 +37,7 @@ import {
     surprise,
     withLetters,
 } from "./avatarSession";
-import { AVATAR_STYLES, type AvatarStyleId, styleById } from "./avatarStyles";
+import { styleById } from "./avatarStyles";
 
 export function isTyping(target: EventTarget | null): boolean {
     return (
@@ -120,34 +118,11 @@ export function PickerDialog({
                         <HeroStage shown={shown} previewing={previewing} name={displayName} />
                     </div>
                     <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-                        <Tabs
+                        <StylePicker
                             value={session.tab}
-                            onValueChange={(tab) =>
-                                update((previous) => ({ ...previous, tab: tab as AvatarStyleId }))
-                            }
-                        >
-                            <TabsList
-                                variant="line"
-                                aria-label="Style"
-                                className="h-12 w-full justify-start gap-0 overflow-x-auto border-b"
-                            >
-                                {AVATAR_STYLES.map((item) => (
-                                    <TabsTrigger
-                                        key={item.id}
-                                        value={item.id}
-                                        className="flex-none gap-2.5 px-3 text-base sm:px-4"
-                                    >
-                                        <AvatarTile
-                                            choice={session.selected[item.id]}
-                                            name={displayName}
-                                            size="md"
-                                            className="hidden sm:flex [&_svg]:!size-full"
-                                        />
-                                        {item.name}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                        </Tabs>
+                            name={displayName}
+                            onChange={(tab) => update((previous) => ({ ...previous, tab }))}
+                        />
                         <CandidateGrid
                             label={style.seeded ? `${style.name} options` : `${style.name} colours`}
                             items={session.batches[session.tab]}
