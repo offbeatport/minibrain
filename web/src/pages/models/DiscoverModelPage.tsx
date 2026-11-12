@@ -131,7 +131,7 @@ function variantColumns(
                     <span className="inline-flex items-center gap-2">
                         {bytes(value)}
                         {row.original.train_fit.level === "fits" && (
-                            <StatusText tone="success">Trains on your hardware</StatusText>
+                            <StatusText tone="success">Trains on your compute</StatusText>
                         )}
                     </span>
                 );

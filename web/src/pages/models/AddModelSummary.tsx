@@ -82,9 +82,7 @@ function TrainLine({ variant }: { variant: CatalogVariantInfo | null }) {
             </div>
             {level && (
                 <StatusText tone={TRAIN_TONES[level]}>
-                    {level === "fits"
-                        ? "Trains on your hardware"
-                        : "Too big to train on your hardware"}
+                    {level === "fits" ? "Trains on your compute" : "Too large to train"}
                 </StatusText>
             )}
         </div>

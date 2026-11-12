@@ -364,10 +364,10 @@ const muted = (text: string) => <span className="text-muted-foreground">{text}</
 function trainHint(entry: CatalogEntry): ReactNode {
     const levels = new Set(entry.variants.map((variant) => variant.train_fit.level));
     if (levels.has("fits")) {
-        return <StatusText tone="success">Trains on your hardware</StatusText>;
+        return <StatusText tone="success">Trains on your compute</StatusText>;
     }
     if (levels.has("insufficient")) {
-        return <StatusText tone="neutral">Too big to train on your hardware</StatusText>;
+        return <StatusText tone="neutral">Too large to train</StatusText>;
     }
     return null;
 }
@@ -762,8 +762,8 @@ export function Discover({
                     ).length
                 }
             >
-                Runs on your hardware
-                <InfoTip label="What runs on your hardware means">{RUNS_HERE_INFO}</InfoTip>
+                Fits your compute
+                <InfoTip label="What fits your compute means">{RUNS_HERE_INFO}</InfoTip>
             </Option>
             <Option
                 checked={latestOnly(filters)}

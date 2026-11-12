@@ -123,9 +123,9 @@ function trainHelp(option: BaseOption): string {
     const level = option.variant?.train_fit.level;
     const where =
         level === "fits"
-            ? " Trains on your hardware."
+            ? " Trains on your compute."
             : level === "insufficient"
-              ? " Too big to train on the machines here."
+              ? " Too large to train."
               : "";
     return `Memory to train (QLoRA): GPU memory it takes to train with QLoRA 4-bit.${where}`;
 }
@@ -443,7 +443,7 @@ export function BasePicker({
                             kind: "toggle",
                             key: "runs-here",
                             title: "Compute",
-                            label: "Runs on your hardware",
+                            label: "Fits your compute",
                             info: RUNS_HERE_INFO,
                             count: count((option) => runsSomewhere(option.entry)),
                             checked: runsHere,
@@ -453,7 +453,7 @@ export function BasePicker({
                             kind: "toggle",
                             key: "trains-here",
                             title: "Training",
-                            label: "Trains on your hardware",
+                            label: "Trains on your compute",
                             info: TRAINS_HERE_INFO,
                             count: count((option) => trainsSomewhere(option.entry)),
                             checked: trainsHere,
