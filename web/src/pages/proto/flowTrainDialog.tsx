@@ -7,7 +7,6 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
     Kbd,
@@ -65,7 +64,6 @@ import {
     nextNumber,
     setHeldOut,
     startTraining,
-    trainingVersion,
     useFlowState,
 } from "./modelsFlowData";
 
@@ -141,7 +139,6 @@ function Body({ model }: { model: FlowModel }) {
     ) as Record<Quality, number | null>;
     const issues = errorsOf(recipe, base, plan);
     const number = nextNumber(model);
-    const running = trainingVersion(model);
     const shown = shownMachine(plan, compute);
     const option = shown ? (shown.chosen ?? shown.smallest) : null;
     const pending = state.feedback.filter(
@@ -229,9 +226,6 @@ function Body({ model }: { model: FlowModel }) {
         >
             <DialogHeader className="border-b px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
                 <DialogTitle>{`Train v${number} · ${model.name}`}</DialogTitle>
-                <DialogDescription className="tabular-nums">
-                    {`Trains from ${base.name}, not from ${running ? `v${running.number}` : "the version before"}. Scored on the same ${count(heldOut)} held-out rows as every version.`}
-                </DialogDescription>
             </DialogHeader>
             <div
                 ref={scroller}
@@ -241,9 +235,6 @@ function Body({ model }: { model: FlowModel }) {
                     <Row id="train-method" label="Method">
                         <p className="flex min-h-8 flex-wrap items-center gap-x-3">
                             <span>Supervised fine-tuning (SFT)</span>
-                            <span className="text-sm text-muted-foreground">
-                                DPO, continued pretraining, RL: coming soon
-                            </span>
                         </p>
                     </Row>
                     <Row id="train-quality" label="Training quality">

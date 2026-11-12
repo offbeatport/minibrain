@@ -15,7 +15,6 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
     Kbd,
@@ -178,7 +177,6 @@ function Body({
     const issues = issuesOf(recipe, info, planError);
     const quality = qualityOf(recipe);
     const number = nextVersion(row);
-    const running = versions.find((version) => version.status === "training");
     const heldOut = info?.held_out_rows ?? chosen?.counts.eval ?? 0;
     const option = info?.chosen ?? info?.machines.find((item) => item.picked)?.smallest ?? null;
     const memoryLabel = info?.memory_label ?? "memory";
@@ -274,18 +272,12 @@ function Body({
         >
             <DialogHeader className="border-b px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
                 <DialogTitle>{`Train v${number} · ${row.name}`}</DialogTitle>
-                <DialogDescription className="tabular-nums">
-                    {`Trains from ${baseName}, not from ${running ? `v${running.number}` : "the version before"}. Scored on the same ${count(heldOut)} held-out rows as every version.`}
-                </DialogDescription>
             </DialogHeader>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7">
                 <div className="divide-y">
                     <Row id="train-method" label="Method">
                         <p className="flex min-h-8 flex-wrap items-center gap-x-3">
                             <span>Supervised fine-tuning (SFT)</span>
-                            <span className="text-sm text-muted-foreground">
-                                DPO, continued pretraining, RL: coming soon
-                            </span>
                         </p>
                     </Row>
                     <Row id="train-quality" label="Training quality">
