@@ -122,7 +122,7 @@ function trainHelp(option: BaseOption): string {
     const level = option.variant?.train_fit.level;
     const where =
         level === "fits"
-            ? " Trains here."
+            ? " Trains on your hardware."
             : level === "insufficient"
               ? " Too big to train on the machines here."
               : "";
@@ -436,7 +436,7 @@ export function BasePicker({
                             kind: "toggle",
                             key: "runs-here",
                             title: "Compute",
-                            label: "Runs here",
+                            label: "Runs on your hardware",
                             info: RUNS_HERE_INFO,
                             count: count((option) => runsSomewhere(option.entry)),
                             checked: runsHere,
@@ -446,7 +446,7 @@ export function BasePicker({
                             kind: "toggle",
                             key: "trains-here",
                             title: "Training",
-                            label: "Trains here",
+                            label: "Trains on your hardware",
                             info: TRAINS_HERE_INFO,
                             count: count((option) => trainsSomewhere(option.entry)),
                             checked: trainsHere,

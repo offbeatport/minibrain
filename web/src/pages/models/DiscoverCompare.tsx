@@ -153,7 +153,7 @@ function TrainFigure({ entry }: { entry: CatalogEntry }) {
     return (
         <div className="flex flex-col">
             <span className="tabular-nums">{bytes(least)}</span>
-            {here && <span className="text-muted-foreground">Trains here</span>}
+            {here && <span className="text-muted-foreground">Trains on your hardware</span>}
         </div>
     );
 }
