@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { History } from "lucide-react";
+import { Eye, GitCompare, History, Rocket, RotateCcw, Trash2, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -201,6 +201,7 @@ function VersionRow({
                         jobId && (
                             <Button variant="outline" asChild>
                                 <Link href={jobHref(version.job ?? { id: jobId, kind: "train" })}>
+                                    <Eye aria-hidden="true" />
                                     Watch
                                 </Link>
                             </Button>
@@ -211,11 +212,13 @@ function VersionRow({
                             disabled={again.isPending}
                             onClick={() => again.mutate(jobId)}
                         >
+                            <RotateCcw aria-hidden="true" />
                             Retry
                         </Button>
                     )}
                     {can.build && live && !blocked && (
                         <Button variant="outline" onClick={onLive}>
+                            <Rocket aria-hidden="true" />
                             {`Make v${version.number} live`}
                         </Button>
                     )}
@@ -296,6 +299,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                 <>
                     {picked.length > 0 && (
                         <Button variant="outline" onClick={() => setPicked([])}>
+                            <X aria-hidden="true" />
                             Clear
                         </Button>
                     )}
@@ -311,6 +315,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                                 router.history.push(modelCompareHref(row.key, sorted[0], sorted[1]))
                             }
                         >
+                            <GitCompare aria-hidden="true" />
                             {sorted.length === 2
                                 ? `Compare v${sorted[0]} and v${sorted[1]}`
                                 : "Compare"}
@@ -327,10 +332,11 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                             }
                         >
                             <Button
-                                variant="outline"
+                                variant="destructive"
                                 disabled={deletable.length === 0}
                                 onClick={remove}
                             >
+                                <Trash2 aria-hidden="true" />
                                 {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
                             </Button>
                         </Tip>
