@@ -33,6 +33,9 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
                 self.reply(400, {"object": "error", "message": "grammar compilation failed", "code": 400})
                 return
             served = body.get("model") if body.get("model") != "qwen3-0.6b" else None
+            if self.path == "/v1/completions":
+                self.complete_text(body, f"{body.get('lora_path') or served or 'base'}:{body['prompt']}")
+                return
             text = f"{body.get('lora_path') or served or 'base'}:{body['messages'][-1]['content']}"
             choice = {"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}
             if (body.get("chat_template_kwargs") or {}).get("enable_thinking") or body.get("reasoning_effort"):
@@ -54,6 +57,26 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
                 return
             self.reply(200, {"choices": [choice], "usage": usage})
 
+        def complete_text(self, body: dict, text: str) -> None:
+            usage = {"prompt_tokens": 5, "completion_tokens": len(text)}
+            if not body.get("stream"):
+                self.reply(200, {"choices": [{"index": 0, "text": text, "finish_reason": "length"}], "usage": usage})
+                return
+            chunks = [{"choices": [{"index": 0, "text": char, "finish_reason": None}]} for char in text]
+            chunks += [
+                {"choices": [{"index": 0, "text": "", "finish_reason": "length"}]},
+                {"choices": [], "usage": usage},
+            ]
+            self.send_events(chunks)
+
+        def send_events(self, chunks: list) -> None:
+            data = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Length", str(len(data.encode())))
+            self.end_headers()
+            self.wfile.write(data.encode())
+
         def stream(self, choice: dict, usage: dict) -> None:
             message = choice["message"]
             deltas = [{"reasoning_content": message["reasoning_content"]}] if message.get("reasoning_content") else []
@@ -67,12 +90,7 @@ def handler(log: Path) -> type[BaseHTTPRequestHandler]:
             chunks = [{"choices": [{"index": 0, "delta": delta, "finish_reason": None}]} for delta in deltas]
             chunks += [{"choices": [{"index": 0, "delta": {}, "finish_reason": choice["finish_reason"]}]}]
             chunks += [{"choices": [], "usage": usage}]
-            data = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n"
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Content-Length", str(len(data.encode())))
-            self.end_headers()
-            self.wfile.write(data.encode())
+            self.send_events(chunks)
 
         def log_message(self, format: str, *args: object) -> None:
             return

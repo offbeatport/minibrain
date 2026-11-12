@@ -15,7 +15,7 @@ def dangling(document: dict[str, Any]) -> set[str]:
 def test_the_gateway_reference_covers_v1_from_its_base_url(harness: Harness) -> None:
     document = harness.client.get("/api/openapi/v1.json").json()
     assert document["servers"] == [{"url": "/v1"}]
-    assert set(document["paths"]) == {"/models", "/chat/completions", "/feedback"}
+    assert set(document["paths"]) == {"/models", "/chat/completions", "/completions", "/feedback"}
     assert document["info"]["version"] == library_version("minibrain")
     assert document["components"]["securitySchemes"]["apiKey"] == {
         "type": "http",

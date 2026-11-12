@@ -59,6 +59,11 @@ class CompletionRequest:
     tools: ToolUse = field(default_factory=ToolUse)
     reasoning: str | None = None
     template_extra: dict[str, Any] = field(default_factory=dict)
+    prompt: str | None = None
+
+    @property
+    def raw(self) -> bool:
+        return self.prompt is not None
 
     def decoding_choices(self) -> tuple[str, ...]:
         return self.constraint.options() if self.constraint else ()
@@ -77,10 +82,18 @@ class CompletionRequest:
         return found | self.template_extra
 
     def reader(self) -> Reader:
+        if self.raw:
+            return reader_for(None, ToolUse())
         return reader_for(self.base.tools, self.tools, think_mode(self.base.reasoning, self.template_kwargs()))
 
 
 Event = Piece | Completion
+
+
+def with_bos(bos: object, prompt: str) -> str:
+    return bos + prompt if isinstance(bos, str) and bos and not prompt.startswith(bos) else prompt
+
+
 Raw = Iterator[str | Completion]
 
 
@@ -169,6 +182,8 @@ class TransformersBackend:
     def prompt(self, runtime: "Runtime", request: CompletionRequest) -> str:
         if request.adapter is not None:
             self.use_adapter(runtime, request.adapter)
+        if request.prompt is not None:
+            return with_bos(runtime.tokenizer.bos_token, request.prompt)
         messages, tools, kwargs = request.template_messages(), request.template_tools(), request.template_kwargs()
         return runtime.render(messages, tools, kwargs) + request.prefill()
 

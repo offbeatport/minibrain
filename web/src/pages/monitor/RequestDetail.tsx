@@ -30,7 +30,13 @@ import {
 } from "~/lib/feedback";
 import { count, milliseconds } from "~/lib/format";
 import { REQUEST_BODIES_ID, deploymentPageHref } from "~/lib/modelLinks";
-import { SECURITY_PATH, STATUS_CLASSES, STATUS_TONES, modelLabel } from "~/lib/requests";
+import {
+    REQUEST_KINDS,
+    SECURITY_PATH,
+    STATUS_CLASSES,
+    STATUS_TONES,
+    modelLabel,
+} from "~/lib/requests";
 import { exactTime, relativeTime } from "~/lib/time";
 
 function Block({ label, children }: { label: string; children: ReactNode }) {
@@ -229,6 +235,12 @@ function facts(row: RequestRow): [string, ReactNode][] {
             </span>,
         ],
         ...requested,
+        [
+            "Endpoint",
+            <span key="kind" className="font-mono">
+                {REQUEST_KINDS[row.kind].path}
+            </span>,
+        ],
         ["API key", row.key_name ?? "Deleted key"],
         [
             "Status",

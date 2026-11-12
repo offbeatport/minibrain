@@ -2755,6 +2755,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/completions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a text completion
+         * @description Continue a prompt, as the legacy OpenAI completions API does: the text goes to the model as it is, without the chat template, which suits code completion and base models. A custom model applies its adapter but not its instructions or contract. Every call is logged without its content, unless the model keeps request inputs and answers.
+         */
+        post: operations["completions_v1_completions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/feedback": {
         parameters: {
             query?: never;
@@ -6704,6 +6724,11 @@ export interface components {
             safety?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Kind
+             * @default chat
+             */
+            kind?: string;
         };
         /** LoggedRequest */
         LoggedRequest: {
@@ -7901,6 +7926,11 @@ export interface components {
              * @default false
              */
             deleted?: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "chat" | "completion";
             /** Version */
             version: number | null;
             /** Contract */
@@ -8062,6 +8092,11 @@ export interface components {
              * @default false
              */
             deleted?: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "chat" | "completion";
             /** Version */
             version: number | null;
             /** Contract */
@@ -8843,6 +8878,157 @@ export interface components {
             prompt_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
+        };
+        /** TextChoice */
+        TextChoice: {
+            /** Index */
+            index: number;
+            /**
+             * Text
+             * @description The text that follows the prompt; empty when the safety model blocked the call.
+             */
+            text: string;
+            /** Logprobs */
+            logprobs?: null;
+            /**
+             * Finish Reason
+             * @description stop when the text ended or hit a stop text, length when max_tokens cut it, content_filter when the safety model blocked it.
+             * @enum {string}
+             */
+            finish_reason: "stop" | "length" | "content_filter";
+        };
+        /** TextCompletion */
+        TextCompletion: {
+            /**
+             * Id
+             * @description The response id; send it as response_id to POST /feedback.
+             */
+            id: string;
+            /**
+             * Object
+             * @constant
+             */
+            object: "text_completion";
+            /** Created */
+            created: number;
+            /** Model */
+            model: string;
+            /** Choices */
+            choices: components["schemas"]["TextChoice"][];
+            usage: components["schemas"]["TokenUsage"];
+            /** @description Present when a safety model checked the call. */
+            safety?: components["schemas"]["SafetyVerdict"] | null;
+        };
+        /**
+         * TextCompletionRequest
+         * @example {
+         *       "max_tokens": 64,
+         *       "model": "qwen3-0.6b",
+         *       "prompt": "def fibonacci(n):"
+         *     }
+         */
+        TextCompletionRequest: {
+            /**
+             * Model
+             * @description A name from GET /models: a custom model follows its live version, name@3 pins version 3, and a served base model goes by its key.
+             */
+            model: string;
+            /**
+             * Prompt
+             * @description The text to continue, sent as it is; a list holding one text works too. Token ids are not read.
+             */
+            prompt: string | string[] | number[] | number[][];
+            /**
+             * Max Tokens
+             * @description The most tokens to answer with; 16 when unset.
+             * @default 16
+             */
+            max_tokens?: number | null;
+            /**
+             * Temperature
+             * @description 0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's default; custom models answer at 0, the way their scores were measured.
+             */
+            temperature?: number | null;
+            /**
+             * Top P
+             * @description Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p.
+             */
+            top_p?: number | null;
+            /**
+             * Top K
+             * @description Sample only from the k likeliest tokens. An extension vLLM and SGLang share.
+             */
+            top_k?: number | null;
+            /**
+             * Min P
+             * @description 0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension.
+             */
+            min_p?: number | null;
+            /**
+             * Presence Penalty
+             * @description -2 to 2: above 0 favours tokens that have not appeared yet.
+             */
+            presence_penalty?: number | null;
+            /**
+             * Frequency Penalty
+             * @description -2 to 2: above 0 lowers a token's odds the more often it appeared.
+             */
+            frequency_penalty?: number | null;
+            /**
+             * Repetition Penalty
+             * @description Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension.
+             */
+            repetition_penalty?: number | null;
+            /**
+             * Seed
+             * @description Sample the same way for the same seed and inputs, as far as the engine allows.
+             */
+            seed?: number | null;
+            /**
+             * Stop
+             * @description Up to 4 texts that end the answer; the text itself is not returned.
+             */
+            stop?: string | string[] | null;
+            /**
+             * N
+             * @description How many answers; only 1 is supported.
+             */
+            n?: number | null;
+            /**
+             * Best Of
+             * @description Only 1 is supported.
+             */
+            best_of?: number | null;
+            /**
+             * Stream
+             * @description Send the answer as server-sent events, ending with data: [DONE].
+             * @default false
+             */
+            stream?: boolean;
+            /**
+             * Logprobs
+             * @description Not returned; leave it unset.
+             */
+            logprobs?: number | null;
+            /**
+             * Echo
+             * @description Not supported; leave it unset or false.
+             */
+            echo?: boolean | null;
+            /**
+             * Suffix
+             * @description Not supported; leave it unset.
+             */
+            suffix?: string | null;
+            /**
+             * User
+             * @description Accepted and ignored.
+             */
+            user?: string | null;
+            /** @description A minibrain extension: check the request with a safety model on this install (Llama Guard, ShieldGemma, Qwen3Guard, gpt-oss-safeguard), and the answer too with answers: true. A model with a safety model set in Settings or on its page is always checked by it; a request can add the answer check but not change or turn off that model. A blocked request answers with message.refusal and finish_reason content_filter. */
+            safety?: components["schemas"]["SafetyRequest"] | null;
+        } & {
+            [key: string]: unknown;
         };
         /** ThresholdInfo */
         ThresholdInfo: {
@@ -15748,6 +15934,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description No engine is serving this model right now. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+        };
+    };
+    completions_v1_completions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextCompletionRequest"];
+            };
+        };
+        responses: {
+            /** @description The text, or with stream set, server-sent text_completion events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TextCompletion"];
+                    "text/event-stream": string;
+                };
+            };
+            /** @description A field is out of range or cannot be applied to this model; param names it. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenAIErrorBody"];
+                };
+            };
+            /** @description The API key is missing, unknown or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The API key does not cover this model. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description No model has this name. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description The version was trained on base weights that changed since. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description No engine is serving this model right now. */

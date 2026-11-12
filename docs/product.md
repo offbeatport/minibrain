@@ -330,9 +330,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **OpenAI-compatible API** · shipped · engineer
   Call any model by name or pinned version, streamed token by token.
   UI: Models › model › API · API: POST /v1/chat/completions, GET /v1/models
+- **Text completions** · shipped · engineer
+  Continue a raw prompt without the chat template, for code completion.
+  API: POST /v1/completions
 - **Sampling settings** · shipped · engineer
   Set temperature, top_p, top_k, min_p, penalties, seed and stops.
-  API: POST /v1/chat/completions
+  API: POST /v1/chat/completions, POST /v1/completions
 - **Tool calling** · shipped · engineer
   Call functions from Qwen, Llama, Mistral and gpt-oss models, streamed too.
   API: POST /v1/chat/completions
@@ -341,7 +344,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   API: POST /v1/chat/completions
 - **Safety model** · shipped · engineer, admin
   Block unsafe requests and answers with a guard model, audited.
-  UI: Settings › General › Safety model, Models › model › API, Monitoring › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{slug}/safety, POST /v1/chat/completions
+  UI: Settings › General › Safety model, Models › model › API, Monitoring › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{slug}/safety, POST /v1/chat/completions, POST /v1/completions
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access

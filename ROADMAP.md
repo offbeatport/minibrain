@@ -127,8 +127,8 @@ Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, to
 chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss), reasoning off or at an effort with
 `reasoning_content` apart from the answer, token streaming from every engine, and a safety model (Llama Guard,
 ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request, and a Playground with every setting,
-Recent chats saved per person and Save as test example. Not yet: `/v1/completions`, sizing guidance, the staff
-Chat app. `/v1/embeddings` moved to item 2 with retrieval.
+Recent chats saved per person and Save as test example, and `/v1/completions` (2026-11-12). Not yet: sizing
+guidance, the staff Chat app. `/v1/embeddings` moved to item 2 with retrieval.
 
 The staff Chat app comes next and is separate from the Playground: a ChatGPT-like app for everyone in the
 organisation, with per-person history, retrieval over company documents, sharing and admin retention. The Playground
@@ -953,6 +953,10 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 ## API and access
 
 - `/v1/chat/completions` with streaming (tokens as each engine generates them, since 2026-11-06), `/v1/models`.
+- `/v1/completions` (built 2026-11-12): a raw `prompt` continued without the chat template, for code completion and
+  base models, streamed too; keys, `name@N`, sampling, safety and request logs (kind `completion`) as in chat. A custom
+  model applies its adapter but not its instructions or contract. One prompt per call; `logprobs`, `echo` and
+  `suffix` are refused with a 400. Details in `docs/serving.md`, Text completions.
 - `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema; without
   one, a custom model's contract holds decoding: its labels for a label set, its schema for a JSON contract (checked
   the same way). A request's format only narrows a model whose contract is free text; a label or schema contract
@@ -978,8 +982,8 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   `<base>:<adapter>` name.
 - API keys cover one or more models; a call to a model the key does not cover gets 403. Keys are managed on
   each model's API tab. Audit log: who created, changed or revoked which key, when.
-- Request metadata is logged for every `/v1` call: time, model, version, key, status, latency, tokens, finish reason
-  and response id, never content. Monitoring, cost and the Requests tab depend on it, so it cannot be turned
+- Request metadata is logged for every `/v1` call: time, endpoint, model, version, key, status, latency, tokens,
+  finish reason and response id, never content. Monitoring, cost and the Requests tab depend on it, so it cannot be turned
   off; log retention deletes it.
 - Request inputs and answers (the last user message and the model's answer) are kept per model: "Keep request inputs
   and answers" on the model's page, off by default, changed by Builders and audited as
@@ -1652,6 +1656,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [x] `transformers` backend for local mode and tests
 - [x] Gateway: chat completions with streaming, models, `name@version`, scoped API keys, batched request logs; serves
       from a versioned config snapshot, standalone role, engines as supervised children with LRU adapters
+- [x] Gateway: `/v1/completions` (raw prompt, every engine, streamed, logged as `completion`)
 - [ ] Gateway: `response_format`, per-model request bodies, retrieval context step (`response_format`, response ids
       on request logs and per-model request inputs and answers done)
 - [x] Monitor → Requests: live `/v1` request log, server-paged, with filters and a summary, finish reasons recorded

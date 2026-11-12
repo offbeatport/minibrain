@@ -12,6 +12,8 @@ from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog
 
 FLUSH_SECONDS = 2.0
 MAX_BUFFERED = 10_000
+CHAT_KIND = "chat"
+COMPLETION_KIND = "completion"
 
 log = logging.getLogger("minibrain.gateway")
 
@@ -33,6 +35,7 @@ class LogEntry:
     output: str | None = None
     finish_reason: str | None = None
     safety: dict[str, Any] | None = None
+    kind: str = CHAT_KIND
 
     def as_json(self) -> dict:
         return asdict(self) | {"at": self.at.isoformat()}

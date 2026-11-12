@@ -67,6 +67,8 @@ class LlamaCppBackend:
         return self.models[spec.key]
 
     def render(self, model: Any, request: CompletionRequest) -> str:
+        if request.prompt is not None:
+            return request.prompt
         from transformers.utils.chat_template_utils import render_jinja_template
 
         template = model.metadata.get("tokenizer.chat_template")

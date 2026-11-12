@@ -80,6 +80,10 @@ def sampling_fields(request: CompletionRequest) -> dict[str, Any]:
     return {key: value for key, value in given.items() if key != "stop"} | {"stop": stops}
 
 
+def endpoint(url: str, request: CompletionRequest) -> str:
+    return f"{url}/v1/completions" if request.raw else f"{url}/v1/chat/completions"
+
+
 class OpenAIServerBackend:
     engine = ""
     device = ""
@@ -157,16 +161,15 @@ class OpenAIServerBackend:
 
     def body(self, request: CompletionRequest) -> dict[str, Any]:
         spec = request.base
-        body: dict[str, Any] = {
-            "model": spec.key,
-            "messages": request.messages,
-            "chat_template_kwargs": request.template_kwargs(),
-        }
-        if spec.reasoning == EFFORT and request.reasoning in EFFORTS:
-            body["reasoning_effort"] = request.reasoning
+        found: dict[str, Any] = {"model": spec.key}
         if request.max_tokens is not None:
-            body["max_tokens"] = request.max_tokens
-        return body | sampling_fields(request) | tool_fields(request) | self.constraint_fields(request)
+            found["max_tokens"] = request.max_tokens
+        if request.prompt is not None:
+            return found | {"prompt": request.prompt} | sampling_fields(request) | self.constraint_fields(request)
+        found |= {"messages": request.messages, "chat_template_kwargs": request.template_kwargs()}
+        if spec.reasoning == EFFORT and request.reasoning in EFFORTS:
+            found["reasoning_effort"] = request.reasoning
+        return found | sampling_fields(request) | tool_fields(request) | self.constraint_fields(request)
 
     def refused(self, request: CompletionRequest, response: httpx.Response) -> None:
         if response.status_code != 400:
@@ -190,7 +193,7 @@ class OpenAIServerBackend:
         url, body = self.prepared(request)
         body |= {"stream": True, "stream_options": {"include_usage": True}}
         started = time.perf_counter()
-        with self.http.stream("POST", f"{url}/v1/chat/completions", json=body) as response:
+        with self.http.stream("POST", endpoint(url, request), json=body) as response:
             if response.status_code != 200:
                 response.read()
                 self.refused(request, response)
@@ -209,7 +212,7 @@ class OpenAIServerBackend:
             usage = chunk.get("usage") or usage
             for choice in chunk.get("choices") or ():
                 finish = choice.get("finish_reason") or finish
-                delta = choice.get("delta") or {}
+                delta = choice.get("delta") or {"content": choice.get("text")}
                 calls.add(delta.get("tool_calls") or ())
                 thought = delta.get("reasoning_content") or delta.get("reasoning") or ""
                 piece = Piece(content=delta.get("content") or "", reasoning=thought)
@@ -232,13 +235,13 @@ class OpenAIServerBackend:
     def complete(self, request: CompletionRequest) -> Completion:
         url, body = self.prepared(request)
         started = time.perf_counter()
-        response = self.http.post(f"{url}/v1/chat/completions", json=body)
+        response = self.http.post(endpoint(url, request), json=body)
         self.refused(request, response)
         response.raise_for_status()
         result = response.json()
         choice = result["choices"][0]
         usage = result.get("usage") or {}
-        message = choice.get("message") or {}
+        message = choice.get("message") or {"content": choice.get("text")}
         return Completion(
             text=str(message.get("content") or ""),
             prompt_tokens=int(usage.get("prompt_tokens", 0)),

@@ -6,7 +6,7 @@ import time
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Protocol
 
 from fastapi import HTTPException
 
@@ -14,7 +14,7 @@ from minibrain.base_models import BaseModelSpec, base_model
 from minibrain.gateway.config import GatewayConfig, Route
 from minibrain.gateway.errors import OpenAIError, invalid
 from minibrain.gateway.safety import SafetyPlan, SafetyUnavailableError, Verdict, judged
-from minibrain.gateway.schema import ChatCompletionRequest, Message
+from minibrain.gateway.schema import ChatCompletionRequest, Message, TextCompletionRequest
 from minibrain.ml.completion import Completion, Piece
 from minibrain.models.health import base_changed
 from minibrain.serve.backend import (
@@ -40,6 +40,7 @@ FUNCTION_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
 UNCONSTRAINED = "only SGLang and llama.cpp engines constrain decoding, the others check the answer afterwards."
 ROLES = ("system", "developer", "user", "assistant", "tool")
 CHOICES = (AUTO, NONE, REQUIRED)
+Requested = ChatCompletionRequest | TextCompletionRequest
 
 
 def spec_for(config: GatewayConfig, key: str) -> BaseModelSpec:
@@ -146,7 +147,7 @@ def stops_of(raw: str | list[str] | None) -> tuple[str, ...]:
     return tuple(found)
 
 
-def sampling_of(body: ChatCompletionRequest, route: Route) -> Sampling:
+def sampling_of(body: Requested, route: Route) -> Sampling:
     sampling = Sampling(
         temperature=body.temperature,
         top_p=body.top_p,
@@ -316,7 +317,7 @@ def guard_spec(config: GatewayConfig, key: str) -> BaseModelSpec:
     return BaseModelSpec.from_dict(found)
 
 
-def safety_of(body: ChatCompletionRequest, route: Route, config: GatewayConfig) -> SafetyPlan | None:
+def safety_of(body: Requested, route: Route, config: GatewayConfig) -> SafetyPlan | None:
     asked = body.safety
     configured = route.safety or {}
     model = configured.get("model")
@@ -573,16 +574,40 @@ def failure_body(error: BaseException) -> dict[str, Any]:
 Finished = Callable[[Completion | None, BaseException | None], None]
 
 
-def sse(
-    identifier: str,
-    model: str,
-    first: Event,
-    events: Iterator[Event],
-    include_usage: bool = False,
-    finished: Finished | None = None,
+class Chunks(Protocol):
+    def piece(self, piece: Piece) -> dict[str, Any] | None: ...
+
+    def ending(self, final: Completion) -> list[dict[str, Any]]: ...
+
+
+def usage_endings(last: dict[str, Any], final: Completion, include_usage: bool) -> list[dict[str, Any]]:
+    if include_usage:
+        return [{"choices": [last]}, {"choices": [], "usage": usage(final)}]
+    return [{"choices": [last], "usage": usage(final)}]
+
+
+@dataclass
+class ChatChunks:
+    include_usage: bool = False
+    calls: int = 0
+    opening: bool = True
+
+    def piece(self, piece: Piece) -> dict[str, Any] | None:
+        found = {"choices": [moving(delta_of(piece, self.calls, self.opening))]}
+        self.calls, self.opening = self.calls + len(piece.tool_calls), False
+        return found
+
+    def ending(self, final: Completion) -> list[dict[str, Any]]:
+        found: list[dict[str, Any]] = []
+        if self.opening or final.refusal:
+            found.append({"choices": [moving(delta_of(Piece(refusal=final.refusal or ""), 0, self.opening))]})
+        last = {"index": 0, "delta": {}, "finish_reason": final.finish_reason}
+        return found + usage_endings(last, final, self.include_usage)
+
+
+def events_sse(
+    head: dict[str, Any], first: Event, events: Iterator[Event], chunks: Chunks, finished: Finished | None = None
 ) -> Iterator[str]:
-    chunk = {"id": identifier, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
-    calls, opening = 0, True
     final: Completion | None = None
     failure: BaseException | None = None
     try:
@@ -590,18 +615,13 @@ def sse(
             if isinstance(event, Completion):
                 final = event
                 continue
-            yield data(
-                chunk | {"choices": [{"index": 0, "delta": delta_of(event, calls, opening), "finish_reason": None}]}
-            )
-            calls, opening = calls + len(event.tool_calls), False
+            found = chunks.piece(event)
+            if found is not None:
+                yield data(head | found)
         if final is None:
             raise EngineUnavailableError("the engine stopped before it finished the answer")
-        if opening or final.refusal:
-            yield data(chunk | {"choices": [moving(delta_of(Piece(refusal=final.refusal or ""), 0, opening))]})
-        last = {"index": 0, "delta": {}, "finish_reason": final.finish_reason}
-        yield data(chunk | {"choices": [last]} | ({} if include_usage else {"usage": usage(final)}))
-        if include_usage:
-            yield data(chunk | {"choices": [], "usage": usage(final)})
+        for found in chunks.ending(final):
+            yield data(head | found)
     except Exception as error:
         failure = error
         log.warning("a streamed answer failed: %s", error)
@@ -610,3 +630,15 @@ def sse(
         if finished is not None:
             finished(final, failure)
     yield "data: [DONE]\n\n"
+
+
+def sse(
+    identifier: str,
+    model: str,
+    first: Event,
+    events: Iterator[Event],
+    include_usage: bool = False,
+    finished: Finished | None = None,
+) -> Iterator[str]:
+    head = {"id": identifier, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
+    return events_sse(head, first, events, ChatChunks(include_usage), finished)

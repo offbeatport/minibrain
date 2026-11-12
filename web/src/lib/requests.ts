@@ -14,6 +14,13 @@ export const STATUS_CLASSES: { value: StatusClass; label: string }[] = [
     { value: "server_error", label: "Server error (5xx)" },
 ];
 
+export type RequestKind = "chat" | "completion";
+
+export const REQUEST_KINDS: Record<RequestKind, { label: string; path: string }> = {
+    chat: { label: "Chat", path: "/v1/chat/completions" },
+    completion: { label: "Completion", path: "/v1/completions" },
+};
+
 export const STATUS_TONES: Record<StatusClass, Tone> = {
     ok: "success",
     client_error: "warning",

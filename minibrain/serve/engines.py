@@ -219,6 +219,8 @@ class EngineBackend:
             "reasoning": request.reasoning,
             "template_extra": request.template_extra,
         }
+        if request.prompt is not None:
+            body["prompt"] = request.prompt
         if request.constraint is not None:
             body["constraint"] = asdict(request.constraint)
         return body
@@ -239,7 +241,8 @@ class EngineBackend:
     def opened(self, request: CompletionRequest, stream: bool) -> tuple[Any, ExitStack]:
         base = request.base.key
         body = self.body_of(request)
-        key = sticky_key(base, request.adapter.name if request.adapter else None, request.messages)
+        history = request.messages or [{"role": "user", "content": request.prompt or ""}]
+        key = sticky_key(base, request.adapter.name if request.adapter else None, history)
         started = time.monotonic()
         deadline = started + STARTUP_SECONDS
         tried: set[str] = set()

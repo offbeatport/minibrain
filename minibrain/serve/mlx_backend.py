@@ -144,6 +144,8 @@ class MlxRuntime:
         self.zeros: dict[str, Any] = {}
 
     def render(self, request: CompletionRequest) -> list[int]:
+        if request.prompt is not None:
+            return list(self.tokenizer.encode(request.prompt))
         text = self.tokenizer.apply_chat_template(
             request.template_messages(),
             tools=request.template_tools(),

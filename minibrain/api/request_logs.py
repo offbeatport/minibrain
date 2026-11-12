@@ -26,9 +26,10 @@ PAGE_MAX = 200
 CLIENT_ERROR = 400
 SERVER_ERROR = 500
 NO_KEY = "none"
-RESPONSE_ID = re.compile(r"chatcmpl-[0-9a-f]{32}")
+RESPONSE_ID = re.compile(r"(chat)?cmpl-[0-9a-f]{32}")
 
 StatusClass = Literal["ok", "client_error", "server_error"]
+RequestKind = Literal["chat", "completion"]
 BodyState = Literal["kept", "hidden", "missing", "off"]
 Facet = Literal["model", "version", "key", "status"]
 STATUS_CLASSES: tuple[StatusClass, ...] = ("ok", "client_error", "server_error")
@@ -42,6 +43,7 @@ class RequestRow(pydantic.BaseModel):
     model_name: str
     custom: bool
     deleted: bool = False
+    kind: RequestKind
     version: int | None
     contract: int | None = None
     key_id: int | None
@@ -288,6 +290,7 @@ def request_rows(session: Session, found: Sequence[Any]) -> list[RequestRow]:
                 model_name=owner.name,
                 custom=owner.custom,
                 deleted=owner.deleted,
+                kind="completion" if log.kind == "completion" else "chat",
                 version=log.version,
                 contract=log.contract,
                 key_id=log.key_id,

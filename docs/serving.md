@@ -88,6 +88,24 @@ the request sets one, the way its scores were measured.
 - Without `max_tokens` the answer runs to the end of the model's context (`max_position_embeddings`, or 4,096 tokens
   for llama.cpp's window).
 
+## Text completions
+
+`/v1/completions` is OpenAI's legacy text completion API, for code completion and base models: `prompt` goes to the
+engine as it is, without the chat template, and `choices[].text` is what follows it. It shares the chat path's keys,
+`name@N` addressing, sampling fields, safety model, request log (`kind` `completion`, shown as the Endpoint on
+Monitoring › Requests) and streaming (`text_completion` chunks ending with `data: [DONE]`).
+
+- Each engine takes its raw-prompt path: `transformers` tokenizes the text with the tokenizer's BOS token in front
+  (when it has one and the prompt lacks it), MLX encodes it with special tokens, llama.cpp passes it to
+  `create_completion`, and SGLang and vLLM get it on their own `/v1/completions`. Remote engines carry it as `prompt`
+  on `/generate`. The answer is read as plain text: no reasoning split, no tool calls.
+- A custom model applies its live (or pinned) version's adapter but not its instructions, few-shot turns or contract;
+  it answers at temperature 0 unless the request sets one, as in chat. A prompt-only version is its base model.
+- `max_tokens` defaults to 16, as OpenAI's does. `prompt` may be a list holding one text; a longer list or token ids
+  are a 400. So are `n` or `best_of` above 1, `logprobs`, `echo`, `suffix` and `logit_bias`; `user` is accepted and
+  ignored.
+- A blocked call answers with empty `text`, `finish_reason: content_filter` and the `safety` verdict.
+
 ## Structured output
 
 `/v1/chat/completions` takes OpenAI's `response_format`: `{"type": "text"}`, `{"type": "json_object"}` or

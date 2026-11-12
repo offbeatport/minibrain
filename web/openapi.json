@@ -6115,22 +6115,22 @@
               }
             }
           },
-          "422": {
-            "description": "The answer does not match response_format or the contract.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OpenAIErrorBody"
-                }
-              }
-            }
-          },
           "503": {
             "description": "No engine is serving this model right now.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The answer does not match response_format or the contract.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
                 }
               }
             }
@@ -9582,12 +9582,114 @@
               }
             }
           },
+          "503": {
+            "description": "No engine is serving this model right now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "The answer does not match response_format or the contract.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/v1/completions": {
+      "post": {
+        "tags": [
+          "completions"
+        ],
+        "summary": "Create a text completion",
+        "description": "Continue a prompt, as the legacy OpenAI completions API does: the text goes to the model as it is, without the chat template, which suits code completion and base models. A custom model applies its adapter but not its instructions or contract. Every call is logged without its content, unless the model keeps request inputs and answers.",
+        "operationId": "completions_v1_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The text, or with stream set, server-sent text_completion events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextCompletion"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field is out of range or cannot be applied to this model; param names it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The API key is missing, unknown or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key does not cover this model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No model has this name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The version was trained on base weights that changed since.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDetail"
                 }
               }
             }
@@ -9598,6 +9700,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -21857,6 +21969,11 @@
               }
             ],
             "title": "Safety"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": "chat"
           }
         },
         "type": "object",
@@ -25503,6 +25620,14 @@
             "title": "Deleted",
             "default": false
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "completion"
+            ],
+            "title": "Kind"
+          },
           "version": {
             "anyOf": [
               {
@@ -25673,6 +25798,7 @@
           "model_key",
           "model_name",
           "custom",
+          "kind",
           "version",
           "key_id",
           "key_name",
@@ -25966,6 +26092,14 @@
             "title": "Deleted",
             "default": false
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "completion"
+            ],
+            "title": "Kind"
+          },
           "version": {
             "anyOf": [
               {
@@ -26093,6 +26227,7 @@
           "model_key",
           "model_name",
           "custom",
+          "kind",
           "version",
           "key_id",
           "key_name",
@@ -28360,6 +28495,378 @@
           "completion_tokens"
         ],
         "title": "TestResponse"
+      },
+      "TextChoice": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The text that follows the prompt; empty when the safety model blocked the call."
+          },
+          "logprobs": {
+            "type": "null",
+            "title": "Logprobs"
+          },
+          "finish_reason": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "length",
+              "content_filter"
+            ],
+            "title": "Finish Reason",
+            "description": "stop when the text ended or hit a stop text, length when max_tokens cut it, content_filter when the safety model blocked it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "text",
+          "finish_reason"
+        ],
+        "title": "TextChoice"
+      },
+      "TextCompletion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The response id; send it as response_id to POST /feedback."
+          },
+          "object": {
+            "type": "string",
+            "const": "text_completion",
+            "title": "Object"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/TextChoice"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/TokenUsage"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyVerdict"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when a safety model checked the call."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "title": "TextCompletion"
+      },
+      "TextCompletionRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "A name from GET /models: a custom model follows its live version, name@3 pins version 3, and a served base model goes by its key."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Prompt",
+            "description": "The text to continue, sent as it is; a list holding one text works too. Token ids are not read."
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens",
+            "description": "The most tokens to answer with; 16 when unset.",
+            "default": 16
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "description": "0 to 2: higher is more varied, 0 picks the likeliest token every time. Unset: the model's default; custom models answer at 0, the way their scores were measured."
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P",
+            "description": "Above 0, up to 1: sample only from the likeliest tokens whose probabilities add up to top_p."
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K",
+            "description": "Sample only from the k likeliest tokens. An extension vLLM and SGLang share."
+          },
+          "min_p": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min P",
+            "description": "0 to 1: drop tokens less likely than min_p times the likeliest one. An engine extension."
+          },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -2.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Penalty",
+            "description": "-2 to 2: above 0 favours tokens that have not appeared yet."
+          },
+          "frequency_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -2.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency Penalty",
+            "description": "-2 to 2: above 0 lowers a token's odds the more often it appeared."
+          },
+          "repetition_penalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repetition Penalty",
+            "description": "Above 0, up to 2: above 1 discourages repeating any token seen so far. An engine extension."
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed",
+            "description": "Sample the same way for the same seed and inputs, as far as the engine allows."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop",
+            "description": "Up to 4 texts that end the answer; the text itself is not returned."
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N",
+            "description": "How many answers; only 1 is supported."
+          },
+          "best_of": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Of",
+            "description": "Only 1 is supported."
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "description": "Send the answer as server-sent events, ending with data: [DONE].",
+            "default": false
+          },
+          "logprobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logprobs",
+            "description": "Not returned; leave it unset."
+          },
+          "echo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Echo",
+            "description": "Not supported; leave it unset or false."
+          },
+          "suffix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suffix",
+            "description": "Not supported; leave it unset."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User",
+            "description": "Accepted and ignored."
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SafetyRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A minibrain extension: check the request with a safety model on this install (Llama Guard, ShieldGemma, Qwen3Guard, gpt-oss-safeguard), and the answer too with answers: true. A model with a safety model set in Settings or on its page is always checked by it; a request can add the answer check but not change or turn off that model. A blocked request answers with message.refusal and finish_reason content_filter."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "title": "TextCompletionRequest",
+        "example": {
+          "max_tokens": 64,
+          "model": "qwen3-0.6b",
+          "prompt": "def fibonacci(n):"
+        }
       },
       "ThresholdInfo": {
         "properties": {

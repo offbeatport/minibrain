@@ -13,7 +13,7 @@ from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
-from minibrain.gateway.logs import LogEntry, database_sink
+from minibrain.gateway.logs import CHAT_KIND, LogEntry, database_sink
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.usage import touch
@@ -48,6 +48,7 @@ class LogBody(BaseModel):
     output: str | None = None
     finish_reason: str | None = None
     safety: dict[str, Any] | None = None
+    kind: str = CHAT_KIND
 
 
 class LogsBody(BaseModel):

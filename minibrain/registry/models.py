@@ -470,6 +470,7 @@ class RequestLog(Base):
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     model_slug: Mapped[str | None] = mapped_column(default=None)
     model_name: Mapped[str | None] = mapped_column(default=None)
+    kind: Mapped[str] = mapped_column(default="chat", server_default="chat")
 
 
 class Feedback(Base):

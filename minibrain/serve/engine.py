@@ -58,7 +58,8 @@ class AdapterBody(BaseModel):
 
 
 class GenerateBody(BaseModel):
-    messages: list[dict[str, Any]]
+    messages: list[dict[str, Any]] = []
+    prompt: str | None = None
     adapter: AdapterBody | None = None
     max_tokens: int | None = None
     constraint: Constraint | None = None
@@ -83,6 +84,7 @@ class GenerateBody(BaseModel):
             tools=ToolUse(tuple(self.tools), self.tool_choice, self.parallel_tool_calls),
             reasoning=self.reasoning,
             template_extra=dict(self.template_extra),
+            prompt=self.prompt,
         )
 
 

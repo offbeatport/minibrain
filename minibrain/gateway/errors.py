@@ -5,7 +5,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 
-CHAT_PATHS = frozenset({"/v1/chat/completions", "/api/playground/chat/completions"})
+CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/completions", "/api/playground/chat/completions"})
 
 
 class OpenAIError(Exception):

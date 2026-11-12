@@ -38,6 +38,7 @@ import {
     RANGES,
     REQUESTS_PATH,
     REQUEST_KEYS,
+    REQUEST_KINDS,
     STATUS_CLASSES,
     STATUS_TONES,
     type StatusClass,
@@ -124,6 +125,11 @@ const COLUMNS: ColumnDef<RequestRow, unknown>[] = [
                 className="block max-w-48 truncate"
             />
         ),
+    },
+    {
+        id: "kind",
+        header: "Endpoint",
+        cell: ({ row }) => REQUEST_KINDS[row.original.kind].label,
     },
     {
         id: "key",

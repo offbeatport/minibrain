@@ -1,6 +1,6 @@
 import contextlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from minibrain.data.feedback import ORIGIN_API, Submission
 from minibrain.gateway.chat import (
     ChatPlan,
+    Requested,
     answer,
     chat_events,
     checked_base,
@@ -26,17 +27,21 @@ from minibrain.gateway.chat import (
 )
 from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
 from minibrain.gateway.errors import OpenAIError
-from minibrain.gateway.logs import LogBuffer, LogEntry
+from minibrain.gateway.logs import CHAT_KIND, COMPLETION_KIND, LogBuffer, LogEntry
 from minibrain.gateway.safety import Verdict
 from minibrain.gateway.schema import (
     CHAT_HELP,
     CHAT_RESPONSES,
     FEEDBACK_RESPONSES,
     KEY_ERRORS,
+    TEXT_HELP,
+    TEXT_RESPONSES,
     ChatCompletionRequest,
     ModelInfo,
     ModelList,
+    TextCompletionRequest,
 )
+from minibrain.gateway.text import kept_prompt, text_body, text_id, text_plan, text_sse
 from minibrain.ml.completion import Completion
 from minibrain.registry.models import now
 from minibrain.registry.service import KEY_PREFIX, key_digest
@@ -82,7 +87,30 @@ def authorize(
 GrantDep = Annotated[Grant, Depends(authorize)]
 
 
-def sampling_labels(body: ChatCompletionRequest) -> dict[str, Any]:
+@dataclass(frozen=True)
+class Surface:
+    kind: str
+    operation: str
+    identifier: Callable[[], str]
+    plan: Callable[..., ChatPlan]
+    body: Callable[[str, str, Completion, Verdict | None], dict[str, Any]]
+    stream: Callable[..., Iterator[str]]
+    input: Callable[[Any], str | None]
+
+
+CHAT = Surface(CHAT_KIND, "chat", response_id, plan, response_body, sse, lambda body: last_user_text(body.messages))
+TEXT = Surface(
+    COMPLETION_KIND,
+    "text_completion",
+    text_id,
+    text_plan,
+    text_body,
+    text_sse,
+    lambda body: kept_prompt(body.prompt),
+)
+
+
+def sampling_labels(body: Requested) -> dict[str, Any]:
     stops = [body.stop] if isinstance(body.stop, str) else body.stop
     found = {
         "temperature": body.temperature,
@@ -96,8 +124,9 @@ def sampling_labels(body: ChatCompletionRequest) -> dict[str, Any]:
     return {name: value for name, value in found.items() if value is not None}
 
 
-def note_chat(
-    body: ChatCompletionRequest,
+def note_call(
+    surface: Surface,
+    body: Requested,
     route: Route | None,
     completion: Completion | None,
     answered: str | None,
@@ -106,7 +135,7 @@ def note_chat(
     call = current_call()
     if call is None:
         return
-    call.operation = "chat"
+    call.operation = surface.operation
     call.request_model = body.model
     call.model_known = route is not None
     call.max_tokens = body.token_budget
@@ -134,6 +163,46 @@ def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
     return ModelList(data=[ModelInfo(id=name, created=0, owned_by="minibrain") for name in names])
 
 
+def routed(config: GatewayConfig, grant: Grant, model: str) -> Route:
+    route = config.routes.get(model)
+    if route is None:
+        raise HTTPException(status_code=404, detail=f"model {model} not found")
+    if not grant.covers(route):
+        raise HTTPException(status_code=403, detail=f"this API key does not cover {model}")
+    return route
+
+
+def served(
+    surface: Surface, body: Requested, grant: Grant, config: GatewayConfig, request: Request
+) -> dict | StreamingResponse:
+    started = time.monotonic()
+    identifier = surface.identifier()
+    route = config.routes.get(body.model)
+    planned: list[ChatPlan] = []
+
+    def finished(completion: Completion | None, error: BaseException | None) -> None:
+        verdict = planned[0].verdict if planned else None
+        outcome = Outcome(completion, error, verdict)
+        log_call(request.app.state.request_logs, surface, body, grant, route, identifier, started, outcome)
+
+    try:
+        route = routed(config, grant, body.model)
+        base, adapter = checked_base(config, route)
+        chat = surface.plan(body, route, base, adapter, safety_of(body, route, config))
+        planned.append(chat)
+        backend = request.app.state.backend
+        if body.stream:
+            events = chat_events(backend, chat)
+            stream = surface.stream(identifier, body.model, next(events), events, include_usage(body), finished)
+            return StreamingResponse(stream, media_type="text/event-stream")
+        completion = answer(backend, chat)
+    except Exception as error:
+        finished(None, error)
+        raise
+    finished(completion, None)
+    return surface.body(identifier, body.model, completion, chat.verdict)
+
+
 @router.post(
     "/chat/completions",
     response_model=None,
@@ -145,38 +214,24 @@ def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
 def chat_completions(
     body: ChatCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
 ) -> dict | StreamingResponse:
-    started = time.monotonic()
-    identifier = response_id()
-    route = config.routes.get(body.model)
-    planned: list[ChatPlan] = []
-
-    def finished(completion: Completion | None, error: BaseException | None) -> None:
-        verdict = planned[0].verdict if planned else None
-        outcome = Outcome(completion, error, verdict)
-        log_chat(request.app.state.request_logs, body, grant, route, identifier, started, outcome)
-
-    try:
-        if route is None:
-            raise HTTPException(status_code=404, detail=f"model {body.model} not found")
-        if not grant.covers(route):
-            raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
-        base, adapter = checked_base(config, route)
-        chat = plan(body, route, base, adapter, safety_of(body, route, config))
-        planned.append(chat)
-        backend = request.app.state.backend
-        if body.stream:
-            events = chat_events(backend, chat)
-            stream = sse(identifier, body.model, next(events), events, include_usage(body), finished)
-            return StreamingResponse(stream, media_type="text/event-stream")
-        completion = answer(backend, chat)
-    except Exception as error:
-        finished(None, error)
-        raise
-    finished(completion, None)
-    return response_body(identifier, body.model, completion, chat.verdict)
+    return served(CHAT, body, grant, config, request)
 
 
-def include_usage(body: ChatCompletionRequest) -> bool:
+@router.post(
+    "/completions",
+    response_model=None,
+    tags=["completions"],
+    summary="Create a text completion",
+    description=TEXT_HELP,
+    responses=TEXT_RESPONSES,
+)
+def completions(
+    body: TextCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
+) -> dict | StreamingResponse:
+    return served(TEXT, body, grant, config, request)
+
+
+def include_usage(body: Requested) -> bool:
     options = (body.model_extra or {}).get("stream_options")
     return isinstance(options, dict) and bool(options.get("include_usage"))
 
@@ -198,9 +253,10 @@ class Outcome:
         return self.verdict.as_dict() if self.verdict is not None and not self.verdict.safe else None
 
 
-def log_chat(
+def log_call(
     logs: LogBuffer,
-    body: ChatCompletionRequest,
+    surface: Surface,
+    body: Requested,
     grant: Grant,
     route: Route | None,
     identifier: str,
@@ -212,7 +268,7 @@ def log_chat(
     answered = completion is not None and status == 200
     kept = answered and route is not None and route.request_bodies
     code = error.code if isinstance(error, OpenAIError) else None
-    note_chat(body, route, completion if answered else None, identifier if answered else None, code)
+    note_call(surface, body, route, completion if answered else None, identifier if answered else None, code)
     logs.add(
         LogEntry(
             at=now(),
@@ -226,10 +282,11 @@ def log_chat(
             prompt_tokens=completion.prompt_tokens if completion else 0,
             completion_tokens=completion.completion_tokens if completion else 0,
             response_id=identifier if answered else None,
-            input=last_user_text(body.messages) if kept else None,
+            input=surface.input(body) if kept else None,
             output=kept_output(completion) if completion and kept else None,
             finish_reason=completion.finish_reason if completion and answered else None,
             safety=outcome.blocked,
+            kind=surface.kind,
         )
     )
 
@@ -269,11 +326,7 @@ class FeedbackReceipt(BaseModel):
     responses=FEEDBACK_RESPONSES,
 )
 def feedback(body: FeedbackRequest, grant: GrantDep, config: ConfigDep, request: Request) -> FeedbackReceipt:
-    route = config.routes.get(body.model)
-    if route is None:
-        raise HTTPException(status_code=404, detail=f"model {body.model} not found")
-    if not grant.covers(route):
-        raise HTTPException(status_code=403, detail=f"this API key does not cover {body.model}")
+    route = routed(config, grant, body.model)
     if route.model_id is None:
         raise HTTPException(status_code=422, detail="feedback is collected for custom models only")
     logs: LogBuffer = request.app.state.request_logs

@@ -76,4 +76,4 @@ class SglangBackend(OpenAIServerBackend):
 
     def body(self, request: CompletionRequest) -> dict[str, Any]:
         found = super().body(request)
-        return found | ({"separate_reasoning": True} if request.base.reasoning else {})
+        return found | ({"separate_reasoning": True} if request.base.reasoning and not request.raw else {})

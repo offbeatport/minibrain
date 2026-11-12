@@ -31,6 +31,8 @@ gpt-oss); answers carry `tool_calls`, and results go back as `tool` messages.
 comes back as `reasoning_content`, apart from the answer.
 - A safety model set for the install or the model checks each call; a blocked one answers with `message.refusal` \
 and `finish_reason: content_filter`.
+- `POST /completions` continues a `prompt` as it is, without the chat template, for code completion and base \
+models; a custom model applies its adapter but not its instructions or contract.
 - Send a completion's `id` to `POST /feedback` to rate or correct its answer."""
 
 MANAGEMENT_INTRO = f"""The API the minibrain UI runs on: data, models, training, evaluations, deployments, keys, \
