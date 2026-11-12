@@ -1,8 +1,9 @@
 import { Badge } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import { StatusText } from "~/components/models/StatusText";
+import { modelPhase, useCompute, useNow } from "./flowCompute";
 import { ModelHeaderActions } from "./flowModelActions";
-import { type FlowModel, liveVersion, pct } from "./modelsFlowData";
+import { type FlowModel, liveVersion, pct, useFlowState } from "./modelsFlowData";
 import { ModelAvatar } from "./modelsFlowParts";
 
 export type Fact = ReactElement | null | false;
@@ -39,9 +40,9 @@ export function CompactHeader({
     actions?: ReactNode;
 }) {
     return (
-        <header className="flex items-center gap-4 py-4">
+        <header className="flex flex-wrap items-center gap-4 py-4">
             {icon}
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex min-w-64 flex-1 flex-col gap-1">
                 <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
                     <h1 className="text-2xl leading-tight font-normal">{title}</h1>
                     {facts && (
@@ -52,7 +53,7 @@ export function CompactHeader({
                 </div>
                 {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
             </div>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
     );
 }
@@ -73,6 +74,10 @@ function trimmed(text: string): string {
 }
 
 export function ModelHeader({ model }: { model: FlowModel }) {
+    const state = useFlowState();
+    const compute = useCompute(state.mode);
+    const now = useNow(500);
+    const phase = modelPhase(model, state, compute, now);
     const custom = model.kind === "custom";
     const subtitle = custom
         ? [model.description ? trimmed(model.description) : null, `On ${model.base}`]
@@ -87,15 +92,9 @@ export function ModelHeader({ model }: { model: FlowModel }) {
                 <Badge key="kind" variant="outline">
                     {custom ? "Custom" : "Base"}
                 </Badge>,
-                model.deployed ? (
-                    <StatusText key="on" tone="success">
-                        Deployed
-                    </StatusText>
-                ) : (
-                    <StatusText key="off" tone="neutral">
-                        Not deployed
-                    </StatusText>
-                ),
+                <StatusText key="phase" tone={phase.tone}>
+                    {phase.text}
+                </StatusText>,
                 custom && liveVersion(model) ? <span key="live">{liveText(model)}</span> : null,
             ]}
             subtitle={subtitle}

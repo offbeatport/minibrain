@@ -41,6 +41,7 @@ import {
     isInstalled,
     jobHref,
     jobOfVersion,
+    markVisited,
     modelHref,
     openIntent,
     retryWithQLoRA,
@@ -417,6 +418,7 @@ export function FlowAddModelPage() {
     const create = (event: FormEvent) => {
         event.preventDefault();
         const slug = createModel(display, base, identity.avatar);
+        markVisited("infra-add");
         router.history.push(modelHref(slug));
     };
     return (
@@ -459,7 +461,7 @@ export function FlowAddModelPage() {
                 </NameAvatarField>
                 <div>
                     <Button type="submit" disabled={!identity.name.trim()}>
-                        Create
+                        Add model
                     </Button>
                 </div>
             </form>

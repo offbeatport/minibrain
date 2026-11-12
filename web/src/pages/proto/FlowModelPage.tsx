@@ -131,9 +131,8 @@ function CatalogOnly({ entry }: { entry: CatalogEntry }) {
                             onClick={() => {
                                 installBase(entry.id);
                                 toast({
-                                    title: `${entry.name} is installed`,
-                                    description: `Downloaded ${entry.size}; its BF16 variant is ready to deploy.`,
-                                    tone: "success",
+                                    title: `Downloading ${entry.name}`,
+                                    description: `${entry.size} to storage. Nothing loads on a GPU until it is deployed or tried.`,
                                 });
                             }}
                         >

@@ -27,6 +27,7 @@ import {
 } from "obp-ui/shell";
 import { type ReactNode, useEffect, useState } from "react";
 import { CommandPalette } from "./FlowCommand";
+import { resetCompute } from "./flowCompute";
 import { type Role, allows, setRole, useOverlays } from "./flowOverlays";
 import { TrainDialog } from "./flowTrainDialog";
 import {
@@ -38,6 +39,7 @@ import {
     jobHref,
     markVisited,
     modelHref,
+    playgroundHref,
     restartJourney,
     setMode,
     useFlowState,
@@ -83,12 +85,7 @@ const SECTIONS: { label: string | null; items: Entry[] }[] = [
         items: [
             { label: "Monitor", path: `${FLOW}/monitor`, icon: Activity },
             { label: "Jobs", path: `${FLOW}/jobs`, icon: ListChecks, role: "builder" },
-            {
-                label: "Infrastructure",
-                path: `${FLOW}/infrastructure`,
-                icon: Server,
-                role: "admin",
-            },
+            { label: "Infrastructure", path: `${FLOW}/infrastructure`, icon: Server },
         ],
     },
     {
@@ -111,6 +108,11 @@ type Step = {
     mode?: Mode;
 };
 
+type Journey = { title: string; steps: Step[] };
+
+const INFRA = `${FLOW}/infrastructure`;
+const JOURNEY_BASE = "mistral-7b";
+
 const MODEL_PAGE = /^\/proto\/flow\/models\/(?!new$)[^/]+$/;
 
 function focusOf(state: FlowState): string {
@@ -119,6 +121,46 @@ function focusOf(state: FlowState): string {
         state.models.find((model) => model.kind === "custom")?.slug ??
         "support-triage"
     );
+}
+
+function journeyModel(state: FlowState): string {
+    const added = state.models.find(
+        (model) => model.kind === "custom" && model.base === "Mistral 7B Instruct",
+    );
+    return added?.slug ?? focusOf(state);
+}
+
+function infraSteps(state: FlowState): Step[] {
+    const slug = journeyModel(state);
+    return [
+        {
+            id: "infra-add",
+            label: "Add model on Mistral 7B: its page downloads, then reads Ready",
+            href: `${FLOW}/models/new?base=${JOURNEY_BASE}`,
+            mode: "full",
+        },
+        {
+            id: "infra-deploy",
+            label: "Deploy it: pick the pool and replicas",
+            href: modelHref(slug),
+        },
+        {
+            id: "infra-loading",
+            label: "Infrastructure: it loads, then serves on gpu-a10-1",
+            href: INFRA,
+        },
+        { id: "infra-try", label: "Use › Try it in the Playground", href: playgroundHref(slug) },
+        { id: "infra-traffic", label: "Infrastructure: the GPU card shows traffic", href: INFRA },
+        { id: "infra-undeploy", label: "Deployed › Undeploy", href: modelHref(slug) },
+        { id: "infra-unload", label: "Infrastructure: it unloads", href: INFRA },
+    ];
+}
+
+function journeys(state: FlowState): Journey[] {
+    return [
+        { title: "Train and ship", steps: steps(state) },
+        { title: "What runs where", steps: infraSteps(state) },
+    ];
 }
 
 function steps(state: FlowState): Step[] {
@@ -224,15 +266,21 @@ function steps(state: FlowState): Step[] {
 function go(step: Step) {
     if (step.id === "home") {
         restartJourney();
+        resetCompute("empty");
+    } else if (step.mode) {
+        setMode(step.mode);
     }
 }
 
 function Journey({ pathname, compact }: { pathname: string; compact: boolean }) {
     const state = useFlowState();
     const [open, setOpen] = useState(false);
-    const list = steps(state);
+    const groups = journeys(state);
+    const list = groups.flatMap((group) => group.steps);
     const done = list.filter((step) => state.visited.includes(step.id)).length;
     const next = list.findIndex((step) => !state.visited.includes(step.id));
+    const nextGroup = groups.find((group) => group.steps.includes(list[next]));
+    const nextNumber = nextGroup ? nextGroup.steps.indexOf(list[next]) + 1 : next + 1;
     return (
         <div className="relative flex min-w-0 items-center gap-3">
             {next >= 0 && (
@@ -245,7 +293,7 @@ function Journey({ pathname, compact }: { pathname: string; compact: boolean }) 
                         compact ? "2xl:block" : "xl:block",
                     )}
                 >
-                    {`Next: ${next + 1}. ${list[next].label}`}
+                    {`Next: ${nextNumber}. ${list[next].label}`}
                 </Link>
             )}
             <Button
@@ -269,42 +317,49 @@ function Journey({ pathname, compact }: { pathname: string; compact: boolean }) 
                     id="flow-journey"
                     aria-label="Journey"
                     onKeyDown={(event) => event.key === "Escape" && setOpen(false)}
-                    className="absolute top-10 right-0 z-30 w-96 rounded-lg border bg-popover p-2 text-popover-foreground shadow-e2"
+                    className="absolute top-10 right-0 z-30 flex max-h-[calc(100dvh-5rem)] w-96 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto rounded-lg border bg-popover p-2 text-popover-foreground shadow-e2"
                 >
-                    <ol className="flex flex-col">
-                        {list.map((step, index) => {
-                            const visited = state.visited.includes(step.id);
-                            const here = step.match?.(pathname, state) ?? false;
-                            return (
-                                <li key={step.id}>
-                                    <Link
-                                        href={step.href}
-                                        onClick={() => {
-                                            go(step);
-                                            setOpen(false);
-                                        }}
-                                        aria-current={here ? "step" : undefined}
-                                        className={cn(
-                                            "flex min-h-8 items-center gap-2 rounded-md px-2 py-1 hover:bg-secondary",
-                                            here &&
-                                                "bg-accent text-accent-foreground hover:bg-accent",
-                                        )}
-                                    >
-                                        <span className="w-5 shrink-0 text-right text-sm text-muted-foreground tabular-nums">
-                                            {index + 1}
-                                        </span>
-                                        <span className="flex-1">{step.label}</span>
-                                        {visited && (
-                                            <Check
-                                                aria-label="Done"
-                                                className="size-4 shrink-0 text-success"
-                                            />
-                                        )}
-                                    </Link>
-                                </li>
-                            );
-                        })}
-                    </ol>
+                    {groups.map((group) => (
+                        <div key={group.title} className="flex flex-col">
+                            <h2 className="px-2 py-1 text-sm text-muted-foreground">
+                                {group.title}
+                            </h2>
+                            <ol className="flex flex-col">
+                                {group.steps.map((step, index) => {
+                                    const visited = state.visited.includes(step.id);
+                                    const here = step.match?.(pathname, state) ?? false;
+                                    return (
+                                        <li key={step.id}>
+                                            <Link
+                                                href={step.href}
+                                                onClick={() => {
+                                                    go(step);
+                                                    setOpen(false);
+                                                }}
+                                                aria-current={here ? "step" : undefined}
+                                                className={cn(
+                                                    "flex min-h-8 items-center gap-2 rounded-md px-2 py-1 hover:bg-secondary",
+                                                    here &&
+                                                        "bg-accent text-accent-foreground hover:bg-accent",
+                                                )}
+                                            >
+                                                <span className="w-5 shrink-0 text-right text-sm text-muted-foreground tabular-nums">
+                                                    {index + 1}
+                                                </span>
+                                                <span className="flex-1">{step.label}</span>
+                                                {visited && (
+                                                    <Check
+                                                        aria-label="Done"
+                                                        className="size-4 shrink-0 text-success"
+                                                    />
+                                                )}
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ol>
+                        </div>
+                    ))}
                 </nav>
             )}
         </div>

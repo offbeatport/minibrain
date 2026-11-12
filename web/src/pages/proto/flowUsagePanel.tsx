@@ -1,6 +1,5 @@
 import { ChartLine } from "lucide-react";
 import { PanelSection } from "~/components/Section";
-import { StatusLine } from "./flowStatusLine";
 import { usageOf, useUsageRange } from "./flowUsage";
 import { UsageChart, ms, rate } from "./flowUsageChart";
 import { type FlowModel, useFlowState } from "./modelsFlowData";
@@ -23,7 +22,6 @@ export function UsagePanel({ model }: { model: FlowModel }) {
             }
         >
             <div className="flex min-w-0 flex-col gap-4">
-                <StatusLine model={model} />
                 <UsageChart
                     load={(metric) => usageOf(model, range, metric, keys)}
                     range={range}

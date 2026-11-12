@@ -54,10 +54,11 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, PanelSection, PanelSections, Section, Stat } from "~/components/Section";
 import { StepChart, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
-import { ProgressBar, StatusText } from "~/components/models/StatusText";
+import { ProgressBar } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { relativeTime } from "~/lib/time";
+import { type Served, serveRequest } from "./flowCompute";
 import { ArtifactLine } from "./flowExport";
 import { useCan } from "./flowOverlays";
 import { BulkJobs, JobStatusText } from "./flowTraining";
@@ -929,15 +930,14 @@ export function FlowPlaygroundPage() {
     const state = useFlowState();
     const toast = useToast();
     const requested = useSearchParam("model");
-    const usable = state.models.filter(
-        (model) => model.deployed || model.versions.some((version) => version.status === "ready"),
-    );
+    const usable = state.models.filter((model) => !(model.slug in state.downloads));
     const [slug, setSlug] = useState(requested ?? state.focus ?? usable[0]?.slug ?? "");
     const [messages, setMessages] = useState<Message[]>([]);
     const [draft, setDraft] = useState(
         "I was charged twice for my plan, can you send one payment back?",
     );
     const [streaming, setStreaming] = useState(false);
+    const [served, setServed] = useState<Served | null>(null);
     const timer = useRef<number | null>(null);
     useEffect(
         () => () => {
@@ -964,6 +964,7 @@ export function FlowPlaygroundPage() {
         setDraft("");
         setStreaming(true);
         countRequest(slug);
+        setServed(serveRequest(slug));
         timer.current = window.setInterval(() => {
             shown += 1;
             setMessages((current) => [
@@ -1084,7 +1085,23 @@ export function FlowPlaygroundPage() {
                     </Button>
                 </form>
             </section>
-            <p className="text-sm text-muted-foreground tabular-nums">{`Test examples saved in this session: ${state.examples}.`}</p>
+            <p className="text-sm text-muted-foreground tabular-nums">
+                {served && (
+                    <>
+                        {served.onDemand
+                            ? `${served.loading ? "Loading" : "Loaded"} on demand on ${served.where}; it unloads after 5 min with no requests. `
+                            : `Served by its deployment on ${served.where}. `}
+                        <Link
+                            href={`${FLOW}/infrastructure`}
+                            className="text-primary hover:underline"
+                        >
+                            See it in Infrastructure
+                        </Link>
+                        {" · "}
+                    </>
+                )}
+                {`Test examples saved in this session: ${state.examples}.`}
+            </p>
         </Page>
     );
 }
@@ -1382,47 +1399,6 @@ export function FlowFeedbackPage() {
                                 </TableCell>
                             </TableRow>
                         ))}
-                    </TableBody>
-                </Table>
-            </div>
-        </Page>
-    );
-}
-
-export function FlowInfrastructurePage() {
-    return (
-        <Page>
-            <PageHeader title="Infrastructure" caption="Stub: compute this install can use." />
-            <div className="overflow-x-auto rounded-lg border bg-card">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Device</TableHead>
-                            <TableHead>Pool</TableHead>
-                            <TableHead className="text-right">Memory</TableHead>
-                            <TableHead>Does</TableHead>
-                            <TableHead>Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell className="font-mono text-sm">gpu-a10-1</TableCell>
-                            <TableCell>gpu</TableCell>
-                            <TableCell className="text-right">24 GB</TableCell>
-                            <TableCell>Serve and train</TableCell>
-                            <TableCell>
-                                <StatusText tone="success">Online</StatusText>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell className="font-mono text-sm">cpu-1</TableCell>
-                            <TableCell>cpu</TableCell>
-                            <TableCell className="text-right">64 GB</TableCell>
-                            <TableCell>Serve GGUF</TableCell>
-                            <TableCell>
-                                <StatusText tone="success">Online</StatusText>
-                            </TableCell>
-                        </TableRow>
                     </TableBody>
                 </Table>
             </div>

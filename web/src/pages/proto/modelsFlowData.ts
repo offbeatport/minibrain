@@ -321,7 +321,7 @@ const VARIANTS: Record<string, BaseVariant[]> = {
     "qwen3-8b": [
         variant("bf16", "BF16", "16 GB", "qwen3-8b", 9.6, {
             live: true,
-            replicas: ["gpu-a10-1", "gpu-a10-3"],
+            replicas: ["gpu-a10-2"],
             traffic: [120, 140, 132, 168, 150, 60, 41],
             previous: 760,
             p95: 410,
@@ -329,7 +329,7 @@ const VARIANTS: Record<string, BaseVariant[]> = {
         variant("fp8", "FP8", "8 GB", "qwen3-8b-fp8", 5.1, {
             live: true,
             trainable: false,
-            replicas: ["gpu-a10-2"],
+            replicas: ["local"],
             traffic: [90, 120, 108, 132, 138, 30, 34],
             previous: 560,
             p95: 290,
@@ -369,7 +369,7 @@ const EXTRA: Record<string, Extra> = {
     "support-triage": {
         task: "Classify",
         gpuSeconds: 9.6,
-        replicas: ["gpu-a10-1", "gpu-a10-2"],
+        replicas: ["gpu-a10-2"],
         p95: 240,
         recent: [
             answer("Need my money back for the duplicate seat.", "refund_request", 2),
@@ -380,7 +380,7 @@ const EXTRA: Record<string, Extra> = {
     "invoice-extractor": {
         task: "Extract",
         gpuSeconds: 1.4,
-        replicas: ["gpu-a10-2"],
+        replicas: ["gpu-a10-1"],
         p95: 310,
         errors: 0.04,
         usualErrors: 0.005,
@@ -415,7 +415,7 @@ const EXTRA: Record<string, Extra> = {
     guy1: {
         task: "Classify",
         gpuSeconds: 0.7,
-        replicas: ["gpu-a10-1"],
+        replicas: ["local"],
         p95: 95,
         recent: [answer("test", "billing", 300)],
     },
@@ -1115,6 +1115,7 @@ type World = {
     examples: number;
     dismissed: string[];
     exports: ExportArtifact[];
+    downloads: Record<string, number>;
 };
 
 type Shared = { visited: string[]; mode: Mode; intent: Intent };
@@ -1139,6 +1140,7 @@ const FULL: World = {
     examples: 0,
     dismissed: [],
     exports: [],
+    downloads: {},
 };
 
 const EMPTY: World = {
@@ -1151,6 +1153,7 @@ const EMPTY: World = {
     examples: 0,
     dismissed: [],
     exports: [],
+    downloads: {},
 };
 
 let worlds: Record<Mode, World> = { full: FULL, empty: EMPTY };
@@ -1181,6 +1184,14 @@ function setWorld(mode: Mode, change: (world: World) => World) {
 function subscribe(listener: () => void) {
     listeners.add(listener);
     return () => listeners.delete(listener);
+}
+
+export function flowMode(): Mode {
+    return shared.mode;
+}
+
+export function flowState(): FlowState {
+    return state;
 }
 
 export function useFlowState(): FlowState {
@@ -1269,7 +1280,7 @@ export function makeLive(slug: string, number: number, source?: "inbox") {
         deployed: current.deployed || first,
         canary: null,
         autopilot: current.autopilot ? { ...current.autopilot, run: null } : null,
-        replicas: current.replicas.length > 0 ? current.replicas : ["gpu-a10-1"],
+        replicas: current.replicas.length > 0 ? current.replicas : homeOf(current.base),
         traffic: first ? [0, 0, 0, 0, 0, 0, 3] : current.traffic,
         versions: current.versions.map((version) =>
             version.number === current.live ? { ...version, wasLive: true } : version,
@@ -1291,6 +1302,34 @@ export function makeLive(slug: string, number: number, source?: "inbox") {
     }
 }
 
+const HOMES: Record<string, string> = {
+    "Qwen3 8B": "gpu-a10-2",
+    "Llama 3.2 1B": "gpu-a10-1",
+    "Qwen3 0.6B": "local",
+};
+
+function homeOf(base: string | null): string[] {
+    if (shared.mode === "empty") {
+        return ["local"];
+    }
+    if (base?.includes("GGUF")) {
+        return ["cpu-1"];
+    }
+    return [HOMES[base ?? ""] ?? "gpu-a10-1"];
+}
+
+export function setDeployment(slug: string, deployed: boolean, replicas: string[]) {
+    update(slug, (current) => ({ ...current, deployed, replicas: deployed ? replicas : [] }));
+}
+
+export function setVariantsLive(keys: string[], live: boolean, replicas: string[]) {
+    changeVariants(keys, (item) =>
+        live
+            ? { ...item, live: true, replicas, p95: item.p95 ?? 180 }
+            : { ...item, live: false, replicas: [] },
+    );
+}
+
 export function setOnApi(slug: string, on: boolean) {
     const model = state.models.find((item) => item.slug === slug);
     if (!model) {
@@ -1310,7 +1349,7 @@ export function setOnApi(slug: string, on: boolean) {
     update(slug, (current) => ({
         ...current,
         deployed: on,
-        replicas: on ? (current.replicas.length > 0 ? current.replicas : ["gpu-a10-1"]) : [],
+        replicas: on ? (current.replicas.length > 0 ? current.replicas : homeOf(current.base)) : [],
     }));
 }
 
@@ -1359,7 +1398,14 @@ function changeVariants(keys: string[], change: (item: BaseVariant) => BaseVaria
 
 export function deployVariants(keys: string[]) {
     changeVariants(keys, (item) =>
-        item.live ? item : { ...item, live: true, replicas: ["gpu-a10-2"], p95: item.p95 ?? 180 },
+        item.live
+            ? item
+            : {
+                  ...item,
+                  live: true,
+                  replicas: homeOf(item.format.startsWith("GGUF") ? "GGUF" : null),
+                  p95: item.p95 ?? 180,
+              },
     );
 }
 
@@ -1470,11 +1516,42 @@ export function installBase(id: string) {
                   variants: [variant("bf16", "BF16", source.size, id, 1.2)],
               });
     const jobId = nextJob++;
+    const mode = shared.mode;
     set((current) => ({
         ...current,
         models: [...current.models, { ...withVariants, licence: source.licence }],
-        jobs: [{ ...transfer(jobId, "download", id, 0, 3), atMs: Date.now() }, ...current.jobs],
+        downloads: { ...current.downloads, [id]: Date.now() },
+        jobs: [
+            {
+                ...transfer(jobId, "download", id, 0, 3),
+                status: "running",
+                progress: 0,
+                minutes: null,
+                atMs: Date.now(),
+            },
+            ...current.jobs,
+        ],
     }));
+    window.setTimeout(() => finishDownload(mode, id, jobId), DOWNLOAD_MS);
+}
+
+export const DOWNLOAD_MS = 9000;
+
+function finishDownload(mode: Mode, id: string, jobId: number) {
+    setWorld(mode, (world) => ({
+        ...world,
+        downloads: Object.fromEntries(
+            Object.entries(world.downloads).filter(([slug]) => slug !== id),
+        ),
+        jobs: world.jobs.map((job) =>
+            job.id === jobId ? { ...job, status: "done", progress: 1, minutes: 3 } : job,
+        ),
+    }));
+}
+
+export function downloadProgress(current: FlowState, baseSlug: string, now: number): number | null {
+    const start = current.downloads[baseSlug];
+    return start === undefined ? null : Math.min(0.99, (now - start) / DOWNLOAD_MS);
 }
 
 function freeSlug(name: string): string {
@@ -1714,7 +1791,7 @@ export function startTraining(
         recipe: chosen,
         versions: [...current.versions, version],
     }));
-    const device = start.device ?? (trainingVersion(model) ? "gpu-a10-2" : DEVICE);
+    const device = start.device ?? (trainingVersion(model) ? "gpu-t4-1" : DEVICE);
     const minutes = Math.max(1, Math.round(start.minutes ?? 12));
     const status = start.queued ? "queued" : "running";
     set((current) => ({
