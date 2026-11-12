@@ -9,7 +9,6 @@ import {
     DialogHeader,
     DialogTitle,
     Kbd,
-    KbdHint,
     Tabs,
     TabsList,
     TabsTrigger,
@@ -262,11 +261,6 @@ export function PickerDialog({
                                 }
                             />
                         )}
-                        <div className="hidden flex-wrap gap-x-4 gap-y-1 sm:flex">
-                            <KbdHint keys={["←", "↑", "→", "↓"]}>preview</KbdHint>
-                            <KbdHint keys={["Enter"]}>pick, again to use</KbdHint>
-                            <KbdHint keys={["Esc"]}>close</KbdHint>
-                        </div>
                         <RecentStrip
                             items={session.recent}
                             selected={draft}
