@@ -11999,6 +11999,17 @@
             "title": "Catalog Name",
             "description": "The catalogue model a base variant belongs to."
           },
+          "imported_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where a base that is not in the catalogue came from."
+          },
           "variant_label": {
             "anyOf": [
               {
@@ -19321,6 +19332,73 @@
               }
             ],
             "title": "Connection"
+          },
+          "problem_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_found",
+                  "no_access",
+                  "policy",
+                  "invalid",
+                  "unreadable"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem Kind"
+          },
+          "weights_bytes": {
+            "type": "integer",
+            "title": "Weights Bytes",
+            "default": 0
+          },
+          "quantized": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantized",
+            "description": "Quantization method, such as fp8 or gptq: serves only."
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License",
+            "description": "The licence id in the model's README, when it names one."
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FitInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "train_fit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainFitInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -19357,6 +19435,29 @@
           "ok"
         ],
         "title": "ImportCheckItem"
+      },
+      "ImportOrigin": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hub",
+              "s3",
+              "folder"
+            ],
+            "title": "Kind"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "location"
+        ],
+        "title": "ImportOrigin"
       },
       "ImportRequest": {
         "properties": {
@@ -22905,6 +23006,17 @@
             ],
             "title": "Catalog Name",
             "description": "The catalogue model a base variant belongs to."
+          },
+          "imported_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where a base that is not in the catalogue came from."
           },
           "variant_label": {
             "anyOf": [

@@ -5,7 +5,15 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import admin, builder, viewer
-from minibrain.api.deps import BackendDep, QueueDep, SessionDep, SettingsDep, StoreDep, get_local_node
+from minibrain.api.deps import (
+    BackendDep,
+    LocalNodeDep,
+    QueueDep,
+    SessionDep,
+    SettingsDep,
+    StoreDep,
+    get_local_node,
+)
 from minibrain.api.jobs import canceller
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
@@ -13,6 +21,7 @@ from minibrain.api.schemas import (
     BaseModelDetail,
     DeployRequest,
     FileState,
+    FitInfo,
     ImportCheck,
     ImportRequest,
     InspectRequest,
@@ -23,10 +32,12 @@ from minibrain.api.schemas import (
     TestRequest,
     TestResponse,
 )
+from minibrain.api.training_plan import base_train_fit
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
 from minibrain.models.copies import BUCKET
+from minibrain.models.hardware import pool_fit
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health
 from minibrain.models.inspect import inspect_location, source_type_of
 from minibrain.models.registry import (
@@ -42,8 +53,9 @@ from minibrain.models.registry import (
     start_verify,
     store_label,
 )
-from minibrain.models.train_facts import base_facts
+from minibrain.models.train_facts import base_facts, config_base, trainer_machines
 from minibrain.models.usage import touch
+from minibrain.registry.compute import find_pool, pools
 from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, now
 from minibrain.registry.service import ConflictError, NotFoundError, check_rename
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
@@ -156,8 +168,18 @@ def list_all_models(request: Request, session: SessionDep, settings: SettingsDep
 
 
 @router.post("/base-models/inspect", dependencies=[Depends(admin)])
-def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep) -> ImportCheck:
-    return ImportCheck(**inspect_location(session, settings, body.location, body.connection_id))
+def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> ImportCheck:
+    found = inspect_location(session, settings, body.location, body.connection_id)
+    config = found.pop("config", None)
+    if config is not None:
+        weights = found["weights_bytes"]
+        pool = find_pool(pools(session, node), None)
+        base = config_base(found["name"], config, weights, found["quantized"])
+        found |= {
+            "fit": FitInfo(**pool_fit(weights, {}, pool.machines())),
+            "train_fit": base_train_fit(base, trainer_machines([pool])),
+        }
+    return ImportCheck(**found)
 
 
 @router.post("/base-models/import", status_code=202, dependencies=[Depends(admin)])

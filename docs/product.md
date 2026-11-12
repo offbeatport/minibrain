@@ -121,8 +121,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Download weights pinned to a revision, hash-checked and resumable.
   UI: Discover › model › Download · API: POST /api/catalog/{catalog_id}/download
 - **Import base models** · shipped · admin
-  Import weights from a folder or S3 path, checked before copying.
-  UI: Models › Add model › Import · API: POST /api/base-models/inspect, POST /api/base-models/import · Config: MINIBRAIN_MODELS_S3_URL
+  Import from Hugging Face, S3 or a server folder, previewed first.
+  UI: Models › Add model › Your imports · API: POST /api/base-models/inspect, POST /api/base-models/import · Config: MINIBRAIN_MODELS_S3_URL
 - **Models list** · shipped · product, ml
   Custom and base models with score, traffic, cost and status.
   UI: Models · API: GET /api/all-models

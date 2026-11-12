@@ -55,6 +55,7 @@ export type CatalogEntry = Schemas["CatalogEntry"];
 export type CatalogVariantInfo = Schemas["CatalogVariantInfo"];
 export type HardwareInfo = Schemas["HardwareInfo"];
 export type FitInfo = Schemas["FitInfo"];
+export type ImportCheck = Schemas["ImportCheck"];
 export type TrainFitInfo = Schemas["TrainFitInfo"];
 export type TrainingPlanInfo = Schemas["TrainingPlanInfo"];
 export type TrainingOptionInfo = Schemas["TrainingOptionInfo"];

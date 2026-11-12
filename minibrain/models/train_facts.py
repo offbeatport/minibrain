@@ -1,6 +1,7 @@
 from collections import Counter
 from dataclasses import replace
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -39,12 +40,15 @@ def safetensors_bytes(model: BaseModel) -> int:
     return sum(int(item.get("size") or 0) for item in model.files if str(item.get("path", "")).endswith(".safetensors"))
 
 
-def imported_base(settings: Settings, model: BaseModel, quantized: str | None) -> Base:
-    config = base_config(settings, model) or {}
-    weights = safetensors_bytes(model) or model.size_bytes
+def config_base(name: str, config: dict[str, Any], weights: int, quantized: str | None) -> Base:
     dtype = str(config.get("torch_dtype") or config.get("dtype") or "bf16")
     params = weights / BYTES_PER_PARAM.get(dtype, 2)
-    return Base.of(model.name, params / 1e9, weights, context_of(config), shape_of(config), False, quantized)
+    return Base.of(name, params / 1e9, weights, context_of(config), shape_of(config), False, quantized)
+
+
+def imported_base(settings: Settings, model: BaseModel, quantized: str | None) -> Base:
+    config = base_config(settings, model) or {}
+    return config_base(model.name, config, safetensors_bytes(model) or model.size_bytes, quantized)
 
 
 def base_facts(session: Session, settings: Settings, key: str) -> Base:

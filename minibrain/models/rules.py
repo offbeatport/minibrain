@@ -140,6 +140,12 @@ def needed(path: str) -> bool:
     return "/" not in path and not duplicate and (path in KEEP_FILES or path.endswith(".safetensors"))
 
 
+def config_quantization(config: dict[str, Any]) -> str | None:
+    found = config.get("quantization_config")
+    method = found.get("quant_method") if isinstance(found, dict) else None
+    return str(method) if method else None
+
+
 def context_of(config: dict[str, Any]) -> int | None:
     for section in (config, config.get("text_config") or {}):
         value = section.get("max_position_embeddings")

@@ -1,4 +1,6 @@
 import type { CatalogEntry, CatalogVariantInfo, FitInfo, ModelRow } from "~/api/client";
+
+export type ImportOrigin = NonNullable<ModelRow["imported_from"]>;
 import { parameters } from "./Discover";
 import { FIT_ORDER, type LicenceUse } from "./DiscoverFilters";
 import { trainable } from "./formats";
@@ -24,6 +26,7 @@ export type BaseOption = {
     fit: FitLevel;
     licence: LicenceUse | null;
     note: string | null;
+    origin: ImportOrigin | null;
 };
 
 type TaskNeeds = {
@@ -134,6 +137,7 @@ export function catalogueOption(entry: CatalogEntry, variantId?: string): BaseOp
         fit: variant.fit.level,
         licence: entry.license_use,
         note: entry.superseded_by ? "A newer version is in the catalogue" : null,
+        origin: null,
     };
 }
 
@@ -156,7 +160,8 @@ function localOption(row: ModelRow): BaseOption {
         size: row.size_bytes ?? null,
         fit: "unknown",
         licence: null,
-        note: "Imported on this install",
+        note: row.imported_from ? null : "Imported on this install",
+        origin: row.imported_from ?? null,
     };
 }
 
@@ -260,6 +265,7 @@ export function searchText(option: BaseOption): string {
         option.entry?.family,
         option.baseKey,
         option.note,
+        option.origin?.location,
     ]
         .filter(Boolean)
         .join(" ");

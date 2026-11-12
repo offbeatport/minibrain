@@ -102,7 +102,7 @@ export function AddModelPage() {
     const [accepted, setAccepted] = useState(false);
     const [checked, setChecked] = useState(false);
     const [open, setOpen] = useState(params.source === "import");
-    const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "import" : "catalogue");
+    const [tab, setTab] = useState<PickerTab>(params.source === "import" ? "imports" : "catalogue");
     const [typedName, setName] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
@@ -136,8 +136,8 @@ export function AddModelPage() {
         );
     const importPick = (found: ImportPick) => {
         if (found.kind === "catalogue") {
-            const fresh = catalogueOption(found.entry);
-            choose({ kind: "catalogue", id: found.entry.id, variant: fresh.variant?.id ?? "" });
+            choose({ kind: "catalogue", id: found.entry.id, variant: found.variant });
+            setAccepted(found.accepted);
             return;
         }
         choose({ kind: "import", text: found.text, connection: found.connection });

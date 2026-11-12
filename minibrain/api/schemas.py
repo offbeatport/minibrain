@@ -1293,6 +1293,11 @@ class VersionRow(BaseModel):
     base_refusal: str | None = None
 
 
+class ImportOrigin(BaseModel):
+    kind: Literal["hub", "s3", "folder"]
+    location: str
+
+
 class ModelRow(BaseModel):
     kind: Literal["base", "custom"]
     key: str
@@ -1327,6 +1332,9 @@ class ModelRow(BaseModel):
         default_factory=list, description="Live engines serving it: its own for a base, its base's for a custom model."
     )
     catalog_name: str | None = Field(default=None, description="The catalogue model a base variant belongs to.")
+    imported_from: ImportOrigin | None = Field(
+        default=None, description="Where a base that is not in the catalogue came from."
+    )
     variant_label: str | None = Field(default=None, description="A base's format, such as BF16, FP8 or GGUF Q8_0.")
 
 
@@ -1434,6 +1442,12 @@ class ImportCheck(BaseModel):
     match: str | None = None
     connection_id: int | None = None
     connection: str | None = None
+    problem_kind: Literal["not_found", "no_access", "policy", "invalid", "unreadable"] | None = None
+    weights_bytes: int = 0
+    quantized: str | None = Field(default=None, description="Quantization method, such as fp8 or gptq: serves only.")
+    license: str | None = Field(default=None, description="The licence id in the model's README, when it names one.")
+    fit: "FitInfo | None" = None
+    train_fit: "TrainFitInfo | None" = None
 
 
 class DeployRequest(BaseModel):

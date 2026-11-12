@@ -19,7 +19,7 @@ from minibrain.models.bucket import missing_objects, writes_bucket
 from minibrain.models.copies import BUCKET, FOLDER
 from minibrain.models.health import MISSING, content_hash, listed, problem_of, size_problems
 from minibrain.models.inspect import source_type_of
-from minibrain.models.rules import publisher_of
+from minibrain.models.rules import config_quantization, publisher_of
 from minibrain.models.sources import HUB, S3, s3_endpoint
 from minibrain.models.templates import gguf_template, template_in_files
 from minibrain.object_store import load_config
@@ -179,9 +179,7 @@ def quantization(session: Session, settings: Settings, key: str) -> str | None:
         return "gguf"
     model = session.get(BaseModel, key)
     config = base_config(settings, model) if model is not None else None
-    found = config.get("quantization_config") if config else None
-    method = found.get("quant_method") if isinstance(found, dict) else None
-    return str(method) if method else None
+    return config_quantization(config or {})
 
 
 def model_id_for(variant: CatalogVariant) -> str:

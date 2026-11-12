@@ -6,9 +6,11 @@ import {
     HardDrive,
     type LucideIcon,
     MemoryStick,
+    Plus,
 } from "lucide-react";
 import {
     Badge,
+    Button,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -16,22 +18,23 @@ import {
     DialogTrigger,
     FilterMenu,
     TabbedSearchList,
-    type TabbedSearchListGroup,
     type TabbedSearchListTab,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { useState } from "react";
+import { type ClipboardEvent, useState } from "react";
 import type { CatalogEntry, CatalogResponse, ModelRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { discoverListHref } from "~/lib/modelsSearch";
-import { ImportPanel, type ImportPick, looksLikeSource } from "./BaseSource";
+import { type ImportPick, looksLikeSource } from "./BaseSource";
 import { discoverHref } from "./Discover";
 import { TIERS } from "./DiscoverFilters";
+import { ImportForm } from "./ImportForm";
 import {
     type BaseOption,
     type FitLevel,
+    type ImportOrigin,
     type Recommendations,
     catalogueOption,
     gigabytes,
@@ -50,7 +53,7 @@ import {
     useTrainsHere,
 } from "./runsHere";
 
-export type PickerTab = "catalogue" | "imported" | "import";
+export type PickerTab = "catalogue" | "imports";
 
 const USE_FILTERS = [
     { value: "commercial", label: "Commercial use" },
@@ -227,6 +230,7 @@ function OptionRow({
                 {facts.length > 0 && (
                     <span className="truncate text-muted-foreground">{facts.join(" · ")}</span>
                 )}
+                {option.origin && <Origin origin={option.origin} />}
                 {description && (
                     <span className="line-clamp-1 text-muted-foreground">{description}</span>
                 )}
@@ -239,6 +243,102 @@ function OptionRow({
     );
 }
 
+const ORIGIN_PREFIX: Record<ImportOrigin["kind"], string> = {
+    hub: "hf: ",
+    s3: "",
+    folder: "folder ",
+};
+
+function Origin({ origin }: { origin: ImportOrigin }) {
+    return (
+        <span className="truncate text-muted-foreground">
+            {`Imported from ${ORIGIN_PREFIX[origin.kind]}`}
+            <span className="font-mono">{origin.location}</span>
+        </span>
+    );
+}
+
+function ImportRow({
+    option,
+    current,
+    deleting,
+    onPick,
+}: {
+    option: BaseOption;
+    current: boolean;
+    deleting: boolean;
+    onPick: () => void;
+}) {
+    return (
+        <li>
+            <button
+                type="button"
+                aria-current={current || undefined}
+                aria-disabled={deleting || undefined}
+                onClick={() => !deleting && onPick()}
+                className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left text-base outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-current:not-hover:bg-accent aria-disabled:cursor-default"
+            >
+                <OptionRow option={option} deleting={deleting} />
+                {current && <span className="sr-only">Current choice</span>}
+            </button>
+        </li>
+    );
+}
+
+function ImportsList({
+    imported,
+    query,
+    currentKey,
+    deleting,
+    onPick,
+    onImport,
+}: {
+    imported: BaseOption[];
+    query: string;
+    currentKey: string | undefined;
+    deleting: (option: BaseOption) => boolean;
+    onPick: (option: BaseOption) => void;
+    onImport: () => void;
+}) {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = imported.filter((option) => {
+        const text = searchText(option).toLowerCase();
+        return terms.every((term) => text.includes(term));
+    });
+    const summary =
+        terms.length > 0
+            ? `${shown.length} of ${imported.length} ${imported.length === 1 ? "import" : "imports"}`
+            : `${imported.length} imported ${imported.length === 1 ? "model" : "models"}`;
+    return (
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-muted-foreground tabular-nums">{summary}</span>
+                <Button type="button" variant="outline" onClick={onImport}>
+                    <Plus />
+                    Import a model
+                </Button>
+            </div>
+            {shown.length > 0 ? (
+                <ul className="flex min-h-0 flex-col divide-y divide-border-soft overflow-y-auto rounded-md border">
+                    {shown.map((option) => (
+                        <ImportRow
+                            key={option.key}
+                            option={option}
+                            current={option.key === currentKey}
+                            deleting={deleting(option)}
+                            onPick={() => onPick(option)}
+                        />
+                    ))}
+                </ul>
+            ) : (
+                <div className="flex min-h-32 flex-col items-center justify-center gap-1 rounded-md border px-3 py-6 text-center text-muted-foreground">
+                    No import matches this search.
+                </div>
+            )}
+        </div>
+    );
+}
+
 function descriptionOf(option: BaseOption): string | null {
     return option.entry?.description || option.note || null;
 }
@@ -247,18 +347,6 @@ const FIT_RANK: Record<FitLevel, number> = { fits: 0, limited: 1, unknown: 2, in
 
 function trainableFirst(left: BaseOption, right: BaseOption): number {
     return Number(servesOnly(left)) - Number(servesOnly(right));
-}
-
-function rows(group: string, options: BaseOption[]): Row[] {
-    return [...options].sort(trainableFirst).map((option) => ({ group, option }));
-}
-
-function groupOf(
-    key: string,
-    label: string | undefined,
-    options: BaseOption[],
-): TabbedSearchListGroup<Row> {
-    return { key, label, items: rows(key, options) };
 }
 
 type PickerValue = { option: BaseOption | null; importText: string | null };
@@ -363,6 +451,7 @@ export function BasePicker({
     const [uses, setUses] = useState<string[]>([]);
     const [runsHere, setRunsHere] = useState(false);
     const [trainsHere, setTrainsHere] = useState(false);
+    const [formOpen, setFormOpen] = useState(tab === "imports");
     const entries = catalog?.entries ?? [];
     const deleting = new Set(
         models
@@ -468,24 +557,49 @@ export function BasePicker({
             empty: "No catalogue model matches these filters.",
         },
         {
-            value: "imported",
-            label: "Imported",
-            groups: [groupOf("imported", undefined, imported)].filter(
-                (group) => group.items.length > 0,
-            ),
-            empty: "No imported base models yet. Import one from a Hugging Face id, an S3 path or a folder.",
-        },
-        {
-            value: "import",
-            label: "Import",
+            value: "imports",
+            label: "Your imports",
             matches: looksLikeSource,
-            panel: (query) => <ImportPanel seed={query} onUse={onImport} />,
+            panel: (query) =>
+                formOpen || imported.length === 0 || looksLikeSource(query) ? (
+                    <ImportForm
+                        seed={query}
+                        catalog={catalog}
+                        onUse={onImport}
+                        onBack={imported.length > 0 ? () => setFormOpen(false) : undefined}
+                        intro={
+                            imported.length > 0
+                                ? undefined
+                                : "No imports yet. Import a model from Hugging Face, a bucket or a server folder; it lists here once added."
+                        }
+                    />
+                ) : (
+                    <ImportsList
+                        imported={imported}
+                        query={query}
+                        currentKey={value.option?.key}
+                        deleting={beingDeleted}
+                        onPick={onPick}
+                        onImport={() => setFormOpen(true)}
+                    />
+                ),
         },
     ];
+    const pasted = (event: ClipboardEvent<HTMLDivElement>) => {
+        const field = event.target;
+        const text = event.clipboardData.getData("text");
+        if (field instanceof HTMLInputElement && field.type === "search" && looksLikeSource(text)) {
+            setFormOpen(true);
+            onTabChange("imports");
+        }
+    };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <Trigger value={value} />
-            <DialogContent className="flex h-[min(46rem,calc(100%-2rem))] flex-col sm:max-w-3xl">
+            <DialogContent
+                onPaste={pasted}
+                className="flex h-[min(46rem,calc(100%-2rem))] flex-col sm:max-w-3xl"
+            >
                 <DialogHeader className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 pr-9">
                     <DialogTitle className="pr-0">Choose a base model</DialogTitle>
                     <a

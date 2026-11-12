@@ -16,6 +16,7 @@ from minibrain.api.schemas import (
     Deployment,
     DeploymentState,
     Health,
+    ImportOrigin,
     ModelRow,
     ServeOnlyInfo,
     ServingReplica,
@@ -382,6 +383,17 @@ def base_activity(job: Job | None) -> Activity:
     return Activity(state="idle", label="No active jobs")
 
 
+def imported_from(model: BaseModel) -> ImportOrigin | None:
+    if model.catalog_id is not None:
+        return None
+    kind, _, location = (model.source_path or "").partition(":")
+    if kind == "s3" and location:
+        return ImportOrigin(kind="s3", location=location)
+    if kind == "folder" and location:
+        return ImportOrigin(kind="folder", location=location)
+    return ImportOrigin(kind="hub", location=model.repo) if model.repo else None
+
+
 def base_row(
     model: BaseModel,
     job: Job | None,
@@ -423,6 +435,7 @@ def base_row(
         catalog_id=model.catalog_id,
         last_used_at=model.last_used_at or model.created_at,
         teardown=teardown_info(teardown),
+        imported_from=imported_from(model),
     )
 
 

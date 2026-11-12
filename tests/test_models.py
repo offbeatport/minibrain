@@ -250,6 +250,7 @@ def test_import_from_a_folder(harness: Harness, tmp_path: Path) -> None:
     body = {"name": "Corp LLM", "source_type": "folder", "location": str(folder), "tags": ["legal"]}
     row = harness.client.post("/api/base-models/import", json=body).json()
     assert (row["key"], row["availability"]["state"]) == ("corp-llm", "importing")
+    assert row["imported_from"] == {"kind": "folder", "location": str(folder)}
     assert harness.worker(kinds=["import"]).run_once()
     detail = harness.client.get("/api/base-models/corp-llm").json()
     assert detail["availability"]["state"] == "available"
@@ -482,9 +483,13 @@ def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Pat
     assert (found["ok"], found["source_type"], found["name"], found["files"]) == (True, "folder", "corp model v2", 3)
     assert [check["ok"] for check in found["checks"]] == [True] * len(found["checks"])
     assert {check["label"] for check in found["checks"]} >= {"config.json", "Tokenizer"}
+    assert found["fit"]["needed_bytes"] > 0 and found["train_fit"] is not None and found["quantized"] is None
+    missing = harness.client.post("/api/base-models/inspect", json={"location": str(tmp_path / "gone")}).json()
+    assert missing["problem_kind"] == "not_found"
     empty = harness.client.post("/api/base-models/inspect", json={"location": str(tmp_path)}).json()
     assert not empty["ok"] and "config.json" in empty["problem"]
     assert [check["label"] for check in empty["checks"] if not check["ok"]] == ["config.json", "Weights", "Tokenizer"]
+    assert empty["problem_kind"] == "invalid"
     monkeypatch.delenv("MINIBRAIN_MODELS_S3_URL", raising=False)
     relative = harness.client.post("/api/base-models/inspect", json={"location": "models/qwen"}).json()
     assert "absolute folder path" in relative["problem"]

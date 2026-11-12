@@ -3528,6 +3528,8 @@ export interface components {
              * @description The catalogue model a base variant belongs to.
              */
             catalog_name?: string | null;
+            /** @description Where a base that is not in the catalogue came from. */
+            imported_from?: components["schemas"]["ImportOrigin"] | null;
             /**
              * Variant Label
              * @description A base's format, such as BF16, FP8 or GGUF Q8_0.
@@ -5913,6 +5915,25 @@ export interface components {
             connection_id?: number | null;
             /** Connection */
             connection?: string | null;
+            /** Problem Kind */
+            problem_kind?: ("not_found" | "no_access" | "policy" | "invalid" | "unreadable") | null;
+            /**
+             * Weights Bytes
+             * @default 0
+             */
+            weights_bytes?: number;
+            /**
+             * Quantized
+             * @description Quantization method, such as fp8 or gptq: serves only.
+             */
+            quantized?: string | null;
+            /**
+             * License
+             * @description The licence id in the model's README, when it names one.
+             */
+            license?: string | null;
+            fit?: components["schemas"]["FitInfo"] | null;
+            train_fit?: components["schemas"]["TrainFitInfo"] | null;
         };
         /** ImportCheckItem */
         ImportCheckItem: {
@@ -5922,6 +5943,16 @@ export interface components {
             ok: boolean;
             /** Detail */
             detail?: string | null;
+        };
+        /** ImportOrigin */
+        ImportOrigin: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "hub" | "s3" | "folder";
+            /** Location */
+            location: string;
         };
         /** ImportRequest */
         ImportRequest: {
@@ -7036,6 +7067,8 @@ export interface components {
              * @description The catalogue model a base variant belongs to.
              */
             catalog_name?: string | null;
+            /** @description Where a base that is not in the catalogue came from. */
+            imported_from?: components["schemas"]["ImportOrigin"] | null;
             /**
              * Variant Label
              * @description A base's format, such as BF16, FP8 or GGUF Q8_0.

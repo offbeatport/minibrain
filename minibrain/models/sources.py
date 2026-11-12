@@ -31,6 +31,14 @@ class HubGoneError(Exception):
         self.path = path
 
 
+class SourceMissingError(FinalError):
+    pass
+
+
+class SourceDeniedError(FinalError):
+    pass
+
+
 class FileSource(Protocol):
     def describe(self) -> str: ...
 
@@ -89,9 +97,9 @@ class StorageSource:
         try:
             listing = self.fs.ls(self.root, detail=True)
         except FileNotFoundError as error:
-            raise FinalError(f"{self.url} does not exist or is not readable") from error
+            raise SourceMissingError(f"{self.url} does not exist or is not readable") from error
         except PermissionError as error:
-            raise FinalError(f"Access denied to {self.url}: check the credentials") from error
+            raise SourceDeniedError(f"Access denied to {self.url}: check the credentials") from error
         found = []
         for item in listing:
             name = str(item["name"]).rstrip("/").rsplit("/", 1)[-1]

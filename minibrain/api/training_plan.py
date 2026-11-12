@@ -252,7 +252,10 @@ def get_training_plan(
 
 
 def train_fit(entry: CatalogModel, variant: CatalogVariant, machines: list[Machine]) -> TrainFitInfo:
-    base = catalogue_base(entry, variant)
+    return base_train_fit(catalogue_base(entry, variant), machines)
+
+
+def base_train_fit(base: Base, machines: list[Machine]) -> TrainFitInfo:
     if base.quantized:
         return TrainFitInfo(
             level="unsupported",
