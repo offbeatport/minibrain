@@ -298,12 +298,10 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
             actions={
                 picked.length > 0 && (
                     <>
-                        {
-                            <Button variant="outline" onClick={() => setPicked([])}>
-                                <X aria-hidden="true" />
-                                Clear
-                            </Button>
-                        }
+                        <Button variant="outline" onClick={() => setPicked([])}>
+                            <X aria-hidden="true" />
+                            Clear
+                        </Button>
                         <Tip
                             tip={
                                 sorted.length === 2
