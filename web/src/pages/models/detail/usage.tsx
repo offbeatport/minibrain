@@ -1,7 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { ChartLine } from "lucide-react";
-import { Button, Link, SegmentedTabs } from "obp-ui";
+import {
+    Button,
+    Link,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "obp-ui";
 import { useState, useSyncExternalStore } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { type StatusAction, useModelTraffic } from "~/api/modelPageQueries";
@@ -57,6 +65,33 @@ export function useTrafficRange(): [TrafficRange, (range: TrafficRange) => void]
     ];
 }
 
+function Choice<T extends string>({
+    label,
+    options,
+    value,
+    onValue,
+}: {
+    label: string;
+    options: { key: T; label: string }[];
+    value: T;
+    onValue: (value: T) => void;
+}) {
+    return (
+        <Select value={value} onValueChange={(next) => next && onValue(next as T)}>
+            <SelectTrigger aria-label={label}>
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+                {options.map((option) => (
+                    <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
 export function RangeSwitch({
     range,
     onRange,
@@ -64,13 +99,7 @@ export function RangeSwitch({
     range: TrafficRange;
     onRange: (range: TrafficRange) => void;
 }) {
-    return (
-        <SegmentedTabs
-            tabs={RANGES}
-            active={range}
-            onSelect={(key) => onRange(key as TrafficRange)}
-        />
-    );
+    return <Choice label="Time range" options={RANGES} value={range} onValue={onRange} />;
 }
 
 export function TrafficChart({
@@ -103,14 +132,22 @@ export function TrafficChart({
     const now = Date.now();
     const rows = usage.rows.length > 0 ? usage.rows : [{ step: now - 86400000 }, { step: now }];
     return (
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <SegmentedTabs
-                    tabs={METRICS}
-                    active={metric}
-                    onSelect={(key) => setMetric(key as TrafficMetric)}
-                />
-                {onRange && <RangeSwitch range={range} onRange={onRange} />}
+                {showHeadline && report ? (
+                    <p className="flex items-baseline gap-2">
+                        <span className="text-xl tabular-nums">
+                            {headline(metric, report.totals)}
+                        </span>
+                        <span className="text-base text-muted-foreground">{SPAN[range]}</span>
+                    </p>
+                ) : (
+                    <span />
+                )}
+                <div className="flex items-center gap-2">
+                    <Choice label="Metric" options={METRICS} value={metric} onValue={setMetric} />
+                    {onRange && <RangeSwitch range={range} onRange={onRange} />}
+                </div>
             </div>
             <LineChart
                 rows={rows}
@@ -123,16 +160,6 @@ export function TrafficChart({
                 xFormat={xFormat(range)}
                 readoutTitle={report ? readoutTitle(report) : undefined}
                 readoutNotes={report ? readoutNotes(report) : undefined}
-                header={
-                    showHeadline && report ? (
-                        <p className="flex items-baseline gap-2">
-                            <span className="text-xl tabular-nums">
-                                {headline(metric, report.totals)}
-                            </span>
-                            <span className="text-sm text-muted-foreground">{SPAN[range]}</span>
-                        </p>
-                    ) : undefined
-                }
                 empty={empty ? { title: "No requests yet", hint: emptyHint } : null}
             />
         </div>

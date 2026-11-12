@@ -165,11 +165,9 @@ function liveText(row: ModelRow): string | null {
     return `v${row.current_version} live${score}`;
 }
 
-function subtitleOf(row: ModelRow, base: BaseModelDetail | undefined, baseName: string): string {
+function subtitleOf(row: ModelRow, base: BaseModelDetail | undefined): string {
     if (row.kind === "custom") {
-        return [row.description ? trimmed(row.description) : null, `On ${baseName}`]
-            .filter(Boolean)
-            .join(" · ");
+        return row.description ? trimmed(row.description) : "";
     }
     return [
         row.description ? trimmed(row.description) : null,
@@ -202,10 +200,8 @@ export function ModelHeader({
     detail: ModelDetail | undefined;
     base: BaseModelDetail | undefined;
 }) {
-    const models = useAllModels();
     const status = DEPLOYMENT[row.deployment.state];
     const live = liveText(row);
-    const baseName = baseNameOf(models.data, row.base_model);
     return (
         <CompactHeader
             icon={<ModelAvatar row={row} size="lg" />}
@@ -219,13 +215,13 @@ export function ModelHeader({
                 </StatusText>,
                 live ? <span key="live">{live}</span> : null,
             ]}
-            subtitle={subtitleOf(row, base, baseName)}
+            subtitle={subtitleOf(row, base)}
             actions={<HeaderActions row={row} detail={detail} base={base} />}
         />
     );
 }
 
-function PlaygroundButton({ row }: { row: ModelRow }) {
+function TryItButton({ row }: { row: ModelRow }) {
     if (!row.can_test) {
         return (
             <Tip
@@ -237,7 +233,7 @@ function PlaygroundButton({ row }: { row: ModelRow }) {
             >
                 <Button variant="outline" disabled>
                     <Play />
-                    Playground
+                    Try it
                 </Button>
             </Tip>
         );
@@ -246,7 +242,7 @@ function PlaygroundButton({ row }: { row: ModelRow }) {
         <Button variant="outline" asChild>
             <Link href={playgroundHref(row.key)}>
                 <Play />
-                Playground
+                Try it
             </Link>
         </Button>
     );
@@ -265,7 +261,7 @@ function HeaderActions({
     const [connecting, setConnecting] = useState(false);
     return (
         <>
-            <PlaygroundButton row={row} />
+            <TryItButton row={row} />
             <Button variant="outline" onClick={() => setConnecting(true)}>
                 <Plug />
                 Connect

@@ -127,7 +127,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Custom and base models with score, traffic, cost and status.
   UI: Models · API: GET /api/all-models
 - **List view options** · shipped · product, ml
-  Filter by status, kind and base, sort, and pick columns.
+  Filter by status, kind and base, sort, pick columns, reset to default.
   UI: Models › View options
 - **Versions and variants in the list** · shipped · product, ml
   Show versions under models and installed formats under base models.
@@ -145,7 +145,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Usage by version, one next step, its facts, details and activity.
   UI: Models › model › Overview · API: GET /api/model-pages/{name}, GET /api/model-pages/{name}/traffic
 - **Model activity** · shipped · product, ml, admin
-  See a model's audited changes as a timeline, bursts folded.
+  This model's audited changes as a timeline, never a deleted namesake's.
   UI: Models › model › Overview › Activity · API: GET /api/model-pages/{name}/activity
 - **Model monitoring** · shipped · engineer, admin
   Traffic, latency, errors, versions, callers and requests of one model.

@@ -125,12 +125,7 @@ export function ContextStrip({ choice, name }: { choice: AvatarChoice; name: str
                 </ContextRow>
                 <ContextRow size="32 px" caption="Picker item" className="py-2">
                     <AvatarTile choice={choice} name={name} size="md" />
-                    <span className="flex min-w-0 flex-col">
-                        <span className="truncate font-semibold">{name}</span>
-                        <span className="truncate text-sm text-muted-foreground">
-                            on Qwen3 0.6B
-                        </span>
-                    </span>
+                    <span className="min-w-0 truncate font-semibold">{name}</span>
                 </ContextRow>
                 <ContextRow size="20 px" caption="List row" className="gap-2 py-2">
                     <AvatarTile choice={choice} name={name} size="sm" />

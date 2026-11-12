@@ -576,7 +576,7 @@ function primaryOf(model: ListModel, on: Handlers, can: Abilities) {
         model.kind === "custom" ? row.can_test : row.availability.state === "available";
     return runnable
         ? {
-              label: "Try",
+              label: "Try it",
               icon: <Play aria-hidden="true" />,
               run: () => on.open(playgroundHref(row.key)),
           }

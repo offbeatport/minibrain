@@ -23,7 +23,7 @@ export function EmptyOverlay({ title, hint }: { title: string; hint?: ReactNode 
     return (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 pb-6 pl-14 text-center">
             <p className="bg-card px-2 font-medium">{title}</p>
-            {hint && <p className="bg-card px-2 text-sm text-muted-foreground">{hint}</p>}
+            {hint && <p className="bg-card px-2 text-base text-muted-foreground">{hint}</p>}
         </div>
     );
 }
