@@ -113,9 +113,11 @@ Set on 2026-11-06. The premise is owning your intelligence: run and adapt strong
 ChatGPT, Claude or Gemini APIs. Training a frontier model from scratch is not the goal; adapting a strong open one is.
 
 1. A private endpoint that is a drop-in for the OpenAI API: tool calling (function calling) with streaming,
-   `/v1/embeddings`, `/v1/completions` for code completion, a chat UI for staff, and sizing guidance for 30B to 120B
-   models on several GPUs.
-2. Retrieval over company documents with per-user access, for internal knowledge assistants.
+   `/v1/completions` for code completion, a chat UI for staff, and sizing guidance for 30B to 120B models on several
+   GPUs.
+2. Retrieval over company documents with per-user access, for internal knowledge assistants. It brings embedding
+   models as their own kind (catalogue type, embed-mode engines, deploy without versions or training, a compare-texts
+   view instead of chat) and `/v1/embeddings`, because the index is built from them.
 3. Adapting the chat assistant: instructions, fine-tuning on your best answers, distillation from a teacher, DPO from
    feedback.
 4. Extract, for document processing.
@@ -125,8 +127,8 @@ Item 1 progress (2026-11-06): sampling fields on every engine, a vLLM engine, to
 chat template (Qwen and Hermes, Llama 3.x, Mistral, gpt-oss), reasoning off or at an effort with
 `reasoning_content` apart from the answer, token streaming from every engine, and a safety model (Llama Guard,
 ShieldGemma, Qwen3Guard, gpt-oss-safeguard) per install, model or request, and a Playground with every setting,
-Recent chats saved per person and Save as test example. Not yet: `/v1/embeddings`, `/v1/completions`, sizing
-guidance, the staff Chat app.
+Recent chats saved per person and Save as test example. Not yet: `/v1/completions`, sizing guidance, the staff
+Chat app. `/v1/embeddings` moved to item 2 with retrieval.
 
 The staff Chat app comes next and is separate from the Playground: a ChatGPT-like app for everyone in the
 organisation, with per-person history, retrieval over company documents, sharing and admin retention. The Playground
