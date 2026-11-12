@@ -232,9 +232,9 @@ def tool_base(harness: Harness, tmp_path: Path, template: str, key: str = "tool-
     for name, data in files.items():
         (folder / name).write_bytes(data)
     body = {"name": key.replace("-", " ").title(), "source_type": "folder", "location": str(folder)}
-    assert harness.client.post("/api/base-models/import", json=body).status_code < 300
+    assert harness.client.post("/api/models/import", json=body).status_code < 300
     harness.worker(kinds=["import"]).run_once()
-    assert harness.client.post(f"/api/base-models/{key}/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post(f"/api/models/{key}/deploy", json={"deployed": True}).status_code == 200
     harness.backend = Scripted()
     harness.app.state.backend = harness.backend
     return headers(add_key(harness, ("base", key)))

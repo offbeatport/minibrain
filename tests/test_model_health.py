@@ -29,11 +29,11 @@ def installed(harness: Harness) -> dict[str, Any]:
     add_tiny(harness)
     download_tiny(harness)
     assert harness.worker(kinds=["download"]).run_once()
-    return harness.client.get("/api/base-models/tiny").json()
+    return harness.client.get("/api/models/tiny").json()
 
 
 def row(harness: Harness, key: str = "tiny") -> dict[str, Any]:
-    return next(item for item in harness.client.get("/api/all-models").json() if item["key"] == key)
+    return next(item for item in harness.client.get("/api/models").json() if item["key"] == key)
 
 
 def actions(found: dict[str, Any]) -> list[str]:
@@ -76,35 +76,33 @@ def test_install_saves_a_sha256_list_of_every_file(harness: Harness, hub: Path, 
     folder.mkdir()
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
-    harness.client.post(
-        "/api/base-models/import", json={"name": "Corp", "source_type": "folder", "location": str(folder)}
-    )
+    harness.client.post("/api/models/import", json={"name": "Corp", "source_type": "folder", "location": str(folder)})
     assert harness.worker(kinds=["import"]).run_once()
-    imported = harness.client.get("/api/base-models/corp").json()
+    imported = harness.client.get("/api/models/corp").json()
     local = json.loads((Path(imported["storage_path"]) / "minibrain-model.json").read_text())
     assert all(entry["sha256"] for entry in local["files"]) and local["content_hash"] == imported["content_hash"]
 
 
 def test_corrupt_file_is_found_by_verify_and_repaired_from_the_hub(harness: Harness, hub: Path) -> None:
     stored = Path(installed(harness)["storage_path"])
-    assert harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/tiny/deploy", json={"deployed": True}).status_code == 200
     headers = bearer(harness, ("base", "tiny"))
     (stored / WEIGHTS).write_bytes(b"tampers" * 1000)
     assert row(harness)["health"] is None
-    verifying = harness.client.post("/api/base-models/tiny/verify")
+    verifying = harness.client.post("/api/models/tiny/verify")
     assert verifying.status_code == 202 and verifying.json()["activity"]["label"].startswith("Verifying files")
-    assert harness.client.post("/api/base-models/tiny/repair").status_code == 409
+    assert harness.client.post("/api/models/tiny/repair").status_code == 409
     assert harness.worker(kinds=["verify"]).run_once()
     found = row(harness)
     assert (found["health"]["state"], found["health"]["label"]) == ("corrupt", "Corrupt (1 file)")
     assert actions(found) == ["repair", "reimport", "verify"] and found["health"]["files"] == [WEIGHTS]
     assert "SHA-256" in found["health"]["detail"] and found["can_test"] is False
-    files = {entry["path"]: entry["state"] for entry in harness.client.get("/api/base-models/tiny").json()["files"]}
+    files = {entry["path"]: entry["state"] for entry in harness.client.get("/api/models/tiny").json()["files"]}
     assert files[WEIGHTS] == "corrupt" and files["config.json"] == "ok"
     refused = chat(harness, "tiny", headers)
     assert refused.status_code == 503 and "cannot be loaded" in refused.json()["detail"]
-    assert harness.client.post("/api/base-models/tiny/test", json={"text": "hi"}).status_code == 409
-    assert harness.client.post("/api/base-models/tiny/repair").status_code == 202
+    assert harness.client.post("/api/models/tiny/test", json={"text": "hi"}).status_code == 409
+    assert harness.client.post("/api/models/tiny/repair").status_code == 202
     assert row(harness)["activity"]["label"].startswith("Repairing")
     assert harness.worker(kinds=["repair"]).run_once()
     assert (stored / WEIGHTS).read_bytes() == FILES[WEIGHTS]
@@ -124,22 +122,22 @@ def test_missing_files_point_to_a_new_location_validated_against_the_saved_list(
     assert actions(found) == ["repair", "relocate", "remove"] and WEIGHTS in found["health"]["detail"]
     empty = tmp_path / "empty"
     empty.mkdir()
-    refused = harness.client.post("/api/base-models/tiny/relocate", json={"location": str(empty)})
+    refused = harness.client.post("/api/models/tiny/relocate", json={"location": str(empty)})
     assert refused.status_code == 409 and "config.json is missing" in refused.json()["detail"]
     short = tmp_path / "short"
     shutil.copytree(moved, short)
     (short / WEIGHTS).write_bytes(b"weights")
-    wrong = harness.client.post("/api/base-models/tiny/relocate", json={"location": str(short)}).json()["detail"]
+    wrong = harness.client.post("/api/models/tiny/relocate", json={"location": str(short)}).json()["detail"]
     assert f"{WEIGHTS} is 7 bytes, expected {len(FILES[WEIGHTS])}" in wrong
-    pointed = harness.client.post("/api/base-models/tiny/relocate", json={"location": str(moved)})
+    pointed = harness.client.post("/api/models/tiny/relocate", json={"location": str(moved)})
     assert pointed.status_code == 200 and pointed.json()["storage_path"] == str(moved)
     assert pointed.json()["relocated"] is True and pointed.json()["activity"]["label"].startswith("Verifying files")
     assert harness.worker(kinds=["verify"]).run_once()
     assert row(harness)["health"] is None and row(harness)["availability"]["state"] == "available"
     assert [event.detail["to"] for event in audited(harness, "model.relocate")] == [str(moved)]
-    assert harness.client.delete("/api/base-models/tiny").status_code == 202
+    assert harness.client.delete("/api/models/tiny").status_code == 202
     harness.settle()
-    assert all(item["key"] != "tiny" for item in harness.client.get("/api/all-models").json())
+    assert all(item["key"] != "tiny" for item in harness.client.get("/api/models").json())
     assert (moved / WEIGHTS).is_file()
 
 
@@ -150,9 +148,9 @@ def test_download_checks_free_space_before_writing(harness: Harness, hub: Path) 
     found = row(harness)
     assert (found["health"]["state"], found["health"]["label"]) == ("no_space", "Not enough space")
     assert actions(found) == ["storage", "resume"] and "free on the disk that holds models" in found["health"]["detail"]
-    stored = Path(harness.client.get("/api/base-models/tiny").json()["storage_path"])
+    stored = Path(harness.client.get("/api/models/tiny").json()["storage_path"])
     assert not any(stored.glob("*.part")) and not (stored / WEIGHTS).exists()
-    assert harness.client.post("/api/base-models/tiny/retry").status_code == 202
+    assert harness.client.post("/api/models/tiny/retry").status_code == 202
     assert harness.worker(kinds=["download"]).run_once()
     assert row(harness)["health"] is None
 
@@ -169,12 +167,12 @@ def test_hub_401_needs_access_and_404_cannot_repair_from_source(
     assert actions(found) == ["get_access", "resume"]
     assert "(401)" in found["health"]["detail"] and "HF_TOKEN" in found["health"]["detail"]
     allow()
-    assert harness.client.post("/api/base-models/tiny/retry").status_code == 202
+    assert harness.client.post("/api/models/tiny/retry").status_code == 202
     assert harness.worker(kinds=["download"]).run_once()
-    stored = Path(harness.client.get("/api/base-models/tiny").json()["storage_path"])
+    stored = Path(harness.client.get("/api/models/tiny").json()["storage_path"])
     (stored / WEIGHTS).unlink()
     (hub / REPO / "resolve" / REVISION / WEIGHTS).unlink()
-    assert harness.client.post("/api/base-models/tiny/repair").status_code == 202
+    assert harness.client.post("/api/models/tiny/repair").status_code == 202
     assert harness.worker(kinds=["repair"]).run_once()
     gone = row(harness)
     assert (gone["health"]["state"], gone["health"]["label"]) == ("source_gone", "Can't repair from source")
@@ -189,7 +187,7 @@ def test_reimport_restores_files_only_from_an_identical_copy(harness: Harness, h
     for name, data in FILES.items():
         (other / name).write_bytes(b"different" * 778 if name == WEIGHTS else data)
     (other / WEIGHTS).write_bytes((other / WEIGHTS).read_bytes()[: len(FILES[WEIGHTS])])
-    assert harness.client.post("/api/base-models/tiny/reimport", json={"location": str(other)}).status_code == 202
+    assert harness.client.post("/api/models/tiny/reimport", json={"location": str(other)}).status_code == 202
     assert harness.worker(kinds=["repair"]).run_once()
     failed = row(harness)
     assert failed["health"]["label"] == "Re-import failed" and "different files" in failed["health"]["detail"]
@@ -197,7 +195,7 @@ def test_reimport_restores_files_only_from_an_identical_copy(harness: Harness, h
     backup.mkdir()
     for name, data in FILES.items():
         (backup / name).write_bytes(data)
-    assert harness.client.post("/api/base-models/tiny/reimport", json={"location": str(backup)}).status_code == 202
+    assert harness.client.post("/api/models/tiny/reimport", json={"location": str(backup)}).status_code == 202
     assert harness.worker(kinds=["repair"]).run_once()
     assert row(harness)["health"] is None and (stored / WEIGHTS).read_bytes() == FILES[WEIGHTS]
     assert [event.detail["source"] for event in audited(harness, "model.reimport")] == [str(other), str(backup)]
@@ -262,8 +260,8 @@ def test_engine_load_failures_become_a_state_with_a_way_out(harness: Harness, hu
     found = row(harness)
     assert (found["health"]["state"], found["health"]["label"]) == ("no_memory", "Failed to start")
     assert actions(found) == ["find_smaller", "try_again"] and "smaller" in found["health"]["detail"]
-    assert harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True}).status_code == 409
-    assert harness.client.post("/api/base-models/tiny/recheck").status_code == 200
+    assert harness.client.post("/api/models/tiny/deploy", json={"deployed": True}).status_code == 409
+    assert harness.client.post("/api/models/tiny/recheck").status_code == 200
     assert row(harness)["health"] is None
 
 

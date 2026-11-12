@@ -115,7 +115,7 @@ def add_tiny(harness: Harness, gated: bool = False) -> None:
 
 
 def rows(harness: Harness, query: str = "") -> dict[str, dict]:
-    return {row["key"]: row for row in harness.client.get(f"/api/all-models{query}").json()}
+    return {row["key"]: row for row in harness.client.get(f"/api/models{query}").json()}
 
 
 def download_tiny(harness: Harness) -> dict:
@@ -165,7 +165,7 @@ def test_download_appears_in_my_models_and_validates(harness: Harness, hub: Path
     added = next(e for e in harness.client.get("/api/catalog").json()["entries"] if e["id"] == "tiny")["added"]
     assert added[0]["availability"]["state"] == "downloading"
     assert harness.worker(kinds=["download"]).run_once()
-    detail = harness.client.get("/api/base-models/tiny").json()
+    detail = harness.client.get("/api/models/tiny").json()
     assert detail["availability"]["state"] == "available"
     assert detail["license_ack_by"] == "admin@example.com"
     assert (detail["parameters"], detail["context_tokens"]) == (round(len(FILES["model.safetensors"]) / 2), None)
@@ -178,24 +178,24 @@ def test_download_appears_in_my_models_and_validates(harness: Harness, hub: Path
 def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness, hub: Path) -> None:
     add_tiny(harness)
     download_tiny(harness)
-    assert harness.client.delete("/api/base-models/tiny").status_code == 409
+    assert harness.client.delete("/api/models/tiny").status_code == 409
     assert harness.worker(kinds=["download"]).run_once()
-    stored = Path(harness.client.get("/api/base-models/tiny").json()["storage_path"])
+    stored = Path(harness.client.get("/api/models/tiny").json()["storage_path"])
     assert rows(harness)["tiny"]["size_bytes"] == sum(len(data) for data in FILES.values())
-    harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True})
-    assert "undeploy it first" in harness.client.delete("/api/base-models/tiny").json()["detail"]
-    harness.client.post("/api/base-models/tiny/deploy", json={"deployed": False})
+    harness.client.post("/api/models/tiny/deploy", json={"deployed": True})
+    assert "undeploy it first" in harness.client.delete("/api/models/tiny").json()["detail"]
+    harness.client.post("/api/models/tiny/deploy", json={"deployed": False})
     custom = harness.client.post(
         "/api/models",
         json={"preset": "classify", "labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"},
     ).json()
-    assert "Tickets is trained on Tiny" in harness.client.delete("/api/base-models/tiny").json()["detail"]
+    assert "Tickets is trained on Tiny" in harness.client.delete("/api/models/tiny").json()["detail"]
     assert harness.client.delete(f"/api/models/{custom['slug']}").status_code == 202
     harness.settle()
-    assert harness.client.delete("/api/base-models/tiny").status_code == 202
+    assert harness.client.delete("/api/models/tiny").status_code == 202
     harness.settle()
     assert not stored.exists() and "tiny" not in rows(harness)
-    assert harness.client.get("/api/base-models/tiny").status_code == 404
+    assert harness.client.get("/api/models/tiny").status_code == 404
     with harness.sessions() as session:
         deleted = session.query(AuditEvent).filter(AuditEvent.action == "model.delete").all()
         assert sorted((event.target, event.detail["kind"]) for event in deleted) == [
@@ -233,11 +233,11 @@ def test_gated_download_fails_with_the_fix_and_retries(harness: Harness, hub: Pa
     download_tiny(harness)
     monkeypatch.delenv("HF_TOKEN")
     harness.worker(kinds=["download"]).run_once()
-    failed = harness.client.get("/api/base-models/tiny").json()
+    failed = harness.client.get("/api/models/tiny").json()
     assert failed["availability"]["state"] == "not_downloaded"
     assert failed["activity"]["label"] == "Download failed" and "HF_TOKEN" in failed["error"]
     monkeypatch.setenv("HF_TOKEN", "hf_test")
-    assert harness.client.post("/api/base-models/tiny/retry").json()["availability"]["state"] == "downloading"
+    assert harness.client.post("/api/models/tiny/retry").json()["availability"]["state"] == "downloading"
     assert harness.worker(kinds=["download"]).run_once()
     assert rows(harness)["tiny"]["availability"]["state"] == "available"
 
@@ -248,21 +248,19 @@ def test_import_from_a_folder(harness: Harness, tmp_path: Path) -> None:
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     body = {"name": "Corp LLM", "source_type": "folder", "location": str(folder), "tags": ["legal"]}
-    row = harness.client.post("/api/base-models/import", json=body).json()
+    row = harness.client.post("/api/models/import", json=body).json()
     assert (row["key"], row["availability"]["state"]) == ("corp-llm", "importing")
     assert row["imported_from"] == {"kind": "folder", "location": str(folder)}
     assert harness.worker(kinds=["import"]).run_once()
-    detail = harness.client.get("/api/base-models/corp-llm").json()
+    detail = harness.client.get("/api/models/corp-llm").json()
     assert detail["availability"]["state"] == "available"
     assert {f["path"]: f["sha256"] for f in detail["files"]}["model.safetensors"] == manifest()[1]["sha256"]
     inferred = body | {"name": "Corp LLM 2", "source_type": None}
-    assert harness.client.post("/api/base-models/import", json=inferred).json()["key"] == "corp-llm-2"
+    assert harness.client.post("/api/models/import", json=inferred).json()["key"] == "corp-llm-2"
     assert harness.worker(kinds=["import"]).run_once()
-    bad = harness.client.post(
-        "/api/base-models/import", json=body | {"name": "Empty", "location": str(tmp_path)}
-    ).json()
+    bad = harness.client.post("/api/models/import", json=body | {"name": "Empty", "location": str(tmp_path)}).json()
     harness.worker(kinds=["import"]).run_once()
-    assert "config.json" in harness.client.get(f"/api/base-models/{bad['key']}").json()["error"]
+    assert "config.json" in harness.client.get(f"/api/models/{bad['key']}").json()["error"]
 
 
 def test_storage_sources_read_buckets_and_folders(tmp_path: Path) -> None:
@@ -313,7 +311,7 @@ def test_catalogue_sync_reads_our_url_and_keeps_pins(
     assert harness.worker(kinds=["catalog_sync"]).run_once()
     row = rows(harness)["tiny"]
     assert row["update_available"] is True
-    assert harness.client.get("/api/base-models/tiny").json()["revision"] == REVISION
+    assert harness.client.get("/api/models/tiny").json()["revision"] == REVISION
     with harness.sessions() as session:
         entry = session.get(CatalogModel, "tiny")
         assert entry is not None and entry.popularity == 7
@@ -368,10 +366,10 @@ def test_base_models_deploy_through_the_gateway(harness: Harness, tmp_path: Path
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     harness.client.post(
-        "/api/base-models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
+        "/api/models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
     )
     harness.worker(kinds=["import"]).run_once()
-    assert harness.client.post("/api/base-models/base-one/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/base-one/deploy", json={"deployed": True}).status_code == 200
     headers = bearer(harness, ("base", "base-one"))
     models = harness.client.get("/v1/models", headers=headers).json()
     assert [model["id"] for model in models["data"]] == ["base-one"]
@@ -386,7 +384,7 @@ def test_base_models_deploy_through_the_gateway(harness: Harness, tmp_path: Path
     create_with_dataset(harness)
     other = bearer(harness)
     assert harness.client.post("/v1/chat/completions", headers=other, json=chat).status_code == 403
-    tested = harness.client.post("/api/base-models/base-one/test", json={"text": "Hello"}).json()
+    tested = harness.client.post("/api/models/base-one/test", json={"text": "Hello"}).json()
     assert tested["output"] == "billing"
     assert rows(harness)["base-one"]["deployment"]["label"] == "Running"
 
@@ -404,9 +402,9 @@ def hf_folder(root: Path, revision: str | None = REVISION) -> Path:
 
 def import_folder(harness: Harness, name: str, folder: Path, **extra: str) -> dict:
     body = {"name": name, "source_type": "folder", "location": str(folder), **extra}
-    row = harness.client.post("/api/base-models/import", json=body).json()
+    row = harness.client.post("/api/models/import", json=body).json()
     harness.worker(kinds=["import"]).run_once()
-    return harness.client.get(f"/api/base-models/{row['key']}").json()
+    return harness.client.get(f"/api/models/{row['key']}").json()
 
 
 def test_hf_download_folder_is_verified_against_the_catalogue(harness: Harness, tmp_path: Path) -> None:
@@ -479,22 +477,22 @@ def test_inspect_reads_a_folder_before_importing(harness: Harness, tmp_path: Pat
     folder.mkdir()
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
-    found = harness.client.post("/api/base-models/inspect", json={"location": str(folder)}).json()
+    found = harness.client.post("/api/models/inspect", json={"location": str(folder)}).json()
     assert (found["ok"], found["source_type"], found["name"], found["files"]) == (True, "folder", "corp model v2", 3)
     assert [check["ok"] for check in found["checks"]] == [True] * len(found["checks"])
     assert {check["label"] for check in found["checks"]} >= {"config.json", "Tokenizer"}
     assert found["fit"]["needed_bytes"] > 0 and found["train_fit"] is not None and found["quantized"] is None
-    missing = harness.client.post("/api/base-models/inspect", json={"location": str(tmp_path / "gone")}).json()
+    missing = harness.client.post("/api/models/inspect", json={"location": str(tmp_path / "gone")}).json()
     assert missing["problem_kind"] == "not_found"
-    empty = harness.client.post("/api/base-models/inspect", json={"location": str(tmp_path)}).json()
+    empty = harness.client.post("/api/models/inspect", json={"location": str(tmp_path)}).json()
     assert not empty["ok"] and "config.json" in empty["problem"]
     assert [check["label"] for check in empty["checks"] if not check["ok"]] == ["config.json", "Weights", "Tokenizer"]
     assert empty["problem_kind"] == "invalid"
     monkeypatch.delenv("MINIBRAIN_MODELS_S3_URL", raising=False)
-    relative = harness.client.post("/api/base-models/inspect", json={"location": "models/qwen"}).json()
+    relative = harness.client.post("/api/models/inspect", json={"location": "models/qwen"}).json()
     assert "absolute folder path" in relative["problem"]
     monkeypatch.setenv("MINIBRAIN_MODELS_S3_URL", "s3://bucket/models")
-    bucket = harness.client.post("/api/base-models/inspect", json={"location": "qwen"}).json()
+    bucket = harness.client.post("/api/models/inspect", json={"location": "qwen"}).json()
     assert (bucket["source_type"], bucket["resolved"]) == ("s3", "s3://bucket/models/qwen")
 
 
@@ -503,7 +501,7 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     folder.mkdir()
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
-    base = harness.client.post("/api/base-models/import", json={"name": "Corp base", "location": str(folder)}).json()
+    base = harness.client.post("/api/models/import", json={"name": "Corp base", "location": str(folder)}).json()
     created = harness.client.post(
         "/api/models",
         json={"preset": "classify", "labels": ["billing", "bug"], "name": "On corp", "base_model": base["key"]},
@@ -528,7 +526,7 @@ def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: 
         (folder / name).write_bytes(data)
     config = {"architectures": ["Qwen3ForCausalLM"], "quantization_config": {"quant_method": "fp8"}}
     (folder / "config.json").write_text(json.dumps(config))
-    base = harness.client.post("/api/base-models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
+    base = harness.client.post("/api/models/import", json={"name": "Corp FP8", "location": str(folder)}).json()
     harness.worker(kinds=["import"]).run_once()
     assert (
         harness.client.post(
@@ -583,4 +581,4 @@ def test_sample_needing_a_download_offline_creates_nothing(
     assert response.status_code == 409
     detail = response.json()["detail"]
     assert detail.startswith("The sample needs Qwen3 0.6B, which is not on this install.") and "Offline" in detail
-    assert harness.client.get("/api/models").json() == []
+    assert harness.client.get("/api/models", params={"kind": "custom"}).json() == []

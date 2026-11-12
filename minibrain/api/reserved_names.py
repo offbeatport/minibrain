@@ -6,7 +6,7 @@ from minibrain.api.schemas import ReservedNameInfo
 from minibrain.registry.models import ReservedName
 from minibrain.registry.service import NotFoundError, deleted_on, reserved_name
 
-router = APIRouter(prefix="/api/reserved-names", tags=["models"])
+router = APIRouter(prefix="/api/reserved-names")
 
 
 def reserved_info(reserved: ReservedName) -> ReservedNameInfo:
@@ -24,6 +24,7 @@ def reserved_info(reserved: ReservedName) -> ReservedNameInfo:
     "/{name}",
     dependencies=[Depends(viewer)],
     description="An API name kept after its model was deleted, so it never reaches another model.",
+    summary="Read a reserved API name",
 )
 def read_reserved(name: str, session: SessionDep) -> ReservedNameInfo:
     reserved = reserved_name(session, name)

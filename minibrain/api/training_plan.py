@@ -49,7 +49,7 @@ from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 from minibrain.tasks.rebase import serve_only
 
-router = APIRouter(prefix="/api", tags=["training"])
+router = APIRouter(prefix="/api")
 PlanLevel = Literal["fits", "insufficient", "unknown"]
 QUEUE_SHOWN = 10
 HELD_OUT_SPLIT = "eval"
@@ -233,15 +233,15 @@ def plan_info(found: Plan, default: Plan, longest: int, held_out: int, queue: Tr
     )
 
 
-@router.get("/models/{slug}/training-plan", dependencies=[Depends(viewer)])
+@router.get("/models/{name}/training-plan", dependencies=[Depends(viewer)], summary="Plan a training run")
 def get_training_plan(
-    slug: str,
+    name: str,
     query: Annotated[TrainingPlanQuery, Query()],
     session: SessionDep,
     settings: SettingsDep,
     node: LocalNodeDep,
 ) -> TrainingPlanInfo:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     dataset_version = chosen_dataset_version(session, model, query.dataset_version_id)
     found, longest = training_plan(session, settings, node, model, dataset_version, query)
     default = found

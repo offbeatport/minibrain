@@ -18,7 +18,7 @@ from minibrain.registry.service import NotFoundError, get_model, latest_dataset_
 from minibrain.tasks.examples import Turn
 from minibrain.tasks.service import contract_of
 
-router = APIRouter(prefix="/api", tags=["feedback"])
+router = APIRouter(prefix="/api")
 
 PAGE = 50
 PAGE_MAX = 200
@@ -206,7 +206,7 @@ def after_cursor(cursor: str) -> ColumnElement[bool]:
     )
 
 
-@router.get("/feedback", dependencies=[Depends(builder)])
+@router.get("/feedback", dependencies=[Depends(builder)], summary="List feedback")
 def list_feedback(
     session: SessionDep,
     filters: FilterDep,
@@ -228,7 +228,7 @@ def list_feedback(
     )
 
 
-@router.get("/feedback/facets", dependencies=[Depends(builder)])
+@router.get("/feedback/facets", dependencies=[Depends(builder)], summary="Count feedback by filter")
 def feedback_facets(session: SessionDep, filters: FilterDep) -> FeedbackFacets:
     by_status = select(Feedback.status, func.count()).where(*filters.conditions("status")).group_by(Feedback.status)
     by_model = (
@@ -280,12 +280,12 @@ def feedback_detail(session: Session, item: Feedback) -> FeedbackDetail:
     return FeedbackDetail.model_validate(feedback_info(item).model_dump() | extra)
 
 
-@router.get("/feedback/{feedback_id}", dependencies=[Depends(builder)])
+@router.get("/feedback/{feedback_id}", dependencies=[Depends(builder)], summary="Read feedback")
 def read_feedback(feedback_id: int, session: SessionDep) -> FeedbackDetail:
     return feedback_detail(session, get_feedback(session, feedback_id))
 
 
-@router.post("/feedback/{feedback_id}/review", dependencies=[Depends(builder)])
+@router.post("/feedback/{feedback_id}/review", dependencies=[Depends(builder)], summary="Accept or reject feedback")
 def review_feedback(feedback_id: int, body: ReviewRequest, session: SessionDep) -> FeedbackDetail:
     item = store.review(
         session, get_feedback(session, feedback_id), body.decision == "accept", body.label, current_actor()
@@ -294,16 +294,21 @@ def review_feedback(feedback_id: int, body: ReviewRequest, session: SessionDep) 
     return feedback_detail(session, item)
 
 
-@router.post("/feedback/{feedback_id}/assign", dependencies=[Depends(builder)])
+@router.post("/feedback/{feedback_id}/assign", dependencies=[Depends(builder)], summary="Assign feedback to me")
 def assign_feedback(feedback_id: int, body: AssignRequest, session: SessionDep) -> FeedbackDetail:
     item = store.assign(session, get_feedback(session, feedback_id), body.mine, current_actor())
     session.commit()
     return feedback_detail(session, item)
 
 
-@router.post("/models/{slug}/feedback", status_code=201, dependencies=[Depends(viewer)])
-def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep) -> FeedbackInfo:
-    model = get_model(session, slug)
+@router.post(
+    "/models/{name}/feedback",
+    status_code=201,
+    dependencies=[Depends(viewer)],
+    summary="Rate an answer from the Playground",
+)
+def playground_feedback(name: str, body: PlaygroundFeedback, session: SessionDep) -> FeedbackInfo:
+    model = get_model(session, name)
     submission = Submission(
         model_id=model.id,
         origin=ORIGIN_PLAYGROUND,
@@ -320,9 +325,13 @@ def playground_feedback(slug: str, body: PlaygroundFeedback, session: SessionDep
     return feedback_info(item)
 
 
-@router.get("/models/{slug}/feedback/summary", dependencies=[Depends(viewer)])
-def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
-    found = store.summary(session, get_model(session, slug))
+@router.get(
+    "/models/{name}/feedback/summary",
+    dependencies=[Depends(viewer)],
+    summary="Count a model's feedback since its last version",
+)
+def feedback_summary(name: str, session: SessionDep) -> FeedbackSummary:
+    found = store.summary(session, get_model(session, name))
     return FeedbackSummary(
         version=found.version,
         since=found.since,
@@ -335,7 +344,7 @@ def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
 
 
 @router.post(
-    "/models/{slug}/test-examples",
+    "/models/{name}/test-examples",
     status_code=201,
     dependencies=[Depends(builder)],
     summary="Save a test example",
@@ -345,8 +354,8 @@ def feedback_summary(slug: str, session: SessionDep) -> FeedbackSummary:
         "it. Audited as feedback.example."
     ),
 )
-def save_test_example(slug: str, body: SaveExampleBody, session: SessionDep) -> FeedbackInfo:
-    model = get_model(session, slug)
+def save_test_example(name: str, body: SaveExampleBody, session: SessionDep) -> FeedbackInfo:
+    model = get_model(session, name)
     saved = SavedExample(
         turns=tuple(Turn(turn.role, turn.content) for turn in body.messages),
         expected=body.expected,
@@ -359,6 +368,6 @@ def save_test_example(slug: str, body: SaveExampleBody, session: SessionDep) -> 
     return feedback_info(item)
 
 
-@router.get("/models/{slug}/test-examples", dependencies=[Depends(builder)], summary="List test examples")
-def list_test_examples(slug: str, session: SessionDep) -> list[FeedbackInfo]:
-    return [feedback_info(item) for item in store.saved_examples(session, get_model(session, slug))]
+@router.get("/models/{name}/test-examples", dependencies=[Depends(builder)], summary="List test examples")
+def list_test_examples(name: str, session: SessionDep) -> list[FeedbackInfo]:
+    return [feedback_info(item) for item in store.saved_examples(session, get_model(session, name))]

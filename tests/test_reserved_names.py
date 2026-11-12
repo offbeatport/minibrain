@@ -78,7 +78,7 @@ def test_a_deleted_name_is_reserved_and_the_next_model_gets_a_suffix(harness: Ha
     info = harness.client.get(f"/api/reserved-names/{SLUG}").json()
     assert info["message"] == f"{SLUG} was deleted on {today()}"
     assert harness.client.get("/api/reserved-names/nothing").status_code == 404
-    page = harness.client.get(f"/api/model-pages/{SLUG}")
+    page = harness.client.get(f"/api/models/{SLUG}/overview")
     assert page.status_code == 404 and page.json()["detail"] == f"{SLUG} was deleted on {today()}"
     assert harness.client.get(f"/api/models/{SLUG}").json()["detail"] == f"{SLUG} was deleted on {today()}"
 
@@ -105,7 +105,7 @@ def test_duplicates_imports_and_downloads_avoid_reserved_names(harness: Harness,
     copy = harness.client.post("/api/models/source/duplicate", json={"name": "Support Triage"})
     assert copy.status_code == 201 and copy.json()["slug"] == f"{SLUG}-2"
     add_base(harness, "tiny")
-    delete(harness, "tiny", "/api/base-models")
+    delete(harness, "tiny", "/api/models")
     imported = import_base(harness, tmp_path, "Tiny")
     assert imported.status_code == 202 and imported.json()["key"] == "tiny-2"
     with harness.sessions() as session:

@@ -356,6 +356,7 @@ def custom_row(
         current_version=current,
         error=jobs[0].error if jobs and jobs[0].status == JobStatus.FAILED else None,
         versions=version_rows(model, jobs, version_usage or {}, known, prices),
+        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in jobs),
         ready_version=ready.number if ready is not None else None,
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         score=held_out_score(shown) if shown is not None else None,
@@ -438,6 +439,7 @@ def base_row(
         last_used_at=model.last_used_at or model.created_at,
         teardown=teardown_info(teardown),
         imported_from=imported_from(model),
+        active_jobs=int(job is not None and job.status in ACTIVE_JOB_STATUSES),
     )
 
 

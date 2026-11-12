@@ -30,7 +30,6 @@ from minibrain.api.schemas import (
     ModelAvatar,
     ModelDetail,
     ModelSafety,
-    ModelSummary,
     PromotionInfo,
     RequestBodiesInfo,
     ScoreInfo,
@@ -394,22 +393,6 @@ def avatar_of(model: Model) -> ModelAvatar | None:
     return ModelAvatar.model_validate(model.avatar) if model.avatar else None
 
 
-def summary(model: Model) -> ModelSummary:
-    return ModelSummary(
-        slug=model.slug,
-        name=model.name,
-        preset=model.preset,
-        base_model=model.base_model,
-        current_version=model.current_version,
-        deployed=model.deployed,
-        main_metric=model_metric(model),
-        current_score=current_score(model),
-        versions=len(model.versions),
-        active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in model.jobs),
-        avatar=avatar_of(model),
-    )
-
-
 def bodies_info(model: Model) -> RequestBodiesInfo:
     session = object_session(model)
     kept, lock = bodies_choice(session, model.request_bodies) if session else (model.request_bodies, None)
@@ -467,6 +450,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         raise RuntimeError(f"{model.slug} is not attached to a session")
     graders = shown_graders(session, model)
     return ModelDetail(
+        kind="custom",
         slug=model.slug,
         name=model.name,
         preset=model.preset,

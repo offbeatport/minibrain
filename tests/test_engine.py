@@ -74,7 +74,7 @@ def test_classify_needs_labels_or_data(harness: Harness) -> None:
     refused = harness.client.post("/api/models", json={"name": "Router", "preset": "classify"})
     assert refused.status_code == 409
     assert "at least two labels" in refused.json()["detail"]
-    assert harness.client.get("/api/models").json() == []
+    assert harness.client.get("/api/models", params={"kind": "custom"}).json() == []
 
 
 def test_v0_is_scored_at_once_when_the_model_starts_with_data(harness: Harness) -> None:

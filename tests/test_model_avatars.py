@@ -28,12 +28,11 @@ def test_avatar_is_stored_on_create_and_returned_everywhere(harness: Harness) ->
     created = create(harness, PIXELBOT)
     assert created.status_code == 201, created.text
     assert created.json()["avatar"] == {**PIXELBOT, "letters": None}
-    listed = {item["slug"]: item for item in harness.client.get("/api/models").json()}
-    assert listed[SLUG]["avatar"]["style"] == "pixelbot"
-    rows = {row["key"]: row for row in harness.client.get("/api/all-models").json()}
+    rows = {row["key"]: row for row in harness.client.get("/api/models").json()}
+    assert rows[SLUG]["avatar"]["style"] == "pixelbot"
     assert rows[SLUG]["avatar"]["tone"] == "parquet"
     assert all(row["avatar"] is None for row in rows.values() if row["kind"] == "base")
-    page = harness.client.get(f"/api/model-pages/{SLUG}").json()
+    page = harness.client.get(f"/api/models/{SLUG}/overview").json()
     assert page["avatar"]["seed"] == "a1b2c3d4"
     assert events(harness, "model.create")[0].detail["avatar"] == PIXELBOT
 
@@ -78,7 +77,7 @@ def test_changing_the_avatar_is_audited_once(harness: Harness) -> None:
         "from": PIXELBOT,
         "to": INITIALS,
     }
-    activity = harness.client.get(f"/api/model-pages/{SLUG}/activity").json()
+    activity = harness.client.get(f"/api/models/{SLUG}/activity").json()
     assert any("changed the avatar" in str(event) for event in activity["events"])
 
 

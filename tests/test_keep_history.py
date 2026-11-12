@@ -48,7 +48,7 @@ def base_with_history(harness: Harness) -> int:
         job_id = job.id
     cancel(harness, job_id)
     log(harness, BASE)
-    assert harness.client.delete(f"/api/base-models/{BASE}").status_code == 202
+    assert harness.client.delete(f"/api/models/{BASE}").status_code == 202
     harness.settle()
     return job_id
 

@@ -1,14 +1,12 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
-from minibrain.api.base_models import model_row, wake_teardowns
 from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
-from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
-from minibrain.api.jobs import canceller
+from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.reserved_names import reserved_info
 from minibrain.api.schemas import (
     ContractChange,
@@ -16,7 +14,6 @@ from minibrain.api.schemas import (
     ContractInfo,
     ContractUpdate,
     DatasetChoice,
-    DeployRequest,
     ExampleInfo,
     GraderConfig,
     GradersUpdate,
@@ -28,8 +25,6 @@ from minibrain.api.schemas import (
     ModelCreate,
     ModelDetail,
     ModelDuplicate,
-    ModelRow,
-    ModelSummary,
     ModelUpdate,
     NameSuggestion,
     PreviewResponse,
@@ -40,7 +35,7 @@ from minibrain.api.schemas import (
     SampleDetail,
 )
 from minibrain.api.versions import audit_version, start_version
-from minibrain.api.views import detail, summary
+from minibrain.api.views import detail
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import Role, allows
@@ -78,7 +73,6 @@ from minibrain.registry.service import (
     free_model_name,
     get_model,
     latest_dataset_version,
-    list_models,
     preview_address,
     slugify,
 )
@@ -96,14 +90,9 @@ from minibrain.tasks.service import (
     version_contract,
     went_live,
 )
-from minibrain.teardown import cancel_stop, delete_custom, require_idle, undeploy_custom
+from minibrain.teardown import cancel_stop, require_idle, undeploy_custom
 
-router = APIRouter(prefix="/api/models", tags=["models"])
-
-
-@router.get("", dependencies=[Depends(viewer)])
-def list_all(session: SessionDep) -> list[ModelSummary]:
-    return [summary(model) for model in list_models(session)]
+router = APIRouter(prefix="/api/models")
 
 
 def contract_from(info: ContractInfo | None) -> Contract:
@@ -185,7 +174,7 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     return model
 
 
-@router.post("", status_code=201, dependencies=[Depends(builder)])
+@router.post("", status_code=201, dependencies=[Depends(builder)], summary="Create a custom model")
 def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> ModelDetail:
     model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
     session.commit()
@@ -197,11 +186,11 @@ def created(model: Model) -> dict[str, Any]:
     return facts | {"avatar": model.avatar} if model.avatar else facts
 
 
-@router.post("/{slug}/duplicate", status_code=201, dependencies=[Depends(builder)])
+@router.post("/{name}/duplicate", status_code=201, dependencies=[Depends(builder)], summary="Duplicate a custom model")
 def duplicate(
-    slug: str, body: ModelDuplicate, session: SessionDep, settings: SettingsDep, store: StoreDep
+    name: str, body: ModelDuplicate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> ModelDetail:
-    source = get_model(session, slug)
+    source = get_model(session, name)
     require_idle(source.teardown, source.name)
     require_base(session, source.base_model)
     model = duplicate_model(session, source, body.name, body.api_name)
@@ -222,6 +211,7 @@ def duplicate(
     "/name",
     dependencies=[Depends(viewer)],
     description="A free name and the API name it gets; with name, the API name that name would get.",
+    summary="Suggest a model name and its API name",
 )
 def default_name(
     session: SessionDep,
@@ -234,9 +224,7 @@ def default_name(
     return NameSuggestion(name=chosen, api_name=found.address, reserved=reserved)
 
 
-@router.patch("/{slug}", dependencies=[Depends(builder)])
-def update(slug: str, body: ModelUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+def update_custom(session: Session, settings: Settings, model: Model, body: ModelUpdate) -> ModelDetail:
     before = {"name": model.name, "description": model.description, "tags": list(model.tags)}
     if body.name is not None:
         check_rename(session, model.name, body.name)
@@ -264,9 +252,9 @@ def audit_update(session: Session, model: Model, before: dict[str, Any]) -> None
     session.add(AuditEvent(actor=current_actor(), action="model.update", target=model.slug, detail=facts))
 
 
-@router.put("/{slug}/avatar", dependencies=[Depends(builder)])
-def change_avatar(slug: str, body: ModelAvatar, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/avatar", dependencies=[Depends(builder)], summary="Change a custom model's avatar")
+def change_avatar(name: str, body: ModelAvatar, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     before = model.avatar
     after = body.model_dump(exclude_none=True)
     if after != before:
@@ -278,48 +266,21 @@ def change_avatar(slug: str, body: ModelAvatar, session: SessionDep, settings: S
     return detail(settings, model)
 
 
-@router.get("/{slug}", dependencies=[Depends(viewer)])
-def read(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    found = detail(settings, get_model(session, slug))
+def read_custom(settings: Settings, model: Model) -> ModelDetail:
+    found = detail(settings, model)
     if sees_rows() or found.dataset_version is None:
         return found
     checks = [check.model_copy(update={"examples": []}) for check in found.dataset_version.checks]
     return found.model_copy(update={"dataset_version": found.dataset_version.model_copy(update={"checks": checks})})
 
 
-@router.delete("/{slug}", status_code=202, dependencies=[Depends(builder)])
-def delete(
-    slug: str,
-    request: Request,
-    session: SessionDep,
-    settings: SettingsDep,
-    store: StoreDep,
-    queue: QueueDep,
-    undeploy: bool = False,
-    cancel_jobs: bool = False,
-) -> ModelRow:
-    model = get_model(session, slug)
-    delete_custom(session, model, current_actor(), undeploy=undeploy, cancel=canceller(session, queue, cancel_jobs))
-    session.commit()
-    wake_teardowns(request)
-    return model_row(request, session, settings, store, "custom", slug)
-
-
 SAMPLE_FILE = "travel_intents.jsonl"
 SAMPLE_PRESET = "general"
 
 
-@router.post("/{slug}/deploy", dependencies=[Depends(builder)])
-def deploy(
-    slug: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
-) -> ModelDetail:
-    model = get_model(session, slug)
-    if not body.deployed:
-        if undeploy_custom(session, model, current_actor()) is not None:
-            response.status_code = 202
-        session.commit()
-        wake_teardowns(request)
-        return detail(settings, model)
+def deploy_custom(session: Session, model: Model, deployed: bool) -> bool:
+    if not deployed:
+        return undeploy_custom(session, model, current_actor()) is not None
     cancel_stop(session, model.teardown, model.name)
     if not model.deployed:
         facts = {"name": model.name, "version": model.current_version}
@@ -327,8 +288,7 @@ def deploy(
         model.deployed_base = model.base_model
     model.deployed = True
     model.updated_at = now()
-    session.commit()
-    return detail(settings, model)
+    return False
 
 
 LOCKED_BY = {
@@ -338,11 +298,13 @@ LOCKED_BY = {
 }
 
 
-@router.put("/{slug}/request-bodies", dependencies=[Depends(builder)])
+@router.put(
+    "/{name}/request-bodies", dependencies=[Depends(builder)], summary="Keep or drop request inputs and answers"
+)
 def keep_request_bodies(
-    slug: str, body: RequestBodiesUpdate, session: SessionDep, settings: SettingsDep
+    name: str, body: RequestBodiesUpdate, session: SessionDep, settings: SettingsDep
 ) -> ModelDetail:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     _, lock = bodies_choice(session, model.request_bodies)
     if lock is not None:
         raise LockedError(f"Keep request inputs and answers is {LOCKED_BY.get(lock, lock)}")
@@ -385,7 +347,7 @@ def sample_body(session: Session, settings: Settings, store: ArtifactStore) -> M
     )
 
 
-@router.post("/sample", status_code=201, dependencies=[Depends(builder)])
+@router.post("/sample", status_code=201, dependencies=[Depends(builder)], summary="Create the sample model")
 def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> SampleDetail:
     base_name, download_bytes = fetch_sample_base(session, settings, DEFAULT_BASE_MODEL)
     body = sample_body(session, settings, store)
@@ -394,20 +356,22 @@ def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     return SampleDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
 
 
-@router.put("/{slug}/dataset", dependencies=[Depends(builder)])
-def choose_dataset(slug: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/dataset", dependencies=[Depends(builder)], summary="Choose the dataset a custom model trains on")
+def choose_dataset(name: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     model.dataset = get_dataset(session, body.dataset) if body.dataset else None
     model.updated_at = now()
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/mapping", dependencies=[Depends(builder)])
+@router.put(
+    "/{name}/mapping", dependencies=[Depends(builder)], summary="Change the mapping of a custom model's dataset"
+)
 def update_mapping(
-    slug: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
+    name: str, body: MappingUpdate, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> ModelDetail:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     dataset = dataset_of(model)
     apply_mapping(session, settings, store, dataset, body)
     take_version(session, settings, dataset)
@@ -416,30 +380,35 @@ def update_mapping(
     return detail(settings, model)
 
 
-@router.post("/{slug}/query", dependencies=[Depends(builder)])
-def query(slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
-    dataset = dataset_of(get_model(session, slug))
+@router.post("/{name}/query", dependencies=[Depends(builder)], summary="Run SQL over a custom model's sources")
+def query(name: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
+    dataset = dataset_of(get_model(session, name))
     sources = sources_in(session, body.sql, dataset.sources)
     return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
-@router.get("/{slug}/preview", dependencies=[Depends(builder)])
-def preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
-    return dataset_preview_of(settings, store, dataset_of(get_model(session, slug)))
+@router.get("/{name}/preview", dependencies=[Depends(builder)], summary="Preview a custom model's training rows")
+def preview(name: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
+    return dataset_preview_of(settings, store, dataset_of(get_model(session, name)))
 
 
-@router.post("/{slug}/dataset-versions", status_code=201, dependencies=[Depends(builder)])
-def build_dataset_version(slug: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.post(
+    "/{name}/dataset-versions",
+    status_code=201,
+    dependencies=[Depends(builder)],
+    summary="Build a dataset version for a custom model",
+)
+def build_dataset_version(name: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     take_version(session, settings, dataset_of(model))
     cleanup(session, settings)
     session.commit()
     return detail(settings, model)
 
 
-@router.get("/{slug}/golden", dependencies=[Depends(builder)])
-def golden(slug: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
-    current = latest_dataset_version(get_model(session, slug))
+@router.get("/{name}/golden", dependencies=[Depends(builder)], summary="List a custom model's test set")
+def golden(name: str, session: SessionDep, store: StoreDep) -> list[ExampleInfo]:
+    current = latest_dataset_version(get_model(session, name))
     if current is None or not current.counts:
         return []
     examples = splits.read_split(dataset_version_location(session, store, current), "golden")
@@ -455,9 +424,9 @@ def contract_check(model: Model, contract: Contract) -> ContractCheck:
     return ContractCheck(changes=found, breaking=breaking, against=newest.contract_number)
 
 
-@router.post("/{slug}/contract/check", dependencies=[Depends(builder)])
-def check_contract(slug: str, body: ContractInfo, session: SessionDep) -> ContractCheck:
-    return contract_check(get_model(session, slug), contract_from(body))
+@router.post("/{name}/contract/check", dependencies=[Depends(builder)], summary="Check what a contract change breaks")
+def check_contract(name: str, body: ContractInfo, session: SessionDep) -> ContractCheck:
+    return contract_check(get_model(session, name), contract_from(body))
 
 
 def switch_preset(model: Model, contract: Contract) -> None:
@@ -468,9 +437,9 @@ def switch_preset(model: Model, contract: Contract) -> None:
         model.promotion = chosen.promotion.as_dict()
 
 
-@router.put("/{slug}/contract", dependencies=[Depends(builder)])
-def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/contract", dependencies=[Depends(builder)], summary="Change a custom model's contract")
+def update_contract(name: str, body: ContractUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     contract = contract_from(body.contract)
     found = contract_check(model, contract)
     if found.breaking and not body.breaking:
@@ -487,14 +456,14 @@ def update_contract(slug: str, body: ContractUpdate, session: SessionDep, settin
         "breaking": found.breaking,
         "changes": [item.model_dump() for item in found.changes],
     }
-    session.add(AuditEvent(actor=current_actor(), action="model.contract", target=slug, detail=facts | before))
+    session.add(AuditEvent(actor=current_actor(), action="model.contract", target=name, detail=facts | before))
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/label-proposal/dismissal", dependencies=[Depends(builder)])
-def dismiss_labels(slug: str, body: LabelDismissal, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/label-proposal/dismissal", dependencies=[Depends(builder)], summary="Dismiss proposed labels")
+def dismiss_labels(name: str, body: LabelDismissal, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     found = session.get(DatasetVersion, body.dataset_version_id)
     if found is None or model.dataset_id is None or found.dataset_id != model.dataset_id:
         raise ConflictError(f"dataset version {body.dataset_version_id} is not a version of {model.name}'s data")
@@ -502,15 +471,15 @@ def dismiss_labels(slug: str, body: LabelDismissal, session: SessionDep, setting
     if found.id not in dismissed:
         model.labels_dismissed = [*dismissed, found.id]
         facts = {"name": model.name, "dataset_version": found.hash, "labels": len(found.labels)}
-        session.add(AuditEvent(actor=current_actor(), action="model.labels_dismiss", target=slug, detail=facts))
+        session.add(AuditEvent(actor=current_actor(), action="model.labels_dismiss", target=name, detail=facts))
     model.updated_at = now()
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/graders", dependencies=[Depends(builder)])
-def update_graders(slug: str, body: GradersUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/graders", dependencies=[Depends(builder)], summary="Change a custom model's graders")
+def update_graders(name: str, body: GradersUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     configs = chosen_graders(body.graders)
     facts = {"name": model.name, "from": [item.get("name") for item in model.graders]}
     before = model.graders
@@ -522,44 +491,44 @@ def update_graders(slug: str, body: GradersUpdate, session: SessionDep, settings
         raise
     model.updated_at = now()
     facts["to"] = [item["name"] for item in configs]
-    session.add(AuditEvent(actor=current_actor(), action="model.graders", target=slug, detail=facts))
+    session.add(AuditEvent(actor=current_actor(), action="model.graders", target=name, detail=facts))
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/promotion", dependencies=[Depends(builder)])
-def update_promotion(slug: str, body: PromotionInfo, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/promotion", dependencies=[Depends(builder)], summary="Change a custom model's promotion rule")
+def update_promotion(name: str, body: PromotionInfo, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     facts = {"name": model.name, "from": dict(model.promotion)}
     model.promotion = rule_from(body, Rule())
     model.updated_at = now()
     session.add(
-        AuditEvent(actor=current_actor(), action="model.promotion", target=slug, detail=facts | {"to": model.promotion})
+        AuditEvent(actor=current_actor(), action="model.promotion", target=name, detail=facts | {"to": model.promotion})
     )
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/instructions", dependencies=[Depends(builder)])
-def update_instructions(slug: str, body: InstructionsUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/instructions", dependencies=[Depends(builder)], summary="Change a custom model's instructions")
+def update_instructions(name: str, body: InstructionsUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     model.instructions = body.instructions.strip() or None
     model.updated_at = now()
     session.add(
-        AuditEvent(actor=current_actor(), action="model.instructions", target=slug, detail={"name": model.name})
+        AuditEvent(actor=current_actor(), action="model.instructions", target=name, detail={"name": model.name})
     )
     session.commit()
     return detail(settings, model)
 
 
-@router.put("/{slug}/judge", dependencies=[Depends(builder)])
-def update_judge(slug: str, body: JudgeUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.put("/{name}/judge", dependencies=[Depends(builder)], summary="Change a custom model's judge")
+def update_judge(name: str, body: JudgeUpdate, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     if body.model and not installed(session, body.model):
         raise ConflictError(f"{body.model} is not a base model on this install")
     facts = {"name": model.name, "from": model.judge_model, "to": body.model or None}
     model.judge_model = body.model or None
     model.updated_at = now()
-    session.add(AuditEvent(actor=current_actor(), action="model.judge", target=slug, detail=facts))
+    session.add(AuditEvent(actor=current_actor(), action="model.judge", target=name, detail=facts))
     session.commit()
     return detail(settings, model)

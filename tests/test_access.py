@@ -11,6 +11,7 @@ from minibrain.auth.roles import Role
 from tests.conftest import Harness
 from tests.test_accounts import csrf
 from tests.test_flow import SLUG, add_version, create_with_dataset, finish
+from tests.test_teardown import BASE, add_base
 
 ROUTE_ROLES = {
     ("GET", "/api/auth/session"): "public",
@@ -26,39 +27,39 @@ ROUTE_ROLES = {
     ("POST", "/api/accounts/{account_id}/password-link"): "admin",
     ("GET", "/api/models"): "viewer",
     ("POST", "/api/models"): "builder",
-    ("PATCH", "/api/models/{slug}"): "builder",
-    ("PUT", "/api/models/{slug}/avatar"): "builder",
-    ("GET", "/api/models/{slug}"): "viewer",
-    ("DELETE", "/api/models/{slug}"): "builder",
-    ("POST", "/api/models/{slug}/duplicate"): "builder",
-    ("POST", "/api/models/{slug}/base"): "builder",
-    ("GET", "/api/models/{slug}/base-options"): "viewer",
-    ("POST", "/api/models/{slug}/deploy"): "builder",
+    ("PATCH", "/api/models/{name}"): "builder",
+    ("PUT", "/api/models/{name}/avatar"): "builder",
+    ("GET", "/api/models/{name}"): "viewer",
+    ("DELETE", "/api/models/{name}"): "builder",
+    ("POST", "/api/models/{name}/duplicate"): "builder",
+    ("POST", "/api/models/{name}/base"): "builder",
+    ("GET", "/api/models/{name}/base-options"): "viewer",
+    ("POST", "/api/models/{name}/deploy"): "builder",
     ("POST", "/api/models/sample"): "builder",
     ("GET", "/api/models/name"): "viewer",
     ("GET", "/api/reserved-names/{name}"): "viewer",
-    ("POST", "/api/models/{slug}/contract/check"): "builder",
-    ("PUT", "/api/models/{slug}/contract"): "builder",
-    ("PUT", "/api/models/{slug}/label-proposal/dismissal"): "builder",
-    ("PUT", "/api/models/{slug}/graders"): "builder",
-    ("PUT", "/api/models/{slug}/promotion"): "builder",
-    ("PUT", "/api/models/{slug}/instructions"): "builder",
-    ("PUT", "/api/models/{slug}/judge"): "builder",
-    ("PUT", "/api/models/{slug}/safety"): "builder",
-    ("GET", "/api/models/{slug}/versions/{number}/answers"): "builder",
+    ("POST", "/api/models/{name}/contract/check"): "builder",
+    ("PUT", "/api/models/{name}/contract"): "builder",
+    ("PUT", "/api/models/{name}/label-proposal/dismissal"): "builder",
+    ("PUT", "/api/models/{name}/graders"): "builder",
+    ("PUT", "/api/models/{name}/promotion"): "builder",
+    ("PUT", "/api/models/{name}/instructions"): "builder",
+    ("PUT", "/api/models/{name}/judge"): "builder",
+    ("PUT", "/api/models/{name}/safety"): "builder",
+    ("GET", "/api/models/{name}/versions/{number}/answers"): "builder",
     ("GET", "/api/settings/judge"): "viewer",
     ("PUT", "/api/settings/judge"): "admin",
     ("GET", "/api/settings/safety"): "viewer",
     ("PUT", "/api/settings/safety"): "admin",
-    ("POST", "/api/models/{slug}/versions/{number}/test"): "viewer",
+    ("POST", "/api/models/{name}/versions/{number}/test"): "viewer",
     ("GET", "/api/presets"): "viewer",
-    ("PUT", "/api/models/{slug}/dataset"): "builder",
-    ("PUT", "/api/models/{slug}/mapping"): "builder",
-    ("PUT", "/api/models/{slug}/request-bodies"): "builder",
-    ("POST", "/api/models/{slug}/query"): "builder",
-    ("GET", "/api/models/{slug}/preview"): "builder",
-    ("POST", "/api/models/{slug}/dataset-versions"): "builder",
-    ("GET", "/api/models/{slug}/golden"): "builder",
+    ("PUT", "/api/models/{name}/dataset"): "builder",
+    ("PUT", "/api/models/{name}/mapping"): "builder",
+    ("PUT", "/api/models/{name}/request-bodies"): "builder",
+    ("POST", "/api/models/{name}/query"): "builder",
+    ("GET", "/api/models/{name}/preview"): "builder",
+    ("POST", "/api/models/{name}/dataset-versions"): "builder",
+    ("GET", "/api/models/{name}/golden"): "builder",
     ("GET", "/api/sources"): "builder",
     ("POST", "/api/sources"): "builder",
     ("GET", "/api/data/folders"): "builder",
@@ -105,20 +106,15 @@ ROUTE_ROLES = {
     ("POST", "/api/sources/database"): "builder",
     ("POST", "/api/sources/iceberg"): "builder",
     ("POST", "/api/sources/delta"): "builder",
-    ("GET", "/api/all-models"): "viewer",
-    ("POST", "/api/base-models/inspect"): "admin",
-    ("POST", "/api/base-models/import"): "admin",
-    ("GET", "/api/base-models/{key}"): "viewer",
-    ("PATCH", "/api/base-models/{key}"): "admin",
-    ("DELETE", "/api/base-models/{key}"): "admin",
-    ("POST", "/api/base-models/{key}/verify"): "admin",
-    ("POST", "/api/base-models/{key}/repair"): "admin",
-    ("POST", "/api/base-models/{key}/reimport"): "admin",
-    ("POST", "/api/base-models/{key}/relocate"): "admin",
-    ("POST", "/api/base-models/{key}/recheck"): "admin",
-    ("POST", "/api/base-models/{key}/retry"): "admin",
-    ("POST", "/api/base-models/{key}/deploy"): "builder",
-    ("POST", "/api/base-models/{key}/test"): "viewer",
+    ("POST", "/api/models/inspect"): "admin",
+    ("POST", "/api/models/import"): "admin",
+    ("POST", "/api/models/{name}/verify"): "admin",
+    ("POST", "/api/models/{name}/repair"): "admin",
+    ("POST", "/api/models/{name}/reimport"): "admin",
+    ("POST", "/api/models/{name}/relocate"): "admin",
+    ("POST", "/api/models/{name}/recheck"): "admin",
+    ("POST", "/api/models/{name}/retry"): "admin",
+    ("POST", "/api/models/{name}/test"): "viewer",
     ("GET", "/api/catalog"): "viewer",
     ("POST", "/api/catalog/{catalog_id}/download"): "admin",
     ("POST", "/api/catalog/hub"): "admin",
@@ -140,11 +136,11 @@ ROUTE_ROLES = {
     ("GET", "/api/audit/export"): "admin",
     ("GET", "/api/audit/chain"): "admin",
     ("GET", "/api/audit/{event_id}"): "admin",
-    ("GET", "/api/models/{slug}/versions"): "viewer",
-    ("POST", "/api/models/{slug}/versions"): "builder",
-    ("DELETE", "/api/models/{slug}/versions/{number}"): "builder",
-    ("POST", "/api/models/{slug}/versions/{number}/promote"): "builder",
-    ("GET", "/api/models/{slug}/training-plan"): "viewer",
+    ("GET", "/api/models/{name}/versions"): "viewer",
+    ("POST", "/api/models/{name}/versions"): "builder",
+    ("DELETE", "/api/models/{name}/versions/{number}"): "builder",
+    ("POST", "/api/models/{name}/versions/{number}/promote"): "builder",
+    ("GET", "/api/models/{name}/training-plan"): "viewer",
     ("GET", "/api/playground/models"): "viewer",
     ("POST", "/api/playground/chat/completions"): "viewer",
     ("GET", "/api/playground/presets"): "viewer",
@@ -156,24 +152,24 @@ ROUTE_ROLES = {
     ("GET", "/api/playground/sessions/{chat_id}"): "viewer",
     ("PUT", "/api/playground/sessions/{chat_id}"): "viewer",
     ("DELETE", "/api/playground/sessions/{chat_id}"): "viewer",
-    ("GET", "/api/models/{slug}/versions/{number}/card"): "viewer",
-    ("GET", "/api/models/{slug}/versions/{number}/card.json"): "viewer",
-    ("GET", "/api/models/{slug}/versions/{number}/card.md"): "viewer",
-    ("GET", "/api/models/{slug}/versions/{number}/aibom.json"): "viewer",
-    ("GET", "/api/models/{slug}/versions/{number}/files"): "viewer",
-    ("GET", "/api/model-pages/{name}"): "viewer",
-    ("GET", "/api/model-pages/{name}/traffic"): "viewer",
-    ("GET", "/api/model-pages/{name}/activity"): "viewer",
-    ("PUT", "/api/models/{slug}/versions/{number}/card"): "builder",
+    ("GET", "/api/models/{name}/versions/{number}/card"): "viewer",
+    ("GET", "/api/models/{name}/versions/{number}/card.json"): "viewer",
+    ("GET", "/api/models/{name}/versions/{number}/card.md"): "viewer",
+    ("GET", "/api/models/{name}/versions/{number}/aibom.json"): "viewer",
+    ("GET", "/api/models/{name}/versions/{number}/files"): "viewer",
+    ("GET", "/api/models/{name}/overview"): "viewer",
+    ("GET", "/api/models/{name}/traffic"): "viewer",
+    ("GET", "/api/models/{name}/activity"): "viewer",
+    ("PUT", "/api/models/{name}/versions/{number}/card"): "builder",
     ("GET", "/api/feedback"): "builder",
     ("GET", "/api/feedback/facets"): "builder",
     ("GET", "/api/feedback/{feedback_id}"): "builder",
     ("POST", "/api/feedback/{feedback_id}/review"): "builder",
     ("POST", "/api/feedback/{feedback_id}/assign"): "builder",
-    ("POST", "/api/models/{slug}/feedback"): "viewer",
-    ("GET", "/api/models/{slug}/feedback/summary"): "viewer",
-    ("POST", "/api/models/{slug}/test-examples"): "builder",
-    ("GET", "/api/models/{slug}/test-examples"): "builder",
+    ("POST", "/api/models/{name}/feedback"): "viewer",
+    ("GET", "/api/models/{name}/feedback/summary"): "viewer",
+    ("POST", "/api/models/{name}/test-examples"): "builder",
+    ("GET", "/api/models/{name}/test-examples"): "builder",
     ("GET", "/api/keys"): "builder",
     ("POST", "/api/keys"): "builder",
     ("PUT", "/api/keys/{key_id}/models"): "builder",
@@ -271,7 +267,7 @@ def test_viewers_see_models_but_change_nothing(team: Team) -> None:
     viewer = team.viewer
     assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/models/triage") == 200
-    assert status(viewer, "GET", "/api/all-models") == 200
+    assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/jobs") == 200
     assert status(viewer, "GET", "/api/system/infrastructure") == 200
     refused = viewer.post(
@@ -303,9 +299,18 @@ def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     assert status(builder, "GET", "/api/audit") == 403
     assert status(builder, "GET", "/api/accounts") == 403
     assert status(builder, "GET", "/api/system/install") == 403
-    assert status(builder, "DELETE", "/api/base-models/qwen") == 403
+    assert status(builder, "PATCH", "/api/models/triage", {"description": "Tickets"}) == 200
     assert status(builder, "POST", "/api/catalog/sync") == 403
     assert status(builder, "PUT", "/api/settings/data", {"row_limit": 1000}) == 403
+
+
+def test_base_models_need_an_admin_to_change_or_delete(harness: Harness, team: Team) -> None:
+    add_base(harness)
+    refused = team.builder.patch(f"/api/models/{BASE}", json={"description": "Mine"}, headers=csrf(team.builder))
+    assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Admin role"
+    assert status(team.builder, "DELETE", f"/api/models/{BASE}") == 403
+    assert status(team.viewer, "GET", f"/api/models/{BASE}") == 200
+    assert status(team.admin, "PATCH", f"/api/models/{BASE}", {"description": "Shared"}) == 200
 
 
 def test_admins_reach_everything(team: Team) -> None:

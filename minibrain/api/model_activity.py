@@ -16,7 +16,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
 from minibrain.tasks.service import held_out_score
 
-router = APIRouter(prefix="/api", tags=["models"])
+router = APIRouter(prefix="/api")
 
 LinkKind = Literal["model", "version", "job", "key", "base", "monitoring"]
 Tone = Literal["neutral", "success", "failed"]
@@ -387,7 +387,7 @@ def activity_of(session: Session, name: str, limit: int) -> ModelActivity:
 
 
 @router.get(
-    "/model-pages/{name}/activity",
+    "/models/{name}/activity",
     dependencies=[Depends(viewer)],
     summary="List what changed on a model",
     description="Audited changes to the model, its versions, its keys and its jobs, newest first, as sentences.",

@@ -141,16 +141,16 @@ def test_deleting_a_base_with_its_models_cancels_every_job_first(harness: Harnes
     give_data(harness, slug)
     assert harness.client.post(f"/api/models/{slug}/dataset-versions").status_code == 201
     claim = train(harness, slug)
-    verified = harness.client.post(f"/api/base-models/{BASE}/verify")
+    verified = harness.client.post(f"/api/models/{BASE}/verify")
     assert verified.status_code == 202, verified.text
     with harness.sessions() as session:
         verify = session.scalar(select(Job.id).where(Job.base_model_id == BASE, Job.status == JobStatus.QUEUED))
     assert verify is not None
     params: dict[str, Any] = {"cascade": True}
-    refused = harness.client.delete(f"/api/base-models/{BASE}", params=params)
+    refused = harness.client.delete(f"/api/models/{BASE}", params=params)
     assert refused.status_code == 409
     assert [item["id"] for item in refused.json()["jobs"]] == [verify]
-    accepted = harness.client.delete(f"/api/base-models/{BASE}", params=params | {"cancel_jobs": True})
+    accepted = harness.client.delete(f"/api/models/{BASE}", params=params | {"cancel_jobs": True})
     assert accepted.status_code == 202, accepted.text
     assert job(harness, verify).status == "cancelled"
     assert sorted(event.target for event in audits(harness, "job.cancel")) == sorted(

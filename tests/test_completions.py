@@ -29,7 +29,7 @@ CODE = "def fibonacci(n):"
 
 def served_base(harness: Harness, tmp_path: Path) -> dict[str, str]:
     import_base(harness, tmp_path, "Chat Base", BASE)
-    assert harness.client.post(f"/api/base-models/{BASE}/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post(f"/api/models/{BASE}/deploy", json={"deployed": True}).status_code == 200
     return headers(add_key(harness, ("base", BASE)))
 
 

@@ -136,7 +136,7 @@ def test_queued_downloads_are_refused_when_the_policy_changes(harness: Harness, 
     assert harness.client.post("/api/catalog/tiny/download", json=body).status_code == 202
     set_policy(harness, "network", "offline")
     assert harness.worker(kinds=["download"]).run_once() is False
-    detail = harness.client.get("/api/base-models/tiny").json()
+    detail = harness.client.get("/api/models/tiny").json()
     assert detail["activity"]["state"] == "failed" and "Offline" in (detail["error"] or "")
 
 

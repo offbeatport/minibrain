@@ -69,7 +69,7 @@ from minibrain.teardown import (
     version_jobs,
 )
 
-router = APIRouter(prefix="/api", tags=["versions"])
+router = APIRouter(prefix="/api")
 
 DEFAULT_ANSWER_TOKENS = 256
 ANSWER_TOKENS = {key: item.answer_tokens for key, item in presets().items()}
@@ -118,18 +118,18 @@ def needs_no_data(model: Model, body: VersionCreate) -> bool:
     return body.dataset_version_id is None and latest_dataset_version(model) is None
 
 
-@router.get("/models/{slug}/versions", dependencies=[Depends(viewer)])
-def list_versions(slug: str, session: SessionDep) -> list[VersionInfo]:
-    model = get_model(session, slug)
+@router.get("/models/{name}/versions", dependencies=[Depends(viewer)], summary="List a custom model's versions")
+def list_versions(name: str, session: SessionDep) -> list[VersionInfo]:
+    model = get_model(session, name)
     versions = sorted(model.versions, key=lambda version: version.number, reverse=True)
     prices = load_prices(session)
     found = [version_info(model, version, prices) for version in versions]
     return found if sees_rows() else [info.model_copy(update={"mistakes": []}) for info in found]
 
 
-@router.get("/models/{slug}/versions/{number}/files", dependencies=[Depends(viewer)])
-def version_files(slug: str, number: int, session: SessionDep, store: StoreDep) -> VersionFiles:
-    version = get_version(get_model(session, slug), number)
+@router.get("/models/{name}/versions/{number}/files", dependencies=[Depends(viewer)], summary="List a version's files")
+def version_files(name: str, number: int, session: SessionDep, store: StoreDep) -> VersionFiles:
+    version = get_version(get_model(session, name), number)
     artifact = session.get(Artifact, version.adapter_artifact_id) if version.adapter_artifact_id else None
     if artifact is None:
         return VersionFiles(number=number, artifact_id=version.adapter_artifact_id, size=None, files=[])
@@ -142,11 +142,15 @@ def answer_side(side: Side | None) -> AnswerSide | None:
     return None if side is None else AnswerSide(answer=side.answer, scores=side.scores, reason=side.reason)
 
 
-@router.get("/models/{slug}/versions/{number}/answers", dependencies=[Depends(builder)])
+@router.get(
+    "/models/{name}/versions/{number}/answers",
+    dependencies=[Depends(builder)],
+    summary="List the answers a version was scored on",
+)
 def version_answers(
-    slug: str, number: int, session: SessionDep, store: StoreDep, against: int | None = None
+    name: str, number: int, session: SessionDep, store: StoreDep, against: int | None = None
 ) -> VersionAnswers:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     other = get_version(model, against) if against is not None else None
     found = compared(session, store, model, get_version(model, number), other)
     return VersionAnswers(
@@ -166,16 +170,21 @@ def version_answers(
     )
 
 
-@router.post("/models/{slug}/versions", status_code=201, dependencies=[Depends(builder)])
+@router.post(
+    "/models/{name}/versions",
+    status_code=201,
+    dependencies=[Depends(builder)],
+    summary="Add a version: prompt-only or trained",
+)
 def add_version(
-    slug: str,
+    name: str,
     body: VersionCreate,
     session: SessionDep,
     settings: SettingsDep,
     store: StoreDep,
     node: LocalNodeDep,
 ) -> VersionInfo:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     require_idle(model.teardown, model.name)
     base = session.get(BaseModel, model.base_model)
     if base is not None:
@@ -206,14 +215,15 @@ def add_version(
 
 
 @router.delete(
-    "/models/{slug}/versions/{number}",
+    "/models/{name}/versions/{number}",
     status_code=204,
     response_model=None,
     responses={202: {"model": VersionInfo, "description": "Its cancelled jobs are stopping; it goes once they end"}},
     dependencies=[Depends(builder)],
+    summary="Delete a version",
 )
 def delete_version(
-    slug: str,
+    name: str,
     number: int,
     request: Request,
     session: SessionDep,
@@ -221,10 +231,10 @@ def delete_version(
     queue: QueueDep,
     cancel_jobs: bool = False,
 ) -> Response:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     version = get_version(model, number)
     jobs = version_jobs(session, version)
-    refusal = a_job_running(f"{slug}@{number}", uncancelled(jobs))
+    refusal = a_job_running(f"{name}@{number}", uncancelled(jobs))
     cancel = canceller(session, queue, cancel_jobs)
     if version.status == VersionStatus.DELETING:
         if cancel is not None:
@@ -232,14 +242,14 @@ def delete_version(
             session.commit()
         return deleting(model, version)
     if model.deployed and model.current_version == number:
-        raise ConflictError(f"{slug}@{number} is deployed; undeploy it first")
+        raise ConflictError(f"{name}@{number} is deployed; undeploy it first")
     stop_jobs(jobs, cancel, refusal)
     if model.current_version == number:
         model.current_version = None
     facts: dict[str, Any] = {"name": model.name, "kind": version.kind, "status": version.status}
     if jobs:
         facts["jobs"] = [job.id for job in jobs]
-    session.add(AuditEvent(actor=current_actor(), action="version.delete", target=f"{slug}@{number}", detail=facts))
+    session.add(AuditEvent(actor=current_actor(), action="version.delete", target=f"{name}@{number}", detail=facts))
     if version_jobs(session, version):
         version.status = VersionStatus.DELETING
         session.commit()
@@ -254,25 +264,25 @@ def deleting(model: Model, version: Version) -> JSONResponse:
     return JSONResponse(status_code=202, content=version_info(model, version).model_dump(mode="json"))
 
 
-@router.post("/models/{slug}/versions/{number}/promote", dependencies=[Depends(builder)])
-def promote_version(slug: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelDetail:
-    model = get_model(session, slug)
+@router.post("/models/{name}/versions/{number}/promote", dependencies=[Depends(builder)], summary="Make a version live")
+def promote_version(name: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+    model = get_model(session, name)
     version = get_version(model, number)
     already = model.deployed and model.current_version == number
     refusal = other_base(session, model, version)
     if refusal is not None and not already:
         raise ConflictError(refusal)
     mismatch = base_changed(
-        f"{slug}@{number}", version.base_model, version.base_hash, base_hash(session, version.base_model)
+        f"{name}@{number}", version.base_model, version.base_hash, base_hash(session, version.base_model)
     )
     if mismatch is not None:
         raise ConflictError(mismatch)
     if version.status != VersionStatus.READY:
-        raise ConflictError(f"{slug}@{number} is not ready")
+        raise ConflictError(f"{name}@{number} is not ready")
     if version.live_at is None:
         found = decision(model, version)
         if not found.passed:
-            raise ConflictError(f"{slug}@{number} does not pass the promotion rule: {found.reason()}")
+            raise ConflictError(f"{name}@{number} does not pass the promotion rule: {found.reason()}")
     previous, was_deployed = model.current_version, model.deployed
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number
@@ -333,11 +343,13 @@ def test_scores(version: Version, output: str, expected: str | None, messages: l
     ]
 
 
-@router.post("/models/{slug}/versions/{number}/test", dependencies=[Depends(viewer)])
+@router.post(
+    "/models/{name}/versions/{number}/test", dependencies=[Depends(viewer)], summary="Send a prompt to a version"
+)
 def test_version(
-    slug: str, number: int, body: VersionTest, session: SessionDep, backend: BackendDep, request: Request
+    name: str, number: int, body: VersionTest, session: SessionDep, backend: BackendDep, request: Request
 ) -> VersionTestResult:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     version = get_version(model, number)
     config = request.app.state.gateway_config.current()
     route = routed(config, model, number)

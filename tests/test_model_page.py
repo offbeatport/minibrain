@@ -13,7 +13,7 @@ from tests.test_teardown import add_base
 
 
 def page(harness: Harness, name: str = SLUG) -> dict[str, Any]:
-    response = harness.client.get(f"/api/model-pages/{name}")
+    response = harness.client.get(f"/api/models/{name}/overview")
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -23,7 +23,7 @@ def import_base(harness: Harness, tmp_path: Path, name: str) -> Any:
     folder.mkdir()
     for path, data in FILES.items():
         (folder / path).write_bytes(data)
-    return harness.client.post("/api/base-models/import", json={"name": name, "location": str(folder)})
+    return harness.client.post("/api/models/import", json={"name": name, "location": str(folder)})
 
 
 def test_names_are_unique_across_base_and_custom(harness: Harness, tmp_path: Path) -> None:
@@ -35,7 +35,7 @@ def test_names_are_unique_across_base_and_custom(harness: Harness, tmp_path: Pat
     assert taken.status_code == 409
     renamed = harness.client.patch(f"/api/models/{SLUG}", json={"name": "corp llm"})
     assert renamed.status_code == 409 and "share names" in renamed.json()["detail"]
-    base = harness.client.patch("/api/base-models/corp-llm", json={"name": "Support Triage"})
+    base = harness.client.patch("/api/models/corp-llm", json={"name": "Support Triage"})
     assert base.status_code == 409
     assert harness.client.patch(f"/api/models/{SLUG}", json={"name": "SUPPORT triage"}).status_code == 200
     reserved = harness.client.post("/api/models", json={"name": "New", "preset": "general"})
@@ -51,7 +51,7 @@ def test_a_name_finds_either_kind_of_model(harness: Harness) -> None:
     create_model(harness)
     add_base(harness, "tiny")
     assert (page(harness)["kind"], page(harness, "tiny")["kind"]) == ("custom", "base")
-    assert harness.client.get("/api/model-pages/nothing").status_code == 404
+    assert harness.client.get("/api/models/nothing/overview").status_code == 404
 
 
 def test_the_next_step_follows_the_model(harness: Harness) -> None:
@@ -78,7 +78,7 @@ def test_the_next_step_follows_the_model(harness: Harness) -> None:
 def test_a_base_is_deployed_then_built_on(harness: Harness) -> None:
     add_base(harness, "tiny")
     assert page(harness, "tiny")["next"]["kind"] == "deploy"
-    assert harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/tiny/deploy", json={"deployed": True}).status_code == 200
     assert page(harness, "tiny")["next"] == {
         "kind": "create_custom",
         "label": "Create a custom model from it",

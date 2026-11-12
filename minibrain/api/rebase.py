@@ -22,7 +22,7 @@ from minibrain.tasks.rebase import (
 from minibrain.tasks.service import live_version, serving_base
 from minibrain.teardown import require_idle
 
-router = APIRouter(prefix="/api/models", tags=["models"])
+router = APIRouter(prefix="/api/models")
 
 
 def choice(session: Session, settings: Settings, model: Model, key: str) -> BaseChoice | None:
@@ -48,13 +48,13 @@ def choice(session: Session, settings: Settings, model: Model, key: str) -> Base
 
 
 @router.get(
-    "/{slug}/base-options",
+    "/{name}/base-options",
     dependencies=[Depends(viewer)],
     summary="List the bases a custom model can move to",
     description="Installed bases with what the model would lose on each, and the full-precision variant to download.",
 )
-def base_options(slug: str, session: SessionDep, settings: SettingsDep) -> BaseOptions:
-    model = get_model(session, slug)
+def base_options(name: str, session: SessionDep, settings: SettingsDep) -> BaseOptions:
+    model = get_model(session, name)
     choices = [choice(session, settings, model, key) for key in installed_keys(session)]
     return BaseOptions(
         current=model.base_model,
@@ -64,7 +64,7 @@ def base_options(slug: str, session: SessionDep, settings: SettingsDep) -> BaseO
 
 
 @router.post(
-    "/{slug}/base",
+    "/{name}/base",
     dependencies=[Depends(builder)],
     summary="Move a custom model to another base",
     description=(
@@ -73,9 +73,9 @@ def base_options(slug: str, session: SessionDep, settings: SettingsDep) -> BaseO
     ),
 )
 def switch_base(
-    slug: str, body: BaseSwitch, session: SessionDep, settings: SettingsDep, store: StoreDep
+    name: str, body: BaseSwitch, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> ModelDetail:
-    model = get_model(session, slug)
+    model = get_model(session, name)
     require_idle(model.teardown, model.name)
     require_switchable(session, model, body.base_model)
     require_usable(session, settings, body.base_model)

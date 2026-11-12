@@ -1,25 +1,22 @@
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.api.access import admin, builder, viewer
+from minibrain.api.access import admin, viewer
 from minibrain.api.deps import (
     BackendDep,
     LocalNodeDep,
-    QueueDep,
     SessionDep,
     SettingsDep,
-    StoreDep,
     get_local_node,
 )
-from minibrain.api.jobs import canceller
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
 from minibrain.api.schemas import (
     BaseModelDetail,
-    DeployRequest,
     FileState,
     FitInfo,
     ImportCheck,
@@ -56,14 +53,14 @@ from minibrain.models.registry import (
 from minibrain.models.train_facts import base_facts, config_base, trainer_machines
 from minibrain.models.usage import touch
 from minibrain.registry.compute import find_pool, pools
-from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, now
-from minibrain.registry.service import ConflictError, check_rename, no_model
+from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, Model, now
+from minibrain.registry.service import ConflictError, NotFoundError, check_rename, no_model
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
-from minibrain.teardown import cancel_stop, delete_base, require_idle, undeploy_base
+from minibrain.teardown import cancel_stop, require_idle, undeploy_base
 
-router = APIRouter(prefix="/api", tags=["base models"])
+router = APIRouter(prefix="/api")
 
 
 def health_for(request: Request) -> EngineHealth:
@@ -75,6 +72,8 @@ def health_for(request: Request) -> EngineHealth:
 
 def get_base_model(session: Session, key: str) -> BaseModel:
     model = session.get(BaseModel, key)
+    if model is None and session.scalar(select(Model.id).where(Model.slug == key)) is not None:
+        raise NotFoundError(f"{key} is a custom model; this needs a base model")
     if model is None:
         raise no_model(session, key)
     return model
@@ -162,12 +161,9 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Bas
     )
 
 
-@router.get("/all-models", dependencies=[Depends(viewer)])
-def list_all_models(request: Request, session: SessionDep, settings: SettingsDep, store: StoreDep) -> list[ModelRow]:
-    return all_rows(session, settings, store, health_for(request), context_for(session, settings, request))
-
-
-@router.post("/base-models/inspect", dependencies=[Depends(admin)])
+@router.post(
+    "/models/inspect", dependencies=[Depends(admin)], summary="Check a folder or bucket before importing a base model"
+)
 def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep, node: LocalNodeDep) -> ImportCheck:
     found = inspect_location(session, settings, body.location, body.connection_id)
     config = found.pop("config", None)
@@ -182,7 +178,12 @@ def inspect(body: InspectRequest, session: SessionDep, settings: SettingsDep, no
     return ImportCheck(**found)
 
 
-@router.post("/base-models/import", status_code=202, dependencies=[Depends(admin)])
+@router.post(
+    "/models/import",
+    status_code=202,
+    dependencies=[Depends(admin)],
+    summary="Import a base model from a folder or bucket",
+)
 def import_model(body: ImportRequest, request: Request, session: SessionDep, settings: SettingsDep) -> ModelRow:
     tags = user_tags(body.tags)
     try:
@@ -205,16 +206,7 @@ def import_model(body: ImportRequest, request: Request, session: SessionDep, set
     return row_of(session, settings, request, model)
 
 
-@router.get("/base-models/{key}", dependencies=[Depends(viewer)])
-def read_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    return detail_of(session, settings, request, get_base_model(session, key))
-
-
-@router.patch("/base-models/{key}", dependencies=[Depends(admin)])
-def update_base(
-    key: str, body: ModelUpdate, request: Request, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = get_base_model(session, key)
+def update_base(session: Session, model: BaseModel, body: ModelUpdate) -> None:
     if body.name is not None:
         check_rename(session, model.name, body.name)
         model.name = body.name.strip()
@@ -223,28 +215,6 @@ def update_base(
     if body.tags is not None:
         model.tags = merged_tags(model.tags, body.tags)
     model.updated_at = now()
-    session.commit()
-    return detail_of(session, settings, request, model)
-
-
-@router.delete("/base-models/{key}", status_code=202, dependencies=[Depends(admin)])
-def delete_base_model(
-    key: str,
-    request: Request,
-    session: SessionDep,
-    settings: SettingsDep,
-    store: StoreDep,
-    queue: QueueDep,
-    cascade: bool = False,
-    undeploy: bool = False,
-    cancel_jobs: bool = False,
-) -> ModelRow:
-    cancel = canceller(session, queue, cancel_jobs)
-    base = get_base_model(session, key)
-    delete_base(session, base, current_actor(), cascade=cascade, undeploy=undeploy, cancel=cancel)
-    session.commit()
-    wake_teardowns(request)
-    return model_row(request, session, settings, store, "base", key)
 
 
 def audit(session: Session, action: str, model: BaseModel, **detail: Any) -> None:
@@ -253,40 +223,52 @@ def audit(session: Session, action: str, model: BaseModel, **detail: Any) -> Non
     )
 
 
-@router.post("/base-models/{key}/verify", status_code=202, dependencies=[Depends(admin)])
-def verify_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = idle_base_model(session, key)
+@router.post(
+    "/models/{name}/verify", status_code=202, dependencies=[Depends(admin)], summary="Verify a base model's files"
+)
+def verify_base(name: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = idle_base_model(session, name)
     job = start_verify(session, settings, model)
     audit(session, "model.verify", model, job=job.id, files=len(model.files))
     session.commit()
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/repair", status_code=202, dependencies=[Depends(admin)])
-def repair_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = idle_base_model(session, key)
+@router.post(
+    "/models/{name}/repair",
+    status_code=202,
+    dependencies=[Depends(admin)],
+    summary="Download a base model's damaged files again",
+)
+def repair_base(name: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = idle_base_model(session, name)
     job = start_repair(session, settings, model)
     audit(session, "model.repair", model, job=job.id, source=f"{model.repo}@{model.revision}")
     session.commit()
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/reimport", status_code=202, dependencies=[Depends(admin)])
+@router.post(
+    "/models/{name}/reimport",
+    status_code=202,
+    dependencies=[Depends(admin)],
+    summary="Import a base model's files again from another location",
+)
 def reimport_base(
-    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
+    name: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
-    model = idle_base_model(session, key)
+    model = idle_base_model(session, name)
     job = start_reimport(session, settings, model, body.location, body.connection_id)
     audit(session, "model.reimport", model, job=job.id, source=body.location.strip())
     session.commit()
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/relocate", dependencies=[Depends(admin)])
+@router.post("/models/{name}/relocate", dependencies=[Depends(admin)], summary="Point a base model at files that moved")
 def relocate_base(
-    key: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
+    name: str, body: LocationRequest, request: Request, session: SessionDep, settings: SettingsDep
 ) -> BaseModelDetail:
-    model = idle_base_model(session, key)
+    model = idle_base_model(session, name)
     before = str(model_folder(settings, model))
     job = relocate(session, settings, model, body.location)
     audit(session, "model.relocate", model, job=job.id, **{"from": before, "to": str(model_folder(settings, model))})
@@ -294,9 +276,9 @@ def relocate_base(
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/recheck", dependencies=[Depends(admin)])
-def recheck_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = get_base_model(session, key)
+@router.post("/models/{name}/recheck", dependencies=[Depends(admin)], summary="Clear a base model's start-up failure")
+def recheck_base(name: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = get_base_model(session, name)
     if model.health not in LOAD_PROBLEMS:
         raise ConflictError(f"{model.name} has no start-up failure to clear")
     set_health(model, None)
@@ -306,24 +288,21 @@ def recheck_base(key: str, request: Request, session: SessionDep, settings: Sett
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/retry", status_code=202, dependencies=[Depends(admin)])
-def retry_base(key: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
-    model = retry(session, settings, idle_base_model(session, key))
+@router.post(
+    "/models/{name}/retry",
+    status_code=202,
+    dependencies=[Depends(admin)],
+    summary="Retry a base model's failed download or import",
+)
+def retry_base(name: str, request: Request, session: SessionDep, settings: SettingsDep) -> BaseModelDetail:
+    model = retry(session, settings, idle_base_model(session, name))
     session.commit()
     return detail_of(session, settings, request, model)
 
 
-@router.post("/base-models/{key}/deploy", dependencies=[Depends(builder)])
-def deploy_base(
-    key: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
-) -> BaseModelDetail:
-    model = get_base_model(session, key)
-    if not body.deployed:
-        if undeploy_base(session, model, current_actor()) is not None:
-            response.status_code = 202
-        session.commit()
-        wake_teardowns(request)
-        return detail_of(session, settings, request, model)
+def deploy_base(session: Session, settings: Settings, model: BaseModel, deployed: bool) -> bool:
+    if not deployed:
+        return undeploy_base(session, model, current_actor()) is not None
     if model.status != BaseModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; deploy it once its files are available")
     require_usable(session, settings, model.id)
@@ -332,21 +311,20 @@ def deploy_base(
         audit(session, "model.deploy", model)
     model.deployed = True
     model.updated_at = now()
-    session.commit()
-    return detail_of(session, settings, request, model)
+    return False
 
 
-@router.post("/base-models/{key}/test", dependencies=[Depends(viewer)])
+@router.post("/models/{name}/test", dependencies=[Depends(viewer)], summary="Send a prompt to a base model")
 def test_base(
-    key: str, body: TestRequest, session: SessionDep, settings: SettingsDep, backend: BackendDep
+    name: str, body: TestRequest, session: SessionDep, settings: SettingsDep, backend: BackendDep
 ) -> TestResponse:
-    model = get_base_model(session, key)
+    model = get_base_model(session, name)
     if model.status != BaseModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; test it once its files are available")
     require_usable(session, settings, model.id)
     touch(session, model.id)
     session.commit()
-    spec = resolve_spec(session, settings, key)
+    spec = resolve_spec(session, settings, name)
     started = time.monotonic()
     try:
         completion = backend.complete(
@@ -355,7 +333,7 @@ def test_base(
     except EngineUnavailableError as error:
         raise ConflictError(str(error)) from error
     return TestResponse(
-        model=key,
+        model=name,
         output=completion.text,
         latency_ms=(time.monotonic() - started) * 1000,
         prompt_tokens=completion.prompt_tokens,

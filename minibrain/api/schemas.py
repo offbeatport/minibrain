@@ -839,6 +839,7 @@ class ServeOnlyInfo(BaseModel):
 
 
 class ModelDetail(ModelSummary):
+    kind: Literal["custom"]
     source: SourceInfo | None
     mapping: MappingInfo
     dataset: str | None = None
@@ -1357,8 +1358,7 @@ class ImportOrigin(BaseModel):
     location: str
 
 
-class ModelRow(BaseModel):
-    kind: Literal["base", "custom"]
+class ModelFacts(BaseModel):
     key: str
     name: str
     avatar: ModelAvatar | None = None
@@ -1382,6 +1382,7 @@ class ModelRow(BaseModel):
     revision: str | None = None
     error: str | None = None
     versions: list[VersionRow] = []
+    active_jobs: int
     key_count: int = 0
     health: Health | None = None
     catalog_id: str | None = None
@@ -1396,6 +1397,10 @@ class ModelRow(BaseModel):
         default=None, description="Where a base that is not in the catalogue came from."
     )
     variant_label: str | None = Field(default=None, description="A base's format, such as BF16, FP8 or GGUF Q8_0.")
+
+
+class ModelRow(ModelFacts):
+    kind: Literal["base", "custom"]
 
 
 class BaseChoice(BaseModel):
@@ -1428,7 +1433,8 @@ class ModelFile(BaseModel):
     state: FileState = "unchecked"
 
 
-class BaseModelDetail(ModelRow):
+class BaseModelDetail(ModelFacts):
+    kind: Literal["base"]
     source: str
     repo: str | None
     latest_revision: str | None

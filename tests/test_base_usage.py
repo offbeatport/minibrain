@@ -30,7 +30,7 @@ def add_base(harness: Harness, key: str, days: float) -> None:
 
 
 def row(harness: Harness, key: str) -> dict[str, Any]:
-    return next(item for item in harness.client.get("/api/all-models").json() if item["key"] == key)
+    return next(item for item in harness.client.get("/api/models").json() if item["key"] == key)
 
 
 def test_loading_or_testing_a_base_marks_it_used(harness: Harness) -> None:
@@ -41,7 +41,7 @@ def test_loading_or_testing_a_base_marks_it_used(harness: Harness) -> None:
         "/internal/gateway/engines", json=body | {"state": "ready"}, headers=harness.gateway_headers
     )
     assert announced.status_code == 204
-    assert harness.client.post("/api/base-models/old/test", json={"text": "hi"}).status_code == 200
+    assert harness.client.post("/api/models/old/test", json={"text": "hi"}).status_code == 200
     with harness.sessions() as session:
         moments = [model.last_used_at for model in session.query(BaseModel)]
     assert all(moment is not None and now() - moment < timedelta(minutes=1) for moment in moments)

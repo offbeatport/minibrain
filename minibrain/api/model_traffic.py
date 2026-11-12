@@ -18,7 +18,7 @@ from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog, now
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
 
-router = APIRouter(prefix="/api", tags=["models"])
+router = APIRouter(prefix="/api")
 
 TrafficRange = Literal["24h", "7d", "30d"]
 HOUR = 3600
@@ -350,7 +350,7 @@ def traffic_report(session: Session, name: str, span: TrafficRange) -> ModelTraf
 
 
 @router.get(
-    "/model-pages/{name}/traffic",
+    "/models/{name}/traffic",
     dependencies=[Depends(viewer)],
     summary="Chart a model's requests by version",
     description="Requests, errors, latency and device time per bucket and per version for the range, with what "

@@ -59,14 +59,14 @@ def import_base(harness: Harness, tmp_path: Path, name: str, key: str) -> None:
     for file, data in FILES.items():
         (folder / file).write_bytes(data)
     body = {"name": name, "source_type": "folder", "location": str(folder)}
-    assert harness.client.post("/api/base-models/import", json=body).status_code < 300
+    assert harness.client.post("/api/models/import", json=body).status_code < 300
     harness.worker(kinds=["import"]).run_once()
 
 
 def guarded(harness: Harness, tmp_path: Path, answers: bool = False) -> tuple[dict[str, str], Guarded]:
     import_base(harness, tmp_path, "Llama Guard 3 1B", GUARD)
     import_base(harness, tmp_path, "Chat Base", "chat-base")
-    assert harness.client.post("/api/base-models/chat-base/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/chat-base/deploy", json={"deployed": True}).status_code == 200
     saved = harness.client.put("/api/settings/safety", json={"model": GUARD, "answers": answers})
     assert saved.status_code == 200, saved.text
     backend = Guarded()

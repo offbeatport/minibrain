@@ -151,7 +151,7 @@ def test_remote_engines_pull_weights_from_main_not_the_hub(harness: Harness, hub
     spec = pull_base(harness.client, token, "tiny", tmp_path / "weights")
     assert spec.path == str(tmp_path / "weights") and spec.format == "safetensors"
     assert all((tmp_path / "weights" / name).read_bytes() == data for name, data in FILES.items())
-    served = Path(harness.client.get("/api/base-models/tiny").json()["storage_path"]) / "config.json"
+    served = Path(harness.client.get("/api/models/tiny").json()["storage_path"]) / "config.json"
     served.write_bytes(served.read_bytes().replace(b"{", b"[", 1))
     (tmp_path / "weights" / "config.json").unlink()
     with pytest.raises(CopyError, match=r"config\.json"):

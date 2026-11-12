@@ -20,7 +20,7 @@ from tests.test_flow import (
 
 
 def custom_row(harness: Harness, slug: str) -> dict:
-    return next(row for row in harness.client.get("/api/all-models").json() if row["key"] == slug)
+    return next(row for row in harness.client.get("/api/models").json() if row["key"] == slug)
 
 
 def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
@@ -165,7 +165,7 @@ def count_queries(harness: Harness) -> int:
 
     event.listen(engine, "before_cursor_execute", record)
     try:
-        assert harness.client.get("/api/all-models").status_code == 200
+        assert harness.client.get("/api/models").status_code == 200
     finally:
         event.remove(engine, "before_cursor_execute", record)
     return len(seen)
@@ -188,7 +188,7 @@ def test_listing_takes_the_same_queries_however_many_models_and_versions_there_a
     one = count_queries(harness)
     for name in ("Second", "Third", "Fourth"):
         scored_model(harness, name)
-    rows = [row for row in harness.client.get("/api/all-models").json() if row["kind"] == "custom"]
+    rows = [row for row in harness.client.get("/api/models").json() if row["kind"] == "custom"]
     assert len(rows) == 4 and all(row["versions"][0]["score"] == 0.7 for row in rows)
     assert count_queries(harness) == one
 
@@ -207,7 +207,7 @@ def test_usage_reports_p95_and_errors_from_one_pass(harness: Harness) -> None:
     usage = custom_row(harness, SLUG)["usage"]
     assert (usage["total"], usage["errors"], usage["failed"]) == (20, 2, 1)
     assert (usage["p50_ms"], usage["p95_ms"], usage["device_seconds"]) == (100.0, 190.0, 2.1)
-    week = harness.client.get(f"/api/model-pages/{SLUG}/traffic", params={"range": "7d"}).json()["totals"]
+    week = harness.client.get(f"/api/models/{SLUG}/traffic", params={"range": "7d"}).json()["totals"]
     listed = (usage["total"], usage["errors"], usage["p95_ms"], usage["device_seconds"])
     assert listed == (week["requests"], week["errors"], week["p95_ms"], week["device_seconds"])
 
@@ -259,7 +259,7 @@ def add_variant(harness: Harness, key: str, variant: str, name: str) -> None:
 def test_base_variants_name_their_catalogue_model_format_and_whether_they_train(harness: Harness) -> None:
     add_variant(harness, "qwen3-0.6b", "qwen3-0.6b:bf16:safetensors", "Qwen3 0.6B")
     add_variant(harness, "qwen3-0.6b-q8_0-gguf", "qwen3-0.6b:q8_0:gguf", "Qwen3 0.6B Q8_0")
-    rows = {row["key"]: row for row in harness.client.get("/api/all-models").json() if row["kind"] == "base"}
+    rows = {row["key"]: row for row in harness.client.get("/api/models").json() if row["kind"] == "base"}
     full, gguf = rows["qwen3-0.6b"], rows["qwen3-0.6b-q8_0-gguf"]
     assert (full["catalog_name"], full["variant_label"], full["serve_only"]) == ("Qwen3 0.6B", "BF16", None)
     assert (gguf["catalog_name"], gguf["variant_label"]) == ("Qwen3 0.6B", "GGUF Q8_0")

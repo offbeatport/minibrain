@@ -276,11 +276,12 @@ def test_recent_jobs_span_models(harness: Harness) -> None:
     create_model(harness, "Other")
     jobs = harness.client.get("/api/jobs?limit=5").json()["items"]
     assert {(job["model"], job["model_name"]) for job in jobs} == {(SLUG, "Support Triage")}
-    summaries = {item["slug"]: item for item in harness.client.get("/api/models").json()}
-    assert summaries[SLUG]["current_score"] == 0.4
-    assert summaries[SLUG]["main_metric"] == "label_accuracy"
-    assert summaries["other"]["current_score"] is None
-    assert summaries["other"]["base_model"] == "qwen3-0.6b"
+    rows = {item["key"]: item for item in harness.client.get("/api/models", params={"kind": "custom"}).json()}
+    assert set(rows) == {SLUG, "other"}
+    assert rows[SLUG]["score"] == 0.4
+    assert rows[SLUG]["metric"] == "label_accuracy"
+    assert rows["other"]["score"] is None
+    assert rows["other"]["base_model"] == "qwen3-0.6b"
 
 
 def test_system_settings_and_ops(harness: Harness) -> None:

@@ -21,7 +21,7 @@ from minibrain.registry.models import (
 )
 
 KEY_PREFIX = "mb_"
-RESERVED_ADDRESSES = frozenset({"new", "base", "custom", "name"})
+RESERVED_ADDRESSES = frozenset({"new", "base", "custom", "name", "sample", "inspect", "import"})
 ADDRESS_LENGTH = 48
 ADDRESS = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,46}[a-z0-9])?")
 
@@ -75,6 +75,8 @@ def reserve_name(session: Session, name: str, kind: str, model_name: str, actor:
 
 def get_model(session: Session, slug: str) -> Model:
     model = session.scalar(select(Model).where(Model.slug == slug))
+    if model is None and session.get(BaseModel, slug) is not None:
+        raise NotFoundError(f"{slug} is a base model; this needs a custom model")
     if model is None:
         raise no_model(session, slug)
     return model

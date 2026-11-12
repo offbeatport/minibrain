@@ -32,7 +32,7 @@ from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
 from minibrain.tasks.service import live_version
 
-router = APIRouter(prefix="/api", tags=["models"])
+router = APIRouter(prefix="/api")
 
 DAYS = 7
 DAY = timedelta(days=1)
@@ -198,7 +198,7 @@ def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
 
 
 @router.get(
-    "/model-pages/{name}",
+    "/models/{name}/overview",
     dependencies=[Depends(viewer)],
     summary="Summarise a model for its page",
     description="Base keys and custom slugs share one namespace, so a name finds either kind of model.",

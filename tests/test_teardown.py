@@ -122,7 +122,7 @@ def trained_and_live(harness: Harness) -> None:
 
 
 def row(harness: Harness, key: str, kind: str = "custom") -> dict[str, Any] | None:
-    found = harness.client.get("/api/all-models").json()
+    found = harness.client.get("/api/models").json()
     return next((item for item in found if item["kind"] == kind and item["key"] == key), None)
 
 
@@ -283,7 +283,7 @@ def test_a_base_with_models_built_on_it_is_deleted_only_with_cascade(harness: Ha
     add_base(harness)
     add_custom(harness, "Foo")
     add_custom(harness, "Wef")
-    refused = harness.client.delete(f"/api/base-models/{BASE}")
+    refused = harness.client.delete(f"/api/models/{BASE}")
     assert refused.status_code == 409
     assert refused.json()["detail"].startswith("Foo and Wef are trained on Tiny; delete them first")
     assert row(harness, BASE, "base") is not None and teardowns(harness) == []
@@ -296,9 +296,9 @@ def test_cascade_deletes_the_base_and_every_model_built_on_it(harness: Harness) 
     assert harness.client.post(f"/api/models/{foo}/versions/0/promote").status_code == 200
     add_key(harness, ("custom", foo), name="foo-only")
     adapters = adapter_ids(harness)
-    live = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    live = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True})
     assert live.status_code == 409 and "Foo is live" in live.json()["detail"]
-    started = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True, "undeploy": True})
+    started = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True, "undeploy": True})
     assert started.status_code == 202
     teardown = started.json()["teardown"]
     assert (teardown["label"], teardown["models"], teardown["cascade"]) == ("Deleting", ["Foo", "Wef"], True)
@@ -318,12 +318,12 @@ def test_cascade_deletes_the_base_and_every_model_built_on_it(harness: Harness) 
 def test_a_base_goes_only_with_the_models_built_on_it_and_takes_its_files(harness: Harness) -> None:
     folder = add_base(harness)
     foo = add_custom(harness, "Foo")
-    refused = harness.client.delete(f"/api/base-models/{BASE}")
+    refused = harness.client.delete(f"/api/models/{BASE}")
     assert refused.status_code == 409 and refused.json()["detail"].endswith("delete them with it (cascade=true)")
-    assert harness.client.post(f"/api/base-models/{BASE}/remove-files").status_code in (404, 405)
+    assert harness.client.post(f"/api/models/{BASE}/remove-files").status_code in (404, 405)
     assert folder.is_dir() and shown(harness, BASE, "base")["availability"]["state"] == "available"
     assert shown(harness, foo)["health"] is None and teardowns(harness) == []
-    started = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    started = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True})
     assert started.status_code == 202 and started.json()["teardown"]["models"] == ["Foo"]
     harness.settle()
     assert not folder.exists() and row(harness, BASE, "base") is None and row(harness, foo) is None
@@ -336,7 +336,7 @@ def test_a_failed_delete_shows_the_reason_and_retry_finishes_it(harness: Harness
     folder = add_base(harness)
     folder.parent.chmod(0o500)
     try:
-        assert harness.client.delete(f"/api/base-models/{BASE}").status_code == 202
+        assert harness.client.delete(f"/api/models/{BASE}").status_code == 202
         harness.settle()
         found = shown(harness, BASE, "base")
         assert found["teardown"]["label"] == "Delete failed"
@@ -344,7 +344,7 @@ def test_a_failed_delete_shows_the_reason_and_retry_finishes_it(harness: Harness
         assert events(harness, "model.delete_finished")[0].detail["outcome"] == "failed"
     finally:
         folder.parent.chmod(0o700)
-    retried = harness.client.delete(f"/api/base-models/{BASE}")
+    retried = harness.client.delete(f"/api/models/{BASE}")
     assert retried.status_code == 202 and retried.json()["teardown"]["state"] == "running"
     harness.settle()
     assert row(harness, BASE, "base") is None and not folder.exists()
@@ -353,7 +353,7 @@ def test_a_failed_delete_shows_the_reason_and_retry_finishes_it(harness: Harness
 
 def test_released_engines_stop_once_nothing_routes_their_base(harness: Harness) -> None:
     add_base(harness)
-    assert harness.client.post(f"/api/base-models/{BASE}/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post(f"/api/models/{BASE}/deploy", json={"deployed": True}).status_code == 200
     register_engine(harness, BASE, managed=True)
     harness.app.state.teardowns.http = FakeEngines(drained())
     released: list[frozenset[str]] = []
@@ -363,7 +363,7 @@ def test_released_engines_stop_once_nothing_routes_their_base(harness: Harness) 
         return {}
 
     harness.app.state.gateway_config.engines = spawn
-    assert harness.client.post(f"/api/base-models/{BASE}/deploy", json={"deployed": False}).status_code == 202
+    assert harness.client.post(f"/api/models/{BASE}/deploy", json={"deployed": False}).status_code == 202
     harness.app.state.teardowns.run_once()
     assert shown(harness, BASE, "base")["teardown"]["waiting"] == ["the engine on gpu-1 to stop"]
     harness.app.state.teardowns.run_once()
@@ -382,12 +382,12 @@ def test_who_can_delete_and_undeploy(harness: Harness) -> None:
     builder = harness.person(Role.BUILDER)
     assert viewer.delete(f"/api/models/{foo}").status_code == 403
     assert viewer.post(f"/api/models/{foo}/deploy", json={"deployed": False}).status_code == 403
-    assert builder.delete(f"/api/base-models/{BASE}", params={"cascade": True}).status_code == 403
+    assert builder.delete(f"/api/models/{BASE}", params={"cascade": True}).status_code == 403
     assert builder.post(f"/api/models/{foo}/deploy", json={"deployed": False}).status_code == 202
     assert builder.delete(f"/api/models/{foo}").status_code == 202
     assert events(harness, "model.delete")[0].actor == "builder@example.com"
     harness.settle()
-    assert harness.client.delete(f"/api/base-models/{BASE}").status_code == 202
+    assert harness.client.delete(f"/api/models/{BASE}").status_code == 202
 
 
 def test_engines_finish_requests_in_flight_before_unloading_an_adapter(tmp_path: Path) -> None:
@@ -424,7 +424,7 @@ def test_a_base_being_deleted_takes_no_new_models_and_a_failed_delete_restarts_w
 ) -> None:
     folder = add_base(harness)
     add_custom(harness, "Foo")
-    started = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    started = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True})
     assert started.status_code == 202
     refused = harness.client.post("/api/models", json={"name": "Late", "base_model": BASE})
     assert refused.status_code == 409 and refused.json()["detail"] == "Tiny is being deleted; pick another base"
@@ -434,7 +434,7 @@ def test_a_base_being_deleted_takes_no_new_models_and_a_failed_delete_restarts_w
     harness.settle()
     failed = shown(harness, BASE, "base")["teardown"]
     assert (failed["state"], failed["added"]) == ("failed", ["Late"])
-    again = harness.client.delete(f"/api/base-models/{BASE}", params={"cascade": True})
+    again = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True})
     assert again.status_code == 202 and again.json()["teardown"]["models"] == ["Late"]
     harness.settle()
     assert row(harness, BASE, "base") is None and row(harness, "late") is None and not folder.exists()

@@ -175,7 +175,7 @@ def test_deleting_is_audited_with_a_snapshot(harness: Harness) -> None:
             },
         )
     ]
-    activity = harness.client.get(f"/api/model-pages/{SLUG}/activity").json()["events"]
+    activity = harness.client.get(f"/api/models/{SLUG}/activity").json()["events"]
     said = {event["text"]: event["link"] for event in activity if event["action"].startswith("job.")}
     assert said == {f"deleted job #{train}": None}
     with harness.sessions() as session:

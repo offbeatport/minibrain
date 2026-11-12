@@ -13,13 +13,13 @@ from tests.test_teardown import add_base
 
 
 def traffic(harness: Harness, name: str = SLUG, span: str = "30d") -> dict[str, Any]:
-    response = harness.client.get(f"/api/model-pages/{name}/traffic", params={"range": span})
+    response = harness.client.get(f"/api/models/{name}/traffic", params={"range": span})
     assert response.status_code == 200, response.text
     return response.json()
 
 
 def activity(harness: Harness, name: str = SLUG, **params: Any) -> dict[str, Any]:
-    response = harness.client.get(f"/api/model-pages/{name}/activity", params=params)
+    response = harness.client.get(f"/api/models/{name}/activity", params=params)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -62,8 +62,8 @@ def test_traffic_splits_requests_by_version_and_bucket(harness: Harness) -> None
     month = traffic(harness)
     assert (month["bucket_seconds"], len(month["buckets"]), month["totals"]["requests"]) == (86400, 30, 6)
     assert month["previous"]["requests"] == 1
-    assert harness.client.get(f"/api/model-pages/{SLUG}/traffic", params={"range": "1y"}).status_code == 422
-    assert harness.client.get("/api/model-pages/nothing/traffic").status_code == 404
+    assert harness.client.get(f"/api/models/{SLUG}/traffic", params={"range": "1y"}).status_code == 422
+    assert harness.client.get("/api/models/nothing/traffic").status_code == 404
 
 
 def test_seven_days_match_the_models_list(harness: Harness) -> None:
@@ -78,7 +78,7 @@ def test_seven_days_match_the_models_list(harness: Harness) -> None:
         {"at": today - timedelta(days=3), "version": 1},
     )
     week = traffic(harness, span="7d")
-    rows = harness.client.get("/api/all-models").json()
+    rows = harness.client.get("/api/models").json()
     listed = next(row for row in rows if row["key"] == SLUG)["usage"]["total"]
     assert week["totals"]["requests"] == listed == 3
     assert week["bucket_seconds"] == 6 * 3600 and 25 <= len(week["buckets"]) <= 28
@@ -122,7 +122,7 @@ def test_activity_tells_what_happened_to_the_model(harness: Harness) -> None:
     with harness.sessions() as session:
         renames = session.query(AuditEvent).filter(AuditEvent.action == "model.update").all()
         assert len(renames) == 1 and renames[0].detail["to"] == {"name": "Ticket Triage"}
-    assert harness.client.get("/api/model-pages/nothing/activity").status_code == 404
+    assert harness.client.get("/api/models/nothing/activity").status_code == 404
 
 
 def status_of(harness: Harness, name: str = SLUG) -> dict[str, Any]:
@@ -206,7 +206,7 @@ def test_a_failed_version_asks_for_a_retry(harness: Harness) -> None:
 def test_a_base_is_deployed_then_built_on(harness: Harness) -> None:
     add_base(harness, "tiny")
     assert status_of(harness, "tiny")["action"]["kind"] == "deploy"
-    assert harness.client.post("/api/base-models/tiny/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/tiny/deploy", json={"deployed": True}).status_code == 200
     live = status_of(harness, "tiny")
     assert (live["tone"], live["text"], live["action"]["kind"]) == ("success", "Live · 0 replicas", "create_custom")
     assert page(harness, "tiny")["created_at"] is not None

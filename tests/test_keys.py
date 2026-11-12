@@ -25,10 +25,10 @@ def two_models(harness: Harness, tmp_path: Path) -> None:
     for name, data in FILES.items():
         (folder / name).write_bytes(data)
     harness.client.post(
-        "/api/base-models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
+        "/api/models/import", json={"name": "Base One", "source_type": "folder", "location": str(folder)}
     )
     harness.worker(kinds=["import"]).run_once()
-    assert harness.client.post("/api/base-models/base-one/deploy", json={"deployed": True}).status_code == 200
+    assert harness.client.post("/api/models/base-one/deploy", json={"deployed": True}).status_code == 200
     create_on_data(harness)
     finish(harness, "eval", accuracy=0.4)
     deploy(harness)
@@ -131,7 +131,7 @@ def test_an_all_models_key_reaches_models_added_later(harness: Harness, tmp_path
     assert harness.client.delete(f"/api/models/{SLUG}").status_code == 202
     harness.settle()
     assert harness.client.post("/v1/chat/completions", headers=auth, json=chat(SLUG)).status_code == 404
-    rows = {row["key"]: row["key_count"] for row in harness.client.get("/api/all-models").json()}
+    rows = {row["key"]: row["key_count"] for row in harness.client.get("/api/models").json()}
     assert rows["base-one"] == 1
 
 
