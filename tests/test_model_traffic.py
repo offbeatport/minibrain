@@ -2,8 +2,8 @@ from datetime import timedelta
 from typing import Any
 
 from minibrain.registry.models import AuditEvent, now
-from tests.conftest import Harness
-from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
+from tests.conftest import Harness, give_data
+from tests.test_flow import SLUG, add_key, add_version, build_dataset, create_model, create_with_dataset, deploy, finish
 from tests.test_gateway import servable
 from tests.test_model_page import page
 from tests.test_request_logs import seed
@@ -131,11 +131,11 @@ def test_the_status_line_puts_problems_first(harness: Harness) -> None:
     create_with_dataset(harness)
     first = page(harness)
     assert first["created_by"] and first["created_at"]
-    assert first["status"]["action"]["kind"] == "promote" and first["status"]["text"].startswith("v0 ready")
+    assert (first["status"]["text"], first["status"]["action"]["label"]) == ("Ready to train", "Train v1")
     deploy(harness)
     assert status_of(harness) == {
         "tone": "neutral",
-        "text": "No version trained yet",
+        "text": "Ready to train",
         "action": {
             "kind": "train",
             "label": "Train v1",
@@ -208,3 +208,33 @@ def test_a_base_is_deployed_then_built_on(harness: Harness) -> None:
     live = status_of(harness, "tiny")
     assert (live["tone"], live["text"], live["action"]["kind"]) == ("success", "Live · 0 replicas", "create_custom")
     assert page(harness, "tiny")["created_at"] is not None
+
+
+def test_the_status_line_never_offers_the_baseline(harness: Harness) -> None:
+    create_model(harness)
+    empty = status_of(harness)
+    assert (empty["text"], empty["action"]["label"]) == ("No data yet", "Add data")
+    give_data(harness, SLUG)
+    build_dataset(harness)
+    ready = status_of(harness)
+    assert (ready["text"], ready["action"]["kind"], ready["action"]["version"]) == ("Ready to train", "train", 1)
+    add_version(harness, "lora")
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.0)
+    trained = status_of(harness)
+    assert (trained["text"], trained["action"]["label"]) == ("v1 ready · 0.0%", "Make v1 live")
+
+
+def test_activity_of_a_recreated_model_holds_only_its_own_events(harness: Harness) -> None:
+    create_with_dataset(harness)
+    deploy(harness)
+    add_key(harness, name="old-key")
+    assert harness.client.delete(f"/api/models/{SLUG}", params={"undeploy": True}).status_code == 202
+    harness.settle()
+    with harness.sessions() as session:
+        old = {event.id for event in session.query(AuditEvent).all()}
+    create_model(harness)
+    found = activity(harness)
+    assert [event["text"] for event in found["events"]] == ["scored v0, prompt only", "created Support Triage"]
+    assert found["total"] == 2 and not old & {event["id"] for event in found["events"]}
+    assert page(harness)["created_by"]

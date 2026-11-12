@@ -54,7 +54,7 @@ def test_a_name_finds_either_kind_of_model(harness: Harness) -> None:
 
 def test_the_next_step_follows_the_model(harness: Harness) -> None:
     create_with_dataset(harness)
-    assert page(harness)["next"] == {"kind": "promote", "label": "Deploy v0", "version": 0, "count": None, "base": None}
+    assert page(harness)["next"] == {"kind": "train", "label": "Train v1", "version": 1, "count": None, "base": None}
     deploy(harness)
     assert page(harness)["next"] == {"kind": "train", "label": "Train v1", "version": 1, "count": None, "base": None}
     add_version(harness, "prompt")

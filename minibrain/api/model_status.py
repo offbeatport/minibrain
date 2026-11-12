@@ -69,12 +69,19 @@ class ModelStatus(BaseModel):
     action: StatusAction | None
 
 
+def baseline(version: Version) -> bool:
+    return version.kind == VersionKind.PROMPT and version.number == 0
+
+
 def passing_candidate(model: Model) -> int | None:
     current = model.current_version if model.deployed and model.current_version is not None else -1
     ready = [
         v
         for v in model.versions
-        if v.status == VersionStatus.READY and v.number > current and v.base_model == model.base_model
+        if v.status == VersionStatus.READY
+        and v.number > current
+        and v.base_model == model.base_model
+        and not baseline(v)
     ]
     passing = [v for v in ready if v.live_at is not None or decision(model, v).passed]
     best = max(passing, key=lambda v: v.number, default=None)
@@ -222,16 +229,14 @@ def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly
         return neutral(rows_text(pending), StatusAction(kind="review_feedback", label="Review"))
     if latest_dataset_version(model) is None:
         return neutral("No data yet", StatusAction(kind="add_data", label="Add data"))
+    if limit is None and not trained(model):
+        upcoming = next_number(model)
+        return neutral("Ready to train", StatusAction(kind="train", label=f"Train v{upcoming}", version=upcoming))
     if not model.deployed:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))
     if limit is not None and limit.target is not None:
         move = StatusAction(kind="switch_base", label=f"Move to {limit.target.name} to train", base=limit.target.key)
         return neutral(f"{limit.format.upper()} weights can't be trained", move)
-    if limit is None and not trained(model):
-        upcoming = next_number(model)
-        return neutral(
-            "No version trained yet", StatusAction(kind="train", label=f"Train v{upcoming}", version=upcoming)
-        )
     return settled(session, model)
 
 

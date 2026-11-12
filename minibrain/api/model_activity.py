@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, String, and_, cast, or_, select
+from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api", tags=["models"])
 LinkKind = Literal["model", "version", "job", "key", "base", "monitoring"]
 Tone = Literal["neutral", "success", "failed"]
 DEFAULT_LIMIT = 40
+CREATING = ("model.create", "model.duplicate", "model.download", "model.import")
 MAX_LIMIT = 200
 
 
@@ -52,6 +53,8 @@ class Owner:
     key: str
     name: str
     custom: bool
+    created_at: datetime
+    made: int | None = None
 
 
 @dataclass(frozen=True)
@@ -61,14 +64,25 @@ class Said:
     tone: Tone = "neutral"
 
 
+def creation_event(session: Session, key: str) -> int | None:
+    query = select(func.max(AuditEvent.id)).where(AuditEvent.target == key, AuditEvent.action.in_(CREATING))
+    return session.scalar(query)
+
+
 def owner_of(session: Session, name: str) -> Owner:
     custom = session.scalar(select(Model).where(Model.slug == name))
     if custom is not None:
-        return Owner(custom.slug, custom.name, True)
+        return Owner(custom.slug, custom.name, True, custom.created_at, creation_event(session, custom.slug))
     base = session.get(BaseRow, name)
     if base is None:
         raise NotFoundError(f"no model called {name}")
-    return Owner(base.id, base.name, False)
+    return Owner(base.id, base.name, False, base.created_at)
+
+
+def this_instance(owner: Owner) -> ColumnElement[bool]:
+    if owner.made is not None:
+        return AuditEvent.id >= owner.made
+    return AuditEvent.at >= owner.created_at
 
 
 def number_of(target: str) -> int | None:
@@ -228,7 +242,7 @@ def candidates(owner: Owner) -> ColumnElement[bool]:
     if owner.custom:
         targeted = or_(targeted, AuditEvent.target.like(f"{owner.key}@%"))
     related = or_(AuditEvent.action.like("key.%"), AuditEvent.action.like("job.%"))
-    return or_(targeted, and_(related, mentioned))
+    return and_(this_instance(owner), or_(targeted, and_(related, mentioned)))
 
 
 def belongs(owner: Owner, event: AuditEvent) -> bool:

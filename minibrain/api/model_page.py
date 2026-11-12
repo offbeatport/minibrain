@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep, SettingsDep
-from minibrain.api.model_status import ModelStatus, base_status, custom_status, passing_candidate, rows_text
+from minibrain.api.model_activity import CREATING
+from minibrain.api.model_status import ModelStatus, base_status, custom_status, passing_candidate, rows_text, trained
 from minibrain.api.overview import Identity, model_rows, series_points
 from minibrain.api.request_logs import model_match
 from minibrain.api.schemas import ModelAvatar
@@ -121,6 +122,14 @@ def train_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
     return NextAction(kind="switch_base", label=f"Move to {limit.target.name} to train", base=limit.target.key)
 
 
+def undeployed_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
+    if latest_dataset_version(model) is None:
+        return NextAction(kind="add_data", label="Add training data")
+    if limit is None and not trained(model):
+        return train_next(model, limit)
+    return NextAction(kind="deploy", label="Deploy")
+
+
 def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | None = None) -> NextAction | None:
     if model.teardown is not None or working:
         return None
@@ -129,7 +138,7 @@ def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | No
         label = f"v{candidate} beats live, deploy it" if live_version(model) else f"Deploy v{candidate}"
         return NextAction(kind="promote", label=label, version=candidate)
     if not model.deployed:
-        return NextAction(kind="deploy", label="Deploy")
+        return undeployed_next(model, limit)
     if pending > 0:
         return NextAction(kind="review_feedback", label=rows_text(pending), count=pending)
     if latest_dataset_version(model) is None:
@@ -145,14 +154,11 @@ def base_next(model: BaseRow) -> NextAction | None:
     return NextAction(kind="create_custom", label="Create a custom model from it")
 
 
-CREATING = ("model.create", "model.duplicate", "model.download", "model.import")
-
-
 def creator(session: Session, target: str) -> str | None:
     query = (
         select(AuditEvent.actor)
         .where(AuditEvent.target == target, AuditEvent.action.in_(CREATING))
-        .order_by(AuditEvent.id)
+        .order_by(AuditEvent.id.desc())
         .limit(1)
     )
     return session.scalar(query)
