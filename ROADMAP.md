@@ -1750,6 +1750,13 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
   - [ ] MLX training on Macs behind a flag, only if MPS training is too slow for local use: a second trainer plus an
     MLX-to-PEFT adapter converter, so Mac-trained adapters still serve on SGLang and vLLM
 
+## v3
+
+- [ ] Managed compute (minibrain Cloud): GPUs run by us, added from "Add compute" like any pool, for teams without
+  hardware. Opt-in per install, never the default: installs stay self-hosted and air-gapped by default, and the UI says
+  plainly that data and weights leave the customer's network when a managed pool is used. Jobs and deployments place
+  onto it with the same pool rules; usage is metered per pool.
+
 ## Fixes
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
