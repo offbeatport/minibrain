@@ -208,9 +208,7 @@ function unsupported(machine: Machine, strategy: Strategy): string | null {
     if (strategy !== "QLoRA" || machine.quantizes) {
         return null;
     }
-    return machine.device === "cuda"
-        ? "QLoRA needs bitsandbytes on this worker"
-        : "QLoRA needs an NVIDIA GPU";
+    return machine.device === "cuda" ? "no QLoRA here" : "QLoRA needs a GPU";
 }
 
 function estimate(
@@ -291,10 +289,10 @@ export type Recipe = {
 
 export type Quality = "fast" | "balanced" | "quality";
 
-export const QUALITIES: { id: Quality; label: string; blurb: string }[] = [
-    { id: "fast", label: "Fast", blurb: "Check whether training helps." },
-    { id: "balanced", label: "Balanced", blurb: "The usual run." },
-    { id: "quality", label: "Higher quality", blurb: "More capacity and passes." },
+export const QUALITIES: { id: Quality; label: string }[] = [
+    { id: "fast", label: "Fast" },
+    { id: "balanced", label: "Balanced" },
+    { id: "quality", label: "Best" },
 ];
 
 const SHARED: Omit<Recipe, "rank" | "alpha" | "learningRate" | "epochs" | "maxRows"> = {
@@ -437,9 +435,12 @@ export type MachinePlan = {
     checks: number;
     minutes: number;
     wait: number;
+    ahead: number;
     after: string | null;
     reason: string | null;
 };
+
+export type Problem = { text: string; detail: string | null };
 
 export type Plan = {
     seq: number;
@@ -447,7 +448,7 @@ export type Plan = {
     mixed: number;
     machines: MachinePlan[];
     pick: MachinePlan | null;
-    error: string | null;
+    error: Problem | null;
 };
 
 export type PlanInput = {
@@ -512,9 +513,9 @@ function refusal(machine: Machine, smallest: Option | null): string {
     }
     const need = gigabytes(smallest.peak);
     if (smallest.peak <= smallest.available) {
-        return `needs ${need}, ${gigabytes(smallest.usable)} of its ${machine.memoryGb} GB usable`;
+        return `needs ${need}, ${gigabytes(smallest.usable)} usable`;
     }
-    return `needs ${need}, has ${machine.memoryGb} GB`;
+    return `needs ${need} of ${machine.memoryGb} GB`;
 }
 
 function planMachine(input: PlanInput, machine: Machine, seq: number, mixed: number): MachinePlan {
@@ -544,6 +545,7 @@ function planMachine(input: PlanInput, machine: Machine, seq: number, mixed: num
         checks,
         minutes: SETUP_MINUTES + (work * WORK_MINUTES) / speed + evalEach * checks,
         wait: queue.reduce((total, item) => total + item.minutes, 0),
+        ahead: queue.length,
         after: queue.at(-1)?.label ?? null,
         reason: chosen ? null : refusal(machine, smallest),
     };
@@ -583,10 +585,10 @@ export function makePlan(input: PlanInput): Plan {
     };
 }
 
-function noFit(compute: ComputeChoice, machines: MachinePlan[]): string {
+function noFit(compute: ComputeChoice, machines: MachinePlan[]): Problem {
     const wanted = machines.filter((item) => candidates(compute).includes(item.machine));
     if (wanted.length === 1) {
-        return `Does not fit ${wanted[0].machine.name}: ${wanted[0].reason}.`;
+        return { text: `Doesn't fit ${wanted[0].machine.name}`, detail: wanted[0].reason };
     }
     const closest = wanted.reduce<MachinePlan | null>(
         (best, item) =>
@@ -598,8 +600,8 @@ function noFit(compute: ComputeChoice, machines: MachinePlan[]): string {
         null,
     );
     return closest
-        ? `No machine fits these settings. Closest is ${closest.machine.name}: ${closest.reason}.`
-        : "No machine takes training jobs.";
+        ? { text: "Nothing fits", detail: `${closest.machine.name} ${closest.reason}` }
+        : { text: "No training machines", detail: null };
 }
 
 export function duration(minutes: number): string {
@@ -616,28 +618,41 @@ export function duration(minutes: number): string {
 
 export function computeHours(plan: MachinePlan): string {
     const hours = plan.minutes / 60;
-    const amount = hours < 0.1 ? "< 0.1" : `≈ ${hours.toFixed(1)}`;
-    return `${amount} ${plan.machine.device === "cpu" ? "CPU" : "GPU"}-hours`;
+    return hours < 0.1 ? "< 0.1" : hours.toFixed(1);
 }
 
-export type Issue = { field: keyof Recipe | "data" | "compute"; text: string };
+export function hoursUnit(plan: MachinePlan): string {
+    return `${plan.machine.device === "cpu" ? "CPU" : "GPU"}-hours`;
+}
+
+export function approx(minutes: number): string {
+    return minutes < 1 ? "< 1 min" : `~${duration(minutes)}`;
+}
+
+export type Issue = {
+    field: keyof Recipe | "data" | "compute";
+    text: string;
+    detail: string | null;
+};
 
 export function errorsOf(recipe: Recipe, base: Base, plan: Plan): Issue[] {
     const found: Issue[] = [];
     if (recipe.rank > MAX_RANK) {
         found.push({
             field: "rank",
-            text: `Rank ${recipe.rank} is above ${MAX_RANK}, the largest the serving engines load.`,
+            text: `Rank ${recipe.rank} · max ${MAX_RANK}`,
+            detail: `Serving loads rank ${MAX_RANK} at most`,
         });
     }
     if (recipe.seqLen !== "auto" && recipe.seqLen > base.context) {
         found.push({
             field: "seqLen",
-            text: `${base.name} reads at most ${base.context.toLocaleString()} tokens.`,
+            text: `Max ${base.context.toLocaleString()} tokens`,
+            detail: `${base.name} context`,
         });
     }
     if (plan.error) {
-        found.push({ field: "compute", text: plan.error });
+        found.push({ field: "compute", ...plan.error });
     }
     return found;
 }
