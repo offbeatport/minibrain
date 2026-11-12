@@ -4,6 +4,7 @@ import {
     ExternalLink,
     GraduationCap,
     HardDrive,
+    Info,
     type LucideIcon,
     MemoryStick,
 } from "lucide-react";
@@ -183,28 +184,32 @@ function factsOf(option: BaseOption): string[] {
 
 function Details({ entry }: { entry: CatalogEntry }) {
     return (
-        <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="invisible shrink-0 self-center in-data-highlighted:visible focus-visible:visible"
-        >
-            <a
-                href={discoverHref(entry)}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                        event.stopPropagation();
-                    }
-                }}
-            >
-                Details
-                <ExternalLink aria-hidden="true" className="size-3.5" />
-                <span className="sr-only"> (opens in a new tab)</span>
-            </a>
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    asChild
+                    variant="ghost"
+                    size="icon-xs"
+                    className="invisible in-data-highlighted:visible focus-visible:visible"
+                >
+                    <a
+                        href={discoverHref(entry)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Details for ${entry.name} (opens in a new tab)`}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.stopPropagation();
+                            }
+                        }}
+                    >
+                        <Info aria-hidden="true" />
+                    </a>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>Details</TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -227,6 +232,9 @@ function OptionRow({
                     <span className="truncate text-base font-semibold">{option.name}</span>
                     {recommended && <Badge variant="info">Recommended</Badge>}
                     <ServeOnly option={option} />
+                    {option.kind === "catalogue" && option.entry && (
+                        <Details entry={option.entry} />
+                    )}
                 </span>
                 {facts.length > 0 && (
                     <span className="truncate text-muted-foreground">{facts.join(" · ")}</span>
@@ -239,7 +247,6 @@ function OptionRow({
                 <Availability option={option} deleting={deleting} />
                 <Resources option={option} />
             </span>
-            {option.kind === "catalogue" && option.entry && <Details entry={option.entry} />}
         </span>
     );
 }
