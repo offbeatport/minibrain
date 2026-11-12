@@ -4,13 +4,11 @@ import {
     ExternalLink,
     GraduationCap,
     HardDrive,
-    Info,
     type LucideIcon,
     MemoryStick,
 } from "lucide-react";
 import {
     Badge,
-    Button,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -184,32 +182,22 @@ function factsOf(option: BaseOption): string[] {
 
 function Details({ entry }: { entry: CatalogEntry }) {
     return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    asChild
-                    variant="ghost"
-                    size="icon-xs"
-                    className="invisible in-data-highlighted:visible focus-visible:visible"
-                >
-                    <a
-                        href={discoverHref(entry)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`Details for ${entry.name} (opens in a new tab)`}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                event.stopPropagation();
-                            }
-                        }}
-                    >
-                        <Info aria-hidden="true" />
-                    </a>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent>Details</TooltipContent>
-        </Tooltip>
+        <a
+            href={discoverHref(entry)}
+            target="_blank"
+            rel="noreferrer"
+            className="invisible inline-flex items-center gap-1 text-sm text-primary hover:underline in-data-highlighted:visible focus-visible:visible"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                    event.stopPropagation();
+                }
+            }}
+        >
+            Details
+            <ExternalLink aria-hidden="true" className="size-3.5" />
+            <span className="sr-only"> for {entry.name} (opens in a new tab)</span>
+        </a>
     );
 }
 
