@@ -200,14 +200,11 @@ export function NameAvatarField({
                     </TooltipContent>
                 </Tooltip>
             </div>
-            <div className="flex min-h-5 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {locks.name === null && locks.avatar === null && (
-                    <span>Name it after what it does, like Ticket router or Invoice reader.</span>
-                )}
-                {locks.name !== null && (
+            {locks.name !== null && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <LockNote what="Name" previous={locks.name} onUndo={undoName} />
-                )}
-            </div>
+                </div>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             {children}
             <PickerDialog
