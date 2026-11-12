@@ -13,7 +13,6 @@ import {
     Play,
     ScrollText,
     Server,
-    Settings,
     ShieldCheck,
     SlidersHorizontal,
     Table2,
@@ -55,7 +54,6 @@ export const SECTIONS: NavSection[] = [
             { label: "Infrastructure", path: "/infrastructure", icon: Server, role: "admin" },
         ],
     },
-    { label: null, items: [{ label: "Settings", path: "/settings", icon: Settings }] },
 ];
 
 export const SETTINGS_PAGES: NavEntry[] = [
