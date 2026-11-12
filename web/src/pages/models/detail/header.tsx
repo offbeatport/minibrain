@@ -16,7 +16,6 @@ import {
     Trash2,
 } from "lucide-react";
 import {
-    Badge,
     Button,
     Dialog,
     DialogContent,
@@ -207,12 +206,11 @@ export function ModelHeader({
             icon={<ModelAvatar row={row} size="lg" />}
             title={row.name}
             facts={[
-                <Badge key="kind" variant="outline">
-                    {row.kind === "custom" ? "Custom" : "Base"}
-                </Badge>,
-                <StatusText key="deployed" tone={status.tone}>
-                    {status.label}
-                </StatusText>,
+                isDeployed(row) ? (
+                    <StatusText key="deployed" tone={status.tone}>
+                        {status.label}
+                    </StatusText>
+                ) : null,
                 live ? <span key="live">{live}</span> : null,
             ]}
             subtitle={subtitleOf(row, base)}
