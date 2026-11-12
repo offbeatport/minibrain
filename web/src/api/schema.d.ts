@@ -2316,7 +2316,8 @@ export interface paths {
         get: operations["read_job_api_jobs__job_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Job */
+        delete: operations["delete_job_api_jobs__job_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2401,6 +2402,23 @@ export interface paths {
         put?: never;
         /** Retry Job */
         post: operations["retry_job_api_jobs__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Jobs */
+        post: operations["delete_jobs_api_jobs_delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6160,7 +6178,20 @@ export interface components {
             status: string | null;
             /** Error */
             error?: string | null;
+            /** Reason */
+            reason?: ("not_found" | "in_use" | "active" | "state") | null;
             retry?: components["schemas"]["JobInfo"] | null;
+        };
+        /** JobDeletion */
+        JobDeletion: {
+            /** Ids */
+            ids: number[];
+            /**
+             * Cancel Jobs
+             * @description Cancel queued or running jobs first; they go once stopped.
+             * @default false
+             */
+            cancel_jobs?: boolean;
         };
         /** JobDetail */
         JobDetail: {
@@ -6198,6 +6229,17 @@ export interface components {
             max_attempts: number;
             /** Cancel Requested */
             cancel_requested: boolean;
+            /**
+             * Delete Requested
+             * @description Asked to delete; it goes once it stops.
+             * @default false
+             */
+            delete_requested?: boolean;
+            /**
+             * Delete Refusal
+             * @description Why the job can't be deleted, if it can't.
+             */
+            delete_refusal?: string | null;
             /** Retry Of */
             retry_of: number | null;
             /**
@@ -6335,6 +6377,17 @@ export interface components {
             max_attempts: number;
             /** Cancel Requested */
             cancel_requested: boolean;
+            /**
+             * Delete Requested
+             * @description Asked to delete; it goes once it stops.
+             * @default false
+             */
+            delete_requested?: boolean;
+            /**
+             * Delete Refusal
+             * @description Why the job can't be deleted, if it can't.
+             */
+            delete_refusal?: string | null;
             /** Retry Of */
             retry_of: number | null;
             /**
@@ -14806,6 +14859,46 @@ export interface operations {
             };
         };
     };
+    delete_job_api_jobs__job_id__delete: {
+        parameters: {
+            query?: {
+                cancel_jobs?: boolean;
+            };
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled; it goes once it stops */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobInfo"];
+                };
+            };
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stream_events_api_jobs__job_id__events_get: {
         parameters: {
             query?: {
@@ -14952,6 +15045,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_jobs_api_jobs_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobDeletion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobActionResult"][];
                 };
             };
             /** @description Validation Error */

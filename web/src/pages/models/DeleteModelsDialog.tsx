@@ -93,13 +93,13 @@ function targetJobs(jobs: JobInfo[], picked: Entry[], dependents: ModelRow[]): J
     );
 }
 
-function jobName(job: JobInfo): string {
+export function jobName(job: JobInfo): string {
     const owner = job.model_name ?? job.model ?? job.base_model ?? `Job #${job.id}`;
     const version = job.version === null || job.version === undefined ? "" : ` v${job.version}`;
     return `${owner}${version}`;
 }
 
-function JobList({ jobs }: { jobs: JobInfo[] }) {
+export function JobList({ jobs }: { jobs: JobInfo[] }) {
     return (
         <ul className="flex max-h-48 flex-col divide-y overflow-y-auto rounded-lg border">
             {jobs.map((job) => (

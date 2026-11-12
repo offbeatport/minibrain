@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.data.dataset_versions import cleanup
 from minibrain.gateway.config import LocalConfig, served_bases
+from minibrain.jobs.removal import Leftovers, remove_job
 from minibrain.leader import Leader
 from minibrain.models.bucket import drop_weights, sweep_weights
 from minibrain.models.registry import model_dir
@@ -536,7 +537,19 @@ class Teardowns:
             found = select(Teardown.id).where(Teardown.status == TeardownStatus.RUNNING).limit(1)
             return session.scalar(found) is not None
 
+    def finish_jobs(self) -> int:
+        with self.sessions() as session:
+            stopped = select(Job).where(Job.delete_requested.is_(True), Job.status.not_in(ACTIVE_JOB_STATUSES))
+            leftovers = Leftovers()
+            jobs = list(session.scalars(stopped))
+            for job in jobs:
+                leftovers.merge(remove_job(session, self.settings.work_dir(), job))
+            session.commit()
+        leftovers.clear(store_for(self.settings))
+        return len(jobs)
+
     def run_once(self) -> int:
+        self.finish_jobs()
         versions = self.finish_versions()
         if not self.active():
             return versions

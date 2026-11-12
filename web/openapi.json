@@ -8104,6 +8104,59 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Delete Job",
+        "operationId": "delete_job_api_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "cancel_jobs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Jobs"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "202": {
+            "description": "Cancelled; it goes once it stops",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/jobs/{job_id}/events": {
@@ -8308,6 +8361,51 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/delete": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Delete Jobs",
+        "operationId": "delete_jobs_api_jobs_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobDeletion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobActionResult"
+                  },
+                  "type": "array",
+                  "title": "Response Delete Jobs Api Jobs Delete Post"
                 }
               }
             }
@@ -20116,6 +20214,23 @@
             ],
             "title": "Error"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "not_found",
+                  "in_use",
+                  "active",
+                  "state"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
           "retry": {
             "anyOf": [
               {
@@ -20134,6 +20249,30 @@
           "status"
         ],
         "title": "JobActionResult"
+      },
+      "JobDeletion": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Ids"
+          },
+          "cancel_jobs": {
+            "type": "boolean",
+            "title": "Cancel Jobs",
+            "description": "Cancel queued or running jobs first; they go once stopped.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "JobDeletion"
       },
       "JobDetail": {
         "properties": {
@@ -20229,6 +20368,24 @@
           "cancel_requested": {
             "type": "boolean",
             "title": "Cancel Requested"
+          },
+          "delete_requested": {
+            "type": "boolean",
+            "title": "Delete Requested",
+            "description": "Asked to delete; it goes once it stops.",
+            "default": false
+          },
+          "delete_refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Refusal",
+            "description": "Why the job can't be deleted, if it can't."
           },
           "retry_of": {
             "anyOf": [
@@ -20603,6 +20760,24 @@
           "cancel_requested": {
             "type": "boolean",
             "title": "Cancel Requested"
+          },
+          "delete_requested": {
+            "type": "boolean",
+            "title": "Delete Requested",
+            "description": "Asked to delete; it goes once it stops.",
+            "default": false
+          },
+          "delete_refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Refusal",
+            "description": "Why the job can't be deleted, if it can't."
           },
           "retry_of": {
             "anyOf": [

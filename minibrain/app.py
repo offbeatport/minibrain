@@ -74,6 +74,7 @@ from minibrain.gateway.errors import OpenAIError, invalid_body, openai_error
 from minibrain.gateway.logs import LogBuffer, database_sink
 from minibrain.jobs.effects import DomainEffects
 from minibrain.jobs.queue import JobStateError, LeaseError, SqlJobQueue
+from minibrain.jobs.removal import DeleteRefused
 from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
@@ -113,6 +114,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     JobsRunningError: 409,
     LeaseError: 409,
     JobStateError: 409,
+    DeleteRefused: 409,
     MissingArtifactError: 409,
     SourceError: 422,
     TagError: 422,

@@ -793,6 +793,19 @@ once it matches; only deleting a base removes its files.
   base's name is written there when the base goes). Filters match the snapshot slug, so a deleted model still filters,
   and lists show its name with "(deleted)" and no link. A job whose model or version is gone is not retried (409, and
   refused per job in the bulk retry). A new model that reuses a deleted slug shares that slug's history in filters.
+- Deleting jobs: history stays until a Builder deletes it. Failed and cancelled jobs, finished jobs whose model or
+  version is gone, and finished housekeeping jobs (download, import, verify, repair, catalogue sync) can be deleted. A
+  finished train, eval or judge job of a version that still exists (or a copied version that cites its run) is
+  refused with 409 "Used by <model> v5. Delete the version first." Queued and running jobs need `cancel_jobs=true`:
+  a queued one is cancelled and goes at once; a running one is cancelled, marked `delete_requested` (202, shown as
+  Deleting) and removed by the leader once its worker stops, so nothing races a live process. Deleting removes the
+  row, its attempts, events (logs and metrics), its log artifacts nothing else references and its scratch
+  (`work/job-<id>`); a retry of it keeps running with no `retry_of`. `DELETE /api/jobs/{id}` and `POST
+  /api/jobs/delete` (`{ids, cancel_jobs}`, per-job `done`, `error`, `reason`) are Builder-only and audited as
+  `job.delete` with the kind, model snapshot and status; the audit log stays. The Jobs and Training selection bars
+  have Delete N (refused ones counted in a tooltip) with a confirm dialog listing the jobs, the skipped ones with their
+  reasons and "Cancel running jobs first", ticked; the job page's ⋯ menu has Delete job, off with the reason when
+  refused, and goes back to the list after.
 - Audit: `model.delete` and `model.undeploy` when a person starts one (`retry` on a retry), and `model.delete_finished`
   and `model.undeploy_finished` with the outcome, what went and the reason a failure gives.
 

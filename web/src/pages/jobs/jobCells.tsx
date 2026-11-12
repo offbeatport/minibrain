@@ -24,6 +24,9 @@ const METHODS: Record<string, string> = { sft: "SFT" };
 const STRATEGIES: Record<string, string> = { lora: "LoRA", qlora: "QLoRA" };
 
 export function jobState(job: JobInfo): { tone: Tone; label: string } {
+    if (job.delete_requested) {
+        return { tone: "warning", label: "Deleting" };
+    }
     if (job.status === "running" && job.cancel_requested) {
         return { tone: "warning", label: "Cancelling" };
     }

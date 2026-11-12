@@ -243,8 +243,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Every training run across models, filtered by model, status and method.
   UI: Training · API: GET /api/jobs, GET /api/jobs/facets
 - **Bulk job actions** · shipped · product, ml
-  Tick jobs to cancel or retry them together, each one audited.
-  UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry
+  Tick jobs to cancel, retry or delete them together, each one audited.
+  UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry, POST /api/jobs/delete
 - **Versions** · shipped · product, ml
   Keep immutable prompt-only and trained versions per model.
   UI: Evaluations · API: GET /api/models/{slug}/versions, DELETE /api/models/{slug}/versions/{number}
@@ -531,11 +531,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Browse every /v1 call live, filtered, with its kept input.
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Jobs** · shipped · ml, admin
-  Every job of every kind, by kind and status; cancel or retry.
+  Every job of every kind, by status; cancel, retry or delete.
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
 - **Job page** · shipped · product, ml, admin
-  One job's progress, settings and data, loss, learning rate and log.
-  UI: Training › job, Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry
+  One job's progress, settings, data, loss and log; delete it.
+  UI: Training › job, Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, DELETE /api/jobs/{job_id}
 - **Job log** · shipped · ml, admin
   Read a job's own events apart from library output, by level.
   UI: Jobs › job › Logs · API: GET /api/jobs/{job_id}/events

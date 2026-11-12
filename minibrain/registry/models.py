@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, text
+from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, false, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.registry.db import Base, UtcDateTime
@@ -352,6 +352,7 @@ class Job(Base):
     model_name: Mapped[str | None] = mapped_column(default=None)
     version_number: Mapped[int | None] = mapped_column(default=None)
     base_model_key: Mapped[str | None] = mapped_column(default=None)
+    delete_requested: Mapped[bool] = mapped_column(default=False, server_default=false())
 
     model: Mapped[Model | None] = relationship(back_populates="jobs")
     version: Mapped[Version | None] = relationship()

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
-from minibrain.registry.models import AuditEvent, Model
+from minibrain.registry.models import AuditEvent, Job, Model
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import NotFoundError
 
@@ -115,13 +115,14 @@ def key_said(event: AuditEvent) -> Said:
     return Said(verbs.get(event.action, f"{humanised(event.action)} {name}"), link)
 
 
-def job_said(event: AuditEvent) -> Said:
+def job_said(session: Session, event: AuditEvent) -> Said:
     raw = event.target.removeprefix("job:")
     number = int(raw) if raw.isdigit() else None
     label = f"job #{number}" if number is not None else event.target
     kind = event.detail.get("kind") if isinstance(event.detail.get("kind"), str) else None
-    link = ActivityLink(kind="job", label=label, job_id=number, job_kind=kind) if number is not None else None
-    verbs = {"job.cancel": f"cancelled {label}", "job.retry": f"retried {label}"}
+    exists = number is not None and session.get(Job, number) is not None
+    link = ActivityLink(kind="job", label=label, job_id=number, job_kind=kind) if exists else None
+    verbs = {"job.cancel": f"cancelled {label}", "job.retry": f"retried {label}", "job.delete": f"deleted {label}"}
     return Said(verbs.get(event.action, f"{humanised(event.action)} {label}"), link)
 
 
@@ -212,7 +213,7 @@ def said(session: Session, owner: Owner, event: AuditEvent) -> Said:
     if event.action.startswith("key."):
         return key_said(event)
     if event.action.startswith("job."):
-        return job_said(event)
+        return job_said(session, event)
     if event.action == "model.base_change":
         return base_change_said(session, event)
     sentence = SENTENCES.get(event.action)

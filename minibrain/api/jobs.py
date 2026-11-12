@@ -5,22 +5,33 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import ColumnElement, false, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from starlette.concurrency import run_in_threadpool
 
 from minibrain.api.access import builder, sees_rows, viewer
-from minibrain.api.deps import QueueDep, SessionDep, StoreDep
+from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
-from minibrain.api.schemas import JobActionResult, JobDetail, JobEventInfo, JobFacets, JobIds, JobInfo, JobPage
+from minibrain.api.schemas import (
+    JobActionResult,
+    JobDeletion,
+    JobDetail,
+    JobEventInfo,
+    JobFacets,
+    JobIds,
+    JobInfo,
+    JobPage,
+)
 from minibrain.api.views import job_detail, job_info
 from minibrain.auth.identity import current_actor
 from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
-from minibrain.jobs.queue import JobStateError, SqlJobQueue
+from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state
+from minibrain.jobs.removal import DeleteRefused, Leftovers, active_refusal, kept_by, remove_job
 from minibrain.registry.models import (
+    ACTIVE_JOB_STATUSES,
     FINAL_JOB_STATUSES,
     Artifact,
     AuditEvent,
@@ -33,6 +44,7 @@ from minibrain.registry.models import (
     Worker,
 )
 from minibrain.registry.service import NotFoundError
+from minibrain.settings import Settings
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -319,6 +331,90 @@ def retry_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
     again = retry(session, queue, get_job(session, job_id))
     session.commit()
     return job_info(again)
+
+
+def snapshot(job: Job) -> dict[str, Any]:
+    facts: dict[str, Any] = {"status": job.status}
+    if job.model_name:
+        facts["model_name"] = job.model_name
+    if job.version_number is not None:
+        facts["version"] = job.version_number
+    return facts
+
+
+def stop_for_delete(session: Session, queue: SqlJobQueue, job: Job, cancel_jobs: bool) -> None:
+    if job.status not in ACTIVE_JOB_STATUSES or job.cancel_requested:
+        return
+    if not cancel_jobs:
+        raise DeleteRefused(active_refusal(job), "active")
+    cancel(session, queue, job, reason="delete")
+
+
+def delete(session: Session, queue: SqlJobQueue, settings: Settings, job: Job, cancel_jobs: bool) -> Leftovers:
+    if job.delete_requested:
+        return Leftovers()
+    refusal = kept_by(job)
+    if refusal is not None:
+        raise DeleteRefused(refusal, "in_use")
+    facts = snapshot(job)
+    stop_for_delete(session, queue, job, cancel_jobs)
+    audit(session, "job.delete", job, **facts)
+    if job.status in ACTIVE_JOB_STATUSES:
+        job.delete_requested = True
+        add_state(session, job, "delete requested; it goes once it stops", "warning")
+        return Leftovers()
+    return remove_job(session, settings.work_dir(), job)
+
+
+def delete_one(
+    session: Session, queue: SqlJobQueue, settings: Settings, job_id: int, cancel_jobs: bool, leftovers: Leftovers
+) -> JobActionResult:
+    job = session.get(Job, job_id)
+    if job is None:
+        return JobActionResult(id=job_id, done=False, status=None, error=f"job {job_id} not found", reason="not_found")
+    before = job.status
+    try:
+        left = delete(session, queue, settings, job, cancel_jobs)
+    except DeleteRefused as refused:
+        return JobActionResult(id=job_id, done=False, status=before, error=str(refused), reason=refused.reason)
+    leftovers.merge(left)
+    return JobActionResult(id=job_id, done=True, status=before if left.removed else job.status)
+
+
+@router.post("/jobs/delete", dependencies=[Depends(builder)])
+def delete_jobs(
+    body: JobDeletion, session: SessionDep, queue: QueueDep, settings: SettingsDep, store: StoreDep
+) -> list[JobActionResult]:
+    leftovers = Leftovers()
+    ids = dict.fromkeys(body.ids)
+    results = [delete_one(session, queue, settings, job_id, body.cancel_jobs, leftovers) for job_id in ids]
+    session.commit()
+    leftovers.clear(store)
+    return results
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    status_code=204,
+    response_model=None,
+    responses={202: {"model": JobInfo, "description": "Cancelled; it goes once it stops"}},
+    dependencies=[Depends(builder)],
+)
+def delete_job(
+    job_id: int,
+    session: SessionDep,
+    queue: QueueDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    cancel_jobs: bool = False,
+) -> Response:
+    job = get_job(session, job_id)
+    leftovers = delete(session, queue, settings, job, cancel_jobs)
+    session.commit()
+    if not leftovers.removed:
+        return JSONResponse(status_code=202, content=job_info(job).model_dump(mode="json"))
+    leftovers.clear(store)
+    return Response(status_code=204)
 
 
 @router.get("/artifacts/{artifact_id}", response_class=StreamingResponse, dependencies=[Depends(builder)])

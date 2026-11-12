@@ -44,6 +44,9 @@ export function VersionState({ version }: { version: { status: string; live: boo
 }
 
 export function JobStatus({ job }: { job: JobInfo }) {
+    if (job.delete_requested) {
+        return <Badge variant="warning">Deleting</Badge>;
+    }
     if (job.status === "running" && job.cancel_requested) {
         return <Badge variant="warning">Cancelling</Badge>;
     }

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleX, type LucideIcon, RotateCcw, X } from "lucide-react";
+import { CircleX, type LucideIcon, RotateCcw, Trash2, X } from "lucide-react";
 import {
     Button,
     type ToastOptions,
@@ -16,6 +16,7 @@ import type { components } from "~/api/schema";
 import { useCan } from "~/lib/access";
 import { plural } from "~/pages/data/catalogue";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
+import { DeleteJobsDialog, canDelete, deleteSummary, refusalSummary } from "./DeleteJobs";
 
 type JobAction = "cancel" | "retry";
 type JobActionResult = components["schemas"]["JobActionResult"];
@@ -30,9 +31,11 @@ export function canCancel(job: JobInfo): boolean {
     return isActiveJob(job) && !job.cancel_requested;
 }
 
-export function canRetry(job: Pick<JobInfo, "status" | "deleted" | "version_deleted">): boolean {
+export function canRetry(
+    job: Pick<JobInfo, "status" | "deleted" | "version_deleted" | "delete_requested">,
+): boolean {
     const ended = job.status === "failed" || job.status === "cancelled";
-    return ended && !job.deleted && !job.version_deleted;
+    return ended && !job.deleted && !job.version_deleted && !job.delete_requested;
 }
 
 function send(action: JobAction, jobs: JobInfo[]): Promise<JobActionResult[]> {
@@ -95,6 +98,8 @@ function BulkButton({
     label,
     jobs,
     none,
+    note,
+    destructive,
     pending,
     onClick,
 }: {
@@ -102,28 +107,34 @@ function BulkButton({
     label: string;
     jobs: JobInfo[];
     none: string;
+    note?: string;
+    destructive?: boolean;
     pending?: boolean;
     onClick: () => void;
 }) {
-    if (jobs.length > 0) {
-        return (
-            <Button variant="outline" disabled={pending} onClick={onClick}>
+    const variant = destructive ? "destructive" : "outline";
+    const button =
+        jobs.length > 0 ? (
+            <Button variant={variant} disabled={pending} onClick={onClick}>
                 <Icon aria-hidden="true" />
                 <span className="tabular-nums">{`${label} ${jobs.length.toLocaleString()}`}</span>
             </Button>
+        ) : (
+            <span className="inline-flex">
+                <Button variant={variant} disabled>
+                    <Icon aria-hidden="true" />
+                    {label}
+                </Button>
+            </span>
         );
+    const tip = jobs.length > 0 ? note : none;
+    if (!tip) {
+        return button;
     }
     return (
         <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="inline-flex">
-                    <Button variant="outline" disabled>
-                        <Icon aria-hidden="true" />
-                        {label}
-                    </Button>
-                </span>
-            </TooltipTrigger>
-            <TooltipContent>{none}</TooltipContent>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">{tip}</TooltipContent>
         </Tooltip>
     );
 }
@@ -140,8 +151,11 @@ function JobSelectionBar({
     const toast = useToast();
     const client = useQueryClient();
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const [deleting, setDeleting] = useState<JobInfo[] | null>(null);
     const cancellable = jobs.filter(canCancel);
     const retriable = jobs.filter(canRetry);
+    const deletable = jobs.filter(canDelete);
+    const kept = jobs.filter((job) => !canDelete(job));
     const run = async (action: JobAction, targets: JobInfo[]) => {
         const results = await send(action, targets);
         toast(actionSummary(action, results));
@@ -180,10 +194,28 @@ function JobSelectionBar({
                         )
                     }
                 />
+                <BulkButton
+                    icon={Trash2}
+                    label="Delete"
+                    jobs={deletable}
+                    destructive
+                    none={kept.length > 0 ? refusalSummary(kept) : "Select jobs to delete."}
+                    note={kept.length > 0 ? refusalSummary(kept) : undefined}
+                    onClick={() => setDeleting(jobs)}
+                />
             </div>
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
+            />
+            <DeleteJobsDialog
+                chosen={deleting}
+                onOpenChange={(open) => !open && setDeleting(null)}
+                onDeleted={async (results) => {
+                    toast(deleteSummary(results));
+                    onClear();
+                    await client.invalidateQueries();
+                }}
             />
         </div>
     );

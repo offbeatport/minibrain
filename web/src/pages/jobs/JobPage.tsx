@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { Logs, SlidersHorizontal } from "lucide-react";
-import { Button, Link, LogViewer } from "obp-ui";
-import { type ReactNode, useEffect } from "react";
+import { Logs, MoreHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Link,
+    LogViewer,
+    useToast,
+} from "obp-ui";
+import { type ReactNode, useEffect, useState } from "react";
 import { type JobDetail, api, unwrap } from "~/api/client";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import { isActiveJob, useJob } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { DeleteJobsDialog, deleteRefusal, deleteSummary } from "~/components/DeleteJobs";
 import { Facts } from "~/components/Facts";
 import { canCancel, canRetry } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
@@ -124,6 +134,56 @@ function Context({ job }: { job: JobDetail }) {
     );
 }
 
+function MoreActions({ job }: { job: JobDetail }) {
+    const router = useRouter();
+    const client = useQueryClient();
+    const toast = useToast();
+    const [deleting, setDeleting] = useState<JobDetail[] | null>(null);
+    const refusal = deleteRefusal(job);
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={`More actions for job #${job.id}`}
+                    >
+                        <MoreHorizontal />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuItem
+                        variant="destructive"
+                        disabled={refusal !== null}
+                        className={refusal ? "items-start [&>svg]:mt-0.5" : undefined}
+                        onSelect={() => setDeleting([job])}
+                    >
+                        <Trash2 />
+                        <span className="flex flex-col">
+                            <span>Delete job</span>
+                            {refusal && (
+                                <span className="text-sm whitespace-normal text-muted-foreground">
+                                    {refusal}
+                                </span>
+                            )}
+                        </span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <DeleteJobsDialog
+                chosen={deleting}
+                onOpenChange={(open) => !open && setDeleting(null)}
+                onDeleted={async (results) => {
+                    toast(deleteSummary(results));
+                    router.history.push(sectionOf(job.kind, "").href);
+                    await client.invalidateQueries({ queryKey: ["jobs"] });
+                }}
+            />
+        </>
+    );
+}
+
 function Actions({ job }: { job: JobDetail }) {
     const can = useCan();
     const router = useRouter();
@@ -160,6 +220,7 @@ function Actions({ job }: { job: JobDetail }) {
                     Retry
                 </Button>
             )}
+            <MoreActions job={job} />
         </>
     );
 }
@@ -456,11 +517,12 @@ function useCanonical(job: JobDetail | undefined, pathname: string) {
     const router = useRouter();
     const canonical = job ? jobHref(job) : null;
     const here = pathname.replace(/\/+$/, "");
+    const onJobPage = idOf(here.split("/").pop()) !== null;
     useEffect(() => {
-        if (canonical && here !== canonical) {
+        if (canonical && onJobPage && here !== canonical) {
             router.history.replace(canonical);
         }
-    }, [canonical, here, router]);
+    }, [canonical, here, onJobPage, router]);
 }
 
 export function JobPage() {

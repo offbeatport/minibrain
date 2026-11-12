@@ -45,6 +45,7 @@ from minibrain.data.dataset_versions import Changes, changes_since, version_numb
 from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import plain_columns
+from minibrain.jobs.removal import kept_by
 from minibrain.models.safety import model_safety
 from minibrain.policy import bodies_choice
 from minibrain.presets import answer_preset
@@ -227,6 +228,8 @@ def job_fields(job: Job) -> dict:
         "attempt": job.attempt,
         "max_attempts": job.max_attempts,
         "cancel_requested": job.cancel_requested,
+        "delete_requested": job.delete_requested,
+        "delete_refusal": kept_by(job),
         "retry_of": job.retry_of,
         "created_at": job.created_at,
         "run_after": job.run_after,

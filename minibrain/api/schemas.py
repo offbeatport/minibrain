@@ -466,6 +466,8 @@ class JobInfo(BaseModel):
     attempt: int
     max_attempts: int
     cancel_requested: bool
+    delete_requested: bool = Field(default=False, description="Asked to delete; it goes once it stops.")
+    delete_refusal: str | None = Field(default=None, description="Why the job can't be deleted, if it can't.")
     retry_of: int | None
     created_at: datetime
     run_after: datetime
@@ -498,11 +500,16 @@ class JobIds(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=1000)
 
 
+class JobDeletion(JobIds):
+    cancel_jobs: bool = Field(default=False, description="Cancel queued or running jobs first; they go once stopped.")
+
+
 class JobActionResult(BaseModel):
     id: int
     done: bool
     status: str | None
     error: str | None = None
+    reason: Literal["not_found", "in_use", "active", "state"] | None = None
     retry: JobInfo | None = None
 
 
