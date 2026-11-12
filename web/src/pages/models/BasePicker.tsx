@@ -329,7 +329,7 @@ function Trigger({ value }: { value: PickerValue }) {
                 </span>
                 <ChevronDown
                     aria-hidden="true"
-                    className="size-6 shrink-0 self-center text-muted-foreground"
+                    className="size-6 shrink-0 self-center text-primary"
                 />
             </button>
         </DialogTrigger>
