@@ -246,7 +246,7 @@ export function AddModelPage() {
             </Link>
             <PageHeader
                 title="Add model"
-                caption="Pick a base model and a name. It starts as a chat assistant that answers at once; narrow it to labels or a schema and train it later from its page."
+                caption="Add your custom model."
             />
             <form
                 onSubmit={submit}
