@@ -159,7 +159,7 @@ function UseMenu({ model }: { model: FlowModel }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button>
+                <Button variant="outline">
                     <Play />
                     Use
                     <ChevronDown aria-hidden="true" />
