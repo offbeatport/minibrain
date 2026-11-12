@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
-from minibrain.registry.models import AuditEvent, Job, Model
+from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model, User
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import NotFoundError
+from minibrain.tasks.service import held_out_score
 
 router = APIRouter(prefix="/api", tags=["models"])
 
@@ -37,10 +38,12 @@ class ModelActivityEvent(BaseModel):
     id: int
     at: datetime
     actor: str
+    actor_name: str | None
     action: str
     text: str
     link: ActivityLink | None
     tone: Tone
+    score: float | None = None
 
 
 class ModelActivity(BaseModel):
@@ -55,6 +58,7 @@ class Owner:
     custom: bool
     created_at: datetime
     made: int | None = None
+    model_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -72,7 +76,8 @@ def creation_event(session: Session, key: str) -> int | None:
 def owner_of(session: Session, name: str) -> Owner:
     custom = session.scalar(select(Model).where(Model.slug == name))
     if custom is not None:
-        return Owner(custom.slug, custom.name, True, custom.created_at, creation_event(session, custom.slug))
+        made = creation_event(session, custom.slug)
+        return Owner(custom.slug, custom.name, True, custom.created_at, made, custom.id)
     base = session.get(BaseRow, name)
     if base is None:
         raise NotFoundError(f"no model called {name}")
@@ -138,6 +143,20 @@ def job_said(session: Session, event: AuditEvent) -> Said:
     link = ActivityLink(kind="job", label=label, job_id=number, job_kind=kind) if exists else None
     verbs = {"job.cancel": f"cancelled {label}", "job.retry": f"retried {label}", "job.delete": f"deleted {label}"}
     return Said(verbs.get(event.action, f"{humanised(event.action)} {label}"), link)
+
+
+def feedback_said(event: AuditEvent) -> Said:
+    _, _, number = event.target.rpartition("/")
+    row = f"feedback row #{number}" if number.isdigit() else "a feedback row"
+    verbs = {
+        "feedback.accept": f"accepted {row}",
+        "feedback.fix": f"corrected {row}",
+        "feedback.reject": f"rejected {row}",
+        "feedback.example": f"added {row} to the examples",
+        "feedback.assign": f"assigned {row}",
+        "feedback.unassign": f"unassigned {row}",
+    }
+    return Said(verbs.get(event.action, f"{humanised(event.action)} {row}"))
 
 
 def changed_fields(event: AuditEvent) -> dict[str, Any]:
@@ -229,6 +248,8 @@ def said(session: Session, owner: Owner, event: AuditEvent) -> Said:
         return key_said(event)
     if event.action.startswith("job."):
         return job_said(session, event)
+    if event.action.startswith("feedback."):
+        return feedback_said(event)
     if event.action == "model.base_change":
         return base_change_said(session, event)
     sentence = SENTENCES.get(event.action)
@@ -240,7 +261,8 @@ def candidates(owner: Owner) -> ColumnElement[bool]:
     mentioned = text.contains(f'"{owner.key}"', autoescape=True)
     targeted = AuditEvent.target == owner.key
     if owner.custom:
-        targeted = or_(targeted, AuditEvent.target.like(f"{owner.key}@%"))
+        own = or_(AuditEvent.target.like(f"{owner.key}@%"), AuditEvent.target.like(f"{owner.key}/feedback/%"))
+        targeted = or_(targeted, own)
     related = or_(AuditEvent.action.like("key.%"), AuditEvent.action.like("job.%"))
     return and_(this_instance(owner), or_(targeted, and_(related, mentioned)))
 
@@ -251,15 +273,83 @@ def belongs(owner: Owner, event: AuditEvent) -> bool:
         return owner.key in (detail.get("models") or [])
     if event.action.startswith("job."):
         return detail.get("model") == owner.key
-    return event.target == owner.key or (owner.custom and event.target.startswith(f"{owner.key}@"))
+    owned = event.target.startswith((f"{owner.key}@", f"{owner.key}/feedback/"))
+    return event.target == owner.key or (owner.custom and owned)
 
 
-def event_of(session: Session, owner: Owner, event: AuditEvent) -> ModelActivityEvent:
+def display_names(session: Session, actors: set[str]) -> dict[str, str]:
+    if not actors:
+        return {}
+    query = select(User).where(or_(User.email.in_(actors), User.subject.in_(actors)))
+    names: dict[str, str] = {}
+    for user in session.scalars(query):
+        for handle in (user.email, user.subject):
+            if handle in actors and user.name and user.name != handle:
+                names[handle] = user.name
+    return names
+
+
+def name_of(actor: str, names: dict[str, str]) -> str | None:
+    if actor == SYSTEM_ACTOR:
+        return None
+    return names.get(actor) or actor.partition("@")[0] or actor
+
+
+def failure_reason(job: Job) -> str:
+    return ": out of memory" if "memory" in (job.error or "").lower() else ""
+
+
+def outcome_of(job: Job, started: AuditEvent | None, names: dict[str, str]) -> ModelActivityEvent:
+    number = job.version_number
+    name = f"v{number}"
+    failed = job.status == JobStatus.FAILED
+    actor = SYSTEM_ACTOR if failed or started is None else started.actor
+    if failed:
+        text = f"{name} failed{failure_reason(job)}"
+    else:
+        text = f"{name} trained" if actor == SYSTEM_ACTOR else f"trained {name}"
+    return ModelActivityEvent(
+        id=-job.id,
+        at=aware(job.finished_at or job.created_at),
+        actor=actor,
+        actor_name=name_of(actor, names),
+        action="version.failed" if failed else "version.trained",
+        text=text,
+        link=ActivityLink(kind="version", label=name, version=number),
+        tone="failed" if failed else "neutral",
+        score=None if failed or job.version is None else held_out_score(job.version),
+    )
+
+
+def finished_training(session: Session, owner: Owner) -> list[Job]:
+    if owner.model_id is None:
+        return []
+    query = select(Job).where(
+        Job.model_id == owner.model_id,
+        Job.kind == JobKind.TRAIN,
+        Job.status.in_((JobStatus.SUCCEEDED, JobStatus.FAILED)),
+        Job.version_number.is_not(None),
+        Job.finished_at >= owner.created_at,
+    )
+    return list(session.scalars(query))
+
+
+def starts_of(found: list[AuditEvent], jobs: list[Job]) -> dict[int, AuditEvent]:
+    starts = {number_of(event.target): event for event in reversed(found) if event.action == "version.create"}
+    return {
+        job.id: starts[job.version_number]
+        for job in jobs
+        if job.status == JobStatus.SUCCEEDED and job.version_number in starts
+    }
+
+
+def event_of(session: Session, owner: Owner, event: AuditEvent, names: dict[str, str]) -> ModelActivityEvent:
     sentence = said(session, owner, event)
     return ModelActivityEvent(
         id=event.id,
         at=aware(event.at),
         actor=event.actor,
+        actor_name=name_of(event.actor, names),
         action=event.action,
         text=sentence.text,
         link=sentence.link,
@@ -271,7 +361,29 @@ def activity_of(session: Session, name: str, limit: int) -> ModelActivity:
     owner = owner_of(session, name)
     query = select(AuditEvent).where(candidates(owner)).order_by(AuditEvent.id.desc())
     found = [event for event in session.scalars(query) if belongs(owner, event)]
-    return ModelActivity(events=[event_of(session, owner, event) for event in found[:limit]], total=len(found))
+    jobs = finished_training(session, owner)
+    starts = starts_of(found, jobs)
+    merged = {event.id for event in starts.values()}
+    kept = [event for event in found if event.id not in merged]
+    moments = sorted(
+        [(aware(event.at), event.id, event) for event in kept]
+        + [(aware(job.finished_at or job.created_at), -job.id, job) for job in jobs],
+        key=lambda entry: (entry[0], entry[1]),
+        reverse=True,
+    )[:limit]
+    actors = {
+        item.actor if isinstance(item, AuditEvent) else starts[item.id].actor
+        for _, _, item in moments
+        if isinstance(item, AuditEvent) or item.id in starts
+    }
+    names = display_names(session, actors)
+    events = [
+        event_of(session, owner, item, names)
+        if isinstance(item, AuditEvent)
+        else outcome_of(item, starts.get(item.id), names)
+        for _, _, item in moments
+    ]
+    return ModelActivity(events=events, total=len(kept) + len(jobs))
 
 
 @router.get(

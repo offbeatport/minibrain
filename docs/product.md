@@ -145,7 +145,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Usage by version, its facts, details and activity.
   UI: Models › model › Overview · API: GET /api/model-pages/{name}, GET /api/model-pages/{name}/traffic
 - **Model activity** · shipped · product, ml, admin
-  This model's audited changes as a timeline, never a deleted namesake's.
+  Who changed or trained this model, by day, with bursts folded.
   UI: Models › model › Overview › Activity · API: GET /api/model-pages/{name}/activity
 - **Model monitoring** · shipped · engineer, admin
   Traffic, latency, errors, versions, callers and requests of one model.

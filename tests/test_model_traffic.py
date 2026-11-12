@@ -1,8 +1,10 @@
 from datetime import timedelta
 from typing import Any
 
-from minibrain.registry.models import AuditEvent, now
-from tests.conftest import Harness, give_data
+from sqlalchemy import select
+
+from minibrain.registry.models import AuditEvent, Job, JobKind, JobStatus, Model, User, now
+from tests.conftest import ADMIN_EMAIL, Harness, give_data
 from tests.test_flow import SLUG, add_key, add_version, build_dataset, create_model, create_with_dataset, deploy, finish
 from tests.test_gateway import servable
 from tests.test_model_page import page
@@ -238,3 +240,56 @@ def test_activity_of_a_recreated_model_holds_only_its_own_events(harness: Harnes
     assert [event["text"] for event in found["events"]] == ["scored v0, prompt only", "created Support Triage"]
     assert found["total"] == 2 and not old & {event["id"] for event in found["events"]}
     assert page(harness)["created_by"]
+
+
+def test_activity_names_people_and_tells_how_training_ended(harness: Harness) -> None:
+    create_model(harness)
+    with harness.sessions() as session:
+        user = session.scalar(select(User).where(User.email == ADMIN_EMAIL))
+        assert user is not None
+        user.name = "Dana Ilie"
+        model = session.scalar(select(Model).where(Model.slug == SLUG))
+        assert model is not None
+        moment = now()
+        session.add(AuditEvent(at=moment, actor="lee.chan@example.com", action="model.avatar", target=SLUG, detail={}))
+        session.add(
+            AuditEvent(
+                at=moment + timedelta(seconds=1),
+                actor=ADMIN_EMAIL,
+                action="feedback.accept",
+                target=f"{SLUG}/feedback/1",
+                detail={"name": "x"},
+            )
+        )
+        session.add(
+            Job(
+                kind=JobKind.TRAIN,
+                model_id=model.id,
+                status=JobStatus.FAILED,
+                version_number=7,
+                error="CUDA out of memory",
+                finished_at=moment + timedelta(seconds=2),
+            )
+        )
+        session.add(
+            Job(
+                kind=JobKind.TRAIN,
+                model_id=model.id,
+                status=JobStatus.SUCCEEDED,
+                version_number=0,
+                finished_at=moment + timedelta(milliseconds=500),
+            )
+        )
+        session.commit()
+    found = activity(harness)
+    named = [(event["actor_name"], event["text"]) for event in found["events"]]
+    assert named[:4] == [
+        (None, "v7 failed: out of memory"),
+        ("Dana Ilie", "accepted feedback row #1"),
+        ("Dana Ilie", "trained v0"),
+        ("lee.chan", "changed the avatar"),
+    ]
+    assert "scored v0, prompt only" not in [text for _, text in named]
+    assert found["events"][0]["tone"] == "failed" and found["events"][0]["link"]["version"] == 7
+    assert found["events"][1]["actor"] == ADMIN_EMAIL
+    assert named[-1][0] == "Dana Ilie" and found["total"] == len(named)

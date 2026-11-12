@@ -22285,6 +22285,17 @@
             "type": "string",
             "title": "Actor"
           },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
           "action": {
             "type": "string",
             "title": "Action"
@@ -22311,6 +22322,17 @@
               "failed"
             ],
             "title": "Tone"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           }
         },
         "type": "object",
@@ -22318,6 +22340,7 @@
           "id",
           "at",
           "actor",
+          "actor_name",
           "action",
           "text",
           "link",
